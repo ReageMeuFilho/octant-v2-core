@@ -1,0 +1,13 @@
+@solady/=lib/solady/src/
+solady/=lib/solady/
+@diva/contracts/=lib/smartcontract/contracts/
+@openzeppelin/=lib/smartcontract/node_modules/@openzeppelin/
+ds-test/=lib/forge-std/lib/ds-test/src/
+forge-std/=lib/forge-std/src/
+foundry-huff/=lib/smartcontract/lib/huffmate/lib/foundry-huff/src/
+huffmate/=lib/smartcontract/lib/huffmate/src/
+smartcontract/=lib/smartcontract/
+solady/=lib/solady/src/
+solidity-stringutils/=lib/smartcontract/lib/huffmate/lib/foundry-huff/lib/solidity-stringutils/
+solmate/=lib/smartcontract/node_modules/solmate/
+stringutils/=lib/smartcontract/lib/huffmate/lib/foundry-huff/lib/solidity-stringutils/
