@@ -16,15 +16,24 @@ contract Converter {
 
     uint256 public startingBlock = block.number;
 
+    // @notice Heights at which `buy()` can be executed is decided by `block.prevrandao` value.
+    //         If you see `Converter__WrongRandao()` error, retry in the next block.
+    //         Note, you don't need to pay for gas to learn if tx will apply!
+    error Converter__WrongRandao();
+
+    // @notice This error indicates that contract has spent more ETH than allowed.
+    //         Retry tx in the next block.
+    error Converter__SpendingTooMuch();
+
     constructor(uint256 chance_, uint256 spendADay_) {
         chance = chance_;
         spendADay = spendADay_;
     }
 
     function buy() public {
-        require(getRandomNumber() < chance, "Are you sure you are a searcher?");
-        require(spent < (block.number - startingBlock) * (spendADay / blocksADay),
-                "Can't spend more at this height");
+        if (getRandomNumber() > chance) revert Converter__WrongPrevrandao();
+        if (spent > (block.number - startingBlock) * (spendADay / blocksADay)) revert Converter__SpendingTooMuch();
+
         payable(address(0x0)).transfer(1 ether);
         spent = spent + 1 ether;
     }
