@@ -3,16 +3,22 @@ pragma solidity ^0.8.0;
 /* SPDX-License-Identifier: UNLICENSED */
 contract Converter {
 
-    uint256 public deployedAt = block.number;
-    uint256 public spent = 0;
-    uint256 public targetRate;
+    uint256 public blocksADay = 7200;
+
+    // @notice Chance is probability normalized to uint256.max instead to 1
     uint256 public chance;
 
-    mapping (uint => uint) gasBurner;
+    // @notice How much ETH can be spend per day on average (upper bound)
+    uint256 public spendADay;
 
-    constructor(uint256 chance_, uint256 targetRate_) {
+    // @notice Spent ETH since startingBlock
+    uint256 public spent = 0;
+
+    uint256 public startingBlock = block.number;
+
+    constructor(uint256 chance_, uint256 spendADay_) {
         chance = chance_;
-        targetRate = targetRate_;
+        spendADay = spendADay_;
     }
 
     modifier randaoGuarded() {
@@ -21,7 +27,7 @@ contract Converter {
     }
 
     modifier underTarget() {
-        require(spent < (block.number - deployedAt) * (targetRate / 7400),
+        require(spent < (block.number - startingBlock) * (spendADay / 7400),
                "Can't spend more at this height");
         _;
     }
