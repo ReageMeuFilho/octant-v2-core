@@ -29,6 +29,14 @@ contract Converter {
         spent = spent + 1 ether;
     }
 
+    // @dev Testing helper function. Rethink how such admin should be performed.
+    function setSpendADay(uint256 chance_, uint256 spendADay_) public {
+        chance = chance_;
+        spendADay = spendADay_;
+        startingBlock = block.number;
+        spent = 0;
+    }
+
     function getRandomNumber() private view returns (uint256) {
         return uint256(keccak256(abi.encode("Octant", block.prevrandao)));
     }
