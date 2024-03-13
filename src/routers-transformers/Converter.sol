@@ -21,18 +21,10 @@ contract Converter {
         spendADay = spendADay_;
     }
 
-    modifier randaoGuarded() {
+    function buy() public {
         require(random() < chance, "Are you sure you are a searcher?");
-        _;
-    }
-
-    modifier underTarget() {
-        require(spent < (block.number - startingBlock) * (spendADay / 7400),
-               "Can't spend more at this height");
-        _;
-    }
-
-    function buyGuarded() public randaoGuarded underTarget {
+        require(spent < (block.number - startingBlock) * (spendADay / blocksADay),
+                "Can't spend more at this height");
         payable(address(0x0)).transfer(1 ether);
         spent = spent + 1 ether;
     }
