@@ -22,7 +22,7 @@ contract Wrapper is Test {
         vm.roll(blockno);
         vm.prevrandao(bytes32(blockno));
         blockno = blockno + 1;
-        try conv.buyGuarded() {
+        try conv.buy() {
             return true;
         } catch (bytes memory /*lowLevelData*/) {
             return false;
@@ -36,10 +36,10 @@ contract Wrapper is Test {
         }
 
         // check if spending above target minus two buys
-        assertLt((blocks * 1 ether / 7400) - 2 ether, conv.spent());
+        assertLt((blocks * 1 ether / 7200) - 2 ether, conv.spent());
 
         // check if spending below target plus one buy
-        assertLt(conv.spent(), 1 ether + (blocks * 1 ether / 7400));
+        assertLt(conv.spent(), 1 ether + (blocks * 1 ether / 7200));
     }
 
     function test_keccak_distribution() external {
