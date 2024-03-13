@@ -22,14 +22,14 @@ contract Converter {
     }
 
     function buy() public {
-        require(random() < chance, "Are you sure you are a searcher?");
+        require(getRandomNumber() < chance, "Are you sure you are a searcher?");
         require(spent < (block.number - startingBlock) * (spendADay / blocksADay),
                 "Can't spend more at this height");
         payable(address(0x0)).transfer(1 ether);
         spent = spent + 1 ether;
     }
 
-    function random() private view returns (uint256) {
-        return uint256(keccak256(abi.encode(block.prevrandao)));
+    function getRandomNumber() private view returns (uint256) {
+        return uint256(keccak256(abi.encode("Octant", block.prevrandao)));
     }
 }
