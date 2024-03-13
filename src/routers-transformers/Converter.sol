@@ -34,6 +34,7 @@ contract Converter {
         if (getRandomNumber() > chance) revert Converter__WrongPrevrandao();
         if (spent > (block.number - startingBlock) * (spendADay / blocksADay)) revert Converter__SpendingTooMuch();
 
+        // TODO: this is a placeholder. ETH will be sold for GLM here.
         payable(address(0x0)).transfer(1 ether);
         spent = spent + 1 ether;
     }
@@ -46,6 +47,7 @@ contract Converter {
         spent = 0;
     }
 
+    // TODO: to save some gas, consider inlining or making this private.
     function getRandomNumber() public view returns (uint256) {
         return uint256(keccak256(abi.encode("Octant", block.prevrandao)));
     }
