@@ -10,10 +10,9 @@ contract Wrapper is Test {
     uint256 public budget = 10_000 ether;
 
     function setUp() external {
-        uint256 chance = type(uint256).max / uint256(4000); // corresponds to 0.00025 chance
-        conv = new Converter(chance, 1 ether);
+        conv = new Converter(0, 0);
         vm.deal(address(conv), budget);
-     }
+    }
 
     // sequential call to this function emulate time
     // progressing and set random values for randao
@@ -30,6 +29,9 @@ contract Wrapper is Test {
     }
 
     function test_wrapBuy() external {
+        uint256 chance = type(uint256).max / uint256(4000); // corresponds to 0.00025 chance
+        uint256 spendADay = 1 ether;
+        conv.setSpendADay(chance, spendADay);
         uint256 blocks = 500_000;
         for (uint256 i = 0; i < blocks; i++) {
             wrapBuy();
