@@ -28,7 +28,7 @@ contract Wrapper is Test {
         }
     }
 
-    function test_wrapBuy() external {
+    function test_wrapBuyBounded() external {
         uint256 chance = type(uint256).max / uint256(4000); // corresponds to 0.00025 chance
         uint256 spendADay = 1 ether;
         conv.setSpendADay(chance, spendADay);
@@ -42,6 +42,21 @@ contract Wrapper is Test {
 
         // check if spending below target plus one buy
         assertLt(conv.spent(), 1 ether + (blocks * 1 ether / 7200));
+    }
+
+    function test_wrapBuyUnbounded() external {
+        uint256 chance = type(uint256).max / uint256(4000); // corresponds to 0.00025 chance
+        uint256 spendADay = 100 ether;
+        conv.setSpendADay(chance, spendADay);
+        uint256 blocks = 500_000;
+        for (uint256 i = 0; i < blocks; i++) {
+            wrapBuy();
+        }
+
+        // comparing to bounded test, average spending will be significantly higher
+        // proving that bounding with `spendADay` works
+        assertLt((blocks * 1.4 ether / 7200) - 2 ether, conv.spent());
+        assertLt(conv.spent(), 2 ether + (blocks * 1.5 ether / 7200));
     }
 
     function test_keccak_distribution() external {
