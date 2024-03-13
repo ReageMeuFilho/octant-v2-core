@@ -3,7 +3,7 @@ pragma solidity ^0.8.23;
 
 contract Converter {
 
-    uint256 public blocksADay = 7200;
+    uint256 public constant blocksADay = 7200;
 
     // @notice Chance is probability normalized to uint256.max instead to 1
     uint256 public chance;

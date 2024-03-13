@@ -39,10 +39,10 @@ contract Wrapper is Test {
         }
 
         // check if spending above target minus two buys
-        assertLt((blocks * 1 ether / 7200) - 2 ether, conv.spent());
+        assertLt((blocks * 1 ether / conv.blocksADay()) - 2 ether, conv.spent());
 
         // check if spending below target plus one buy
-        assertLt(conv.spent(), 1 ether + (blocks * 1 ether / 7200));
+        assertLt(conv.spent(), 1 ether + (blocks * 1 ether / conv.blocksADay()));
     }
 
     function test_wrapBuyUnbounded() external {
@@ -56,8 +56,8 @@ contract Wrapper is Test {
 
         // comparing to bounded test, average spending will be significantly higher
         // proving that bounding with `spendADay` works
-        assertLt((blocks * 1.4 ether / 7200) - 2 ether, conv.spent());
-        assertLt(conv.spent(), 2 ether + (blocks * 1.5 ether / 7200));
+        assertLt((blocks * 1.4 ether / conv.blocksADay()) - 2 ether, conv.spent());
+        assertLt(conv.spent(), 2 ether + (blocks * 1.5 ether / conv.blocksADay()));
     }
 
     function test_keccak_distribution() external {
