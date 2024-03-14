@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.23;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "solady/src/tokens/ERC20.sol";
 import "../interfaces/ISubsidyPool.sol";
 import "../interfaces/IUserDeposits.sol";
-import "../interfaces/IPeriodTracker.sol";
 import "../interfaces/ITimeTracker.sol";
 
 contract SubsidyPool is ISubsidyPool {
@@ -13,7 +12,7 @@ contract SubsidyPool is ISubsidyPool {
     error SubsidyPool__DepositZeroAmount();
     error SubsidyPool__TokenTransferFailed();
     error SubsidyPool__NotEligibleForSubsidy();
-    error SubsidyPool__SubsidyClaimClosed();
+    error SubsidyPool__SubsidyClaimNotOpenedYet();
 
      event Deposited(
         uint256 depositBefore,
@@ -46,9 +45,9 @@ contract SubsidyPool is ISubsidyPool {
     function deposit(uint256 _amount) external { //TODO Only PpfGlmTransformer
         if (_amount == 0) revert SubsidyPool__DepositZeroAmount();
 
-        uint256 period = timeTracker.getCurrentPeriod();
-        uint256 oldDeposit = subsidies[period];
-        subsidies[period] = oldDeposit + _amount;
+        (uint256 periodNumber,,) = timeTracker.getCurrentAccumulationPeriod();
+        uint256 oldDeposit = subsidies[periodNumber];
+        subsidies[periodNumber] = oldDeposit + _amount;
         bool success = token.transferFrom(msg.sender, address(this), _amount);
         if (!success) {
             revert SubsidyPool__TokenTransferFailed();
@@ -57,34 +56,30 @@ contract SubsidyPool is ISubsidyPool {
         emit Deposited(oldDeposit, _amount, block.timestamp, msg.sender);
     }
 
-    function getUserEntitlement(address _user, uint256 _period, bytes memory _data) external view returns (uint256 _amount) {
+    function getUserEntitlement(address _user, uint256 _period, bytes memory _data) public view returns (uint256 _amount) {
         uint256 individualShare = userDeposits.getIndividualShare(_user, _period, _data);
-        uint256 totalSubsidy = subsidies(_period);
+        uint256 totalSubsidy = subsidies[_period];
 
         return totalSubsidy * individualShare;
     }
 
     //TODO only our contract
-    function claimUserEntitlement(address _user, uint256 _period, bytes memory _data) external {
-        uint256 previousPeriod = _period - 1;
-        uint256 decisionWindowEnd = timeTracker.getDecisionWindowEnd(_period);
-        uint256 previousDecisionWindowEnd = timeTracker.getDecisionWindowEnd(previousPeriod);
+    function claimUserEntitlement(address _user, bytes memory _data) external {
+        (, uint256 attributionPeriodStart, uint256 attributionPeriodEnd) = timeTracker.getSubsidyAttributionPeriod();
+        (uint256 claimPeriod, uint256 claimPeriodStart, uint256 claimPeriodEnd) = timeTracker.getSubsidyClaimPeriod();
 
-        if (block.timestamp < decisionWindowEnd) revert SubsidyPool__SubsidyClaimClosed();
+        if (block.timestamp < claimPeriodStart) revert SubsidyPool__SubsidyClaimNotOpenedYet();
 
-        uint256 alreadyClaimed = claimed[previousPeriod][_user];
-        uint256 userEntitlement = getUserEntitlement(_user, previousPeriod, _data);
+        uint256 alreadyClaimed = claimed[claimPeriod][_user];
+        uint256 userEntitlement = getUserEntitlement(_user, claimPeriod, _data);
 
-        uint256 tokensUnlockedPrevious = userDeposits.getTokensLocked(_user, previousPeriod, previousDecisionWindowEnd, type(uint256).max, _data);
-        uint256 tokensUnlockedCurrent = userDeposits.getTokensLocked(_user, _period, 0, decisionWindowEnd, _data);
-
-        uint256 tokensLocked = userDeposits.getTokensLocked(_user, _period, 0, type(uint256).max, _data);
+        uint256 tokensUnlocked = userDeposits.getTokensUnlocked(_user, attributionPeriodStart, attributionPeriodEnd, _data);
+        uint256 tokensLocked = userDeposits.getTokensLocked(_user, claimPeriodStart, claimPeriodEnd, _data);
 
         if (tokensLocked == 0 ||
             userEntitlement == 0 ||
-            tokensUnlockedPrevious > 0 ||
-            tokensUnlockedCurrent > 0 ||
-            alreadyClaimed == userEntitlement)
+            tokensUnlocked > 0 ||
+            alreadyClaimed >= userEntitlement)
         {
             revert SubsidyPool__NotEligibleForSubsidy();
         }
@@ -95,13 +90,13 @@ contract SubsidyPool is ISubsidyPool {
         } else {
             amountToTransfer = tokensLocked - alreadyClaimed;
         }
-        claimed[previousPeriod][_user] = alreadyClaimed + amountToTransfer;
+        claimed[claimPeriod][_user] = alreadyClaimed + amountToTransfer;
 
-        bool success = token.transfer(_user, amount);
+        bool success = token.transfer(_user, amountToTransfer);
         if (!success) {
             revert SubsidyPool__TokenTransferFailed();
         }
 
-        emit Deposited(amount, block.timestamp, _user);
+        emit Claimed(amountToTransfer, block.timestamp, _user);
     }
 }
