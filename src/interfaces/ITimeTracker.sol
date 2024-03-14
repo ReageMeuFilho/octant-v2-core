@@ -2,6 +2,7 @@
 pragma solidity ^0.8.23;
 
 interface ITimeTracker {
-    function getCurrentPeriod() external view returns (uint256 amount);
-    function getDecisionWindowEnd(uint256 _period) external view returns (uint256 end);
+    function getCurrentAccumulationPeriod() external view returns (uint256 number, uint256 start, uint256 end);
+    function getSubsidyAttributionPeriod() external view returns (uint256 number, uint256 start, uint256 end);
+    function getSubsidyClaimPeriod() external view returns (uint256 number, uint256 start, uint256 end);
 }
