@@ -5,24 +5,24 @@ contract Converter {
 
     uint256 public constant blocksADay = 7200;
 
-    // @notice Chance is probability normalized to uint256.max instead to 1
+    /// @notice Chance is probability normalized to uint256.max instead to 1
     uint256 public chance;
 
-    // @notice How much ETH can be spend per day on average (upper bound)
+    /// @notice How much ETH can be spend per day on average (upper bound)
     uint256 public spendADay;
 
-    // @notice Spent ETH since startingBlock
+    /// @notice Spent ETH since startingBlock
     uint256 public spent = 0;
 
     uint256 public startingBlock = block.number;
 
-    // @notice Heights at which `buy()` can be executed is decided by `block.prevrandao` value.
-    //         If you see `Converter__WrongRandao()` error, retry in the next block.
-    //         Note, you don't need to pay for gas to learn if tx will apply!
-    error Converter__WrongRandao();
+    /// @notice Heights at which `buy()` can be executed is decided by `block.prevrandao` value.
+    ///         If you see `Converter__WrongPrevrandao()` error, retry in the next block.
+    ///         Note, you don't need to pay for gas to learn if tx will apply!
+    error Converter__WrongPrevrandao();
 
-    // @notice This error indicates that contract has spent more ETH than allowed.
-    //         Retry tx in the next block.
+    /// @notice This error indicates that contract has spent more ETH than allowed.
+    ///         Retry tx in the next block.
     error Converter__SpendingTooMuch();
 
     constructor(uint256 chance_, uint256 spendADay_) {
@@ -39,7 +39,7 @@ contract Converter {
         spent = spent + 1 ether;
     }
 
-    // @dev Testing helper function. Rethink how such admin should be performed.
+    /// @dev Testing helper function. Rethink how such admin should be performed.
     function setSpendADay(uint256 chance_, uint256 spendADay_) public {
         chance = chance_;
         spendADay = spendADay_;
