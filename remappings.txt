@@ -12,3 +12,4 @@ solidity-stringutils/=lib/smartcontract/lib/huffmate/lib/foundry-huff/lib/solidi
 solmate/=lib/smartcontract/node_modules/solmate/
 stringutils/=lib/smartcontract/lib/huffmate/lib/foundry-huff/lib/solidity-stringutils/
 @uniswap/v3-periphery=lib/v3-periphery/
+@uniswap/v3-core=lib/v3-core/
