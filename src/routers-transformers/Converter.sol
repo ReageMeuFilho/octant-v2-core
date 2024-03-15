@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: UNLICENSED */
 pragma solidity ^0.8.23;
 
+import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
+
 contract Converter {
 
     uint256 public constant blocksADay = 7200;
