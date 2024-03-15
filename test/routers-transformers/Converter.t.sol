@@ -11,7 +11,7 @@ contract Wrapper is Test {
     uint256 public budget = 10_000 ether;
 
     function setUp() external {
-        conv = new Converter(0, 0);
+        conv = new Converter(0, 0, 0.6 ether, 1.4 ether);
         vm.deal(address(conv), budget);
     }
 
@@ -29,10 +29,26 @@ contract Wrapper is Test {
         }
     }
 
+    function test_wrapBuyBoundedWithRange() external {
+        uint256 chance = type(uint256).max / uint256(4000); // corresponds to 0.00025 chance
+        uint256 spendADay = 1 ether;
+        conv.setSpendADay(chance, spendADay, 0.6 ether, 1.4 ether);
+        uint256 blocks = 500_000;
+        for (uint256 i = 0; i < blocks; i++) {
+            wrapBuy();
+        }
+
+        // check if spending above target minus two buys
+        assertLt((blocks * 1 ether / conv.blocksADay()) - 2 ether, conv.spent());
+
+        // check if spending below target plus one buy
+        assertLt(conv.spent(), 1.4 ether + (blocks * 1 ether / conv.blocksADay()));
+    }
+
     function test_wrapBuyBounded() external {
         uint256 chance = type(uint256).max / uint256(4000); // corresponds to 0.00025 chance
         uint256 spendADay = 1 ether;
-        conv.setSpendADay(chance, spendADay);
+        conv.setSpendADay(chance, spendADay, 1 ether, 1 ether);
         uint256 blocks = 500_000;
         for (uint256 i = 0; i < blocks; i++) {
             wrapBuy();
@@ -48,7 +64,7 @@ contract Wrapper is Test {
     function test_wrapBuyUnbounded() external {
         uint256 chance = type(uint256).max / uint256(4000); // corresponds to 0.00025 chance
         uint256 spendADay = 100 ether;
-        conv.setSpendADay(chance, spendADay);
+        conv.setSpendADay(chance, spendADay, 1 ether, 1 ether);
         uint256 blocks = 500_000;
         for (uint256 i = 0; i < blocks; i++) {
             wrapBuy();
@@ -60,7 +76,7 @@ contract Wrapper is Test {
         assertLt(conv.spent(), 2 ether + (blocks * 1.5 ether / conv.blocksADay()));
     }
 
-    function test_keccak_distribution() external {
+    function test_keccakDistribution() external {
         uint256 maxdiv4096 = 28269553036454149273332760011886696253239742350009903329945699220681916416;
         uint256 counter = 0;
 
@@ -74,7 +90,7 @@ contract Wrapper is Test {
         assertLt(counter, 260); // EV(counter) ~= 244
     }
 
-    function test_setting_prevrandao() external {
+    function test_settingPrevrandao() external {
         uint256 i = 12093812093812;
         bytes32 val = keccak256(abi.encode(bytes32(i)));
         vm.prevrandao(val);
@@ -87,6 +103,39 @@ contract Wrapper is Test {
         uint256 maxdiv4096 = 28269553036454149273332760011886696253239742350009903329945699220681916416;
         assertGt(type(uint256).max / uint256(4095), maxdiv4096);
         assertLt(type(uint256).max / uint256(4097), maxdiv4096);
+    }
+
+    function test_getUniformInRange_wei() public {
+        runner_getUniformInRange(0, 256);
+    }
+
+    function test_getUniformInRange_ether() public {
+        runner_getUniformInRange(100 ether, 200 ether);
+    }
+
+    function test_getUniformInRange_highEthers() public {
+        runner_getUniformInRange(1_000_000 ether, 2_000_000 ether);
+    }
+
+    function runner_getUniformInRange(uint low, uint high) public {
+        uint256 counter = 0;
+        uint256 val = 0;
+        uint256 min = type(uint256).max;
+        uint256 max = type(uint256).min;
+        uint256 mid = uint256((high + low) / 2);
+
+        for (uint256 i = 0; i < 100_000; i++) {
+            val = conv.getUniformInRange(low, high, i);
+            if (val < mid) counter = counter + 1;
+            if (val > max) max = val;
+            if (val < min) min = val;
+        }
+        assertLt(49_500, counter); // EV(counter) ~= 50_000
+        assertLt(counter, 51_500); // EV(counter) ~= 50_000
+        if (high - low < 1000) {
+            assertEq(min, low);
+            assertEq(max, high-1);
+        }
     }
 
 }
