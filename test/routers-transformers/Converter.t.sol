@@ -64,11 +64,13 @@ contract Wrapper is Test {
         uint256 counter = 0;
 
         for (uint256 i = 0; i < 1_000_000; i++) {
-            if (uint256(keccak256(abi.encode(bytes32(i)))) < maxdiv4096) {
+            vm.prevrandao(bytes32(i));
+            if (conv.getRandomNumber() < maxdiv4096) {
                 counter = counter + 1;
             }
         }
-        assertGt(counter, 240); // EV(counter) ~= 244
+        assertLt(200, counter); // EV(counter) ~= 244
+        assertLt(counter, 260); // EV(counter) ~= 244
     }
 
     function test_setting_prevrandao() external {
