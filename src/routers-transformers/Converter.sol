@@ -37,7 +37,7 @@ contract Converter {
         spent = 0;
     }
 
-    function getRandomNumber() private view returns (uint256) {
+    function getRandomNumber() public view returns (uint256) {
         return uint256(keccak256(abi.encode("Octant", block.prevrandao)));
     }
 }
