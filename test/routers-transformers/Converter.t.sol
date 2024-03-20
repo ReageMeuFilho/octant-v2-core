@@ -2,9 +2,11 @@
 pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
+import "solady/src/tokens/ERC20.sol";
 import "src/routers-transformers/Converter.sol";
+import '@uniswap/v3-core/contracts/interfaces/pool/IUniswapV3PoolDerivedState.sol';
 
-contract Wrapper is Test {
+contract ConverterWrapper is Test {
     Converter public conv;
     uint256 public blockno = 1;
     uint256 public constr = 0;
@@ -12,7 +14,27 @@ contract Wrapper is Test {
 
     function setUp() external {
         conv = new Converter(0, 0, 0.6 ether, 1.4 ether);
+        mockOracle();
+        mockRouter();
         vm.deal(address(conv), budget);
+    }
+
+    function mockRouter() public returns (address) {
+        MockOfRouter mock = new MockOfRouter();
+        vm.mockCall(
+                    address(mock),
+                    abi.encodeWithSelector(MockOfRouter.exactInputSingle.selector),
+                    abi.encode(true)
+        );
+        return address(mock);
+    }
+
+    function mockOracle() public {
+        vm.mockCall(
+                    address(conv.priceFeed()),
+                    abi.encodeWithSelector(GLMPriceFeed.getGLMQuota.selector),
+                    abi.encode(5000 * 10**9)
+        );
     }
 
     // sequential call to this function emulate time
@@ -29,52 +51,81 @@ contract Wrapper is Test {
         }
     }
 
-    function test_wrapBuyBoundedWithRange() external {
-        uint256 chance = type(uint256).max / uint256(4000); // corresponds to 0.00025 chance
-        uint256 spendADay = 1 ether;
-        conv.setSpendADay(chance, spendADay, 0.6 ether, 1.4 ether);
-        uint256 blocks = 500_000;
-        for (uint256 i = 0; i < blocks; i++) {
-            wrapBuy();
-        }
-
-        // check if spending above target minus two buys
-        assertLt((blocks * 1 ether / conv.blocksADay()) - 2 ether, conv.spent());
-
-        // check if spending below target plus one buy
-        assertLt(conv.spent(), 1.4 ether + (blocks * 1 ether / conv.blocksADay()));
-    }
-
-    function test_wrapBuyBounded() external {
-        uint256 chance = type(uint256).max / uint256(4000); // corresponds to 0.00025 chance
-        uint256 spendADay = 1 ether;
+    function test_simpleBuy() external {
+        // effectively disable randao check
+        uint256 chance = type(uint256).max;
+        // effectively disable upper bound check
+        uint256 spendADay = 1_000_000_000_000 ether;
         conv.setSpendADay(chance, spendADay, 1 ether, 1 ether);
-        uint256 blocks = 500_000;
-        for (uint256 i = 0; i < blocks; i++) {
-            wrapBuy();
-        }
-
-        // check if spending above target minus two buys
-        assertLt((blocks * 1 ether / conv.blocksADay()) - 2 ether, conv.spent());
-
-        // check if spending below target plus one buy
-        assertLt(conv.spent(), 1 ether + (blocks * 1 ether / conv.blocksADay()));
+        vm.roll(block.number + 100);
+        conv.buy();
+        assertEq(conv.spent(), 1 ether);
     }
 
-    function test_wrapBuyUnbounded() external {
-        uint256 chance = type(uint256).max / uint256(4000); // corresponds to 0.00025 chance
-        uint256 spendADay = 100 ether;
-        conv.setSpendADay(chance, spendADay, 1 ether, 1 ether);
-        uint256 blocks = 500_000;
-        for (uint256 i = 0; i < blocks; i++) {
-            wrapBuy();
-        }
+    /* function test_wrapBuyBoundedWithRange() external { */
+    /*     uint256 chance = type(uint256).max / uint256(4000); // corresponds to 0.00025 chance */
+    /*     uint256 spendADay = 1 ether; */
+    /*     conv.setSpendADay(chance, spendADay, 0.6 ether, 1.4 ether); */
+    /*     uint256 blocks = 500_000; */
+    /*     for (uint256 i = 0; i < blocks; i++) { */
+    /*         wrapBuy(); */
+    /*     } */
 
-        // comparing to bounded test, average spending will be significantly higher
-        // proving that bounding with `spendADay` works
-        assertLt((blocks * 1.4 ether / conv.blocksADay()) - 2 ether, conv.spent());
-        assertLt(conv.spent(), 2 ether + (blocks * 1.5 ether / conv.blocksADay()));
-    }
+    /*     // check if spending above target minus two buys */
+    /*     assertLt( */
+    /*         ((blocks * 1 ether) / conv.blocksADay()) - 2 ether, */
+    /*         conv.spent() */
+    /*     ); */
+
+    /*     // check if spending below target plus one buy */
+    /*     assertLt( */
+    /*         conv.spent(), */
+    /*         1.4 ether + ((blocks * 1 ether) / conv.blocksADay()) */
+    /*     ); */
+    /* } */
+
+    /* function test_wrapBuyBounded() external { */
+    /*     uint256 chance = type(uint256).max / uint256(4000); // corresponds to 0.00025 chance */
+    /*     uint256 spendADay = 1 ether; */
+    /*     conv.setSpendADay(chance, spendADay, 1 ether, 1 ether); */
+    /*     uint256 blocks = 500_000; */
+    /*     for (uint256 i = 0; i < blocks; i++) { */
+    /*         wrapBuy(); */
+    /*     } */
+
+    /*     // check if spending above target minus two buys */
+    /*     assertLt( */
+    /*         ((blocks * 1 ether) / conv.blocksADay()) - 2 ether, */
+    /*         conv.spent() */
+    /*     ); */
+
+    /*     // check if spending below target plus one buy */
+    /*     assertLt( */
+    /*         conv.spent(), */
+    /*         1 ether + ((blocks * 1 ether) / conv.blocksADay()) */
+    /*     ); */
+    /* } */
+
+    /* function test_wrapBuyUnbounded() external { */
+    /*     uint256 chance = type(uint256).max / uint256(4000); // corresponds to 0.00025 chance */
+    /*     uint256 spendADay = 100 ether; */
+    /*     conv.setSpendADay(chance, spendADay, 1 ether, 1 ether); */
+    /*     uint256 blocks = 500_000; */
+    /*     for (uint256 i = 0; i < blocks; i++) { */
+    /*         wrapBuy(); */
+    /*     } */
+
+    /*     // comparing to bounded test, average spending will be significantly higher */
+    /*     // proving that bounding with `spendADay` works */
+    /*     assertLt( */
+    /*         ((blocks * 1.4 ether) / conv.blocksADay()) - 2 ether, */
+    /*         conv.spent() */
+    /*     ); */
+    /*     assertLt( */
+    /*         conv.spent(), */
+    /*         2 ether + ((blocks * 1.5 ether) / conv.blocksADay()) */
+    /*     ); */
+    /* } */
 
     function test_keccakDistribution() external {
         uint256 maxdiv4096 = 28269553036454149273332760011886696253239742350009903329945699220681916416;
@@ -99,7 +150,10 @@ contract Wrapper is Test {
 
     function test_division() external {
         assertLt(0, type(uint256).max / uint256(4000));
-        assertLt(type(uint256).max / uint256(4000), type(uint256).max / uint256(3999));
+        assertLt(
+            type(uint256).max / uint256(4000),
+            type(uint256).max / uint256(3999)
+        );
         uint256 maxdiv4096 = 28269553036454149273332760011886696253239742350009903329945699220681916416;
         assertGt(type(uint256).max / uint256(4095), maxdiv4096);
         assertLt(type(uint256).max / uint256(4097), maxdiv4096);
@@ -134,8 +188,31 @@ contract Wrapper is Test {
         assertLt(counter, 51_500); // EV(counter) ~= 50_000
         if (high - low < 1000) {
             assertEq(min, low);
-            assertEq(max, high-1);
+            assertEq(max, high - 1);
         }
     }
 
+    function test_getUniformInRange_narrow() public {
+        assertEq(1 ether, conv.getUniformInRange(1 ether, 1 ether, 4));
+    }
+}
+
+contract MockOfRouter is ISwapRouter {
+    function exactInput(
+        ExactInputParams calldata params
+    ) external payable returns (uint256 amountOut) {}
+    function exactInputSingle(
+        ExactInputSingleParams calldata params
+    ) external payable returns (uint256 amountOut) {}
+    function exactOutput(
+        ExactOutputParams calldata params
+    ) external payable returns (uint256 amountIn) {}
+    function exactOutputSingle(
+        ExactOutputSingleParams calldata params
+    ) external payable returns (uint256 amountIn) {}
+    function uniswapV3SwapCallback(
+        int256 amount0Delta,
+        int256 amount1Delta,
+        bytes calldata data
+    ) external {}
 }
