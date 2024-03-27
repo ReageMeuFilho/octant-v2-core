@@ -27,7 +27,6 @@ import {Ownable} from "@solady/auth/Ownable.sol";
 import {ERC20} from "@solady/tokens/ERC20.sol";
 
 import {DivaEtherToken} from "@diva/contracts/DivaEtherToken.sol";
-import {IErrors} from "@diva/contracts/interfaces/IErrors.sol";
 
 import {ICapitalSourceProvider} from "../interfaces/ICapitalSourceProvider.sol";
 import {IPgStaking} from "../interfaces/IPgStaking.sol";
@@ -42,31 +41,28 @@ interface IDivaWithdrawer {
     function isRequestFulfilled(uint256 withdrawalRequestId) external returns (bool);
 }
 
-contract PgEthToken is ERC20, Ownable, ICapitalSourceProvider, IPgStaking, IErrors {
+contract PgEtherToken is ERC20, Ownable, ICapitalSourceProvider, IPgStaking {
     /**
      * Errors
      */
+    error PgEtherToken__ZeroAmount();
+    error PgEtherToken__PgAssetsMustBeBelowDeposit();
     error PgEtherToken__NoEligibleRewards();
     error PgEtherToken__RequestInProgress();
     error PgEtherToken__PgAmountIsTheSame();
 
-    DivaEtherToken public immutable divaERC20;
+    DivaEtherToken public immutable divaToken;
     IDivaWithdrawer public immutable divaWithdrawer;
-
-    /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
-    /*                          UUPS ADMIN                        */
-    /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
-
     IOctantRouter public octantRouter;
+
     uint256 public totalPgShares;
     // mapping(uint256 withdrawalRequestId => uint256 estimatedTimeToWithdraw) withdrawalRequests;
     uint256 public currentWithdrawalRequestId;
-    mapping(address user => uint256 shares) pgShares;
 
-    constructor(address _divaERC20, IOctantRouter router, IDivaWithdrawer withdrawer) {
-        divaERC20 = DivaEtherToken(payable(_divaERC20));
-        octantRouter = router;
-        divaWithdrawer = withdrawer;
+    constructor(address token, address withdrawer, address router) {
+        divaToken = DivaEtherToken(payable(token));
+        divaWithdrawer = IDivaWithdrawer(withdrawer);
+        octantRouter = IOctantRouter(router);
         _initializeOwner(msg.sender);
     }
 
@@ -78,24 +74,25 @@ contract PgEthToken is ERC20, Ownable, ICapitalSourceProvider, IPgStaking, IErro
         return "pgDivETH";
     }
 
-    function deposit(uint256 pgAmount) external payable {
-        depositFor(msg.sender, pgAmount);
+    function deposit(uint256 pgAssets) public payable returns (uint256 shares, uint256 pgShares) {
+        return depositFor(msg.sender, pgAssets);
     }
 
-    function depositFor(address user, uint256 pgAmount) public payable {
-        uint256 divEthDeposit = msg.value - pgAmount;
-        divaERC20.depositFor{value: divEthDeposit}(user);
-        mint(pgAmount);
+    function depositFor(address user, uint256 pgAssets) public payable returns (uint256 shares, uint256 pgShares) {
+        if (pgAssets < msg.value) revert PgEtherToken__PgAssetsMustBeBelowDeposit();
+        shares = divaToken.depositFor{value: msg.value}(user);
+        pgShares = divaToken.convertToShares(pgAssets);
+        mint(pgShares);
     }
     
-    function updatePgAmount(uint256 pgAmount) external {
-        if (pgAmount == 0) revert PgEtherToken__PgAmountIsTheSame();
-        uint256 currentPgAmount = pgShares[msg.sender];
-        int256 pgAmountDiff = int256(pgAmount) - int256(currentPgAmount); // @audit use conversion below or just switch operands
-        if (pgAmountDiff > 0) {
-            mint(uint256(pgAmountDiff));
+    function updatePgShares(uint256 pgShares) external {
+        if (pgShares == 0) revert PgEtherToken__ZeroAmount();
+        uint256 currentPgShares = balanceOf(msg.sender);
+        if (pgShares == currentPgShares) revert PgEtherToken__PgAmountIsTheSame();
+        if (pgShares > currentPgShares) {
+            mint(pgShares - currentPgShares);
         } else {
-            burn(uint256(pgAmountDiff));
+            burn(currentPgShares - pgShares);
         }
     }
 
@@ -126,44 +123,28 @@ contract PgEthToken is ERC20, Ownable, ICapitalSourceProvider, IPgStaking, IErro
     }
 
     function getEligibleRewards() public view returns (uint256) {
-        uint256 allRewards = divaERC20.totalShares() - divaERC20.totalEther(); // @audit make sure there is no overflow
-        uint256 pgSharesPercentage = totalPgShares / divaERC20.totalShares(); // Get the percentage of PG shares in relation to all shares
+        uint256 allRewards = divaToken.totalShares() - divaToken.totalEther(); // @audit make sure there is no overflow
+        uint256 pgSharesPercentage = totalPgShares / divaToken.totalShares(); // Get the percentage of PG shares in relation to all shares
         return allRewards * pgSharesPercentage;
     }
 
-    function mint(uint256 amount) public {
-        // @dev assumption DIVA is a compatible ERC20 that will revert on failure, no need to check return value
-        uint256 shares = divaERC20.convertToShares(amount);
+    function mint(uint256 pgShares) public {
+        if (pgShares == 0) revert PgEtherToken__ZeroAmount();
+        totalPgShares += pgShares;
 
-        divaERC20.transferSharesFrom(msg.sender, address(this), shares);
-
-        _mint(msg.sender, shares);
-        pgShares[msg.sender] += shares;
-
-        totalPgShares += shares;
+        _mint(msg.sender, pgShares);
+        divaToken.transferSharesFrom(msg.sender, address(this), pgShares);
     }
 
-    function burn(uint256 shares) public {
-        if (shares == 0) revert ZeroAmount();
+    function burn(uint256 pgShares) public {
+        if (pgShares == 0) revert PgEtherToken__ZeroAmount();
+        totalPgShares -= pgShares;
 
-        _burn(msg.sender, shares);
-
-        divaERC20.transferShares(msg.sender, shares);
-
-        totalPgShares -= shares;
-    }
-
-    // leave original audit comment, instead of receive shoul i add a named function?
-    // @audit we need a receive() fallback that wraps ETH into wdivETH
-    function depositETH() public payable {
-        if (msg.value == 0) revert ZeroAmount();
-
-        uint256 depositedShares = divaERC20.deposit{value: msg.value}();
-
-        _mint(msg.sender, depositedShares);
+        _burn(msg.sender, pgShares);
+        divaToken.transferShares(msg.sender, pgShares);
     }
 
     receive() external payable {
-        depositETH();
+        deposit(msg.value);
     }
 }
