@@ -77,10 +77,12 @@ contract PgEtherToken is ERC20, Ownable, ICapitalSourceProvider, IPgStaking {
     }
 
     function depositFor(address user, uint256 pgAssets) public payable returns (uint256 shares, uint256 pgShares) {
-        if (pgAssets < msg.value) revert PgEtherToken__PgAssetsMustBeBelowDeposit();
+        if (pgAssets > msg.value) revert PgEtherToken__PgAssetsMustBeBelowDeposit();
         shares = divaToken.depositFor{value: msg.value}(user);
-        pgShares = divaToken.convertToShares(pgAssets);
-        mint(pgShares);
+        if (pgAssets > 0) {
+            pgShares = divaToken.convertToShares(pgAssets);
+            mint(pgShares);
+        }
     }
     
     function updatePgShares(uint256 pgShares) external {
