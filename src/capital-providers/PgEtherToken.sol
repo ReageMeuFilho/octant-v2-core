@@ -33,10 +33,9 @@ import {IPgStaking} from "../interfaces/IPgStaking.sol";
 import {IOctantRouter} from "../interfaces/IOctantRouter.sol";
 
 interface IDivaWithdrawer {
-    // function requestRewardsWithdawal(address account) external returns (uint256 withdrawalRequestId, uint256 estimatedTimeToWithdraw);
     function requestWithdrawal(uint256 amount)
         external
-        returns (uint256 withdrawalRequestId, uint256 estimatedTimeToWithdraw);
+        returns (uint256 withdrawalRequestId); 
     function claim(uint256 withdrawalRequestId) external;
     function isRequestFulfilled(uint256 withdrawalRequestId) external returns (bool);
 }
@@ -56,7 +55,6 @@ contract PgEtherToken is ERC20, Ownable, ICapitalSourceProvider, IPgStaking {
     IOctantRouter public octantRouter;
 
     uint256 public totalPgShares;
-    // mapping(uint256 withdrawalRequestId => uint256 estimatedTimeToWithdraw) withdrawalRequests;
     uint256 public currentWithdrawalRequestId;
 
     constructor(address token, address withdrawer, address router) {
@@ -67,7 +65,7 @@ contract PgEtherToken is ERC20, Ownable, ICapitalSourceProvider, IPgStaking {
     }
 
     function name() public pure override returns (string memory) {
-        return "Wrapped PG Diva Ether Token";
+        return "PG Diva Ether Token";
     }
 
     function symbol() public pure override returns (string memory) {
@@ -104,28 +102,33 @@ contract PgEtherToken is ERC20, Ownable, ICapitalSourceProvider, IPgStaking {
         return divaWithdrawer.isRequestFulfilled(currentWithdrawalRequestId);
     }
 
-    function requestPgWithdrawal() external returns (uint256 estimatedTimeToWithdraw) {
+    function requestPgWithdrawal() external {
         if (currentWithdrawalRequestId != 0) revert PgEtherToken__RequestInProgress();
         uint256 eligibleRewards = getEligibleRewards();
         if (eligibleRewards == 0) revert PgEtherToken__NoEligibleRewards();
-        (uint256 withdrawalRequestId, uint256 requestTimeToWithdraw) = divaWithdrawer.requestWithdrawal(eligibleRewards);
+        uint256 withdrawalRequestId = divaWithdrawer.requestWithdrawal(eligibleRewards);
         currentWithdrawalRequestId = withdrawalRequestId;
-        // withdrawalRequests[withdrawalRequestId] = requestTimeToWithdraw;
-        estimatedTimeToWithdraw = requestTimeToWithdraw;
     }
 
-    function withdrawAccumulatedPgCapital() external returns (uint256 pgAmount) {
+    function claimAccumulatedPgCapital() public {
         divaWithdrawer.claim(currentWithdrawalRequestId);
         currentWithdrawalRequestId = 0;
-        pgAmount = 0; // @audit-issue temp
-        // Transfer to Octant here?
-        // octantRouter.route{value: address(this).balance}(address[], uint256[]);
+    }
+
+    function withdrawAccumulatedPgCapital() public returns (uint256 pgAmount) {
+        pgAmount = address(this).balance;
+        octantRouter.deposit{value: address(this).balance}(); // @audit-issue store balance as a variable
+    }
+    function claimAndWithdrawAccumulatedPgCapital() external returns (uint256 pgAmount) {
+        claimAccumulatedPgCapital();
+        return withdrawAccumulatedPgCapital();
     }
 
     function getEligibleRewards() public view returns (uint256) {
-        uint256 allRewards = divaToken.totalShares() - divaToken.totalEther(); // @audit make sure there is no overflow
-        uint256 pgSharesPercentage = totalPgShares / divaToken.totalShares(); // Get the percentage of PG shares in relation to all shares
-        return allRewards * pgSharesPercentage;
+        uint256 divEthShares = divaToken.balanceOf(address(this));
+        if (divEthShares <= totalPgShares) revert PgEtherToken__NoEligibleRewards();
+        uint256 sharesToWithdraw = divEthShares - totalPgShares;
+        return sharesToWithdraw;
     }
 
     function mint(uint256 pgShares) public {
