@@ -4,7 +4,6 @@ pragma solidity ^0.8.23;
 import "forge-std/Test.sol";
 import "solady/src/tokens/ERC20.sol";
 import "src/routers-transformers/Converter.sol";
-import '@uniswap/v3-core/contracts/interfaces/pool/IUniswapV3PoolDerivedState.sol';
 
 contract ConverterWrapper is Test {
     Converter public conv;
