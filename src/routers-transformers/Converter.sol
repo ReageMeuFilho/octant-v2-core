@@ -84,7 +84,7 @@ contract Converter {
         uint256 saleValue = getUniformInRange(saleValueLow, saleValueHigh, rand);
         if (saleValue > saleValueHigh) revert Converter__SoftwareError();
 
-        uint256 deadline = block.timestamp + 20;
+        uint160 priceImpact = 0; // 0 means we don't limit acceptable price impact
 
         // We can't ask for a spot price - it is too easy to manipulate.
         // Instead rely on TWAP oracle price.
@@ -96,10 +96,10 @@ contract Converter {
                                    GLMAddress,
                                    10_000, // 1% pool, expensive one
                                    address(this),
-                                   deadline,
+                                   block.timestamp,
                                    saleValue,
                                    GLMQuota,
-                                   0 // TODO: figure out if 0 is acceptable
+                                   priceImpact
             );
         uint256 amountOut = uniswap.exactInputSingle(params);
         assert(GLMQuota <= amountOut);
