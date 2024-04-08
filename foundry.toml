@@ -24,4 +24,7 @@ verbosity = 4
   # Speed up compilation and tests during development.
   optimizer = false
 
+[rpc_endpoints]
+mainnet = "${ETHEREUM_NODE_MAINNET}"
+
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

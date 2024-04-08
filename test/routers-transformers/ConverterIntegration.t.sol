@@ -3,22 +3,24 @@ pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
 import "solady/src/tokens/ERC20.sol";
+import "solady/src/tokens/WETH.sol";
 import "src/routers-transformers/Converter.sol";
 
 contract ConverterIntegrationWrapper is Test {
     Converter public conv;
     ERC20 public glm;
-    ERC20 public weth;
-    uint a = 1;
+    WETH public weth;
 
     function setUp() public {
+        uint forkId = vm.createFork("mainnet");
+        vm.selectFork(forkId);
         conv = new Converter(type(uint256).max-1,
                              1_000_000_000_000 ether,
                              1 ether,
                              2 ether
-        );
+                            );
         glm = ERC20(conv.GLMAddress());
-        weth = ERC20(conv.WETHAddress());
+        weth = WETH(payable(conv.WETHAddress()));
         vm.deal(address(conv), 1000 ether);
         conv.wrap();
     }
