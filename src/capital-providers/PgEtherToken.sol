@@ -45,7 +45,7 @@ contract PgEtherToken is ERC20, Ownable, ICapitalSourceProvider, IPgStaking {
      * Errors
      */
     error PgEtherToken__ZeroAmount();
-    error PgEtherToken__PgAssetsMustBeBelowDeposit();
+    error PgEtherToken__PgAssetsAboveDeposit();
     error PgEtherToken__NoEligibleRewards();
     error PgEtherToken__RequestInProgress();
     error PgEtherToken__PgAmountIsTheSame();
@@ -77,7 +77,7 @@ contract PgEtherToken is ERC20, Ownable, ICapitalSourceProvider, IPgStaking {
     }
 
     function depositFor(address user, uint256 pgAssets) public payable returns (uint256 shares, uint256 pgShares) {
-        if (pgAssets > msg.value) revert PgEtherToken__PgAssetsMustBeBelowDeposit();
+        if (pgAssets > msg.value) revert PgEtherToken__PgAssetsAboveDeposit();
         shares = divaToken.depositFor{value: msg.value}(user);
         if (pgAssets > 0) {
             pgShares = divaToken.convertToShares(pgAssets);
@@ -128,9 +128,10 @@ contract PgEtherToken is ERC20, Ownable, ICapitalSourceProvider, IPgStaking {
 
     function getEligibleRewards() public view returns (uint256) {
         uint256 divEthShares = divaToken.balanceOf(address(this));
-        if (divEthShares <= totalPgShares) revert PgEtherToken__NoEligibleRewards();
-        uint256 sharesToWithdraw = divEthShares - totalPgShares;
-        return sharesToWithdraw;
+        if (totalPgShares > divEthShares) { // @audit check what happens if divaEthShares < totalPgShares, if possible - when?
+            return  divEthShares - totalPgShares;
+        }
+        return 0;
     }
 
     function mint(uint256 pgShares) public {
