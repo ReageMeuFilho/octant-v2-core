@@ -7,28 +7,31 @@ import "../interfaces/vendored/ISwapRouter.sol";
 import "forge-std/console.sol";
 
 import "solady/src/tokens/ERC20.sol";
+import "solady/src/tokens/WETH.sol";
 import "solady/src/utils/SafeCastLib.sol";
 
-// TODO: this doesn't need to be a separate contract anymore
+import "@uniswap/v3-periphery/contracts/libraries/OracleLibrary.sol";
+
 contract GLMPriceFeed {
     address public GLMAddress = 0x7DD9c5Cba05E151C895FDe1CF355C9A1D5DA6429;
     address public WETHAddress = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
-    address public UniswapV3Quoter = 0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6;
-
-    IQuoter quoter = IQuoter(UniswapV3Quoter);
-
-    function getGLMQuota(uint256 amountIn_) public returns (uint256) {
-        uint24 fee = 10_000; // 1% pool, expensive one
-        uint24 sqrtPriceLimitX96 = 0; // TODO: check if 0 can be used here
-        return quoter.quoteExactInputSingle(WETHAddress, GLMAddress, fee, amountIn_, sqrtPriceLimitX96);
+    address public GlmEth10000Pool = 0x531b6A4b3F962208EA8Ed5268C642c84BB29be0b;
+    function getGLMQuota(uint256 amountIn_) view public returns (uint256) {
+        (int24 twapTick, ) = OracleLibrary.consult(GlmEth10000Pool, 30);
+        return OracleLibrary.getQuoteAtTick(
+                                            twapTick,
+                                            SafeCastLib.toUint128(amountIn_),
+                                            GLMAddress,
+                                            WETHAddress
+        );
     }
 }
 
 contract Converter {
 
     /// @notice GLM token contract
-    address public GlmEth10000Pool = 0x531b6A4b3F962208EA8Ed5268C642c84BB29be0b;
-    address public UniswapV3Router = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
+    address public GlmEth10000PoolAddress = 0x531b6A4b3F962208EA8Ed5268C642c84BB29be0b;
+    address public UniswapV3RouterAddress = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
     address public GLMAddress = 0x7DD9c5Cba05E151C895FDe1CF355C9A1D5DA6429;
     address public WETHAddress = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
 
@@ -52,9 +55,9 @@ contract Converter {
     /// @dev Technically, this value minus one wei.
     uint256 public saleValueHigh;
 
-    ISwapRouter public uniswap = ISwapRouter(UniswapV3Router);
+    ISwapRouter public uniswap = ISwapRouter(UniswapV3RouterAddress);
     ERC20 public glm = ERC20(GLMAddress);
-    ERC20 public weth = ERC20(WETHAddress);
+    WETH public weth = WETH(payable(WETHAddress));
     GLMPriceFeed public priceFeed = new GLMPriceFeed();
 
     /// @notice Heights at which `buy()` can be executed is decided by `block.prevrandao` value.
@@ -135,10 +138,9 @@ contract Converter {
     // TODO: consider making coverter payable and do wrapping inside
     function wrap() public {
         uint selfbalance = address(this).balance;
-        // FIXME: fix gas amount
-        // FIXME: check results of the call
-        payable(address(weth)).call{value: selfbalance, gas: 100_000_000}("");
+        (bool success,) = payable(address(weth)).call{value: selfbalance}("");
+        if (!success) revert();
         uint myWETHBalance = weth.balanceOf(address(this));
-        weth.approve(UniswapV3Router, myWETHBalance);
+        weth.approve(UniswapV3RouterAddress, myWETHBalance);
     }
 }

@@ -8,7 +8,7 @@ unit:
 
 .PHONY: integration
 integration:
-	forge test --fork-url $$INFURA_URL --match-path "*Integration*.sol"
+	forge test --match-path "*Integration*.sol"
 
 .PHONY: test
 test: unit integration
