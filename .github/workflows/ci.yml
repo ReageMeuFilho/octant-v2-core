@@ -21,6 +21,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          # secret is needed to download diva's smartcontracts
           token: ${{ secrets.GH_PAT }} # `GH_PAT` is a secret that contains your PAT
 
       - name: Install Foundry
@@ -49,7 +50,7 @@ jobs:
         uses: foundry-rs/foundry-toolchain@v1
 
       - name: Run tests
-        run: forge test
+        run: forge test -v
 
   coverage:
     strategy:
