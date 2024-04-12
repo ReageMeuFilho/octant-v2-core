@@ -1,27 +1,26 @@
 /* SPDX-License-Identifier: UNLICENSED */
 pragma solidity ^0.8.23;
 
+import "../interfaces/vendored/IQuoter.sol";
+import "../interfaces/vendored/ISwapRouter.sol";
+
 import "forge-std/console.sol";
 
 import "solady/src/tokens/ERC20.sol";
 import "solady/src/utils/SafeCastLib.sol";
-import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 
-// FIXME: this library doesn't compile
-import "@uniswap/v3-periphery/contracts/libraries/OracleLibrary.sol";
-
+// TODO: this doesn't need to be a separate contract anymore
 contract GLMPriceFeed {
     address public GLMAddress = 0x7DD9c5Cba05E151C895FDe1CF355C9A1D5DA6429;
     address public WETHAddress = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
-    address public GlmEth10000Pool = 0x531b6A4b3F962208EA8Ed5268C642c84BB29be0b;
-    function getGLMQuota(uint256 amountIn_) view public returns (uint256) {
-        (int24 twapTick, ) = OracleLibrary.consult(GlmEth10000Pool, 30);
-        return OracleLibrary.getQuoteAtTick(
-                                            twapTick,
-                                            SafeCastLib.toUint128(amountIn_),
-                                            GLMAddress,
-                                            WETHAddress
-        );
+    address public UniswapV3Quoter = 0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6;
+
+    IQuoter quoter = IQuoter(UniswapV3Quoter);
+
+    function getGLMQuota(uint256 amountIn_) public returns (uint256) {
+        uint24 fee = 10_000; // 1% pool, expensive one
+        uint24 sqrtPriceLimitX96 = 0; // TODO: check if 0 can be used here
+        return quoter.quoteExactInputSingle(WETHAddress, GLMAddress, fee, amountIn_, sqrtPriceLimitX96);
     }
 }
 
