@@ -11,3 +11,5 @@ solady/=lib/solady/src/
 solidity-stringutils/=lib/smartcontract/lib/huffmate/lib/foundry-huff/lib/solidity-stringutils/
 solmate/=lib/smartcontract/node_modules/solmate/
 stringutils/=lib/smartcontract/lib/huffmate/lib/foundry-huff/lib/solidity-stringutils/
+@uniswap/v3-periphery/=lib/uniswap-v3-periphery-0.8/
+@uniswap/v3-core/=lib/uniswap-v3-core-0.8/
