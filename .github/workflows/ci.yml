@@ -50,6 +50,8 @@ jobs:
         uses: foundry-rs/foundry-toolchain@v1
 
       - name: Run tests
+        env:
+          ETHEREUM_NODE_MAINNET: ${{ secrets.ETHEREUM_NODE_MAINNET }}
         run: forge test -v
 
   coverage:
