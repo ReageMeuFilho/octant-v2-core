@@ -1,6 +1,8 @@
 @solady/=lib/solady/src/
 solady/=lib/solady/
 @diva/contracts/=lib/smartcontract/contracts/
+@uniswap/v3-periphery/contracts/=lib/uniswap-v3-periphery-0.8/contracts/
+@uniswap/v3-core/contracts/=lib/uniswap-v3-core-0.8/contracts/
 @openzeppelin/=lib/smartcontract/node_modules/@openzeppelin/
 ds-test/=lib/forge-std/lib/ds-test/src/
 forge-std/=lib/forge-std/src/
@@ -11,5 +13,5 @@ solady/=lib/solady/src/
 solidity-stringutils/=lib/smartcontract/lib/huffmate/lib/foundry-huff/lib/solidity-stringutils/
 solmate/=lib/smartcontract/node_modules/solmate/
 stringutils/=lib/smartcontract/lib/huffmate/lib/foundry-huff/lib/solidity-stringutils/
-@uniswap/v3-periphery/=lib/uniswap-v3-periphery-0.8/
-@uniswap/v3-core/=lib/uniswap-v3-core-0.8/
+uniswap-v3-core-0.8/=lib/uniswap-v3-core-0.8/contracts/
+uniswap-v3-periphery-0.8/=lib/uniswap-v3-periphery-0.8/contracts/
