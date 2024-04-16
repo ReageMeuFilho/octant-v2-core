@@ -10,8 +10,11 @@ pragma solidity ^0.8.23;
  */
 
 interface ICapitalSourceProvider {
+    function getEligibleRewards() external view returns (uint256);
     function isWithdrawalRequestRequired() external returns (bool);
     function availableToWithdraw() external returns (bool);
-    function requestPgWithdrawal() external /* returns (uint256 estimatedTimeToWithdraw) */;
+    function requestPgWithdrawal() external;
+    function claimAccumulatedPgCapital() external;
     function withdrawAccumulatedPgCapital() external returns (uint256 pgAmount);
+    function claimAndWithdrawAccumulatedPgCapital() external returns (uint256 pgAmount);
 }

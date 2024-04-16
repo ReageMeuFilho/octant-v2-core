@@ -11,11 +11,11 @@ pragma solidity ^0.8.23;
  */
 
 interface IPgStaking {
-    function deposit(uint256 pgAmount) external payable returns (uint256 shares, uint256 pgShares);
-    function depositFor(address user, uint256 pgAmount) external payable returns (uint256 shares, uint256 pgShares);
+    function deposit(uint256 pgAssets) external payable returns (uint256 shares, uint256 pgShares);
+    function depositFor(address user, uint256 pgAssets) external payable returns (uint256 shares, uint256 pgShares);
 }
 
 
 interface IPgStakingWithDestination {
-    function depositForWithDestination(address user, uint256 pgAmount, address pgDestination) external payable;
+    function depositForWithDestination(address user, uint256 pgAssets, address pgDestination) external payable;
 }
