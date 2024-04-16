@@ -26,7 +26,7 @@ pragma solidity ^0.8.23;
 import {Ownable} from "@solady/auth/Ownable.sol";
 import {ERC20} from "@solady/tokens/ERC20.sol";
 
-import {DivaEtherToken} from "@diva/contracts/DivaEtherToken.sol";
+import {IDivaEtherToken} from "../vendor/shamirlabs/IDivaEtherToken.sol";
 
 import {ICapitalSourceProvider} from "../interfaces/ICapitalSourceProvider.sol";
 import {IPgStaking} from "../interfaces/IPgStaking.sol";
@@ -50,7 +50,7 @@ contract PgEtherToken is ERC20, Ownable, ICapitalSourceProvider, IPgStaking {
     error PgEtherToken__RequestInProgress();
     error PgEtherToken__PgAmountIsTheSame();
 
-    DivaEtherToken public immutable divaToken;
+    IDivaEtherToken public immutable divaToken;
     IDivaWithdrawer public immutable divaWithdrawer;
     IOctantRouter public octantRouter;
 
@@ -58,7 +58,7 @@ contract PgEtherToken is ERC20, Ownable, ICapitalSourceProvider, IPgStaking {
     uint256 public currentWithdrawalRequestId;
 
     constructor(address token, address withdrawer, address router) {
-        divaToken = DivaEtherToken(payable(token));
+        divaToken = IDivaEtherToken(payable(token));
         divaWithdrawer = IDivaWithdrawer(withdrawer);
         octantRouter = IOctantRouter(router);
         _initializeOwner(msg.sender);
