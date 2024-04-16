@@ -1,9 +1,6 @@
 /* SPDX-License-Identifier: UNLICENSED */
 pragma solidity ^0.8.23;
 
-import "../interfaces/vendored/IQuoter.sol";
-import "../interfaces/vendored/ISwapRouter.sol";
-
 import "forge-std/console.sol";
 
 import "solady/src/tokens/ERC20.sol";
@@ -11,6 +8,7 @@ import "solady/src/tokens/WETH.sol";
 import "solady/src/utils/SafeCastLib.sol";
 
 import "@uniswap/v3-periphery/contracts/libraries/OracleLibrary.sol";
+import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 
 contract GLMPriceFeed {
     address public GLMAddress = 0x7DD9c5Cba05E151C895FDe1CF355C9A1D5DA6429;
