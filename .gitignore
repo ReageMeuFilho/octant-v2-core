@@ -18,3 +18,6 @@ docs/
 
 # Direnv file
 .envrc
+
+# Github CI secrets for local CI runner (https://github.com/nektos/act)
+/.secrets
