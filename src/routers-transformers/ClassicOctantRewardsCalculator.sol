@@ -27,15 +27,15 @@ contract ClassicOctantRewardsCalculator is IOctantRewardsCalculator {
         return totalRewards - userRewards;
     }
 
-    function calculatePfpFund(uint256 totalAmount) public pure returns (uint256) {
+    function calculatePfpFund(uint256 /* totalAmount */) public pure returns (uint256) {
         return 0;
     }
 
-    function calculateCommunityFund(uint256 totalAmount) public pure returns (uint256) {
+    function calculateCommunityFund(uint256 /* totalAmount */) public pure returns (uint256) {
         return 0;
     }
     
-    function calculateOperationalCosts(uint256 totalAmount) public view returns (uint256) {
+    function calculateOperationalCosts(uint256 totalAmount) public pure returns (uint256) {
         return (totalAmount * 25) / 100;
     }
 
