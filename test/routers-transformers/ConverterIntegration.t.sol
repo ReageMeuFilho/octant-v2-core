@@ -34,6 +34,6 @@ contract ConverterIntegrationWrapper is Test {
         uint256 glmAfter = glm.balanceOf(address(conv));
         assertLt(wethAfter, wethBefore);
         assertGt(glmAfter, glmBefore);
-        console.log(glmAfter - glmBefore);
+        assertGt(glmAfter - glmBefore, 5000 ether);
     }
 }
