@@ -141,4 +141,6 @@ contract Converter {
         uint myWETHBalance = weth.balanceOf(address(this));
         weth.approve(UniswapV3RouterAddress, myWETHBalance);
     }
+
+    receive() external payable {}
 }

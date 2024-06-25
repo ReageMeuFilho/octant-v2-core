@@ -59,6 +59,11 @@ contract ConverterWrapper is Test {
         assertEq(conv.spent(), 1 ether);
     }
 
+    function test_receivesEth() external {
+        (bool sent, bytes memory data_) = payable(address(conv)).call{value: 100000}("");
+        require(sent, "Failed to send Ether");
+    }
+
     function test_wrapBuyBoundedWithRange() external {
         uint256 chance = type(uint256).max / uint256(4000); // corresponds to 0.00025 chance
         uint256 spendADay = 1 ether;
