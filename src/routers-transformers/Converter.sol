@@ -19,13 +19,16 @@ contract GLMPriceFeed {
         return OracleLibrary.getQuoteAtTick(
                                             twapTick,
                                             SafeCastLib.toUint128(amountIn_),
-                                            GLMAddress,
-                                            WETHAddress
+                                            WETHAddress,
+                                            GLMAddress
         );
     }
 }
 
 contract Converter {
+
+    event Conversion(uint256 sold, uint256 bought);
+    event Status(uint256 ethBalance, uint256 glmBalance);
 
     /// @notice GLM token contract
     address public GlmEth10000PoolAddress = 0x531b6A4b3F962208EA8Ed5268C642c84BB29be0b;
@@ -58,6 +61,9 @@ contract Converter {
     WETH public weth = WETH(payable(WETHAddress));
     GLMPriceFeed public priceFeed = new GLMPriceFeed();
 
+    uint256 public lastBought = 0;
+    uint256 public lastSold = 0;
+
     /// @notice Heights at which `buy()` can be executed is decided by `block.prevrandao` value.
     ///         If you see `Converter__WrongPrevrandao()` error, retry in the next block.
     ///         Note, you don't need to pay for gas to learn if tx will apply!
@@ -70,11 +76,20 @@ contract Converter {
     /// @notice This one indicates software error. Should never happen.
     error Converter__SoftwareError();
 
-    constructor(uint256 chance_, uint256 spendADay_, uint256 low_, uint256 high_) {
+    constructor(uint256 chance_, uint256 spendADay_, uint256 low_, uint256 high_) payable {
         chance = chance_;
         spendADay = spendADay_;
         saleValueLow = low_;
         saleValueHigh = high_;
+    }
+
+    function test_rand() public view returns (bool) {
+        uint256 rand = getRandomNumber();
+        return (rand > chance);
+    }
+
+    function test_limit() public view returns (bool) {
+        return (spent > (block.number - startingBlock) * (spendADay / blocksADay));
     }
 
     function buy() public {
@@ -99,13 +114,25 @@ contract Converter {
                                    address(this),
                                    block.timestamp,
                                    saleValue,
-                                   GLMQuota,
+                                   0,
                                    priceImpact
             );
         uint256 amountOut = uniswap.exactInputSingle(params);
-        assert(GLMQuota <= amountOut);
+        emit Conversion(saleValue, amountOut);
+        /* uint ethBalance = weth.balanceOf(address(this)); */
+        /* uint glmBalance = glm.balanceOf(address(this)); */
+        /* emit Status(ethBalance, glmBalance); */
+        /* require(GLMQuota <= amountOut, "got less GLM than predicted by Quota"); */
+        lastBought = amountOut;
+        lastSold = saleValue;
         spent = spent + saleValue;
     }
+
+
+    function price() public view returns (uint256) {
+        return priceFeed.getGLMQuota(1 ether);
+    }
+
 
     /// @dev FIXME. Testing helper function. Rethink how such admin should be performed.
     function setSpendADay(uint256 chance_, uint256 spendADay_, uint256 low_, uint256 high_) public {

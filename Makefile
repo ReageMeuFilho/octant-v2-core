@@ -12,3 +12,7 @@ integration:
 
 .PHONY: test
 test: unit integration
+
+.PHONY: demo-converter-searcher
+demo-converter-searcher: build
+	./demos/glm-converter/start-searcher-demo.sh

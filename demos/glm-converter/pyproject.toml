@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "glm-converter-searcher-demo"
+version = "0.1.0"
+description = ""
+authors = ["Pawel Peregud <paulperegud@protonmail.ch>"]
+readme = "README.md"
+packages = [{include = "glm_converter_searcher_demo"}]
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.10"
+web3 = "^6.19.0"
+click = "^8.1.7"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
