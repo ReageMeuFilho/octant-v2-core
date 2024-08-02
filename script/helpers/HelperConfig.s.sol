@@ -27,15 +27,15 @@ contract HelperConfig is Script {
 
     function getSepoliaEthConfig() public view returns (NetworkConfig memory) {
         return NetworkConfig({
-            wethToken: 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14,
             glmToken: 0x71432DD1ae7DB41706ee6a22148446087BdD0906,
+            wethToken: 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14,
             nonfungiblePositionManager: 0x1238536071E1c677A632429e3655c799b22cDA52,
             deployerKey: vm.envUint("PRIVATE_KEY")
         });
     }
 
     function getOrCreateAnvilEthConfig() public returns(NetworkConfig memory) {
-        if (activeNetworkConfig.wethToken != address(0)) {
+        if (activeNetworkConfig.glmToken != address(0)) {
             return activeNetworkConfig;
         }
 
@@ -47,8 +47,8 @@ contract HelperConfig is Script {
         vm.stopBroadcast();
 
         return NetworkConfig({
-            wethToken: address(wethMock),
             glmToken: address(glmMock),
+            wethToken: address(wethMock),
             nonfungiblePositionManager: address(0), // deploy
             deployerKey: DEFAULT_ANVIL_KEY
         });
