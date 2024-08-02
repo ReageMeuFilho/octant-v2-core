@@ -8,8 +8,8 @@ import {ERC20Mock} from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 contract HelperConfig is Script {
 
     struct NetworkConfig {
-        address wethToken;
         address glmToken;
+        address wethToken;
         address nonfungiblePositionManager;
         uint256 deployerKey;
     }
