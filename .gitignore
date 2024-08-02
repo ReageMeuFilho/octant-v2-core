@@ -21,3 +21,6 @@ docs/
 
 # Github CI secrets for local CI runner (https://github.com/nektos/act)
 /.secrets
+
+# npm/pnpm related files
+node_modules/
