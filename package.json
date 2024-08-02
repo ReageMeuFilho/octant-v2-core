@@ -1,0 +1,17 @@
+{
+  "name": "octant-v2-core",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "deploy:liquidity-helper": ". ./.env && forge script script/UniswapLiquidityHelperDeployer.s.sol:UniswapLiquidityHelperDeployer --rpc-url $FORGE_RPC_URL --etherscan-api-key $ETHERSCAN_API_KEY --verify --broadcast -vvvv",
+    "deploy:liquidity-helper:local": ". ./.env && forge script script/UniswapLiquidityHelperDeployer.s.sol:UniswapLiquidityHelperDeployer --rpc-url $FORGE_RPC_URL --broadcast -vvvv",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^16.4.5"
+  }
+}
