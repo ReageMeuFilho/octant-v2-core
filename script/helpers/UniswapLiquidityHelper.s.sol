@@ -80,6 +80,7 @@ contract UniswapLiquidityHelper is IERC721Receiver {
     /// @return liquidity The amount of liquidity for the position
     /// @return amount0 The amount of token0
     /// @return amount1 The amount of token1
+    /// @dev possible improvement to do is to make the msg.sender the owner of the NFT and approve the liquidity helper to perform operations
     function mintNewPosition(uint256 amountToMint0Wei_, uint256 amountToMint1Wei_)
         external
         returns (
@@ -134,6 +135,105 @@ contract UniswapLiquidityHelper is IERC721Receiver {
         }
     }
 
+    /// @notice Collects the fees associated with provided liquidity
+    /// @dev The contract must hold the erc721 token before it can collect fees
+    /// @param tokenId The id of the erc721 token
+    /// @return amount0 The amount of fees collected in token0
+    /// @return amount1 The amount of fees collected in token1
+    function collectAllFees(uint256 tokenId) external returns (uint256 amount0, uint256 amount1) {
+        // Caller must own the ERC721 position
+        // Call to safeTransfer will trigger `onERC721Received` which must return the selector else transfer will fail
+        // nonfungiblePositionManager.safeTransferFrom(msg.sender, address(this), tokenId); 
+
+        // set amount0Max and amount1Max to uint256.max to collect all fees
+        // alternatively can set recipient to msg.sender and avoid another transaction in `sendToOwner`
+        INonfungiblePositionManager.CollectParams memory params =
+            INonfungiblePositionManager.CollectParams({
+                tokenId: tokenId,
+                recipient: msg.sender,
+                amount0Max: type(uint128).max,
+                amount1Max: type(uint128).max
+            });
+
+        (amount0, amount1) = nonfungiblePositionManager.collect(params);
+    }
+
+    /// @notice A function that decreases the current liquidity by half. An example to show how to call the `decreaseLiquidity` function defined in periphery.
+    /// @param tokenId The id of the erc721 token
+    /// @return amount0 The amount received back in token0
+    /// @return amount1 The amount returned back in token1
+    function decreaseLiquidityInHalf(uint256 tokenId) external returns (uint256 amount0, uint256 amount1) {
+        // caller must be the owner of the NFT
+        require(msg.sender == deposits[tokenId].owner, 'Not the owner');
+        // get liquidity data for tokenId
+        (, , address token0, address token1, , , , uint128 liquidity, , , , ) =
+            nonfungiblePositionManager.positions(tokenId);
+        uint128 halfLiquidity = liquidity / 2;
+        deposits[tokenId].liquidity = halfLiquidity;
+
+        return _decreaseLiquidity(tokenId, halfLiquidity);
+    }
+
+    function removeLiquidity(uint256 tokenId) external returns (uint256 amount0, uint256 amount1) {
+        // caller must be the owner of the NFT
+        require(msg.sender == deposits[tokenId].owner, 'Not the owner');
+        // get liquidity data for tokenId
+        (, , address token0, address token1, , , , uint128 liquidity, , , , ) =
+            nonfungiblePositionManager.positions(tokenId);
+        deposits[tokenId].liquidity = 0;
+
+         _decreaseLiquidity(tokenId, liquidity);
+    }
+
+    /// @notice Increases liquidity in the current range
+    /// @dev Pool must be initialized already to add liquidity
+    /// @param tokenId The id of the erc721 token
+    /// @param amount0 The amount to add of token0
+    /// @param amount1 The amount to add of token1
+    function increaseLiquidityCurrentRange(
+        uint256 tokenId,
+        uint256 amountAdd0,
+        uint256 amountAdd1
+    )
+        external
+        returns (
+            uint128 liquidity,
+            uint256 amount0,
+            uint256 amount1
+        )
+    {
+        // Approve the position manager
+        TransferHelper.safeApprove(token0Address, address(nonfungiblePositionManager), amountAdd0);
+        TransferHelper.safeApprove(token1Address, address(nonfungiblePositionManager), amountAdd1);
+        
+        INonfungiblePositionManager.IncreaseLiquidityParams memory params =
+            INonfungiblePositionManager.IncreaseLiquidityParams({
+                tokenId: tokenId,
+                amount0Desired: amountAdd0,
+                amount1Desired: amountAdd1,
+                amount0Min: 0,
+                amount1Min: 0,
+                deadline: block.timestamp
+            });
+
+        (liquidity, amount0, amount1) = nonfungiblePositionManager.increaseLiquidity(params);
+
+        // Update deposit
+        deposits[tokenId].liquidity = liquidity;
+
+        // Remove allowance and refund in both assets.
+        if (amount0 < amountAdd0) {
+            TransferHelper.safeApprove(token0Address, address(nonfungiblePositionManager), 0);
+            uint256 refund0 = amountAdd0 - amount0;
+            TransferHelper.safeTransfer(token0Address, msg.sender, refund0);
+        }
+
+        if (amount1 < amountAdd1) {
+            TransferHelper.safeApprove(token1Address, address(nonfungiblePositionManager), 0);
+            uint256 refund1 = amountAdd1 - amount1;
+            TransferHelper.safeTransfer(token1Address, msg.sender, refund1);
+        }
+    }
 
     function returnFunds(uint256 token0Amount, uint256 token1Amount) public {
         if (msg.sender != contractOwner) {
@@ -141,6 +241,24 @@ contract UniswapLiquidityHelper is IERC721Receiver {
         } 
         TransferHelper.safeTransfer(token0Address, contractOwner, token0Amount);
         TransferHelper.safeTransfer(token1Address, contractOwner, token1Amount);
+    }
+
+    /** Internal & Private functions */
+
+    function _decreaseLiquidity(uint256 tokenId, uint128 liquidity) internal returns (uint256 amount0, uint256 amount1) {
+
+        // amount0Min and amount1Min are price slippage checks
+        // if the amount received after burning is not greater than these minimums, transaction will fail
+        INonfungiblePositionManager.DecreaseLiquidityParams memory params =
+            INonfungiblePositionManager.DecreaseLiquidityParams({
+                tokenId: tokenId,
+                liquidity: liquidity,
+                amount0Min: 0,
+                amount1Min: 0,
+                deadline: block.timestamp
+            });
+
+        (amount0, amount1) = nonfungiblePositionManager.decreaseLiquidity(params);
     }
 
     function _createDeposit(address owner, uint256 tokenId) internal {
