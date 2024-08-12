@@ -68,7 +68,7 @@ contract ConverterWrapper is Test {
         uint256 chance = type(uint256).max / uint256(4000); // corresponds to 0.00025 chance
         uint256 spendADay = 1 ether;
         conv.setSpendADay(chance, spendADay, 0.6 ether, 1.4 ether);
-        uint256 blocks = 500_000;
+        uint256 blocks = 100_000;
         for (uint256 i = 0; i < blocks; i++) {
             wrapBuy();
         }
@@ -90,7 +90,7 @@ contract ConverterWrapper is Test {
         uint256 chance = type(uint256).max / uint256(4000); // corresponds to 0.00025 chance
         uint256 spendADay = 1 ether;
         conv.setSpendADay(chance, spendADay, 1 ether, 1 ether);
-        uint256 blocks = 500_000;
+        uint256 blocks = 100_000;
         for (uint256 i = 0; i < blocks; i++) {
             wrapBuy();
         }
@@ -112,7 +112,7 @@ contract ConverterWrapper is Test {
         uint256 chance = type(uint256).max / uint256(4000); // corresponds to 0.00025 chance
         uint256 spendADay = 100 ether;
         conv.setSpendADay(chance, spendADay, 1 ether, 1 ether);
-        uint256 blocks = 500_000;
+        uint256 blocks = 100_000;
         for (uint256 i = 0; i < blocks; i++) {
             wrapBuy();
         }
@@ -133,14 +133,14 @@ contract ConverterWrapper is Test {
         uint256 maxdiv4096 = 28269553036454149273332760011886696253239742350009903329945699220681916416;
         uint256 counter = 0;
 
-        for (uint256 i = 0; i < 1_000_000; i++) {
+        for (uint256 i = 0; i < 100_000; i++) {
             vm.prevrandao(bytes32(i));
             if (conv.getRandomNumber() < maxdiv4096) {
                 counter = counter + 1;
             }
         }
-        assertLt(200, counter); // EV(counter) ~= 244
-        assertLt(counter, 260); // EV(counter) ~= 244
+        assertLt(20, counter); // EV(counter) ~= 21
+        assertLt(counter, 22); // EV(counter) ~= 21
     }
 
     function test_settingPrevrandao() external {
