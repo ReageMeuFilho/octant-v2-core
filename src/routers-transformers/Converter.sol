@@ -3,9 +3,9 @@ pragma solidity ^0.8.23;
 
 import "forge-std/console.sol";
 
-import "solady/src/tokens/ERC20.sol";
-import "solady/src/tokens/WETH.sol";
-import "solady/src/utils/SafeCastLib.sol";
+import "@solady/tokens/ERC20.sol";
+import "@solady/tokens/WETH.sol";
+import "@solady/utils/SafeCastLib.sol";
 
 import "@uniswap/v3-periphery/contracts/libraries/OracleLibrary.sol";
 import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";

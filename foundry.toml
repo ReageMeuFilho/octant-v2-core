@@ -8,11 +8,13 @@ optimizer_runs = 10_000_000
 solc = "0.8.23"
 verbosity = 3
 remappings = [
-    "@solady=lib/solady/src", # octant solady path
-    "solady=lib/solady", # deps solady path
-    "@diva/contracts=lib/smartcontract/contracts",
-    "@uniswap/v3-periphery/contracts=lib/uniswap-v3-periphery-0.8/contracts",
-    "@uniswap/v3-core/contracts=lib/uniswap-v3-core-0.8/contracts"
+    "@solady=lib/solady/src/", # octant solady path
+    "solady=lib/solady/src/",  # deps solady path
+    "@diva/contracts=lib/smartcontract/contracts/",
+    "@uniswap/v3-periphery/contracts=lib/uniswap-v3-periphery-0.8/contracts/",
+    "@uniswap/v3-core/contracts=lib/uniswap-v3-core-0.8/contracts/",
+    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+    "@splits/splits-pass-through-wallet=lib/splits-pass-through-wallet/src/"
 ]
 
 [profile.ci]

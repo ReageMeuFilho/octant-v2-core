@@ -2,8 +2,8 @@
 pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
-import "solady/src/tokens/ERC20.sol";
-import "solady/src/tokens/WETH.sol";
+import "@solady/tokens/ERC20.sol";
+import "@solady/tokens/WETH.sol";
 import "src/routers-transformers/Converter.sol";
 
 contract ConverterIntegrationWrapper is Test {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.23;
 
-import "solady/src/tokens/ERC20.sol";
+import "@solady/tokens/ERC20.sol";
 import "../interfaces/ISubsidyPool.sol";
 import "../interfaces/IUserDeposits.sol";
 import "../interfaces/ITimeTracker.sol";
