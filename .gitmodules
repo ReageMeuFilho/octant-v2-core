@@ -19,3 +19,6 @@
 [submodule "lib/splits-pass-through-wallet"]
 	path = lib/splits-pass-through-wallet
 	url = https://github.com/0xSplits/splits-pass-through-wallet
+[submodule "lib/splits-contracts-monorepo"]
+	path = lib/splits-contracts-monorepo
+	url = https://github.com/0xSplits/splits-contracts-monorepo
