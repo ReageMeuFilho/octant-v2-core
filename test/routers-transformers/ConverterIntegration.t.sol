@@ -5,6 +5,8 @@ import "forge-std/Test.sol";
 import "solady/src/tokens/ERC20.sol";
 import "solady/src/tokens/WETH.sol";
 import "src/routers-transformers/Converter.sol";
+import {HelperConfig} from "script/helpers/HelperConfig.s.sol";
+import {UniswapLiquidityHelper} from "script/helpers/UniswapLiquidityHelper.s.sol";
 
 contract ConverterIntegrationWrapper is Test {
     Converter public conv;
@@ -14,13 +16,23 @@ contract ConverterIntegrationWrapper is Test {
     function setUp() public {
         uint forkId = vm.createFork("mainnet");
         vm.selectFork(forkId);
-        conv = new Converter(type(uint256).max-1,
-                             1_000_000_000_000 ether,
-                             1 ether,
-                             2 ether
-                            );
-        glm = ERC20(conv.GLMAddress());
-        weth = WETH(payable(conv.WETHAddress()));
+        (
+            address glmToken,
+            address wethToken,
+            address _nonfungiblePositionManager,
+            uint256 _deployerKey,
+            address router,
+            address pool
+        ) = new HelperConfig().activeNetworkConfig();
+        glm = ERC20(glmToken);
+        weth = WETH(payable(wethToken));
+        conv = new Converter(pool, router, glmToken, wethToken);
+        conv.setSpendADay(
+            type(uint256).max - 1,
+            1_000_000_000_000 ether,
+            1 ether,
+            2 ether
+        );
         vm.deal(address(conv), 1000 ether);
         conv.wrap();
     }

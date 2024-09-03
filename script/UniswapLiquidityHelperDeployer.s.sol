@@ -9,7 +9,14 @@ contract UniswapLiquidityHelperDeployer is Script {
     function run() external {
         HelperConfig helperConfig = new HelperConfig();
 
-        (address glmToken, address wethToken, address nonfungiblePositionManager, uint256 deployerKey) = helperConfig.activeNetworkConfig();
+        (
+            address glmToken,
+            address wethToken,
+            address nonfungiblePositionManager,
+            uint256 deployerKey,
+            address _router,
+            address _pool
+        ) = helperConfig.activeNetworkConfig();
         console.log("Glm Token: ", glmToken);
         console.log("Weth Token: ", wethToken);
         console.log("nonfungiblePositionManager: ", nonfungiblePositionManager);
@@ -17,14 +24,17 @@ contract UniswapLiquidityHelperDeployer is Script {
         vm.startBroadcast(deployerKey);
 
         UniswapLiquidityHelper uniswapLiquidityHelper = new UniswapLiquidityHelper(
-            glmToken,
-            wethToken,
-            nonfungiblePositionManager,
-            10000
-        );
+                glmToken,
+                wethToken,
+                nonfungiblePositionManager,
+                10000
+            );
 
         vm.stopBroadcast();
 
-        console.log("UniswapLiquidityHelper deployed to: ", address(uniswapLiquidityHelper));
+        console.log(
+            "UniswapLiquidityHelper deployed to: ",
+            address(uniswapLiquidityHelper)
+        );
     }
 }

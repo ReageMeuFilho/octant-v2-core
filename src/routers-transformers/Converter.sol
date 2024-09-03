@@ -3,6 +3,7 @@ pragma solidity ^0.8.23;
 
 import "forge-std/console.sol";
 
+import {Ownable} from "@solady/auth/Ownable.sol";
 import "solady/src/tokens/ERC20.sol";
 import "solady/src/tokens/WETH.sol";
 import "solady/src/utils/SafeCastLib.sol";
@@ -11,9 +12,16 @@ import "@uniswap/v3-periphery/contracts/libraries/OracleLibrary.sol";
 import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 
 contract GLMPriceFeed {
-    address public GLMAddress = 0x7DD9c5Cba05E151C895FDe1CF355C9A1D5DA6429;
-    address public WETHAddress = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
-    address public GlmEth10000Pool = 0x531b6A4b3F962208EA8Ed5268C642c84BB29be0b;
+    address public GLMAddress;
+    address public WETHAddress;
+    address public GlmEth10000Pool;
+
+    constructor(address _poolAddress, address _glm, address _weth) public {
+        GLMAddress = _glm;
+        WETHAddress = _weth;
+        GlmEth10000Pool = _poolAddress;
+    }
+
     function getGLMQuota(uint256 amountIn_) view public returns (uint256) {
         (int24 twapTick, ) = OracleLibrary.consult(GlmEth10000Pool, 30);
         return OracleLibrary.getQuoteAtTick(
@@ -25,16 +33,16 @@ contract GLMPriceFeed {
     }
 }
 
-contract Converter {
+contract Converter is Ownable {
 
     event Conversion(uint256 sold, uint256 bought);
     event Status(uint256 ethBalance, uint256 glmBalance);
 
     /// @notice GLM token contract
-    address public GlmEth10000PoolAddress = 0x531b6A4b3F962208EA8Ed5268C642c84BB29be0b;
-    address public UniswapV3RouterAddress = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
-    address public GLMAddress = 0x7DD9c5Cba05E151C895FDe1CF355C9A1D5DA6429;
-    address public WETHAddress = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+    address public GlmEth10000PoolAddress;
+    address public UniswapV3RouterAddress;
+    address public GLMAddress;
+    address public WETHAddress;
 
     uint256 public constant blocksADay = 7200;
 
@@ -56,10 +64,10 @@ contract Converter {
     /// @dev Technically, this value minus one wei.
     uint256 public saleValueHigh;
 
-    ISwapRouter public uniswap = ISwapRouter(UniswapV3RouterAddress);
-    ERC20 public glm = ERC20(GLMAddress);
-    WETH public weth = WETH(payable(WETHAddress));
-    GLMPriceFeed public priceFeed = new GLMPriceFeed();
+    ISwapRouter public uniswap;
+    ERC20 public glm;
+    WETH public weth;
+    GLMPriceFeed public priceFeed;
 
     uint256 public lastBought = 0;
     uint256 public lastSold = 0;
@@ -76,11 +84,18 @@ contract Converter {
     /// @notice This one indicates software error. Should never happen.
     error Converter__SoftwareError();
 
-    constructor(uint256 chance_, uint256 spendADay_, uint256 low_, uint256 high_) payable {
-        chance = chance_;
-        spendADay = spendADay_;
-        saleValueLow = low_;
-        saleValueHigh = high_;
+    constructor(address _poolAddress, address _v3Router, address _glm, address _weth) payable {
+        GlmEth10000PoolAddress = _poolAddress;
+        UniswapV3RouterAddress = _v3Router;
+        GLMAddress = _glm;
+        WETHAddress = _weth;
+
+        uniswap = ISwapRouter(UniswapV3RouterAddress);
+        glm = ERC20(GLMAddress);
+        weth = WETH(payable(WETHAddress));
+        priceFeed = new GLMPriceFeed(GlmEth10000PoolAddress, GLMAddress, WETHAddress);
+
+        _initializeOwner(msg.sender);
     }
 
     function test_rand() public view returns (bool) {
@@ -134,8 +149,7 @@ contract Converter {
     }
 
 
-    /// @dev FIXME. Testing helper function. Rethink how such admin should be performed.
-    function setSpendADay(uint256 chance_, uint256 spendADay_, uint256 low_, uint256 high_) public {
+    function setSpendADay(uint256 chance_, uint256 spendADay_, uint256 low_, uint256 high_) public onlyOwner {
         chance = chance_;
         spendADay = spendADay_;
         startingBlock = block.number;

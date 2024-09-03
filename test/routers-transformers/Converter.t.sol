@@ -4,33 +4,45 @@ pragma solidity ^0.8.23;
 import "forge-std/Test.sol";
 import "solady/src/tokens/ERC20.sol";
 import "src/routers-transformers/Converter.sol";
+import {HelperConfig} from "script/helpers/HelperConfig.s.sol";
+import {UniswapLiquidityHelper} from "script/helpers/UniswapLiquidityHelper.s.sol";
 
 contract ConverterWrapper is Test {
     Converter public conv;
     uint256 public blockno = 1;
     uint256 public constr = 0;
     uint256 public budget = 10_000 ether;
+    HelperConfig helperConfig = new HelperConfig();
 
     function setUp() external {
-        conv = new Converter(0, 0, 0.6 ether, 1.4 ether);
+        (
+            address glmToken,
+            address wethToken,
+            address _nonfungiblePositionManager,
+            uint256 _deployerKey,
+            address router,
+            address pool
+        ) = helperConfig.activeNetworkConfig();
+        conv = new Converter(pool, router, glmToken, wethToken);
         mockOracle();
         mockRouter();
+        conv.setSpendADay(0, 0, 0.6 ether, 1.4 ether);
         vm.deal(address(conv), budget);
     }
 
     function mockRouter() public {
         vm.mockCall(
-                    address(conv.uniswap()),
-                    abi.encodeWithSelector(MockOfRouter.exactInputSingle.selector),
-                    abi.encode(5000 * 10**9)
+            address(conv.uniswap()),
+            abi.encodeWithSelector(MockOfRouter.exactInputSingle.selector),
+            abi.encode(5000 * 10 ** 9)
         );
     }
 
     function mockOracle() public {
         vm.mockCall(
-                    address(conv.priceFeed()),
-                    abi.encodeWithSelector(GLMPriceFeed.getGLMQuota.selector),
-                    abi.encode(5000 * 10**9)
+            address(conv.priceFeed()),
+            abi.encodeWithSelector(GLMPriceFeed.getGLMQuota.selector),
+            abi.encode(5000 * 10 ** 9)
         );
     }
 
@@ -60,7 +72,9 @@ contract ConverterWrapper is Test {
     }
 
     function test_receivesEth() external {
-        (bool sent, bytes memory data_) = payable(address(conv)).call{value: 100000}("");
+        (bool sent, bytes memory data_) = payable(address(conv)).call{
+            value: 100000
+        }("");
         require(sent, "Failed to send Ether");
     }
 
