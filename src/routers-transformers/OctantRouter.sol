@@ -131,7 +131,7 @@ abstract contract OctantRouter is IOctantRouter, IOctantForwarder, ICapitalTrans
         for (uint256 i = 0; i < sources.length; i++) {
             ICapitalTransformer transformer = capitalTransformers[sources[i]];
             if (address(transformer) != address(0)) {
-                transformer.transform{value: amount}(amount);
+                transformer.transform{value: amount}(amount, "");
             }
         }
         state = RouterState.TRANSFORMED;

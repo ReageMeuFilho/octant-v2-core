@@ -14,7 +14,8 @@ remappings = [
     "@uniswap/v3-periphery/contracts=lib/uniswap-v3-periphery-0.8/contracts/",
     "@uniswap/v3-core/contracts=lib/uniswap-v3-core-0.8/contracts/",
     "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
-    "@splits/splits-pass-through-wallet=lib/splits-pass-through-wallet/src/"
+    "@splits/splits-pass-through-wallet=lib/splits-pass-through-wallet/src/",
+    "@splits/splits-v2=lib/splits-contracts-monorepo/packages/splits-v2/src/"
 ]
 
 [profile.ci]

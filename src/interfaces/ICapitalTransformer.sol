@@ -11,7 +11,8 @@ pragma solidity ^0.8.23;
  */
 
 interface ICapitalTransformer {
-    function transform(uint256 amount) external payable;
+    function transform(uint256 amount, bytes calldata data) external payable returns (uint256);
+    function receiver() external returns (address);
 }
 
 interface ITransformerObserver {
