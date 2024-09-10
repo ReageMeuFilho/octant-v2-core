@@ -14,7 +14,7 @@ contract ConverterIntegrationWrapper is Test {
     WETH public weth;
 
     function setUp() public {
-        uint forkId = vm.createFork("mainnet");
+        uint forkId = vm.createFork("sepolia");
         vm.selectFork(forkId);
         (
             address glmToken,
@@ -46,6 +46,6 @@ contract ConverterIntegrationWrapper is Test {
         uint256 glmAfter = glm.balanceOf(address(conv));
         assertLt(wethAfter, wethBefore);
         assertGt(glmAfter, glmBefore);
-        assertGt(glmAfter - glmBefore, 5000 ether);
+        assertGt(glmAfter - glmBefore, 1000 ether);
     }
 }
