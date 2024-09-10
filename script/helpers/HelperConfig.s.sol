@@ -33,12 +33,13 @@ contract HelperConfig is Script {
 
     function getSepoliaEthConfig() public view returns (NetworkConfig memory) {
         return
+            // factory at 0x7eb12e415F88477B3Ef2f0D839161Ffa0f5329a0
             NetworkConfig({
                 glmToken: 0x71432DD1ae7DB41706ee6a22148446087BdD0906,
-                wethToken: 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14,
-                nonfungiblePositionManager: 0x1238536071E1c677A632429e3655c799b22cDA52,
-                uniswapV3Router: 0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD,
-                uniswapGlmWeth10000Pool: 0x8C315b47CC6c25aF900C73E0689C106b50D5c6DF,
+                wethToken: 0xeA438fB469540f1Ba54Ad2D2342d2dBCb191cE29,
+                nonfungiblePositionManager: 0xC8118AcDf29cBa90c3142437c0e84AE3902bfA74,
+                uniswapV3Router: 0xD6601e25cF43CAc433A23cB95a39D38012B2e9f0,
+                uniswapGlmWeth10000Pool: 0x1985134644683848EF81bdd9B1F4b16DDC647EF3,
                 deployerKey: vm.envUint("PRIVATE_KEY")
             });
     }
