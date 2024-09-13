@@ -109,7 +109,7 @@ contract Converter is Ownable {
 
     function buy() public {
         uint256 rand = getRandomNumber();
-        if (rand > chance) revert Converter__WrongPrevrandao();
+        require(rand < chance);
         if (spent > (block.number - startingBlock) * (spendADay / blocksADay)) revert Converter__SpendingTooMuch();
 
         uint256 saleValue = getUniformInRange(saleValueLow, saleValueHigh, rand);
