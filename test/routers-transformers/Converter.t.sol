@@ -21,7 +21,8 @@ contract ConverterWrapper is Test {
             address _nonfungiblePositionManager,
             uint256 _deployerKey,
             address router,
-            address pool
+            address pool,
+            address _demoConverter
         ) = helperConfig.activeNetworkConfig();
         conv = new Converter(pool, router, glmToken, wethToken);
         mockOracle();

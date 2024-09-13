@@ -13,6 +13,7 @@ contract HelperConfig is Script {
         uint256 deployerKey;
         address uniswapV3Router;
         address uniswapGlmWeth10000Pool;
+        address demoConverter;
     }
 
     uint256 public constant DEFAULT_ANVIL_KEY =
@@ -40,7 +41,8 @@ contract HelperConfig is Script {
                 nonfungiblePositionManager: 0xC8118AcDf29cBa90c3142437c0e84AE3902bfA74,
                 uniswapV3Router: 0xD6601e25cF43CAc433A23cB95a39D38012B2e9f0,
                 uniswapGlmWeth10000Pool: 0x1985134644683848EF81bdd9B1F4b16DDC647EF3,
-                deployerKey: vm.envUint("PRIVATE_KEY")
+                deployerKey: vm.envUint("PRIVATE_KEY"),
+                demoConverter: 0x5742F2B61093a470a2d69B685f82bD1dd00A5312
             });
     }
 
@@ -52,8 +54,9 @@ contract HelperConfig is Script {
                 nonfungiblePositionManager: 0xC36442b4a4522E871399CD717aBDD847Ab11FE88,
                 uniswapV3Router: 0xE592427A0AEce92De3Edee1F18E0157C05861564,
                 uniswapGlmWeth10000Pool: 0x531b6A4b3F962208EA8Ed5268C642c84BB29be0b,
-                deployerKey: vm.envUint("PRIVATE_KEY")
-            });
+                deployerKey: vm.envUint("PRIVATE_KEY"),
+                demoConverter: address(0)
+                });
     }
 
     function getOrCreateAnvilEthConfig() public returns (NetworkConfig memory) {
@@ -75,7 +78,8 @@ contract HelperConfig is Script {
                 nonfungiblePositionManager: address(0), // deploy
                 uniswapV3Router: address(0),
                 uniswapGlmWeth10000Pool: address(0),
-                deployerKey: DEFAULT_ANVIL_KEY
+                deployerKey: DEFAULT_ANVIL_KEY,
+                demoConverter: address(0)
             });
     }
 }

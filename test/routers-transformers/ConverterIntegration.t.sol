@@ -22,7 +22,8 @@ contract ConverterIntegrationWrapper is Test {
             address _nonfungiblePositionManager,
             uint256 _deployerKey,
             address router,
-            address pool
+            address pool,
+            address _demoConverter
         ) = new HelperConfig().activeNetworkConfig();
         glm = ERC20(glmToken);
         weth = WETH(payable(wethToken));

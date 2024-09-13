@@ -15,7 +15,8 @@ contract UniswapLiquidityHelperDeployer is Script {
             address nonfungiblePositionManager,
             uint256 deployerKey,
             address _router,
-            address _pool
+            address _pool,
+            address _demoConverter
         ) = helperConfig.activeNetworkConfig();
         console.log("Glm Token: ", glmToken);
         console.log("Weth Token: ", wethToken);
