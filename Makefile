@@ -15,4 +15,4 @@ test: unit integration
 
 .PHONY: demo-converter-searcher
 demo-converter-searcher: build
-	./demos/glm-converter/start-searcher-demo.sh
+	poetry -C demos/glm-converter run python3 demos/glm-converter/flashbots-searcher.py
