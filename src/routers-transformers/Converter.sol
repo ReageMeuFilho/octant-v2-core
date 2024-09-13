@@ -70,6 +70,7 @@ contract Converter is Ownable {
     GLMPriceFeed public priceFeed;
 
     uint256 public lastBought = 0;
+    uint256 public lastQuota = 0;
     uint256 public lastSold = 0;
 
     /// @notice Heights at which `buy()` can be executed is decided by `block.prevrandao` value.
@@ -140,6 +141,7 @@ contract Converter is Ownable {
         /* require(GLMQuota <= amountOut, "got less GLM than predicted by Quota"); */
         lastBought = amountOut;
         lastSold = saleValue;
+        lastQuota = GLMQuota;
         spent = spent + saleValue;
     }
 
