@@ -74,12 +74,12 @@ def try_to_buy(converter, w3, height):
         })
         signed_tx = w3.eth.account.sign_transaction(unsigned_tx, private_key=acc.key)
         bundle = [{'signed_transaction': signed_tx.rawTransaction}]
-        replacement_uuid = str(uuid4())
+        # replacement_uuid = str(uuid4())
         logging.info("submitting bundle...")
         send_result = w3.flashbots.send_bundle(
             bundle,
             target_block_number=height + 1,
-            opts={"replacementUuid": replacement_uuid},
+            # opts={"replacementUuid": replacement_uuid},
         )
         print(f"send_result: {send_result}")
         bundle_hash = w3.to_hex(send_result.bundle_hash())
