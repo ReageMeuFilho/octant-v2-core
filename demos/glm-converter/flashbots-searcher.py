@@ -74,22 +74,13 @@ def try_to_buy(converter, w3, height):
         })
         signed_tx = w3.eth.account.sign_transaction(unsigned_tx, private_key=acc.key)
         bundle = [{'signed_transaction': signed_tx.rawTransaction}]
-        # replacement_uuid = str(uuid4())
-        logging.info("submitting bundle...")
         send_result = w3.flashbots.send_bundle(
             bundle,
             target_block_number=height + 1,
-            # opts={"replacementUuid": replacement_uuid},
         )
-        print(f"send_result: {send_result}")
         bundle_hash = w3.to_hex(send_result.bundle_hash())
-        logging.info(f"bundleHash {bundle_hash}")
-
-        stats_v1 = w3.flashbots.get_bundle_stats(bundle_hash, height+1)
-        logging.info(f"bundleStats v1 for {height+1} is {stats_v1}")
-
-        stats_v2 = w3.flashbots.get_bundle_stats_v2(bundle_hash, height+1)
-        logging.info(f"bundleStats v2 for {height+1} is {stats_v2}")
+        # stats_v1 = w3.flashbots.get_bundle_stats(bundle_hash, height+1)
+        # stats_v2 = w3.flashbots.get_bundle_stats_v2(bundle_hash, height+1)
         send_result.wait()
         try:
             receipts = send_result.receipts()
@@ -119,7 +110,10 @@ async def get_event():
         await ws.send(json.dumps({"id": 1, "method": "eth_subscribe", "params": ["newHeads"]}))
         subscription_response = await ws.recv()
         while True:
-            message_str = await asyncio.wait_for(ws.recv(), timeout=60)
+            try:
+                message_str = await asyncio.wait_for(ws.recv(), timeout=60)
+            except:
+                continue
             message = json.loads(message_str)
             height = int(message["params"]["result"]["number"][2:], 16)
             try_to_buy(converter, w3, height)
