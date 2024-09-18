@@ -312,7 +312,10 @@ async def get_event():
         await ws.send(json.dumps({"id": 1, "method": "eth_subscribe", "params": ["newHeads"]}))
         subscription_response = await ws.recv()
         while True:
-            message_str = await asyncio.wait_for(ws.recv(), timeout=60)
+            try:
+                message_str = await asyncio.wait_for(ws.recv(), timeout=60)
+            except:
+                continue
             message = json.loads(message_str)
             height = int(message["params"]["result"]["number"][2:], 16)
             status = get_status(conv, w3, height)
