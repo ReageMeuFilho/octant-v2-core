@@ -291,7 +291,7 @@ class ConvStatus:
     last_quota: int # price of 1 ETH in GLMs, wei
 
 def log_status(height: int, sts: ConvStatus):
-    print(f"{height},{sts.spent},{sts.spendable},{sts.weth_balance},{sts.glm_balance},{sts.price},{sts.last_quota}")
+    print(f"{height},{sts.spent},{sts.spendable},{sts.weth_balance},{sts.glm_balance},{sts.price},{sts.last_quota}", flush=True)
 
 def get_status(conv, w3, height):
     spent = conv.functions.spent().call()
