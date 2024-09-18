@@ -24,6 +24,7 @@ contract TraderStatus is Script, Test {
 
         console.log("ChainID:", block.chainid);
         console.log("Converter at", demoConverter);
+        console.log("Height:", block.number);
         assert(demoConverter != address(0));
 
         Converter conv = Converter(payable(demoConverter));

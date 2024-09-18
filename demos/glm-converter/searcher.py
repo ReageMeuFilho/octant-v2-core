@@ -10,42 +10,25 @@ from web3 import Web3
 from web3.exceptions import ContractCustomError, ContractLogicError
 
 logging.basicConfig(
-    format='%(asctime)s %(levelname)-8s %(message)s',
+    format="%(asctime)s %(levelname)-8s %(message)s",
     level=logging.INFO,
-    datefmt='[%H:%M:%S]')
+    datefmt="[%H:%M:%S]",
+)
 
 token_abi = [
     {
         "inputs": ["address"],
         "name": "balanceOf",
-        "outputs": [
-            {
-                "name": "",
-                "type": "uint256",
-                "internalType": "uint256"
-            }
-        ],
+        "outputs": [{"name": "", "type": "uint256", "internalType": "uint256"}],
         "stateMutability": "view",
-        "type": "function"
+        "type": "function",
     }
 ]
 
 conv_abi = [
-    {
-        "inputs": [],
-        "type": "error",
-        "name": "Converter__SoftwareError"
-    },
-    {
-        "inputs": [],
-        "type": "error",
-        "name": "Converter__SpendingTooMuch"
-    },
-    {
-        "inputs": [],
-        "type": "error",
-        "name": "Converter__WrongPrevrandao"
-    },
+    {"inputs": [], "type": "error", "name": "Converter__SoftwareError"},
+    {"inputs": [], "type": "error", "name": "Converter__SpendingTooMuch"},
+    {"inputs": [], "type": "error", "name": "Converter__WrongPrevrandao"},
     {
         "inputs": [],
         "name": "buy",
@@ -57,181 +40,120 @@ conv_abi = [
         "type": "function",
         "name": "price",
         "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "uint256",
-                "internalType": "uint256"
-            }
-        ],
-        "stateMutability": "view"
+        "outputs": [{"name": "", "type": "uint256", "internalType": "uint256"}],
+        "stateMutability": "view",
     },
     {
         "type": "function",
         "name": "lastBought",
         "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "uint256",
-                "internalType": "uint256"
-            }
-        ],
-        "stateMutability": "view"
+        "outputs": [{"name": "", "type": "uint256", "internalType": "uint256"}],
+        "stateMutability": "view",
     },
     {
         "type": "function",
         "name": "lastSold",
         "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "uint256",
-                "internalType": "uint256"
-            }
-        ],
-        "stateMutability": "view"
+        "outputs": [{"name": "", "type": "uint256", "internalType": "uint256"}],
+        "stateMutability": "view",
     },
     {
         "type": "function",
         "name": "saleValueLow",
         "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "uint256",
-                "internalType": "uint256"
-            }
-        ],
-        "stateMutability": "view"
+        "outputs": [{"name": "", "type": "uint256", "internalType": "uint256"}],
+        "stateMutability": "view",
     },
     {
         "type": "function",
         "name": "saleValueHigh",
         "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "uint256",
-                "internalType": "uint256"
-            }
-        ],
-        "stateMutability": "view"
+        "outputs": [{"name": "", "type": "uint256", "internalType": "uint256"}],
+        "stateMutability": "view",
     },
     {
         "type": "function",
         "name": "spent",
         "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "uint256",
-                "internalType": "uint256"
-            }
-        ],
-        "stateMutability": "view"
+        "outputs": [{"name": "", "type": "uint256", "internalType": "uint256"}],
+        "stateMutability": "view",
     },
     {
         "type": "function",
         "name": "startingBlock",
         "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "uint256",
-                "internalType": "uint256"
-            }
-        ],
-        "stateMutability": "view"
+        "outputs": [{"name": "", "type": "uint256", "internalType": "uint256"}],
+        "stateMutability": "view",
     },
     {
         "type": "function",
         "name": "spendADay",
         "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "uint256",
-                "internalType": "uint256"
-            }
-        ],
-        "stateMutability": "view"
+        "outputs": [{"name": "", "type": "uint256", "internalType": "uint256"}],
+        "stateMutability": "view",
     },
     {
         "type": "function",
         "name": "test_rand",
         "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "bool",
-                "internalType": "bool"
-            }
-        ],
-        "stateMutability": "view"
+        "outputs": [{"name": "", "type": "bool", "internalType": "bool"}],
+        "stateMutability": "view",
     },
     {
         "type": "function",
         "name": "test_limit",
         "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "bool",
-                "internalType": "bool"
-            }
-        ],
-        "stateMutability": "view"
+        "outputs": [{"name": "", "type": "bool", "internalType": "bool"}],
+        "stateMutability": "view",
     },
     {
         "type": "function",
         "name": "randao",
         "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "uint256",
-                "internalType": "uint256"
-            }
-        ],
-        "stateMutability": "view"
+        "outputs": [{"name": "", "type": "uint256", "internalType": "uint256"}],
+        "stateMutability": "view",
     },
     {
         "type": "function",
         "name": "chance",
         "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "uint256",
-                "internalType": "uint256"
-            }
-        ],
-        "stateMutability": "view"
-    }
+        "outputs": [{"name": "", "type": "uint256", "internalType": "uint256"}],
+        "stateMutability": "view",
+    },
 ]
+
 
 def decode_custom_error(w3, contract_abi, error_data):
     for error in [abi for abi in contract_abi if abi["type"] == "error"]:
         # Get error signature components
         name = error["name"]
-        data_types = [collapse_if_tuple(abi_input) for abi_input in error.get("inputs", [])]
+        data_types = [
+            collapse_if_tuple(abi_input) for abi_input in error.get("inputs", [])
+        ]
         error_signature_hex = function_abi_to_4byte_selector(error).hex()
         # Find match signature from error_data
         if error_signature_hex.casefold() == str(error_data.data)[2:10].casefold():
-            params = ','.join([str(x) for x in w3.codec.decode(data_types,bytes.fromhex(str(error_data.data)[10:]))])
-            decoded = "%s(%s)" % (name , str(params))
+            params = ",".join(
+                [
+                    str(x)
+                    for x in w3.codec.decode(
+                        data_types, bytes.fromhex(str(error_data.data)[10:])
+                    )
+                ]
+            )
+            decoded = "%s(%s)" % (name, str(params))
             return decoded
     return None
 
+
 def loop(converter, w3, state):
     # check if new block was mined
-    block = w3.eth.get_block('latest')
-    current_height = block['number']
-    if current_height == state['height']:
+    block = w3.eth.get_block("latest")
+    current_height = block["number"]
+    if current_height == state["height"]:
         time.sleep(0.5)
         return
-    state['height'] = current_height
+    state["height"] = current_height
 
     can_buy = False
     failure_reason = None
@@ -256,7 +178,9 @@ def loop(converter, w3, state):
         w3.eth.get_transaction_receipt(tx_hash)
     except ContractCustomError as exp:
         failure_reason = decode_custom_error(w3, conv_abi, exp)
-        print(f"failed in transact() while being succesful in call() with error: {failure_reason}")
+        print(
+            f"failed in transact() while being succesful in call() with error: {failure_reason}"
+        )
         exit(1)
     except ContractLogicError as exp:
         print(f"Logic: {exp}")
@@ -272,7 +196,7 @@ def get_spending_stats(block, converter, w3) -> (int, int):
     startingBlock = converter.functions.startingBlock().call()
     height = block.number - startingBlock
     spent = converter.functions.spent().call()
-    spendable = (height*(spendADay / blocksADay)) - spent
+    spendable = (height * (spendADay / blocksADay)) - spent
     return (int(high), int(spendable))
 
 
@@ -285,7 +209,6 @@ def get_price(converter):
     except ContractLogicError:
         pass
     return (oraclePrice, lastBought, lastSold)
-
 
 
 @click.command
@@ -301,36 +224,32 @@ def get_price(converter):
     "--private-key",
     help="Key for account to pay for gas",
 )
-@click.option(
-    "-url",
-    help="Ethereum ERC URL"
-)
-@click.option(
-    "-c",
-    "--converter",
-    help="Converter address"
-)
+@click.option("-url", help="Ethereum ERC URL")
+@click.option("-c", "--converter", help="Converter address")
 def run(verbose, private_key, url, converter):
     w3 = Web3(Web3.HTTPProvider(url))
-    assert(w3.is_connected())
+    assert w3.is_connected()
 
     converter = w3.eth.contract(address=converter, abi=conv_abi)
 
-    state = {'height': 0}
+    state = {"height": 0}
     while True:
-        prev = state['height']
+        prev = state["height"]
         reason = loop(converter, w3, state)
-        cur = state['height']
+        cur = state["height"]
         if prev != cur:
-            block = w3.eth.get_block('latest')
+            block = w3.eth.get_block("latest")
             (avg, spendable) = get_spending_stats(block, converter, w3)
             (oraclePrice, lastBought, lastSold) = get_price(converter)
-            print(f"block {cur}; spendable: {float(spendable / avg):5.2f}; ", end='')
-            print(f"oracle $GLM={oraclePrice:8.2f}; ", end='')
-            if lastSold!=0:
-                print(f"actual $GLM={(lastBought/lastSold):.2f} = {lastBought:.2f} / {lastSold:.2f}; ", end='')
+            print(f"block {cur}; spendable: {float(spendable / avg):5.2f}; ", end="")
+            print(f"oracle $GLM={oraclePrice:8.2f}; ", end="")
+            if lastSold != 0:
+                print(
+                    f"actual $GLM={(lastBought/lastSold):.2f} = {lastBought:.2f} / {lastSold:.2f}; ",
+                    end="",
+                )
             print(f"{reason}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     run()
