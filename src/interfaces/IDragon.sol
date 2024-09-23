@@ -2,15 +2,14 @@
 
 pragma solidity ^0.8.23;
 
-import {IOctantRouter} from "./IOctantRouter.sol";
+import { IOctantRouter } from "./IOctantRouter.sol";
 
 /**
  * @author  .
  * @title   The Dragon
  * @dev     Draft
- * @notice  Interface for the Dragon contract, the facade to interact with an Octant-based ecosystem 
+ * @notice  Interface for the Dragon contract, the facade to interact with an Octant-based ecosystem
  */
-
 interface IDragon {
     /**
      * @notice  Returns the dragon token address
@@ -18,14 +17,14 @@ interface IDragon {
      * @return  dragonToken  A token that is used as a collateral to receive PG voting rights and individual rewards
      */
     function getDragonToken() external view returns (address);
-    
+
     /**
      * @notice  .
      * @dev     .
      * @return  octantRouter  A router that acts as entry point for routing, transformation and distribution of the rewards
      */
     function getOctantRouter() external view returns (address);
-    
+
     /**
      * @notice  .
      * @dev     .

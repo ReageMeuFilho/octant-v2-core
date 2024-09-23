@@ -2,8 +2,8 @@
 
 pragma solidity ^0.8.23;
 
-import {IDragonsFactory} from "../interfaces/IDragonsFactory.sol";
-import {Dragon} from "./Dragon.sol";
+import { IDragonsFactory } from "../interfaces/IDragonsFactory.sol";
+import { Dragon } from "./Dragon.sol";
 
 /**
  * @author  .
@@ -11,7 +11,6 @@ import {Dragon} from "./Dragon.sol";
  * @notice  Deploys and manages Dragons
  */
 contract DragonsFactory is IDragonsFactory {
-    
     /// @inheritdoc IDragonsFactory
     function createDragon(
         address governingToken,

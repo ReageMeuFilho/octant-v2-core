@@ -2,7 +2,8 @@
 // Modified from OpenZeppelin Contracts (last updated v5.0.0) (token/ERC20/extensions/IERC20Permit.sol)
 pragma solidity ^0.8.20;
 
-import {IERC20} from "./IERC20.sol";
+import { IERC20 } from "./IERC20.sol";
+
 interface IERC20Permit is IERC20 {
     /**
      * @dev Sets `value` as the allowance of `spender` over ``owner``'s tokens,

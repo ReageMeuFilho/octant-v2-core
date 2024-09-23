@@ -23,16 +23,24 @@
 
 pragma solidity ^0.8.23;
 
-import {ERC20} from "@solady/tokens/ERC20.sol";
-import {TokenAccountingVault} from "./TokenAccountingVault.sol";
+import { ERC20 } from "@solady/tokens/ERC20.sol";
+import { TokenAccountingVault } from "./TokenAccountingVault.sol";
 
 // TODO: move to the interfaces
 interface IUserBudgetCalculator {
-    function calculateBudget(uint256 currentUserRewards, uint256 userMaturedDeposit, uint256 totalMaturedDeposit) external view returns (uint256 userBudget);
+    function calculateBudget(
+        uint256 currentUserRewards,
+        uint256 userMaturedDeposit,
+        uint256 totalMaturedDeposit
+    ) external view returns (uint256 userBudget);
 }
 
 contract UserBudgetV2Calculator is IUserBudgetCalculator {
-    function calculateBudget(uint256 currentUserRewards, uint256 userMaturedDeposit, uint256 totalMaturedDeposit) public view returns (uint256 userBudget) {
+    function calculateBudget(
+        uint256 currentUserRewards,
+        uint256 userMaturedDeposit,
+        uint256 totalMaturedDeposit
+    ) public view returns (uint256 userBudget) {
         return 0; // TODO: implement logic as on the server
     }
 }
@@ -51,9 +59,8 @@ struct UserAction {
 // Depending on the amount of ETH, the balance of the share is attributed to the users
 // But it's minted and redeemed according to certain rules and connected to the AccountingTokenVault
 contract UserVault is ERC20, UserBudgetV2Calculator {
-
     // TODO: override transfer functions
-    
+
     error UserVault__AssetsCantBeZero();
     error UserVault__SharesCantBeZero();
     error UserVault__ReceiverIsZero();
@@ -111,7 +118,7 @@ contract UserVault is ERC20, UserBudgetV2Calculator {
     // function convertToShares(uint256 assets) public view returns (uint256 shares) {
     //     // should not depend on the specific user
     // }
-    
+
     // function convertToAssets(uint256 shares) public view returns (uint256 assets) {
     //     // should not depend on the specific user
     // }
@@ -120,9 +127,9 @@ contract UserVault is ERC20, UserBudgetV2Calculator {
         deposit(msg.value, ETH_ASSET_ADDRESS);
     }
 
-    function deposit(uint256 assets, address to) public virtual payable returns (uint256) {
+    function deposit(uint256 assets, address to) public payable virtual returns (uint256) {
         assets; // Ignore assets input variable
-        to;     // Ignore to variable
+        to; // Ignore to variable
         if (msg.value == 0) revert UserVault__AssetsCantBeZero();
 
         totalBalanceOvertime += msg.value;
@@ -133,7 +140,7 @@ contract UserVault is ERC20, UserBudgetV2Calculator {
         return msg.value;
     }
 
-    function mint(uint256 shares, address to) public virtual payable returns (uint256) {
+    function mint(uint256 shares, address to) public payable virtual returns (uint256) {
         deposit(shares, to);
     }
 
@@ -163,7 +170,7 @@ contract UserVault is ERC20, UserBudgetV2Calculator {
         shares = assets; // @audit optimize
         _withdraw(assets, shares, to, owner);
 
-    emit Withdrawn(msg.sender, to, owner, assets, assets);
+        emit Withdrawn(msg.sender, to, owner, assets, assets);
         return assets;
     }
 
@@ -176,7 +183,8 @@ contract UserVault is ERC20, UserBudgetV2Calculator {
             uint256 toBurn = totalUserBudget - shares; // ex: shares = 70
             _burn(owner, toBurn);
         }
-        if (shares < virtualUserShares) { // @audit else if ?
+        if (shares < virtualUserShares) {
+            // @audit else if ?
             uint256 toMint = virtualUserShares - shares; // ex: shares = 30
             _mint(to, toMint);
         }
@@ -189,8 +197,8 @@ contract UserVault is ERC20, UserBudgetV2Calculator {
             balanceSnapshot: address(this).balance,
             userMaturedDeposit: 0,
             totalMaturedDeposit: 0
-            }); // @audit fix it later
-        to.call{value: assets};
+        }); // @audit fix it later
+        to.call{ value: assets };
     }
 
     function _actualBalance(address owner) internal view returns (uint256) {

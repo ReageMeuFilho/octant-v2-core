@@ -12,13 +12,9 @@ contract ConverterIntegrationWrapper is Test {
     WETH public weth;
 
     function setUp() public {
-        uint forkId = vm.createFork("mainnet");
+        uint256 forkId = vm.createFork("mainnet");
         vm.selectFork(forkId);
-        conv = new Converter(type(uint256).max-1,
-                             1_000_000_000_000 ether,
-                             1 ether,
-                             2 ether
-                            );
+        conv = new Converter(type(uint256).max - 1, 1_000_000_000_000 ether, 1 ether, 2 ether);
         glm = ERC20(conv.GLMAddress());
         weth = WETH(payable(conv.WETHAddress()));
         vm.deal(address(conv), 1000 ether);

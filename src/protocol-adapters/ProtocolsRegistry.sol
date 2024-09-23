@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.23;
 
-import {IProtocolRegistry} from "../interfaces/IProtocolsRegistry.sol";
+import { IProtocolRegistry } from "../interfaces/IProtocolsRegistry.sol";
 
 /**
  * @author  .
@@ -10,7 +10,6 @@ import {IProtocolRegistry} from "../interfaces/IProtocolsRegistry.sol";
  * @dev     .
  * @notice  Protocols Registry is a mechanism to curate external funds allocation & distribution algorithms
  */
-
 contract ProtocolsRegistry is IProtocolRegistry {
     mapping(uint256 => Protocol) protocolRegistry;
     mapping(uint256 => ProtocolStrategy) strategiesRegistry;

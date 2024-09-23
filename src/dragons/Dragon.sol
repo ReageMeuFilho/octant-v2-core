@@ -2,17 +2,15 @@
 
 pragma solidity ^0.8.23;
 
-import {IDragon} from "../interfaces/IDragon.sol";
+import { IDragon } from "../interfaces/IDragon.sol";
 
 /**
  * @author  .
  * @title   Dragon Contract
  * @dev     .
- * @notice  The Dragon is a facade contract that is the main entrypoint of interactions with an Octant model PG funding mechanism for a specific Dragon 
+ * @notice  The Dragon is a facade contract that is the main entrypoint of interactions with an Octant model PG funding mechanism for a specific Dragon
  */
-
 contract Dragon is IDragon {
-
     address token;
     address octantRouter;
     address epochsGuardian;
@@ -32,9 +30,9 @@ contract Dragon is IDragon {
     function getOctantRouter() external view returns (address) {
         return octantRouter;
     }
-    
+
     /// @inheritdoc IDragon
-    function getEpochsGuardian() external view returns (address ) {
+    function getEpochsGuardian() external view returns (address) {
         return epochsGuardian;
     }
 }

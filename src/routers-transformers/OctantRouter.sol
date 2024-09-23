@@ -23,9 +23,9 @@
 
 pragma solidity ^0.8.23;
 
-import {IOctantRouter} from "../interfaces/IOctantRouter.sol";
-import {IOctantForwarder} from "../interfaces/IOctantForwarder.sol";
-import {ICapitalTransformer} from "../interfaces/ICapitalTransformer.sol";
+import { IOctantRouter } from "../interfaces/IOctantRouter.sol";
+import { IOctantForwarder } from "../interfaces/IOctantForwarder.sol";
+import { ICapitalTransformer } from "../interfaces/ICapitalTransformer.sol";
 
 enum RouterState {
     VOID,
@@ -40,7 +40,6 @@ enum RouterState {
  * @dev     Octant Router is a base classs for all transformers
  * This contract is intentionally NOT gas-efficient, optimizing for the desirable behaviour first
  */
-
 abstract contract OctantRouter is IOctantRouter, IOctantForwarder, ICapitalTransformer {
     /**
      * Errors
@@ -113,10 +112,11 @@ abstract contract OctantRouter is IOctantRouter, IOctantForwarder, ICapitalTrans
         state = RouterState.LOADED;
     }
 
-    function enqueueToWithGivers(address[] calldata givers, uint256[] calldata amounts, address target)
-        external
-        payable
-    {
+    function enqueueToWithGivers(
+        address[] calldata givers,
+        uint256[] calldata amounts,
+        address target
+    ) external payable {
         _enqueueWithGivers(givers, amounts);
         enqueueTo(target);
     }
@@ -131,7 +131,7 @@ abstract contract OctantRouter is IOctantRouter, IOctantForwarder, ICapitalTrans
         for (uint256 i = 0; i < sources.length; i++) {
             ICapitalTransformer transformer = capitalTransformers[sources[i]];
             if (address(transformer) != address(0)) {
-                transformer.transform{value: amount}(amount);
+                transformer.transform{ value: amount }(amount);
             }
         }
         state = RouterState.TRANSFORMED;
@@ -149,13 +149,14 @@ abstract contract OctantRouter is IOctantRouter, IOctantForwarder, ICapitalTrans
         if (amountToForward == 0) revert OctantRouter__CantForwardEmptyBalance();
         targetRoutesQueue[target] -= amountToForward;
         targetRoutesTransferred[target] += amountToForward;
-        target.call{value: amountToForward};
+        target.call{ value: amountToForward };
     }
 
-    function forwardToWithGivers(address[] calldata givers, uint256[] calldata amounts, address target)
-        external
-        payable
-    {
+    function forwardToWithGivers(
+        address[] calldata givers,
+        uint256[] calldata amounts,
+        address target
+    ) external payable {
         _enqueueWithGivers(givers, amounts);
         forwardTo(target);
     }
@@ -163,7 +164,6 @@ abstract contract OctantRouter is IOctantRouter, IOctantForwarder, ICapitalTrans
     /**
      * Internal & Private
      */
-     
     function _receive() internal {
         thisBalance += msg.value;
         state = RouterState.LOADED;

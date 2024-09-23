@@ -23,8 +23,8 @@
 
 pragma solidity ^0.8.23;
 
-import {ITimeTracker} from "../interfaces/ITimeTracker.sol";
-import {ERC20} from "@solady/tokens/ERC20.sol";
+import { ITimeTracker } from "../interfaces/ITimeTracker.sol";
+import { ERC20 } from "@solady/tokens/ERC20.sol";
 
 struct UserDeposit {
     uint256 timestamp;
@@ -40,7 +40,6 @@ struct UserEffectiveDeposit {
 // OGLM represents the amount of shares in the vault and calculated based on the IR,
 // which is in turn is based on maturity of the deposits
 contract TokenAccountingVault is ERC20 {
-
     error TokenAccountingVault__AssetsCantBeZero();
     error TokenAccountingVault__SharesCantBeZero();
     error TokenAccountingVault__ReceiverIsZero();
@@ -50,7 +49,7 @@ contract TokenAccountingVault is ERC20 {
     mapping(address user => UserEffectiveDeposit effectiveDeposit) userEffectiveDeposits;
 
     ITimeTracker timeTracker;
-    
+
     string public sharesTokenName;
     string public sharesTokenSymbol;
 
@@ -86,13 +85,9 @@ contract TokenAccountingVault is ERC20 {
         return tokenAsset.balanceOf(address(this));
     }
 
-    function convertToShares(uint256 assets) public view returns (uint256 shares) {
+    function convertToShares(uint256 assets) public view returns (uint256 shares) {}
 
-    }
-    
-    function convertToAssets(uint256 shares) public view returns (uint256 assets) {
-
-    }
+    function convertToAssets(uint256 shares) public view returns (uint256 assets) {}
 
     function _actualBalance(address owner) internal returns (uint256) {
         return super.balanceOf(owner);

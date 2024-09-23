@@ -8,7 +8,6 @@ pragma solidity ^0.8.23;
  * @dev     .
  * @notice  Protocols Registry is a mechanism to curate external funds allocation & distribution algorithms
  */
-
 interface IProtocolRegistry {
     struct Protocol {
         string name;

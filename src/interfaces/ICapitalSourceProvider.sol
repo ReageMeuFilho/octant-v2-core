@@ -8,7 +8,6 @@ pragma solidity ^0.8.23;
  * @dev     .
  * @notice  Capital Source Provider is used as a mechanism to deliver capital from external protocols to Octant
  */
-
 interface ICapitalSourceProvider {
     function getEligibleRewards() external view returns (uint256);
     function isWithdrawalRequestRequired() external returns (bool);

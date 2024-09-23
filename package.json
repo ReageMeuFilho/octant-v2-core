@@ -3,15 +3,34 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
+    "precommit": "lint-staged",
+    "test": "forge clean && forge test",
+    "format": "prettier --config .prettierrc --write --plugin=prettier-plugin-solidity '{contracts,src}/**/*.sol'",
+    "lint": "solhint './{src,scripts,test}/**/*.sol' --fix",
+    "build": "forge clean && forge compile",
+    "slither:setup": "python3 -m venv .venv && . .venv/bin/activate && pip3 install slither-analyzer",
+    "slither": ". .venv/bin/activate && slither ./ --exclude-low --exclude-optimization --exclude-dependencies --filter-paths \"test\"",
+    "gas": "forge snapshot --isolate --mc Benchmark --gas-report --diff .gas-snapshot > gasreport.txt",
     "deploy:liquidity-helper": ". ./.env && forge script script/UniswapLiquidityHelperDeployer.s.sol:UniswapLiquidityHelperDeployer --rpc-url $FORGE_RPC_URL --etherscan-api-key $ETHERSCAN_API_KEY --verify --broadcast -vvvv",
-    "deploy:liquidity-helper:local": ". ./.env && forge script script/UniswapLiquidityHelperDeployer.s.sol:UniswapLiquidityHelperDeployer --rpc-url $FORGE_RPC_URL --broadcast -vvvv",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "deploy:liquidity-helper:local": ". ./.env && forge script script/UniswapLiquidityHelperDeployer.s.sol:UniswapLiquidityHelperDeployer --rpc-url $FORGE_RPC_URL --broadcast -vvvv"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "lint-staged": "^15.2.10",
+    "prettier": "^3.3.3",
+    "prettier-plugin-solidity": "^1.4.1",
+    "solady": "^0.0.243",
+    "solhint": "^5.0.3",
+    "solhint-plugin-prettier": "^0.1.0",
+    "typescript": "^5.6.2"
   }
 }

@@ -20,17 +20,17 @@ contract ConverterWrapper is Test {
 
     function mockRouter() public {
         vm.mockCall(
-                    address(conv.uniswap()),
-                    abi.encodeWithSelector(MockOfRouter.exactInputSingle.selector),
-                    abi.encode(5000 * 10**9)
+            address(conv.uniswap()),
+            abi.encodeWithSelector(MockOfRouter.exactInputSingle.selector),
+            abi.encode(5000 * 10 ** 9)
         );
     }
 
     function mockOracle() public {
         vm.mockCall(
-                    address(conv.priceFeed()),
-                    abi.encodeWithSelector(GLMPriceFeed.getGLMQuota.selector),
-                    abi.encode(5000 * 10**9)
+            address(conv.priceFeed()),
+            abi.encodeWithSelector(GLMPriceFeed.getGLMQuota.selector),
+            abi.encode(5000 * 10 ** 9)
         );
     }
 
@@ -43,7 +43,7 @@ contract ConverterWrapper is Test {
         blockno = blockno + 1;
         try conv.buy() {
             return true;
-        } catch (bytes memory /*lowLevelData*/) {
+        } catch (bytes memory) /*lowLevelData*/ {
             return false;
         }
     }
@@ -69,16 +69,10 @@ contract ConverterWrapper is Test {
         }
 
         // check if spending above target minus two buys
-        assertLt(
-            ((blocks * 1 ether) / conv.blocksADay()) - 2 ether,
-            conv.spent()
-        );
+        assertLt(((blocks * 1 ether) / conv.blocksADay()) - 2 ether, conv.spent());
 
         // check if spending below target plus one buy
-        assertLt(
-            conv.spent(),
-            1.4 ether + ((blocks * 1 ether) / conv.blocksADay())
-        );
+        assertLt(conv.spent(), 1.4 ether + ((blocks * 1 ether) / conv.blocksADay()));
     }
 
     function test_wrapBuyBounded() external {
@@ -91,16 +85,10 @@ contract ConverterWrapper is Test {
         }
 
         // check if spending above target minus two buys
-        assertLt(
-            ((blocks * 1 ether) / conv.blocksADay()) - 2 ether,
-            conv.spent()
-        );
+        assertLt(((blocks * 1 ether) / conv.blocksADay()) - 2 ether, conv.spent());
 
         // check if spending below target plus one buy
-        assertLt(
-            conv.spent(),
-            1 ether + ((blocks * 1 ether) / conv.blocksADay())
-        );
+        assertLt(conv.spent(), 1 ether + ((blocks * 1 ether) / conv.blocksADay()));
     }
 
     function test_wrapBuyUnbounded() external {
@@ -114,14 +102,8 @@ contract ConverterWrapper is Test {
 
         // comparing to bounded test, average spending will be significantly higher
         // proving that bounding with `spendADay` works
-        assertLt(
-            ((blocks * 1.4 ether) / conv.blocksADay()) - 2 ether,
-            conv.spent()
-        );
-        assertLt(
-            conv.spent(),
-            2 ether + ((blocks * 1.5 ether) / conv.blocksADay())
-        );
+        assertLt(((blocks * 1.4 ether) / conv.blocksADay()) - 2 ether, conv.spent());
+        assertLt(conv.spent(), 2 ether + ((blocks * 1.5 ether) / conv.blocksADay()));
     }
 
     function test_keccakDistribution() external {
@@ -147,10 +129,7 @@ contract ConverterWrapper is Test {
 
     function test_division() external {
         assertLt(0, type(uint256).max / uint256(4000));
-        assertLt(
-            type(uint256).max / uint256(4000),
-            type(uint256).max / uint256(3999)
-        );
+        assertLt(type(uint256).max / uint256(4000), type(uint256).max / uint256(3999));
         uint256 maxdiv4096 = 28269553036454149273332760011886696253239742350009903329945699220681916416;
         assertGt(type(uint256).max / uint256(4095), maxdiv4096);
         assertLt(type(uint256).max / uint256(4097), maxdiv4096);
@@ -168,7 +147,7 @@ contract ConverterWrapper is Test {
         runner_getUniformInRange(1_000_000 ether, 2_000_000 ether);
     }
 
-    function runner_getUniformInRange(uint low, uint high) public {
+    function runner_getUniformInRange(uint256 low, uint256 high) public {
         uint256 counter = 0;
         uint256 val = 0;
         uint256 min = type(uint256).max;
@@ -195,21 +174,9 @@ contract ConverterWrapper is Test {
 }
 
 contract MockOfRouter is ISwapRouter {
-    function exactInput(
-        ExactInputParams calldata params
-    ) external payable returns (uint256 amountOut) {}
-    function exactInputSingle(
-        ExactInputSingleParams calldata params
-    ) external payable returns (uint256 amountOut) {}
-    function exactOutput(
-        ExactOutputParams calldata params
-    ) external payable returns (uint256 amountIn) {}
-    function exactOutputSingle(
-        ExactOutputSingleParams calldata params
-    ) external payable returns (uint256 amountIn) {}
-    function uniswapV3SwapCallback(
-        int256 amount0Delta,
-        int256 amount1Delta,
-        bytes calldata data
-    ) external {}
+    function exactInput(ExactInputParams calldata params) external payable returns (uint256 amountOut) {}
+    function exactInputSingle(ExactInputSingleParams calldata params) external payable returns (uint256 amountOut) {}
+    function exactOutput(ExactOutputParams calldata params) external payable returns (uint256 amountIn) {}
+    function exactOutputSingle(ExactOutputSingleParams calldata params) external payable returns (uint256 amountIn) {}
+    function uniswapV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data) external {}
 }

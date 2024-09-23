@@ -2,16 +2,13 @@
 
 pragma solidity ^0.8.23;
 
-
 /**
  * @author  .
  * @title   The interface for the DragonsFactory
  * @dev     Draft
  * @notice  This contract is used to deploy and configure facade Dragon contracts
  */
-
 interface IDragonsFactory {
-
     /**
      * @notice  Creates a dragon contract that defines key parameters, algorithms and addresses of that dragon
      * @dev     Consider using beacon proxy

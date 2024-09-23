@@ -14,19 +14,14 @@ contract GLMPriceFeed {
     address public GLMAddress = 0x7DD9c5Cba05E151C895FDe1CF355C9A1D5DA6429;
     address public WETHAddress = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     address public GlmEth10000Pool = 0x531b6A4b3F962208EA8Ed5268C642c84BB29be0b;
-    function getGLMQuota(uint256 amountIn_) view public returns (uint256) {
+
+    function getGLMQuota(uint256 amountIn_) public view returns (uint256) {
         (int24 twapTick, ) = OracleLibrary.consult(GlmEth10000Pool, 30);
-        return OracleLibrary.getQuoteAtTick(
-                                            twapTick,
-                                            SafeCastLib.toUint128(amountIn_),
-                                            GLMAddress,
-                                            WETHAddress
-        );
+        return OracleLibrary.getQuoteAtTick(twapTick, SafeCastLib.toUint128(amountIn_), GLMAddress, WETHAddress);
     }
 }
 
 contract Converter {
-
     /// @notice GLM token contract
     address public GlmEth10000PoolAddress = 0x531b6A4b3F962208EA8Ed5268C642c84BB29be0b;
     address public UniswapV3RouterAddress = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
@@ -91,17 +86,16 @@ contract Converter {
         // Instead rely on TWAP oracle price.
         uint256 GLMQuota = priceFeed.getGLMQuota(saleValue);
 
-        ISwapRouter.ExactInputSingleParams memory params =
-            ISwapRouter.ExactInputSingleParams(
-                                   WETHAddress,
-                                   GLMAddress,
-                                   10_000, // 1% pool, expensive one
-                                   address(this),
-                                   block.timestamp,
-                                   saleValue,
-                                   GLMQuota,
-                                   priceImpact
-            );
+        ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams(
+            WETHAddress,
+            GLMAddress,
+            10_000, // 1% pool, expensive one
+            address(this),
+            block.timestamp,
+            saleValue,
+            GLMQuota,
+            priceImpact
+        );
         uint256 amountOut = uniswap.exactInputSingle(params);
         assert(GLMQuota <= amountOut);
         spent = spent + saleValue;
@@ -130,15 +124,15 @@ contract Converter {
     ///      Note, some values will not be chosen because of precision compromise.
     ///      Also, if high > 2**200, this function may overflow.
     function getUniformInRange(uint256 low, uint256 high, uint256 seed) public pure returns (uint256) {
-        return low + ((high - low) * (randomize(seed) >> 200) / 2**(256-200));
+        return low + (((high - low) * (randomize(seed) >> 200)) / 2 ** (256 - 200));
     }
 
     // TODO: consider making coverter payable and do wrapping inside
     function wrap() public {
-        uint selfbalance = address(this).balance;
-        (bool success,) = payable(address(weth)).call{value: selfbalance}("");
+        uint256 selfbalance = address(this).balance;
+        (bool success, ) = payable(address(weth)).call{ value: selfbalance }("");
         if (!success) revert();
-        uint myWETHBalance = weth.balanceOf(address(this));
+        uint256 myWETHBalance = weth.balanceOf(address(this));
         weth.approve(UniswapV3RouterAddress, myWETHBalance);
     }
 }
