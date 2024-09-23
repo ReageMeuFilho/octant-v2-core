@@ -36,6 +36,7 @@ struct UserEffectiveDeposit {
     uint256 maturityRate;
 }
 
+// solhint-disable
 // TokenAccountingVault accepts GLM and mints non-tranferrable shares in form of OGLM
 // OGLM represents the amount of shares in the vault and calculated based on the IR,
 // which is in turn is based on maturity of the deposits

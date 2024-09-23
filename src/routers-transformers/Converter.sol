@@ -1,8 +1,6 @@
 /* SPDX-License-Identifier: UNLICENSED */
 pragma solidity ^0.8.23;
 
-import "forge-std/console.sol";
-
 import "solady/src/tokens/ERC20.sol";
 import "solady/src/tokens/WETH.sol";
 import "solady/src/utils/SafeCastLib.sol";
@@ -28,7 +26,7 @@ contract Converter {
     address public GLMAddress = 0x7DD9c5Cba05E151C895FDe1CF355C9A1D5DA6429;
     address public WETHAddress = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
 
-    uint256 public constant blocksADay = 7200;
+    uint256 public constant BLOCKS_A_DAY = 7200;
 
     /// @notice Chance is probability normalized to uint256.max instead to 1
     uint256 public chance;
@@ -75,7 +73,7 @@ contract Converter {
     function buy() public {
         uint256 rand = getRandomNumber();
         if (rand > chance) revert Converter__WrongPrevrandao();
-        if (spent > (block.number - startingBlock) * (spendADay / blocksADay)) revert Converter__SpendingTooMuch();
+        if (spent > (block.number - startingBlock) * (spendADay / BLOCKS_A_DAY)) revert Converter__SpendingTooMuch();
 
         uint256 saleValue = getUniformInRange(saleValueLow, saleValueHigh, rand);
         if (saleValue > saleValueHigh) revert Converter__SoftwareError();

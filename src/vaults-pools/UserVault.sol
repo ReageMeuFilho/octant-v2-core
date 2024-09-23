@@ -27,6 +27,7 @@ import { ERC20 } from "@solady/tokens/ERC20.sol";
 import { TokenAccountingVault } from "./TokenAccountingVault.sol";
 
 // TODO: move to the interfaces
+// solhint-disable
 interface IUserBudgetCalculator {
     function calculateBudget(
         uint256 currentUserRewards,

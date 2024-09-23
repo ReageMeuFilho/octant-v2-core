@@ -69,10 +69,10 @@ contract ConverterWrapper is Test {
         }
 
         // check if spending above target minus two buys
-        assertLt(((blocks * 1 ether) / conv.blocksADay()) - 2 ether, conv.spent());
+        assertLt(((blocks * 1 ether) / conv.BLOCKS_A_DAY()) - 2 ether, conv.spent());
 
         // check if spending below target plus one buy
-        assertLt(conv.spent(), 1.4 ether + ((blocks * 1 ether) / conv.blocksADay()));
+        assertLt(conv.spent(), 1.4 ether + ((blocks * 1 ether) / conv.BLOCKS_A_DAY()));
     }
 
     function test_wrapBuyBounded() external {
@@ -85,10 +85,10 @@ contract ConverterWrapper is Test {
         }
 
         // check if spending above target minus two buys
-        assertLt(((blocks * 1 ether) / conv.blocksADay()) - 2 ether, conv.spent());
+        assertLt(((blocks * 1 ether) / conv.BLOCKS_A_DAY()) - 2 ether, conv.spent());
 
         // check if spending below target plus one buy
-        assertLt(conv.spent(), 1 ether + ((blocks * 1 ether) / conv.blocksADay()));
+        assertLt(conv.spent(), 1 ether + ((blocks * 1 ether) / conv.BLOCKS_A_DAY()));
     }
 
     function test_wrapBuyUnbounded() external {
@@ -102,8 +102,8 @@ contract ConverterWrapper is Test {
 
         // comparing to bounded test, average spending will be significantly higher
         // proving that bounding with `spendADay` works
-        assertLt(((blocks * 1.4 ether) / conv.blocksADay()) - 2 ether, conv.spent());
-        assertLt(conv.spent(), 2 ether + ((blocks * 1.5 ether) / conv.blocksADay()));
+        assertLt(((blocks * 1.4 ether) / conv.BLOCKS_A_DAY()) - 2 ether, conv.spent());
+        assertLt(conv.spent(), 2 ether + ((blocks * 1.5 ether) / conv.BLOCKS_A_DAY()));
     }
 
     function test_keccakDistribution() external {
@@ -175,8 +175,12 @@ contract ConverterWrapper is Test {
 
 contract MockOfRouter is ISwapRouter {
     function exactInput(ExactInputParams calldata params) external payable returns (uint256 amountOut) {}
+
     function exactInputSingle(ExactInputSingleParams calldata params) external payable returns (uint256 amountOut) {}
+
     function exactOutput(ExactOutputParams calldata params) external payable returns (uint256 amountIn) {}
+
     function exactOutputSingle(ExactOutputSingleParams calldata params) external payable returns (uint256 amountIn) {}
+
     function uniswapV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data) external {}
 }

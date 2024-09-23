@@ -5,3 +5,4 @@ dist/
 node_modules/
 contracts/openzeppelin-presets/
 lib/
+test/
