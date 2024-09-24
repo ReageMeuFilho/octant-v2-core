@@ -2,11 +2,12 @@
 src = "src"
 out = "out"
 libs = ["lib"]
-evm_version = "shanghai"
+evm_version = "cancun"
 optimizer = true
 optimizer_runs = 10_000_000
-solc = "0.8.23"
+solc = "0.8.25"
 verbosity = 3
+viaIR = true
 remappings = [
     "@solady=lib/solady/src", # octant solady path
     "solady=lib/solady", # deps solady path
@@ -23,7 +24,7 @@ verbosity = 4
   fuzz = { runs = 50 }
   invariant = { runs = 10 }
   # Speed up compilation and tests during development.
-  optimizer = false
+  optimizer = true
 
 [rpc_endpoints]
 mainnet = "${ETHEREUM_NODE_MAINNET}"
