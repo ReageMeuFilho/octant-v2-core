@@ -15,6 +15,8 @@
     "slither:setup": "python3 -m venv .venv && . .venv/bin/activate && pip3 install slither-analyzer",
     "slither": ". .venv/bin/activate && slither ./ --exclude-dependencies --filter-paths \"test\" --print human-summary",
     "gas": "forge snapshot --isolate --gas-report --diff .gas-snapshot > gasreport.txt",
+    "storage:generate": "./script/storage.sh generate",
+    "storage:check": "./script/storage.sh check",
     "deploy:liquidity-helper": ". ./.env && forge script script/UniswapLiquidityHelperDeployer.s.sol:UniswapLiquidityHelperDeployer --rpc-url $FORGE_RPC_URL --etherscan-api-key $ETHERSCAN_API_KEY --verify --broadcast -vvvv",
     "deploy:liquidity-helper:local": ". ./.env && forge script script/UniswapLiquidityHelperDeployer.s.sol:UniswapLiquidityHelperDeployer --rpc-url $FORGE_RPC_URL --broadcast -vvvv"
   },
