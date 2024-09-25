@@ -1,26 +1,37 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import "forge-std/Script.sol";
 import "safe-contracts/proxies/SafeProxy.sol";
 import { ModuleProxyFactory } from "../src/dragons/ModuleProxyFactory.sol";
 import { BatchScript } from "forge-safe/src/BatchScript.sol";
 
-contract AddTransactionToSafe is BatchScript {
+contract DeployModuleAndEnableOnSafe is Script, BatchScript {
     address public safe_;
+    address public token;
     ModuleProxyFactory public moduleFactory;
+    address public safeModuleImplementation;
     address public dragonVaultModule;
 
     function setUp() public {
         safe_ = vm.envAddress("SAFE_ADDRESS");
-        moduleFactory = ModuleProxyFactory(payable(vm.envAddress("MODULE_FACTORY"));
+        moduleFactory = ModuleProxyFactory(vm.envAddress("MODULE_FACTORY"));
         safeModuleImplementation = vm.envAddress("MODULE");
-        address token = vm.envAddress("TOKEN");        
+        token = vm.envAddress("TOKEN");
     }
 
     function run() public isBatch(safe_) {
-        dragonVaultModule = moduleFactory.deployModule(safeModuleImplementation, abi.encodeWithSignature("setUp(bytes)", abi.encode(safe_, token)), block.timestamp)
+        vm.startBroadcast();
+
+        dragonVaultModule = moduleFactory.deployModule(
+            safeModuleImplementation,
+            abi.encodeWithSignature("setUp(bytes)", abi.encode(safe_, token)),
+            block.timestamp
+        );
 
         console.log("Linked Dragon Vault Module: ", dragonVaultModule);
+
+        vm.stopBroadcast();
 
         bytes memory txn1 = abi.encodeWithSignature("enableModule(address)", dragonVaultModule);
 

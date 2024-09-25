@@ -1,15 +1,10 @@
 @solady/=lib/solady/src/
 solady/=lib/solady/
-@uniswap/v3-periphery/contracts/=lib/uniswap-v3-periphery-0.8/contracts/
-@uniswap/v3-core/contracts/=lib/uniswap-v3-core-0.8/contracts/
 @openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
 ds-test/=lib/forge-std/lib/ds-test/src/
 forge-std/=lib/forge-std/src/
 solady/=lib/solady/src
-uniswap-v3-core-0.8/=lib/uniswap-v3-core-0.8/contracts/
-uniswap-v3-periphery-0.8/=lib/uniswap-v3-periphery-0.8/contracts/
 openzeppelin-upgradeable=lib/openzeppelin-contracts-upgradeable/contracts
 zodiac=lib/zodiac/contracts
 safe-contracts=lib/safe-smart-account/contracts
 abdk-libraries-solidity=lib/abdk-libraries-solidity
-@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/

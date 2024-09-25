@@ -8,16 +8,18 @@ import { BatchScript } from "forge-safe/src/BatchScript.sol";
 contract AddTransactionToSafe is BatchScript {
     address public safe_;
     address public dragonVaultModule;
+    address public token;
 
     function setUp() public {
         safe_ = vm.envAddress("SAFE_ADDRESS");
         dragonVaultModule = vm.envAddress("SAFE_DRAGON_VAULT_MODULE_ADDRESS");
+        token = vm.envAddress("TOKEN");
     }
 
     function run() public isBatch(safe_) {
         bytes memory txn1 = abi.encodeWithSignature("approve(address,uint256)", dragonVaultModule, 100e18);
 
-        addToBatch(safe_, 0, txn1);
+        addToBatch(token, 0, txn1);
 
         bytes memory data = abi.encodeWithSignature("mint(uint256,address)", 1e18, safe_);
 

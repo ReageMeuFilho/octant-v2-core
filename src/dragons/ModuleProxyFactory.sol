@@ -50,7 +50,11 @@ contract ModuleProxyFactory {
         address asset,
         uint256 saltNonce
     ) public returns (address proxy) {
-        deployModule(masterCopy, abi.encodeWithSignature("setUp(bytes)", abi.encode(address(this), asset)), saltNonce);
+        proxy = deployModule(
+            masterCopy,
+            abi.encodeWithSignature("setUp(bytes)", abi.encode(address(this), asset)),
+            saltNonce
+        );
 
         ISafe(address(this)).enableModule(proxy);
     }
