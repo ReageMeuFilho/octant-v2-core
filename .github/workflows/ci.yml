@@ -14,40 +14,52 @@ jobs:
   build:
     strategy:
       fail-fast: true
+      matrix:
+        node-version:
+          - 16.x
 
     name: Octant V2 Core Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
         with:
           submodules: recursive
-          # secret is needed to download diva's smartcontracts
-          token: ${{ secrets.GH_PAT }} # `GH_PAT` is a secret that contains your PAT
+      - name: Setup node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16.x.x
 
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+        uses: onbjerg/foundry-toolchain@v1
         with:
           version: nightly
 
+      - name: Run npm install
+        run: "npm i"
+
       - name: Run Forge build
-        run: |
-          forge --version
-          forge build --sizes
+        run: "forge build"
 
   test:
     strategy:
       fail-fast: true
-    
+
     name: Octant V2 Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
         with:
           submodules: recursive
-          token: ${{ secrets.GH_PAT }} # `GH_PAT` is a secret that contains your PAT
+      - name: Setup node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16.x.x
 
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+        uses: onbjerg/foundry-toolchain@v1
+
+      - name: Run npm install
+        run: "npm i"
 
       - name: Run tests
         env:
@@ -57,17 +69,23 @@ jobs:
   coverage:
     strategy:
       fail-fast: true
-      
+
     name: Coverage
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
         with:
           submodules: recursive
-          token: ${{ secrets.GH_PAT }} # `GH_PAT` is a secret that contains your PAT
+      - name: Setup node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16.x.x
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Run npm install
+        run: "npm i"
 
       - name: Run coverage
         run: forge coverage --report summary --report lcov
