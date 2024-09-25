@@ -12,3 +12,4 @@ openzeppelin-upgradeable=lib/openzeppelin-contracts-upgradeable/contracts
 zodiac=lib/zodiac/contracts
 safe-contracts=lib/safe-smart-account/contracts
 abdk-libraries-solidity=lib/abdk-libraries-solidity
+@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/
