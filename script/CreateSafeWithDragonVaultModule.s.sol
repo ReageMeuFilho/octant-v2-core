@@ -23,7 +23,7 @@ contract CreateSafeWithModule is Script {
 
         // Set the addresses for the Safe singleton and Proxy Factory
         safeSingleton = vm.envAddress("SAFE_SINGLETON");
-        proxyFactory = vm.envAddress("PROXY_FACTORY");
+        proxyFactory = vm.envAddress("SAFE_PROXY_FACTORY");
 
         moduleFactory = vm.envAddress("MODULE_FACTORY");
         module = vm.envAddress("MODULE");
