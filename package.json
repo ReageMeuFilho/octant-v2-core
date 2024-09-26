@@ -19,16 +19,18 @@
     "storage:check": "./script/storage.sh check",
     "coverage": "forge coverage --ir-minimum --report lcov",
     "coverage:genhtml": "genhtml lcov.info --branch-coverage --output-dir coverage --ignore-errors inconsistent,corrupt,category",
-    "deploy:liquidity-helper": ". ./.env && forge script script/UniswapLiquidityHelperDeployer.s.sol:UniswapLiquidityHelperDeployer --rpc-url $FORGE_RPC_URL --etherscan-api-key $ETHERSCAN_API_KEY --verify --broadcast -vvvv",
-    "deploy:liquidity-helper:local": ". ./.env && forge script script/UniswapLiquidityHelperDeployer.s.sol:UniswapLiquidityHelperDeployer --rpc-url $FORGE_RPC_URL --broadcast -vvvv"
+    "deploy:liquidity-helper": ". ./.env && forge script script/UniswapLiquidityHelperDeployer.s.sol:UniswapLiquidityHelperDeployer --rpc-url $RPC_URL --etherscan-api-key $ETHERSCAN_API_KEY --verify --broadcast -vvvv",
+    "deploy:liquidity-helper:local": ". ./.env && forge script script/UniswapLiquidityHelperDeployer.s.sol:UniswapLiquidityHelperDeployer --rpc-url $RPC_URL --broadcast -vvvv"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@gnosis.pm/safe-contracts": "^1.3.0",
     "dotenv": "^16.4.5"
   },
   "devDependencies": {
+    "forge-stack-tracer": "^1.0.3",
     "lint-staged": "^15.2.10",
     "prettier": "^3.3.3",
     "prettier-plugin-solidity": "^1.4.1",

@@ -1,9 +1,7 @@
 {
   "solc_remaps": [
     "@solady=lib/solady/src",
-    "solady=lib/solady",
-    "@uniswap/v3-periphery/contracts=lib/uniswap-v3-periphery-0.8/contracts",
-    "@uniswap/v3-core/contracts=lib/uniswap-v3-core-0.8/contracts"
+    "solady=lib/solady"
   ],
   "detectors_to_exclude": "external-function,naming-convention,solc-version,dead-code,block-timestamp,missing-zero-check,delegatecall-loop,msg-value-loop",
   "filter_paths": "node_modules|openzeppelin-presets",
