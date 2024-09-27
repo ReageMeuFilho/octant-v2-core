@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LGPL-3.0-only
-pragma solidity ^0.8.23;
+pragma solidity >=0.7.0 <0.9.0;
 
 interface ISafe {
     /**
@@ -38,7 +38,11 @@ interface ISafe {
      * @param data That should be signed (this is passed to an external validator contract)
      * @param signatures Signature data that should be verified. Can be ECDSA signature, contract signature (EIP-1271) or approved hash.
      */
-    function checkSignatures(bytes32 dataHash, bytes memory data, bytes memory signatures) external view;
+    function checkSignatures(
+        bytes32 dataHash,
+        bytes memory data,
+        bytes memory signatures
+    ) external view;
 
     /**
      * @dev Returns the domain separator for this contract, as defined in the EIP-712 standard.

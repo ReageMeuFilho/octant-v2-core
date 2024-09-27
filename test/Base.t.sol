@@ -3,8 +3,8 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 import { TestPlus } from "solady/test/utils/TestPlus.sol";
-import { ModuleProxyFactory } from "../src/dragons/ModuleProxyFactory.sol";
-import { DragonVaultModule } from "../src/dragons/DragonVaultModule.sol";
+import { DragonModuleProxyFactory } from "../src/dragons/ModuleProxyFactory.sol";
+import { DragonVaultModule } from "../poc/dragons/DragonVaultModule.sol";
 import { TestERC20 } from "../src/test/TestERC20.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
 import { ISafe } from "../src/interfaces/Safe.sol";
@@ -23,7 +23,7 @@ contract BaseTest is Test, TestPlus {
 
     uint256 threshold = 1;
     uint256 fork;
-    ModuleProxyFactory public moduleFactory;
+    DragonModuleProxyFactory public moduleFactory;
     TestERC20 public token;
     address[] public owners;
 
@@ -32,7 +32,7 @@ contract BaseTest is Test, TestPlus {
         vm.selectFork(fork);
 
         // deploy module proxy factory and test erc20 asset
-        moduleFactory = new ModuleProxyFactory();
+        moduleFactory = new DragonModuleProxyFactory();
 
         token = new TestERC20();
     }

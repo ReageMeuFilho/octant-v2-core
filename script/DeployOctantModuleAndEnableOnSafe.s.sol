@@ -2,14 +2,14 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Script.sol";
-import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxy.sol";
-import { ModuleProxyFactory } from "../src/dragons/ModuleProxyFactory.sol";
+import "safe-contracts/proxies/SafeProxy.sol";
+import { DragonModuleProxyFactory } from "../src/dragons/ModuleProxyFactory.sol";
 import { BatchScript } from "forge-safe/src/BatchScript.sol";
 
 contract DeployModuleAndEnableOnSafe is Script, BatchScript {
     address public safe_;
     address public token;
-    ModuleProxyFactory public moduleFactory;
+    DragonModuleProxyFactory public moduleFactory;
     address public safeModuleImplementation;
     address public octantVaultModule;
 
@@ -20,7 +20,7 @@ contract DeployModuleAndEnableOnSafe is Script, BatchScript {
 
     function setUp() public {
         safe_ = vm.envAddress("SAFE_ADDRESS");
-        moduleFactory = ModuleProxyFactory(vm.envAddress("MODULE_FACTORY"));
+        moduleFactory = DragonModuleProxyFactory(vm.envAddress("MODULE_FACTORY"));
         safeModuleImplementation = vm.envAddress("MODULE");
         keeper = vm.envAddress("KEEPER");
         treasury = vm.envAddress("TREASURY");
