@@ -10,7 +10,7 @@ contract DragonVaultModule is Module, ERC4626Upgradeable {
     /// @dev Initialize function, will be triggered when a new proxy is deployed
     /// @param initializeParams Parameters of initialization encoded
     function setUp(bytes memory initializeParams) public override initializer {
-        (address _owner, address _asset) = abi.decode(initializeParams, (address, address));
+        (, address _owner, address _asset) = abi.decode(initializeParams, (bytes32, address, address));
 
         __Ownable_init(msg.sender);
         __ERC4626_init(IERC20(_asset));
