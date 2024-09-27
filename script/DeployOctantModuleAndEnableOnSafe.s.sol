@@ -11,29 +11,40 @@ contract DeployModuleAndEnableOnSafe is Script, BatchScript {
     address public token;
     ModuleProxyFactory public moduleFactory;
     address public safeModuleImplementation;
-    address public dragonVaultModule;
+    address public octantVaultModule;
+
+    address keeper;
+    address treasury;
+    address dragonRouter;
+    uint256 totalValidators;
 
     function setUp() public {
         safe_ = vm.envAddress("SAFE_ADDRESS");
         moduleFactory = ModuleProxyFactory(vm.envAddress("MODULE_FACTORY"));
         safeModuleImplementation = vm.envAddress("MODULE");
-        token = vm.envAddress("TOKEN");
+        keeper = vm.envAddress("KEEPER");
+        treasury = vm.envAddress("TREASURY");
+        dragonRouter = vm.envAddress("DRAGON_ROUTER");
+        totalValidators = vm.envUint("TOTAL_VALIDATORS");
     }
 
     function run() public isBatch(safe_) {
         vm.startBroadcast();
 
-        dragonVaultModule = moduleFactory.deployModule(
+        octantVaultModule = moduleFactory.deployModule(
             safeModuleImplementation,
-            abi.encodeWithSignature("setUp(bytes)", abi.encode(safe_, bytes32(0), bytes32(0), token)),
+            abi.encodeWithSignature(
+                "setUp(bytes)",
+                abi.encode(safe_, bytes32(0), bytes32(0), keeper, treasury, dragonRouter, totalValidators)
+            ),
             block.timestamp
         );
 
-        console.log("Linked Dragon Vault Module: ", dragonVaultModule);
+        console.log("Linked Octant Vault Module: ", octantVaultModule);
 
         vm.stopBroadcast();
 
-        bytes memory txn1 = abi.encodeWithSignature("enableModule(address)", dragonVaultModule);
+        bytes memory txn1 = abi.encodeWithSignature("enableModule(address)", octantVaultModule);
 
         addToBatch(safe_, 0, txn1);
 
