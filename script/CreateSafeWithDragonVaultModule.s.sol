@@ -42,9 +42,9 @@ contract CreateSafeWithModule is Script {
             threshold,
             moduleFactory,
             abi.encodeWithSignature(
-                "deployAndEnableModuleFromSafe(address,address,uint256)",
+                "deployAndEnableModuleFromSafe(address,bytes,uint256)",
                 module,
-                address(token),
+                abi.encode(address(token)),
                 block.timestamp
             ),
             address(0),

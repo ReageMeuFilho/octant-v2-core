@@ -12,18 +12,17 @@ contract DeployModuleFactoryTestToken is Script {
     function run() public {
         vm.startBroadcast();
 
-        // Deploy a new Safe Multisig using the Proxy Factory
         ModuleProxyFactory factory = new ModuleProxyFactory();
 
         DragonVaultModule dragonVaultModule = new DragonVaultModule();
 
-        // TestERC20 testERC20 = new TestERC20();
+        TestERC20 testERC20 = new TestERC20();
 
         vm.stopBroadcast();
 
         // Log the address of the newly deployed Safe
         console.log("Factory deployed at:", address(factory));
         console.log("Dragon Vault Module deployed at:", address(dragonVaultModule));
-        // console.log("Test ERC20 Token", address(testERC20));
+        console.log("Test ERC20 Token", address(testERC20));
     }
 }
