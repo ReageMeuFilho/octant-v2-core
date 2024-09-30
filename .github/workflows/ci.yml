@@ -73,12 +73,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16.x.x
+
+      - name: Run npm install
+        run: "npm i"
+
       - name: Run Slither
         uses: crytic/slither-action@v0.4.0
-        id: slither
         with:
-          sarif: results.sarif
-          fail-on: none
+          target: "src/"
 
   # coverage:
   #   strategy:
