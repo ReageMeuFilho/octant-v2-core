@@ -199,7 +199,7 @@ contract TokenizedStrategy {
         bytes32 INITIAL_DOMAIN_SEPARATOR; // The domain separator used for permits on the initial chain.
         mapping(address => uint256) nonces; // Mapping of nonces used for permit functions.
         mapping(address => uint256) balances; // Mapping to track current balances for each account that holds shares.
-        mapping(address => mapping(addres:withdraw( gg, receiver, owner);s => uint256)) allowances; // Mapping to track the allowances for the strategies shares.
+        mapping(address => mapping(address => uint256)) allowances; // Mapping to track the allowances for the strategies shares.
 
 
         // Assets data to track totals the strategy holds.
