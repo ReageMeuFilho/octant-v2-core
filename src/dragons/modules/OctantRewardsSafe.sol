@@ -36,12 +36,22 @@ contract OctantRewardsSafe is Module {
 
     /// @dev Emitted when `amount` of ETH is transferred from `from` to `to`.
     event Transfer(address indexed from, address indexed to, uint256 amount);
-    /// @dev Emitted when `treasury` from `oldAddress` to `newAddress` by the owner.
+    /// @dev Emitted when `treasury` is updated from `oldAddress` to `newAddress` by the owner.
     event TreasuryUpdated(address oldAddress, address newAddress);
-    /// @dev Emitted when `dragonRouter` from `oldAddress` to `newAddress` by the owner.
+    /// @dev Emitted when `dragonRouter` is updated from `oldAddress` to `newAddress` by the owner.
     event DragonRouterUpdated(address oldAddress, address newAddress);
-    /// @dev
+    /// @dev Emitted when yield is harvested
     event Report(uint256 yield, uint256 totalDepositedAssets, uint256 timePeriod);
+    /// @dev Emitted when owner requests `amount` of validators to be exited.
+    event RequestExitValidators(uint256 amount, uint256 totalExitedValidators);
+    /// @dev Emitted when owner requests `amount` of validators to be added.
+    event RequestNewValidators(uint256 amount, uint256 totalNewValidators);
+    /// @dev Emitted when `maxYield` is updated from `oldMaxYield` to `newMaxYield` by the owner.
+    event MaxYieldUpdated(uint256 oldMaxYield, uint256 newMaxYield);
+    /// @dev Emitted when keeper confirm new `amount` of validators are added.
+    event NewValidatorsConfirmed(uint256 newValidators, uint256 totalValidators);
+    /// @dev Emitted when keeper confirm `amount` of validators are exited.
+    event ExitValidatorsConfirmed(uint256 validtorsExited, uint256 totalValidators);
 
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
     /*                        MODIFIERS                           */
@@ -110,7 +120,7 @@ contract OctantRewardsSafe is Module {
     function requestNewValidators(uint256 amount) external onlyOwner {
         require(amount != 0, "Invalid Amount");
         newValidators += amount;
-        // emit Request New validators event
+        emit RequestNewValidators(amount, newValidators);
     }
 
     /// @dev Request the number of validtors to be exited.
@@ -119,7 +129,7 @@ contract OctantRewardsSafe is Module {
     function requestExitValidators(uint256 amount) external onlyOwner {
         require(amount != 0, "Invalid Amount");
         exitedValidators += amount;
-        // emit Request exit validators event
+        emit RequestExitValidators(amount, exitedValidators);
     }
 
     /// @dev sets treasury address. Can be only called by the owner of the module.
@@ -138,6 +148,14 @@ contract OctantRewardsSafe is Module {
         dragonRouter = _dragonRouter;
     }
 
+    /// @dev sets max yield that can be harvested.
+    /// @param _maxYield maximum yield that can be harvested
+    function setMaxYield(uint256 _maxYield) external onlyOwner {
+        require(_maxYield > 0 && _maxYield < 32 ether, "Invalid Max Yield");
+        emit MaxYieldUpdated(maxYield, _maxYield);
+        maxYield = _maxYield;
+    }
+
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
     /*                      ONLY KEEPER FUNCTIONS                 */
     /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
@@ -147,8 +165,8 @@ contract OctantRewardsSafe is Module {
     function confirmNewValidators() external onlyKeeper {
         require(newValidators != 0, "Invalid Amount");
         totalValidators += newValidators;
+        emit NewValidatorsConfirmed(newValidators, totalValidators);
         newValidators = 0;
-        // emit an event.
     }
 
     /// @dev Confirm's validators are exited and withdraws principal to treasury.
@@ -162,5 +180,6 @@ contract OctantRewardsSafe is Module {
         bool success = exec(treasury, validtorsExited * 32 ether, "", Enum.Operation.Call);
         require(success, "Failed to transfer principal to Treasury");
         emit Transfer(owner(), treasury, validtorsExited * 32 ether);
+        emit ExitValidatorsConfirmed(validtorsExited, totalValidators);
     }
 }

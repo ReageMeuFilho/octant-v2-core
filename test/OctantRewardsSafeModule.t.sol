@@ -3,6 +3,7 @@ pragma solidity ^0.8.13;
 
 import "./Base.t.sol";
 import { OctantRewardsSafe } from "../src/dragons/modules/OctantRewardsSafe.sol";
+import { FailSafe } from "./mocks/MockFailSafe.sol";
 
 contract OctantRewardsSafeModule is BaseTest {
     address keeper = makeAddr("keeper");
@@ -96,6 +97,23 @@ contract OctantRewardsSafeModule is BaseTest {
         vm.stopPrank();
     }
 
+    function testOnlyOwnerCanSetMaxYield() public {
+        uint256 _newMaxYield = 3 ether;
+        vm.expectRevert();
+        module.setMaxYield(_newMaxYield);
+
+        vm.startPrank(temps.safe);
+
+        // fails if max yield not in range
+        vm.expectRevert("Invalid Max Yield");
+        module.setMaxYield(0);
+
+        module.setMaxYield(_newMaxYield);
+        assertTrue(module.maxYield() == _newMaxYield);
+
+        vm.stopPrank();
+    }
+
     function testExitValidators() public {
         uint256 exitedValidators = 1;
 
@@ -112,6 +130,17 @@ contract OctantRewardsSafeModule is BaseTest {
         // can only be called by keeper
         vm.expectRevert();
         module.confirmExitValidators();
+
+        /// confirmExitValidators Fails if execTransactionFromModule returns false
+        FailSafe failSafe = new FailSafe();
+        vm.prank(temps.safe);
+        module.setTarget(address(failSafe));
+        vm.deal(temps.safe, exitedValidators * 32 ether); // send yield to safe
+        vm.expectRevert("Failed to transfer principal to Treasury");
+        vm.prank(keeper);
+        module.confirmExitValidators();
+        vm.prank(temps.safe);
+        module.setTarget(temps.safe);
 
         vm.startPrank(keeper);
 
@@ -141,5 +170,13 @@ contract OctantRewardsSafeModule is BaseTest {
         assertTrue(dragonRouter.balance == 0);
         module.harvest();
         assertTrue(dragonRouter.balance == yield);
+
+        /// Harvest Fails if execTransactionFromModule returns false
+        FailSafe failSafe = new FailSafe();
+        vm.prank(temps.safe);
+        module.setTarget(address(failSafe));
+        vm.deal(temps.safe, yield); // send yield to safe
+        vm.expectRevert("Failed to transfer yield to Dragon Router");
+        module.harvest();
     }
 }
