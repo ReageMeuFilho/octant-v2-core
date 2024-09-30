@@ -25,3 +25,4 @@ docs/
 
 # npm/pnpm related files
 node_modules/
+.venv

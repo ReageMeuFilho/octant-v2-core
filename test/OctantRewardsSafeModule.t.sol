@@ -9,6 +9,7 @@ contract OctantRewardsSafeModule is BaseTest {
     address treasury = makeAddr("treasury");
     address dragonRouter = makeAddr("dragonRouter");
     uint256 totalValidators = 2;
+    uint256 maxYield = 31 ether;
 
     testTemps temps;
     OctantRewardsSafe moduleImplementation;
@@ -17,7 +18,10 @@ contract OctantRewardsSafeModule is BaseTest {
     function setUp() public override {
         super.setUp();
         moduleImplementation = new OctantRewardsSafe();
-        temps = _testTemps(address(moduleImplementation), abi.encode(keeper, treasury, dragonRouter, totalValidators));
+        temps = _testTemps(
+            address(moduleImplementation),
+            abi.encode(keeper, treasury, dragonRouter, totalValidators, maxYield)
+        );
         module = OctantRewardsSafe(payable(temps.module));
     }
 
@@ -29,15 +33,30 @@ contract OctantRewardsSafeModule is BaseTest {
         assertTrue(module.totalValidators() == totalValidators);
     }
 
-    function testOnlyKeeperCanAddNewValidators() public {
+    function testOnlyKeeperCanConfirmNewValidators() public {
         uint256 amount = 2;
 
+        vm.startPrank(temps.safe);
+
+        // Fails if 0 is passed
+        vm.expectRevert("Invalid Amount");
+        module.requestNewValidators(0);
+
+        module.requestNewValidators(amount);
+
+        vm.stopPrank();
+
         vm.expectRevert();
-        module.addNewValidators(amount);
+        module.confirmNewValidators();
 
         vm.startPrank(keeper);
-        module.addNewValidators(amount);
+        module.confirmNewValidators();
         assertTrue(module.totalValidators() == totalValidators + amount);
+
+        // fails when newValidators == 0
+        vm.expectRevert("Invalid Amount");
+        module.confirmNewValidators();
+
         vm.stopPrank();
     }
 
@@ -48,8 +67,14 @@ contract OctantRewardsSafeModule is BaseTest {
         module.setTreasury(newTreasury);
 
         vm.startPrank(temps.safe);
+
+        // fails if zero address is passed.
+        vm.expectRevert("Invalid address");
+        module.setTreasury(address(0));
+
         module.setTreasury(newTreasury);
         assertTrue(module.treasury() == newTreasury);
+
         vm.stopPrank();
     }
 
@@ -60,58 +85,61 @@ contract OctantRewardsSafeModule is BaseTest {
         module.setDragonRouter(newDragonRouter);
 
         vm.startPrank(temps.safe);
+
+        // fails if zero address is passed.
+        vm.expectRevert("Invalid address");
+        module.setDragonRouter(address(0));
+
         module.setDragonRouter(newDragonRouter);
         assertTrue(module.dragonRouter() == newDragonRouter);
+
         vm.stopPrank();
     }
 
-    function testExitValidtors() public {
-        uint256 yield = 1 ether;
+    function testExitValidators() public {
         uint256 exitedValidators = 1;
+
+        vm.startPrank(temps.safe);
+
+        // Fails if 0 is passed
+        vm.expectRevert("Invalid Amount");
+        module.requestExitValidators(0);
+
+        module.requestExitValidators(exitedValidators);
+
+        vm.stopPrank();
 
         // can only be called by keeper
         vm.expectRevert();
-        module.exitValidators(exitedValidators);
+        module.confirmExitValidators();
 
         vm.startPrank(keeper);
 
-        // Keeper cannot exit more than totalValidators
-        vm.expectRevert();
-        module.exitValidators(totalValidators + 1);
-
-        assertTrue(dragonRouter.balance == 0);
-        vm.deal(temps.safe, yield); // send yield to safe
-        module.exitValidators(1);
+        assertTrue(treasury.balance == 0);
+        vm.deal(temps.safe, exitedValidators * 32 ether); // send yield to safe
+        module.confirmExitValidators();
         assertTrue(module.totalValidators() == (totalValidators - exitedValidators));
-        assertTrue(dragonRouter.balance == yield);
+        assertTrue(treasury.balance == exitedValidators * 32 ether);
+
+        // keeper cannot call confirmExitValidators when exitedValidators = 0
+        vm.expectRevert("Validators to be exited should be > 0");
+        module.confirmExitValidators();
 
         vm.stopPrank();
     }
 
     function testHarvest() public {
         uint256 yield = 1 ether;
-        uint256 exitedValidators = 1;
 
-        /// Harvest works when there's no validator exited
+        /// Harvest fails when Yield > Max Yield
+        vm.deal(temps.safe, maxYield + 1 ether); // send yield to safe
+        vm.expectRevert("Yield not in range");
+        module.harvest();
+
+        /// Harvest works when Yield < Max Yield
         vm.deal(temps.safe, yield); // send yield to safe
         assertTrue(dragonRouter.balance == 0);
         module.harvest();
         assertTrue(dragonRouter.balance == yield);
-
-        /// Harvest works when a validator is exited and there is some yield in the vault
-        // exit validator
-        vm.startPrank(keeper);
-        module.exitValidators(1);
-        vm.stopPrank();
-
-        // yield and principal are in the safe
-        vm.deal(temps.safe, yield + exitedValidators * 32 ether); // principal
-
-        uint256 previousDragonRouterBalance = dragonRouter.balance;
-        uint256 previousTreasuryBalance = treasury.balance;
-        module.harvest();
-        assertTrue(dragonRouter.balance == (previousDragonRouterBalance + yield));
-        assertTrue(treasury.balance == (previousTreasuryBalance + exitedValidators * 32 ether));
-        assertTrue(module.exitedValidators() == 0);
     }
 }

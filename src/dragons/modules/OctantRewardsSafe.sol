@@ -19,8 +19,16 @@ contract OctantRewardsSafe is Module {
     address public dragonRouter;
     /// @dev total number of validators currently active.
     uint256 public totalValidators;
+    /// @dev amount of new validators to be added.
+    uint256 public newValidators;
     /// @dev amount of validators currently being exited.
     uint256 public exitedValidators;
+    /// @dev total amount of yield harvested
+    uint256 public totalYield;
+    /// @dev latest timestamp of harvest()
+    uint256 public lastHarvested;
+    /// @dev Maximum yield that can be harvested
+    uint256 public maxYield;
 
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
     /*                           EVENTS                           */
@@ -32,6 +40,8 @@ contract OctantRewardsSafe is Module {
     event TreasuryUpdated(address oldAddress, address newAddress);
     /// @dev Emitted when `dragonRouter` from `oldAddress` to `newAddress` by the owner.
     event DragonRouterUpdated(address oldAddress, address newAddress);
+    /// @dev
+    event Report(uint256 yield, uint256 totalDepositedAssets, uint256 timePeriod);
 
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
     /*                        MODIFIERS                           */
@@ -49,8 +59,16 @@ contract OctantRewardsSafe is Module {
     /// @dev owner of this module will the safe multisig that calls setUp function
     /// @param initializeParams Parameters of initialization encoded
     function setUp(bytes memory initializeParams) public override initializer {
-        (address _owner, , , address _keeper, address _treasury, address _dragonRouter, uint256 _totalValidators) = abi
-            .decode(initializeParams, (address, bytes32, bytes32, address, address, address, uint256));
+        (
+            address _owner,
+            ,
+            ,
+            address _keeper,
+            address _treasury,
+            address _dragonRouter,
+            uint256 _totalValidators,
+            uint256 _maxYield
+        ) = abi.decode(initializeParams, (address, bytes32, bytes32, address, address, address, uint256, uint256));
 
         __Ownable_init(msg.sender);
 
@@ -58,6 +76,7 @@ contract OctantRewardsSafe is Module {
         treasury = _treasury;
         dragonRouter = _dragonRouter;
         totalValidators = _totalValidators;
+        maxYield = _maxYield;
         setAvatar(_owner);
         setTarget(_owner);
         transferOwnership(_owner);
@@ -68,36 +87,39 @@ contract OctantRewardsSafe is Module {
     /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
 
     /// @dev transfers the yield to the dragon router from safe and principal to treasury.
-    function harvest() public returns (bool success) {
-        if (exitedValidators != 0) {
-            uint256 validtorsExited = exitedValidators;
-            exitedValidators = 0;
-            success = exec(treasury, validtorsExited * 32 ether, "", Enum.Operation.Call);
-            require(success, "Failed to transfer principal to Treasury");
-            emit Transfer(owner(), treasury, validtorsExited * 32 ether);
-        }
+    function harvest() external {
         uint256 yield = owner().balance;
-        if (yield != 0) {
-            success = exec(dragonRouter, yield, "", Enum.Operation.Call);
-            require(success, "Failed to transfer yield to Dragon Router");
-            emit Transfer(owner(), dragonRouter, yield);
-        }
+        require(yield != 0 && yield < maxYield, "Yield not in range");
+
+        uint256 lastHarvestTime = lastHarvested;
+        lastHarvested = block.timestamp;
+        totalYield += yield;
+        bool success = exec(dragonRouter, yield, "", Enum.Operation.Call);
+        require(success, "Failed to transfer yield to Dragon Router");
+        emit Transfer(owner(), dragonRouter, yield);
+        emit Report(yield, totalValidators * 32 ether, block.timestamp - lastHarvestTime);
     }
 
-    /// @dev increases the number of total validators.
+    /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
+    /*                      ONLY OWNER FUNCTIONS                  */
+    /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
+
+    /// @dev Request to increase the number of total validators.
     ///      Can be only called by the owner of the module.
     /// @param amount Amount of validators to be added.
-    function addNewValidators(uint256 amount) external onlyKeeper {
-        totalValidators += amount;
+    function requestNewValidators(uint256 amount) external onlyOwner {
+        require(amount != 0, "Invalid Amount");
+        newValidators += amount;
+        // emit Request New validators event
     }
 
-    /// @dev Sets the number of validtors to be exited. This function should be called before exiting the validators.
-    ///      Can be only called by the keeper.
+    /// @dev Request the number of validtors to be exited.
+    ///      Can be only called by the owner of the module.
     /// @param amount Amount of validators to be exited.
-    function exitValidators(uint256 amount) external onlyKeeper {
-        totalValidators -= amount;
-        harvest();
-        exitedValidators = amount;
+    function requestExitValidators(uint256 amount) external onlyOwner {
+        require(amount != 0, "Invalid Amount");
+        exitedValidators += amount;
+        // emit Request exit validators event
     }
 
     /// @dev sets treasury address. Can be only called by the owner of the module.
@@ -114,5 +136,31 @@ contract OctantRewardsSafe is Module {
         require(_dragonRouter != address(0), "Invalid address");
         emit DragonRouterUpdated(dragonRouter, _dragonRouter);
         dragonRouter = _dragonRouter;
+    }
+
+    /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
+    /*                      ONLY KEEPER FUNCTIONS                 */
+    /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
+
+    /// @dev Increases the number of total validators.
+    ///      Can be only called by the keeper.
+    function confirmNewValidators() external onlyKeeper {
+        require(newValidators != 0, "Invalid Amount");
+        totalValidators += newValidators;
+        newValidators = 0;
+        // emit an event.
+    }
+
+    /// @dev Confirm's validators are exited and withdraws principal to treasury.
+    ///      Can be only called by the owner of the module.
+    function confirmExitValidators() external onlyKeeper {
+        uint256 validtorsExited = exitedValidators;
+        require(validtorsExited != 0, "Validators to be exited should be > 0");
+
+        totalValidators -= validtorsExited;
+        exitedValidators = 0;
+        bool success = exec(treasury, validtorsExited * 32 ether, "", Enum.Operation.Call);
+        require(success, "Failed to transfer principal to Treasury");
+        emit Transfer(owner(), treasury, validtorsExited * 32 ether);
     }
 }
