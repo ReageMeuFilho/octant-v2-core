@@ -56,7 +56,7 @@ import { IBaseStrategy } from "./interfaces/IBaseStrategy.sol";
 
 /**
  * @title Yearn Tokenized Strategy
- * @author yearn.finance
+ * @author yearn.finance , Octact 
  * @notice
  *  This TokenizedStrategy can be used by anyone wishing to easily build
  *  and deploy their own custom ERC4626 compliant single strategy Vault.
@@ -933,6 +933,7 @@ contract TokenizedStrategy {
      * @return loss The notional amount of loss if any since the last
      * report in terms of `asset`.
      */
+    //solhint-disable-next-line code-complexity
     function report() external nonReentrant onlyKeepers returns (uint256 profit, uint256 loss) {
         // Cache storage pointer since its used repeatedly.
         StrategyData storage S = _strategyStorage();
@@ -1939,4 +1940,3 @@ contract TokenizedStrategy {
         _strategyStorage().asset = ERC20(address(1));
     }
 }
-
