@@ -11,4 +11,14 @@ contract DragonModule is Module {
         setAvatar(_owner);
         setTarget(_owner);
     }
+
+    // Gnosis Safe Module functions
+    function execTransaction(
+        address to,
+        uint256 value,
+        bytes memory data,
+        uint8 operation
+    ) external onlyGnosisSafe returns (bool) {
+        return IGnosisSafe(gnosisSafe).execTransactionFromModule(to, value, data, operation);
+    }
 }
