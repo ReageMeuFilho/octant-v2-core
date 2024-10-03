@@ -6,7 +6,7 @@ import { TestPlus } from "solady/test/utils/TestPlus.sol";
 import { ModuleProxyFactory } from "../src/dragons/ModuleProxyFactory.sol";
 import { DragonVaultModule } from "../src/dragons/DragonVaultModule.sol";
 import { TestERC20 } from "../src/test/TestERC20.sol";
-import "safe-contracts/proxies/SafeProxyFactory.sol";
+import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
 import { ISafe } from "../src/interfaces/Safe.sol";
 
 contract BaseTest is Test, TestPlus {
