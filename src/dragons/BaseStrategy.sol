@@ -2,7 +2,6 @@
 pragma solidity >=0.8.18;
 
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
 // TokenizedStrategy interface used for internal view delegateCalls.
 import { ITokenizedStrategy } from "../interfaces/ITokenizedStrategy.sol";
@@ -37,7 +36,7 @@ import { ITokenizedStrategy } from "../interfaces/ITokenizedStrategy.sol";
  *  can be viewed within the Strategy by a simple call using the
  *  `TokenizedStrategy` variable. IE: TokenizedStrategy.globalVariable();.
  */
-abstract contract BaseStrategy is Initializable {
+abstract contract BaseStrategy {
     /*//////////////////////////////////////////////////////////////
                             MODIFIERS
     //////////////////////////////////////////////////////////////*/
@@ -143,7 +142,7 @@ abstract contract BaseStrategy is Initializable {
      * @param _name Name the strategy will use.
      * 
      */
-    function __BaseStrategy_init(address _tokenizedStrategyImplementation, address _asset, address _management, address _keeper, address _dragonRouter, uint256 _maxReportDelay, string memory _name) internal onlyInitializing {
+    function __BaseStrategy_init(address _tokenizedStrategyImplementation, address _asset, address _management, address _keeper, address _dragonRouter, uint256 _maxReportDelay, string memory _name) internal {
         tokenizedStrategyImplementation = _tokenizedStrategyImplementation;
         asset = ERC20(_asset);
         maxReportDelay = _maxReportDelay;
