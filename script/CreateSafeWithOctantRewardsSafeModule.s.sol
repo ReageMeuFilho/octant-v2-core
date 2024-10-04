@@ -14,7 +14,11 @@ contract CreateSafeWithModule is Script {
     address public proxyFactory;
     address public moduleFactory;
     address public module;
-    TestERC20 public token;
+
+    address keeper;
+    address treasury;
+    address dragonRouter;
+    uint256 totalValidators;
 
     function setUp() public {
         // Initialize owners and threshold
@@ -27,8 +31,10 @@ contract CreateSafeWithModule is Script {
 
         moduleFactory = vm.envAddress("MODULE_FACTORY");
         module = vm.envAddress("MODULE");
-
-        token = TestERC20(payable(vm.envAddress("TOKEN")));
+        keeper = vm.envAddress("KEEPER");
+        treasury = vm.envAddress("TREASURY");
+        dragonRouter = vm.envAddress("DRAGON_ROUTER");
+        totalValidators = vm.envUint("TOTAL_VALIDATORS");
     }
 
     function run() public {
@@ -44,7 +50,7 @@ contract CreateSafeWithModule is Script {
             abi.encodeWithSignature(
                 "deployAndEnableModuleFromSafe(address,bytes,uint256)",
                 module,
-                abi.encode(address(token)),
+                abi.encode(keeper, treasury, dragonRouter, totalValidators),
                 block.timestamp
             ),
             address(0),
@@ -54,8 +60,6 @@ contract CreateSafeWithModule is Script {
         );
 
         SafeProxy proxy = factory.createProxyWithNonce(safeSingleton, data, block.timestamp);
-
-        token.mint(address(proxy), 100 ether);
 
         vm.stopBroadcast();
 

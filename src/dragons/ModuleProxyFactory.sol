@@ -47,12 +47,12 @@ contract ModuleProxyFactory {
 
     function deployAndEnableModuleFromSafe(
         address masterCopy,
-        address asset,
+        bytes memory data,
         uint256 saltNonce
     ) public returns (address proxy) {
         proxy = deployModule(
             masterCopy,
-            abi.encodeWithSignature("setUp(bytes)", abi.encode(address(this), asset)),
+            abi.encodeWithSignature("setUp(bytes)", abi.encode(address(this), data)),
             saltNonce
         );
 
