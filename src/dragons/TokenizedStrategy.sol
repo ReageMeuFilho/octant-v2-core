@@ -761,19 +761,18 @@ contract TokenizedStrategy {
         }
     }
 
+    // TODO: docsumentation
+    //function to get total yield
+    function totalYield() public view returns (uint256) {
+        return _strategyStorage().totalYield;
+    }
+
     /**
-     * @notice Get the current supply of the strategies shares.
-     *
-     * Locked shares issued to the strategy from profits are not
-     * counted towards the full supply until they are unlocked.
-     *
-     * As more shares slowly unlock the totalSupply will decrease
-     * causing the PPS of the strategy to increase.
-     *
-     * @return . Total amount of shares issued.
+     * @notice Get the current supply of the strategy's shares.
+     * @return Total amount of shares issued.
      */
     function totalSupply() public view returns (uint256) {
-        return _strategyStorage().totalSupply - _unlockedShares();
+        return _strategyStorage().totalSupply;
     }
 
     /**
@@ -893,12 +892,40 @@ contract TokenizedStrategy {
 
         _burn(owner, shares);
 
+        // Check if we need to use yield to cover the withdrawal
+        if (assets > idle) {
+            uint256 yieldNeeded = assets - idle;
+            require(yieldNeeded <= S.totalYield, "Insufficient yield");
+            S.totalYield -= yieldNeeded;
+        }
+
         _asset.safeTransfer(receiver, assets);
 
         emit Withdraw(msg.sender, receiver, owner, assets, shares);
 
         // Return the actual amount of assets withdrawn.
         return assets;
+    }
+
+    /**
+     * @notice Function for keepers to harvest and record yield.
+     * @return yield The amount of yield harvested.
+     */
+    function harvestYield() external onlyKeepers returns (uint256 yield) {
+        StrategyData storage S = _strategyStorage();
+
+        uint256 beforeBalance = S.asset.balanceOf(address(this));
+
+        yield = IBaseStrategy(address(this)).harvestAndReport();
+
+        uint256 actualYield = S.asset.balanceOf(address(this)) - beforeBalance;
+
+        require(actualYield >= yield, "Yield mismatch");
+
+        S.totalYield += yield;
+        S.totalIdle += (actualYield - yield); // Any excess goes to idle
+
+        emit YieldHarvested(yield);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -933,152 +960,55 @@ contract TokenizedStrategy {
      * @return loss The notional amount of loss if any since the last
      * report in terms of `asset`.
      */
-    //solhint-disable-next-line code-complexity
-    function report() external nonReentrant onlyKeepers returns (uint256 profit, uint256 loss) {
-        // Cache storage pointer since its used repeatedly.
+    function report() external nonReentrant onlyKeepers returns (uint256 yield) {
         StrategyData storage S = _strategyStorage();
 
-        uint256 oldTotalAssets;
-        unchecked {
-            // Manually calculate totalAssets to save a SLOAD.
-            oldTotalAssets = S.totalIdle + S.totalDebt;
-        }
+        uint256 oldTotalAssets = S.totalIdle + S.totalDebt;
 
         // Tell the strategy to report the real total assets it has.
-        // It should do all reward selling and redepositing now and
-        // account for deployed and loose `asset` so we can accurately
-        // account for all funds including those potentially airdropped
-        // by a trade factory. It is safe here to use asset.balanceOf()
-        // instead of totalIdle because any profits are immediately locked.
+        // It should do all reward selling and redepositing now.
         uint256 newTotalAssets = IBaseStrategy(address(this)).harvestAndReport();
 
-        // Burn unlocked shares.
-        _burnUnlockedShares();
-
-        // Initialize variables needed throughout.
-        uint256 totalFees;
-        uint256 protocolFees;
-        uint256 sharesToLock;
-        uint256 _profitMaxUnlockTime = S.profitMaxUnlockTime;
-        // Calculate profit/loss.
+        // Calculate yield
         if (newTotalAssets > oldTotalAssets) {
-            // We have a profit.
-            unchecked {
-                profit = newTotalAssets - oldTotalAssets;
-                // Asses performance fees.
-                totalFees = (profit * S.performanceFee) / MAX_BPS;
-            }
-
-            address protocolFeesRecipient;
-            uint256 performanceFeeShares;
-            uint256 protocolFeeShares;
-            // If performance fees are 0 so will protocol fees.
-            if (totalFees != 0) {
-                // Get the config from the factory.
-                uint16 protocolFeeBps;
-                (protocolFeeBps, protocolFeesRecipient) = IFactory(FACTORY).protocol_fee_config();
-
-                // Check if there is a protocol fee to charge.
-                if (protocolFeeBps != 0) {
-                    // Calculate protocol fees based on the performance Fees.
-                    protocolFees = (totalFees * protocolFeeBps) / MAX_BPS;
-                }
-
-                // We need to get the shares to issue for the fees at
-                // current PPS before any minting or burning.
-                unchecked {
-                    performanceFeeShares = convertToShares(totalFees - protocolFees);
-                }
-                if (protocolFees != 0) {
-                    protocolFeeShares = convertToShares(protocolFees);
-                }
-            }
-
-            // we have a net profit. Check if we are locking profit.
-            if (_profitMaxUnlockTime != 0) {
-                // lock (profit - fees)
-                unchecked {
-                    sharesToLock = convertToShares(profit - totalFees);
-                }
-                // Mint the shares to lock the strategy.
-                _mint(address(this), sharesToLock);
-            }
-
-            // Mint fees shares to recipients.
-            if (performanceFeeShares != 0) {
-                _mint(S.performanceFeeRecipient, performanceFeeShares);
-            }
-
-            if (protocolFeeShares != 0) {
-                _mint(protocolFeesRecipient, protocolFeeShares);
-            }
-        } else {
-            // We have a loss.
-            unchecked {
-                loss = oldTotalAssets - newTotalAssets;
-            }
-
-            // Check in case else was due to being equal.
-            if (loss != 0) {
-                // We will try and burn shares from any pending profit still unlocking
-                // to offset the loss to prevent any PPS decline post report.
-                uint256 sharesToBurn = Math.min(S.balances[address(this)], convertToShares(loss));
-
-                // Check if there is anything to burn.
-                if (sharesToBurn != 0) {
-                    _burn(address(this), sharesToBurn);
-                }
-            }
+            yield = newTotalAssets - oldTotalAssets;
+            S.totalYield += yield;
+        } else if (newTotalAssets < oldTotalAssets) {
+            // In case of loss, reduce totalDebt
+            uint256 loss = oldTotalAssets - newTotalAssets;
+            S.totalDebt = (S.totalDebt > loss) ? S.totalDebt - loss : 0;
         }
 
-        // Update unlocking rate and time to fully unlocked.
-        uint256 totalLockedShares = S.balances[address(this)];
-        if (totalLockedShares != 0) {
-            uint256 previouslyLockedTime;
-            uint128 _fullProfitUnlockDate = S.fullProfitUnlockDate;
-            // Check if we need to account for shares still unlocking.
-            if (_fullProfitUnlockDate > block.timestamp) {
-                unchecked {
-                    // There will only be previously locked shares if time remains.
-                    // We calculate this here since it should be rare.
-                    previouslyLockedTime =
-                        (_fullProfitUnlockDate - block.timestamp) *
-                        (totalLockedShares - sharesToLock);
-                }
-            }
-
-            // newProfitLockingPeriod is a weighted average between the remaining
-            // time of the previously locked shares and the profitMaxUnlockTime.
-            uint256 newProfitLockingPeriod = (previouslyLockedTime + sharesToLock * _profitMaxUnlockTime) /
-                totalLockedShares;
-
-            // Calculate how many shares unlock per second.
-            S.profitUnlockingRate = (totalLockedShares * MAX_BPS_EXTENDED) / newProfitLockingPeriod;
-
-            // Calculate how long until the full amount of shares is unlocked.
-            S.fullProfitUnlockDate = uint128(block.timestamp + newProfitLockingPeriod);
-        } else {
-            // Only setting this to 0 will turn in the desired effect,
-            // no need to update fullProfitUnlockDate.
-            S.profitUnlockingRate = 0;
-        }
-
-        // Update storage we use the actual loose here since it should have
-        // been accounted for in `harvestAndReport` and any airdropped amounts
-        // would have been locked to prevent PPS manipulation.
+        // Update storage
         uint256 newIdle = S.asset.balanceOf(address(this));
         S.totalIdle = newIdle;
-        S.totalDebt = newTotalAssets - newIdle;
+        S.totalDebt = newTotalAssets - newIdle - S.totalYield;
 
         S.lastReport = uint128(block.timestamp);
 
-        // Emit event with info
-        emit Reported(
-            profit,
-            loss,
-            protocolFees, // Protocol fees
-            totalFees - protocolFees // Performance Fees
-        );
+        emit Reported(yield, S.totalYield);
+    }
+
+    /**
+     * @notice Function for keepers to withdraw accumulated yield.
+     * @param amount The amount of yield to withdraw.
+     */
+    function withdrawYield(uint256 amount) external nonReentrant onlyKeepers {
+        StrategyData storage S = _strategyStorage();
+        require(amount <= S.totalYield, "Insufficient yield");
+
+        S.totalYield -= amount;
+        S.asset.safeTransfer(S.keeper, amount);
+
+        emit YieldWithdrawn(S.keeper, amount);
+    }
+
+    /**
+     * @notice Get the current accumulated yield.
+     * @return The total amount of yield accumulated.
+     */
+    function currentYield() external view returns (uint256) {
+        return _strategyStorage().totalYield;
     }
 
     /**
@@ -1160,11 +1090,23 @@ contract TokenizedStrategy {
      * A report() call will be needed to record the profit.
      */
     function tend() external nonReentrant onlyKeepers {
+        StrategyData storage S = _strategyStorage();
+        uint256 beforeTotalAssets = S.totalIdle + S.totalDebt;
+
         // Tend the strategy with the current totalIdle.
-        IBaseStrategy(address(this)).tendThis(_strategyStorage().totalIdle);
+        IBaseStrategy(address(this)).tendThis(S.totalIdle);
 
         // Update balances based on ending state.
         _updateBalances();
+
+        uint256 afterTotalAssets = S.totalIdle + S.totalDebt;
+
+        // If there's any increase in total assets, it's considered new yield
+        if (afterTotalAssets > beforeTotalAssets) {
+            uint256 newYield = afterTotalAssets - beforeTotalAssets;
+            S.totalYield += newYield;
+            emit NewYield(newYield);
+        }
     }
 
     /**
@@ -1241,14 +1183,25 @@ contract TokenizedStrategy {
      * @param amount The amount of asset to attempt to free.
      */
     function emergencyWithdraw(uint256 amount) external nonReentrant onlyEmergencyAuthorized {
+        StrategyData storage S = _strategyStorage();
+
         // Make sure the strategy has been shutdown.
-        require(_strategyStorage().shutdown, "not shutdown");
+        require(S.shutdown, "not shutdown");
 
         // Withdraw from the yield source.
         IBaseStrategy(address(this)).shutdownWithdraw(amount);
 
         // Record the updated balances based on the new amounts.
         _updateBalances();
+
+        // Check if we've generated any additional yield during emergency withdrawal
+        uint256 currentBalance = S.asset.balanceOf(address(this));
+        uint256 expectedBalance = S.totalIdle + S.totalDebt + S.totalYield;
+        if (currentBalance > expectedBalance) {
+            uint256 additionalYield = currentBalance - expectedBalance;
+            S.totalYield += additionalYield;
+            emit NewYield(additionalYield);
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
