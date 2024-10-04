@@ -22,12 +22,7 @@ contract DeployTraderHelper is Script {
 
         vm.startBroadcast(deployerKey);
 
-        Converter conv = new Converter(
-            uniswapGlmWethPool,
-            uniswapV3Router,
-            glmToken,
-            wethToken
-        );
+        Converter conv = new Converter(uniswapGlmWethPool, uniswapV3Router, glmToken, wethToken);
 
         vm.stopBroadcast();
 

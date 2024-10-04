@@ -28,18 +28,17 @@ contract TraderStatus is Script, Test {
         assert(demoConverter != address(0));
 
         Converter conv = Converter(payable(demoConverter));
-        uint chance = conv.chance();
+        uint256 chance = conv.chance();
         if (chance == 0) {
             emit log("Trade every (blocks): never");
-        }
-        else {
-            uint tradeEveryNBlocks = type(uint256).max / chance;
+        } else {
+            uint256 tradeEveryNBlocks = type(uint256).max / chance;
             emit log_named_uint("Trade every (blocks)", tradeEveryNBlocks);
         }
-        uint spent = conv.spent();
+        uint256 spent = conv.spent();
         emit log_named_decimal_uint("Spent (ETH)", spent, 18);
 
-        uint height = block.number - conv.startingBlock();
+        uint256 height = block.number - conv.startingBlock();
         emit log_named_uint("Configured for (blocks)", height);
 
         WETH weth = WETH(payable(wethToken));
@@ -49,10 +48,11 @@ contract TraderStatus is Script, Test {
         emit log_named_decimal_uint("Contract balance (WETH)", weth.balanceOf(demoConverter), 18);
         emit log_named_decimal_uint("Contract balance (GLM)", glm.balanceOf(demoConverter), 18);
 
-        uint price = conv.price();
+        uint256 price = conv.price();
         emit log_named_decimal_uint("ETH price (GLM)", price, 18);
 
-        int spendable = int((block.number - conv.startingBlock()) * (conv.spendADay() / conv.blocksADay())) - int(spent);
+        int256 spendable =
+            int256((block.number - conv.startingBlock()) * (conv.spendADay() / conv.blocksADay())) - int256(spent);
         emit log_named_decimal_int("Spendable (ETH)", spendable, 18);
 
         emit log_named_decimal_uint("Min trade (ETH)", conv.saleValueLow(), 18);

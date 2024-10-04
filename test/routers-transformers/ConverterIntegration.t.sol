@@ -14,7 +14,7 @@ contract ConverterIntegrationWrapper is Test {
     WETH public weth;
 
     function setUp() public {
-        uint forkId = vm.createFork("sepolia");
+        uint256 forkId = vm.createFork("sepolia");
         vm.selectFork(forkId);
         (
             address glmToken,
@@ -28,12 +28,7 @@ contract ConverterIntegrationWrapper is Test {
         glm = ERC20(glmToken);
         weth = WETH(payable(wethToken));
         conv = new Converter(pool, router, glmToken, wethToken);
-        conv.setSpendADay(
-            type(uint256).max - 1,
-            1_000_000_000_000 ether,
-            1 ether,
-            2 ether
-        );
+        conv.setSpendADay(type(uint256).max - 1, 1_000_000_000_000 ether, 1 ether, 2 ether);
         vm.deal(address(conv), 1000 ether);
         conv.wrap();
     }

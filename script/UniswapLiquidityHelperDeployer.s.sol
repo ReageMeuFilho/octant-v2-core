@@ -24,18 +24,11 @@ contract UniswapLiquidityHelperDeployer is Script {
 
         vm.startBroadcast(deployerKey);
 
-        UniswapLiquidityHelper uniswapLiquidityHelper = new UniswapLiquidityHelper(
-                glmToken,
-                wethToken,
-                nonfungiblePositionManager,
-                10000
-            );
+        UniswapLiquidityHelper uniswapLiquidityHelper =
+            new UniswapLiquidityHelper(glmToken, wethToken, nonfungiblePositionManager, 10000);
 
         vm.stopBroadcast();
 
-        console.log(
-            "UniswapLiquidityHelper deployed to: ",
-            address(uniswapLiquidityHelper)
-        );
+        console.log("UniswapLiquidityHelper deployed to: ", address(uniswapLiquidityHelper));
     }
 }
