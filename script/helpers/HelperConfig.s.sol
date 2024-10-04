@@ -41,7 +41,7 @@ contract HelperConfig is Script {
             uniswapV3Router: 0xD6601e25cF43CAc433A23cB95a39D38012B2e9f0,
             uniswapGlmWeth10000Pool: 0x1985134644683848EF81bdd9B1F4b16DDC647EF3,
             deployerKey: vm.envUint("PRIVATE_KEY"),
-            demoConverter: 0x5742F2B61093a470a2d69B685f82bD1dd00A5312
+            demoConverter: 0x6bdCEE5603322Aaa1cDBEf5bb361c63373C0b1a2
         });
     }
 

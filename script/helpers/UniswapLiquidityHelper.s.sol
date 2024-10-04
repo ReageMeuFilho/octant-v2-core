@@ -159,7 +159,7 @@ contract UniswapLiquidityHelper is IERC721Receiver {
         // caller must be the owner of the NFT
         require(msg.sender == deposits[tokenId].owner, "Not the owner");
         // get liquidity data for tokenId
-        (,, address token0, address token1,,,, uint128 liquidity,,,,) = nonfungiblePositionManager.positions(tokenId);
+        (,,,,,,, uint128 liquidity,,,,) = nonfungiblePositionManager.positions(tokenId);
         uint128 halfLiquidity = liquidity / 2;
         deposits[tokenId].liquidity = halfLiquidity;
 
@@ -167,10 +167,13 @@ contract UniswapLiquidityHelper is IERC721Receiver {
     }
 
     function removeLiquidity(uint256 tokenId) external returns (uint256 amount0, uint256 amount1) {
+        // assign returned variables to silence warnings
+        amount0 = 0;
+        amount1 = 0;
         // caller must be the owner of the NFT
         require(msg.sender == deposits[tokenId].owner, "Not the owner");
         // get liquidity data for tokenId
-        (,, address token0, address token1,,,, uint128 liquidity,,,,) = nonfungiblePositionManager.positions(tokenId);
+        (,,,,,,, uint128 liquidity,,,,) = nonfungiblePositionManager.positions(tokenId);
         deposits[tokenId].liquidity = 0;
 
         _decreaseLiquidity(tokenId, liquidity);

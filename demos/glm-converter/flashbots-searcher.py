@@ -40,21 +40,56 @@ acc = w3.eth.account.from_key(pk)
 
 converter_address = "0x5742F2B61093a470a2d69B685f82bD1dd00A5312"
 conv_abi = [
+    {"inputs": [], "type": "error", "name": "Converter__SoftwareError"},
+    {"inputs": [], "type": "error", "name": "Converter__SpendingTooMuch"},
+    {"inputs": [], "type": "error", "name": "Converter__WrongPrevrandao"},
+    {"inputs": [], "type": "error", "name": "Converter__RandomnessAlreadyUsed"},
+    {"inputs": [], "type": "error", "name": "Converter__RandomnessUnsafeSeed"},
     {
-        "inputs": [],
-        "name": "buy",
-        "outputs": [],
+        "inputs": [{"internalType": "uint256", "name": "height", "type": "uint256"}],
         "stateMutability": "nonpayable",
         "type": "function",
-    }
+        "name": "buy",
+    },
+    {
+        "inputs": [{"internalType": "uint256", "name": "height", "type": "uint256"}],
+        "stateMutability": "view",
+        "type": "function",
+        "name": "getRandomNumber",
+        "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+    },
 ]
+
+
+def decode_custom_error(w3, contract_abi, error_data):
+    print("decoding")
+    for error in [abi for abi in contract_abi if abi["type"] == "error"]:
+        # Get error signature components
+        name = error["name"]
+        data_types = [
+            collapse_if_tuple(abi_input) for abi_input in error.get("inputs", [])
+        ]
+        error_signature_hex = function_abi_to_4byte_selector(error).hex()
+        # Find match signature from error_data
+        if error_signature_hex.casefold() == str(error_data.data)[2:10].casefold():
+            params = ",".join(
+                [
+                    str(x)
+                    for x in w3.codec.decode(
+                        data_types, bytes.fromhex(str(error_data.data)[10:])
+                    )
+                ]
+            )
+            decoded = "%s(%s)" % (name, str(params))
+            return decoded
+    return None
 
 
 def try_to_buy(converter, w3, height, use_mempool):
     can_buy = False
     failure_reason = None
     try:
-        converter.functions.buy().call({"from": acc.address})
+        converter.functions.buy(height - 1).call({"from": acc.address})
         can_buy = True
     except ContractCustomError as exp:
         failure_reason = decode_custom_error(w3, conv_abi, exp)
@@ -66,7 +101,9 @@ def try_to_buy(converter, w3, height, use_mempool):
         failure_reason = "generic"
         pass
 
-    logging.info(f"height: {height}, can_buy: {can_buy}")
+    logging.info(
+        f"height: {height}, can_buy: {can_buy}, failure_reason: {failure_reason}"
+    )
     if not can_buy:
         return failure_reason
     if use_mempool:
@@ -78,12 +115,12 @@ def try_to_buy(converter, w3, height, use_mempool):
 def submit_mempool(converter, w3, height):
     nonce = w3.eth.get_transaction_count(acc.address)
     try:
-        unsigned_tx = converter.functions.buy().build_transaction(
+        unsigned_tx = converter.functions.buy(height - 1).build_transaction(
             {
                 "from": acc.address,
                 "nonce": nonce,
-                "maxFeePerGas": w3.to_wei(100, "gwei"),
-                "maxPriorityFeePerGas": w3.to_wei(20, "gwei"),
+                # "maxFeePerGas": w3.to_wei(100, "gwei"),
+                # "maxPriorityFeePerGas": w3.to_wei(20, "gwei"),
             }
         )
         signed_tx = w3.eth.account.sign_transaction(unsigned_tx, private_key=acc.key)
@@ -107,7 +144,7 @@ def submit_flashbots(converter, w3, height):
     nonce = w3.eth.get_transaction_count(acc.address)
     max_pri_gas = w3.eth.max_priority_fee
     try:
-        unsigned_tx = converter.functions.buy().build_transaction(
+        unsigned_tx = converter.functions.buy(height - 1).build_transaction(
             {
                 "from": acc.address,
                 "nonce": nonce,

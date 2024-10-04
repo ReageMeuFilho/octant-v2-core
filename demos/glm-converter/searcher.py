@@ -29,6 +29,8 @@ conv_abi = [
     {"inputs": [], "type": "error", "name": "Converter__SoftwareError"},
     {"inputs": [], "type": "error", "name": "Converter__SpendingTooMuch"},
     {"inputs": [], "type": "error", "name": "Converter__WrongPrevrandao"},
+    {"inputs": [], "type": "error", "name": "Converter__RandomnessAlreadyUsed"},
+    {"inputs": [], "type": "error", "name": "Converter__RandomnessUnsafeSeed"},
     {
         "inputs": [],
         "name": "buy",

@@ -45,11 +45,6 @@ contract TraderStatus is Script, Test {
         ERC20 glm = ERC20(glmToken);
 
         emit log_named_decimal_uint("Contract balance (ETH)", demoConverter.balance, 18);
-        emit log_named_decimal_uint("Contract balance (WETH)", weth.balanceOf(demoConverter), 18);
-        emit log_named_decimal_uint("Contract balance (GLM)", glm.balanceOf(demoConverter), 18);
-
-        uint256 price = conv.price();
-        emit log_named_decimal_uint("ETH price (GLM)", price, 18);
 
         int256 spendable =
             int256((block.number - conv.startingBlock()) * (conv.spendADay() / conv.blocksADay())) - int256(spent);
@@ -59,6 +54,5 @@ contract TraderStatus is Script, Test {
         emit log_named_decimal_uint("Max trade (ETH)", conv.saleValueHigh(), 18);
 
         emit log_named_decimal_uint("Last bought (GLM)", conv.lastBought(), 18);
-        emit log_named_decimal_uint("Last quota  (GLM)", conv.lastQuota(), 18);
     }
 }

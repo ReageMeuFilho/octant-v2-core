@@ -16,32 +16,24 @@ contract ConverterIntegrationWrapper is Test {
     function setUp() public {
         uint256 forkId = vm.createFork("sepolia");
         vm.selectFork(forkId);
-        (
-            address glmToken,
-            address wethToken,
-            address _nonfungiblePositionManager,
-            uint256 _deployerKey,
-            address router,
-            address pool,
-            address _demoConverter
-        ) = new HelperConfig().activeNetworkConfig();
+        (address glmToken, address wethToken,,, address router, address pool,) =
+            new HelperConfig().activeNetworkConfig();
         glm = ERC20(glmToken);
         weth = WETH(payable(wethToken));
         conv = new Converter(pool, router, glmToken, wethToken);
         conv.setSpendADay(type(uint256).max - 1, 1_000_000_000_000 ether, 1 ether, 2 ether);
-        vm.deal(address(conv), 1000 ether);
-        conv.wrap();
+        vm.deal(address(this), 1000 ether);
+        (bool success,) = payable(address(conv)).call{value: 1000 ether}("");
+        require(success);
     }
+
+    receive() external payable {}
 
     function test_integration() public {
         vm.roll(block.number + 100);
-        uint256 wethBefore = weth.balanceOf(address(conv));
-        uint256 glmBefore = glm.balanceOf(address(conv));
-        conv.buy();
-        uint256 wethAfter = weth.balanceOf(address(conv));
-        uint256 glmAfter = glm.balanceOf(address(conv));
-        assertLt(wethAfter, wethBefore);
-        assertGt(glmAfter, glmBefore);
-        assertGt(glmAfter - glmBefore, 1000 ether);
+        uint256 ethBefore = address(conv).balance;
+        conv.buy(block.number - 1);
+        uint256 ethAfter = address(conv).balance;
+        assertLt(ethAfter, ethBefore);
     }
 }

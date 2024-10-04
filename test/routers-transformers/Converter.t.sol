@@ -15,21 +15,15 @@ contract ConverterWrapper is Test {
     HelperConfig helperConfig = new HelperConfig();
 
     function setUp() external {
-        (
-            address glmToken,
-            address wethToken,
-            address _nonfungiblePositionManager,
-            uint256 _deployerKey,
-            address router,
-            address pool,
-            address _demoConverter
-        ) = helperConfig.activeNetworkConfig();
+        (address glmToken, address wethToken,,, address router, address pool,) = helperConfig.activeNetworkConfig();
         conv = new Converter(pool, router, glmToken, wethToken);
         mockOracle();
         mockRouter();
         conv.setSpendADay(0, 0, 0.6 ether, 1.4 ether);
         vm.deal(address(conv), budget);
     }
+
+    receive() external payable {}
 
     function mockRouter() public {
         vm.mockCall(
@@ -50,11 +44,11 @@ contract ConverterWrapper is Test {
     // sequential call to this function emulate time
     // progressing and set random values for randao
     function wrapBuy() public returns (bool) {
-        constr = 1;
         vm.roll(blockno);
-        vm.prevrandao(bytes32(blockno));
         blockno = blockno + 1;
-        try conv.buy() {
+        /* emit log_named_uint("blockno", block.number); */
+        /* emit log_named_bytes32("blockhash", blockhash(block.number-1)); */
+        try conv.buy(block.number - 1) {
             return true;
         } catch (bytes memory) /*lowLevelData*/ {
             return false;
@@ -68,12 +62,12 @@ contract ConverterWrapper is Test {
         uint256 spendADay = 1_000_000_000_000 ether;
         conv.setSpendADay(chance, spendADay, 1 ether, 1 ether);
         vm.roll(block.number + 100);
-        conv.buy();
+        conv.buy(block.number - 2);
         assertEq(conv.spent(), 1 ether);
     }
 
     function test_receivesEth() external {
-        (bool sent, bytes memory data_) = payable(address(conv)).call{value: 100000}("");
+        (bool sent,) = payable(address(conv)).call{value: 100000}("");
         require(sent, "Failed to send Ether");
     }
 
@@ -124,20 +118,6 @@ contract ConverterWrapper is Test {
         assertLt(conv.spent(), 2 ether + ((blocks * 1.5 ether) / conv.blocksADay()));
     }
 
-    function test_keccakDistribution() external {
-        uint256 maxdiv4096 = 28269553036454149273332760011886696253239742350009903329945699220681916416;
-        uint256 counter = 0;
-
-        for (uint256 i = 0; i < 100_000; i++) {
-            vm.prevrandao(bytes32(i));
-            if (conv.getRandomNumber() < maxdiv4096) {
-                counter = counter + 1;
-            }
-        }
-        assertLt(20, counter); // EV(counter) ~= 21
-        assertLt(counter, 22); // EV(counter) ~= 21
-    }
-
     function test_settingPrevrandao() external {
         uint256 i = 12093812093812;
         bytes32 val = keccak256(abi.encode(bytes32(i)));
@@ -145,7 +125,7 @@ contract ConverterWrapper is Test {
         assert(block.prevrandao == uint256(val));
     }
 
-    function test_division() external {
+    function test_division() external pure {
         assertLt(0, type(uint256).max / uint256(4000));
         assertLt(type(uint256).max / uint256(4000), type(uint256).max / uint256(3999));
         uint256 maxdiv4096 = 28269553036454149273332760011886696253239742350009903329945699220681916416;
@@ -153,19 +133,19 @@ contract ConverterWrapper is Test {
         assertLt(type(uint256).max / uint256(4097), maxdiv4096);
     }
 
-    function test_getUniformInRange_wei() public {
+    function test_getUniformInRange_wei() public view {
         runner_getUniformInRange(0, 256);
     }
 
-    function test_getUniformInRange_ether() public {
+    function test_getUniformInRange_ether() public view {
         runner_getUniformInRange(100 ether, 200 ether);
     }
 
-    function test_getUniformInRange_highEthers() public {
+    function test_getUniformInRange_highEthers() public view {
         runner_getUniformInRange(1_000_000 ether, 2_000_000 ether);
     }
 
-    function runner_getUniformInRange(uint256 low, uint256 high) public {
+    function runner_getUniformInRange(uint256 low, uint256 high) public view {
         uint256 counter = 0;
         uint256 val = 0;
         uint256 min = type(uint256).max;
@@ -186,8 +166,23 @@ contract ConverterWrapper is Test {
         }
     }
 
-    function test_getUniformInRange_narrow() public {
+    function test_getUniformInRange_narrow() public view {
         assertEq(1 ether, conv.getUniformInRange(1 ether, 1 ether, 4));
+    }
+
+    function test_blockHashValues() public {
+        vm.roll(20);
+        for (uint256 i = 1; i < 11; i++) {
+            assert(blockhash(block.number - i) != blockhash(block.number - i - 1));
+            assert(conv.getRandomNumber(block.number - i) != conv.getRandomNumber(block.number - i - 1));
+        }
+    }
+
+    function test_futureBlockHashValues() public {
+        vm.roll(20);
+        assert(blockhash(block.number - 1) != bytes32(0));
+        assert(blockhash(block.number) == bytes32(0));
+        assert(blockhash(block.number + 1) == bytes32(0));
     }
 }
 

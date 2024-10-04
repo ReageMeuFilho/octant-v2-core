@@ -29,7 +29,7 @@ contract TraderRun is Script {
         vm.startBroadcast(deployerKey);
 
         Converter conv = Converter(payable(demoConverter));
-        conv.buy();
+        conv.buy(block.number - 1);
 
         vm.stopBroadcast();
     }

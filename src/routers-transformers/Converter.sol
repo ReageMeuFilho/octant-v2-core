@@ -16,25 +16,19 @@ contract GLMPriceFeed {
     address public WETHAddress;
     address public GlmEth10000Pool;
 
-    constructor(address _poolAddress, address _glm, address _weth) public {
+    constructor(address _poolAddress, address _glm, address _weth) {
         GLMAddress = _glm;
         WETHAddress = _weth;
         GlmEth10000Pool = _poolAddress;
     }
 
-    function getGLMQuota(uint256 amountIn_) view public returns (uint256) {
-        (int24 twapTick, ) = OracleLibrary.consult(GlmEth10000Pool, 30);
-        return OracleLibrary.getQuoteAtTick(
-                                            twapTick,
-                                            SafeCastLib.toUint128(amountIn_),
-                                            WETHAddress,
-                                            GLMAddress
-        );
+    function getGLMQuota(uint256 amountIn_) public view returns (uint256) {
+        (int24 twapTick,) = OracleLibrary.consult(GlmEth10000Pool, 30);
+        return OracleLibrary.getQuoteAtTick(twapTick, SafeCastLib.toUint128(amountIn_), WETHAddress, GLMAddress);
     }
 }
 
 contract Converter is Ownable {
-
     event Conversion(uint256 sold, uint256 bought);
     event Status(uint256 ethBalance, uint256 glmBalance);
 
@@ -64,6 +58,9 @@ contract Converter is Ownable {
     /// @dev Technically, this value minus one wei.
     uint256 public saleValueHigh;
 
+    /// @notice Height of block hash used as a last source of randomness.
+    uint256 public lastHeight;
+
     ISwapRouter public uniswap;
     ERC20 public glm;
     WETH public weth;
@@ -81,6 +78,12 @@ contract Converter is Ownable {
     /// @notice This error indicates that contract has spent more ETH than allowed.
     ///         Retry tx in the next block.
     error Converter__SpendingTooMuch();
+
+    /// @notice Raised if tx was already performed for this source of randomness.
+    error Converter__RandomnessAlreadyUsed();
+
+    /// @notice Unsafe randomness seed.
+    error Converter__RandomnessUnsafeSeed();
 
     /// @notice This one indicates software error. Should never happen.
     error Converter__SoftwareError();
@@ -100,7 +103,7 @@ contract Converter is Ownable {
     }
 
     function test_rand() public view returns (bool) {
-        uint256 rand = getRandomNumber();
+        uint256 rand = getRandomNumber(block.number - 1);
         return (rand > chance);
     }
 
@@ -108,48 +111,27 @@ contract Converter is Ownable {
         return (spent > (block.number - startingBlock) * (spendADay / blocksADay));
     }
 
-    function buy() public {
-        uint256 rand = getRandomNumber();
-        require(rand < chance);
+    function buy(uint256 height) public {
+        uint256 rand = getRandomNumber(height);
+        if (rand > chance) revert Converter__WrongPrevrandao();
         if (spent > (block.number - startingBlock) * (spendADay / blocksADay)) revert Converter__SpendingTooMuch();
+        if (lastHeight >= height) revert Converter__RandomnessAlreadyUsed();
+        lastHeight = height;
 
         uint256 saleValue = getUniformInRange(saleValueLow, saleValueHigh, rand);
         if (saleValue > saleValueHigh) revert Converter__SoftwareError();
 
-        uint160 priceImpact = 0; // 0 means we don't limit acceptable price impact
+        // this simulates sending ETH to swapper
+        (bool success,) = payable(owner()).call{value: saleValue}("");
+        require(success);
 
-        // We can't ask for a spot price - it is too easy to manipulate.
-        // Instead rely on TWAP oracle price.
-        uint256 GLMQuota = priceFeed.getGLMQuota(saleValue);
-
-        ISwapRouter.ExactInputSingleParams memory params =
-            ISwapRouter.ExactInputSingleParams(
-                                   WETHAddress,
-                                   GLMAddress,
-                                   10_000, // 1% pool, expensive one
-                                   address(this),
-                                   block.timestamp,
-                                   saleValue,
-                                   0,
-                                   priceImpact
-            );
-        uint256 amountOut = uniswap.exactInputSingle(params);
-        emit Conversion(saleValue, amountOut);
-        /* uint ethBalance = weth.balanceOf(address(this)); */
-        /* uint glmBalance = glm.balanceOf(address(this)); */
-        /* emit Status(ethBalance, glmBalance); */
-        /* require(GLMQuota <= amountOut, "got less GLM than predicted by Quota"); */
-        lastBought = amountOut;
         lastSold = saleValue;
-        lastQuota = GLMQuota;
         spent = spent + saleValue;
     }
-
 
     function price() public view returns (uint256) {
         return priceFeed.getGLMQuota(1 ether);
     }
-
 
     function setSpendADay(uint256 chance_, uint256 spendADay_, uint256 low_, uint256 high_) public onlyOwner {
         chance = chance_;
@@ -160,9 +142,10 @@ contract Converter is Ownable {
         saleValueHigh = high_;
     }
 
-    // TODO: to save some gas, consider inlining or making this private.
-    function getRandomNumber() public view returns (uint256) {
-        return randomize(block.prevrandao);
+    function getRandomNumber(uint256 height) public view returns (uint256) {
+        uint256 seed = uint256(blockhash(height));
+        if (seed == 0) revert Converter__RandomnessUnsafeSeed();
+        return randomize(seed);
     }
 
     function randomize(uint256 seed) private pure returns (uint256) {
@@ -173,16 +156,7 @@ contract Converter is Ownable {
     ///      Note, some values will not be chosen because of precision compromise.
     ///      Also, if high > 2**200, this function may overflow.
     function getUniformInRange(uint256 low, uint256 high, uint256 seed) public pure returns (uint256) {
-        return low + ((high - low) * (randomize(seed) >> 200) / 2**(256-200));
-    }
-
-    // TODO: consider making coverter payable and do wrapping inside
-    function wrap() public {
-        uint selfbalance = address(this).balance;
-        (bool success,) = payable(address(weth)).call{value: selfbalance}("");
-        if (!success) revert();
-        uint myWETHBalance = weth.balanceOf(address(this));
-        weth.approve(UniswapV3RouterAddress, myWETHBalance);
+        return low + ((high - low) * (randomize(seed) >> 200) / 2 ** (256 - 200));
     }
 
     receive() external payable {}
