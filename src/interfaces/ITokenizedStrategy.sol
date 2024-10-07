@@ -35,9 +35,10 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
                            INITIALIZATION
     //////////////////////////////////////////////////////////////*/
 
-    function setUp(
+    function initialize(
         address _asset,
         string memory _name,
+        address _owner,
         address _management,
         address _keeper,
         address _dragonRouter

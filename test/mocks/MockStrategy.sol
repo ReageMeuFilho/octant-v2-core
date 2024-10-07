@@ -31,7 +31,7 @@ contract MockStrategy is Module, BaseStrategy {
         ) = abi.decode(initializeParams, (address, bytes32, bytes32, address, address, address, address, address, address, uint256, string));
 
         __Ownable_init(msg.sender);
-        __BaseStrategy_init(_tokenizedStrategyImplementation, _asset, _management, _keeper, _dragonRouter, _maxReportDelay, _name);
+        __BaseStrategy_init(_tokenizedStrategyImplementation, _asset, _owner, _management, _keeper, _dragonRouter, _maxReportDelay, _name);
 
         yieldSource = _yieldSource;
         ERC20(_asset).approve(_yieldSource, type(uint256).max);
@@ -49,14 +49,14 @@ contract MockStrategy is Module, BaseStrategy {
         MockYieldSource(yieldSource).withdraw(_amount);
     }
 
-    function _harvestAndReport() internal override returns (uint256) {
+    function _harvestAndReport() internal override returns (uint256, uint256) {
         uint256 balance = ERC20(asset).balanceOf(address(this));
         if (balance > 0 && !TokenizedStrategy.isShutdown()) {
             MockYieldSource(yieldSource).deposit(balance);
         }
         return
-            MockYieldSource(yieldSource).balance() +
-            ERC20(asset).balanceOf(address(this));
+            (0, MockYieldSource(yieldSource).balance() +
+            ERC20(asset).balanceOf(address(this)));
     }
 
     function _tend(uint256 /*_idle*/) internal override {

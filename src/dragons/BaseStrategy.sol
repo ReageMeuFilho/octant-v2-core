@@ -142,7 +142,7 @@ abstract contract BaseStrategy {
      * @param _name Name the strategy will use.
      * 
      */
-    function __BaseStrategy_init(address _tokenizedStrategyImplementation, address _asset, address _management, address _keeper, address _dragonRouter, uint256 _maxReportDelay, string memory _name) internal {
+    function __BaseStrategy_init(address _tokenizedStrategyImplementation, address _asset, address _owner, address _management, address _keeper, address _dragonRouter, uint256 _maxReportDelay, string memory _name) internal {
         tokenizedStrategyImplementation = _tokenizedStrategyImplementation;
         asset = ERC20(_asset);
         maxReportDelay = _maxReportDelay;
@@ -152,7 +152,7 @@ abstract contract BaseStrategy {
 
         // Initialize the strategy's storage variables.
         _delegateCall(
-            abi.encodeCall(ITokenizedStrategy.setUp, (_asset, _name, _management, _keeper, _dragonRouter))
+            abi.encodeCall(ITokenizedStrategy.initialize, (_asset, _name, _owner, _management, _keeper, _dragonRouter))
         );
 
         // Store the tokenizedStrategyImplementation at the standard implementation
@@ -226,20 +226,21 @@ abstract contract BaseStrategy {
      * `TokenizedStrategy.isShutdown()` to decide if funds should be
      * redeployed or simply realize any profits/losses.
      *
+     * @return _yield Amount of yield harvest from the farm.
      * @return _totalAssets A trusted and accurate account for the total
      * amount of 'asset' the strategy currently holds including idle funds.
      */
-    function _harvestAndReport() internal virtual returns (uint256 _totalAssets);
+    function _harvestAndReport() internal virtual returns (uint256 _yield, uint256 _totalAssets);
 
     /// @dev Handle the liquidation of strategy assets.
-    function liquidatePosition(uint256 _amountNeeded) external virtual onlyKeepers returns (uint256 _liquidatedAmount, uint256 _loss) {}
+    function liquidatePosition(uint256 _amountNeeded) external virtual onlyManagement returns (uint256 _liquidatedAmount, uint256 _loss) {}
 
     /*//////////////////////////////////////////////////////////////
                     OPTIONAL TO OVERRIDE BY STRATEGIST
     //////////////////////////////////////////////////////////////*/
 
     /// @dev Handle the strategy’s core position adjustments.
-    function adjustPosition(uint256 _debtOutstanding) external virtual onlyKeepers {}
+    function adjustPosition(uint256 _debtOutstanding) external virtual onlyManagement {}
 
     /**
      * @dev Optional function for strategist to override that can
@@ -415,10 +416,11 @@ abstract contract BaseStrategy {
      * This can only be called after a report() delegateCall to the
      * TokenizedStrategy so msg.sender == address(this).
      *
+     * @return Yield harvested.
      * @return . A trusted and accurate account for the total amount
      * of 'asset' the strategy currently holds including idle funds.
      */
-    function harvestAndReport() external virtual onlySelf returns (uint256) {
+    function harvestAndReport() external virtual onlySelf returns (uint256, uint256) {
         return _harvestAndReport();
     }
 
