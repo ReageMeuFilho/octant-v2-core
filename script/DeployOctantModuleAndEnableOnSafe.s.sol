@@ -35,7 +35,7 @@ contract DeployModuleAndEnableOnSafe is Script, BatchScript {
             safeModuleImplementation,
             abi.encodeWithSignature(
                 "setUp(bytes)",
-                abi.encode(safe_, bytes32(0), bytes32(0), keeper, treasury, dragonRouter, totalValidators)
+                abi.encode(safe_, abi.encode(keeper, treasury, dragonRouter, totalValidators))
             ),
             block.timestamp
         );

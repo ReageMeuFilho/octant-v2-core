@@ -69,14 +69,16 @@ contract OctantRewardsSafe is Module {
     function setUp(bytes memory initializeParams) public override initializer {
         (
             address _owner,
-            ,
-            ,
+            bytes memory data
+        ) = abi.decode(initializeParams, (address, bytes));
+
+        (
             address _keeper,
             address _treasury,
             address _dragonRouter,
             uint256 _totalValidators,
             uint256 _maxYield
-        ) = abi.decode(initializeParams, (address, bytes32, bytes32, address, address, address, uint256, uint256));
+        ) = abi.decode(data, (address, address, address, uint256, uint256));
 
         __Ownable_init(msg.sender);
 

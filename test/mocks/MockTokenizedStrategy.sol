@@ -339,7 +339,7 @@ contract MockTokenizedStrategy {
         // Set the Strategy Tokens name.
         S.name = _name;
         // Set decimals based off the `asset`.
-        S.decimals = ERC20(_asset).decimals();
+        S.decimals = _asset == ETH ? 18 : ERC20(_asset).decimals();
 
         S.lastReport = uint96(block.timestamp);
 
@@ -1596,13 +1596,7 @@ contract MockTokenizedStrategy {
                             DEPLOYMENT
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @dev On contract creation we set `asset` for this contract to address(1).
-     * This prevents it from ever being initialized in the future.
-     * @param _factory Address of the factory of the same version for protocol fees.
-     */
-    constructor(address _factory) {
-        FACTORY = _factory;
+    constructor() {
         _strategyStorage().asset = ERC20(address(1));
     }
 }

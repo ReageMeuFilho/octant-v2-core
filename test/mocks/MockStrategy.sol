@@ -12,14 +12,18 @@ contract MockStrategy is Module, BaseStrategy {
     bool public kept;
     bool public emergentizated;
 
+    address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE; // using this address to represent native ETH
+
     /// @dev Initialize function, will be triggered when a new proxy is deployed
     /// @dev owner of this module will the safe multisig that calls setUp function
     /// @param initializeParams Parameters of initialization encoded
     function setUp(bytes memory initializeParams) public override initializer {
         (
             address _owner,
-            ,
-            ,
+            bytes memory data
+        ) = abi.decode(initializeParams, (address, bytes));
+
+        (
             address _tokenizedStrategyImplementation,
             address _asset,
             address _yieldSource,
@@ -28,13 +32,13 @@ contract MockStrategy is Module, BaseStrategy {
             address _dragonRouter,
             uint256 _maxReportDelay,
             string memory _name
-        ) = abi.decode(initializeParams, (address, bytes32, bytes32, address, address, address, address, address, address, uint256, string));
+        ) = abi.decode(data, (address, address, address, address, address, address, uint256, string));
 
         __Ownable_init(msg.sender);
         __BaseStrategy_init(_tokenizedStrategyImplementation, _asset, _owner, _management, _keeper, _dragonRouter, _maxReportDelay, _name);
 
         yieldSource = _yieldSource;
-        ERC20(_asset).approve(_yieldSource, type(uint256).max);
+        if (_asset != ETH) ERC20(_asset).approve(_yieldSource, type(uint256).max);
 
         setAvatar(_owner);
         setTarget(_owner);
@@ -50,7 +54,7 @@ contract MockStrategy is Module, BaseStrategy {
     }
 
     function _harvestAndReport() internal override returns (uint256, uint256) {
-        uint256 balance = ERC20(asset).balanceOf(address(this));
+        uint256 balance = address(asset) == ETH ? address(this).balance : ERC20(asset).balanceOf(address(this));
         if (balance > 0 && !TokenizedStrategy.isShutdown()) {
             MockYieldSource(yieldSource).deposit(balance);
         }
@@ -60,7 +64,7 @@ contract MockStrategy is Module, BaseStrategy {
     }
 
     function _tend(uint256 /*_idle*/) internal override {
-        uint256 balance = ERC20(asset).balanceOf(address(this));
+        uint256 balance = address(asset) == ETH ? address(this).balance : ERC20(asset).balanceOf(address(this));
         if (balance > 0) {
             MockYieldSource(yieldSource).deposit(balance);
         }
