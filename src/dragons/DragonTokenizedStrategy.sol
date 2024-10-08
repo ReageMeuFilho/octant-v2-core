@@ -2,7 +2,6 @@
 pragma solidity 0.8.25;
 
 import { TokenizedStrategy, IBaseStrategy, Math, ERC20 } from "./TokenizedStrategy.sol";
-import { IDragonModule } from "../interfaces/IDragonModule.sol";
 import { VaultSharesNotTransferable, MaxUnlockIsAlwaysZero, CantWithdrawLockedShares, ZeroLockupDuration, InsufficientLockupDuration, SharesStillLocked } from "src/errors.sol";
 
 contract DragonTokenizedStrategy is TokenizedStrategy {
