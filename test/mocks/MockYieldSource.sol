@@ -31,7 +31,12 @@ contract MockYieldSource {
         return asset == ETH ? address(this).balance : ERC20(asset).balanceOf(address(this));
     }
 
-    function simulateLoss(uint256 _amount) public {
+    function simulateHarvestRewards(uint256 _amount) public {
+        if (asset == ETH) {
+           (bool success, ) = msg.sender.call{value: _amount}("");
+           require(success, "Transfer Failed");
+           return;
+        }
         ERC20(asset).transfer(msg.sender, _amount);
     }
 }

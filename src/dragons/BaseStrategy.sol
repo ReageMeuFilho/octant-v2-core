@@ -378,7 +378,7 @@ abstract contract BaseStrategy {
      * @param _amount The amount of 'asset' that the strategy can
      * attempt to deposit in the yield source.
      */
-    function deployFunds(uint256 _amount) external virtual onlySelf {
+    function deployFunds(uint256 _amount) external payable virtual onlySelf {
         _deployFunds(_amount);
     }
 
@@ -497,7 +497,10 @@ abstract contract BaseStrategy {
      * calldata and return any relevant values.
      *
      */
-    fallback() external {
+    fallback() external payable {
+        assembly {
+            if and(iszero(calldatasize()), not(iszero(callvalue()))) { return(0, 0) }
+        }
         // load our target address
         address _tokenizedStrategyAddress = tokenizedStrategyImplementation;
         // Execute external function using delegatecall and return any value.

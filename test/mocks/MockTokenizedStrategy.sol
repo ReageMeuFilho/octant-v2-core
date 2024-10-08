@@ -154,6 +154,11 @@ contract MockTokenizedStrategy {
                             MODIFIERS
     //////////////////////////////////////////////////////////////*/
 
+    modifier onlyOwner() {
+        require(msg.sender == owner(), "Unauthorized");
+        _;
+    }
+
     /**
      * @dev Require that the call is coming from the strategies management.
      */
@@ -253,9 +258,6 @@ contract MockTokenizedStrategy {
     uint8 internal constant ENTERED = 2;
     /// @notice Value to set the `entered` flag to at the end of the call.
     uint8 internal constant NOT_ENTERED = 1;
-
-    /// @notice Maximum in Basis Points the Performance Fee can be set to.
-    uint16 public constant MAX_FEE = 5_000; // 50%
 
     /// @notice Used for fee calculations.
     uint256 internal constant MAX_BPS = 10_000;
@@ -367,20 +369,10 @@ contract MockTokenizedStrategy {
     function deposit(
         uint256 assets,
         address receiver
-    ) external nonReentrant payable returns (uint256 shares) {
+    ) external nonReentrant onlyOwner payable returns (uint256 shares) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
 
-        // Deposit full balance if using max uint.
-        if (assets == type(uint256).max) {
-            assets = S.asset.balanceOf(msg.sender);
-        }
-
-        // Checking max deposit will also check if shutdown.
-        require(
-            assets <= _maxDeposit(S, receiver),
-            "ERC4626: deposit more than max"
-        );
         // Check for rounding error.
         require(
             (shares = _convertToShares(S, assets, Math.Rounding.Floor)) != 0,
@@ -400,7 +392,7 @@ contract MockTokenizedStrategy {
     function mint(
         uint256 shares,
         address receiver
-    ) external nonReentrant payable returns (uint256 assets) {
+    ) external nonReentrant onlyOwner payable returns (uint256 assets) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
 
@@ -428,7 +420,7 @@ contract MockTokenizedStrategy {
         uint256 assets,
         address receiver,
         address owner
-    ) external returns (uint256 shares) {
+    ) external onlyOwner returns (uint256 shares) {
         return withdraw(assets, receiver, owner, 0);
     }
 
@@ -447,13 +439,10 @@ contract MockTokenizedStrategy {
         address receiver,
         address owner,
         uint256 maxLoss
-    ) public nonReentrant returns (uint256 shares) {
+    ) public nonReentrant onlyOwner returns (uint256 shares) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
-        require(
-            assets <= _maxWithdraw(S, owner),
-            "ERC4626: withdraw more than max"
-        );
+
         // Check for rounding error or 0 value.
         require(
             (shares = _convertToShares(S, assets, Math.Rounding.Ceil)) != 0,
@@ -477,7 +466,7 @@ contract MockTokenizedStrategy {
         uint256 shares,
         address receiver,
         address owner
-    ) external returns (uint256) {
+    ) external onlyOwner returns (uint256) {
         // We default to not limiting a potential loss.
         return redeem(shares, receiver, owner, MAX_BPS);
     }
@@ -497,7 +486,7 @@ contract MockTokenizedStrategy {
         address receiver,
         address owner,
         uint256 maxLoss
-    ) public nonReentrant returns (uint256) {
+    ) public onlyOwner nonReentrant returns (uint256) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
         require(
@@ -840,12 +829,12 @@ contract MockTokenizedStrategy {
         // Cache storage variables used more than once.
         ERC20 _asset = S.asset;
 
-        if (address(_asset) == ETH) IAvatar(address(this)).execTransactionFromModule(S.owner, assets, "", Enum.Operation.Call);
-        else IAvatar(address(this)).execTransactionFromModule(address(_asset), 0, abi.encodeWithSignature("transfer(address,uint256)", address(this), assets), Enum.Operation.Call);
+        if (address(_asset) == ETH) IAvatar(S.owner).execTransactionFromModule(address(this), assets, "", Enum.Operation.Call);
+        else IAvatar(S.owner).execTransactionFromModule(address(_asset), 0, abi.encodeWithSignature("transfer(address,uint256)", address(this), assets), Enum.Operation.Call);
 
         // We can deploy the full loose balance currently held.
         IBaseStrategy(address(this)).deployFunds(
-            _asset.balanceOf(address(this))
+            address(_asset) == ETH ? address(this).balance : _asset.balanceOf(address(this))
         );
 
         // Adjust total Assets.
@@ -875,17 +864,11 @@ contract MockTokenizedStrategy {
         uint256 maxLoss
     ) internal returns (uint256) {
         require(receiver != address(0), "ZERO ADDRESS");
-        require(maxLoss <= MAX_BPS, "exceeds MAX_BPS");
-
-        // Spend allowance if applicable.
-        if (msg.sender != owner) {
-            _spendAllowance(S, owner, msg.sender, shares);
-        }
 
         // Cache `asset` since it is used multiple times..
         ERC20 _asset = S.asset;
 
-        uint256 idle = _asset.balanceOf(address(this));
+        uint256 idle = address(_asset) == ETH ? address(this).balance : _asset.balanceOf(address(this));
         uint256 loss;
         // Check if we need to withdraw funds.
         if (idle < assets) {
@@ -895,7 +878,7 @@ contract MockTokenizedStrategy {
             }
 
             // Return the actual amount withdrawn. Adjust for potential under withdraws.
-            idle = _asset.balanceOf(address(this));
+            idle = address(_asset) == ETH ? address(this).balance : _asset.balanceOf(address(this));
 
             // If we didn't get enough out then we have a loss.
             if (idle < assets) {
@@ -921,7 +904,7 @@ contract MockTokenizedStrategy {
         _burn(S, owner, shares);
 
         if (address(S.asset) == ETH) {
-            (bool success, ) = address(this).call{value: assets}("");
+            (bool success, ) = receiver.call{value: assets}("");
             require(success, "Transfer Failed");
         }
         else {
@@ -942,7 +925,6 @@ contract MockTokenizedStrategy {
     function report()
         external
         nonReentrant
-        onlyKeepers
         returns (uint256 profit, uint256 loss)
     {
         // Cache storage pointer since its used repeatedly.
@@ -999,9 +981,11 @@ contract MockTokenizedStrategy {
      * A report() call will be needed to record any profits or losses.
      */
     function tend() external nonReentrant onlyKeepers {
+        ERC20 asset = _strategyStorage().asset;
+        uint256 balance = address(asset) == ETH ? address(this).balance : asset.balanceOf(address(this));
         // Tend the strategy with the current loose balance.
         IBaseStrategy(address(this)).tendThis(
-            _strategyStorage().asset.balanceOf(address(this))
+            balance
         );
     }
 
@@ -1086,6 +1070,13 @@ contract MockTokenizedStrategy {
         return _strategyStorage().pendingManagement;
     }
 
+    function owner() public view returns (address) {
+        return _strategyStorage().owner;
+    }
+
+    function dragonRouter() external view returns (address) {
+        return _strategyStorage().dragonRouter;
+    }
     /**
      * @notice Get the current address that can call tend and report.
      * @return . Address of the keeper

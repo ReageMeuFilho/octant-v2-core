@@ -46,7 +46,7 @@ contract MockStrategy is Module, BaseStrategy {
     }
 
     function _deployFunds(uint256 _amount) internal override {
-        MockYieldSource(yieldSource).deposit(_amount);
+        MockYieldSource(yieldSource).deposit{value: _amount}(_amount);
     }
 
     function _freeFunds(uint256 _amount) internal override {
@@ -54,18 +54,19 @@ contract MockStrategy is Module, BaseStrategy {
     }
 
     function _harvestAndReport() internal override returns (uint256, uint256) {
+        uint256 amount = 0.1 ether;
+        MockYieldSource(yieldSource).simulateHarvestRewards(0.1 ether);
         uint256 balance = address(asset) == ETH ? address(this).balance : ERC20(asset).balanceOf(address(this));
-        if (balance > 0 && !TokenizedStrategy.isShutdown()) {
-            MockYieldSource(yieldSource).deposit(balance);
-        }
-        return
-            (0, MockYieldSource(yieldSource).balance() +
-            ERC20(asset).balanceOf(address(this)));
+        return (amount, MockYieldSource(yieldSource).balance() + balance);
     }
 
     function _tend(uint256 /*_idle*/) internal override {
         uint256 balance = address(asset) == ETH ? address(this).balance : ERC20(asset).balanceOf(address(this));
         if (balance > 0) {
+            if (address(asset) == ETH) {
+                MockYieldSource(yieldSource).deposit{value: balance}(balance);
+                return;
+            }
             MockYieldSource(yieldSource).deposit(balance);
         }
     }

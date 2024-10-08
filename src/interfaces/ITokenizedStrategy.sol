@@ -17,17 +17,11 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
 
     event Reported(uint256 profit, uint256 loss, uint256 protocolFees, uint256 performanceFees);
 
-    event UpdatePerformanceFeeRecipient(address indexed newPerformanceFeeRecipient);
-
     event UpdateKeeper(address indexed newKeeper);
-
-    event UpdatePerformanceFee(uint16 newPerformanceFee);
 
     event UpdateManagement(address indexed newManagement);
 
     event UpdateEmergencyAdmin(address indexed newEmergencyAdmin);
-
-    event UpdateProfitMaxUnlockTime(uint256 newProfitMaxUnlockTime);
 
     event UpdatePendingManagement(address indexed newPendingManagement);
 
@@ -80,8 +74,6 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
 
     function MAX_FEE() external view returns (uint16);
 
-    function FACTORY() external view returns (address);
-
     /*//////////////////////////////////////////////////////////////
                             GETTERS
     //////////////////////////////////////////////////////////////*/
@@ -90,6 +82,10 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
 
     function pricePerShare() external view returns (uint256);
 
+    function owner() external view returns (address);
+
+    function dragonRouter() external view returns (address);
+
     function management() external view returns (address);
 
     function pendingManagement() external view returns (address);
@@ -97,12 +93,6 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
     function keeper() external view returns (address);
 
     function emergencyAdmin() external view returns (address);
-
-    function fullProfitUnlockDate() external view returns (uint256);
-
-    function profitUnlockingRate() external view returns (uint256);
-
-    function profitMaxUnlockTime() external view returns (uint256);
 
     function lastReport() external view returns (uint256);
 
@@ -121,12 +111,6 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
     function setKeeper(address _keeper) external;
 
     function setEmergencyAdmin(address _emergencyAdmin) external;
-
-    function setPerformanceFee(uint16 _performanceFee) external;
-
-    function setPerformanceFeeRecipient(address _performanceFeeRecipient) external;
-
-    function setProfitMaxUnlockTime(uint256 _profitMaxUnlockTime) external;
 
     function setName(string calldata _newName) external;
 
