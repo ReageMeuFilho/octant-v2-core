@@ -3,52 +3,31 @@ pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
 import "solady/src/tokens/ERC20.sol";
-import "src/routers-transformers/Converter.sol";
+import "src/routers-transformers/Trader.sol";
 import {HelperConfig} from "script/helpers/HelperConfig.s.sol";
 import {UniswapLiquidityHelper} from "script/helpers/UniswapLiquidityHelper.s.sol";
 
-contract ConverterWrapper is Test {
-    Converter public conv;
+contract TraderWrapper is Test {
+    Trader public conv;
     uint256 public blockno = 1;
     uint256 public constr = 0;
     uint256 public budget = 10_000 ether;
     HelperConfig helperConfig = new HelperConfig();
 
     function setUp() external {
-        (address glmToken, address wethToken,,, address router, address pool,) = helperConfig.activeNetworkConfig();
-        conv = new Converter(pool, router, glmToken, wethToken);
-        mockOracle();
-        mockRouter();
+        (, address wethToken,,,,,) = helperConfig.activeNetworkConfig();
+        conv = new Trader(wethToken);
         conv.setSpendADay(0, 0, 0.6 ether, 1.4 ether);
         vm.deal(address(conv), budget);
     }
 
     receive() external payable {}
 
-    function mockRouter() public {
-        vm.mockCall(
-            address(conv.uniswap()),
-            abi.encodeWithSelector(MockOfRouter.exactInputSingle.selector),
-            abi.encode(5000 * 10 ** 9)
-        );
-    }
-
-    function mockOracle() public {
-        vm.mockCall(
-            address(conv.priceFeed()),
-            abi.encodeWithSelector(GLMPriceFeed.getGLMQuota.selector),
-            abi.encode(5000 * 10 ** 9)
-        );
-    }
-
-    // sequential call to this function emulate time
-    // progressing and set random values for randao
+    // sequential call to this function emulate time progression
     function wrapBuy() public returns (bool) {
         vm.roll(blockno);
         blockno = blockno + 1;
-        /* emit log_named_uint("blockno", block.number); */
-        /* emit log_named_bytes32("blockhash", blockhash(block.number-1)); */
-        try conv.buy(block.number - 1) {
+        try conv.convert(block.number - 1) {
             return true;
         } catch (bytes memory) /*lowLevelData*/ {
             return false;
@@ -56,13 +35,13 @@ contract ConverterWrapper is Test {
     }
 
     function test_simpleBuy() external {
-        // effectively disable randao check
+        // effectively disable randomness check
         uint256 chance = type(uint256).max;
         // effectively disable upper bound check
         uint256 spendADay = 1_000_000_000_000 ether;
         conv.setSpendADay(chance, spendADay, 1 ether, 1 ether);
         vm.roll(block.number + 100);
-        conv.buy(block.number - 2);
+        conv.convert(block.number - 2);
         assertEq(conv.spent(), 1 ether);
     }
 
@@ -116,13 +95,6 @@ contract ConverterWrapper is Test {
         // proving that bounding with `spendADay` works
         assertLt(((blocks * 1.4 ether) / conv.blocksADay()) - 2 ether, conv.spent());
         assertLt(conv.spent(), 2 ether + ((blocks * 1.5 ether) / conv.blocksADay()));
-    }
-
-    function test_settingPrevrandao() external {
-        uint256 i = 12093812093812;
-        bytes32 val = keccak256(abi.encode(bytes32(i)));
-        vm.prevrandao(val);
-        assert(block.prevrandao == uint256(val));
     }
 
     function test_division() external pure {

@@ -8,28 +8,37 @@ import "solady/src/tokens/ERC20.sol";
 import "solady/src/tokens/WETH.sol";
 
 import {HelperConfig} from "./helpers/HelperConfig.s.sol";
-import {Converter} from "../src/routers-transformers/Converter.sol";
+import {Trader} from "../src/routers-transformers/Trader.sol";
 
-contract TraderRun is Script {
+contract TraderRun is Script, Test {
+    function max(uint a, uint b) public pure returns (uint) {
+        if (a > b) return a;
+        return b;
+    }
     function run() external {
-        (
-            address glmToken,
-            address wethToken,
-            address _nPM,
-            uint256 deployerKey,
-            address _uniswapV3Router,
-            address _uniswapGlmWethPool,
-            address demoConverter
-        ) = new HelperConfig().activeNetworkConfig();
+        (,,, uint256 deployerKey,,, address trader) = new HelperConfig().activeNetworkConfig();
 
         console.log("ChainID:", block.chainid);
-        console.log("Converter at", demoConverter);
-        assert(demoConverter != address(0));
+        console.log("Trader at", trader);
+        assert(trader != address(0));
 
         vm.startBroadcast(deployerKey);
 
-        Converter conv = Converter(payable(demoConverter));
-        conv.buy(block.number - 1);
+        Trader conv = Trader(payable(trader));
+        uint256 scan_since = max(block.number - 255, conv.lastHeight()) + 1;
+        emit log_named_uint("Scanning since", scan_since);
+        for (uint height = scan_since; height < block.number - 1; height++) {
+            if (conv.canTrade(height)) {
+                if (!conv.hasOverspent(height)) {
+                    emit log_named_uint("Height YES, has budget YES", height);
+                    conv.convert(height);
+                } else {
+                    emit log_named_uint("Height YES, has budget no ", height);
+                }
+            } else {
+                emit log_named_uint("Height no ", height);
+            }
+        }
 
         vm.stopBroadcast();
     }

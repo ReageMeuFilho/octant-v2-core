@@ -27,33 +27,12 @@ token_abi = [
 ]
 
 conv_abi = [
-    {"inputs": [], "type": "error", "name": "Converter__SoftwareError"},
-    {"inputs": [], "type": "error", "name": "Converter__SpendingTooMuch"},
-    {"inputs": [], "type": "error", "name": "Converter__WrongPrevrandao"},
-    {
-        "inputs": [],
-        "name": "buy",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function",
-    },
-    {
-        "type": "function",
-        "name": "price",
-        "inputs": [],
-        "outputs": [{"name": "", "type": "uint256", "internalType": "uint256"}],
-        "stateMutability": "view",
-    },
+    {"inputs": [], "type": "error", "name": "Transformer__SoftwareError"},
+    {"inputs": [], "type": "error", "name": "Transformer__SpendingTooMuch"},
+    {"inputs": [], "type": "error", "name": "Transformer__WrongHeight"},
     {
         "type": "function",
         "name": "WETHAddress",
-        "inputs": [],
-        "outputs": [{"name": "", "type": "address", "internalType": "address"}],
-        "stateMutability": "view",
-    },
-    {
-        "type": "function",
-        "name": "GLMAddress",
         "inputs": [],
         "outputs": [{"name": "", "type": "address", "internalType": "address"}],
         "stateMutability": "view",
@@ -67,21 +46,7 @@ conv_abi = [
     },
     {
         "type": "function",
-        "name": "lastBought",
-        "inputs": [],
-        "outputs": [{"name": "", "type": "uint256", "internalType": "uint256"}],
-        "stateMutability": "view",
-    },
-    {
-        "type": "function",
         "name": "lastSold",
-        "inputs": [],
-        "outputs": [{"name": "", "type": "uint256", "internalType": "uint256"}],
-        "stateMutability": "view",
-    },
-    {
-        "type": "function",
-        "name": "lastQuota",
         "inputs": [],
         "outputs": [{"name": "", "type": "uint256", "internalType": "uint256"}],
         "stateMutability": "view",
@@ -137,13 +102,6 @@ conv_abi = [
     },
     {
         "type": "function",
-        "name": "randao",
-        "inputs": [],
-        "outputs": [{"name": "", "type": "uint256", "internalType": "uint256"}],
-        "stateMutability": "view",
-    },
-    {
-        "type": "function",
         "name": "chance",
         "inputs": [],
         "outputs": [{"name": "", "type": "uint256", "internalType": "uint256"}],
@@ -151,7 +109,7 @@ conv_abi = [
     },
 ]
 
-converter_address = "0x5742F2B61093a470a2d69B685f82bD1dd00A5312"
+converter_address = "0x6bdCEE5603322Aaa1cDBEf5bb361c63373C0b1a2"
 SEPOLIA_WSS_URL = os.environ["SEPOLIA_WSS_URL"]
 SEPOLIA_RPC_URL = os.environ["SEPOLIA_RPC_URL"]
 w3 = Web3(Web3.HTTPProvider(SEPOLIA_RPC_URL))
@@ -159,8 +117,6 @@ assert w3.is_connected()
 conv = w3.eth.contract(address=converter_address, abi=conv_abi)
 weth_address = conv.functions.WETHAddress().call()
 weth = w3.eth.contract(address=weth_address, abi=token_abi)
-glm_address = conv.functions.GLMAddress().call()
-glm = w3.eth.contract(address=glm_address, abi=token_abi)
 blocks_a_day = conv.functions.blocksADay().call()
 
 
@@ -169,14 +125,11 @@ class ConvStatus:
     spent: int  # WETH, wei
     spendable: int  # WETH, wei
     weth_balance: int
-    glm_balance: int
-    price: int  # price of 1 ETH in GLMs, wei
-    last_quota: int  # price of 1 ETH in GLMs, wei
 
 
 def log_status(height: int, sts: ConvStatus):
     print(
-        f"{height},{sts.spent},{sts.spendable},{sts.weth_balance},{sts.glm_balance},{sts.price},{sts.last_quota}",
+        f"{height},{sts.spent},{sts.spendable},{sts.weth_balance}",
         flush=True,
     )
 
@@ -190,9 +143,6 @@ def get_status(conv, w3, height):
         spent=spent,
         spendable=spendable,
         weth_balance=weth.functions.balanceOf(converter_address).call(),
-        glm_balance=glm.functions.balanceOf(converter_address).call(),
-        price=conv.functions.price().call(),
-        last_quota=conv.functions.lastQuota().call(),
     )
 
 

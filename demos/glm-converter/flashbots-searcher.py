@@ -40,11 +40,11 @@ acc = w3.eth.account.from_key(pk)
 
 converter_address = "0x5742F2B61093a470a2d69B685f82bD1dd00A5312"
 conv_abi = [
-    {"inputs": [], "type": "error", "name": "Converter__SoftwareError"},
-    {"inputs": [], "type": "error", "name": "Converter__SpendingTooMuch"},
-    {"inputs": [], "type": "error", "name": "Converter__WrongPrevrandao"},
-    {"inputs": [], "type": "error", "name": "Converter__RandomnessAlreadyUsed"},
-    {"inputs": [], "type": "error", "name": "Converter__RandomnessUnsafeSeed"},
+    {"inputs": [], "type": "error", "name": "Transformer__SoftwareError"},
+    {"inputs": [], "type": "error", "name": "Transformer__SpendingTooMuch"},
+    {"inputs": [], "type": "error", "name": "Transformer__WrongHeight"},
+    {"inputs": [], "type": "error", "name": "Transformer__RandomnessAlreadyUsed"},
+    {"inputs": [], "type": "error", "name": "Transformer__RandomnessUnsafeSeed"},
     {
         "inputs": [{"internalType": "uint256", "name": "height", "type": "uint256"}],
         "stateMutability": "nonpayable",

@@ -4,7 +4,6 @@ pragma solidity ^0.8.23;
 import "forge-std/console.sol";
 
 import {Ownable} from "@solady/auth/Ownable.sol";
-import "solady/src/tokens/ERC20.sol";
 import "solady/src/tokens/WETH.sol";
 import "solady/src/utils/SafeCastLib.sol";
 
@@ -14,33 +13,26 @@ import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 contract GLMPriceFeed {
     address public GLMAddress;
     address public WETHAddress;
-    address public GlmEth10000Pool;
 
-    constructor(address _poolAddress, address _glm, address _weth) {
-        GLMAddress = _glm;
+    constructor(address _weth) {
         WETHAddress = _weth;
-        GlmEth10000Pool = _poolAddress;
-    }
-
-    function getGLMQuota(uint256 amountIn_) public view returns (uint256) {
-        (int24 twapTick,) = OracleLibrary.consult(GlmEth10000Pool, 30);
-        return OracleLibrary.getQuoteAtTick(twapTick, SafeCastLib.toUint128(amountIn_), WETHAddress, GLMAddress);
     }
 }
 
-contract Converter is Ownable {
+/// @author .
+/// @title Octant Trader
+/// @notice Octant Trader is a contract that performs "DCA" in terms of sold token into another token.
+/// @dev This contract performs trades in a random times, attempting to isolate the deployer from risks of insider trading.
+contract Trader is Ownable {
     event Conversion(uint256 sold, uint256 bought);
     event Status(uint256 ethBalance, uint256 glmBalance);
 
-    /// @notice GLM token contract
-    address public GlmEth10000PoolAddress;
-    address public UniswapV3RouterAddress;
-    address public GLMAddress;
+    /// @notice Wrapped ETH token address (WETH9).
     address public WETHAddress;
 
     uint256 public constant blocksADay = 7200;
 
-    /// @notice Chance is probability normalized to uint256.max instead to 1
+    /// @notice Chance is probability of a trade occuring at a particular height, normalized to uint256.max instead to 1
     uint256 public chance;
 
     /// @notice How much ETH can be spend per day on average (upper bound)
@@ -49,6 +41,7 @@ contract Converter is Ownable {
     /// @notice Spent ETH since startingBlock
     uint256 public spent = 0;
 
+    /// @notice Rules for spending were last updated at this height.
     uint256 public startingBlock = block.number;
 
     /// @notice Lowest allowed size of a sale.
@@ -61,65 +54,45 @@ contract Converter is Ownable {
     /// @notice Height of block hash used as a last source of randomness.
     uint256 public lastHeight;
 
-    ISwapRouter public uniswap;
-    ERC20 public glm;
-    WETH public weth;
-    GLMPriceFeed public priceFeed;
-
-    uint256 public lastBought = 0;
-    uint256 public lastQuota = 0;
     uint256 public lastSold = 0;
 
-    /// @notice Heights at which `buy()` can be executed is decided by `block.prevrandao` value.
-    ///         If you see `Converter__WrongPrevrandao()` error, retry in the next block.
+    WETH private weth;
+
+    /// @notice Heights at which `convert()` can be called is decided by randomness.
+    ///         If you see `Trader__WrongHeight()` error, retry in the next block.
     ///         Note, you don't need to pay for gas to learn if tx will apply!
-    error Converter__WrongPrevrandao();
+    error Trader__WrongHeight();
 
     /// @notice This error indicates that contract has spent more ETH than allowed.
     ///         Retry tx in the next block.
-    error Converter__SpendingTooMuch();
+    error Trader__SpendingTooMuch();
 
-    /// @notice Raised if tx was already performed for this source of randomness.
-    error Converter__RandomnessAlreadyUsed();
+    /// @notice Raised if tx was already performed for this source of randomness (this height).
+    error Trader__RandomnessAlreadyUsed();
 
     /// @notice Unsafe randomness seed.
-    error Converter__RandomnessUnsafeSeed();
+    error Trader__RandomnessUnsafeSeed();
 
     /// @notice This one indicates software error. Should never happen.
-    error Converter__SoftwareError();
+    error Trader__SoftwareError();
 
-    constructor(address _poolAddress, address _v3Router, address _glm, address _weth) payable {
-        GlmEth10000PoolAddress = _poolAddress;
-        UniswapV3RouterAddress = _v3Router;
-        GLMAddress = _glm;
+    constructor(address _weth) payable {
         WETHAddress = _weth;
-
-        uniswap = ISwapRouter(UniswapV3RouterAddress);
-        glm = ERC20(GLMAddress);
         weth = WETH(payable(WETHAddress));
-        priceFeed = new GLMPriceFeed(GlmEth10000PoolAddress, GLMAddress, WETHAddress);
-
         _initializeOwner(msg.sender);
     }
 
-    function test_rand() public view returns (bool) {
-        uint256 rand = getRandomNumber(block.number - 1);
-        return (rand > chance);
-    }
-
-    function test_limit() public view returns (bool) {
-        return (spent > (block.number - startingBlock) * (spendADay / blocksADay));
-    }
-
-    function buy(uint256 height) public {
+    /// @notice Transfers funds that are to be converted by to target token by external converter.
+    /// @param height that will be used as a source of randomness. One height value can be used only once.
+    function convert(uint256 height) public {
         uint256 rand = getRandomNumber(height);
-        if (rand > chance) revert Converter__WrongPrevrandao();
-        if (spent > (block.number - startingBlock) * (spendADay / blocksADay)) revert Converter__SpendingTooMuch();
-        if (lastHeight >= height) revert Converter__RandomnessAlreadyUsed();
+        if (rand > chance) revert Trader__WrongHeight();
+        if (hasOverspent(height)) revert Trader__SpendingTooMuch();
+        if (lastHeight >= height) revert Trader__RandomnessAlreadyUsed();
         lastHeight = height;
 
         uint256 saleValue = getUniformInRange(saleValueLow, saleValueHigh, rand);
-        if (saleValue > saleValueHigh) revert Converter__SoftwareError();
+        if (saleValue > saleValueHigh) revert Trader__SoftwareError();
 
         // this simulates sending ETH to swapper
         (bool success,) = payable(owner()).call{value: saleValue}("");
@@ -129,22 +102,36 @@ contract Converter is Ownable {
         spent = spent + saleValue;
     }
 
-    function price() public view returns (uint256) {
-        return priceFeed.getGLMQuota(1 ether);
+    function canTrade(uint256 height) public view returns (bool) {
+        uint256 rand = getRandomNumber(height);
+        return (rand <= chance);
     }
 
+    function hasOverspent(uint256 height) public view returns (bool) {
+        return (spent > (height - startingBlock) * (spendADay / blocksADay));
+    }
+
+    /// @notice Sets ETH spending limits.
+    /// @param chance_ Chance determines how often on average trades can be performed
+    /// @param spendADay_ determines how much ETH on average can Trader sell
+    /// @param low_ is a lower bound of sold ETH for a single trade
+    /// @param high_ is a higher bound of sold ETH for a single trade
     function setSpendADay(uint256 chance_, uint256 spendADay_, uint256 low_, uint256 high_) public onlyOwner {
         chance = chance_;
         spendADay = spendADay_;
         startingBlock = block.number;
+        lastHeight = block.number;
         spent = 0;
         saleValueLow = low_;
         saleValueHigh = high_;
     }
 
+    /// @notice Get random value for particular blockchain height.
+    /// @param height Height is block height to be used as a source of randomness. Will raise if called for blocks older than 256.
+    /// @return a pseudorandom uint256 value in range [0, type(uint256).max]
     function getRandomNumber(uint256 height) public view returns (uint256) {
         uint256 seed = uint256(blockhash(height));
-        if (seed == 0) revert Converter__RandomnessUnsafeSeed();
+        if (seed == 0) revert Trader__RandomnessUnsafeSeed();
         return randomize(seed);
     }
 
@@ -155,6 +142,8 @@ contract Converter is Ownable {
     /// @dev This function returns random value distributed uniformly in range [low, high).
     ///      Note, some values will not be chosen because of precision compromise.
     ///      Also, if high > 2**200, this function may overflow.
+    /// @param low Low range of values returned
+
     function getUniformInRange(uint256 low, uint256 high, uint256 seed) public pure returns (uint256) {
         return low + ((high - low) * (randomize(seed) >> 200) / 2 ** (256 - 200));
     }

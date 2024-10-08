@@ -13,7 +13,7 @@ contract HelperConfig is Script {
         uint256 deployerKey;
         address uniswapV3Router;
         address uniswapGlmWeth10000Pool;
-        address demoConverter;
+        address trader;
     }
 
     uint256 public constant DEFAULT_ANVIL_KEY = 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80;
@@ -41,7 +41,7 @@ contract HelperConfig is Script {
             uniswapV3Router: 0xD6601e25cF43CAc433A23cB95a39D38012B2e9f0,
             uniswapGlmWeth10000Pool: 0x1985134644683848EF81bdd9B1F4b16DDC647EF3,
             deployerKey: vm.envUint("PRIVATE_KEY"),
-            demoConverter: 0x6bdCEE5603322Aaa1cDBEf5bb361c63373C0b1a2
+            trader: 0xc654a254EEab4c65F8a786f8c1516ea7e9824daF
         });
     }
 
@@ -53,7 +53,7 @@ contract HelperConfig is Script {
             uniswapV3Router: 0xE592427A0AEce92De3Edee1F18E0157C05861564,
             uniswapGlmWeth10000Pool: 0x531b6A4b3F962208EA8Ed5268C642c84BB29be0b,
             deployerKey: vm.envUint("PRIVATE_KEY"),
-            demoConverter: address(0)
+            trader: address(0)
         });
     }
 
@@ -76,7 +76,7 @@ contract HelperConfig is Script {
             uniswapV3Router: address(0),
             uniswapGlmWeth10000Pool: address(0),
             deployerKey: DEFAULT_ANVIL_KEY,
-            demoConverter: address(0)
+            trader: address(0)
         });
     }
 }
