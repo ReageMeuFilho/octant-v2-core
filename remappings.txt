@@ -7,5 +7,5 @@ solady/=lib/solady/src
 openzeppelin-upgradeable=lib/openzeppelin-contracts-upgradeable/contracts
 @openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
 zodiac/=lib/zodiac/contracts/
-safe-contracts=lib/safe-smart-account/contracts
 abdk-libraries-solidity=lib/abdk-libraries-solidity
+@gnosis.pm/safe-contracts/=lib/safe-smart-account
