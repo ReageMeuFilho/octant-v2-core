@@ -38,7 +38,7 @@ contract BaseStrategyTest is BaseTest {
     }
 
     /// @dev tests if initial params are set correctly.
-    function testInitialize() public {
+    function testInitialize() public view {
         assertTrue(module.tokenizedStrategyImplementation() == address(tokenizedStrategyImplementation));
         assertTrue(module.maxReportDelay() == maxReportDelay);
         assertTrue(ITokenizedStrategy(address(module)).management() == management);
@@ -57,6 +57,8 @@ contract BaseStrategyTest is BaseTest {
         ITokenizedStrategy(address(module)).deposit(amount, temps.safe);
 
         vm.startPrank(temps.safe);
+
+        assertTrue(module.availableDepositLimit(temps.safe) == type(uint256).max);
 
         assertTrue(ITokenizedStrategy(address(module)).balanceOf(temps.safe) == 0);
         assertTrue(address(yieldSource).balance == 0);
@@ -78,6 +80,8 @@ contract BaseStrategyTest is BaseTest {
         ITokenizedStrategy(address(module)).withdraw(withdrawAmount, temps.safe, temps.safe, type(uint256).max);
 
         vm.startPrank(temps.safe);
+
+        assertTrue(module.availableWithdrawLimit(temps.safe) == type(uint256).max);
         
         assertTrue(ITokenizedStrategy(address(module)).balanceOf(temps.safe) == amount);
         assertTrue(address(yieldSource).balance == amount);
@@ -87,6 +91,27 @@ contract BaseStrategyTest is BaseTest {
 
         vm.stopPrank();
     }
+
+    function testHarvestTrigger() public {
+        // returns false if strategy has no assets.
+        assertTrue(!module.harvestTrigger());
+
+        // deposit funds in the strategy
+        uint256 amount = 1 ether;
+        _deposit(amount);
+        
+        // should return false if strategy has funds but report has been called recently
+        assertTrue(!module.harvestTrigger());
+
+        // should return true if strategy has some idle funds
+        vm.deal(address(module), 1 ether);
+        assertTrue(module.harvestTrigger());
+
+        // should return true if assets in strategy > 0 and report hasn't been called for time > maxReportDelay.
+        vm.warp(block.timestamp + 100);
+        assertTrue(module.harvestTrigger());
+    }
+
     function testharvestAndReport() public {
         /// Setup
         uint256 amount = 1 ether;
@@ -104,9 +129,14 @@ contract BaseStrategyTest is BaseTest {
 
         vm.startPrank(keeper);
 
+
         uint256 idleFunds = 1 ether;
         vm.deal(address(module), idleFunds);
-        
+
+        module.setTrigger(true);
+        (bool tendTrigger, ) = module.tendTrigger();
+        assertTrue(tendTrigger == true);
+
         assertTrue(address(module).balance == idleFunds);
         assertTrue(address(yieldSource).balance == 0);
         ITokenizedStrategy(address(module)).tend();
@@ -114,7 +144,60 @@ contract BaseStrategyTest is BaseTest {
         assertTrue(address(yieldSource).balance == idleFunds);
 
         vm.stopPrank();
+    }
 
+    function testShutdownWithdraw() public {
+        /// Setup
+        uint256 amount = 1 ether;
+        _deposit(amount);
+
+        vm.startPrank(management);
+
+        uint256 emergencyWithdrawAmount = 0.5 ether;
+        assertTrue(address(yieldSource).balance == amount);
+        ITokenizedStrategy(address(module)).shutdownStrategy();
+        ITokenizedStrategy(address(module)).emergencyWithdraw(emergencyWithdrawAmount);
+        assertTrue(address(yieldSource).balance == amount - emergencyWithdrawAmount);
+
+        vm.stopPrank();
+    }
+
+    function testAdjustPosition() public {
+        /// Setup
+        uint256 amount = 1 ether;
+        _deposit(amount);
+
+        // reverts if not called by management.
+        uint256 debtOutstanding = 0.5 ether;
+        vm.expectRevert("!management");
+        module.adjustPosition(debtOutstanding);
+
+        vm.startPrank(management);
+
+        assertTrue(address(yieldSource).balance == amount);
+        module.adjustPosition(debtOutstanding);
+        assertTrue(address(yieldSource).balance == amount - debtOutstanding);
+
+        vm.stopPrank();
+    }
+
+    function testLiquidatePosition() public {
+        /// Setup
+        uint256 amount = 1 ether;
+        _deposit(amount);
+
+        // reverts if not called by management.
+        uint256 liquidationAmount = 0.5 ether;
+        vm.expectRevert("!management");
+        module.liquidatePosition(liquidationAmount);
+
+        vm.startPrank(management);
+
+        assertTrue(address(yieldSource).balance == amount);
+        module.liquidatePosition(liquidationAmount);
+        assertTrue(address(yieldSource).balance == amount - liquidationAmount);
+
+        vm.stopPrank();
     }
 
     function _deposit(uint256 _amount) internal {

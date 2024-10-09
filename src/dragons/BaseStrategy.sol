@@ -103,6 +103,8 @@ abstract contract BaseStrategy {
 
     uint256 public maxReportDelay;
 
+    address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE; // using this address to represent native ETH
+
     /*//////////////////////////////////////////////////////////////
                             IMMUTABLES
     //////////////////////////////////////////////////////////////*/
@@ -398,13 +400,10 @@ abstract contract BaseStrategy {
 
     function harvestTrigger() public view virtual returns (bool) {
         // Should not trigger if strategy is not active (no assets).
-        if (TokenizedStrategy.totalAssets() == 0) return false;
-
-        // Should trigger if hasn't been called in a while.
-        if ((block.timestamp - TokenizedStrategy.lastReport()) >= maxReportDelay) return true;
+        if (TokenizedStrategy.totalAssets() != 0 && (block.timestamp - TokenizedStrategy.lastReport()) >= maxReportDelay) return true;
 
         // Check for idle funds in the strategy and deposit in the farm.
-        return asset.balanceOf(address(this)) > 0;
+        return (address(asset) == ETH ? address(this).balance : asset.balanceOf(address(this))) > 0;
     }
 
     /**

@@ -12,8 +12,6 @@ contract MockStrategy is Module, BaseStrategy {
     bool public kept;
     bool public emergentizated;
 
-    address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE; // using this address to represent native ETH
-
     /// @dev Initialize function, will be triggered when a new proxy is deployed
     /// @dev owner of this module will the safe multisig that calls setUp function
     /// @param initializeParams Parameters of initialization encoded
@@ -83,15 +81,12 @@ contract MockStrategy is Module, BaseStrategy {
         trigger = _trigger;
     }
 
-    function onlyLetManagers() public onlyManagement {
-        managed = true;
+    function adjustPosition(uint256 _debtOutstanding) external override onlyManagement {
+        MockYieldSource(yieldSource).withdraw(_debtOutstanding);
     }
 
-    function onlyLetKeepersIn() public onlyKeepers {
-        kept = true;
-    }
-
-    function onlyLetEmergencyAdminsIn() public onlyEmergencyAuthorized {
-        emergentizated = true;
+    function liquidatePosition(uint256 _amountNeeded) external override onlyManagement returns (uint256 _liquidatedAmount, uint256 _loss) {
+        MockYieldSource(yieldSource).withdraw(_amountNeeded);
+        return (_amountNeeded, 0);
     }
 }
