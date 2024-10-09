@@ -284,7 +284,7 @@ contract TokenizedStrategy {
      *
      * @param _sender The original msg.sender.
      */
-    function requireManagement(address _sender) public view {
+    function requireManagement(address _sender) public view virtual {
         require(_sender == _strategyStorage().management, "!management");
     }
 
@@ -297,7 +297,7 @@ contract TokenizedStrategy {
      *
      * @param _sender The original msg.sender.
      */
-    function requireKeeperOrManagement(address _sender) public view {
+    function requireKeeperOrManagement(address _sender) public view virtual {
         StrategyData storage S = _strategyStorage();
         require(_sender == S.keeper || _sender == S.management, "!keeper");
     }
@@ -311,7 +311,7 @@ contract TokenizedStrategy {
      *
      * @param _sender The original msg.sender.
      */
-    function requireEmergencyAuthorized(address _sender) public view {
+    function requireEmergencyAuthorized(address _sender) public view virtual {
         StrategyData storage S = _strategyStorage();
         require(_sender == S.emergencyAdmin || _sender == S.management, "!emergency authorized");
     }
@@ -413,7 +413,7 @@ contract TokenizedStrategy {
         address _management,
         address _performanceFeeRecipient,
         address _keeper
-    ) external {
+    ) external virtual {
         // Cache storage pointer.
         StrategyData storage S = _strategyStorage();
 
@@ -461,7 +461,7 @@ contract TokenizedStrategy {
      * @param receiver The address to receive the `shares`.
      * @return shares The actual amount of shares issued.
      */
-    function deposit(uint256 assets, address receiver) external nonReentrant returns (uint256 shares) {
+    function deposit(uint256 assets, address receiver) external virtual nonReentrant returns (uint256 shares) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
 
@@ -485,7 +485,7 @@ contract TokenizedStrategy {
      * @param receiver The address to receive the `shares`.
      * @return assets The actual amount of asset deposited.
      */
-    function mint(uint256 shares, address receiver) external nonReentrant returns (uint256 assets) {
+    function mint(uint256 shares, address receiver) external virtual nonReentrant returns (uint256 assets) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
 
@@ -506,7 +506,7 @@ contract TokenizedStrategy {
      * @param owner The address whose shares are burnt.
      * @return shares The actual amount of shares burnt.
      */
-    function withdraw(uint256 assets, address receiver, address owner) external returns (uint256 shares) {
+    function withdraw(uint256 assets, address receiver, address owner) external virtual returns (uint256 shares) {
         return withdraw(assets, receiver, owner, 0);
     }
 
@@ -545,7 +545,7 @@ contract TokenizedStrategy {
      * @param owner The address whose shares are burnt.
      * @return assets The actual amount of underlying withdrawn.
      */
-    function redeem(uint256 shares, address receiver, address owner) external returns (uint256) {
+    function redeem(uint256 shares, address receiver, address owner) external virtual returns (uint256) {
         // We default to not limiting a potential loss.
         return redeem(shares, receiver, owner, MAX_BPS);
     }
@@ -589,7 +589,7 @@ contract TokenizedStrategy {
      *
      * @return . Total assets the strategy holds.
      */
-    function totalAssets() external view returns (uint256) {
+    function totalAssets() external view virtual returns (uint256) {
         return _totalAssets(_strategyStorage());
     }
 
@@ -604,7 +604,7 @@ contract TokenizedStrategy {
      *
      * @return . Total amount of shares outstanding.
      */
-    function totalSupply() external view returns (uint256) {
+    function totalSupply() external view virtual returns (uint256) {
         return _totalSupply(_strategyStorage());
     }
 
@@ -616,7 +616,7 @@ contract TokenizedStrategy {
      * @param assets The amount of underlying.
      * @return . Expected shares that `assets` represents.
      */
-    function convertToShares(uint256 assets) external view returns (uint256) {
+    function convertToShares(uint256 assets) external view virtual returns (uint256) {
         return _convertToShares(_strategyStorage(), assets, Math.Rounding.Floor);
     }
 
@@ -628,7 +628,7 @@ contract TokenizedStrategy {
      * @param shares The amount of the strategies shares.
      * @return . Expected amount of `asset` the shares represents.
      */
-    function convertToAssets(uint256 shares) external view returns (uint256) {
+    function convertToAssets(uint256 shares) external view virtual returns (uint256) {
         return _convertToAssets(_strategyStorage(), shares, Math.Rounding.Floor);
     }
 
@@ -641,7 +641,7 @@ contract TokenizedStrategy {
      * @param assets The amount of `asset` to deposits.
      * @return . Expected shares that would be issued.
      */
-    function previewDeposit(uint256 assets) external view returns (uint256) {
+    function previewDeposit(uint256 assets) external view virtual returns (uint256) {
         return _convertToShares(_strategyStorage(), assets, Math.Rounding.Floor);
     }
 
@@ -655,7 +655,7 @@ contract TokenizedStrategy {
      * @param shares The amount of shares to mint.
      * @return . The needed amount of `asset` for the mint.
      */
-    function previewMint(uint256 shares) external view returns (uint256) {
+    function previewMint(uint256 shares) external view virtual returns (uint256) {
         return _convertToAssets(_strategyStorage(), shares, Math.Rounding.Ceil);
     }
 
@@ -669,7 +669,7 @@ contract TokenizedStrategy {
      * @param assets The amount of `asset` that would be withdrawn.
      * @return . The amount of shares that would be burnt.
      */
-    function previewWithdraw(uint256 assets) external view returns (uint256) {
+    function previewWithdraw(uint256 assets) external view virtual returns (uint256) {
         return _convertToShares(_strategyStorage(), assets, Math.Rounding.Ceil);
     }
 
@@ -682,7 +682,7 @@ contract TokenizedStrategy {
      * @param shares The amount of shares that would be redeemed.
      * @return . The amount of `asset` that would be returned.
      */
-    function previewRedeem(uint256 shares) external view returns (uint256) {
+    function previewRedeem(uint256 shares) external view virtual returns (uint256) {
         return _convertToAssets(_strategyStorage(), shares, Math.Rounding.Floor);
     }
 
@@ -694,7 +694,7 @@ contract TokenizedStrategy {
      * @param receiver The address receiving the shares.
      * @return . The max that `receiver` can deposit in `asset`.
      */
-    function maxDeposit(address receiver) external view returns (uint256) {
+    function maxDeposit(address receiver) external view virtual returns (uint256) {
         return _maxDeposit(_strategyStorage(), receiver);
     }
 
@@ -705,7 +705,7 @@ contract TokenizedStrategy {
      * @param receiver The address receiving the shares.
      * @return _maxMint The max that `receiver` can mint in shares.
      */
-    function maxMint(address receiver) external view returns (uint256) {
+    function maxMint(address receiver) external view virtual returns (uint256) {
         return _maxMint(_strategyStorage(), receiver);
     }
 
@@ -717,7 +717,7 @@ contract TokenizedStrategy {
      * @param owner The owner of the shares.
      * @return _maxWithdraw Max amount of `asset` that can be withdrawn.
      */
-    function maxWithdraw(address owner) external view returns (uint256) {
+    function maxWithdraw(address owner) external view virtual returns (uint256) {
         return _maxWithdraw(_strategyStorage(), owner);
     }
 
@@ -726,7 +726,7 @@ contract TokenizedStrategy {
      * @dev Accepts a `maxLoss` variable in order to match the multi
      * strategy vaults ABI.
      */
-    function maxWithdraw(address owner, uint256 /*maxLoss*/) external view returns (uint256) {
+    function maxWithdraw(address owner, uint256 /*maxLoss*/) external view virtual returns (uint256) {
         return _maxWithdraw(_strategyStorage(), owner);
     }
 
@@ -738,7 +738,7 @@ contract TokenizedStrategy {
      * @param owner The owner of the shares.
      * @return _maxRedeem Max amount of shares that can be redeemed.
      */
-    function maxRedeem(address owner) external view returns (uint256) {
+    function maxRedeem(address owner) external view virtual returns (uint256) {
         return _maxRedeem(_strategyStorage(), owner);
     }
 
@@ -747,21 +747,21 @@ contract TokenizedStrategy {
      * @dev Accepts a `maxLoss` variable in order to match the multi
      * strategy vaults ABI.
      */
-    function maxRedeem(address owner, uint256 /*maxLoss*/) external view returns (uint256) {
+    function maxRedeem(address owner, uint256 /*maxLoss*/) external view virtual returns (uint256) {
         return _maxRedeem(_strategyStorage(), owner);
     }
 
     /*//////////////////////////////////////////////////////////////
-                    INTERNAL 4626 VIEW METHODS
+                    INTERNAL 4626 view virtual METHODS
     //////////////////////////////////////////////////////////////*/
 
     /// @dev Internal implementation of {totalAssets}.
-    function _totalAssets(StrategyData storage S) internal view returns (uint256) {
+    function _totalAssets(StrategyData storage S) internal view virtual returns (uint256) {
         return S.totalAssets;
     }
 
     /// @dev Internal implementation of {totalSupply}.
-    function _totalSupply(StrategyData storage S) internal view returns (uint256) {
+    function _totalSupply(StrategyData storage S) internal view virtual returns (uint256) {
         return S.totalSupply - _unlockedShares(S);
     }
 
@@ -770,7 +770,7 @@ contract TokenizedStrategy {
         StrategyData storage S,
         uint256 assets,
         Math.Rounding _rounding
-    ) internal view returns (uint256) {
+    ) internal view virtual returns (uint256) {
         // Saves an extra SLOAD if values are non-zero.
         uint256 totalSupply_ = _totalSupply(S);
         // If supply is 0, PPS = 1.
@@ -788,7 +788,7 @@ contract TokenizedStrategy {
         StrategyData storage S,
         uint256 shares,
         Math.Rounding _rounding
-    ) internal view returns (uint256) {
+    ) internal view virtual returns (uint256) {
         // Saves an extra SLOAD if totalSupply() is non-zero.
         uint256 supply = _totalSupply(S);
 
@@ -796,7 +796,7 @@ contract TokenizedStrategy {
     }
 
     /// @dev Internal implementation of {maxDeposit}.
-    function _maxDeposit(StrategyData storage S, address receiver) internal view returns (uint256) {
+    function _maxDeposit(StrategyData storage S, address receiver) internal view virtual returns (uint256) {
         // Cannot deposit when shutdown or to the strategy.
         if (S.shutdown || receiver == address(this)) return 0;
 
@@ -804,7 +804,7 @@ contract TokenizedStrategy {
     }
 
     /// @dev Internal implementation of {maxMint}.
-    function _maxMint(StrategyData storage S, address receiver) internal view returns (uint256 maxMint_) {
+    function _maxMint(StrategyData storage S, address receiver) internal view virtual returns (uint256 maxMint_) {
         // Cannot mint when shutdown or to the strategy.
         if (S.shutdown || receiver == address(this)) return 0;
 
@@ -815,7 +815,7 @@ contract TokenizedStrategy {
     }
 
     /// @dev Internal implementation of {maxWithdraw}.
-    function _maxWithdraw(StrategyData storage S, address owner) internal view returns (uint256 maxWithdraw_) {
+    function _maxWithdraw(StrategyData storage S, address owner) internal view virtual returns (uint256 maxWithdraw_) {
         // Get the max the owner could withdraw currently.
         maxWithdraw_ = IBaseStrategy(address(this)).availableWithdrawLimit(owner);
 
@@ -829,7 +829,7 @@ contract TokenizedStrategy {
     }
 
     /// @dev Internal implementation of {maxRedeem}.
-    function _maxRedeem(StrategyData storage S, address owner) internal view returns (uint256 maxRedeem_) {
+    function _maxRedeem(StrategyData storage S, address owner) internal view virtual returns (uint256 maxRedeem_) {
         // Get the max the owner could withdraw currently.
         maxRedeem_ = IBaseStrategy(address(this)).availableWithdrawLimit(owner);
 
@@ -977,7 +977,7 @@ contract TokenizedStrategy {
      * report in terms of `asset`.
      */
     // solhint-disable-next-line code-complexity
-    function report() external nonReentrant onlyKeepers returns (uint256 profit, uint256 loss) {
+    function report() external virtual nonReentrant onlyKeepers returns (uint256 profit, uint256 loss) {
         // Cache storage pointer since its used repeatedly.
         StrategyData storage S = _strategyStorage();
 
@@ -1138,7 +1138,7 @@ contract TokenizedStrategy {
      * @notice Get how many shares have been unlocked since last report.
      * @return . The amount of shares that have unlocked.
      */
-    function unlockedShares() external view returns (uint256) {
+    function unlockedShares() external view virtual returns (uint256) {
         return _unlockedShares(_strategyStorage());
     }
 
@@ -1151,7 +1151,7 @@ contract TokenizedStrategy {
      *
      * @return unlocked The amount of shares that have unlocked.
      */
-    function _unlockedShares(StrategyData storage S) internal view returns (uint256 unlocked) {
+    function _unlockedShares(StrategyData storage S) internal view virtual returns (uint256 unlocked) {
         uint96 _fullProfitUnlockDate = S.fullProfitUnlockDate;
         if (_fullProfitUnlockDate > block.timestamp) {
             unchecked {
@@ -1186,7 +1186,7 @@ contract TokenizedStrategy {
      *
      * A report() call will be needed to record any profits or losses.
      */
-    function tend() external nonReentrant onlyKeepers {
+    function tend() external virtual nonReentrant onlyKeepers {
         // Tend the strategy with the current loose balance.
         IBaseStrategy(address(this)).tendThis(_strategyStorage().asset.balanceOf(address(this)));
     }
@@ -1207,7 +1207,7 @@ contract TokenizedStrategy {
      *
      * This is a one way switch and can never be set back once shutdown.
      */
-    function shutdownStrategy() external onlyEmergencyAuthorized {
+    function shutdownStrategy() external virtual onlyEmergencyAuthorized {
         _strategyStorage().shutdown = true;
 
         emit StrategyShutdown();
@@ -1226,7 +1226,7 @@ contract TokenizedStrategy {
      *
      * @param amount The amount of asset to attempt to free.
      */
-    function emergencyWithdraw(uint256 amount) external nonReentrant onlyEmergencyAuthorized {
+    function emergencyWithdraw(uint256 amount) external virtual nonReentrant onlyEmergencyAuthorized {
         // Make sure the strategy has been shutdown.
         require(_strategyStorage().shutdown, "not shutdown");
 
@@ -1242,7 +1242,7 @@ contract TokenizedStrategy {
      * @notice Get the underlying asset for the strategy.
      * @return . The underlying asset.
      */
-    function asset() external view returns (address) {
+    function asset() external view virtual returns (address) {
         return address(_strategyStorage().asset);
     }
 
@@ -1250,7 +1250,7 @@ contract TokenizedStrategy {
      * @notice Get the API version for this TokenizedStrategy.
      * @return . The API version for this TokenizedStrategy
      */
-    function apiVersion() external pure returns (string memory) {
+    function apiVersion() external pure virtual returns (string memory) {
         return API_VERSION;
     }
 
@@ -1258,7 +1258,7 @@ contract TokenizedStrategy {
      * @notice Get the current address that controls the strategy.
      * @return . Address of management
      */
-    function management() external view returns (address) {
+    function management() external view virtual returns (address) {
         return _strategyStorage().management;
     }
 
@@ -1266,7 +1266,7 @@ contract TokenizedStrategy {
      * @notice Get the current pending management address if any.
      * @return . Address of pendingManagement
      */
-    function pendingManagement() external view returns (address) {
+    function pendingManagement() external view virtual returns (address) {
         return _strategyStorage().pendingManagement;
     }
 
@@ -1274,7 +1274,7 @@ contract TokenizedStrategy {
      * @notice Get the current address that can call tend and report.
      * @return . Address of the keeper
      */
-    function keeper() external view returns (address) {
+    function keeper() external view virtual returns (address) {
         return _strategyStorage().keeper;
     }
 
@@ -1282,7 +1282,7 @@ contract TokenizedStrategy {
      * @notice Get the current address that can shutdown and emergency withdraw.
      * @return . Address of the emergencyAdmin
      */
-    function emergencyAdmin() external view returns (address) {
+    function emergencyAdmin() external view virtual returns (address) {
         return _strategyStorage().emergencyAdmin;
     }
 
@@ -1291,7 +1291,7 @@ contract TokenizedStrategy {
      * denominated in Basis Points where 10_000 == 100%
      * @return . Current performance fee.
      */
-    function performanceFee() external view returns (uint16) {
+    function performanceFee() external view virtual returns (uint16) {
         return _strategyStorage().performanceFee;
     }
 
@@ -1299,7 +1299,7 @@ contract TokenizedStrategy {
      * @notice Get the current address that receives the performance fees.
      * @return . Address of performanceFeeRecipient
      */
-    function performanceFeeRecipient() external view returns (address) {
+    function performanceFeeRecipient() external view virtual returns (address) {
         return _strategyStorage().performanceFeeRecipient;
     }
 
@@ -1307,7 +1307,7 @@ contract TokenizedStrategy {
      * @notice Gets the timestamp at which all profits will be unlocked.
      * @return . The full profit unlocking timestamp
      */
-    function fullProfitUnlockDate() external view returns (uint256) {
+    function fullProfitUnlockDate() external view virtual returns (uint256) {
         return uint256(_strategyStorage().fullProfitUnlockDate);
     }
 
@@ -1316,7 +1316,7 @@ contract TokenizedStrategy {
      * @dev This is denominated in EXTENDED_BPS decimals.
      * @return . The current profit unlocking rate.
      */
-    function profitUnlockingRate() external view returns (uint256) {
+    function profitUnlockingRate() external view virtual returns (uint256) {
         return _strategyStorage().profitUnlockingRate;
     }
 
@@ -1324,7 +1324,7 @@ contract TokenizedStrategy {
      * @notice Gets the current time profits are set to unlock over.
      * @return . The current profit max unlock time.
      */
-    function profitMaxUnlockTime() external view returns (uint256) {
+    function profitMaxUnlockTime() external view virtual returns (uint256) {
         return _strategyStorage().profitMaxUnlockTime;
     }
 
@@ -1332,7 +1332,7 @@ contract TokenizedStrategy {
      * @notice The timestamp of the last time protocol fees were charged.
      * @return . The last report.
      */
-    function lastReport() external view returns (uint256) {
+    function lastReport() external view virtual returns (uint256) {
         return uint256(_strategyStorage().lastReport);
     }
 
@@ -1343,7 +1343,7 @@ contract TokenizedStrategy {
      *
      * @return . The price per share.
      */
-    function pricePerShare() external view returns (uint256) {
+    function pricePerShare() external view virtual returns (uint256) {
         StrategyData storage S = _strategyStorage();
         return _convertToAssets(S, 10 ** S.decimals, Math.Rounding.Floor);
     }
@@ -1352,7 +1352,7 @@ contract TokenizedStrategy {
      * @notice To check if the strategy has been shutdown.
      * @return . Whether or not the strategy is shutdown.
      */
-    function isShutdown() external view returns (bool) {
+    function isShutdown() external view virtual returns (bool) {
         return _strategyStorage().shutdown;
     }
 
@@ -1370,7 +1370,7 @@ contract TokenizedStrategy {
      *
      * @param _management New address to set `pendingManagement` to.
      */
-    function setPendingManagement(address _management) external onlyManagement {
+    function setPendingManagement(address _management) external virtual onlyManagement {
         require(_management != address(0), "ZERO ADDRESS");
         _strategyStorage().pendingManagement = _management;
 
@@ -1381,7 +1381,7 @@ contract TokenizedStrategy {
      * @notice Step two of two to set a new 'management' of the strategy.
      * @dev Can only be called by the current `pendingManagement`.
      */
-    function acceptManagement() external {
+    function acceptManagement() external virtual {
         StrategyData storage S = _strategyStorage();
         require(msg.sender == S.pendingManagement, "!pending");
         S.management = msg.sender;
@@ -1396,7 +1396,7 @@ contract TokenizedStrategy {
      *
      * @param _keeper New address to set `keeper` to.
      */
-    function setKeeper(address _keeper) external onlyManagement {
+    function setKeeper(address _keeper) external virtual onlyManagement {
         _strategyStorage().keeper = _keeper;
 
         emit UpdateKeeper(_keeper);
@@ -1408,7 +1408,7 @@ contract TokenizedStrategy {
      *
      * @param _emergencyAdmin New address to set `emergencyAdmin` to.
      */
-    function setEmergencyAdmin(address _emergencyAdmin) external onlyManagement {
+    function setEmergencyAdmin(address _emergencyAdmin) external virtual onlyManagement {
         _strategyStorage().emergencyAdmin = _emergencyAdmin;
 
         emit UpdateEmergencyAdmin(_emergencyAdmin);
@@ -1423,7 +1423,7 @@ contract TokenizedStrategy {
      *
      * @param _performanceFee New performance fee.
      */
-    function setPerformanceFee(uint16 _performanceFee) external onlyManagement {
+    function setPerformanceFee(uint16 _performanceFee) external virtual onlyManagement {
         require(_performanceFee <= MAX_FEE, "MAX FEE");
         _strategyStorage().performanceFee = _performanceFee;
 
@@ -1438,7 +1438,7 @@ contract TokenizedStrategy {
      *
      * @param _performanceFeeRecipient New address to set `management` to.
      */
-    function setPerformanceFeeRecipient(address _performanceFeeRecipient) external onlyManagement {
+    function setPerformanceFeeRecipient(address _performanceFeeRecipient) external virtual onlyManagement {
         require(_performanceFeeRecipient != address(0), "ZERO ADDRESS");
         require(_performanceFeeRecipient != address(this), "Cannot be self");
         _strategyStorage().performanceFeeRecipient = _performanceFeeRecipient;
@@ -1460,7 +1460,7 @@ contract TokenizedStrategy {
      *
      * @param _profitMaxUnlockTime New `profitMaxUnlockTime`.
      */
-    function setProfitMaxUnlockTime(uint256 _profitMaxUnlockTime) external onlyManagement {
+    function setProfitMaxUnlockTime(uint256 _profitMaxUnlockTime) external virtual onlyManagement {
         // Must be less than a year.
         require(_profitMaxUnlockTime <= SECONDS_PER_YEAR, "too long");
         StrategyData storage S = _strategyStorage();
@@ -1486,7 +1486,7 @@ contract TokenizedStrategy {
      * @notice Updates the name for the strategy.
      * @param _name The new name for the strategy.
      */
-    function setName(string calldata _name) external onlyManagement {
+    function setName(string calldata _name) external virtual onlyManagement {
         _strategyStorage().name = _name;
     }
 
@@ -1498,7 +1498,7 @@ contract TokenizedStrategy {
      * @notice Returns the name of the token.
      * @return . The name the strategy is using for its token.
      */
-    function name() external view returns (string memory) {
+    function name() external view virtual returns (string memory) {
         return _strategyStorage().name;
     }
 
@@ -1507,7 +1507,7 @@ contract TokenizedStrategy {
      * @dev Will be 'ys + asset symbol'.
      * @return . The symbol the strategy is using for its tokens.
      */
-    function symbol() external view returns (string memory) {
+    function symbol() external view virtual returns (string memory) {
         return string(abi.encodePacked("ys", _strategyStorage().asset.symbol()));
     }
 
@@ -1515,7 +1515,7 @@ contract TokenizedStrategy {
      * @notice Returns the number of decimals used to get its user representation.
      * @return . The decimals used for the strategy and `asset`.
      */
-    function decimals() external view returns (uint8) {
+    function decimals() external view virtual returns (uint8) {
         return _strategyStorage().decimals;
     }
 
@@ -1526,12 +1526,12 @@ contract TokenizedStrategy {
      * @param account the address to return the balance for.
      * @return . The current balance in y shares of the '_account'.
      */
-    function balanceOf(address account) external view returns (uint256) {
+    function balanceOf(address account) external view virtual returns (uint256) {
         return _balanceOf(_strategyStorage(), account);
     }
 
     /// @dev Internal implementation of {balanceOf}.
-    function _balanceOf(StrategyData storage S, address account) internal view returns (uint256) {
+    function _balanceOf(StrategyData storage S, address account) internal view virtual returns (uint256) {
         if (account == address(this)) {
             return S.balances[account] - _unlockedShares(S);
         }
@@ -1551,7 +1551,7 @@ contract TokenizedStrategy {
      * @param amount The amount of shares to be transferred from sender.
      * @return . a boolean value indicating whether the operation succeeded.
      */
-    function transfer(address to, uint256 amount) external returns (bool) {
+    function transfer(address to, uint256 amount) external virtual returns (bool) {
         _transfer(_strategyStorage(), msg.sender, to, amount);
         return true;
     }
@@ -1566,12 +1566,16 @@ contract TokenizedStrategy {
      * @param spender The address who would be moving the owners shares.
      * @return . The remaining amount of shares of `owner` that could be moved by `spender`.
      */
-    function allowance(address owner, address spender) external view returns (uint256) {
+    function allowance(address owner, address spender) external view virtual returns (uint256) {
         return _allowance(_strategyStorage(), owner, spender);
     }
 
     /// @dev Internal implementation of {allowance}.
-    function _allowance(StrategyData storage S, address owner, address spender) internal view returns (uint256) {
+    function _allowance(
+        StrategyData storage S,
+        address owner,
+        address spender
+    ) internal view virtual returns (uint256) {
         return S.allowances[owner][spender];
     }
 
@@ -1599,7 +1603,7 @@ contract TokenizedStrategy {
      * @param amount the amount of shares to allow `spender` to move.
      * @return . a boolean value indicating whether the operation succeeded.
      */
-    function approve(address spender, uint256 amount) external returns (bool) {
+    function approve(address spender, uint256 amount) external virtual returns (bool) {
         _approve(_strategyStorage(), msg.sender, spender, amount);
         return true;
     }
@@ -1631,7 +1635,7 @@ contract TokenizedStrategy {
      * @param amount the quantity of shares to move.
      * @return . a boolean value indicating whether the operation succeeded.
      */
-    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
+    function transferFrom(address from, address to, uint256 amount) external virtual returns (bool) {
         StrategyData storage S = _strategyStorage();
         _spendAllowance(S, from, msg.sender, amount);
         _transfer(S, from, to, amount);
@@ -1761,7 +1765,7 @@ contract TokenizedStrategy {
      * @param _owner the address of the account to return the nonce for.
      * @return . the current nonce for the account.
      */
-    function nonces(address _owner) external view returns (uint256) {
+    function nonces(address _owner) external view virtual returns (uint256) {
         return _strategyStorage().nonces[_owner];
     }
 
@@ -1836,7 +1840,7 @@ contract TokenizedStrategy {
      *
      * @return . The domain separator that will be used for any {permit} calls.
      */
-    function DOMAIN_SEPARATOR() public view returns (bytes32) {
+    function DOMAIN_SEPARATOR() public view virtual returns (bytes32) {
         return
             keccak256(
                 abi.encode(
