@@ -72,7 +72,7 @@ import { IBaseStrategy } from "src/interfaces/IBaseStrategy.sol";
  *  focused entirely on the strategy specific needs to easily and cheaply
  *  deploy their own permissionless 4626 compliant vault.
  */
-contract TokenizedStrategy {
+abstract contract TokenizedStrategy {
     using Math for uint256;
     using SafeERC20 for ERC20;
 
@@ -1658,7 +1658,7 @@ contract TokenizedStrategy {
      * - `from` must have a balance of at least `amount`.
      *
      */
-    function _transfer(StrategyData storage S, address from, address to, uint256 amount) internal {
+    function _transfer(StrategyData storage S, address from, address to, uint256 amount) internal virtual {
         require(from != address(0), "ERC20: transfer from the zero address");
         require(to != address(0), "ERC20: transfer to the zero address");
         require(to != address(this), "ERC20 transfer to strategy");
