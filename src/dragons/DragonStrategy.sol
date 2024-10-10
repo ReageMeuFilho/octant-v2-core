@@ -8,8 +8,15 @@ import { VaultSharesNotTransferable, PerformanceFeeIsAlwaysZero, PerformanceFeeD
 contract DragonStrategy is TokenizedStrategy {
     constructor(address _dragonModule) TokenizedStrategy(_dragonModule) {}
 
+    struct LockupInfo {
+        uint256 amount;
+        uint256 unlockTime;
+    }
+
     struct DragonStrategyStorageV0 {
         address dragonModule;
+        // Mapping from user address to their lockup information
+        mapping(address => LockupInfo) lockups;
     }
 
     /// keccak256(abi.encode(uint256(keccak256("dragonmodule.storage.v0")) - 1)) & ~bytes32(uint256(0xff))
@@ -114,7 +121,7 @@ contract DragonStrategy is TokenizedStrategy {
      * report in terms of `asset`.
      */
     // solhint-disable-next-line code-complexity
-    function report() external virtual nonReentrant onlyKeepers returns (uint256 profit, uint256 loss) {
+    function report() external override nonReentrant onlyKeepers returns (uint256 profit, uint256 loss) {
         // Cache storage pointer since its used repeatedly.
         StrategyData storage S = _strategyStorage();
         DragonStrategyStorageV0 storage $ = _dragonStrategyStorage();
@@ -193,7 +200,7 @@ contract DragonStrategy is TokenizedStrategy {
      *
      * @param _performanceFee New performance fee.
      */
-    function setPerformanceFee(uint16 _performanceFee) external virtual onlyManagement {
+    function setPerformanceFee(uint16 _performanceFee) external override onlyManagement {
         revert PerformanceFeeIsAlwaysZero();
     }
 
@@ -205,7 +212,7 @@ contract DragonStrategy is TokenizedStrategy {
      *
      * @param _performanceFeeRecipient New address to set `management` to.
      */
-    function setPerformanceFeeRecipient(address _performanceFeeRecipient) external virtual onlyManagement {
+    function setPerformanceFeeRecipient(address _performanceFeeRecipient) external override onlyManagement {
         revert PerformanceFeeDisabled();
     }
 
@@ -271,7 +278,7 @@ contract DragonStrategy is TokenizedStrategy {
      * @param amount the quantity of shares to move.
      * @return . a boolean value indicating whether the operation succeeded.
      */
-    function transferFrom(address from, address to, uint256 amount) external virtual returns (bool) {
+    function transferFrom(address from, address to, uint256 amount) external override returns (bool) {
         revert VaultSharesNotTransferable();
     }
 
