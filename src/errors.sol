@@ -3,3 +3,8 @@ pragma solidity 0.8.25;
 
 error ZeroAddress();
 error Unauthorized();
+
+error VaultSharesNotTransferable();
+error PerformanceFeeIsAlwaysZero();
+error PerformanceFeeDisabled();
+error MaxUnlockIsAlwaysZero();

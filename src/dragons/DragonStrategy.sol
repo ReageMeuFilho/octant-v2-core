@@ -3,6 +3,7 @@ pragma solidity 0.8.25;
 
 import { TokenizedStrategy, IBaseStrategy, Math, ERC20 } from "./TokenizedStrategy.sol";
 import { IDragonModule } from "../interfaces/IDragonModule.sol";
+import { VaultSharesNotTransferable, PerformanceFeeIsAlwaysZero, PerformanceFeeDisabled, MaxUnlockIsAlwaysZero } from "src/errors.sol";
 
 contract DragonStrategy is TokenizedStrategy {
     constructor(address _dragonModule) TokenizedStrategy(_dragonModule) {}
@@ -224,6 +225,54 @@ contract DragonStrategy is TokenizedStrategy {
      */
     function setProfitMaxUnlockTime(uint256 _profitMaxUnlockTime) external override onlyManagement {
         revert MaxUnlockIsAlwaysZero();
+    }
+
+    /**
+     * @notice Transfer '_amount` of shares from `msg.sender` to `to`.
+     * @dev
+     * Requirements:
+     *
+     * - `to` cannot be the zero address.
+     * - `to` cannot be the address of the strategy.
+     * - the caller must have a balance of at least `_amount`.
+     *
+     * @param to The address shares will be transferred to.
+     * @param amount The amount of shares to be transferred from sender.
+     * @return . a boolean value indicating whether the operation succeeded.
+     */
+    function transfer(address to, uint256 amount) external override returns (bool) {
+        revert VaultSharesNotTransferable();
+    }
+
+    /**
+     * @notice `amount` tokens from `from` to `to` using the
+     * allowance mechanism. `amount` is then deducted from the caller's
+     * allowance.
+     *
+     * @dev
+     * Emits an {Approval} event indicating the updated allowance. This is not
+     * required by the EIP.
+     *
+     * NOTE: Does not update the allowance if the current allowance
+     * is the maximum `uint256`.
+     *
+     * Requirements:
+     *
+     * - `from` and `to` cannot be the zero address.
+     * - `to` cannot be the address of the strategy.
+     * - `from` must have a balance of at least `amount`.
+     * - the caller must have allowance for ``from``'s tokens of at least
+     * `amount`.
+     *
+     * Emits a {Transfer} event.
+     *
+     * @param from the address to be moving shares from.
+     * @param to the address to be moving shares to.
+     * @param amount the quantity of shares to move.
+     * @return . a boolean value indicating whether the operation succeeded.
+     */
+    function transferFrom(address from, address to, uint256 amount) external virtual returns (bool) {
+        revert VaultSharesNotTransferable();
     }
 
     /**
