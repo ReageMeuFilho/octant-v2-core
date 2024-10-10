@@ -12,7 +12,7 @@ import { ITokenizedStrategy } from "../interfaces/ITokenizedStrategy.sol";
  *  BaseStrategy implements all of the required functionality to
  *  seamlessly integrate with the `TokenizedStrategy` implementation contract
  *  allowing anyone to easily build a fully permissionless ERC-4626 compliant
- *  Vault by inheriting this contract and overriding three simple functions.
+ *  Vault by inheriting this contract and overriding four simple functions.
 
  *  It utilizes an immutable proxy pattern that allows the BaseStrategy
  *  to remain simple and small. All standard logic is held within the
@@ -20,9 +20,8 @@ import { ITokenizedStrategy } from "../interfaces/ITokenizedStrategy.sol";
  *  `fallback` function to delegatecall the implementation so that strategists
  *  can only be concerned with writing their strategy specific code.
  *
-//TODO: change this
- *  This contract should be inherited and the three main abstract methods
- *  `_deployFunds`, `_freeFunds` and `_harvestAndReport` implemented to adapt
+ *  This contract should be inherited and the four main abstract methods
+ *  `_deployFunds`, `_freeFunds`, `_harvestAndReport` and `liquidatePosition` implemented to adapt
  *  the Strategy to the particular needs it has to generate yield. There are
  *  other optional methods that can be implemented to further customize
  *  the strategy if desired.
@@ -137,10 +136,11 @@ abstract contract BaseStrategy {
      * initializing the default storage variables based on the
      * parameters.
      *
-     * @param _tokenizedStrategyImplementation Address of the TokenStrategyImplementation contract
+     * @param _tokenizedStrategyImplementation Address of the TokenStrategyImplementation contract.
      * @param _asset Address of the underlying asset.
-     * @param _management Address of the strategy manager
-     * @param _keeper Address of keeper
+     * @param _management Address of the strategy manager.
+     * @param _keeper Address of keeper.
+     * @param _dragonRouter Address of the dragon router.
      * @param _name Name the strategy will use.
      * 
      */
@@ -235,6 +235,9 @@ abstract contract BaseStrategy {
     function _harvestAndReport() internal virtual returns (uint256 _yield, uint256 _totalAssets);
 
     /// @dev Handle the liquidation of strategy assets.
+    /// @param _amountNeeded Amount to be liquidated.
+    /// @return _liquidatedAmount liquidated amount.
+    /// @return _loss loss amount if it resulted in liquidation.
     function liquidatePosition(uint256 _amountNeeded) external virtual onlyManagement returns (uint256 _liquidatedAmount, uint256 _loss) {}
 
     /*//////////////////////////////////////////////////////////////
@@ -242,6 +245,7 @@ abstract contract BaseStrategy {
     //////////////////////////////////////////////////////////////*/
 
     /// @dev Handle the strategy’s core position adjustments.
+    /// @param _debtOutstanding Amount of position to adjust.
     function adjustPosition(uint256 _debtOutstanding) external virtual onlyManagement {}
 
     /**
@@ -398,8 +402,12 @@ abstract contract BaseStrategy {
         _freeFunds(_amount);
     }
 
-    function harvestTrigger() public view virtual returns (bool) {
-        // Should not trigger if strategy is not active (no assets).
+    /**
+     * @notice Provide a signal to the keeper that `harvest()` should be called.
+     * @return `true` if `harvest()` should be called, `false` otherwise.
+     */
+    function harvestTrigger() external view virtual returns (bool) {
+        // Should not trigger if strategy is not active (no assets) or harvest has been recently called.
         if (TokenizedStrategy.totalAssets() != 0 && (block.timestamp - TokenizedStrategy.lastReport()) >= maxReportDelay) return true;
 
         // Check for idle funds in the strategy and deposit in the farm.
@@ -415,7 +423,7 @@ abstract contract BaseStrategy {
      * This can only be called after a report() delegateCall to the
      * TokenizedStrategy so msg.sender == address(this).
      *
-     * @return Yield harvested.
+     * @return . Yield harvested.
      * @return . A trusted and accurate account for the total amount
      * of 'asset' the strategy currently holds including idle funds.
      */
