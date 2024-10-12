@@ -525,7 +525,7 @@ abstract contract TokenizedStrategy {
         address receiver,
         address owner,
         uint256 maxLoss
-    ) public nonReentrant returns (uint256 shares) {
+    ) public virtual nonReentrant returns (uint256 shares) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
         require(assets <= _maxWithdraw(S, owner), "ERC4626: withdraw more than max");
@@ -565,7 +565,7 @@ abstract contract TokenizedStrategy {
         address receiver,
         address owner,
         uint256 maxLoss
-    ) public nonReentrant returns (uint256) {
+    ) public virtual nonReentrant returns (uint256) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
         require(shares <= _maxRedeem(S, owner), "ERC4626: redeem more than max");
@@ -894,7 +894,7 @@ abstract contract TokenizedStrategy {
         uint256 assets,
         uint256 shares,
         uint256 maxLoss
-    ) internal returns (uint256) {
+    ) internal virtual returns (uint256) {
         require(receiver != address(0), "ZERO ADDRESS");
         require(maxLoss <= MAX_BPS, "exceeds MAX_BPS");
 

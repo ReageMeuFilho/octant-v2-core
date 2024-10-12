@@ -8,3 +8,5 @@ error VaultSharesNotTransferable();
 error PerformanceFeeIsAlwaysZero();
 error PerformanceFeeDisabled();
 error MaxUnlockIsAlwaysZero();
+
+error CantWithdrawLockedShares();

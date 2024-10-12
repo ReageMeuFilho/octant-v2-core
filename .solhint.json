@@ -18,10 +18,10 @@
     "event-name-camelcase": "error",
     "constructor-syntax": "error",
     "func-name-mixedcase": "off",
-    "func-param-name-mixedcase": "error",
+    "func-param-name-mixedcase": "off",
     "modifier-name-mixedcase": "error",
     "private-vars-leading-underscore": "off",
-    "var-name-mixedcase": "warn",
+    "var-name-mixedcase": "off",
     "func-visibility": [
       "error",
       {
