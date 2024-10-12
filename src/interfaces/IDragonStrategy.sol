@@ -41,7 +41,7 @@ interface IDragonStrategy is IERC4626, IERC20Permit {
         address _management,
         address _performanceFeeRecipient,
         address _keeper,
-        address _dragonRouter
+        address _dragonModule
     ) external;
 
     /*//////////////////////////////////////////////////////////////

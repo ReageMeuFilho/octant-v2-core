@@ -54,8 +54,9 @@ contract DragonStrategy is TokenizedStrategy {
         string memory _name,
         address _management,
         address _keeper,
-        address _performanceFeeRecipient
-    ) external override {
+        address _performanceFeeRecipient,
+        address _dragonModule
+    ) external {
         // Cache storage pointer.
         StrategyData storage S = _strategyStorage();
         DragonStrategyStorageV0 storage $ = _dragonStrategyStorage();
@@ -64,7 +65,7 @@ contract DragonStrategy is TokenizedStrategy {
 
         // Set the dragon module address making sure it is not address(0)
         require(_management != address(0), "ZERO ADDRESS");
-        $.dragonModule = _management;
+        $.dragonModule = _dragonModule;
 
         // Set the strategy's underlying asset.
         S.asset = ERC20(_asset);

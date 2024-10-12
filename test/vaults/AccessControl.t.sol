@@ -57,8 +57,15 @@ contract AccessControlTest is Setup {
         vm.prank(management);
         vm.expectRevert(abi.encodeWithSelector(PerformanceFeeDisabled.selector));
         strategy.setPerformanceFeeRecipient(_address);
+        console.log(strategy.performanceFeeRecipient());
+        console.log(address(mockDragonModule));
+        console.log(address(strategy));
+        console.log(_address);
+        console.log(address(mockFactory));
 
-        assertEq(strategy.performanceFeeRecipient(), address(mockFactory));
+        console.log(address(mockDragonModule));
+        console.log(address(mockDragonRouter));
+        assertEq(strategy.performanceFeeRecipient(), address(mockDragonModule));
     }
 
     function test_setProfitMaxUnlockTime(uint32 _amount) public {

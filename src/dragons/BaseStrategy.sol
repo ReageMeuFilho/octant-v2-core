@@ -146,7 +146,7 @@ abstract contract BaseStrategy {
         _delegateCall(
             abi.encodeCall(
                 IDragonStrategy.initialize,
-                (_asset, _name, msg.sender, msg.sender, msg.sender, _dragonModule)
+                (_asset, _name, msg.sender, _dragonModule, msg.sender, _dragonModule)
             )
         );
 
