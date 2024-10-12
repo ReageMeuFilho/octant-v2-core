@@ -33,6 +33,7 @@ contract Setup is ExtendedTest, IEvents {
     address public emergencyAdmin = address(4);
     address public protocolFeeRecipient = address(5);
     address public performanceFeeRecipient = address(6);
+    address public metaPool = address(7);
 
     // Integer variables that will be used repeatedly.
     uint256 public decimals = 18;
@@ -58,7 +59,8 @@ contract Setup is ExtendedTest, IEvents {
         // create a mock yield source to deposit into
         yieldSource = new MockYieldSource(address(asset));
 
-        // create a mock dragon mockDragonModule
+        // create a mock dragon module and router
+        mockDragonRouter = new MockDragonRouter(address(asset), metaPool, management);
         mockDragonModule = new MockDragonModule(address(asset), address(mockDragonRouter));
 
         // Deploy strategy and set variables

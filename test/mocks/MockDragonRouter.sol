@@ -7,20 +7,20 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 contract MockDragonRouter is IDragonRouter {
     using SafeERC20 for IERC20;
     address public metaPool;
-    address public dragon;
+    address public management;
     IERC20 public asset;
 
     mapping(address => uint256) public balances;
     mapping(address => uint256) public shares;
 
-    constructor(address token, address _pool, address _dragon) {
-        metaPool = _pool;
-        dragon = _dragon;
+    constructor(address token, address _metaPool, address _management) {
+        metaPool = _metaPool;
+        management = _management;
         asset = IERC20(token);
         balances[metaPool] = 0;
-        balances[dragon] = 0;
+        balances[management] = 0;
         shares[metaPool] = 50;
-        shares[dragon] = 50;
+        shares[management] = 50;
     }
 
     /**
@@ -31,7 +31,7 @@ contract MockDragonRouter is IDragonRouter {
         asset.safeTransferFrom(msg.sender, address(this), amount);
 
         balances[metaPool] += amount / 2;
-        balances[dragon] += amount / 2;
+        balances[management] += amount / 2;
     }
 
     /**

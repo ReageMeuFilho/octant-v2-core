@@ -86,7 +86,7 @@ contract AccountingTest is Setup {
         // allow some profit to come unlocked
         skip(profitMaxUnlockTime / 2);
 
-        assertGt(strategy.pricePerShare(), pricePerShare);
+        assertEq(strategy.pricePerShare(), wad);
 
         //air drop again, we should not increase again
         pricePerShare = strategy.pricePerShare();
@@ -96,21 +96,24 @@ contract AccountingTest is Setup {
         // skip the rest of the time for unlocking
         skip(profitMaxUnlockTime / 2);
 
-        // we should get a % return equal to our profit factor
-        assertRelApproxEq(strategy.pricePerShare(), wad + ((wad * _profitFactor) / MAX_BPS), MAX_BPS);
+        // we should not get a return at all since price per share should stay constant because we donate all the profits
+        assertRelApproxEq(strategy.pricePerShare(), wad, MAX_BPS);
 
         // Total is the same but balance has adjusted again
         checkStrategyTotals(strategy, _amount + toAirdrop, _amount, toAirdrop);
-
         uint256 beforeBalance = asset.balanceOf(_address);
         vm.prank(_address);
         strategy.redeem(_amount, _address, _address);
 
-        // should have pulled out the deposit plus profit that was reported but not the second airdrop
-        assertEq(asset.balanceOf(_address), beforeBalance + _amount + toAirdrop);
+        // should have pulled out the deposit and have donated everything else
+        assertEq(asset.balanceOf(_address), beforeBalance + _amount);
         assertEq(asset.balanceOf(address(strategy)), 0);
-        assertEq(asset.balanceOf(address(yieldSource)), toAirdrop);
-        checkStrategyTotals(strategy, 0, 0, 0, 0);
+        assertEq(asset.balanceOf(address(yieldSource)), toAirdrop * 2);
+        // Everything left in the vault is owned by the dragon router
+        // get dragon router shares
+        uint256 dragonRouterShares = strategy.balanceOf(address(mockDragonRouter));
+        assertEq(dragonRouterShares, strategy.convertToShares(toAirdrop));
+        checkStrategyTotals(strategy, toAirdrop, toAirdrop, 0, dragonRouterShares);
     }
 
     function test_earningYieldDoesNotIncreasePPS(address _address, uint256 _amount, uint16 _profitFactor) public {
