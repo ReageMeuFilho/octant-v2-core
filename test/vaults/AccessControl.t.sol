@@ -58,7 +58,7 @@ contract AccessControlTest is Setup {
         vm.expectRevert(abi.encodeWithSelector(PerformanceFeeDisabled.selector));
         strategy.setPerformanceFeeRecipient(_address);
         console.log(strategy.performanceFeeRecipient());
-        console.log(address(mockDragonModule));
+        console.log(address(this));
         console.log(address(strategy));
         console.log(_address);
         console.log(address(mockFactory));

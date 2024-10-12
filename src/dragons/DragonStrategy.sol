@@ -49,12 +49,13 @@ contract DragonStrategy is TokenizedStrategy {
      * @param _management Address to set as the strategies `management`.
      * @param _keeper Address to set as strategies `keeper`.
      */
+
     function initialize(
         address _asset,
         string memory _name,
         address _management,
-        address _keeper,
         address _performanceFeeRecipient,
+        address _keeper,
         address _dragonModule
     ) external {
         // Cache storage pointer.
