@@ -201,7 +201,7 @@ contract DragonStrategy is TokenizedStrategy {
      * @param _performanceFee New performance fee.
      */
     function setPerformanceFee(uint16 _performanceFee) external override onlyManagement {
-        revert PerformanceFeeIsAlwaysZero();
+        revert PerformanceFeeDisabled();
     }
 
     /**

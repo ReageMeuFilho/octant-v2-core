@@ -79,7 +79,7 @@ contract DragonRouter is AccessControl, ReentrancyGuard {
      * @dev Distributes new splits to all shareholders.
      * @param amount The amount of tokens to distribute.
      */
-    function distribute(uint256 amount) external onlyRole(SPLIT_DISTRIBUTOR_ROLE) nonReentrant {
+    function fundFromSource(uint256 amount) external onlyRole(SPLIT_DISTRIBUTOR_ROLE) nonReentrant {
         require(amount > 0, "Amount must be greater than 0");
         require(totalShares > 0, "No shares exist");
 
