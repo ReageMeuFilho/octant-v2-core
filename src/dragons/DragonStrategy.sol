@@ -54,7 +54,7 @@ contract DragonStrategy is TokenizedStrategy {
         string memory _name,
         address _management,
         address _keeper,
-        address _dragonModule
+        address _performanceFeeRecipient
     ) external override {
         // Cache storage pointer.
         StrategyData storage S = _strategyStorage();
@@ -63,8 +63,8 @@ contract DragonStrategy is TokenizedStrategy {
         require(address(S.asset) == address(0), "initialized");
 
         // Set the dragon module address making sure it is not address(0)
-        require(_dragonModule != address(0), "ZERO ADDRESS");
-        $.dragonModule = _dragonModule;
+        require(_management != address(0), "ZERO ADDRESS");
+        $.dragonModule = _management;
 
         // Set the strategy's underlying asset.
         S.asset = ERC20(_asset);
@@ -78,17 +78,15 @@ contract DragonStrategy is TokenizedStrategy {
         // Set address to receive performance fees.
         // Can't be address(0) or we will be burning fees.
         // NOTE that fees are disabled by default.
-        require(FACTORY != address(0), "ZERO ADDRESS");
+        require(_performanceFeeRecipient != address(0), "ZERO ADDRESS");
         // Can't mint shares to its self because of profit locking.
-        require(FACTORY != address(this), "self");
-        S.performanceFeeRecipient = FACTORY;
+        require(_performanceFeeRecipient != address(this), "self");
+        S.performanceFeeRecipient = _performanceFeeRecipient;
         // Default to no performance fee.
         S.performanceFee = 0;
         // Set last report to this block.
         S.lastReport = uint96(block.timestamp);
 
-        // Set the default management address. Can't be 0.
-        require(_management != address(0), "ZERO ADDRESS");
         S.management = _management;
         // Set the keeper address
         S.keeper = _keeper;
@@ -225,7 +223,7 @@ contract DragonStrategy is TokenizedStrategy {
         if (shares > _balanceOf(S, owner) - lockup.lockedShares) {
             revert CantWithdrawLockedShares();
         }
-        super._withdraw(S, receiver, owner, assets, shares, maxLoss);
+        return super._withdraw(S, receiver, owner, assets, shares, maxLoss);
     }
 
     /// @dev Internal implementation of {maxRedeem}.
@@ -450,7 +448,7 @@ contract DragonStrategy is TokenizedStrategy {
             // all of the profit is sent to the dragon router
             totalProfitShares = sharesToLock;
 
-            _mint(S, IDragonModule(FACTORY).getDragonRouter(), totalProfitShares);
+            _mint(S, dragonRouter, totalProfitShares);
         } else {
             // Expect we have a loss.
             unchecked {
@@ -462,7 +460,7 @@ contract DragonStrategy is TokenizedStrategy {
                 // We will try and burn the dragon router shares first before touching the dragon's shares.
                 sharesToBurn = Math.min(
                     // Cannot burn more than we have.
-                    S.balances[address(dragonRouter)],
+                    S.balances[dragonRouter],
                     // Try and burn both the shares already unlocked and the amount for the loss.
                     _convertToShares(S, loss, Math.Rounding.Floor) + sharesToBurn
                 );

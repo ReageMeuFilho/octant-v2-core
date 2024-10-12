@@ -11,7 +11,11 @@ contract MockStrategy is BaseStrategy {
     bool public kept;
     bool public emergentizated;
 
-    constructor(address _asset, address _yieldSource) BaseStrategy(_asset, "Test Strategy") {
+    constructor(
+        address _asset,
+        address _yieldSource,
+        address _dragonModule
+    ) BaseStrategy(_asset, "Test Strategy", _dragonModule) {
         initialize(_asset, _yieldSource);
     }
 

@@ -10,6 +10,8 @@ import { ExtendedTest } from "./ExtendedTest.sol";
 import { MockFactory } from "../mocks/MockFactory.sol";
 import { MockStrategy, MockYieldSource } from "../mocks/MockStrategy.sol";
 import { IMockStrategy } from "../mocks/IMockStrategy.sol";
+import { MockDragonModule } from "../mocks/MockDragonModule.sol";
+import { MockDragonRouter } from "../mocks/MockDragonRouter.sol";
 
 import { IEvents } from "src/interfaces/IEvents.sol";
 import { DragonStrategy } from "src/dragons/DragonStrategy.sol";
@@ -21,6 +23,8 @@ contract Setup is ExtendedTest, IEvents {
     MockFactory public mockFactory;
     MockYieldSource public yieldSource;
     DragonStrategy public tokenizedStrategy;
+    MockDragonModule public mockDragonModule;
+    MockDragonRouter public mockDragonRouter;
 
     // Addresses for different roles we will use repeatedly.
     address public user = address(1);
@@ -54,6 +58,9 @@ contract Setup is ExtendedTest, IEvents {
         // create a mock yield source to deposit into
         yieldSource = new MockYieldSource(address(asset));
 
+        // create a mock dragon mockDragonModule
+        mockDragonModule = new MockDragonModule(address(asset), address(mockDragonRouter));
+
         // Deploy strategy and set variables
         strategy = IMockStrategy(setUpStrategy());
 
@@ -72,7 +79,9 @@ contract Setup is ExtendedTest, IEvents {
 
     function setUpStrategy() public returns (address) {
         // we save the mock base strategy as a IMockStrategy to give it the needed interface
-        IMockStrategy _strategy = IMockStrategy(address(new MockStrategy(address(asset), address(yieldSource))));
+        IMockStrategy _strategy = IMockStrategy(
+            address(new MockStrategy(address(asset), address(yieldSource), address(mockDragonModule)))
+        );
 
         // set keeper
         _strategy.setKeeper(keeper);

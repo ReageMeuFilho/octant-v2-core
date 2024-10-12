@@ -4,7 +4,7 @@ pragma solidity >=0.8.18;
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 // TokenizedStrategy interface used for internal view delegateCalls.
-import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
+import { IDragonStrategy } from "src/interfaces/IDragonStrategy.sol";
 
 /**
  * @title YearnV3 Base Strategy
@@ -123,7 +123,7 @@ abstract contract BaseStrategy {
      * to a call to itself. Which will hit the fallback function and
      * delegateCall that to the actual TokenizedStrategy.
      */
-    ITokenizedStrategy internal immutable TokenizedStrategy;
+    IDragonStrategy internal immutable TokenizedStrategy;
 
     /**
      * @notice Used to initialize the strategy on deployment.
@@ -136,15 +136,18 @@ abstract contract BaseStrategy {
      * @param _asset Address of the underlying asset.
      * @param _name Name the strategy will use.
      */
-    constructor(address _asset, string memory _name) {
+    constructor(address _asset, string memory _name, address _dragonModule) {
         asset = ERC20(_asset);
 
         // Set instance of the implementation for internal use.
-        TokenizedStrategy = ITokenizedStrategy(address(this));
+        TokenizedStrategy = IDragonStrategy(address(this));
 
         // Initialize the strategy's storage variables.
         _delegateCall(
-            abi.encodeCall(ITokenizedStrategy.initialize, (_asset, _name, msg.sender, msg.sender, msg.sender))
+            abi.encodeCall(
+                IDragonStrategy.initialize,
+                (_asset, _name, msg.sender, msg.sender, msg.sender, _dragonModule)
+            )
         );
 
         // Store the tokenizedStrategyAddress at the standard implementation
@@ -271,7 +274,7 @@ abstract contract BaseStrategy {
             // Return the status of the tend trigger.
             _tendTrigger(),
             // And the needed calldata either way.
-            abi.encodeWithSelector(ITokenizedStrategy.tend.selector)
+            abi.encodeWithSelector(IDragonStrategy.tend.selector)
         );
     }
 
