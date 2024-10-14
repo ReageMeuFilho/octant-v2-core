@@ -7,7 +7,6 @@ optimizer = true
 optimizer_runs = 10_000_000
 solc = "0.8.25"
 verbosity = 3
-via_ir = true
 
 [profile.ci]
 fuzz = { runs = 5000 }
