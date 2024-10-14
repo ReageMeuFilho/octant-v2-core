@@ -8,3 +8,5 @@ openzeppelin-upgradeable=lib/openzeppelin-contracts-upgradeable/contracts
 zodiac=lib/zodiac/contracts
 @gnosis.pm/safe-contracts/=lib/safe-smart-account/
 abdk-libraries-solidity=lib/abdk-libraries-solidity
+@uniswap/v3-periphery/contracts/=lib/uniswap-v3-periphery-0.8/contracts/
+@uniswap/v3-core/contracts/=lib/uniswap-v3-core-0.8/contracts/
