@@ -191,10 +191,11 @@ contract AccountingTest is Setup {
 
         checkStrategyTotals(strategy, _amount + toAirdrop, _amount + toAirdrop, 0, _amount + toAirdrop);
 
-        // allow some profit to come unlocked
+        // it doesn't matter how long we wait since profit locking is turned off
         skip(profitMaxUnlockTime / 2);
 
-        assertGt(strategy.pricePerShare(), pricePerShare);
+        // even if profit locking was turned on we donate all of the profits so the price per share should stay the same
+        assertEq(strategy.pricePerShare(), pricePerShare);
 
         //air drop again, we should not increase again
         pricePerShare = strategy.pricePerShare();
@@ -204,8 +205,8 @@ contract AccountingTest is Setup {
         // skip the rest of the time for unlocking
         skip(profitMaxUnlockTime / 2);
 
-        // we should get a % return equal to our profit factor
-        assertRelApproxEq(strategy.pricePerShare(), wad + ((wad * _profitFactor) / MAX_BPS), MAX_BPS);
+        // we should not get a return at all since price per share should stay constant because we donate all the profits
+        assertRelApproxEq(strategy.pricePerShare(), wad, MAX_BPS);
 
         // Total is the same.
         checkStrategyTotals(strategy, _amount + toAirdrop, _amount + toAirdrop, 0);
@@ -214,11 +215,20 @@ contract AccountingTest is Setup {
         vm.prank(_address);
         strategy.redeem(_amount, _address, _address);
 
-        // should have pulled out the deposit plus profit that was reported but not the second airdrop
-        assertEq(asset.balanceOf(_address), beforeBalance + _amount + toAirdrop);
+        // should have pulled out the principal without touching the profit that was reported but not the either airdrop
+        assertEq(asset.balanceOf(_address), beforeBalance + _amount);
 
-        assertEq(asset.balanceOf(address(yieldSource)), toAirdrop);
-        checkStrategyTotals(strategy, 0, 0, 0, 0);
+        assertEq(asset.balanceOf(address(yieldSource)), toAirdrop * 2);
+        uint256 dragonRouterShares = strategy.balanceOf(address(mockDragonRouter));
+        assertEq(dragonRouterShares, strategy.convertToShares(toAirdrop));
+        checkStrategyTotals(strategy, toAirdrop, toAirdrop, 0, dragonRouterShares);
+        // calling report again should assign profit to the dragon router
+        vm.prank(keeper);
+        (profit, ) = strategy.report();
+        dragonRouterShares = strategy.balanceOf(address(mockDragonRouter));
+        assertEq(dragonRouterShares, strategy.convertToShares(toAirdrop * 2));
+
+        checkStrategyTotals(strategy, toAirdrop * 2, toAirdrop * 2, 0, dragonRouterShares);
     }
 
     function test_tend_noIdle_harvestProfit(uint256 _amount, uint16 _profitFactor) public {
@@ -255,16 +265,18 @@ contract AccountingTest is Setup {
 
         skip(profitMaxUnlockTime);
 
-        assertRelApproxEq(strategy.pricePerShare(), wad + ((wad * _profitFactor) / MAX_BPS), MAX_BPS);
-
+        assertRelApproxEq(strategy.pricePerShare(), wad, MAX_BPS);
         uint256 beforeBalance = asset.balanceOf(user);
         vm.prank(user);
         strategy.redeem(_amount, user, user);
 
-        // should have pulled out the deposit plus profit that was reported but not the second airdrop
-        assertEq(asset.balanceOf(user), beforeBalance + _amount + toAirdrop);
-        assertEq(asset.balanceOf(address(yieldSource)), 0);
-        checkStrategyTotals(strategy, 0, 0, 0, 0);
+        // should have pulled out the deposit principal but not any of the profit
+        assertEq(asset.balanceOf(user), beforeBalance + _amount);
+        assertEq(asset.balanceOf(address(yieldSource)), toAirdrop);
+        uint256 dragonRouterShares = strategy.balanceOf(address(mockDragonRouter));
+        assertEq(dragonRouterShares, strategy.convertToShares(toAirdrop));
+
+        checkStrategyTotals(strategy, toAirdrop, toAirdrop, 0, dragonRouterShares);
     }
 
     function test_withdrawWithUnrealizedLoss_reverts(address _address, uint256 _amount, uint16 _lossFactor) public {
