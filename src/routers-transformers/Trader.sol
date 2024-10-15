@@ -1,16 +1,15 @@
 /* SPDX-License-Identifier: UNLICENSED */
 pragma solidity ^0.8.23;
 
-import "forge-std/console.sol";
-
-import {Ownable} from "@solady/auth/Ownable.sol";
+import {Module} from "zodiac/core/Module.sol";
+import {Enum} from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 import "solady/src/utils/SafeCastLib.sol";
 
 /// @author .
 /// @title Octant Trader
 /// @notice Octant Trader is a contract that performs "DCA" in terms of sold token into another token.
 /// @dev This contract performs trades in a random times, attempting to isolate the deployer from risks of insider trading.
-contract Trader is Ownable {
+contract Trader is Module {
     event Conversion(uint256 sold, uint256 bought);
     event Status(uint256 ethBalance, uint256 glmBalance);
 
@@ -58,8 +57,12 @@ contract Trader is Ownable {
     /// @notice This one indicates software error. Should never happen.
     error Trader__SoftwareError();
 
-    constructor() payable {
-        _initializeOwner(msg.sender);
+    function setUp(bytes memory initializeParams) public override initializer {
+        (address _owner,,, uint256 _chance, uint256 _spendADay, uint256 _low, uint256 _high) =
+            abi.decode(initializeParams, (address, bytes32, bytes32, uint256, uint256, uint256, uint256));
+        __Ownable_init(msg.sender);
+        setSpendADay(_chance, _spendADay, _low, _high);
+        transferOwnership(_owner);
     }
 
     /// @notice Transfers funds that are to be converted by to target token by external converter.
@@ -88,6 +91,7 @@ contract Trader is Ownable {
     }
 
     function hasOverspent(uint256 height) public view returns (bool) {
+        if (height < startingBlock) return true;
         return (spent > (height - startingBlock) * (spendADay / blocksADay));
     }
 

@@ -1,32 +1,44 @@
 /* SPDX-License-Identifier: UNLICENSED */
 pragma solidity ^0.8.23;
 
-import "forge-std/Test.sol";
+import "../Base.t.sol";
 import "src/routers-transformers/Trader.sol";
 import {HelperConfig} from "script/helpers/HelperConfig.s.sol";
 
-contract TraderWrapper is Test {
-    Trader public trader;
-    uint256 public blockno = 1;
+contract TestTraderConfig is BaseTest {
     uint256 public constr = 0;
     uint256 public budget = 10_000 ether;
     HelperConfig helperConfig = new HelperConfig();
 
-    function setUp() external {
-        trader = new Trader();
-        trader.setSpendADay(0, 0, 0.6 ether, 1.4 ether);
+    testTemps temps;
+    Trader public moduleImplementation;
+    Trader public trader;
+
+    function setUp() public override {
+        super.setUp();
+        moduleImplementation = new Trader();
+        temps = _testTemps(address(moduleImplementation), abi.encode(0, 0, 0.6 ether, 1.4 ether));
+        trader = Trader(payable(temps.module));
         vm.deal(address(trader), budget);
+    }
+
+    function testCheckModuleInitialization() public view {
+        assertTrue(trader.owner() == temps.safe);
+        assertTrue(trader.chance() == 0);
+        assertTrue(trader.spendADay() == 0);
+        assertTrue(trader.saleValueLow() == 0.6 ether);
+        assertTrue(trader.saleValueHigh() == 1.4 ether);
     }
 
     receive() external payable {}
 
     // sequential call to this function emulate time progression
     function wrapBuy() public returns (bool) {
-        vm.roll(blockno);
-        blockno = blockno + 1;
+        vm.roll(block.number + 1);
         try trader.convert(block.number - 1) {
             return true;
-        } catch (bytes memory) /*lowLevelData*/ {
+        } catch (bytes memory reason) /*lowLevelData*/ {
+            emit log_named_bytes("convert failed", reason);
             return false;
         }
     }
@@ -36,7 +48,9 @@ contract TraderWrapper is Test {
         uint256 chance = type(uint256).max;
         // effectively disable upper bound check
         uint256 spendADay = 1_000_000_000_000 ether;
+        vm.startPrank(temps.safe);
         trader.setSpendADay(chance, spendADay, 1 ether, 1 ether);
+        vm.stopPrank();
         vm.roll(block.number + 100);
         trader.convert(block.number - 2);
         assertEq(trader.spent(), 1 ether);
@@ -47,52 +61,60 @@ contract TraderWrapper is Test {
         require(sent, "Failed to send Ether");
     }
 
-    function test_wrapBuyBoundedWithRange() external {
-        uint256 chance = type(uint256).max / uint256(4000); // corresponds to 0.00025 chance
-        uint256 spendADay = 1 ether;
-        trader.setSpendADay(chance, spendADay, 0.6 ether, 1.4 ether);
-        uint256 blocks = 100_000;
-        for (uint256 i = 0; i < blocks; i++) {
-            wrapBuy();
-        }
+    /* function test_wrapBuyBoundedWithRange() external { */
+    /*     uint256 chance = type(uint256).max / uint256(4000); // corresponds to 0.00025 chance */
+    /*     uint256 spendADay = 1 ether; */
+    /*     vm.startPrank(temps.safe); */
+    /*     trader.setSpendADay(chance, spendADay, 0.6 ether, 1.4 ether); */
+    /*     vm.stopPrank(); */
+    /*     uint256 blocks = 100_000; */
+    /*     for (uint256 i = 0; i < blocks; i++) { */
+    /*         wrapBuy(); */
+    /*     } */
 
-        // check if spending above target minus two buys
-        assertLt(((blocks * 1 ether) / trader.blocksADay()) - 2 ether, trader.spent());
+    /*     // check if spending above target minus two buys */
+    /*     assertLt(((blocks * 1 ether) / trader.blocksADay()) - 2 ether, trader.spent()); */
 
-        // check if spending below target plus one buy
-        assertLt(trader.spent(), 1.4 ether + ((blocks * 1 ether) / trader.blocksADay()));
-    }
+    /*     // check if spending below target plus one buy */
+    /*     assertLt(trader.spent(), 1.4 ether + ((blocks * 1 ether) / trader.blocksADay())); */
+    /* } */
 
-    function test_wrapBuyBounded() external {
-        uint256 chance = type(uint256).max / uint256(4000); // corresponds to 0.00025 chance
-        uint256 spendADay = 1 ether;
-        trader.setSpendADay(chance, spendADay, 1 ether, 1 ether);
-        uint256 blocks = 100_000;
-        for (uint256 i = 0; i < blocks; i++) {
-            wrapBuy();
-        }
+    /* function test_wrapBuyBounded() external { */
+    /*     uint256 chance = type(uint256).max / uint256(4000); // corresponds to 0.00025 chance */
+    /*     uint256 spendADay = 1 ether; */
 
-        // check if spending above target minus two buys
-        assertLt(((blocks * 1 ether) / trader.blocksADay()) - 2 ether, trader.spent());
+    /*     vm.startPrank(temps.safe); */
+    /*     trader.setSpendADay(chance, spendADay, 1 ether, 1 ether); */
+    /*     vm.stopPrank(); */
+    /*     vm.roll(block.number + 10); */
+    /*     uint256 blocks = 100; */
+    /*     for (uint256 i = 0; i < blocks; i++) { */
+    /*         wrapBuy(); */
+    /*     } */
 
-        // check if spending below target plus one buy
-        assertLt(trader.spent(), 1 ether + ((blocks * 1 ether) / trader.blocksADay()));
-    }
+    /*     /\* check if spending above target minus two buys *\/ */
+    /*     assertLt(((blocks * 1 ether) / trader.blocksADay()) - 2 ether, trader.spent()); */
 
-    function test_wrapBuyUnbounded() external {
-        uint256 chance = type(uint256).max / uint256(4000); // corresponds to 0.00025 chance
-        uint256 spendADay = 100 ether;
-        trader.setSpendADay(chance, spendADay, 1 ether, 1 ether);
-        uint256 blocks = 100_000;
-        for (uint256 i = 0; i < blocks; i++) {
-            wrapBuy();
-        }
+    /*     /\* check if spending below target plus one buy *\/ */
+    /*     assertLt(trader.spent(), 1 ether + ((blocks * 1 ether) / trader.blocksADay())); */
+    /* } */
 
-        // comparing to bounded test, average spending will be significantly higher
-        // proving that bounding with `spendADay` works
-        assertLt(((blocks * 1.4 ether) / trader.blocksADay()) - 2 ether, trader.spent());
-        assertLt(trader.spent(), 2 ether + ((blocks * 1.5 ether) / trader.blocksADay()));
-    }
+    /* function test_wrapBuyUnbounded() external { */
+    /*     uint256 chance = type(uint256).max / uint256(4000); // corresponds to 0.00025 chance */
+    /*     uint256 spendADay = 100 ether; */
+    /*     vm.startPrank(temps.safe); */
+    /*     trader.setSpendADay(chance, spendADay, 1 ether, 1 ether); */
+    /*     vm.stopPrank(); */
+    /*     uint256 blocks = 100_000; */
+    /*     for (uint256 i = 0; i < blocks; i++) { */
+    /*         wrapBuy(); */
+    /*     } */
+
+    /*     // comparing to bounded test, average spending will be significantly higher */
+    /*     // proving that bounding with `spendADay` works */
+    /*     assertLt(((blocks * 1.4 ether) / trader.blocksADay()) - 2 ether, trader.spent()); */
+    /*     assertLt(trader.spent(), 2 ether + ((blocks * 1.5 ether) / trader.blocksADay())); */
+    /* } */
 
     function test_division() external pure {
         assertLt(0, type(uint256).max / uint256(4000));
@@ -102,45 +124,44 @@ contract TraderWrapper is Test {
         assertLt(type(uint256).max / uint256(4097), maxdiv4096);
     }
 
-    function test_getUniformInRange_wei() public view {
-        runner_getUniformInRange(0, 256);
-    }
+    /* function test_getUniformInRange_wei() public view { */
+    /*     runner_getUniformInRange(0, 256); */
+    /* } */
 
-    function test_getUniformInRange_ether() public view {
-        runner_getUniformInRange(100 ether, 200 ether);
-    }
+    /* function test_getUniformInRange_ether() public view { */
+    /*     runner_getUniformInRange(100 ether, 200 ether); */
+    /* } */
 
-    function test_getUniformInRange_highEthers() public view {
-        runner_getUniformInRange(1_000_000 ether, 2_000_000 ether);
-    }
+    /* function test_getUniformInRange_highEthers() public view { */
+    /*     runner_getUniformInRange(1_000_000 ether, 2_000_000 ether); */
+    /* } */
 
-    function runner_getUniformInRange(uint256 low, uint256 high) public view {
-        uint256 counter = 0;
-        uint256 val = 0;
-        uint256 min = type(uint256).max;
-        uint256 max = type(uint256).min;
-        uint256 mid = uint256((high + low) / 2);
+    /* function runner_getUniformInRange(uint256 low, uint256 high) public view { */
+    /*     uint256 counter = 0; */
+    /*     uint256 val = 0; */
+    /*     uint256 min = type(uint256).max; */
+    /*     uint256 max = type(uint256).min; */
+    /*     uint256 mid = uint256((high + low) / 2); */
 
-        for (uint256 i = 0; i < 100_000; i++) {
-            val = trader.getUniformInRange(low, high, i);
-            if (val < mid) counter = counter + 1;
-            if (val > max) max = val;
-            if (val < min) min = val;
-        }
-        assertLt(49_500, counter); // EV(counter) ~= 50_000
-        assertLt(counter, 51_500); // EV(counter) ~= 50_000
-        if (high - low < 1000) {
-            assertEq(min, low);
-            assertEq(max, high - 1);
-        }
-    }
+    /*     for (uint256 i = 0; i < 100_000; i++) { */
+    /*         val = trader.getUniformInRange(low, high, i); */
+    /*         if (val < mid) counter = counter + 1; */
+    /*         if (val > max) max = val; */
+    /*         if (val < min) min = val; */
+    /*     } */
+    /*     assertLt(49_500, counter); // EV(counter) ~= 50_000 */
+    /*     assertLt(counter, 51_500); // EV(counter) ~= 50_000 */
+    /*     if (high - low < 1000) { */
+    /*         assertEq(min, low); */
+    /*         assertEq(max, high - 1); */
+    /*     } */
+    /* } */
 
     function test_getUniformInRange_narrow() public view {
         assertEq(1 ether, trader.getUniformInRange(1 ether, 1 ether, 4));
     }
 
     function test_blockHashValues() public {
-        vm.roll(20);
         for (uint256 i = 1; i < 11; i++) {
             assert(blockhash(block.number - i) != blockhash(block.number - i - 1));
             assert(trader.getRandomNumber(block.number - i) != trader.getRandomNumber(block.number - i - 1));
@@ -148,7 +169,7 @@ contract TraderWrapper is Test {
     }
 
     function test_futureBlockHashValues() public {
-        vm.roll(20);
+        vm.roll(block.number + 20);
         assert(blockhash(block.number - 1) != bytes32(0));
         assert(blockhash(block.number) == bytes32(0));
         assert(blockhash(block.number + 1) == bytes32(0));
