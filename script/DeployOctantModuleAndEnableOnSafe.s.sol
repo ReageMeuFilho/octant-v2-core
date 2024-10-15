@@ -17,6 +17,7 @@ contract DeployModuleAndEnableOnSafe is Script, BatchScript {
     address treasury;
     address dragonRouter;
     uint256 totalValidators;
+    uint256 maxYield = 1 ether;
 
     function setUp() public {
         safe_ = vm.envAddress("SAFE_ADDRESS");
@@ -26,16 +27,14 @@ contract DeployModuleAndEnableOnSafe is Script, BatchScript {
         treasury = vm.envAddress("TREASURY");
         dragonRouter = vm.envAddress("DRAGON_ROUTER");
         totalValidators = vm.envUint("TOTAL_VALIDATORS");
-    }
 
-    function run() public isBatch(safe_) {
         vm.startBroadcast();
 
         octantVaultModule = moduleFactory.deployModule(
             safeModuleImplementation,
             abi.encodeWithSignature(
                 "setUp(bytes)",
-                abi.encode(safe_, abi.encode(keeper, treasury, dragonRouter, totalValidators))
+                abi.encode(safe_, abi.encode(keeper, treasury, dragonRouter, totalValidators, maxYield))
             ),
             block.timestamp
         );
@@ -43,7 +42,9 @@ contract DeployModuleAndEnableOnSafe is Script, BatchScript {
         console.log("Linked Octant Vault Module: ", octantVaultModule);
 
         vm.stopBroadcast();
+    }
 
+    function run() public isBatch(safe_) {
         bytes memory txn1 = abi.encodeWithSignature("enableModule(address)", octantVaultModule);
 
         addToBatch(safe_, 0, txn1);

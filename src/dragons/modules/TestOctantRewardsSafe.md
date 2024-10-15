@@ -22,6 +22,6 @@
 
 - Run `script/DeployOctantModuleAndEnableOnSafe.s.sol` to deploy a new octant vault module through Module Factory Proxy and create a transaction to link to safe.
   ```
-  forge script script/DeployModuleAndEnableOnSafe.s.sol --private-key $PRIVATE_KEY --rpc-url $POLYGON_RPC_URL --slow --ffi -vvvvv
+  forge script script/DeployOctantModuleAndEnableOnSafe.s.sol --private-key $PRIVATE_KEY --rpc-url $POLYGON_RPC_URL --slow --ffi -vvvvv
   ```
 - Call harvest on the module through etherscan / using `Zodiac` safe app.
