@@ -203,31 +203,6 @@ contract DragonStrategy is TokenizedStrategy {
         return super._withdraw(S, receiver, owner, assets, shares, maxLoss);
     }
 
-    /**
-     * @dev Override of _withdraw to enforce lockup period.
-     */
-    function _withdraw(
-        StrategyData storage S,
-        address receiver,
-        address owner,
-        uint256 assets,
-        uint256 shares,
-        uint256 maxLoss
-    ) internal override returns (uint256) {
-        DragonStrategyStorageV0 storage $ = _dragonStrategyStorage();
-
-        LockupInfo memory lockup = $.voluntaryLockups[owner];
-        require(
-            block.timestamp >= lockup.unlockTime || shares <= _balanceOf(S, owner) - lockup.lockedShares,
-            "Shares are locked"
-        );
-
-        if (shares > _balanceOf(S, owner) - lockup.lockedShares) {
-            revert CantWithdrawLockedShares();
-        }
-        return super._withdraw(S, receiver, owner, assets, shares, maxLoss);
-    }
-
     /// @dev Internal implementation of {maxRedeem}.
     function _maxRedeem(
         StrategyData storage S,
