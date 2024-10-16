@@ -7,6 +7,7 @@ import { ModuleProxyFactory } from "../src/dragons/ModuleProxyFactory.sol";
 import { DragonVaultModule } from "../src/dragons/DragonVaultModule.sol";
 import { TestERC20 } from "../src/test/TestERC20.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
+import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
 import { ISafe } from "../src/interfaces/Safe.sol";
 
 contract BaseTest is Test, TestPlus {
@@ -27,10 +28,13 @@ contract BaseTest is Test, TestPlus {
     TestERC20 public token;
     address[] public owners;
 
-    function setUp() public virtual {
-        fork = vm.createFork(TEST_RPC_URL);
-        vm.selectFork(fork);
+    function setUp() public virtual {}
 
+    function configure(bool useFork) public {
+        if (useFork) {
+            fork = vm.createFork(TEST_RPC_URL);
+            vm.selectFork(fork);
+        }
         // deploy module proxy factory and test erc20 asset
         moduleFactory = new ModuleProxyFactory();
 
@@ -41,7 +45,12 @@ contract BaseTest is Test, TestPlus {
         (t.owner, t.ownerPrivateKey) = _randomSigner();
         owners = [t.owner];
         // Deploy a new Safe Multisig using the Proxy Factory
-        SafeProxyFactory factory = SafeProxyFactory(proxyFactory);
+        SafeProxyFactory factory;
+        if (fork != 0) {
+            factory = SafeProxyFactory(proxyFactory);
+        }  else {
+            factory = new SafeProxyFactory();
+        }
         bytes memory data = abi.encodeWithSignature(
             "setup(address[],uint256,address,bytes,address,address,uint256,address)",
             owners,
@@ -58,7 +67,10 @@ contract BaseTest is Test, TestPlus {
             0,
             address(0)
         );
-
+        if (fork == 0) {
+            Safe safe = new Safe();
+            safeSingleton = address(safe);
+        }
         SafeProxy proxy = factory.createProxyWithNonce(safeSingleton, data, block.timestamp);
 
         token.mint(address(proxy), 100 ether);
