@@ -26,7 +26,7 @@ contract DeployModuleAndEnableOnSafe is Script, BatchScript {
 
         dragonVaultModule = moduleFactory.deployModule(
             safeModuleImplementation,
-            abi.encodeWithSignature("setUp(bytes)", abi.encode(safe_, bytes32(0), bytes32(0), token)),
+            abi.encodeWithSignature("setUp(bytes)", abi.encode(safe_, abi.encode(token))),
             block.timestamp
         );
 

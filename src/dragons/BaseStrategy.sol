@@ -4,36 +4,10 @@ pragma solidity >=0.8.18;
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 // TokenizedStrategy interface used for internal view delegateCalls.
-import { IDragonStrategy } from "src/interfaces/IDragonStrategy.sol";
+import { ITokenizedStrategy } from "../interfaces/ITokenizedStrategy.sol";
 
 /**
- * @title YearnV3 Base Strategy
- * @author yearn.finance
- * @notice
- *  BaseStrategy implements all of the required functionality to
- *  seamlessly integrate with the `TokenizedStrategy` implementation contract
- *  allowing anyone to easily build a fully permissionless ERC-4626 compliant
- *  Vault by inheriting this contract and overriding three simple functions.
-
- *  It utilizes an immutable proxy pattern that allows the BaseStrategy
- *  to remain simple and small. All standard logic is held within the
- *  `TokenizedStrategy` and is reused over any n strategies all using the
- *  `fallback` function to delegatecall the implementation so that strategists
- *  can only be concerned with writing their strategy specific code.
- *
- *  This contract should be inherited and the three main abstract methods
- *  `_deployFunds`, `_freeFunds` and `_harvestAndReport` implemented to adapt
- *  the Strategy to the particular needs it has to generate yield. There are
- *  other optional methods that can be implemented to further customize
- *  the strategy if desired.
- *
- *  All default storage for the strategy is controlled and updated by the
- *  `TokenizedStrategy`. The implementation holds a storage struct that
- *  contains all needed global variables in a manual storage slot. This
- *  means strategists can feel free to implement their own custom storage
- *  variables as they need with no concern of collisions. All global variables
- *  can be viewed within the Strategy by a simple call using the
- *  `TokenizedStrategy` variable. IE: TokenizedStrategy.globalVariable();.
+ * @title Dragon Base Strategy
  */
 abstract contract BaseStrategy {
     /*//////////////////////////////////////////////////////////////
@@ -98,8 +72,11 @@ abstract contract BaseStrategy {
      * and always be checked before any integration with the Strategy.
      */
     // NOTE: This is a holder address based on expected deterministic location for testing
-    // solhint-disable-next-line const-name-snakecase
-    address public constant tokenizedStrategyAddress = 0x2e234DAe75C793f67A35089C9d99245E1C58470b;
+    address public tokenizedStrategyImplementation;
+
+    uint256 public maxReportDelay;
+
+    address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE; // using this address to represent native ETH
 
     /*//////////////////////////////////////////////////////////////
                             IMMUTABLES
@@ -109,7 +86,7 @@ abstract contract BaseStrategy {
      * @dev Underlying asset the Strategy is earning yield on.
      * Stored here for cheap retrievals within the strategy.
      */
-    ERC20 internal immutable asset;
+    ERC20 internal asset;
 
     /**
      * @dev This variable is set to address(this) during initialization of each strategy.
@@ -123,7 +100,7 @@ abstract contract BaseStrategy {
      * to a call to itself. Which will hit the fallback function and
      * delegateCall that to the actual TokenizedStrategy.
      */
-    IDragonStrategy internal immutable TokenizedStrategy;
+    ITokenizedStrategy internal TokenizedStrategy;
 
     /**
      * @notice Used to initialize the strategy on deployment.
@@ -131,33 +108,37 @@ abstract contract BaseStrategy {
      * This will set the `TokenizedStrategy` variable for easy
      * internal view calls to the implementation. As well as
      * initializing the default storage variables based on the
-     * parameters and using the deployer for the permissioned roles.
+     * parameters.
      *
+     * @param _tokenizedStrategyImplementation Address of the TokenStrategyImplementation contract.
      * @param _asset Address of the underlying asset.
+     * @param _management Address of the strategy manager.
+     * @param _keeper Address of keeper.
+     * @param _dragonRouter Address of the dragon router.
      * @param _name Name the strategy will use.
+     * 
      */
-    constructor(address _asset, string memory _name, address _dragonModule) {
+    function __BaseStrategy_init(address _tokenizedStrategyImplementation, address _asset, address _owner, address _management, address _keeper, address _dragonRouter, uint256 _maxReportDelay, string memory _name) internal {
+        tokenizedStrategyImplementation = _tokenizedStrategyImplementation;
         asset = ERC20(_asset);
+        maxReportDelay = _maxReportDelay;
 
         // Set instance of the implementation for internal use.
-        TokenizedStrategy = IDragonStrategy(address(this));
+        TokenizedStrategy = ITokenizedStrategy(address(this));
 
         // Initialize the strategy's storage variables.
         _delegateCall(
-            abi.encodeCall(
-                IDragonStrategy.initialize,
-                (_asset, _name, msg.sender, _dragonModule, msg.sender, _dragonModule)
-            )
+            abi.encodeCall(ITokenizedStrategy.initialize, (_asset, _name, _owner, _management, _keeper, _dragonRouter))
         );
 
-        // Store the tokenizedStrategyAddress at the standard implementation
+        // Store the tokenizedStrategyImplementation at the standard implementation
         // address storage slot so etherscan picks up the interface. This gets
         // stored on initialization and never updated.
         assembly {
             sstore(
                 // keccak256('eip1967.proxy.implementation' - 1)
                 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc,
-                tokenizedStrategyAddress
+                _tokenizedStrategyImplementation
             )
         }
     }
@@ -221,14 +202,25 @@ abstract contract BaseStrategy {
      * `TokenizedStrategy.isShutdown()` to decide if funds should be
      * redeployed or simply realize any profits/losses.
      *
+     * @return _yield Amount of yield harvest from the farm.
      * @return _totalAssets A trusted and accurate account for the total
      * amount of 'asset' the strategy currently holds including idle funds.
      */
-    function _harvestAndReport() internal virtual returns (uint256 _totalAssets);
+    function _harvestAndReport() internal virtual returns (uint256 _yield, uint256 _totalAssets);
+
+    /// @dev Handle the liquidation of strategy assets.
+    /// @param _amountNeeded Amount to be liquidated.
+    /// @return _liquidatedAmount liquidated amount.
+    /// @return _loss loss amount if it resulted in liquidation.
+    function liquidatePosition(uint256 _amountNeeded) external virtual onlyManagement returns (uint256 _liquidatedAmount, uint256 _loss) {}
 
     /*//////////////////////////////////////////////////////////////
                     OPTIONAL TO OVERRIDE BY STRATEGIST
     //////////////////////////////////////////////////////////////*/
+
+    /// @dev Handle the strategy’s core position adjustments.
+    /// @param _debtOutstanding Amount of position to adjust.
+    function adjustPosition(uint256 _debtOutstanding) external virtual onlyManagement {}
 
     /**
      * @dev Optional function for strategist to override that can
@@ -274,7 +266,7 @@ abstract contract BaseStrategy {
             // Return the status of the tend trigger.
             _tendTrigger(),
             // And the needed calldata either way.
-            abi.encodeWithSelector(IDragonStrategy.tend.selector)
+            abi.encodeWithSelector(ITokenizedStrategy.tend.selector)
         );
     }
 
@@ -366,7 +358,7 @@ abstract contract BaseStrategy {
      * @param _amount The amount of 'asset' that the strategy can
      * attempt to deposit in the yield source.
      */
-    function deployFunds(uint256 _amount) external virtual onlySelf {
+    function deployFunds(uint256 _amount) external payable virtual onlySelf {
         _deployFunds(_amount);
     }
 
@@ -385,6 +377,18 @@ abstract contract BaseStrategy {
     }
 
     /**
+     * @notice Provide a signal to the keeper that `harvest()` should be called.
+     * @return `true` if `harvest()` should be called, `false` otherwise.
+     */
+    function harvestTrigger() external view virtual returns (bool) {
+        // Should not trigger if strategy is not active (no assets) or harvest has been recently called.
+        if (TokenizedStrategy.totalAssets() != 0 && (block.timestamp - TokenizedStrategy.lastReport()) >= maxReportDelay) return true;
+
+        // Check for idle funds in the strategy and deposit in the farm.
+        return (address(asset) == ETH ? address(this).balance : asset.balanceOf(address(this))) > 0;
+    }
+
+    /**
      * @notice Returns the accurate amount of all funds currently
      * held by the Strategy.
      * @dev Callback for the TokenizedStrategy to call during a report to
@@ -393,10 +397,11 @@ abstract contract BaseStrategy {
      * This can only be called after a report() delegateCall to the
      * TokenizedStrategy so msg.sender == address(this).
      *
+     * @return . Yield harvested.
      * @return . A trusted and accurate account for the total amount
      * of 'asset' the strategy currently holds including idle funds.
      */
-    function harvestAndReport() external virtual onlySelf returns (uint256) {
+    function harvestAndReport() external virtual onlySelf returns (uint256, uint256) {
         return _harvestAndReport();
     }
 
@@ -446,7 +451,7 @@ abstract contract BaseStrategy {
      */
     function _delegateCall(bytes memory _calldata) internal returns (bytes memory) {
         // Delegate call the tokenized strategy with provided calldata.
-        (bool success, bytes memory result) = tokenizedStrategyAddress.delegatecall(_calldata);
+        (bool success, bytes memory result) = tokenizedStrategyImplementation.delegatecall(_calldata);
 
         // If the call reverted. Return the error.
         if (!success) {
@@ -473,9 +478,12 @@ abstract contract BaseStrategy {
      * calldata and return any relevant values.
      *
      */
-    fallback() external {
+    fallback() external payable {
+        assembly {
+            if and(iszero(calldatasize()), not(iszero(callvalue()))) { return(0, 0) }
+        }
         // load our target address
-        address _tokenizedStrategyAddress = tokenizedStrategyAddress;
+        address _tokenizedStrategyAddress = tokenizedStrategyImplementation;
         // Execute external function using delegatecall and return any value.
         assembly {
             // Copy function selector and any arguments.

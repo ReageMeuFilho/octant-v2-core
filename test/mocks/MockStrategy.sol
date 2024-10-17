@@ -1,49 +1,70 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.8.18;
 
-import { MockYieldSource } from "./MockYieldSource.sol";
-import { BaseStrategy, ERC20 } from "src/dragons/BaseStrategy.sol";
+import {MockYieldSource} from "./MockYieldSource.sol";
+import {BaseStrategy, ERC20} from "../../src/dragons/BaseStrategy.sol";
+import { Module } from "zodiac/core/Module.sol";
 
-contract MockStrategy is BaseStrategy {
+contract MockStrategy is Module, BaseStrategy {
     address public yieldSource;
     bool public trigger;
     bool public managed;
     bool public kept;
     bool public emergentizated;
 
-    constructor(
-        address _asset,
-        address _yieldSource,
-        address _dragonModule
-    ) BaseStrategy(_asset, "Test Strategy", _dragonModule) {
-        initialize(_asset, _yieldSource);
-    }
+    /// @dev Initialize function, will be triggered when a new proxy is deployed
+    /// @dev owner of this module will the safe multisig that calls setUp function
+    /// @param initializeParams Parameters of initialization encoded
+    function setUp(bytes memory initializeParams) public override initializer {
+        (
+            address _owner,
+            bytes memory data
+        ) = abi.decode(initializeParams, (address, bytes));
 
-    function initialize(address _asset, address _yieldSource) public {
-        require(yieldSource == address(0));
+        (
+            address _tokenizedStrategyImplementation,
+            address _asset,
+            address _yieldSource,
+            address _management,
+            address _keeper,
+            address _dragonRouter,
+            uint256 _maxReportDelay,
+            string memory _name
+        ) = abi.decode(data, (address, address, address, address, address, address, uint256, string));
+
+        __Ownable_init(msg.sender);
+        __BaseStrategy_init(_tokenizedStrategyImplementation, _asset, _owner, _management, _keeper, _dragonRouter, _maxReportDelay, _name);
+
         yieldSource = _yieldSource;
-        ERC20(_asset).approve(_yieldSource, type(uint256).max);
+        if (_asset != ETH) ERC20(_asset).approve(_yieldSource, type(uint256).max);
+
+        setAvatar(_owner);
+        setTarget(_owner);
+        transferOwnership(_owner);
     }
 
     function _deployFunds(uint256 _amount) internal override {
-        MockYieldSource(yieldSource).deposit(_amount);
+        MockYieldSource(yieldSource).deposit{value: _amount}(_amount);
     }
 
     function _freeFunds(uint256 _amount) internal override {
         MockYieldSource(yieldSource).withdraw(_amount);
     }
 
-    function _harvestAndReport() internal override returns (uint256) {
-        uint256 balance = ERC20(asset).balanceOf(address(this));
-        if (balance > 0 && !TokenizedStrategy.isShutdown()) {
-            MockYieldSource(yieldSource).deposit(balance);
-        }
-        return MockYieldSource(yieldSource).balance() + ERC20(asset).balanceOf(address(this));
+    function _harvestAndReport() internal override returns (uint256, uint256) {
+        uint256 amount = 0.1 ether;
+        MockYieldSource(yieldSource).simulateHarvestRewards(0.1 ether);
+        uint256 balance = address(asset) == ETH ? address(this).balance : ERC20(asset).balanceOf(address(this));
+        return (amount, MockYieldSource(yieldSource).balance() + balance);
     }
 
     function _tend(uint256 /*_idle*/) internal override {
-        uint256 balance = ERC20(asset).balanceOf(address(this));
+        uint256 balance = address(asset) == ETH ? address(this).balance : ERC20(asset).balanceOf(address(this));
         if (balance > 0) {
+            if (address(asset) == ETH) {
+                MockYieldSource(yieldSource).deposit{value: balance}(balance);
+                return;
+            }
             MockYieldSource(yieldSource).deposit(balance);
         }
     }
@@ -60,15 +81,12 @@ contract MockStrategy is BaseStrategy {
         trigger = _trigger;
     }
 
-    function onlyLetManagers() public onlyManagement {
-        managed = true;
+    function adjustPosition(uint256 _debtOutstanding) external override onlyManagement {
+        MockYieldSource(yieldSource).withdraw(_debtOutstanding);
     }
 
-    function onlyLetKeepersIn() public onlyKeepers {
-        kept = true;
-    }
-
-    function onlyLetEmergencyAdminsIn() public onlyEmergencyAuthorized {
-        emergentizated = true;
+    function liquidatePosition(uint256 _amountNeeded) external override onlyManagement returns (uint256 _liquidatedAmount, uint256 _loss) {
+        MockYieldSource(yieldSource).withdraw(_amountNeeded);
+        return (_amountNeeded, 0);
     }
 }
