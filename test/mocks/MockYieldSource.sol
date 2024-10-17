@@ -5,7 +5,7 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract MockYieldSource {
     address public asset;
-    
+
     address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE; // using this address to represent native ETH
 
     constructor(address _asset) {
@@ -20,9 +20,9 @@ contract MockYieldSource {
         uint256 _balance = asset == ETH ? address(this).balance : ERC20(asset).balanceOf(address(this));
         _amount = _amount > _balance ? _balance : _amount;
         if (asset == ETH) {
-           (bool success, ) = msg.sender.call{value: _amount}("");
-           require(success, "Transfer Failed");
-           return;
+            (bool success,) = msg.sender.call{value: _amount}("");
+            require(success, "Transfer Failed");
+            return;
         }
         ERC20(asset).transfer(msg.sender, _amount);
     }
@@ -33,10 +33,14 @@ contract MockYieldSource {
 
     function simulateHarvestRewards(uint256 _amount) public {
         if (asset == ETH) {
-           (bool success, ) = msg.sender.call{value: _amount}("");
-           require(success, "Transfer Failed");
-           return;
+            (bool success,) = msg.sender.call{value: _amount}("");
+            require(success, "Transfer Failed");
+            return;
         }
+        ERC20(asset).transfer(msg.sender, _amount);
+    }
+    
+    function simulateLoss(uint256 _amount) public {
         ERC20(asset).transfer(msg.sender, _amount);
     }
 }

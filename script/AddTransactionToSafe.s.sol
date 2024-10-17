@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxy.sol";
 import "forge-std/Script.sol";
-import { BatchScript } from "forge-safe/src/BatchScript.sol";
+import {BatchScript} from "forge-safe/src/BatchScript.sol";
 
 contract AddTransactionToSafe is BatchScript {
     address public safe_;

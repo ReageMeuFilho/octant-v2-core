@@ -4,7 +4,7 @@ pragma solidity >=0.8.18;
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { Enum } from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
+import {Enum} from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 
 import {IBaseStrategy} from "../../src/interfaces/IBaseStrategy.sol";
 import {IAvatar} from "zodiac/interfaces/IAvatar.sol";
@@ -25,22 +25,13 @@ contract MockTokenizedStrategy {
      * @notice Emitted on the initialization of any new `strategy` that uses `asset`
      * with this specific `apiVersion`.
      */
-    event NewTokenizedStrategy(
-        address indexed strategy,
-        address indexed asset,
-        string apiVersion
-    );
+    event NewTokenizedStrategy(address indexed strategy, address indexed asset, string apiVersion);
 
     /**
      * @notice Emitted when the strategy reports `profit` or `loss` and
      * `performanceFees` and `protocolFees` are paid out.
      */
-    event Reported(
-        uint256 profit,
-        uint256 loss,
-        uint256 protocolFees,
-        uint256 performanceFees
-    );
+    event Reported(uint256 profit, uint256 loss, uint256 protocolFees, uint256 performanceFees);
 
     /**
      * @notice Emitted when the 'keeper' address is updated to 'newKeeper'.
@@ -71,11 +62,7 @@ contract MockTokenizedStrategy {
      * @notice Emitted when the allowance of a `spender` for an `owner` is set by
      * a call to {approve}. `value` is the new allowance.
      */
-    event Approval(
-        address indexed owner,
-        address indexed spender,
-        uint256 value
-    );
+    event Approval(address indexed owner, address indexed spender, uint256 value);
 
     /**
      * @notice Emitted when `value` tokens are moved from one account (`from`) to
@@ -89,23 +76,14 @@ contract MockTokenizedStrategy {
      * @notice Emitted when the `caller` has exchanged `assets` for `shares`,
      * and transferred those `shares` to `owner`.
      */
-    event Deposit(
-        address indexed caller,
-        address indexed owner,
-        uint256 assets,
-        uint256 shares
-    );
+    event Deposit(address indexed caller, address indexed owner, uint256 assets, uint256 shares);
 
     /**
      * @notice Emitted when the `caller` has exchanged `owner`s `shares` for `assets`,
      * and transferred those `assets` to `receiver`.
      */
     event Withdraw(
-        address indexed caller,
-        address indexed receiver,
-        address indexed owner,
-        uint256 assets,
-        uint256 shares
+        address indexed caller, address indexed receiver, address indexed owner, uint256 assets, uint256 shares
     );
 
     /*//////////////////////////////////////////////////////////////
@@ -116,11 +94,8 @@ contract MockTokenizedStrategy {
         // The ERC20 compliant underlying asset that will be
         // used by the Strategy
         ERC20 asset;
-
         address owner;
-        
         address dragonRouter;
-
         // These are the corresponding ERC20 variables needed for the
         // strategies token that is issued and burned on each deposit or withdraw.
         uint8 decimals; // The amount of decimals that `asset` and strategy use.
@@ -129,20 +104,15 @@ contract MockTokenizedStrategy {
         mapping(address => uint256) nonces; // Mapping of nonces used for permit functions.
         mapping(address => uint256) balances; // Mapping to track current balances for each account that holds shares.
         mapping(address => mapping(address => uint256)) allowances; // Mapping to track the allowances for the strategies shares.
-
         // We manually track `totalAssets` to prevent PPS manipulation through airdrops.
         uint256 totalAssets;
-
         uint256 totalYield;
-
         address keeper; // Address given permission to call {report} and {tend}.
         uint96 lastReport; // The last time a {report} was called.
-
         // Access management variables.
         address management; // Main address that can set all configurable variables.
         address pendingManagement; // Address that is pending to take over `management`.
         address emergencyAdmin; // Address to act in emergencies as well as `management`.
-
         // Strategy Status
         uint8 entered; // To prevent reentrancy. Use uint8 for gas savings.
         bool shutdown; // Bool that can be used to stop deposits into the strategy.
@@ -241,10 +211,7 @@ contract MockTokenizedStrategy {
      */
     function requireEmergencyAuthorized(address _sender) public view {
         StrategyData storage S = _strategyStorage();
-        require(
-            _sender == S.emergencyAdmin || _sender == S.management,
-            "!emergency authorized"
-        );
+        require(_sender == S.emergencyAdmin || _sender == S.management, "!emergency authorized");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -282,8 +249,7 @@ contract MockTokenizedStrategy {
      * amount of storage in their strategy without worrying
      * about collisions.
      */
-    bytes32 internal constant BASE_STRATEGY_STORAGE =
-        bytes32(uint256(keccak256("yearn.base.strategy.storage")) - 1);
+    bytes32 internal constant BASE_STRATEGY_STORAGE = bytes32(uint256(keccak256("yearn.base.strategy.storage")) - 1);
 
     /*//////////////////////////////////////////////////////////////
                                IMMUTABLE
@@ -334,7 +300,7 @@ contract MockTokenizedStrategy {
 
         // Set the strategy's underlying asset.
         S.asset = ERC20(_asset);
-        
+
         S.owner = _owner;
         S.dragonRouter = _dragonRouter;
 
@@ -366,18 +332,18 @@ contract MockTokenizedStrategy {
      * @param receiver The address to receive the `shares`.
      * @return shares The actual amount of shares issued.
      */
-    function deposit(
-        uint256 assets,
-        address receiver
-    ) external nonReentrant onlyOwner payable returns (uint256 shares) {
+    function deposit(uint256 assets, address receiver)
+        external
+        payable
+        nonReentrant
+        onlyOwner
+        returns (uint256 shares)
+    {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
 
         // Check for rounding error.
-        require(
-            (shares = _convertToShares(S, assets, Math.Rounding.Floor)) != 0,
-            "ZERO_SHARES"
-        );
+        require((shares = _convertToShares(S, assets, Math.Rounding.Floor)) != 0, "ZERO_SHARES");
 
         _deposit(S, receiver, assets, shares);
     }
@@ -389,20 +355,14 @@ contract MockTokenizedStrategy {
      * @param receiver The address to receive the `shares`.
      * @return assets The actual amount of asset deposited.
      */
-    function mint(
-        uint256 shares,
-        address receiver
-    ) external nonReentrant onlyOwner payable returns (uint256 assets) {
+    function mint(uint256 shares, address receiver) external payable nonReentrant onlyOwner returns (uint256 assets) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
 
         // Checking max mint will also check if shutdown.
         require(shares <= _maxMint(S, receiver), "ERC4626: mint more than max");
         // Check for rounding error.
-        require(
-            (assets = _convertToAssets(S, shares, Math.Rounding.Ceil)) != 0,
-            "ZERO_ASSETS"
-        );
+        require((assets = _convertToAssets(S, shares, Math.Rounding.Ceil)) != 0, "ZERO_ASSETS");
 
         _deposit(S, receiver, assets, shares);
     }
@@ -416,11 +376,7 @@ contract MockTokenizedStrategy {
      * @param owner The address whose shares are burnt.
      * @return shares The actual amount of shares burnt.
      */
-    function withdraw(
-        uint256 assets,
-        address receiver,
-        address owner
-    ) external onlyOwner returns (uint256 shares) {
+    function withdraw(uint256 assets, address receiver, address owner) external onlyOwner returns (uint256 shares) {
         return withdraw(assets, receiver, owner, 0);
     }
 
@@ -434,20 +390,17 @@ contract MockTokenizedStrategy {
      * @param maxLoss The amount of acceptable loss in Basis points.
      * @return shares The actual amount of shares burnt.
      */
-    function withdraw(
-        uint256 assets,
-        address receiver,
-        address owner,
-        uint256 maxLoss
-    ) public nonReentrant onlyOwner returns (uint256 shares) {
+    function withdraw(uint256 assets, address receiver, address owner, uint256 maxLoss)
+        public
+        nonReentrant
+        onlyOwner
+        returns (uint256 shares)
+    {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
 
         // Check for rounding error or 0 value.
-        require(
-            (shares = _convertToShares(S, assets, Math.Rounding.Ceil)) != 0,
-            "ZERO_SHARES"
-        );
+        require((shares = _convertToShares(S, assets, Math.Rounding.Ceil)) != 0, "ZERO_SHARES");
 
         // Withdraw and track the actual amount withdrawn for loss check.
         _withdraw(S, receiver, owner, assets, shares, maxLoss);
@@ -462,11 +415,7 @@ contract MockTokenizedStrategy {
      * @param owner The address whose shares are burnt.
      * @return assets The actual amount of underlying withdrawn.
      */
-    function redeem(
-        uint256 shares,
-        address receiver,
-        address owner
-    ) external onlyOwner returns (uint256) {
+    function redeem(uint256 shares, address receiver, address owner) external onlyOwner returns (uint256) {
         // We default to not limiting a potential loss.
         return redeem(shares, receiver, owner, MAX_BPS);
     }
@@ -481,24 +430,18 @@ contract MockTokenizedStrategy {
      * @param maxLoss The amount of acceptable loss in Basis points.
      * @return . The actual amount of underlying withdrawn.
      */
-    function redeem(
-        uint256 shares,
-        address receiver,
-        address owner,
-        uint256 maxLoss
-    ) public onlyOwner nonReentrant returns (uint256) {
+    function redeem(uint256 shares, address receiver, address owner, uint256 maxLoss)
+        public
+        onlyOwner
+        nonReentrant
+        returns (uint256)
+    {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
-        require(
-            shares <= _maxRedeem(S, owner),
-            "ERC4626: redeem more than max"
-        );
+        require(shares <= _maxRedeem(S, owner), "ERC4626: redeem more than max");
         uint256 assets;
         // Check for rounding error or 0 value.
-        require(
-            (assets = _convertToAssets(S, shares, Math.Rounding.Floor)) != 0,
-            "ZERO_ASSETS"
-        );
+        require((assets = _convertToAssets(S, shares, Math.Rounding.Floor)) != 0, "ZERO_ASSETS");
 
         // We need to return the actual amount withdrawn in case of a loss.
         return _withdraw(S, receiver, owner, assets, shares, maxLoss);
@@ -653,10 +596,7 @@ contract MockTokenizedStrategy {
      * @dev Accepts a `maxLoss` variable in order to match the multi
      * strategy vaults ABI.
      */
-    function maxWithdraw(
-        address owner,
-        uint256 /*maxLoss*/
-    ) external view returns (uint256) {
+    function maxWithdraw(address owner, uint256 /*maxLoss*/ ) external view returns (uint256) {
         return _maxWithdraw(_strategyStorage(), owner);
     }
 
@@ -677,10 +617,7 @@ contract MockTokenizedStrategy {
      * @dev Accepts a `maxLoss` variable in order to match the multi
      * strategy vaults ABI.
      */
-    function maxRedeem(
-        address owner,
-        uint256 /*maxLoss*/
-    ) external view returns (uint256) {
+    function maxRedeem(address owner, uint256 /*maxLoss*/ ) external view returns (uint256) {
         return _maxRedeem(_strategyStorage(), owner);
     }
 
@@ -689,25 +626,21 @@ contract MockTokenizedStrategy {
     //////////////////////////////////////////////////////////////*/
 
     /// @dev Internal implementation of {totalAssets}.
-    function _totalAssets(
-        StrategyData storage S
-    ) internal view returns (uint256) {
+    function _totalAssets(StrategyData storage S) internal view returns (uint256) {
         return S.totalAssets;
     }
 
     /// @dev Internal implementation of {totalSupply}.
-    function _totalSupply(
-        StrategyData storage S
-    ) internal view returns (uint256) {
+    function _totalSupply(StrategyData storage S) internal view returns (uint256) {
         return S.totalSupply;
     }
 
     /// @dev Internal implementation of {convertToShares}.
-    function _convertToShares(
-        StrategyData storage S,
-        uint256 assets,
-        Math.Rounding _rounding
-    ) internal view returns (uint256) {
+    function _convertToShares(StrategyData storage S, uint256 assets, Math.Rounding _rounding)
+        internal
+        view
+        returns (uint256)
+    {
         // Saves an extra SLOAD if values are non-zero.
         uint256 totalSupply_ = _totalSupply(S);
         // If supply is 0, PPS = 1.
@@ -721,25 +654,19 @@ contract MockTokenizedStrategy {
     }
 
     /// @dev Internal implementation of {convertToAssets}.
-    function _convertToAssets(
-        StrategyData storage S,
-        uint256 shares,
-        Math.Rounding _rounding
-    ) internal view returns (uint256) {
+    function _convertToAssets(StrategyData storage S, uint256 shares, Math.Rounding _rounding)
+        internal
+        view
+        returns (uint256)
+    {
         // Saves an extra SLOAD if totalSupply() is non-zero.
         uint256 supply = _totalSupply(S);
 
-        return
-            supply == 0
-                ? shares
-                : shares.mulDiv(_totalAssets(S), supply, _rounding);
+        return supply == 0 ? shares : shares.mulDiv(_totalAssets(S), supply, _rounding);
     }
 
     /// @dev Internal implementation of {maxDeposit}.
-    function _maxDeposit(
-        StrategyData storage S,
-        address receiver
-    ) internal view returns (uint256) {
+    function _maxDeposit(StrategyData storage S, address receiver) internal view returns (uint256) {
         // Cannot deposit when shutdown or to the strategy.
         if (S.shutdown || receiver == address(this)) return 0;
 
@@ -747,10 +674,7 @@ contract MockTokenizedStrategy {
     }
 
     /// @dev Internal implementation of {maxMint}.
-    function _maxMint(
-        StrategyData storage S,
-        address receiver
-    ) internal view returns (uint256 maxMint_) {
+    function _maxMint(StrategyData storage S, address receiver) internal view returns (uint256 maxMint_) {
         // Cannot mint when shutdown or to the strategy.
         if (S.shutdown || receiver == address(this)) return 0;
 
@@ -761,36 +685,21 @@ contract MockTokenizedStrategy {
     }
 
     /// @dev Internal implementation of {maxWithdraw}.
-    function _maxWithdraw(
-        StrategyData storage S,
-        address owner
-    ) internal view returns (uint256 maxWithdraw_) {
+    function _maxWithdraw(StrategyData storage S, address owner) internal view returns (uint256 maxWithdraw_) {
         // Get the max the owner could withdraw currently.
-        maxWithdraw_ = IBaseStrategy(address(this)).availableWithdrawLimit(
-            owner
-        );
+        maxWithdraw_ = IBaseStrategy(address(this)).availableWithdrawLimit(owner);
 
         // If there is no limit enforced.
         if (maxWithdraw_ == type(uint256).max) {
             // Saves a min check if there is no withdrawal limit.
-            maxWithdraw_ = _convertToAssets(
-                S,
-                _balanceOf(S, owner),
-                Math.Rounding.Floor
-            );
+            maxWithdraw_ = _convertToAssets(S, _balanceOf(S, owner), Math.Rounding.Floor);
         } else {
-            maxWithdraw_ = Math.min(
-                _convertToAssets(S, _balanceOf(S, owner), Math.Rounding.Floor),
-                maxWithdraw_
-            );
+            maxWithdraw_ = Math.min(_convertToAssets(S, _balanceOf(S, owner), Math.Rounding.Floor), maxWithdraw_);
         }
     }
 
     /// @dev Internal implementation of {maxRedeem}.
-    function _maxRedeem(
-        StrategyData storage S,
-        address owner
-    ) internal view returns (uint256 maxRedeem_) {
+    function _maxRedeem(StrategyData storage S, address owner) internal view returns (uint256 maxRedeem_) {
         // Get the max the owner could withdraw currently.
         maxRedeem_ = IBaseStrategy(address(this)).availableWithdrawLimit(owner);
 
@@ -820,17 +729,20 @@ contract MockTokenizedStrategy {
      * values to prevent view reentrancy issues from the token
      * transfers or the _deployFunds() calls.
      */
-    function _deposit(
-        StrategyData storage S,
-        address receiver,
-        uint256 assets,
-        uint256 shares
-    ) internal {
+    function _deposit(StrategyData storage S, address receiver, uint256 assets, uint256 shares) internal {
         // Cache storage variables used more than once.
         ERC20 _asset = S.asset;
 
-        if (address(_asset) == ETH) IAvatar(S.owner).execTransactionFromModule(address(this), assets, "", Enum.Operation.Call);
-        else IAvatar(S.owner).execTransactionFromModule(address(_asset), 0, abi.encodeWithSignature("transfer(address,uint256)", address(this), assets), Enum.Operation.Call);
+        if (address(_asset) == ETH) {
+            IAvatar(S.owner).execTransactionFromModule(address(this), assets, "", Enum.Operation.Call);
+        } else {
+            IAvatar(S.owner).execTransactionFromModule(
+                address(_asset),
+                0,
+                abi.encodeWithSignature("transfer(address,uint256)", address(this), assets),
+                Enum.Operation.Call
+            );
+        }
 
         // We can deploy the full loose balance currently held.
         IBaseStrategy(address(this)).deployFunds(
@@ -888,10 +800,7 @@ contract MockTokenizedStrategy {
                 // If a non-default max loss parameter was set.
                 if (maxLoss < MAX_BPS) {
                     // Make sure we are within the acceptable range.
-                    require(
-                        loss <= (assets * maxLoss) / MAX_BPS,
-                        "too much loss"
-                    );
+                    require(loss <= (assets * maxLoss) / MAX_BPS, "too much loss");
                 }
                 // Lower the amount to be withdrawn.
                 assets = idle;
@@ -904,14 +813,13 @@ contract MockTokenizedStrategy {
         _burn(S, owner, shares);
 
         if (address(S.asset) == ETH) {
-            (bool success, ) = receiver.call{value: assets}("");
+            (bool success,) = receiver.call{value: assets}("");
             require(success, "Transfer Failed");
-        }
-        else {
+        } else {
             // Transfer the amount of underlying to the receiver.
             _asset.safeTransfer(receiver, assets);
         }
-        
+
         emit Withdraw(msg.sender, receiver, owner, assets, shares);
 
         // Return the actual amount of assets withdrawn.
@@ -922,39 +830,33 @@ contract MockTokenizedStrategy {
                         PROFIT REPORTING
     //////////////////////////////////////////////////////////////*/
 
-    function report()
-        external
-        nonReentrant
-        returns (uint256 profit, uint256 loss)
-    {
+    function report() external nonReentrant returns (uint256 profit, uint256 loss) {
         // Cache storage pointer since its used repeatedly.
         StrategyData storage S = _strategyStorage();
 
-        (uint256 _yield, uint256 _newTotalAssets) = IBaseStrategy(address(this))
-            .harvestAndReport();
+        uint256 _oldTotalAssets = S.totalAssets;
+        uint256 _newTotalAssets = IBaseStrategy(address(this)).harvestAndReport();
 
         if (address(S.asset) == ETH) {
-            (bool success, ) = S.dragonRouter.call{value: _yield}("");
+            (bool success,) = S.dragonRouter.call{value: _newTotalAssets - _oldTotalAssets}("");
             require(success, "Transfer Failed");
-        }
-        else {
+        } else {
             // Transfer the amount of underlying to the receiver.
-            S.asset.safeTransfer(S.dragonRouter, _yield);
+            S.asset.safeTransfer(S.dragonRouter, _newTotalAssets - _oldTotalAssets);
         }
 
-        S.totalAssets += _newTotalAssets - _yield;
-        S.totalYield += _yield;
+        S.totalAssets = _newTotalAssets;
         S.lastReport = uint96(block.timestamp);
 
         // Emit event with info
         emit Reported(
-            _yield,
+            _newTotalAssets - _oldTotalAssets,
             0,
             0, // Protocol fees
             0 // Performance Fees
         );
 
-        return (_yield,0);
+        return (_newTotalAssets - _oldTotalAssets, 0);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -984,9 +886,7 @@ contract MockTokenizedStrategy {
         ERC20 asset = _strategyStorage().asset;
         uint256 balance = address(asset) == ETH ? address(this).balance : asset.balanceOf(address(this));
         // Tend the strategy with the current loose balance.
-        IBaseStrategy(address(this)).tendThis(
-            balance
-        );
+        IBaseStrategy(address(this)).tendThis(balance);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -1024,9 +924,7 @@ contract MockTokenizedStrategy {
      *
      * @param amount The amount of asset to attempt to free.
      */
-    function emergencyWithdraw(
-        uint256 amount
-    ) external nonReentrant onlyEmergencyAuthorized {
+    function emergencyWithdraw(uint256 amount) external nonReentrant onlyEmergencyAuthorized {
         // Make sure the strategy has been shutdown.
         require(_strategyStorage().shutdown, "not shutdown");
 
@@ -1081,6 +979,7 @@ contract MockTokenizedStrategy {
      * @notice Get the current address that can call tend and report.
      * @return . Address of the keeper
      */
+
     function keeper() external view returns (address) {
         return _strategyStorage().keeper;
     }
@@ -1173,9 +1072,7 @@ contract MockTokenizedStrategy {
      *
      * @param _emergencyAdmin New address to set `emergencyAdmin` to.
      */
-    function setEmergencyAdmin(
-        address _emergencyAdmin
-    ) external onlyManagement {
+    function setEmergencyAdmin(address _emergencyAdmin) external onlyManagement {
         _strategyStorage().emergencyAdmin = _emergencyAdmin;
 
         emit UpdateEmergencyAdmin(_emergencyAdmin);
@@ -1199,8 +1096,7 @@ contract MockTokenizedStrategy {
      * @return . The symbol the strategy is using for its tokens.
      */
     function symbol() external view returns (string memory) {
-        return
-            string(abi.encodePacked("octant_", _strategyStorage().asset.symbol()));
+        return string(abi.encodePacked("octant_", _strategyStorage().asset.symbol()));
     }
 
     /**
@@ -1223,10 +1119,7 @@ contract MockTokenizedStrategy {
     }
 
     /// @dev Internal implementation of {balanceOf}.
-    function _balanceOf(
-        StrategyData storage S,
-        address account
-    ) internal view returns (uint256) {
+    function _balanceOf(StrategyData storage S, address account) internal view returns (uint256) {
         return S.balances[account];
     }
 
@@ -1258,19 +1151,12 @@ contract MockTokenizedStrategy {
      * @param spender The address who would be moving the owners shares.
      * @return . The remaining amount of shares of `owner` that could be moved by `spender`.
      */
-    function allowance(
-        address owner,
-        address spender
-    ) external view returns (uint256) {
+    function allowance(address owner, address spender) external view returns (uint256) {
         return _allowance(_strategyStorage(), owner, spender);
     }
 
     /// @dev Internal implementation of {allowance}.
-    function _allowance(
-        StrategyData storage S,
-        address owner,
-        address spender
-    ) internal view returns (uint256) {
+    function _allowance(StrategyData storage S, address owner, address spender) internal view returns (uint256) {
         return S.allowances[owner][spender];
     }
 
@@ -1330,11 +1216,7 @@ contract MockTokenizedStrategy {
      * @param amount the quantity of shares to move.
      * @return . a boolean value indicating whether the operation succeeded.
      */
-    function transferFrom(
-        address from,
-        address to,
-        uint256 amount
-    ) external returns (bool) {
+    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
         StrategyData storage S = _strategyStorage();
         _spendAllowance(S, from, msg.sender, amount);
         _transfer(S, from, to, amount);
@@ -1357,12 +1239,7 @@ contract MockTokenizedStrategy {
      * - `from` must have a balance of at least `amount`.
      *
      */
-    function _transfer(
-        StrategyData storage S,
-        address from,
-        address to,
-        uint256 amount
-    ) internal {
+    function _transfer(StrategyData storage S, address from, address to, uint256 amount) internal {
         require(from != address(0), "ERC20: transfer from the zero address");
         require(to != address(0), "ERC20: transfer to the zero address");
         require(to != address(this), "ERC20 transfer to strategy");
@@ -1375,7 +1252,8 @@ contract MockTokenizedStrategy {
         emit Transfer(from, to, amount);
     }
 
-    /** @dev Creates `amount` tokens and assigns them to `account`, increasing
+    /**
+     * @dev Creates `amount` tokens and assigns them to `account`, increasing
      * the total supply.
      *
      * Emits a {Transfer} event with `from` set to the zero address.
@@ -1385,11 +1263,7 @@ contract MockTokenizedStrategy {
      * - `account` cannot be the zero address.
      *
      */
-    function _mint(
-        StrategyData storage S,
-        address account,
-        uint256 amount
-    ) internal {
+    function _mint(StrategyData storage S, address account, uint256 amount) internal {
         require(account != address(0), "ERC20: mint to the zero address");
 
         S.totalSupply += amount;
@@ -1410,11 +1284,7 @@ contract MockTokenizedStrategy {
      * - `account` cannot be the zero address.
      * - `account` must have at least `amount` tokens.
      */
-    function _burn(
-        StrategyData storage S,
-        address account,
-        uint256 amount
-    ) internal {
+    function _burn(StrategyData storage S, address account, uint256 amount) internal {
         require(account != address(0), "ERC20: burn from the zero address");
 
         S.balances[account] -= amount;
@@ -1437,12 +1307,7 @@ contract MockTokenizedStrategy {
      * - `owner` cannot be the zero address.
      * - `spender` cannot be the zero address.
      */
-    function _approve(
-        StrategyData storage S,
-        address owner,
-        address spender,
-        uint256 amount
-    ) internal {
+    function _approve(StrategyData storage S, address owner, address spender, uint256 amount) internal {
         require(owner != address(0), "ERC20: approve from the zero address");
         require(spender != address(0), "ERC20: approve to the zero address");
 
@@ -1458,18 +1323,10 @@ contract MockTokenizedStrategy {
      *
      * Might emit an {Approval} event.
      */
-    function _spendAllowance(
-        StrategyData storage S,
-        address owner,
-        address spender,
-        uint256 amount
-    ) internal {
+    function _spendAllowance(StrategyData storage S, address owner, address spender, uint256 amount) internal {
         uint256 currentAllowance = _allowance(S, owner, spender);
         if (currentAllowance != type(uint256).max) {
-            require(
-                currentAllowance >= amount,
-                "ERC20: insufficient allowance"
-            );
+            require(currentAllowance >= amount, "ERC20: insufficient allowance");
             unchecked {
                 _approve(S, owner, spender, currentAllowance - amount);
             }
@@ -1515,15 +1372,9 @@ contract MockTokenizedStrategy {
      * https://eips.ethereum.org/EIPS/eip-2612#specification[relevant EIP
      * section].
      */
-    function permit(
-        address owner,
-        address spender,
-        uint256 value,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) external {
+    function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s)
+        external
+    {
         require(deadline >= block.timestamp, "ERC20: PERMIT_DEADLINE_EXPIRED");
 
         // Unchecked because the only math done is incrementing
@@ -1553,10 +1404,7 @@ contract MockTokenizedStrategy {
                 s
             );
 
-            require(
-                recoveredAddress != address(0) && recoveredAddress == owner,
-                "ERC20: INVALID_SIGNER"
-            );
+            require(recoveredAddress != address(0) && recoveredAddress == owner, "ERC20: INVALID_SIGNER");
 
             _approve(_strategyStorage(), recoveredAddress, spender, value);
         }
@@ -1569,18 +1417,15 @@ contract MockTokenizedStrategy {
      * @return . The domain separator that will be used for any {permit} calls.
      */
     function DOMAIN_SEPARATOR() public view returns (bytes32) {
-        return
-            keccak256(
-                abi.encode(
-                    keccak256(
-                        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
-                    ),
-                    keccak256("Yearn Vault"),
-                    keccak256(bytes(API_VERSION)),
-                    block.chainid,
-                    address(this)
-                )
-            );
+        return keccak256(
+            abi.encode(
+                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak256("Yearn Vault"),
+                keccak256(bytes(API_VERSION)),
+                block.chainid,
+                address(this)
+            )
+        );
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity >=0.8.18;
 
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
-import { IERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
+import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 
 // Interface that implements the 4626 standard and the implementation functions
 interface ITokenizedStrategy is IERC4626, IERC20Permit {
@@ -46,9 +46,9 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
 
     function redeem(uint256 shares, address receiver, address owner, uint256 maxLoss) external returns (uint256);
 
-    function maxWithdraw(address owner, uint256 /*maxLoss*/) external view returns (uint256);
+    function maxWithdraw(address owner, uint256 /*maxLoss*/ ) external view returns (uint256);
 
-    function maxRedeem(address owner, uint256 /*maxLoss*/) external view returns (uint256);
+    function maxRedeem(address owner, uint256 /*maxLoss*/ ) external view returns (uint256);
 
     /*//////////////////////////////////////////////////////////////
                         MODIFIER HELPERS

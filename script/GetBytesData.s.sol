@@ -11,11 +11,8 @@ contract GetBytesData is Script {
     function run() public {
         vm.startBroadcast();
 
-        bytes memory data = abi.encodeWithSignature(
-            "mint(uint256,address)",
-            1e18,
-            0x4b3247099847F6a30E763dB903A9C6e63189fCde
-        );
+        bytes memory data =
+            abi.encodeWithSignature("mint(uint256,address)", 1e18, 0x4b3247099847F6a30E763dB903A9C6e63189fCde);
 
         // Log the data of the newly deployed Safe
         emit BytesData(data);

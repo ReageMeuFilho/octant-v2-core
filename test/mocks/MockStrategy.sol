@@ -3,7 +3,7 @@ pragma solidity >=0.8.18;
 
 import {MockYieldSource} from "./MockYieldSource.sol";
 import {BaseStrategy, ERC20} from "../../src/dragons/BaseStrategy.sol";
-import { Module } from "zodiac/core/Module.sol";
+import {Module} from "zodiac/core/Module.sol";
 
 contract MockStrategy is Module, BaseStrategy {
     address public yieldSource;
@@ -16,10 +16,7 @@ contract MockStrategy is Module, BaseStrategy {
     /// @dev owner of this module will the safe multisig that calls setUp function
     /// @param initializeParams Parameters of initialization encoded
     function setUp(bytes memory initializeParams) public override initializer {
-        (
-            address _owner,
-            bytes memory data
-        ) = abi.decode(initializeParams, (address, bytes));
+        (address _owner, bytes memory data) = abi.decode(initializeParams, (address, bytes));
 
         (
             address _tokenizedStrategyImplementation,
@@ -33,7 +30,16 @@ contract MockStrategy is Module, BaseStrategy {
         ) = abi.decode(data, (address, address, address, address, address, address, uint256, string));
 
         __Ownable_init(msg.sender);
-        __BaseStrategy_init(_tokenizedStrategyImplementation, _asset, _owner, _management, _keeper, _dragonRouter, _maxReportDelay, _name);
+        __BaseStrategy_init(
+            _tokenizedStrategyImplementation,
+            _asset,
+            _owner,
+            _management,
+            _keeper,
+            _dragonRouter,
+            _maxReportDelay,
+            _name
+        );
 
         yieldSource = _yieldSource;
         if (_asset != ETH) ERC20(_asset).approve(_yieldSource, type(uint256).max);
@@ -58,7 +64,7 @@ contract MockStrategy is Module, BaseStrategy {
         return (amount, MockYieldSource(yieldSource).balance() + balance);
     }
 
-    function _tend(uint256 /*_idle*/) internal override {
+    function _tend(uint256 /*_idle*/ ) internal override {
         uint256 balance = address(asset) == ETH ? address(this).balance : ERC20(asset).balanceOf(address(this));
         if (balance > 0) {
             if (address(asset) == ETH) {
@@ -85,7 +91,12 @@ contract MockStrategy is Module, BaseStrategy {
         MockYieldSource(yieldSource).withdraw(_debtOutstanding);
     }
 
-    function liquidatePosition(uint256 _amountNeeded) external override onlyManagement returns (uint256 _liquidatedAmount, uint256 _loss) {
+    function liquidatePosition(uint256 _amountNeeded)
+        external
+        override
+        onlyManagement
+        returns (uint256 _liquidatedAmount, uint256 _loss)
+    {
         MockYieldSource(yieldSource).withdraw(_amountNeeded);
         return (_amountNeeded, 0);
     }

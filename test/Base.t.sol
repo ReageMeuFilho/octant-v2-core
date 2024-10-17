@@ -2,12 +2,12 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import { TestPlus } from "solady/test/utils/TestPlus.sol";
-import { DragonModuleProxyFactory } from "../src/dragons/ModuleProxyFactory.sol";
-import { DragonVaultModule } from "../poc/dragons/DragonVaultModule.sol";
-import { TestERC20 } from "../src/test/TestERC20.sol";
+import {TestPlus} from "solady/test/utils/TestPlus.sol";
+import {DragonModuleProxyFactory} from "../src/dragons/ModuleProxyFactory.sol";
+import {DragonVaultModule} from "../poc/dragons/DragonVaultModule.sol";
+import {TestERC20} from "../src/test/TestERC20.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
-import { ISafe } from "../src/interfaces/Safe.sol";
+import {ISafe} from "../src/interfaces/Safe.sol";
 
 contract BaseTest is Test, TestPlus {
     struct testTemps {
@@ -64,7 +64,7 @@ contract BaseTest is Test, TestPlus {
         token.mint(address(proxy), 100 ether);
 
         t.safe = address(proxy);
-        (address[] memory array, ) = ISafe(address(proxy)).getModulesPaginated(address(0x1), 1);
+        (address[] memory array,) = ISafe(address(proxy)).getModulesPaginated(address(0x1), 1);
         t.module = array[0];
     }
 }

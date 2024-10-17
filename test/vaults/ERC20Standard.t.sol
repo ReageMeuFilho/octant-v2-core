@@ -2,8 +2,8 @@
 pragma solidity >=0.8.25;
 
 import "forge-std/console.sol";
-import { Setup, MockStrategy, IMockStrategy } from "./Setup.sol";
-import { VaultSharesNotTransferable } from "src/errors.sol";
+import {Setup, MockStrategy, IMockStrategy} from "./Setup.sol";
+import {VaultSharesNotTransferable} from "src/errors.sol";
 
 // Adapted from Yearn and Maple finance's ERC20 standard testing packages
 // see: https://github.com/maple-labs/erc20/blob/main/contracts/test/ERC20.t.sol
@@ -227,15 +227,8 @@ contract ERC20PermitTest is Setup {
         uint256 startingNonce = strategy.nonces(_owner);
         uint256 expectedNonce = startingNonce + 1;
 
-        (uint8 v, bytes32 r, bytes32 s) = _getValidPermitSignature(
-            address(strategy),
-            _owner,
-            _spender,
-            amount_,
-            startingNonce,
-            _deadline,
-            _skOwner
-        );
+        (uint8 v, bytes32 r, bytes32 s) =
+            _getValidPermitSignature(address(strategy), _owner, _spender, amount_, startingNonce, _deadline, _skOwner);
 
         _user.erc20_permit(address(strategy), _owner, _spender, amount_, _deadline, v, r, s);
 
@@ -250,30 +243,16 @@ contract ERC20PermitTest is Setup {
     }
 
     function test_permit_zeroAddress() public {
-        (uint8 v, bytes32 r, bytes32 s) = _getValidPermitSignature(
-            address(strategy),
-            _owner,
-            _spender,
-            1000,
-            0,
-            _deadline,
-            _skOwner
-        );
+        (uint8 v, bytes32 r, bytes32 s) =
+            _getValidPermitSignature(address(strategy), _owner, _spender, 1000, 0, _deadline, _skOwner);
 
         vm.expectRevert("ERC20: INVALID_SIGNER");
         _user.erc20_permit(address(strategy), address(0), _spender, 1000, _deadline, v, r, s);
     }
 
     function test_permit_differentSpender() public {
-        (uint8 v, bytes32 r, bytes32 s) = _getValidPermitSignature(
-            address(strategy),
-            _owner,
-            address(1111),
-            1000,
-            0,
-            _deadline,
-            _skOwner
-        );
+        (uint8 v, bytes32 r, bytes32 s) =
+            _getValidPermitSignature(address(strategy), _owner, address(1111), 1000, 0, _deadline, _skOwner);
 
         // Using permit with unintended spender should fail.
         vm.expectRevert("ERC20: INVALID_SIGNER");
@@ -281,15 +260,8 @@ contract ERC20PermitTest is Setup {
     }
 
     function test_permit_ownerSignerMismatch() public {
-        (uint8 v, bytes32 r, bytes32 s) = _getValidPermitSignature(
-            address(strategy),
-            _owner,
-            _spender,
-            1000,
-            0,
-            _deadline,
-            _skSpender
-        );
+        (uint8 v, bytes32 r, bytes32 s) =
+            _getValidPermitSignature(address(strategy), _owner, _spender, 1000, 0, _deadline, _skSpender);
 
         vm.expectRevert("ERC20: INVALID_SIGNER");
         _user.erc20_permit(address(strategy), _owner, _spender, 1000, _deadline, v, r, s);
@@ -303,15 +275,8 @@ contract ERC20PermitTest is Setup {
 
         assertEq(block.timestamp, 482112000 + 1 hours + 1);
 
-        (uint8 v, bytes32 r, bytes32 s) = _getValidPermitSignature(
-            address(strategy),
-            _owner,
-            _spender,
-            1000,
-            0,
-            expiry,
-            _skOwner
-        );
+        (uint8 v, bytes32 r, bytes32 s) =
+            _getValidPermitSignature(address(strategy), _owner, _spender, 1000, 0, expiry, _skOwner);
 
         vm.expectRevert("ERC20: PERMIT_DEADLINE_EXPIRED");
         _user.erc20_permit(address(strategy), _owner, _spender, 1000, expiry, v, r, s);
@@ -333,15 +298,8 @@ contract ERC20PermitTest is Setup {
     }
 
     function test_permit_replay() public {
-        (uint8 v, bytes32 r, bytes32 s) = _getValidPermitSignature(
-            address(strategy),
-            _owner,
-            _spender,
-            1000,
-            0,
-            _deadline,
-            _skOwner
-        );
+        (uint8 v, bytes32 r, bytes32 s) =
+            _getValidPermitSignature(address(strategy), _owner, _spender, 1000, 0, _deadline, _skOwner);
 
         // First time should succeed
         _user.erc20_permit(address(strategy), _owner, _spender, 1000, _deadline, v, r, s);
@@ -352,15 +310,8 @@ contract ERC20PermitTest is Setup {
     }
 
     function test_permit_earlyNonce() public {
-        (uint8 v, bytes32 r, bytes32 s) = _getValidPermitSignature(
-            address(strategy),
-            _owner,
-            _spender,
-            1000,
-            1,
-            _deadline,
-            _skOwner
-        );
+        (uint8 v, bytes32 r, bytes32 s) =
+            _getValidPermitSignature(address(strategy), _owner, _spender, 1000, 1, _deadline, _skOwner);
 
         // Previous nonce of 0 has not been consumed yet, so nonce of 1 should fail.
         vm.expectRevert("ERC20: INVALID_SIGNER");
@@ -370,15 +321,8 @@ contract ERC20PermitTest is Setup {
     function test_permit_differentVerifier() public {
         address someToken = setUpStrategy();
 
-        (uint8 v, bytes32 r, bytes32 s) = _getValidPermitSignature(
-            someToken,
-            _owner,
-            _spender,
-            1000,
-            0,
-            _deadline,
-            _skOwner
-        );
+        (uint8 v, bytes32 r, bytes32 s) =
+            _getValidPermitSignature(someToken, _owner, _spender, 1000, 0, _deadline, _skOwner);
 
         // Using permit with unintended verifier should fail.
         vm.expectRevert("ERC20: INVALID_SIGNER");
@@ -386,15 +330,8 @@ contract ERC20PermitTest is Setup {
     }
 
     function test_permit_badS() public {
-        (uint8 v, bytes32 r, ) = _getValidPermitSignature(
-            address(strategy),
-            _owner,
-            _spender,
-            1000,
-            0,
-            _deadline,
-            _skOwner
-        );
+        (uint8 v, bytes32 r,) =
+            _getValidPermitSignature(address(strategy), _owner, _spender, 1000, 0, _deadline, _skOwner);
 
         // Send in an s that is above the upper bound.
         bytes32 badS = bytes32(S_VALUE_INCLUSIVE_UPPER_BOUND + 1);
@@ -407,15 +344,8 @@ contract ERC20PermitTest is Setup {
         // Any other value should fail.
         // If v is 27, then 28 should make it past the MALLEABLE require, but should result in an invalid signature,
         // and vice versa when v is 28.
-        (uint8 v, bytes32 r, bytes32 s) = _getValidPermitSignature(
-            address(strategy),
-            _owner,
-            _spender,
-            1000,
-            0,
-            _deadline,
-            _skOwner
-        );
+        (uint8 v, bytes32 r, bytes32 s) =
+            _getValidPermitSignature(address(strategy), _owner, _spender, 1000, 0, _deadline, _skOwner);
 
         for (uint8 i; i <= type(uint8).max; i++) {
             if (i == type(uint8).max) {
@@ -442,25 +372,22 @@ contract ERC20PermitTest is Setup {
         uint256 nonce_,
         uint256 deadline_
     ) internal view returns (bytes32 digest_) {
-        return
-            keccak256(
-                abi.encodePacked(
-                    "\x19\x01",
-                    IMockStrategy(token_).DOMAIN_SEPARATOR(),
-                    keccak256(
-                        abi.encode(
-                            keccak256(
-                                "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
-                            ),
-                            owner_,
-                            spender_,
-                            amount_,
-                            nonce_,
-                            deadline_
-                        )
+        return keccak256(
+            abi.encodePacked(
+                "\x19\x01",
+                IMockStrategy(token_).DOMAIN_SEPARATOR(),
+                keccak256(
+                    abi.encode(
+                        keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"),
+                        owner_,
+                        spender_,
+                        amount_,
+                        nonce_,
+                        deadline_
                     )
                 )
-            );
+            )
+        );
     }
 
     // Returns a valid `permit` signature signed by this contract's `owner` address
@@ -499,12 +426,10 @@ contract ERC20User {
         return IMockStrategy(token_).transfer(recipient_, amount_);
     }
 
-    function erc20_transferFrom(
-        address token_,
-        address owner_,
-        address recipient_,
-        uint256 amount_
-    ) external returns (bool success_) {
+    function erc20_transferFrom(address token_, address owner_, address recipient_, uint256 amount_)
+        external
+        returns (bool success_)
+    {
         return IMockStrategy(token_).transferFrom(owner_, recipient_, amount_);
     }
 }

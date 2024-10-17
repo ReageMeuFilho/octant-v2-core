@@ -1,100 +1,26 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity 0.8.25;
 
-import { TokenizedStrategy, IBaseStrategy, Math, ERC20 } from "./TokenizedStrategy.sol";
-import { IDragonModule } from "../interfaces/IDragonModule.sol";
-import { VaultSharesNotTransferable, PerformanceFeeDisabled, MaxUnlockIsAlwaysZero, CantWithdrawLockedShares } from "src/errors.sol";
+import {TokenizedStrategy, IBaseStrategy, Math, ERC20} from "./TokenizedStrategy.sol";
+import {IDragonModule} from "../interfaces/IDragonModule.sol";
+import {
+    VaultSharesNotTransferable,
+    MaxUnlockIsAlwaysZero,
+    CantWithdrawLockedShares
+} from "src/errors.sol";
 
-contract DragonStrategy is TokenizedStrategy {
+contract DragonTokenizedStrategy is TokenizedStrategy {
     event NewLockupSet(address indexed user, uint256 indexed unlockTime, uint256 indexed lockedShares);
-
-    constructor(address _dragonModule) TokenizedStrategy(_dragonModule) {}
-
-    struct LockupInfo {
-        uint256 unlockTime;
-        uint256 lockedShares;
-    }
-
-    struct DragonStrategyStorageV0 {
-        address dragonModule;
-        // Mapping from user address to their lockup information
-        mapping(address => LockupInfo) voluntaryLockups;
-    }
-
-    /// keccak256(abi.encode(uint256(keccak256("dragonmodule.storage.v0")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 public constant DRAGON_STRATEGY_STORAGE_LOCATION =
-        0x5c9920b1e29ceee7a72a6a1d1314bf71f30523f55624a0abe6d215ad1e9bf100;
-
-    function _dragonStrategyStorage() internal pure returns (DragonStrategyStorageV0 storage $) {
-        bytes32 loc = DRAGON_STRATEGY_STORAGE_LOCATION;
-        assembly {
-            $.slot := loc
-        }
-    }
-
-    /**
-     * @notice Used to initialize storage for a newly deployed strategy.
-     * @dev This should be called atomically whenever a new strategy is
-     * deployed and can only be called once for each strategy.
-     *
-     * This will set all the default storage that must be set for a
-     * strategy to function. Any changes can be made post deployment
-     * through external calls from `management`.
-     *
-     * The function will also emit an event that off chain indexers can
-     * look for to track any new deployments using this TokenizedStrategy.
-     *
-     * @param _asset Address of the underlying asset.
-     * @param _name Name the strategy will use.
-     * @param _management Address to set as the strategies `management`.
-     * @param _keeper Address to set as strategies `keeper`.
-     */
 
     function initialize(
         address _asset,
         string memory _name,
+        address _owner,
         address _management,
-        address _performanceFeeRecipient,
         address _keeper,
-        address _dragonModule
+        address _dragonRouter
     ) external {
-        // Cache storage pointer.
-        StrategyData storage S = _strategyStorage();
-        DragonStrategyStorageV0 storage $ = _dragonStrategyStorage();
-        // Make sure we aren't initialized.
-        require(address(S.asset) == address(0), "initialized");
-
-        // Set the dragon module address making sure it is not address(0)
-        require(_management != address(0), "ZERO ADDRESS");
-        $.dragonModule = _dragonModule;
-
-        // Set the strategy's underlying asset.
-        S.asset = ERC20(_asset);
-        // Set the Strategy Tokens name.
-        S.name = _name;
-        // Set decimals based off the `asset`.
-        S.decimals = ERC20(_asset).decimals();
-
-        // Disable profit locking by default as all of it will be sent to the dragon router
-        S.profitMaxUnlockTime = 0;
-        // Set address to receive performance fees.
-        // Can't be address(0) or we will be burning fees.
-        // NOTE that fees are disabled by default.
-        require(_performanceFeeRecipient != address(0), "ZERO ADDRESS");
-        // Can't mint shares to its self because of profit locking.
-        require(_performanceFeeRecipient != address(this), "self");
-        S.performanceFeeRecipient = _performanceFeeRecipient;
-        // Default to no performance fee.
-        S.performanceFee = 0;
-        // Set last report to this block.
-        S.lastReport = uint96(block.timestamp);
-
-        S.management = _management;
-        // Set the keeper address
-        S.keeper = _keeper;
-
-        // Emit event to signal a new strategy has been initialized.
-        emit NewTokenizedStrategy(address(this), _asset, API_VERSION);
+        __TokenizedStrategy_init(_asset, _name, _owner, _management, _keeper, _dragonRouter);
     }
 
     /**
@@ -104,8 +30,7 @@ contract DragonStrategy is TokenizedStrategy {
      * @param totalSharesLocked The amount of shares to lock.
      */
     function _setOrExtendLockup(address user, uint256 lockupDuration, uint256 totalSharesLocked) internal {
-        DragonStrategyStorageV0 storage $ = _dragonStrategyStorage();
-        LockupInfo storage lockup = $.voluntaryLockups[user];
+        LockupInfo storage lockup = _strategyStorage().voluntaryLockups[user];
         uint256 currentTime = block.timestamp;
 
         if (lockup.unlockTime <= currentTime) {
@@ -126,12 +51,12 @@ contract DragonStrategy is TokenizedStrategy {
      * @param user The user's address.
      * @return The amount of unlocked shares.
      */
-    function _userUnlockedShares(
-        StrategyData storage S,
-        DragonStrategyStorageV0 storage $,
-        address user
-    ) internal view returns (uint256) {
-        LockupInfo memory lockup = $.voluntaryLockups[user];
+    function _userUnlockedShares(StrategyData storage S, address user)
+        internal
+        view
+        returns (uint256)
+    {
+        LockupInfo memory lockup = _strategyStorage().voluntaryLockups[user];
 
         if (block.timestamp >= lockup.unlockTime) {
             return _balanceOf(S, user);
@@ -145,10 +70,9 @@ contract DragonStrategy is TokenizedStrategy {
      * @param user The user's address.
      * @return The amount of unlocked shares.
      */
-    function unlockedShares(address user) external view returns (uint256) {
+    function unlockedShares(address user) public view returns (uint256) {
         StrategyData storage S = _strategyStorage();
-        DragonStrategyStorageV0 storage $ = _dragonStrategyStorage();
-        return _userUnlockedShares(S, $, user);
+        return _userUnlockedShares(S, user);
     }
 
     /**
@@ -157,24 +81,21 @@ contract DragonStrategy is TokenizedStrategy {
      * @return The unlock timestamp.
      */
     function getUnlockTime(address user) public view returns (uint256) {
-        DragonStrategyStorageV0 storage $ = _dragonStrategyStorage();
-
-        return $.voluntaryLockups[user].unlockTime;
+        return _strategyStorage().voluntaryLockups[user].unlockTime;
     }
 
     /// @dev Internal implementation of {maxWithdraw}.
-    function _maxWithdraw(
-        StrategyData storage S,
-        DragonStrategyStorageV0 storage $,
-        address owner
-    ) internal view returns (uint256 maxWithdraw_) {
+    function _maxWithdraw(StrategyData storage S, address _owner)
+        internal
+        view
+        override
+        returns (uint256 maxWithdraw_)
+    {
         // Get the max the owner could withdraw currently.
 
-        maxWithdraw_ = IBaseStrategy(address(this)).availableWithdrawLimit(owner);
-        maxWithdraw_ = Math.min(
-            _convertToAssets(S, _userUnlockedShares(S, $, owner), Math.Rounding.Floor),
-            maxWithdraw_
-        );
+        maxWithdraw_ = IBaseStrategy(address(this)).availableWithdrawLimit(_owner);
+        maxWithdraw_ =
+            Math.min(_convertToAssets(S, _userUnlockedShares(S, _owner), Math.Rounding.Floor), maxWithdraw_);
     }
 
     /**
@@ -182,39 +103,39 @@ contract DragonStrategy is TokenizedStrategy {
      */
     function _withdraw(
         StrategyData storage S,
-        DragonStrategyStorageV0 storage $,
         address receiver,
-        address owner,
+        address _owner,
         uint256 assets,
         uint256 shares,
         uint256 maxLoss
-    ) internal returns (uint256) {
-        LockupInfo memory lockup = $.voluntaryLockups[owner];
+    ) internal override returns (uint256) {
+        LockupInfo memory lockup = S.voluntaryLockups[_owner];
         require(
-            block.timestamp >= lockup.unlockTime || shares <= _balanceOf(S, owner) - lockup.lockedShares,
+            block.timestamp >= lockup.unlockTime || shares <= _balanceOf(S, _owner) - lockup.lockedShares,
             "Shares are locked"
         );
 
-        if (shares > _balanceOf(S, owner) - lockup.lockedShares) {
+        if (shares > _balanceOf(S, _owner) - lockup.lockedShares) {
             revert CantWithdrawLockedShares();
 
             // Withdrawing unlocked shares
         }
-        return super._withdraw(S, receiver, owner, assets, shares, maxLoss);
+        return super._withdraw(S, receiver, _owner, assets, shares, maxLoss);
     }
 
     /// @dev Internal implementation of {maxRedeem}.
-    function _maxRedeem(
-        StrategyData storage S,
-        DragonStrategyStorageV0 storage $,
-        address owner
-    ) internal view returns (uint256 maxRedeem_) {
+    function _maxRedeem(StrategyData storage S, address _owner)
+        internal
+        view
+        override
+        returns (uint256 maxRedeem_)
+    {
         // Get the max the owner could withdraw currently.
-        maxRedeem_ = IBaseStrategy(address(this)).availableWithdrawLimit(owner);
+        maxRedeem_ = IBaseStrategy(address(this)).availableWithdrawLimit(_owner);
         maxRedeem_ = Math.min(
             // Can't redeem more than the balance.
             _convertToShares(S, maxRedeem_, Math.Rounding.Floor),
-            _userUnlockedShares(S, $, owner)
+            _userUnlockedShares(S, _owner)
         );
     }
 
@@ -223,11 +144,11 @@ contract DragonStrategy is TokenizedStrategy {
      * withdrawn from the strategy by `owner`, where `owner`
      * corresponds to the msg.sender of a {redeem} call.
      *
-     * @param owner The owner of the shares.
+     * @param _owner The owner of the shares.
      * @return _maxWithdraw Max amount of `asset` that can be withdrawn.
      */
-    function maxWithdraw(address owner) external view override returns (uint256) {
-        return _maxWithdraw(_strategyStorage(), _dragonStrategyStorage(), owner);
+    function maxWithdraw(address _owner) external view override returns (uint256) {
+        return _maxWithdraw(_strategyStorage(), _owner);
     }
 
     /**
@@ -235,8 +156,8 @@ contract DragonStrategy is TokenizedStrategy {
      * @dev Accepts a `maxLoss` variable in order to match the multi
      * strategy vaults ABI.
      */
-    function maxWithdraw(address owner, uint256 /*maxLoss*/) external view override returns (uint256) {
-        return _maxWithdraw(_strategyStorage(), _dragonStrategyStorage(), owner);
+    function maxWithdraw(address _owner, uint256 /*maxLoss*/ ) external view override returns (uint256) {
+        return _maxWithdraw(_strategyStorage(), _owner);
     }
 
     /**
@@ -245,26 +166,26 @@ contract DragonStrategy is TokenizedStrategy {
      * @dev This includes an added parameter to allow for losses.
      * @param assets The amount of underlying to withdraw.
      * @param receiver The address to receive `assets`.
-     * @param owner The address whose shares are burnt.
+     * @param _owner The address whose shares are burnt.
      * @param maxLoss The amount of acceptable loss in Basis points.
      * @return shares The actual amount of shares burnt.
      */
-    function withdraw(
-        uint256 assets,
-        address receiver,
-        address owner,
-        uint256 maxLoss
-    ) public override nonReentrant returns (uint256 shares) {
+    function withdraw(uint256 assets, address receiver, address _owner, uint256 maxLoss)
+        public
+        override
+        onlyOwner
+        nonReentrant
+        returns (uint256 shares)
+    {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
-        DragonStrategyStorageV0 storage $ = _dragonStrategyStorage();
 
-        require(assets <= _maxWithdraw(S, $, owner), "ERC4626: withdraw more than max");
+        require(assets <= _maxWithdraw(S, _owner), "ERC4626: withdraw more than max");
         // Check for rounding error or 0 value.
         require((shares = _convertToShares(S, assets, Math.Rounding.Ceil)) != 0, "ZERO_SHARES");
 
         // Withdraw and track the actual amount withdrawn for loss check.
-        _withdraw(S, $, receiver, owner, assets, shares, maxLoss);
+        _withdraw(S, receiver, _owner, assets, shares, maxLoss);
     }
 
     /**
@@ -272,11 +193,11 @@ contract DragonStrategy is TokenizedStrategy {
      * redeemed from the strategy by `owner`, where `owner`
      * corresponds to the msg.sender of a {redeem} call.
      *
-     * @param owner The owner of the shares.
+     * @param _owner The owner of the shares.
      * @return _maxRedeem Max amount of shares that can be redeemed.
      */
-    function maxRedeem(address owner) external view override returns (uint256) {
-        return _maxRedeem(_strategyStorage(), _dragonStrategyStorage(), owner);
+    function maxRedeem(address _owner) external view override returns (uint256) {
+        return _maxRedeem(_strategyStorage(), _owner);
     }
 
     /**
@@ -284,8 +205,8 @@ contract DragonStrategy is TokenizedStrategy {
      * @dev Accepts a `maxLoss` variable in order to match the multi
      * strategy vaults ABI.
      */
-    function maxRedeem(address owner, uint256 /*maxLoss*/) external view override returns (uint256) {
-        return _maxRedeem(_strategyStorage(), _dragonStrategyStorage(), owner);
+    function maxRedeem(address _owner, uint256 /*maxLoss*/ ) external view override returns (uint256) {
+        return _maxRedeem(_strategyStorage(), _owner);
     }
 
     /**
@@ -294,26 +215,26 @@ contract DragonStrategy is TokenizedStrategy {
      * @dev This includes an added parameter to allow for losses.
      * @param shares The amount of shares burnt.
      * @param receiver The address to receive `assets`.
-     * @param owner The address whose shares are burnt.
+     * @param _owner The address whose shares are burnt.
      * @param maxLoss The amount of acceptable loss in Basis points.
      * @return . The actual amount of underlying withdrawn.
      */
-    function redeem(
-        uint256 shares,
-        address receiver,
-        address owner,
-        uint256 maxLoss
-    ) public override nonReentrant returns (uint256) {
+    function redeem(uint256 shares, address receiver, address _owner, uint256 maxLoss)
+        public
+        override
+        onlyOwner
+        nonReentrant
+        returns (uint256)
+    {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
-        DragonStrategyStorageV0 storage $ = _dragonStrategyStorage();
-        require(shares <= _maxRedeem(S, $, owner), "ERC4626: redeem more than max");
+        require(shares <= _maxRedeem(S, _owner), "ERC4626: redeem more than max");
         uint256 assets;
         // Check for rounding error or 0 value.
         require((assets = _convertToAssets(S, shares, Math.Rounding.Floor)) != 0, "ZERO_ASSETS");
 
         // We need to return the actual amount withdrawn in case of a loss.
-        return _withdraw(S, $, receiver, owner, assets, shares, maxLoss);
+        return _withdraw(S, receiver, _owner, assets, shares, maxLoss);
     }
 
     /**
@@ -323,11 +244,11 @@ contract DragonStrategy is TokenizedStrategy {
      * @param lockupDuration The duration of the lockup in seconds.
      * @return shares The amount of shares minted.
      */
-    function depositWithLockup(
-        uint256 assets,
-        address receiver,
-        uint256 lockupDuration
-    ) public returns (uint256 shares) {
+    function depositWithLockup(uint256 assets, address receiver, uint256 lockupDuration)
+        public
+        onlyOwner
+        returns (uint256 shares)
+    {
         require(lockupDuration > 0, "Lockup duration must be greater than 0");
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
@@ -356,7 +277,7 @@ contract DragonStrategy is TokenizedStrategy {
      * @param lockupDuration The duration of the lockup in seconds.
      * @return assets The actual amount of asset deposited.
      */
-    function mintWithLockup(uint256 shares, address receiver, uint256 lockupDuration) public returns (uint256 assets) {
+    function mintWithLockup(uint256 shares, address receiver, uint256 lockupDuration) public onlyOwner returns (uint256 assets) {
         require(lockupDuration > 0, "Lockup duration must be greater than 0");
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
@@ -394,7 +315,7 @@ contract DragonStrategy is TokenizedStrategy {
     function report() external override nonReentrant onlyKeepers returns (uint256 profit, uint256 loss) {
         // Cache storage pointer since its used repeatedly.
         StrategyData storage S = _strategyStorage();
-        DragonStrategyStorageV0 storage $ = _dragonStrategyStorage();
+        
         // Tell the strategy to report the real total assets it has.
         // It should do all reward selling and redepositing now and
         // account for deployed and loose `asset` so we can accurately
@@ -404,13 +325,7 @@ contract DragonStrategy is TokenizedStrategy {
 
         uint256 oldTotalAssets = _totalAssets(S);
 
-        // Get the amount of shares we need to burn from previous reports.
-        uint256 sharesToBurn = _unlockedShares(S);
-
-        // Initialize variables needed throughout.
-        uint256 sharesToLock;
-        uint256 totalProfitShares;
-        address dragonRouter = IDragonModule($.dragonModule).getDragonRouter();
+        address _dragonRouter = S.dragonRouter;
         // Calculate profit/loss.
         if (newTotalAssets > oldTotalAssets) {
             // We have a profit.
@@ -418,28 +333,22 @@ contract DragonStrategy is TokenizedStrategy {
                 profit = newTotalAssets - oldTotalAssets;
             }
 
-            // We need to get the equivalent amount of shares
-            // at the current PPS before any minting or burning.
-            sharesToLock = _convertToShares(S, profit, Math.Rounding.Floor);
-
-            // all of the profit is sent to the dragon router
-            totalProfitShares = sharesToLock;
-
-            _mint(S, dragonRouter, totalProfitShares);
+            _mint(S, _dragonRouter, _convertToShares(S, profit, Math.Rounding.Floor));
         } else {
             // Expect we have a loss.
             unchecked {
                 loss = oldTotalAssets - newTotalAssets;
             }
-
+            
+            uint256 sharesToBurn;
             // Check in case `else` was due to being equal.
             if (loss != 0) {
                 // We will try and burn the dragon router shares first before touching the dragon's shares.
                 sharesToBurn = Math.min(
                     // Cannot burn more than we have.
-                    S.balances[dragonRouter],
+                    S.balances[_dragonRouter],
                     // Try and burn both the shares already unlocked and the amount for the loss.
-                    _convertToShares(S, loss, Math.Rounding.Floor) + sharesToBurn
+                    _convertToShares(S, loss, Math.Rounding.Floor)
                 );
             }
 
@@ -462,46 +371,6 @@ contract DragonStrategy is TokenizedStrategy {
     }
 
     /**
-     * @notice Disables the performance fee to be charged on reported gains.
-     * @dev Can only be called by the current `management`.
-     *
-     * Denominated in Basis Points. So 100% == 10_000.
-     * Cannot set greater than to MAX_FEE.
-     *
-     */
-    function setPerformanceFee(uint16 /*_performanceFee*/) external override onlyManagement {
-        revert PerformanceFeeDisabled();
-    }
-
-    /**
-     * @notice Disables a new address to receive performance fees.
-     * @dev Can only be called by the current `management`.
-     *
-     * Cannot set to address(0).
-     *
-     */
-    function setPerformanceFeeRecipient(address /*_performanceFeeRecipient*/) external override onlyManagement {
-        revert PerformanceFeeDisabled();
-    }
-
-    /**
-     * @notice Disables setting the time for profits to be unlocked over.
-     * @dev Can only be called by the current `management`.
-     *
-     * Denominated in seconds and cannot be greater than 1 year.
-     *
-     * NOTE: Setting to 0 will cause all currently locked profit
-     * to be unlocked instantly and should be done with care.
-     *
-     * `profitMaxUnlockTime` is stored as a uint32 for packing but can
-     * be passed in as uint256 for simplicity.
-     *
-     */
-    function setProfitMaxUnlockTime(uint256 /*_profitMaxUnlockTime*/) external override onlyManagement {
-        revert MaxUnlockIsAlwaysZero();
-    }
-
-    /**
      * @notice Transfer '_amount` of shares from `msg.sender` to `to`.
      * @dev Dragon vault shares are not transferable
      * Requirements:
@@ -512,7 +381,7 @@ contract DragonStrategy is TokenizedStrategy {
      *
      * @return . a boolean value indicating whether the operation succeeded.
      */
-    function transfer(address /*to*/, uint256 /*amount*/) external override returns (bool) {
+    function transfer(address, /*to*/ uint256 /*amount*/ ) external override returns (bool) {
         revert VaultSharesNotTransferable();
     }
 
@@ -540,35 +409,7 @@ contract DragonStrategy is TokenizedStrategy {
      *
      * @return . a boolean value indicating whether the operation succeeded.
      */
-    function transferFrom(address /*from*/, address /*to*/, uint256 /*amount*/) external override returns (bool) {
+    function transferFrom(address, /*from*/ address, /*to*/ uint256 /*amount*/ ) external override returns (bool) {
         revert VaultSharesNotTransferable();
-    }
-
-    /**
-     * @notice Returns the symbol of the strategies token.
-     * @dev Will be 'ys + asset symbol'.
-     * @return . The symbol the strategy is using for its tokens.
-     */
-    function symbol() external view override returns (string memory) {
-        return string(abi.encodePacked("dgn", _strategyStorage().asset.symbol()));
-    }
-
-    /**
-     * @notice Returns the domain separator used in the encoding of the signature
-     * for {permit}, as defined by {EIP712}.
-     *
-     * @return . The domain separator that will be used for any {permit} calls.
-     */
-    function DOMAIN_SEPARATOR() public view override returns (bytes32) {
-        return
-            keccak256(
-                abi.encode(
-                    keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                    keccak256("Dragon Vault"),
-                    keccak256(bytes(API_VERSION)),
-                    block.chainid,
-                    address(this)
-                )
-            );
     }
 }

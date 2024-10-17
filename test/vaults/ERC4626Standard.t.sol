@@ -3,7 +3,7 @@ pragma solidity >=0.8.18;
 
 import "erc4626-tests/ERC4626.test.sol";
 
-import { Setup } from "./Setup.sol";
+import {Setup} from "./Setup.sol";
 
 // SEE https://github.com/a16z/erc4626-tests
 contract ERC4626StdTest is ERC4626Test, Setup {

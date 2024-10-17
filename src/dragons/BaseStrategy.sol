@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity >=0.8.18;
 
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 // TokenizedStrategy interface used for internal view delegateCalls.
-import { ITokenizedStrategy } from "../interfaces/ITokenizedStrategy.sol";
+import {ITokenizedStrategy} from "../interfaces/ITokenizedStrategy.sol";
 
 /**
  * @title Dragon Base Strategy
@@ -116,9 +116,18 @@ abstract contract BaseStrategy {
      * @param _keeper Address of keeper.
      * @param _dragonRouter Address of the dragon router.
      * @param _name Name the strategy will use.
-     * 
+     *
      */
-    function __BaseStrategy_init(address _tokenizedStrategyImplementation, address _asset, address _owner, address _management, address _keeper, address _dragonRouter, uint256 _maxReportDelay, string memory _name) internal {
+    function __BaseStrategy_init(
+        address _tokenizedStrategyImplementation,
+        address _asset,
+        address _owner,
+        address _management,
+        address _keeper,
+        address _dragonRouter,
+        uint256 _maxReportDelay,
+        string memory _name
+    ) internal {
         tokenizedStrategyImplementation = _tokenizedStrategyImplementation;
         asset = ERC20(_asset);
         maxReportDelay = _maxReportDelay;
@@ -212,7 +221,12 @@ abstract contract BaseStrategy {
     /// @param _amountNeeded Amount to be liquidated.
     /// @return _liquidatedAmount liquidated amount.
     /// @return _loss loss amount if it resulted in liquidation.
-    function liquidatePosition(uint256 _amountNeeded) external virtual onlyManagement returns (uint256 _liquidatedAmount, uint256 _loss) {}
+    function liquidatePosition(uint256 _amountNeeded)
+        external
+        virtual
+        onlyManagement
+        returns (uint256 _liquidatedAmount, uint256 _loss)
+    {}
 
     /*//////////////////////////////////////////////////////////////
                     OPTIONAL TO OVERRIDE BY STRATEGIST
@@ -291,7 +305,7 @@ abstract contract BaseStrategy {
      * @param . The address that is depositing into the strategy.
      * @return . The available amount the `_owner` can deposit in terms of `asset`
      */
-    function availableDepositLimit(address /*_owner*/) public view virtual returns (uint256) {
+    function availableDepositLimit(address /*_owner*/ ) public view virtual returns (uint256) {
         return type(uint256).max;
     }
 
@@ -313,7 +327,7 @@ abstract contract BaseStrategy {
      * @param . The address that is withdrawing from the strategy.
      * @return . The available amount that can be withdrawn in terms of `asset`
      */
-    function availableWithdrawLimit(address /*_owner*/) public view virtual returns (uint256) {
+    function availableWithdrawLimit(address /*_owner*/ ) public view virtual returns (uint256) {
         return type(uint256).max;
     }
 
@@ -382,7 +396,9 @@ abstract contract BaseStrategy {
      */
     function harvestTrigger() external view virtual returns (bool) {
         // Should not trigger if strategy is not active (no assets) or harvest has been recently called.
-        if (TokenizedStrategy.totalAssets() != 0 && (block.timestamp - TokenizedStrategy.lastReport()) >= maxReportDelay) return true;
+        if (
+            TokenizedStrategy.totalAssets() != 0 && (block.timestamp - TokenizedStrategy.lastReport()) >= maxReportDelay
+        ) return true;
 
         // Check for idle funds in the strategy and deposit in the farm.
         return (address(asset) == ETH ? address(this).balance : asset.balanceOf(address(this))) > 0;
@@ -414,7 +430,7 @@ abstract contract BaseStrategy {
      *
      * We name the function `tendThis` so that `tend` calls are forwarded to
      * the TokenizedStrategy.
-
+     *
      * @param _totalIdle The amount of current idle funds that can be
      * deployed during the tend
      */
@@ -494,12 +510,8 @@ abstract contract BaseStrategy {
             returndatacopy(0, 0, returndatasize())
             // Return any return value or error back to the caller
             switch result
-            case 0 {
-                revert(0, returndatasize())
-            }
-            default {
-                return(0, returndatasize())
-            }
+            case 0 { revert(0, returndatasize()) }
+            default { return(0, returndatasize()) }
         }
     }
 }

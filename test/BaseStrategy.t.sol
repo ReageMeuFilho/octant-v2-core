@@ -2,11 +2,11 @@
 pragma solidity ^0.8.13;
 
 import "./Base.t.sol";
-import { MockStrategy } from "./mocks/MockStrategy.sol";
-import { MockYieldSource } from "./mocks/MockYieldSource.sol";
-import { MockTokenizedStrategy } from "./mocks/MockTokenizedStrategy.sol";
+import {MockStrategy} from "./mocks/MockStrategy.sol";
+import {MockYieldSource} from "./mocks/MockYieldSource.sol";
+import {MockTokenizedStrategy} from "./mocks/MockTokenizedStrategy.sol";
 
-import { ITokenizedStrategy } from "../src/interfaces/ITokenizedStrategy.sol";
+import {ITokenizedStrategy} from "../src/interfaces/ITokenizedStrategy.sol";
 
 contract BaseStrategyTest is BaseTest {
     address keeper = makeAddr("keeper");
@@ -32,7 +32,16 @@ contract BaseStrategyTest is BaseTest {
         tokenizedStrategyImplementation = new MockTokenizedStrategy();
         temps = _testTemps(
             address(moduleImplementation),
-            abi.encode(address(tokenizedStrategyImplementation), ETH, address(yieldSource), management, keeper, dragonRouter, maxReportDelay, name)
+            abi.encode(
+                address(tokenizedStrategyImplementation),
+                ETH,
+                address(yieldSource),
+                management,
+                keeper,
+                dragonRouter,
+                maxReportDelay,
+                name
+            )
         );
         module = MockStrategy(payable(temps.module));
     }
@@ -82,7 +91,7 @@ contract BaseStrategyTest is BaseTest {
         vm.startPrank(temps.safe);
 
         assertTrue(module.availableWithdrawLimit(temps.safe) == type(uint256).max);
-        
+
         assertTrue(ITokenizedStrategy(address(module)).balanceOf(temps.safe) == amount);
         assertTrue(address(yieldSource).balance == amount);
         ITokenizedStrategy(address(module)).withdraw(withdrawAmount, temps.safe, temps.safe, type(uint256).max);
@@ -99,7 +108,7 @@ contract BaseStrategyTest is BaseTest {
         // deposit funds in the strategy
         uint256 amount = 1 ether;
         _deposit(amount);
-        
+
         // should return false if strategy has funds but report has been called recently
         assertTrue(!module.harvestTrigger());
 
@@ -122,6 +131,7 @@ contract BaseStrategyTest is BaseTest {
         ITokenizedStrategy(address(module)).report();
         assertTrue(dragonRouter.balance == harvestedAmount);
     }
+
     function testTendThis() public {
         // tend works only through keepers
         vm.expectRevert("!keeper");
@@ -129,12 +139,11 @@ contract BaseStrategyTest is BaseTest {
 
         vm.startPrank(keeper);
 
-
         uint256 idleFunds = 1 ether;
         vm.deal(address(module), idleFunds);
 
         module.setTrigger(true);
-        (bool tendTrigger, ) = module.tendTrigger();
+        (bool tendTrigger,) = module.tendTrigger();
         assertTrue(tendTrigger == true);
 
         assertTrue(address(module).balance == idleFunds);

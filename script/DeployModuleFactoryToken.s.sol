@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { DragonModuleProxyFactory } from "../src/dragons/ModuleProxyFactory.sol";
-import { VaultModule } from "../src/vaults/VaultModule.sol";
-import { TestERC20 } from "../src/test/TestERC20.sol";
+import {DragonModuleProxyFactory} from "../src/dragons/ModuleProxyFactory.sol";
+import {VaultModule} from "../src/vaults/VaultModule.sol";
+import {TestERC20} from "../src/test/TestERC20.sol";
 import "forge-std/Script.sol";
 
 contract DeployModuleFactoryTestToken is Script {

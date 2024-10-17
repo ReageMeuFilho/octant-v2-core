@@ -2,7 +2,7 @@
 pragma solidity >=0.8.18;
 
 import "forge-std/console.sol";
-import { Setup, IMockStrategy } from "./Setup.sol";
+import {Setup, IMockStrategy} from "./Setup.sol";
 
 contract AccountingTest is Setup {
     function setUp() public override {
@@ -45,11 +45,9 @@ contract AccountingTest is Setup {
         checkStrategyTotals(strategy, 0, 0, 0, 0);
     }
 
-    function test_airdropDoesNotIncreasePPS_reportRecordsIt(
-        address _address,
-        uint256 _amount,
-        uint16 _profitFactor
-    ) public {
+    function test_airdropDoesNotIncreasePPS_reportRecordsIt(address _address, uint256 _amount, uint16 _profitFactor)
+        public
+    {
         _amount = bound(_amount, minFuzzAmount, maxFuzzAmount);
         _profitFactor = uint16(bound(uint256(_profitFactor), 10, MAX_BPS));
         vm.assume(_address != address(0) && _address != address(strategy) && _address != address(yieldSource));
@@ -77,7 +75,7 @@ contract AccountingTest is Setup {
         // process a report to realize the gain from the airdrop
         uint256 profit;
         vm.prank(keeper);
-        (profit, ) = strategy.report();
+        (profit,) = strategy.report();
 
         assertEq(strategy.pricePerShare(), pricePerShare);
         assertEq(profit, toAirdrop);
@@ -184,7 +182,7 @@ contract AccountingTest is Setup {
         // process a report to realize the gain from the airdrop
         uint256 profit;
         vm.prank(keeper);
-        (profit, ) = strategy.report();
+        (profit,) = strategy.report();
 
         assertEq(strategy.pricePerShare(), pricePerShare);
         assertEq(profit, toAirdrop);
@@ -224,7 +222,7 @@ contract AccountingTest is Setup {
         checkStrategyTotals(strategy, toAirdrop, toAirdrop, 0, dragonRouterShares);
         // calling report again should assign profit to the dragon router
         vm.prank(keeper);
-        (profit, ) = strategy.report();
+        (profit,) = strategy.report();
         dragonRouterShares = strategy.balanceOf(address(mockDragonRouter));
         assertEq(dragonRouterShares, strategy.convertToShares(toAirdrop * 2));
 
@@ -296,7 +294,9 @@ contract AccountingTest is Setup {
         strategy.withdraw(_amount, _address, _address);
     }
 
-    function test_withdrawWithUnrealizedLoss_withMaxLoss(address _address, uint256 _amount, uint16 _lossFactor) public {
+    function test_withdrawWithUnrealizedLoss_withMaxLoss(address _address, uint256 _amount, uint16 _lossFactor)
+        public
+    {
         _amount = bound(_amount, minFuzzAmount, maxFuzzAmount);
         _lossFactor = uint16(bound(uint256(_lossFactor), 10, MAX_BPS));
         vm.assume(_address != address(0) && _address != address(strategy) && _address != address(yieldSource));
@@ -346,11 +346,9 @@ contract AccountingTest is Setup {
         checkStrategyTotals(strategy, 0, 0, 0, 0);
     }
 
-    function test_redeemWithUnrealizedLoss_allowNoLoss_reverts(
-        address _address,
-        uint256 _amount,
-        uint16 _lossFactor
-    ) public {
+    function test_redeemWithUnrealizedLoss_allowNoLoss_reverts(address _address, uint256 _amount, uint16 _lossFactor)
+        public
+    {
         _amount = bound(_amount, minFuzzAmount, maxFuzzAmount);
         _lossFactor = uint16(bound(uint256(_lossFactor), 10, MAX_BPS));
         vm.assume(_address != address(0) && _address != address(strategy) && _address != address(yieldSource));
@@ -367,7 +365,9 @@ contract AccountingTest is Setup {
         strategy.redeem(_amount, _address, _address, 0);
     }
 
-    function test_redeemWithUnrealizedLoss_customMaxLoss(address _address, uint256 _amount, uint16 _lossFactor) public {
+    function test_redeemWithUnrealizedLoss_customMaxLoss(address _address, uint256 _amount, uint16 _lossFactor)
+        public
+    {
         _amount = bound(_amount, minFuzzAmount, maxFuzzAmount);
         _lossFactor = uint16(bound(uint256(_lossFactor), 10, MAX_BPS));
         vm.assume(_address != address(0) && _address != address(strategy) && _address != address(yieldSource));

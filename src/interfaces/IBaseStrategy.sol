@@ -8,19 +8,15 @@ interface IBaseStrategy {
                             IMMUTABLE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    function availableDepositLimit(
-        address _owner
-    ) external view returns (uint256);
+    function availableDepositLimit(address _owner) external view returns (uint256);
 
-    function availableWithdrawLimit(
-        address _owner
-    ) external view returns (uint256);
+    function availableWithdrawLimit(address _owner) external view returns (uint256);
 
     function deployFunds(uint256 _assets) external;
 
     function freeFunds(uint256 _amount) external;
 
-    function harvestAndReport() external returns (uint256, uint256);
+    function harvestAndReport() external returns (uint256);
 
     function tendThis(uint256 _totalIdle) external;
 

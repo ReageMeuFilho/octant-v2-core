@@ -3,36 +3,35 @@ pragma solidity >=0.8.25;
 
 import "forge-std/console.sol";
 
-import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
-import { ERC20Mock } from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {ERC20Mock} from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 
-import { ExtendedTest } from "./ExtendedTest.sol";
-import { MockFactory } from "../mocks/MockFactory.sol";
-import { MockStrategy, MockYieldSource } from "../mocks/MockStrategy.sol";
-import { IMockStrategy } from "../mocks/IMockStrategy.sol";
-import { MockDragonModule } from "../mocks/MockDragonModule.sol";
-import { MockDragonRouter } from "../mocks/MockDragonRouter.sol";
+import {ExtendedTest} from "./ExtendedTest.sol";
+import {MockStrategy} from "../mocks/MockStrategy.sol";
+import {MockYieldSource} from "../mocks/MockYieldSource.sol";
+import {IMockStrategy} from "../mocks/IMockStrategy.sol";
+import {MockDragonRouter} from "../mocks/MockDragonRouter.sol";
 
-import { IEvents } from "src/interfaces/IEvents.sol";
-import { DragonStrategy } from "src/dragons/DragonStrategy.sol";
+import {IEvents} from "src/interfaces/IEvents.sol";
+import {DragonTokenizedStrategy} from "src/dragons/DragonTokenizedStrategy.sol";
 
 contract Setup is ExtendedTest, IEvents {
     // Contract instances that we will use repeatedly.
     ERC20Mock public asset;
     IMockStrategy public strategy;
-    MockFactory public mockFactory;
+    MockStrategy public mockStrategyImplementation;
     MockYieldSource public yieldSource;
-    DragonStrategy public tokenizedStrategy;
-    MockDragonModule public mockDragonModule;
+    DragonTokenizedStrategy public tokenizedStrategy;
     MockDragonRouter public mockDragonRouter;
+
+    string public name = "Test Mock Strategy";
+    uint256 public maxReportDelay = 9;
 
     // Addresses for different roles we will use repeatedly.
     address public user = address(1);
     address public keeper = address(2);
     address public management = address(3);
     address public emergencyAdmin = address(4);
-    address public protocolFeeRecipient = address(5);
-    address public performanceFeeRecipient = address(6);
     address public metaPool = address(7);
 
     // Integer variables that will be used repeatedly.
@@ -44,14 +43,11 @@ contract Setup is ExtendedTest, IEvents {
     uint256 public minFuzzAmount = 10_000;
     uint256 public profitMaxUnlockTime = 10 days;
 
-    bytes32 public constant BASE_STRATEGY_STORAGE = bytes32(uint256(keccak256("yearn.base.strategy.storage")) - 1);
-
-    function setUp() public virtual {
-        // Deploy the mock factory first for deterministic location
-        mockFactory = new MockFactory(0, protocolFeeRecipient);
-
+    function setUp() public virtual override {
         // Deploy the implementation for deterministic location
-        tokenizedStrategy = new DragonStrategy(address(mockFactory));
+        tokenizedStrategy = new DragonTokenizedStrategy();
+
+        mockStrategyImplementation = new MockStrategy();
 
         // create asset we will be using as the underlying asset
         asset = new ERC20Mock();
@@ -61,7 +57,6 @@ contract Setup is ExtendedTest, IEvents {
 
         // create a mock dragon module and router
         mockDragonRouter = new MockDragonRouter(address(asset), metaPool, management);
-        mockDragonModule = new MockDragonModule(address(asset), address(mockDragonRouter));
 
         // Deploy strategy and set variables
         strategy = IMockStrategy(setUpStrategy());
@@ -72,32 +67,26 @@ contract Setup is ExtendedTest, IEvents {
         vm.label(management, "management");
         vm.label(address(strategy), "strategy");
         vm.label(emergencyAdmin, "emergency admin");
-        vm.label(address(mockFactory), "mock Factory");
         vm.label(address(yieldSource), "Mock Yield Source");
         vm.label(address(tokenizedStrategy), "tokenized Logic");
-        vm.label(protocolFeeRecipient, "Protocol Fee Recipient");
-        vm.label(performanceFeeRecipient, "Performance Fee Recipient");
     }
 
     function setUpStrategy() public returns (address) {
-        // we save the mock base strategy as a IMockStrategy to give it the needed interface
-        IMockStrategy _strategy = IMockStrategy(
-            address(new MockStrategy(address(asset), address(yieldSource), address(mockDragonModule)))
+        testTemps memory temps = _testTemps(
+            address(mockStrategyImplementation),
+            abi.encode(
+                address(tokenizedStrategy),
+                address(asset),
+                address(yieldSource),
+                management,
+                keeper,
+                address(mockDragonRouter),
+                maxReportDelay,
+                name
+            )
         );
 
-        // set keeper
-        _strategy.setKeeper(keeper);
-        // set the emergency admin
-        _strategy.setEmergencyAdmin(emergencyAdmin);
-        // set treasury
-        // _strategy.setPerformanceFeeRecipient(performanceFeeRecipient);
-        // set management of the strategy
-        _strategy.setPendingManagement(management);
-
-        vm.prank(management);
-        _strategy.acceptManagement();
-
-        return address(_strategy);
+        return address(temps.module);
     }
 
     function mintAndDepositIntoStrategy(IMockStrategy _strategy, address _user, uint256 _amount) public {
@@ -129,12 +118,9 @@ contract Setup is ExtendedTest, IEvents {
     }
 
     // For checks without totalSupply while profit is unlocking
-    function checkStrategyTotals(
-        IMockStrategy _strategy,
-        uint256 _totalAssets,
-        uint256 _totalDebt,
-        uint256 _totalIdle
-    ) public {
+    function checkStrategyTotals(IMockStrategy _strategy, uint256 _totalAssets, uint256 _totalDebt, uint256 _totalIdle)
+        public
+    {
         uint256 _assets = _strategy.totalAssets();
         uint256 _balance = ERC20Mock(_strategy.asset()).balanceOf(address(_strategy));
         uint256 _idle = _balance > _assets ? _assets : _balance;
@@ -148,15 +134,14 @@ contract Setup is ExtendedTest, IEvents {
     function createAndCheckProfit(
         IMockStrategy _strategy,
         uint256 profit,
-        uint256 _protocolFees,
-        uint256 _performanceFees
+        uint256 _protocolFees
     ) public {
         uint256 startingAssets = _strategy.totalAssets();
         asset.mint(address(_strategy), profit);
 
         // Check the event matches the expected values
         vm.expectEmit(true, true, true, true, address(_strategy));
-        emit Reported(profit, 0, _protocolFees, _performanceFees);
+        emit Reported(profit, 0, _protocolFees, 0);
 
         vm.prank(keeper);
         (uint256 _profit, uint256 _loss) = _strategy.report();
@@ -189,21 +174,5 @@ contract Setup is ExtendedTest, IEvents {
         skip(_time);
         // We give a buffer or 1 wei for rounding
         assertApproxEq(_strategy.balanceOf(address(_strategy)), _buffer, 1, "!Buffer");
-    }
-
-    function setFees(uint16 _protocolFee, uint16 _performanceFee) public {
-        mockFactory.setFee(_protocolFee);
-
-        vm.prank(management);
-        strategy.setPerformanceFee(_performanceFee);
-    }
-
-    function _strategyStorage() internal pure returns (DragonStrategy.StrategyData storage S) {
-        // Since STORAGE_SLOT is a constant, we have to put a variable
-        // on the stack to access it from an inline assembly block.
-        bytes32 slot = BASE_STRATEGY_STORAGE;
-        assembly {
-            S.slot := slot
-        }
     }
 }

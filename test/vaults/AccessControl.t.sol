@@ -2,8 +2,8 @@
 pragma solidity >=0.8.18;
 
 import "forge-std/console.sol";
-import { Setup } from "./Setup.sol";
-import { PerformanceFeeDisabled, MaxUnlockIsAlwaysZero } from "src/errors.sol";
+import {Setup} from "./Setup.sol";
+import {PerformanceFeeDisabled, MaxUnlockIsAlwaysZero} from "src/errors.sol";
 
 contract AccessControlTest is Setup {
     function setUp() public override {
@@ -39,44 +39,6 @@ contract AccessControlTest is Setup {
         strategy.setKeeper(_address);
 
         assertEq(strategy.keeper(), _address);
-    }
-
-    function test_setPerformanceFee(uint16 _amount) public {
-        _amount = uint16(bound(_amount, 500, 5_000));
-
-        vm.prank(management);
-        vm.expectRevert(abi.encodeWithSelector(PerformanceFeeDisabled.selector));
-        strategy.setPerformanceFee(_amount);
-
-        assertEq(strategy.performanceFee(), 0);
-    }
-
-    function test_setPerformanceFeeRecipient(address _address) public {
-        vm.assume(_address != performanceFeeRecipient && _address != address(0) && _address != address(strategy));
-
-        vm.prank(management);
-        vm.expectRevert(abi.encodeWithSelector(PerformanceFeeDisabled.selector));
-        strategy.setPerformanceFeeRecipient(_address);
-        console.log(strategy.performanceFeeRecipient());
-        console.log(address(this));
-        console.log(address(strategy));
-        console.log(_address);
-        console.log(address(mockFactory));
-
-        console.log(address(mockDragonModule));
-        console.log(address(mockDragonRouter));
-        assertEq(strategy.performanceFeeRecipient(), address(mockDragonModule));
-    }
-
-    function test_setProfitMaxUnlockTime(uint32 _amount) public {
-        // Must be less than 1 year
-        uint256 amount = bound(uint256(_amount), 1, 31_556_952);
-
-        vm.prank(management);
-        vm.expectRevert(abi.encodeWithSelector(MaxUnlockIsAlwaysZero.selector));
-        strategy.setProfitMaxUnlockTime(amount);
-
-        assertEq(strategy.profitMaxUnlockTime(), 0);
     }
 
     function test_shutdown() public {
@@ -136,62 +98,6 @@ contract AccessControlTest is Setup {
         assertEq(strategy.keeper(), _keeper);
     }
 
-    function test_settingPerformanceFee_reverts(address _address, uint16 _amount) public {
-        _amount = uint16(bound(_amount, 500, 5_000));
-        vm.assume(_address != management);
-
-        uint256 _performanceFee = strategy.performanceFee();
-
-        vm.prank(_address);
-        vm.expectRevert("!management");
-        strategy.setPerformanceFee(_amount);
-        assertEq(strategy.performanceFee(), 0);
-
-        vm.prank(management);
-        vm.expectRevert(abi.encodeWithSelector(PerformanceFeeDisabled.selector));
-        strategy.setPerformanceFee(uint16(_amount + 5_001));
-    }
-
-    function test_settingPerformanceFeeRecipient_reverts(address _address) public {
-        vm.assume(_address != management && _address != address(strategy));
-
-        address _performanceFeeRecipient = strategy.performanceFeeRecipient();
-
-        vm.prank(_address);
-
-        vm.expectRevert("!management");
-        strategy.setPerformanceFeeRecipient(address(69));
-
-        vm.prank(management);
-
-        vm.expectRevert(abi.encodeWithSelector(PerformanceFeeDisabled.selector));
-        strategy.setPerformanceFeeRecipient(address(strategy));
-
-        assertEq(strategy.performanceFeeRecipient(), _performanceFeeRecipient);
-    }
-
-    function test_settingProfitMaxUnlockTime_reverts(address _address, uint32 _amount, uint256 _badAmount) public {
-        // Must be less than 1 year
-        uint256 amount = bound(uint256(_amount), 1, 31_556_952);
-        _badAmount = bound(_badAmount, 31_556_952 + 1, type(uint256).max);
-        vm.assume(_address != management);
-
-        uint256 profitMaxUnlockTime = strategy.profitMaxUnlockTime();
-
-        vm.prank(_address);
-        vm.expectRevert("!management");
-        strategy.setProfitMaxUnlockTime(amount);
-
-        assertEq(strategy.profitMaxUnlockTime(), profitMaxUnlockTime);
-
-        // Can't be more than 1 year of seconds
-        vm.prank(management);
-        vm.expectRevert(abi.encodeWithSelector(MaxUnlockIsAlwaysZero.selector));
-        strategy.setProfitMaxUnlockTime(_badAmount);
-
-        assertEq(strategy.profitMaxUnlockTime(), profitMaxUnlockTime);
-    }
-
     function test_shutdown_reverts(address _address) public {
         vm.assume(_address != management && _address != emergencyAdmin);
         assertTrue(!strategy.isShutdown());
@@ -223,7 +129,7 @@ contract AccessControlTest is Setup {
         assertEq(tokenizedStrategy.keeper(), address(0));
 
         vm.expectRevert("initialized");
-        tokenizedStrategy.initialize(address(asset), name_, _address, _address, _address);
+        tokenizedStrategy.initialize(address(asset), name_, _address, _address, _address, address(mockDragonRouter));
 
         assertEq(tokenizedStrategy.management(), address(0));
         assertEq(tokenizedStrategy.keeper(), address(0));

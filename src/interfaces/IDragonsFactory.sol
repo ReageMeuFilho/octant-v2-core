@@ -17,9 +17,7 @@ interface IDragonsFactory {
      * @param   epochsGuardian  A guardian that defines rules and conditions for capital flows
      * @return  dragon  Returns an address of the dragon
      */
-    function createDragon(
-        address governingToken,
-        address octantRouter,
-        address epochsGuardian
-    ) external returns (address dragon);
+    function createDragon(address governingToken, address octantRouter, address epochsGuardian)
+        external
+        returns (address dragon);
 }

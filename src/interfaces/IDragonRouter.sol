@@ -4,7 +4,8 @@ pragma solidity ^0.8.25;
 
 /**
  * @dev     In charge of splitting yield profits from dragon strategy, in case of a loss strategy burns shares owned by the dragon module
- * @notice  Interface for the Dragon Router Contract */
+ * @notice  Interface for the Dragon Router Contract
+ */
 interface IDragonRouter {
     /**
      * @dev Distributes new splits to all shareholders.
