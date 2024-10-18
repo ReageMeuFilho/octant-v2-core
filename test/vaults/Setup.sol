@@ -71,6 +71,9 @@ contract Setup is ExtendedTest, IEvents {
         // Deploy strategy and set variables
         strategy = IMockStrategy(setUpStrategy());
 
+        vm.prank(management);
+        strategy.setEmergencyAdmin(emergencyAdmin);
+
         // label all the used addresses for traces
         vm.label(keeper, "keeper");
         vm.label(address(asset), "asset");

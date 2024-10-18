@@ -1087,6 +1087,14 @@ contract TokenizedStrategy {
         emit UpdateEmergencyAdmin(_emergencyAdmin);
     }
 
+    /**
+     * @notice Updates the name for the strategy.
+     * @param _name The new name for the strategy.
+     */
+    function setName(string calldata _name) external virtual onlyManagement {
+        _strategyStorage().name = _name;
+    }
+
     /*//////////////////////////////////////////////////////////////
                         ERC20 METHODS
     //////////////////////////////////////////////////////////////*/

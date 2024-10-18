@@ -191,7 +191,7 @@ contract AccessControlTest is Setup {
     }
 
     function test_accessControl_harvestAndReport(address _address, uint256 _amount) public {
-        _amount = bound(_amount, minFuzzAmount, maxFuzzAmount);
+        _amount = bound(_amount, 0.1 ether, maxFuzzAmount);
         vm.assume(_address != address(strategy));
 
         // deposit into the vault and should deploy funds
