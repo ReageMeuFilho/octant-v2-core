@@ -14,6 +14,8 @@ contract TestTraderRandomness is BaseTest {
     Trader public moduleImplementation;
     Trader public trader;
 
+    string constant deadlineFn = "./cache/test-artifacts/deadline.csv";
+
     function setUp() public override {
         configure(false);
         moduleImplementation = new Trader();
@@ -28,6 +30,8 @@ contract TestTraderRandomness is BaseTest {
     function wrapBuy() public returns (bool) {
         vm.roll(block.number + 1);
         try trader.convert(block.number - 1) {
+            string memory currentBudget = vm.toString((trader.budget()-trader.spent()) / 1e15);
+            vm.writeLine(deadlineFn, string(abi.encodePacked(vm.toString(block.number),",",currentBudget)));
             return true;
         } catch (bytes memory) /*lowLevelData*/ {
             return false;
@@ -39,7 +43,14 @@ contract TestTraderRandomness is BaseTest {
         require(sent, "Failed to send Ether");
     }
 
+    function concat(string memory _a, string memory _b) public pure returns (string memory) {
+        return string(abi.encodePacked(_a, _b));
+    }
+
     function test_deadline() external {
+        if (vm.exists(deadlineFn)) {
+            vm.removeFile(deadlineFn);
+        }
         uint256 blocks = 100_000;
         vm.startPrank(temps.safe);
         trader.setSpendADay(0.6 ether, 1.4 ether, budget, block.number + blocks);
