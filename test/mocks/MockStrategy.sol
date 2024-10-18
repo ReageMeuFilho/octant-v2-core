@@ -50,7 +50,8 @@ contract MockStrategy is Module, BaseStrategy {
     }
 
     function _deployFunds(uint256 _amount) internal override {
-        MockYieldSource(yieldSource).deposit{value: _amount}(_amount);
+        if (address(asset) == ETH) MockYieldSource(yieldSource).deposit{value: _amount}(_amount);
+        else MockYieldSource(yieldSource).deposit(_amount);
     }
 
     function _freeFunds(uint256 _amount) internal override {

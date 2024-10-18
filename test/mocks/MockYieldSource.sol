@@ -39,7 +39,7 @@ contract MockYieldSource {
         }
         ERC20(asset).transfer(msg.sender, _amount);
     }
-    
+
     function simulateLoss(uint256 _amount) public {
         ERC20(asset).transfer(msg.sender, _amount);
     }

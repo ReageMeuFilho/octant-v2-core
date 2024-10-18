@@ -30,7 +30,7 @@ contract Setup is ExtendedTest, IEvents {
     uint256 public maxReportDelay = 9;
 
     // Addresses for different roles we will use repeatedly.
-    address public user = address(1);
+    address public user;
     address public keeper = address(2);
     address public management = address(3);
     address public emergencyAdmin = address(4);
@@ -95,7 +95,7 @@ contract Setup is ExtendedTest, IEvents {
                 name
             )
         );
-
+        user = temps.safe;
         return address(temps.module);
     }
 
@@ -141,11 +141,7 @@ contract Setup is ExtendedTest, IEvents {
         assertEq(_totalAssets, _totalDebt + _totalIdle, "!Added");
     }
 
-    function createAndCheckProfit(
-        IMockStrategy _strategy,
-        uint256 profit,
-        uint256 _protocolFees
-    ) public {
+    function createAndCheckProfit(IMockStrategy _strategy, uint256 profit, uint256 _protocolFees) public {
         uint256 startingAssets = _strategy.totalAssets();
         asset.mint(address(_strategy), profit);
 

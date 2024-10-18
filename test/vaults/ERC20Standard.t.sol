@@ -17,63 +17,53 @@ contract ERC20BaseTest is Setup {
         super.setUp();
     }
 
-    function test_metadata() public {
+    function test_metadata() public view {
         assertEq(strategy.name(), "Test Mock Strategy");
         assertEq(strategy.symbol(), string(abi.encodePacked("dgn", asset.symbol())));
         assertEq(strategy.decimals(), 18);
-        assertEq(strategy.apiVersion(), "3.0.3");
+        assertEq(strategy.apiVersion(), "1.0.0");
     }
 
-    function testFuzz_mint(address account_, uint256 amount_) public {
-        vm.assume(account_ != address(0) && account_ != address(strategy));
+    function testFuzz_mint(uint256 amount_) public {
         amount_ = bound(amount_, minFuzzAmount, maxFuzzAmount);
 
-        vm.prank(address(strategy));
-        mintAndDepositIntoStrategy(strategy, account_, amount_);
+        mintAndDepositIntoStrategy(strategy, user, amount_);
 
         assertEq(strategy.totalSupply(), amount_);
-        assertEq(strategy.balanceOf(account_), amount_);
+        assertEq(strategy.balanceOf(user), amount_);
     }
 
-    function testFuzz_burn(address account_, uint256 amount0_, uint256 amount1_) public {
-        vm.assume(account_ != address(0) && account_ != address(strategy));
+    function testFuzz_burn(uint256 amount0_, uint256 amount1_) public {
         amount0_ = bound(amount0_, minFuzzAmount + 1, maxFuzzAmount);
         amount1_ = bound(amount1_, minFuzzAmount, amount0_);
 
-        mintAndDepositIntoStrategy(strategy, account_, amount0_);
-        vm.prank(account_);
-        strategy.withdraw(amount1_, account_, account_);
+        mintAndDepositIntoStrategy(strategy, user, amount0_);
+        vm.prank(user);
+        strategy.withdraw(amount1_, user, user);
 
         assertEq(strategy.totalSupply(), amount0_ - amount1_);
-        assertEq(strategy.balanceOf(account_), amount0_ - amount1_);
+        assertEq(strategy.balanceOf(user), amount0_ - amount1_);
     }
 
-    function testFuzz_approve(address account_, uint256 amount_) public {
-        vm.assume(account_ != address(0) && account_ != address(strategy));
+    function testFuzz_approve(uint256 amount_) public {
         amount_ = bound(amount_, minFuzzAmount, maxFuzzAmount);
 
-        assertTrue(strategy.approve(account_, amount_));
+        assertTrue(strategy.approve(user, amount_));
 
-        assertEq(strategy.allowance(self, account_), amount_);
+        assertEq(strategy.allowance(self, user), amount_);
     }
 
-    function testFuzz_transfer(address account_, uint256 amount_) public {
-        vm.assume(account_ != address(0) && account_ != address(strategy));
+    function testFuzz_transfer(uint256 amount_) public {
         amount_ = bound(amount_, minFuzzAmount, maxFuzzAmount);
 
-        mintAndDepositIntoStrategy(strategy, self, amount_);
+        mintAndDepositIntoStrategy(strategy, user, amount_);
 
         vm.expectRevert(abi.encodeWithSelector(VaultSharesNotTransferable.selector));
-        strategy.transfer(account_, amount_);
+        strategy.transfer(user, amount_);
 
         assertEq(strategy.totalSupply(), amount_);
 
-        if (self == account_) {
-            assertEq(strategy.balanceOf(self), amount_);
-        } else {
-            assertEq(strategy.balanceOf(self), amount_);
-            assertEq(strategy.balanceOf(account_), 0);
-        }
+        assertEq(strategy.balanceOf(user), amount_);   
     }
 
     function testFuzz_transferFrom(address recipient_, uint256 approval_, uint256 amount_) public {
@@ -82,11 +72,12 @@ contract ERC20BaseTest is Setup {
         amount_ = bound(amount_, minFuzzAmount, maxFuzzAmount);
         approval_ = bound(approval_, amount_, type(uint256).max - 1);
 
-        ERC20User owner = new ERC20User();
+        ERC20User owner = ERC20User(user);
 
         mintAndDepositIntoStrategy(strategy, address(owner), amount_);
 
-        owner.erc20_approve(address(strategy), self, approval_);
+        vm.prank(address(owner));
+        strategy.approve(self, approval_);
 
         vm.expectRevert(abi.encodeWithSelector(VaultSharesNotTransferable.selector));
         strategy.transferFrom(address(owner), recipient_, amount_);
@@ -95,12 +86,8 @@ contract ERC20BaseTest is Setup {
 
         assertEq(strategy.allowance(address(owner), self), approval_);
 
-        if (address(owner) == recipient_) {
-            assertEq(strategy.balanceOf(address(owner)), amount_);
-        } else {
-            assertEq(strategy.balanceOf(address(owner)), amount_);
-            assertEq(strategy.balanceOf(recipient_), 0);
-        }
+        assertEq(strategy.balanceOf(address(owner)), amount_);
+        assertEq(strategy.balanceOf(recipient_), 0);
     }
 
     function testFuzz_transferFrom_infiniteApproval(address recipient_, uint256 amount_) public {
@@ -109,45 +96,42 @@ contract ERC20BaseTest is Setup {
 
         amount_ = bound(amount_, minFuzzAmount, maxFuzzAmount);
 
-        ERC20User owner = new ERC20User();
+        ERC20User owner = ERC20User(user);
 
         mintAndDepositIntoStrategy(strategy, address(owner), amount_);
-        owner.erc20_approve(address(strategy), self, MAX_UINT256);
+        
+        vm.prank(address(owner));
+        strategy.approve(self, MAX_UINT256);
 
         assertEq(strategy.balanceOf(address(owner)), amount_);
         assertEq(strategy.totalSupply(), amount_);
         assertEq(strategy.allowance(address(owner), self), MAX_UINT256);
 
         vm.expectRevert(abi.encodeWithSelector(VaultSharesNotTransferable.selector));
-
         strategy.transferFrom(address(owner), recipient_, amount_);
 
         assertEq(strategy.totalSupply(), amount_);
         assertEq(strategy.allowance(address(owner), self), MAX_UINT256);
 
-        if (address(owner) == recipient_) {
-            assertEq(strategy.balanceOf(address(owner)), amount_);
-        } else {
-            assertEq(strategy.balanceOf(address(owner)), amount_);
-            assertEq(strategy.balanceOf(recipient_), 0);
-        }
+        assertEq(strategy.balanceOf(address(owner)), amount_);
+        assertEq(strategy.balanceOf(recipient_), 0);
     }
 
     function testFuzz_transfer_insufficientBalance(address recipient_, uint256 amount_) public {
         vm.assume(recipient_ != address(0) && recipient_ != address(strategy));
         amount_ = bound(amount_, minFuzzAmount, maxFuzzAmount);
 
-        ERC20User account = new ERC20User();
+        ERC20User account = ERC20User(user);
 
         mintAndDepositIntoStrategy(strategy, address(account), amount_ - 1);
+        account.erc20_approve(address(strategy), recipient_, amount_);
 
         vm.expectRevert(abi.encodeWithSelector(VaultSharesNotTransferable.selector));
-        account.erc20_transfer(address(strategy), recipient_, amount_);
+        strategy.transfer(recipient_, amount_);
 
         mintAndDepositIntoStrategy(strategy, address(account), 1);
         vm.expectRevert(abi.encodeWithSelector(VaultSharesNotTransferable.selector));
-
-        account.erc20_transfer(address(strategy), recipient_, amount_);
+        strategy.transfer(recipient_, amount_);
 
         assertEq(strategy.balanceOf(recipient_), 0);
     }
@@ -156,18 +140,17 @@ contract ERC20BaseTest is Setup {
         vm.assume(recipient_ != address(0) && recipient_ != address(strategy));
         amount_ = bound(amount_, minFuzzAmount, maxFuzzAmount);
 
-        ERC20User owner = new ERC20User();
+        ERC20User owner = ERC20User(user);
 
         mintAndDepositIntoStrategy(strategy, address(owner), amount_);
 
-        owner.erc20_approve(address(strategy), self, amount_ - 1);
+        vm.prank(address(owner));
+        strategy.approve(self, amount_);
 
         vm.expectRevert(abi.encodeWithSelector(VaultSharesNotTransferable.selector));
         strategy.transferFrom(address(owner), recipient_, amount_);
 
-        owner.erc20_approve(address(strategy), self, amount_);
         vm.expectRevert(abi.encodeWithSelector(VaultSharesNotTransferable.selector));
-
         strategy.transferFrom(address(owner), recipient_, amount_);
 
         assertEq(strategy.balanceOf(recipient_), 0);
@@ -177,7 +160,7 @@ contract ERC20BaseTest is Setup {
         vm.assume(recipient_ != address(0) && recipient_ != address(strategy));
         amount_ = bound(amount_, minFuzzAmount, maxFuzzAmount);
 
-        ERC20User owner = new ERC20User();
+        ERC20User owner = ERC20User(user);
 
         mintAndDepositIntoStrategy(strategy, address(owner), amount_ - 1);
         owner.erc20_approve(address(strategy), self, amount_);

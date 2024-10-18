@@ -3,11 +3,7 @@ pragma solidity 0.8.25;
 
 import {TokenizedStrategy, IBaseStrategy, Math, ERC20} from "./TokenizedStrategy.sol";
 import {IDragonModule} from "../interfaces/IDragonModule.sol";
-import {
-    VaultSharesNotTransferable,
-    MaxUnlockIsAlwaysZero,
-    CantWithdrawLockedShares
-} from "src/errors.sol";
+import {VaultSharesNotTransferable, MaxUnlockIsAlwaysZero, CantWithdrawLockedShares} from "src/errors.sol";
 
 contract DragonTokenizedStrategy is TokenizedStrategy {
     event NewLockupSet(address indexed user, uint256 indexed unlockTime, uint256 indexed lockedShares);
@@ -51,11 +47,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @param user The user's address.
      * @return The amount of unlocked shares.
      */
-    function _userUnlockedShares(StrategyData storage S, address user)
-        internal
-        view
-        returns (uint256)
-    {
+    function _userUnlockedShares(StrategyData storage S, address user) internal view returns (uint256) {
         LockupInfo memory lockup = _strategyStorage().voluntaryLockups[user];
 
         if (block.timestamp >= lockup.unlockTime) {
@@ -94,8 +86,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         // Get the max the owner could withdraw currently.
 
         maxWithdraw_ = IBaseStrategy(address(this)).availableWithdrawLimit(_owner);
-        maxWithdraw_ =
-            Math.min(_convertToAssets(S, _userUnlockedShares(S, _owner), Math.Rounding.Floor), maxWithdraw_);
+        maxWithdraw_ = Math.min(_convertToAssets(S, _userUnlockedShares(S, _owner), Math.Rounding.Floor), maxWithdraw_);
     }
 
     /**
@@ -124,12 +115,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     }
 
     /// @dev Internal implementation of {maxRedeem}.
-    function _maxRedeem(StrategyData storage S, address _owner)
-        internal
-        view
-        override
-        returns (uint256 maxRedeem_)
-    {
+    function _maxRedeem(StrategyData storage S, address _owner) internal view override returns (uint256 maxRedeem_) {
         // Get the max the owner could withdraw currently.
         maxRedeem_ = IBaseStrategy(address(this)).availableWithdrawLimit(_owner);
         maxRedeem_ = Math.min(
@@ -277,7 +263,11 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @param lockupDuration The duration of the lockup in seconds.
      * @return assets The actual amount of asset deposited.
      */
-    function mintWithLockup(uint256 shares, address receiver, uint256 lockupDuration) public onlyOwner returns (uint256 assets) {
+    function mintWithLockup(uint256 shares, address receiver, uint256 lockupDuration)
+        public
+        onlyOwner
+        returns (uint256 assets)
+    {
         require(lockupDuration > 0, "Lockup duration must be greater than 0");
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
@@ -315,7 +305,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     function report() external override nonReentrant onlyKeepers returns (uint256 profit, uint256 loss) {
         // Cache storage pointer since its used repeatedly.
         StrategyData storage S = _strategyStorage();
-        
+
         // Tell the strategy to report the real total assets it has.
         // It should do all reward selling and redepositing now and
         // account for deployed and loose `asset` so we can accurately
@@ -339,7 +329,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
             unchecked {
                 loss = oldTotalAssets - newTotalAssets;
             }
-            
+
             uint256 sharesToBurn;
             // Check in case `else` was due to being equal.
             if (loss != 0) {

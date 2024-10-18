@@ -605,7 +605,7 @@ contract TokenizedStrategy {
      * @dev Accepts a `maxLoss` variable in order to match the multi
      * strategy vaults ABI.
      */
-    function maxWithdraw(address owner, uint256 /*maxLoss*/) external view virtual returns (uint256) {
+    function maxWithdraw(address owner, uint256 /*maxLoss*/ ) external view virtual returns (uint256) {
         return _maxWithdraw(_strategyStorage(), owner);
     }
 
@@ -626,7 +626,7 @@ contract TokenizedStrategy {
      * @dev Accepts a `maxLoss` variable in order to match the multi
      * strategy vaults ABI.
      */
-    function maxRedeem(address owner, uint256 /*maxLoss*/) external view virtual returns (uint256) {
+    function maxRedeem(address owner, uint256 /*maxLoss*/ ) external view virtual returns (uint256) {
         return _maxRedeem(_strategyStorage(), owner);
     }
 
@@ -708,7 +708,7 @@ contract TokenizedStrategy {
     }
 
     /// @dev Internal implementation of {maxRedeem}.
-    function _maxRedeem(StrategyData storage S, address owner) internal virtual view returns (uint256 maxRedeem_) {
+    function _maxRedeem(StrategyData storage S, address owner) internal view virtual returns (uint256 maxRedeem_) {
         // Get the max the owner could withdraw currently.
         maxRedeem_ = IBaseStrategy(address(this)).availableWithdrawLimit(owner);
 
@@ -1426,16 +1426,15 @@ contract TokenizedStrategy {
      * @return . The domain separator that will be used for any {permit} calls.
      */
     function DOMAIN_SEPARATOR() public view returns (bytes32) {
-        return
-            keccak256(
-                abi.encode(
-                    keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                    keccak256("Dragon Vault"),
-                    keccak256(bytes(API_VERSION)),
-                    block.chainid,
-                    address(this)
-                )
-            );
+        return keccak256(
+            abi.encode(
+                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak256("Dragon Vault"),
+                keccak256(bytes(API_VERSION)),
+                block.chainid,
+                address(this)
+            )
+        );
     }
 
     /*//////////////////////////////////////////////////////////////
