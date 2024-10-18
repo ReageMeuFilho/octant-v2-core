@@ -211,11 +211,10 @@ abstract contract BaseStrategy {
      * `TokenizedStrategy.isShutdown()` to decide if funds should be
      * redeployed or simply realize any profits/losses.
      *
-     * @return _yield Amount of yield harvest from the farm.
      * @return _totalAssets A trusted and accurate account for the total
      * amount of 'asset' the strategy currently holds including idle funds.
      */
-    function _harvestAndReport() internal virtual returns (uint256 _yield, uint256 _totalAssets);
+    function _harvestAndReport() internal virtual returns (uint256 _totalAssets);
 
     /// @dev Handle the liquidation of strategy assets.
     /// @param _amountNeeded Amount to be liquidated.
@@ -413,11 +412,10 @@ abstract contract BaseStrategy {
      * This can only be called after a report() delegateCall to the
      * TokenizedStrategy so msg.sender == address(this).
      *
-     * @return . Yield harvested.
      * @return . A trusted and accurate account for the total amount
      * of 'asset' the strategy currently holds including idle funds.
      */
-    function harvestAndReport() external virtual onlySelf returns (uint256, uint256) {
+    function harvestAndReport() external virtual onlySelf returns (uint256) {
         return _harvestAndReport();
     }
 

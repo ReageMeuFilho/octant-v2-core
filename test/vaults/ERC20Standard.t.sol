@@ -18,7 +18,7 @@ contract ERC20BaseTest is Setup {
     }
 
     function test_metadata() public {
-        assertEq(strategy.name(), "Test Strategy");
+        assertEq(strategy.name(), "Test Mock Strategy");
         assertEq(strategy.symbol(), string(abi.encodePacked("dgn", asset.symbol())));
         assertEq(strategy.decimals(), 18);
         assertEq(strategy.apiVersion(), "3.0.3");

@@ -9,11 +9,13 @@ import {ERC20Mock} from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 import {ExtendedTest} from "./ExtendedTest.sol";
 import {MockStrategy} from "../mocks/MockStrategy.sol";
 import {MockYieldSource} from "../mocks/MockYieldSource.sol";
-import {IMockStrategy} from "../mocks/IMockStrategy.sol";
 import {MockDragonRouter} from "../mocks/MockDragonRouter.sol";
+import {DragonModuleProxyFactory} from "src/dragons/ModuleProxyFactory.sol";
+import {DragonTokenizedStrategy} from "src/dragons/DragonTokenizedStrategy.sol";
+import {TestERC20} from "src/test/TestERC20.sol";
 
 import {IEvents} from "src/interfaces/IEvents.sol";
-import {DragonTokenizedStrategy} from "src/dragons/DragonTokenizedStrategy.sol";
+import {IMockStrategy} from "../mocks/IMockStrategy.sol";
 
 contract Setup is ExtendedTest, IEvents {
     // Contract instances that we will use repeatedly.
@@ -44,6 +46,14 @@ contract Setup is ExtendedTest, IEvents {
     uint256 public profitMaxUnlockTime = 10 days;
 
     function setUp() public virtual override {
+        fork = vm.createFork(TEST_RPC_URL);
+        vm.selectFork(fork);
+
+        // deploy module proxy factory and test erc20 asset
+        moduleFactory = new DragonModuleProxyFactory();
+
+        token = new TestERC20();
+
         // Deploy the implementation for deterministic location
         tokenizedStrategy = new DragonTokenizedStrategy();
 
