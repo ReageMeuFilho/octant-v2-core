@@ -14,6 +14,7 @@ contract Trader is Module {
     using FixedPointMathLib for uint256;
 
     event Traded(uint256 sold);
+    event ReceiverChanged(address oldReceiver, address newReceiver);
 
     uint256 public constant blocksADay = 7200;
 
@@ -25,6 +26,9 @@ contract Trader is Module {
 
     /// @notice Spent ETH since startingBlock
     uint256 public spent = 0;
+
+    /// @notice Address that will receive the token.
+    address payable public receiver;
 
     /// @notice Rules for spending were last updated at this height.
     uint256 public startingBlock = block.number;
@@ -64,6 +68,7 @@ contract Trader is Module {
         (address _owner,,) = abi.decode(initializeParams, (address, bytes32, bytes32));
         __Ownable_init(msg.sender);
         transferOwnership(_owner);
+        receiver = payable(_owner);
     }
 
     /// @notice Transfers funds that are to be converted by to target token by external converter.
@@ -83,7 +88,7 @@ contract Trader is Module {
         }
 
         // this simulates sending ETH to swapper
-        (bool success,) = payable(owner()).call{value: saleValue}("");
+        (bool success,) = receiver.call{value: saleValue}("");
         require(success);
 
         emit Traded(saleValue);
@@ -117,6 +122,11 @@ contract Trader is Module {
         if (deadline <= block.number) revert Trader__ImpossibleConfiguration();
         if (saleValueLow == 0) revert Trader__ImpossibleConfiguration();
         if (getSafetyBlocks() > (deadline - block.number)) revert Trader__ImpossibleConfiguration();
+    }
+
+    function setReceiver(address receiver_) public onlyOwner {
+        emit ReceiverChanged(receiver, receiver_);
+        receiver = payable(receiver_);
     }
 
     function getSafetyBlocks() public view returns (uint256) {
