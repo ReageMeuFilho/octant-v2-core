@@ -323,7 +323,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
                 profit = newTotalAssets - oldTotalAssets;
             }
 
-            _mint(S, _dragonRouter, _convertToShares(S, profit, Math.Rounding.Floor));
+            _deposit(S, _dragonRouter, profit, _convertToShares(S, profit, Math.Rounding.Floor));
         } else {
             // Expect we have a loss.
             unchecked {
@@ -344,7 +344,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
 
             // Check if there is anything to burn.
             if (sharesToBurn != 0) {
-                _burn(S, address(this), sharesToBurn);
+                _burn(S, _dragonRouter, sharesToBurn);
             }
         }
         // Update the new total assets value.

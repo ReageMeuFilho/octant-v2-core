@@ -63,7 +63,7 @@ contract ERC20BaseTest is Setup {
 
         assertEq(strategy.totalSupply(), amount_);
 
-        assertEq(strategy.balanceOf(user), amount_);   
+        assertEq(strategy.balanceOf(user), amount_);
     }
 
     function testFuzz_transferFrom(address recipient_, uint256 approval_, uint256 amount_) public {
@@ -99,7 +99,7 @@ contract ERC20BaseTest is Setup {
         ERC20User owner = ERC20User(user);
 
         mintAndDepositIntoStrategy(strategy, address(owner), amount_);
-        
+
         vm.prank(address(owner));
         strategy.approve(self, MAX_UINT256);
 
