@@ -7,7 +7,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {ERC20Mock} from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 
 import {ExtendedTest} from "./ExtendedTest.sol";
-import {MockStrategy} from "../mocks/MockStrategy.sol";
+import {MockStrategy} from "../mocks/MockStrategy2.sol";
 import {MockYieldSource} from "../mocks/MockYieldSource.sol";
 import {MockDragonRouter} from "../mocks/MockDragonRouter.sol";
 import {DragonModuleProxyFactory} from "src/dragons/ModuleProxyFactory.sol";
