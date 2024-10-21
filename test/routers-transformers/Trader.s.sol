@@ -83,6 +83,30 @@ contract TestTraderRandomness is BaseTest {
         assertEq(type(uint256).max, trader.chance());
     }
 
+    function test_overspend_protection() external {
+        // This test will attempt to overspend, simulating validator griding hash values.
+        // Since forge doesn't allow to manipulate blockhash directly, overspending
+        // is done by manipulating return value of `chance()` function.
+        uint256 blocks = 1000;
+        vm.startPrank(temps.safe);
+        uint budget_value = 100 ether;
+        trader.setSpendADay(1 ether, 1 ether, budget_value, block.number + blocks);
+        vm.stopPrank();
+
+        // mock chance
+        vm.mockCall(address(trader), abi.encodeWithSelector(Trader.chance.selector), abi.encode(type(uint256).max - 1));
+
+        // sanity check
+        assertEq(type(uint256).max - 1, trader.chance());
+
+        /* run trader */
+        for (uint256 i = 0; i < blocks / 2; i++) {
+            wrapBuy();
+        }
+
+        assertLe(trader.spent(), trader.budget() / 2);
+    }
+
     function test_chance_high() external {
         uint256 blocks = 1_000_000;
         vm.startPrank(temps.safe);

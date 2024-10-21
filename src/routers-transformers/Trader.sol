@@ -75,7 +75,7 @@ contract Trader is Module {
     /// @param height that will be used as a source of randomness. One height value can be used only once.
     function convert(uint256 height) public {
         uint256 rand = getRandomNumber(height);
-        uint256 _chance = chance();
+        uint256 _chance = this.chance();
         if (rand > _chance) revert Trader__WrongHeight();
         if (_chance != type(uint256).max && hasOverspent(height)) revert Trader__SpendingTooMuch();
         if (lastHeight >= height) revert Trader__RandomnessAlreadyUsed();
@@ -83,17 +83,22 @@ contract Trader is Module {
 
         uint256 saleValue = getUniformInRange(saleValueLow, saleValueHigh, rand);
         if (saleValue > saleValueHigh) revert Trader__SoftwareError();
+
+
         if (saleValue > address(this).balance) {
             saleValue = address(this).balance;
+        }
+        if (saleValue > budget - spent) {
+            saleValue = budget - spent;
         }
 
         // this simulates sending ETH to swapper
         (bool success,) = receiver.call{value: saleValue}("");
         require(success);
 
-        emit Traded(saleValue);
-
         spent = spent + saleValue;
+
+        emit Traded(saleValue);
     }
 
     function canTrade(uint256 height) public view returns (bool) {
