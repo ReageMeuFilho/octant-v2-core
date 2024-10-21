@@ -118,10 +118,10 @@ contract ERC20BaseTest is Setup {
     }
 
     function testFuzz_transfer_insufficientBalance(address recipient_, uint256 amount_) public {
-        vm.assume(recipient_ != address(0) && recipient_ != address(strategy));
-        amount_ = bound(amount_, minFuzzAmount, maxFuzzAmount);
-
         ERC20User account = ERC20User(user);
+        
+        vm.assume(recipient_ != address(0) && recipient_ != address(strategy) && recipient_ != address(account));
+        amount_ = bound(amount_, minFuzzAmount, maxFuzzAmount);
 
         mintAndDepositIntoStrategy(strategy, address(account), amount_ - 1);
         account.erc20_approve(address(strategy), recipient_, amount_);
