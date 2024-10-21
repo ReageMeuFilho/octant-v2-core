@@ -669,8 +669,8 @@ BRH:4
 end_of_record
 TN:
 SF:src/dragons/ModuleProxyFactory.sol
-FN:8,DragonModuleProxyFactory.deployAndEnableModuleFromSafe
-FNDA:74,DragonModuleProxyFactory.deployAndEnableModuleFromSafe
+FN:8,ModuleProxyFactory.deployAndEnableModuleFromSafe
+FNDA:74,ModuleProxyFactory.deployAndEnableModuleFromSafe
 DA:12,74
 DA:16,74
 FNF:1

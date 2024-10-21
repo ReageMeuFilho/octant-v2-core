@@ -10,7 +10,7 @@ import {ExtendedTest} from "./ExtendedTest.sol";
 import {MockStrategy} from "../mocks/MockStrategy2.sol";
 import {MockYieldSource} from "../mocks/MockYieldSource.sol";
 import {MockDragonRouter} from "../mocks/MockDragonRouter.sol";
-import {DragonModuleProxyFactory} from "src/dragons/ModuleProxyFactory.sol";
+import {ModuleProxyFactory} from "src/dragons/ModuleProxyFactory.sol";
 import {DragonTokenizedStrategy} from "src/dragons/DragonTokenizedStrategy.sol";
 import {TestERC20} from "src/test/TestERC20.sol";
 
@@ -47,12 +47,6 @@ contract Setup is ExtendedTest, IEvents {
 
     function setUp() public virtual {
         _configure(false);
-
-        // deploy module proxy factory and test erc20 asset
-        moduleFactory = new DragonModuleProxyFactory();
-
-        token = new TestERC20();
-
         // Deploy the implementation for deterministic location
         tokenizedStrategy = new DragonTokenizedStrategy();
 
