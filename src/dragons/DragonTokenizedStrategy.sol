@@ -159,7 +159,6 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     function withdraw(uint256 assets, address receiver, address _owner, uint256 maxLoss)
         public
         override
-        onlyOwner
         nonReentrant
         returns (uint256 shares)
     {
@@ -208,7 +207,6 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     function redeem(uint256 shares, address receiver, address _owner, uint256 maxLoss)
         public
         override
-        onlyOwner
         nonReentrant
         returns (uint256)
     {

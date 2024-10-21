@@ -383,7 +383,7 @@ contract TokenizedStrategy {
      * @param owner The address whose shares are burnt.
      * @return shares The actual amount of shares burnt.
      */
-    function withdraw(uint256 assets, address receiver, address owner) external onlyOwner returns (uint256 shares) {
+    function withdraw(uint256 assets, address receiver, address owner) external returns (uint256 shares) {
         return withdraw(assets, receiver, owner, 0);
     }
 
@@ -400,7 +400,6 @@ contract TokenizedStrategy {
     function withdraw(uint256 assets, address receiver, address owner, uint256 maxLoss)
         public
         virtual
-        onlyOwner
         nonReentrant
         returns (uint256 shares)
     {
@@ -423,7 +422,7 @@ contract TokenizedStrategy {
      * @param owner The address whose shares are burnt.
      * @return assets The actual amount of underlying withdrawn.
      */
-    function redeem(uint256 shares, address receiver, address owner) external onlyOwner returns (uint256) {
+    function redeem(uint256 shares, address receiver, address owner) external returns (uint256) {
         // We default to not limiting a potential loss.
         return redeem(shares, receiver, owner, MAX_BPS);
     }
@@ -441,7 +440,6 @@ contract TokenizedStrategy {
     function redeem(uint256 shares, address receiver, address owner, uint256 maxLoss)
         public
         virtual
-        onlyOwner
         nonReentrant
         returns (uint256)
     {
@@ -785,6 +783,12 @@ contract TokenizedStrategy {
         uint256 maxLoss
     ) internal virtual returns (uint256) {
         require(receiver != address(0), "ZERO ADDRESS");
+        require(maxLoss <= MAX_BPS, "exceeds MAX_BPS");
+
+        // Spend allowance if applicable.
+        if (msg.sender != owner) {
+            _spendAllowance(S, owner, msg.sender, shares);
+        }
 
         // Cache `asset` since it is used multiple times..
         ERC20 _asset = S.asset;
