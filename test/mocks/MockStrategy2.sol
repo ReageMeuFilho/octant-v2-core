@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.8.18;
 
-import { MockYieldSource } from "./MockYieldSource.sol";
-import { BaseStrategy, ERC20 } from "src/dragons/BaseStrategy.sol";
+import {MockYieldSource} from "./MockYieldSource.sol";
+import {BaseStrategy, ERC20} from "src/dragons/BaseStrategy.sol";
 import {Module} from "zodiac/core/Module.sol";
 
 contract MockStrategy is Module, BaseStrategy {
-    
     address public yieldSource;
     bool public trigger;
     bool public managed;
@@ -72,7 +71,7 @@ contract MockStrategy is Module, BaseStrategy {
         return MockYieldSource(yieldSource).balance() + ERC20(asset).balanceOf(address(this));
     }
 
-    function _tend(uint256 /*_idle*/) internal override {
+    function _tend(uint256 /*_idle*/ ) internal override {
         uint256 balance = ERC20(asset).balanceOf(address(this));
         if (balance > 0) {
             MockYieldSource(yieldSource).deposit(balance);

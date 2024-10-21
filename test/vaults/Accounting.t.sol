@@ -144,9 +144,7 @@ contract AccountingTest is Setup {
         checkStrategyTotals(strategy, 0, 0, 0, 0);
     }
 
-    function test_earningYieldDoesNotIncreasePPS_reportRecordsIt(
-        uint256 _amount
-    ) public {
+    function test_earningYieldDoesNotIncreasePPS_reportRecordsIt(uint256 _amount) public {
         _amount = bound(_amount, minFuzzAmount, maxFuzzAmount);
 
         // set fees to 0 for calculations simplicity

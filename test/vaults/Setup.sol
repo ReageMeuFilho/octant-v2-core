@@ -125,7 +125,8 @@ contract Setup is ExtendedTest, IEvents {
 
     // For checks without totalSupply while profit is unlocking
     function checkStrategyTotals(IMockStrategy _strategy, uint256 _totalAssets, uint256 _totalDebt, uint256 _totalIdle)
-        public view
+        public
+        view
     {
         uint256 _assets = _strategy.totalAssets();
         uint256 _balance = ERC20Mock(_strategy.asset()).balanceOf(address(_strategy));

@@ -119,7 +119,7 @@ contract ERC20BaseTest is Setup {
 
     function testFuzz_transfer_insufficientBalance(address recipient_, uint256 amount_) public {
         ERC20User account = ERC20User(user);
-        
+
         vm.assume(recipient_ != address(0) && recipient_ != address(strategy) && recipient_ != address(account));
         amount_ = bound(amount_, minFuzzAmount, maxFuzzAmount);
 
@@ -138,7 +138,7 @@ contract ERC20BaseTest is Setup {
 
     function testFuzz_transferFrom_insufficientAllowance(address recipient_, uint256 amount_) public {
         ERC20User owner = ERC20User(user);
-        
+
         vm.assume(recipient_ != address(0) && recipient_ != address(strategy) && recipient_ != address(owner));
         amount_ = bound(amount_, minFuzzAmount, maxFuzzAmount);
 
@@ -156,7 +156,7 @@ contract ERC20BaseTest is Setup {
         assertEq(strategy.balanceOf(recipient_), 0);
     }
 
-    function testFuzz_transferFrom_insufficientBalance(address recipient_, uint256 amount_) public {        
+    function testFuzz_transferFrom_insufficientBalance(address recipient_, uint256 amount_) public {
         ERC20User owner = ERC20User(user);
 
         vm.assume(recipient_ != address(0) && recipient_ != address(strategy) && recipient_ != address(owner));
