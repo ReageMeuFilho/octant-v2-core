@@ -7,6 +7,7 @@ import {DragonModuleProxyFactory} from "../src/dragons/ModuleProxyFactory.sol";
 import {DragonVaultModule} from "../poc/dragons/DragonVaultModule.sol";
 import {TestERC20} from "../src/test/TestERC20.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
+import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
 import {ISafe} from "../src/interfaces/Safe.sol";
 
 contract BaseTest is Test, TestPlus {
@@ -27,9 +28,14 @@ contract BaseTest is Test, TestPlus {
     TestERC20 public token;
     address[] public owners;
 
-    function setUp() public virtual {
-        fork = vm.createFork(TEST_RPC_URL);
-        vm.selectFork(fork);
+    function _configure(bool _useFork) internal {
+        if (_useFork) {
+            fork = vm.createFork(TEST_RPC_URL);
+            vm.selectFork(fork);
+        } else {
+            safeSingleton = address(new Safe());
+            proxyFactory = address(new SafeProxyFactory());
+        }
 
         // deploy module proxy factory and test erc20 asset
         moduleFactory = new DragonModuleProxyFactory();

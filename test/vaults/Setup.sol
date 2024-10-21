@@ -45,9 +45,8 @@ contract Setup is ExtendedTest, IEvents {
     uint256 public minFuzzAmount = 10_000;
     uint256 public profitMaxUnlockTime = 10 days;
 
-    function setUp() public virtual override {
-        fork = vm.createFork(TEST_RPC_URL);
-        vm.selectFork(fork);
+    function setUp() public virtual {
+        _configure(false);
 
         // deploy module proxy factory and test erc20 asset
         moduleFactory = new DragonModuleProxyFactory();

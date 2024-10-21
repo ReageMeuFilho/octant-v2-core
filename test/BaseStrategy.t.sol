@@ -25,8 +25,9 @@ contract BaseStrategyTest is BaseTest {
 
     address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE; // using this address to represent native ETH
 
-    function setUp() public override {
-        super.setUp();
+    function setUp() public {
+        _configure(true);
+
         moduleImplementation = new MockStrategy();
         yieldSource = new MockYieldSource(ETH);
         tokenizedStrategyImplementation = new MockTokenizedStrategy();

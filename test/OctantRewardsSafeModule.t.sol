@@ -16,8 +16,8 @@ contract OctantRewardsSafeModule is BaseTest {
     OctantRewardsSafe moduleImplementation;
     OctantRewardsSafe module;
 
-    function setUp() public override {
-        super.setUp();
+    function setUp() public {
+        _configure(true);
         moduleImplementation = new OctantRewardsSafe();
         temps = _testTemps(
             address(moduleImplementation), abi.encode(keeper, treasury, dragonRouter, totalValidators, maxYield)
