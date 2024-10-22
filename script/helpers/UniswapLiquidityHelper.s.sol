@@ -3,11 +3,10 @@ pragma solidity ^0.8.23;
 pragma abicoder v2;
 
 import {ABDKMath64x64} from "abdk-libraries-solidity/ABDKMath64x64.sol";
-import "@uniswap/v3-core/contracts/libraries/TickMath.sol";
+import "./vendor/uniswap/libraries/TickMath.sol";
+import "./vendor/uniswap/interfaces/INonfungiblePositionManager.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
-import "@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol";
-import "@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol";
-// import '@uniswap/v3-periphery/contracts/base/LiquidityManagement.sol';
+import "./vendor/uniswap/libraries/TransferHelper.sol";
 
 library ExtraTickMath {
     function divRound(int128 x, int128 y) internal pure returns (int128 result) {
