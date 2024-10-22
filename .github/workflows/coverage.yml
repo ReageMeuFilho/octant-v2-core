@@ -49,7 +49,7 @@ jobs:
         run: |
           {
           echo 'COVERAGE<<EOF'
-          forge coverage --summary | awk '/Test Summary:/{y=1;next}y'
+          forge coverage --ir-minimum --summary | awk '/Test Summary:/{y=1;next}y'
           echo EOF
           } >> "$GITHUB_OUTPUT"
 
