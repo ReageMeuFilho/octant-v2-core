@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: UNLICENSED */
+// SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.23;
 
 import {Module} from "zodiac/core/Module.sol";
@@ -37,8 +37,6 @@ contract Trader is Module {
     /// @notice Height of block hash used as a last source of randomness.
     uint256 public lastHeight;
 
-    uint256 public lastSold = 0;
-
     /// @notice Heights at which `convert()` can be called is decided by randomness.
     ///         If you see `Trader__WrongHeight()` error, retry in the next block.
     ///         Note, you don't need to pay for gas to learn if tx will apply!
@@ -63,12 +61,14 @@ contract Trader is Module {
             abi.decode(data, (uint256, uint256, uint256, uint256));
         __Ownable_init(msg.sender);
         setSpendADay(_chance, _spendADay, _low, _high);
+        setAvatar(_owner);
+        setTarget(_owner);
         transferOwnership(_owner);
     }
 
     /// @notice Transfers funds that are to be converted by to target token by external converter.
     /// @param height that will be used as a source of randomness. One height value can be used only once.
-    function convert(uint256 height) public {
+    function convert(uint256 height) external {
         uint256 rand = getRandomNumber(height);
         if (rand > chance) revert Trader__WrongHeight();
         if (hasOverspent(height)) revert Trader__SpendingTooMuch();
@@ -78,12 +78,11 @@ contract Trader is Module {
         uint256 saleValue = getUniformInRange(saleValueLow, saleValueHigh, rand);
         if (saleValue > saleValueHigh) revert Trader__SoftwareError();
 
+        spent = spent + saleValue;
+
         // this simulates sending ETH to swapper
         (bool success,) = payable(owner()).call{value: saleValue}("");
         require(success);
-
-        lastSold = saleValue;
-        spent = spent + saleValue;
     }
 
     function canTrade(uint256 height) public view returns (bool) {
