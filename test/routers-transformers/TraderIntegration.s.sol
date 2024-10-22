@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: UNLICENSED */
+// SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
@@ -9,13 +9,14 @@ import {HelperConfig} from "script/helpers/HelperConfig.s.sol";
 contract TestTraderConfig is BaseTest {
     uint256 public constr = 0;
     uint256 public budget = 10_000 ether;
-    HelperConfig helperConfig = new HelperConfig();
+    HelperConfig helperConfig;
 
     testTemps temps;
     Trader public moduleImplementation;
     Trader public trader;
 
     function setUp() public {
+        helperConfig = new HelperConfig();
         _configure(true);
         moduleImplementation = new Trader();
         temps = _testTemps(address(moduleImplementation), abi.encode(0, 0, 0.6 ether, 1.4 ether));
