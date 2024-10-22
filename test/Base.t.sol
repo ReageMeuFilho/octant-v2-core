@@ -2,12 +2,12 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import { TestPlus } from "solady/test/utils/TestPlus.sol";
-import { ModuleProxyFactory } from "../src/dragons/ModuleProxyFactory.sol";
-import { DragonVaultModule } from "../src/dragons/DragonVaultModule.sol";
-import { TestERC20 } from "../src/test/TestERC20.sol";
+import {TestPlus} from "solady/test/utils/TestPlus.sol";
+import {ModuleProxyFactory} from "../src/dragons/ModuleProxyFactory.sol";
+import {TestERC20} from "../src/test/TestERC20.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
-import { ISafe } from "../src/interfaces/Safe.sol";
+import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
+import {ISafe} from "../src/interfaces/Safe.sol";
 
 contract BaseTest is Test, TestPlus {
     struct testTemps {
@@ -27,9 +27,14 @@ contract BaseTest is Test, TestPlus {
     TestERC20 public token;
     address[] public owners;
 
-    function setUp() public virtual {
-        fork = vm.createFork(TEST_RPC_URL);
-        vm.selectFork(fork);
+    function _configure(bool _useFork) internal {
+        if (_useFork) {
+            fork = vm.createFork(TEST_RPC_URL);
+            vm.selectFork(fork);
+        } else {
+            safeSingleton = address(new Safe());
+            proxyFactory = address(new SafeProxyFactory());
+        }
 
         // deploy module proxy factory and test erc20 asset
         moduleFactory = new ModuleProxyFactory();
@@ -64,7 +69,7 @@ contract BaseTest is Test, TestPlus {
         token.mint(address(proxy), 100 ether);
 
         t.safe = address(proxy);
-        (address[] memory array, ) = ISafe(address(proxy)).getModulesPaginated(address(0x1), 1);
+        (address[] memory array,) = ISafe(address(proxy)).getModulesPaginated(address(0x1), 1);
         t.module = array[0];
     }
 }

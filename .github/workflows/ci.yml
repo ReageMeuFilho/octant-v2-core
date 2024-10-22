@@ -78,6 +78,9 @@ jobs:
         with:
           node-version: 16.x.x
 
+      - name: Install Foundry
+        uses: onbjerg/foundry-toolchain@v1
+
       - name: Run npm install
         run: "npm i"
 

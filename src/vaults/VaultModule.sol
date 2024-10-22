@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import { Module } from "zodiac/core/Module.sol";
-import { Enum } from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
-import { ERC4626Upgradeable } from "openzeppelin-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {Module} from "zodiac/core/Module.sol";
+import {Enum} from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
+import {ERC4626Upgradeable} from "openzeppelin-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 
-contract DragonVaultModule is Module, ERC4626Upgradeable {
+contract VaultModule is Module, ERC4626Upgradeable {
     /// @dev Initialize function, will be triggered when a new proxy is deployed
     /// @param initializeParams Parameters of initialization encoded
     function setUp(bytes memory initializeParams) public override initializer {
-        (, address _owner, address _asset) = abi.decode(initializeParams, (bytes32, address, address));
+        (address _owner, address _asset) = abi.decode(initializeParams, (address, address));
 
         __Ownable_init(msg.sender);
         __ERC4626_init(IERC20(_asset));
@@ -24,7 +24,9 @@ contract DragonVaultModule is Module, ERC4626Upgradeable {
         return exec(address(this), 0, data, Enum.Operation.Call);
     }
 
-    /** @dev See {IERC4626-mint}. */
+    /**
+     * @dev See {IERC4626-mint}.
+     */
     function mint(uint256 shares, address receiver) public override onlyOwner returns (uint256) {
         uint256 maxShares = maxMint(receiver);
         if (shares > maxShares) {
@@ -37,7 +39,9 @@ contract DragonVaultModule is Module, ERC4626Upgradeable {
         return assets;
     }
 
-    /** @dev See {IERC4626-withdraw}. */
+    /**
+     * @dev See {IERC4626-withdraw}.
+     */
     function withdraw(uint256 assets, address receiver, address owner) public override onlyOwner returns (uint256) {
         uint256 maxAssets = maxWithdraw(owner);
         if (assets > maxAssets) {
@@ -50,7 +54,9 @@ contract DragonVaultModule is Module, ERC4626Upgradeable {
         return shares;
     }
 
-    /** @dev See {IERC4626-redeem}. */
+    /**
+     * @dev See {IERC4626-redeem}.
+     */
     function redeem(uint256 shares, address receiver, address owner) public override onlyOwner returns (uint256) {
         uint256 maxShares = maxRedeem(owner);
         if (shares > maxShares) {

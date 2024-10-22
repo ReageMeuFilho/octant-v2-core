@@ -2,7 +2,7 @@
 // Modified from OpenZeppelin Contracts (last updated v5.0.0) (token/ERC20/extensions/IERC20Permit.sol)
 pragma solidity ^0.8.20;
 
-import { IERC20 } from "./IERC20.sol";
+import {IERC20} from "./IERC20.sol";
 
 interface IERC20Permit is IERC20 {
     /**
@@ -28,15 +28,8 @@ interface IERC20Permit is IERC20 {
      *
      * CAUTION: See Security Considerations above.
      */
-    function permit(
-        address owner,
-        address spender,
-        uint256 value,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) external;
+    function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s)
+        external;
 
     /**
      * @dev Returns the current nonce for `owner`. This value must be
