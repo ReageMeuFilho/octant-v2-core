@@ -92,6 +92,7 @@ contract TokenizedStrategy {
     struct LockupInfo {
         uint256 unlockTime;
         uint256 lockedShares;
+        bool isRageQuit;
     }
 
     struct StrategyData {
@@ -989,6 +990,7 @@ contract TokenizedStrategy {
     function dragonRouter() external view returns (address) {
         return _strategyStorage().dragonRouter;
     }
+
     /**
      * @notice Get the current address that can call tend and report.
      * @return . Address of the keeper

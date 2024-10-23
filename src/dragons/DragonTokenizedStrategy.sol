@@ -17,6 +17,7 @@ error SharesStillLocked();
 
 contract DragonTokenizedStrategy is TokenizedStrategy {
     event NewLockupSet(address indexed user, uint256 indexed unlockTime, uint256 indexed lockedShares);
+    event RageQuitInitiated(address indexed user, uint256 indexed unlockTime);
 
     // Minimum lockup duration of 3 months (in seconds)
     uint256 private constant MINIMUM_LOCKUP_DURATION = 90 days;
@@ -70,11 +71,17 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      */
     function _userUnlockedShares(StrategyData storage S, address user) internal view returns (uint256) {
         LockupInfo memory lockup = _strategyStorage().voluntaryLockups[user];
+        uint256 balance = _balanceOf(S, user);
 
         if (block.timestamp >= lockup.unlockTime) {
-            return _balanceOf(S, user);
+            return balance;
+        } else if (lockup.isRageQuit) {
+            // Calculate unlocked portion based on time elapsed
+            uint256 timeElapsed = block.timestamp - (lockup.unlockTime - MINIMUM_LOCKUP_DURATION);
+            uint256 unlockedPortion = (timeElapsed * lockup.lockedShares) / MINIMUM_LOCKUP_DURATION;
+            return Math.min(unlockedPortion, balance);
         } else {
-            return _balanceOf(S, user) - lockup.lockedShares;
+            return balance - lockup.lockedShares;
         }
     }
 
@@ -266,6 +273,29 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         _setOrExtendLockup(receiver, lockupDuration, _balanceOf(S, receiver));
 
         return shares;
+    }
+
+    /**
+     * @notice Initiates a rage quit, allowing gradual withdrawal over 3 months
+     * @dev Sets a 3-month lockup and enables proportional withdrawals
+     */
+    function initiateRageQuit() external {
+        StrategyData storage S = _strategyStorage();
+        LockupInfo storage lockup = S.voluntaryLockups[msg.sender];
+
+        // Can't rage quit if no shares or already in rage quit
+        require(_balanceOf(S, msg.sender) > 0, "No shares to rage quit");
+        require(!lockup.isRageQuit, "Already in rage quit");
+
+        // Can't rage quit if shares are already unlocked
+        require(block.timestamp < lockup.unlockTime || lockup.unlockTime == 0, "Shares already unlocked");
+
+        // Set 3-month lockup
+        lockup.unlockTime = block.timestamp + MINIMUM_LOCKUP_DURATION;
+        lockup.lockedShares = _balanceOf(S, msg.sender);
+        lockup.isRageQuit = true;
+
+        emit RageQuitInitiated(msg.sender, lockup.unlockTime);
     }
 
     /**
