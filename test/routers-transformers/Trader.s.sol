@@ -16,10 +16,12 @@ contract TestTraderRandomness is BaseTest {
     Trader public moduleImplementation;
     Trader public trader;
 
+    address swapper = makeAddr("swapper");
+
     function setUp() public {
         _configure(false);
         moduleImplementation = new Trader();
-        temps = _testTemps(address(moduleImplementation), abi.encode(ETH, 0, 0, 0.6 ether, 1.4 ether));
+        temps = _testTemps(address(moduleImplementation), abi.encode(ETH, swapper, 0, 0, 0.6 ether, 1.4 ether));
         trader = Trader(payable(temps.module));
         vm.deal(address(trader), budget);
     }
