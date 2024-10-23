@@ -1,8 +1,8 @@
 pragma solidity ^0.8.23;
 
-import {BaseGuard} from "zodiac/guard/BaseGuard.sol";
-import {Enum} from "zodiac/interfaces/IAvatar.sol";
-import {FactoryFriendly} from "zodiac/factory/FactoryFriendly.sol";
+import { BaseGuard } from "zodiac/guard/BaseGuard.sol";
+import { Enum } from "zodiac/interfaces/IAvatar.sol";
+import { FactoryFriendly } from "zodiac/factory/FactoryFriendly.sol";
 
 contract AntiLoopholeGuard is FactoryFriendly, BaseGuard {
     uint256 public lockEndTime;

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
-import {IFactory} from "src/interfaces/IFactory.sol";
-import {IBaseStrategy} from "src/interfaces/IBaseStrategy.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
+import { IFactory } from "src/interfaces/IFactory.sol";
+import { IBaseStrategy } from "src/interfaces/IBaseStrategy.sol";
 
 interface ITransformer {
     function transform(address fromToken, address toToken, uint256 amount) external returns (uint256);
@@ -163,8 +163,11 @@ contract DragonRouter is AccessControl, ReentrancyGuard {
         UserTransformer memory userTransformer = userTransformers[user];
         if (address(userTransformer.transformer) != address(0)) {
             asset.approve(address(userTransformer.transformer), amount);
-            uint256 transformedAmount =
-                userTransformer.transformer.transform(address(asset), userTransformer.targetToken, amount);
+            uint256 transformedAmount = userTransformer.transformer.transform(
+                address(asset),
+                userTransformer.targetToken,
+                amount
+            );
             IERC20(userTransformer.targetToken).safeTransfer(user, transformedAmount);
             emit SplitClaimed(user, transformedAmount, userTransformer.targetToken);
         } else {

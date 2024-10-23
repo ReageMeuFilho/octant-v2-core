@@ -6,7 +6,9 @@ interface IOctantRouter {
     function deposit() external payable; // when this contract is destination
     function depositWithGivers(address[] calldata givers, uint256[] calldata amounts) external payable;
     function enqueueTo(address target) external payable;
-    function enqueueToWithGivers(address[] calldata givers, uint256[] calldata amounts, address target)
-        external
-        payable;
+    function enqueueToWithGivers(
+        address[] calldata givers,
+        uint256[] calldata amounts,
+        address target
+    ) external payable;
 }

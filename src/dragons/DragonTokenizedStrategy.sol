@@ -5,6 +5,16 @@ import { TokenizedStrategy, IBaseStrategy, Math, ERC20 } from "./TokenizedStrate
 import { IDragonModule } from "../interfaces/IDragonModule.sol";
 import { VaultSharesNotTransferable, MaxUnlockIsAlwaysZero, CantWithdrawLockedShares } from "src/errors.sol";
 
+error ZeroLockupDuration();
+error InsufficientLockupDuration();
+error ZeroShares();
+error ZeroAssets();
+error DepositMoreThanMax();
+error MintMoreThanMax();
+error WithdrawMoreThanMax();
+error RedeemMoreThanMax();
+error SharesStillLocked();
+
 contract DragonTokenizedStrategy is TokenizedStrategy {
     event NewLockupSet(address indexed user, uint256 indexed unlockTime, uint256 indexed lockedShares);
 
@@ -29,23 +39,23 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @param totalSharesLocked The amount of shares to lock.
      */
     function _setOrExtendLockup(address user, uint256 lockupDuration, uint256 totalSharesLocked) internal {
-        require(lockupDuration > 0, "Lockup duration must be greater than 0");
+        if (lockupDuration == 0) revert ZeroLockupDuration();
 
         LockupInfo storage lockup = _strategyStorage().voluntaryLockups[user];
         uint256 currentTime = block.timestamp;
 
         if (lockup.unlockTime <= currentTime) {
-            // Start a new lockup
             lockup.unlockTime = currentTime + lockupDuration;
 
-            require(lockupDuration > MINIMUM_LOCKUP_DURATION, "Lockup duration must be greater than 0");
+            if (lockupDuration <= MINIMUM_LOCKUP_DURATION) revert InsufficientLockupDuration();
 
             lockup.lockedShares = totalSharesLocked;
         } else {
             // Extend existing lockup
             uint256 newUnlockTime = lockup.unlockTime + lockupDuration;
             // Ensure the new unlock time is at least 3 months in the future
-            require(newUnlockTime >= currentTime + MINIMUM_LOCKUP_DURATION, "minimum lockup duration is 3 months");
+            if (newUnlockTime < currentTime + MINIMUM_LOCKUP_DURATION) revert InsufficientLockupDuration();
+
             lockup.unlockTime = newUnlockTime;
             lockup.lockedShares = totalSharesLocked;
         }
@@ -110,16 +120,11 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         uint256 maxLoss
     ) internal override returns (uint256) {
         LockupInfo memory lockup = S.voluntaryLockups[_owner];
-        require(
-            block.timestamp >= lockup.unlockTime || shares <= _balanceOf(S, _owner) - lockup.lockedShares,
-            "Shares are locked"
-        );
 
-        if (shares > _balanceOf(S, _owner) - lockup.lockedShares) {
-            revert CantWithdrawLockedShares();
+        if (block.timestamp < lockup.unlockTime) revert SharesStillLocked();
 
-            // Withdrawing unlocked shares
-        }
+        if (shares > _balanceOf(S, _owner) - lockup.lockedShares) revert CantWithdrawLockedShares();
+
         return super._withdraw(S, receiver, _owner, assets, shares, maxLoss);
     }
 

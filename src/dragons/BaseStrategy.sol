@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity >=0.8.18;
 
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 // TokenizedStrategy interface used for internal view delegateCalls.
-import {ITokenizedStrategy} from "../interfaces/ITokenizedStrategy.sol";
+import { ITokenizedStrategy } from "../interfaces/ITokenizedStrategy.sol";
 
 /**
  * @title Dragon Base Strategy
@@ -220,12 +220,9 @@ abstract contract BaseStrategy {
     /// @param _amountNeeded Amount to be liquidated.
     /// @return _liquidatedAmount liquidated amount.
     /// @return _loss loss amount if it resulted in liquidation.
-    function liquidatePosition(uint256 _amountNeeded)
-        external
-        virtual
-        onlyManagement
-        returns (uint256 _liquidatedAmount, uint256 _loss)
-    {}
+    function liquidatePosition(
+        uint256 _amountNeeded
+    ) external virtual onlyManagement returns (uint256 _liquidatedAmount, uint256 _loss) {}
 
     /*//////////////////////////////////////////////////////////////
                     OPTIONAL TO OVERRIDE BY STRATEGIST
@@ -304,7 +301,7 @@ abstract contract BaseStrategy {
      * @param . The address that is depositing into the strategy.
      * @return . The available amount the `_owner` can deposit in terms of `asset`
      */
-    function availableDepositLimit(address /*_owner*/ ) public view virtual returns (uint256) {
+    function availableDepositLimit(address /*_owner*/) public view virtual returns (uint256) {
         return type(uint256).max;
     }
 
@@ -326,7 +323,7 @@ abstract contract BaseStrategy {
      * @param . The address that is withdrawing from the strategy.
      * @return . The available amount that can be withdrawn in terms of `asset`
      */
-    function availableWithdrawLimit(address /*_owner*/ ) public view virtual returns (uint256) {
+    function availableWithdrawLimit(address /*_owner*/) public view virtual returns (uint256) {
         return type(uint256).max;
     }
 
@@ -496,7 +493,9 @@ abstract contract BaseStrategy {
      */
     fallback() external payable {
         assembly {
-            if and(iszero(calldatasize()), not(iszero(callvalue()))) { return(0, 0) }
+            if and(iszero(calldatasize()), not(iszero(callvalue()))) {
+                return(0, 0)
+            }
         }
         // load our target address
         address _tokenizedStrategyAddress = tokenizedStrategyImplementation;
@@ -510,8 +509,12 @@ abstract contract BaseStrategy {
             returndatacopy(0, 0, returndatasize())
             // Return any return value or error back to the caller
             switch result
-            case 0 { revert(0, returndatasize()) }
-            default { return(0, returndatasize()) }
+            case 0 {
+                revert(0, returndatasize())
+            }
+            default {
+                return(0, returndatasize())
+            }
         }
     }
 }
