@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity 0.8.25;
 
-import {TokenizedStrategy, IBaseStrategy, Math, ERC20} from "./TokenizedStrategy.sol";
-import {IDragonModule} from "../interfaces/IDragonModule.sol";
-import {VaultSharesNotTransferable, MaxUnlockIsAlwaysZero, CantWithdrawLockedShares} from "src/errors.sol";
+import { TokenizedStrategy, IBaseStrategy, Math, ERC20 } from "./TokenizedStrategy.sol";
+import { IDragonModule } from "../interfaces/IDragonModule.sol";
+import { VaultSharesNotTransferable, MaxUnlockIsAlwaysZero, CantWithdrawLockedShares } from "src/errors.sol";
 
 contract DragonTokenizedStrategy is TokenizedStrategy {
     event NewLockupSet(address indexed user, uint256 indexed unlockTime, uint256 indexed lockedShares);
+
+    // Minimum lockup duration of 3 months (in seconds)
+    uint256 private constant MINIMUM_LOCKUP_DURATION = 90 days;
 
     function initialize(
         address _asset,
@@ -26,16 +29,24 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @param totalSharesLocked The amount of shares to lock.
      */
     function _setOrExtendLockup(address user, uint256 lockupDuration, uint256 totalSharesLocked) internal {
+        require(lockupDuration > 0, "Lockup duration must be greater than 0");
+
         LockupInfo storage lockup = _strategyStorage().voluntaryLockups[user];
         uint256 currentTime = block.timestamp;
 
         if (lockup.unlockTime <= currentTime) {
             // Start a new lockup
             lockup.unlockTime = currentTime + lockupDuration;
+
+            require(lockupDuration > MINIMUM_LOCKUP_DURATION, "Lockup duration must be greater than 0");
+
             lockup.lockedShares = totalSharesLocked;
         } else {
             // Extend existing lockup
-            lockup.unlockTime += lockupDuration;
+            uint256 newUnlockTime = lockup.unlockTime + lockupDuration;
+            // Ensure the new unlock time is at least 3 months in the future
+            require(newUnlockTime >= currentTime + MINIMUM_LOCKUP_DURATION, "minimum lockup duration is 3 months");
+            lockup.unlockTime = newUnlockTime;
             lockup.lockedShares = totalSharesLocked;
         }
 
@@ -77,12 +88,10 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     }
 
     /// @dev Internal implementation of {maxWithdraw}.
-    function _maxWithdraw(StrategyData storage S, address _owner)
-        internal
-        view
-        override
-        returns (uint256 maxWithdraw_)
-    {
+    function _maxWithdraw(
+        StrategyData storage S,
+        address _owner
+    ) internal view override returns (uint256 maxWithdraw_) {
         // Get the max the owner could withdraw currently.
 
         maxWithdraw_ = IBaseStrategy(address(this)).availableWithdrawLimit(_owner);
@@ -142,7 +151,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @dev Accepts a `maxLoss` variable in order to match the multi
      * strategy vaults ABI.
      */
-    function maxWithdraw(address _owner, uint256 /*maxLoss*/ ) external view override returns (uint256) {
+    function maxWithdraw(address _owner, uint256 /*maxLoss*/) external view override returns (uint256) {
         return _maxWithdraw(_strategyStorage(), _owner);
     }
 
@@ -156,12 +165,12 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @param maxLoss The amount of acceptable loss in Basis points.
      * @return shares The actual amount of shares burnt.
      */
-    function withdraw(uint256 assets, address receiver, address _owner, uint256 maxLoss)
-        public
-        override
-        nonReentrant
-        returns (uint256 shares)
-    {
+    function withdraw(
+        uint256 assets,
+        address receiver,
+        address _owner,
+        uint256 maxLoss
+    ) public override nonReentrant returns (uint256 shares) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
 
@@ -190,7 +199,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @dev Accepts a `maxLoss` variable in order to match the multi
      * strategy vaults ABI.
      */
-    function maxRedeem(address _owner, uint256 /*maxLoss*/ ) external view override returns (uint256) {
+    function maxRedeem(address _owner, uint256 /*maxLoss*/) external view override returns (uint256) {
         return _maxRedeem(_strategyStorage(), _owner);
     }
 
@@ -204,12 +213,12 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @param maxLoss The amount of acceptable loss in Basis points.
      * @return . The actual amount of underlying withdrawn.
      */
-    function redeem(uint256 shares, address receiver, address _owner, uint256 maxLoss)
-        public
-        override
-        nonReentrant
-        returns (uint256)
-    {
+    function redeem(
+        uint256 shares,
+        address receiver,
+        address _owner,
+        uint256 maxLoss
+    ) public override nonReentrant returns (uint256) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
         require(shares <= _maxRedeem(S, _owner), "ERC4626: redeem more than max");
@@ -228,11 +237,11 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @param lockupDuration The duration of the lockup in seconds.
      * @return shares The amount of shares minted.
      */
-    function depositWithLockup(uint256 assets, address receiver, uint256 lockupDuration)
-        public
-        onlyOwner
-        returns (uint256 shares)
-    {
+    function depositWithLockup(
+        uint256 assets,
+        address receiver,
+        uint256 lockupDuration
+    ) public onlyOwner returns (uint256 shares) {
         require(lockupDuration > 0, "Lockup duration must be greater than 0");
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
@@ -261,11 +270,11 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @param lockupDuration The duration of the lockup in seconds.
      * @return assets The actual amount of asset deposited.
      */
-    function mintWithLockup(uint256 shares, address receiver, uint256 lockupDuration)
-        public
-        onlyOwner
-        returns (uint256 assets)
-    {
+    function mintWithLockup(
+        uint256 shares,
+        address receiver,
+        uint256 lockupDuration
+    ) public onlyOwner returns (uint256 assets) {
         require(lockupDuration > 0, "Lockup duration must be greater than 0");
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
