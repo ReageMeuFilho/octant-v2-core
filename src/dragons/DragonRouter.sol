@@ -9,20 +9,18 @@ import {AccessControlUpgradeable} from "openzeppelin-upgradeable/access/AccessCo
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ITokenizedStrategy} from "src/interfaces/ITokenizedStrategy.sol";
 
-
-    struct Split {
-        address[] recipients; // [r1, r2, ..., opexVault, metapool]
-        uint256[] allocations; // should be in SPLIT_PRECISION terms
-        uint256 totalAllocations; // should be in SPLIT_PRECISION terms
-    }
-
+struct Split {
+    address[] recipients; // [r1, r2, ..., opexVault, metapool]
+    uint256[] allocations; // should be in SPLIT_PRECISION terms
+    uint256 totalAllocations; // should be in SPLIT_PRECISION terms
+}
 
 interface ITransformer {
     function transform(address fromToken, address toToken, uint256 amount) external payable returns (uint256);
 }
 
 interface ISplitChecker {
-    function checkSplit(Split memory split, address opexVault, address metapool) external returns (bool);
+    function checkSplit(Split memory split, address opexVault, address metapool) external;
 }
 
 /**
@@ -281,14 +279,14 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
                 ? userTransformer.transformer.transform{value: _amount}(_asset, userTransformer.targetToken, _amount)
                 : userTransformer.transformer.transform(_asset, userTransformer.targetToken, _amount);
             if (userTransformer.targetToken == NATIVE_TOKEN) {
-                (bool success, ) = _user.call{value: _transformedAmount}("");
+                (bool success,) = _user.call{value: _transformedAmount}("");
                 require(success);
             } else {
                 IERC20(userTransformer.targetToken).safeTransfer(_user, _transformedAmount);
             }
         } else {
             if (_asset == NATIVE_TOKEN) {
-                (bool success, ) = _user.call{value: _amount}("");
+                (bool success,) = _user.call{value: _amount}("");
                 require(success);
             } else {
                 IERC20(_asset).safeTransfer(_user, _amount);
