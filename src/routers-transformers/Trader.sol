@@ -22,6 +22,9 @@ contract Trader is Module {
     /// @notice Token to be sold.
     address public token;
 
+    /// @notice Swapper is the address which will handle actual selling.
+    address public swapper;
+
     address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE; // using this address to represent native ETH
 
     /// @notice Chance is probability of a trade occuring at a particular height, normalized to uint256.max instead to 1
@@ -66,10 +69,11 @@ contract Trader is Module {
 
     function setUp(bytes memory initializeParams) public override initializer {
         (address _owner, bytes memory data) = abi.decode(initializeParams, (address, bytes));
-        (address _token, uint256 _chance, uint256 _spendADay, uint256 _low, uint256 _high) =
-            abi.decode(data, (address, uint256, uint256, uint256, uint256));
+        (address _token, address _swapper, uint256 _chance, uint256 _spendADay, uint256 _low, uint256 _high) =
+            abi.decode(data, (address, address, uint256, uint256, uint256, uint256));
         __Ownable_init(msg.sender);
         token = _token;
+        swapper = _swapper;
         setSpendADay(_chance, _spendADay, _low, _high);
         setAvatar(_owner);
         setTarget(_owner);
@@ -91,10 +95,10 @@ contract Trader is Module {
         spent = spent + saleValue;
 
         if (token == ETH) {
-            (bool success,) = payable(owner()).call{value: saleValue}("");
+            (bool success,) = payable(swapper).call{value: saleValue}("");
             require(success);
         } else {
-            IERC20(token).safeTransfer(owner(), saleValue);
+            IERC20(token).safeTransfer(swapper, saleValue);
         }
     }
 

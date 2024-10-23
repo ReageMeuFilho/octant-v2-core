@@ -16,16 +16,19 @@ contract TestTraderIntegrationETH is BaseTest {
     Trader public moduleImplementation;
     Trader public trader;
 
+    address swapper = makeAddr("swapper");
+
     function setUp() public {
         helperConfig = new HelperConfig();
         _configure(true);
         moduleImplementation = new Trader();
-        temps = _testTemps(address(moduleImplementation), abi.encode(ETH, 0, 0, 0.6 ether, 1.4 ether));
+        temps = _testTemps(address(moduleImplementation), abi.encode(ETH, swapper, 0, 0, 0.6 ether, 1.4 ether));
         trader = Trader(payable(temps.module));
     }
 
     function testCheckModuleInitialization() public view {
         assertTrue(trader.owner() == temps.safe);
+        assertTrue(trader.swapper() == swapper);
         assertTrue(trader.chance() == 0);
         assertTrue(trader.spendADay() == 0);
         assertTrue(trader.saleValueLow() == 0.6 ether);
@@ -44,8 +47,11 @@ contract TestTraderIntegrationETH is BaseTest {
         trader.setSpendADay(chance, spendADay, 1 ether, 1 ether);
         vm.stopPrank();
         vm.roll(block.number + 100);
+
+        uint256 oldBalance = swapper.balance;
         trader.convert(block.number - 2);
         assertEq(trader.spent(), 1 ether);
+        assertGt(swapper.balance, oldBalance);
     }
 
     function test_receivesEth() external {
@@ -61,12 +67,14 @@ contract TestTraderIntegrationIERC20 is BaseTest {
     Trader public moduleImplementation;
     Trader public trader;
 
+    address swapper = makeAddr("swapper");
+
     function setUp() public {
         helperConfig = new HelperConfig();
         _configure(true);
         moduleImplementation = new Trader();
 
-        temps = _testTemps(address(moduleImplementation), abi.encode(address(token), 0, 0, 0.6 ether, 1.4 ether));
+        temps = _testTemps(address(moduleImplementation), abi.encode(address(token), swapper, 0, 0, 0.6 ether, 1.4 ether));
         trader = Trader(payable(temps.module));
     }
 
@@ -88,9 +96,9 @@ contract TestTraderIntegrationIERC20 is BaseTest {
         vm.stopPrank();
         vm.roll(block.number + 100);
 
-        uint256 oldBalance = token.balanceOf(trader.owner());
+        uint256 oldBalance = token.balanceOf(swapper);
         trader.convert(block.number - 2);
         assertEq(trader.spent(), 1 ether);
-        assertGt(token.balanceOf(trader.owner()), oldBalance);
+        assertGt(token.balanceOf(swapper), oldBalance);
     }
 }
