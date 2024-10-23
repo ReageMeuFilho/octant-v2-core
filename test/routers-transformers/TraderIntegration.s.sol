@@ -5,11 +5,12 @@ import "forge-std/Test.sol";
 import "../Base.t.sol";
 import "src/routers-transformers/Trader.sol";
 import {HelperConfig} from "script/helpers/HelperConfig.s.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-contract TestTraderConfig is BaseTest {
-    uint256 public constr = 0;
-    uint256 public budget = 10_000 ether;
+contract TestTraderIntegrationETH is BaseTest {
     HelperConfig helperConfig;
+
+    address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
     testTemps temps;
     Trader public moduleImplementation;
@@ -19,9 +20,8 @@ contract TestTraderConfig is BaseTest {
         helperConfig = new HelperConfig();
         _configure(true);
         moduleImplementation = new Trader();
-        temps = _testTemps(address(moduleImplementation), abi.encode(0, 0, 0.6 ether, 1.4 ether));
+        temps = _testTemps(address(moduleImplementation), abi.encode(ETH, 0, 0, 0.6 ether, 1.4 ether));
         trader = Trader(payable(temps.module));
-        vm.deal(address(trader), budget);
     }
 
     function testCheckModuleInitialization() public view {
@@ -34,7 +34,8 @@ contract TestTraderConfig is BaseTest {
 
     receive() external payable {}
 
-    function test_simpleBuy() external {
+    function test_sellEth() external {
+        vm.deal(address(trader), 10_000 ether);
         // effectively disable randomness check
         uint256 chance = type(uint256).max;
         // effectively disable upper bound check
@@ -48,7 +49,48 @@ contract TestTraderConfig is BaseTest {
     }
 
     function test_receivesEth() external {
-        (bool sent,) = payable(address(trader)).call{value: 100000}("");
+        vm.deal(address(this), 10_000 ether);
+        (bool sent,) = payable(address(trader)).call{value: 100 ether}("");
         require(sent, "Failed to send Ether");
+    }
+}
+
+contract TestTraderIntegrationIERC20 is BaseTest {
+    HelperConfig helperConfig;
+    testTemps temps;
+    Trader public moduleImplementation;
+    Trader public trader;
+
+    function setUp() public {
+        helperConfig = new HelperConfig();
+        _configure(true);
+        moduleImplementation = new Trader();
+
+        temps = _testTemps(address(moduleImplementation), abi.encode(address(token), 0, 0, 0.6 ether, 1.4 ether));
+        trader = Trader(payable(temps.module));
+    }
+
+    function testCheckModuleInitialization() public view {
+        assertTrue(IERC20(trader.token()).balanceOf(address(trader.owner())) > 0);
+    }
+
+    receive() external payable {}
+
+    function test_sellERC20() external {
+        token.mint(address(trader), 10_000 ether);
+
+        // effectively disable randomness check
+        uint256 chance = type(uint256).max;
+        // effectively disable upper bound check
+        uint256 spendADay = 1_000_000_000_000 ether;
+        vm.startPrank(temps.safe);
+        trader.setSpendADay(chance, spendADay, 1 ether, 1 ether);
+        vm.stopPrank();
+        vm.roll(block.number + 100);
+
+        uint256 oldBalance = token.balanceOf(trader.owner());
+        trader.convert(block.number - 2);
+        assertEq(trader.spent(), 1 ether);
+        assertGt(token.balanceOf(trader.owner()), oldBalance);
     }
 }

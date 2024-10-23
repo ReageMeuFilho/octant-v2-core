@@ -7,9 +7,10 @@ import "src/routers-transformers/Trader.sol";
 import {HelperConfig} from "script/helpers/HelperConfig.s.sol";
 
 contract TestTraderRandomness is BaseTest {
-    uint256 public constr = 0;
     uint256 public budget = 10_000 ether;
     HelperConfig helperConfig = new HelperConfig();
+
+    address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
     testTemps temps;
     Trader public moduleImplementation;
@@ -18,7 +19,7 @@ contract TestTraderRandomness is BaseTest {
     function setUp() public {
         _configure(false);
         moduleImplementation = new Trader();
-        temps = _testTemps(address(moduleImplementation), abi.encode(0, 0, 0.6 ether, 1.4 ether));
+        temps = _testTemps(address(moduleImplementation), abi.encode(ETH, 0, 0, 0.6 ether, 1.4 ether));
         trader = Trader(payable(temps.module));
         vm.deal(address(trader), budget);
     }
