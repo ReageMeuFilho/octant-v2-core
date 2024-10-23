@@ -91,12 +91,14 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
     function setUp(bytes memory initializeParams) public initializer {
         (address _owner, bytes memory data) = abi.decode(initializeParams, (address, bytes));
 
-        (address[] memory _strategy, address[] memory _asset, address _opexVault, address _metapool) =
-            abi.decode(data, (address[], address[], address, address));
+        (address[] memory _strategy, address[] memory _asset, address _splitChecker, address _opexVault, address _metapool) =
+            abi.decode(data, (address[], address[], address, address, address));
 
         __AccessControl_init();
         __ReentrancyGuard_init();
 
+        require(_splitChecker != address(0));
+        splitChecker = ISplitChecker(_splitChecker);
         _setMetapool(_metapool);
         _setOpexVault(_opexVault);
 
