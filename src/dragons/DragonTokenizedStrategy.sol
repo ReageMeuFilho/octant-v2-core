@@ -104,6 +104,40 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         return _strategyStorage().voluntaryLockups[user].unlockTime;
     }
 
+    /**
+     * @notice Returns detailed information about a user's lockup status
+     * @param user The address to check
+     * @return unlockTime The timestamp when shares unlock
+     * @return lockedShares The amount of shares that are locked
+     * @return isRageQuit Whether the user is in rage quit mode
+     * @return totalShares Total shares owned by user
+     * @return withdrawableShares Amount of shares that can be withdrawn now
+     */
+    function getUserLockupInfo(
+        address user
+    )
+        external
+        view
+        returns (
+            uint256 unlockTime,
+            uint256 lockedShares,
+            bool isRageQuit,
+            uint256 totalShares,
+            uint256 withdrawableShares
+        )
+    {
+        StrategyData storage S = _strategyStorage();
+        LockupInfo memory lockup = S.voluntaryLockups[user];
+
+        return (
+            lockup.unlockTime,
+            lockup.lockedShares,
+            lockup.isRageQuit,
+            _balanceOf(S, user),
+            _userUnlockedShares(S, user)
+        );
+    }
+
     /// @dev Internal implementation of {maxWithdraw}.
     function _maxWithdraw(
         StrategyData storage S,
