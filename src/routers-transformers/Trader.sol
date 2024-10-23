@@ -4,24 +4,33 @@ pragma solidity ^0.8.23;
 import {Module} from "zodiac/core/Module.sol";
 import {Enum} from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 import "solady/src/utils/SafeCastLib.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @author .
 /// @title Octant Trader
 /// @notice Octant Trader is a contract that performs "DCA" in terms of sold token into another token.
 /// @dev This contract performs trades in a random times, attempting to isolate the deployer from risks of insider trading.
 contract Trader is Module {
+    using SafeERC20 for IERC20;
+
     event Conversion(uint256 sold, uint256 bought);
     event Status(uint256 ethBalance, uint256 glmBalance);
 
     uint256 public constant blocksADay = 7200;
 
+    /// @notice Token to be sold.
+    address public token;
+
+    address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE; // using this address to represent native ETH
+
     /// @notice Chance is probability of a trade occuring at a particular height, normalized to uint256.max instead to 1
     uint256 public chance;
 
-    /// @notice How much ETH can be spend per day on average (upper bound)
+    /// @notice How much can be spend per day on average (upper bound)
     uint256 public spendADay;
 
-    /// @notice Spent ETH since startingBlock
+    /// @notice Spent since startingBlock
     uint256 public spent = 0;
 
     /// @notice Rules for spending were last updated at this height.
@@ -42,7 +51,7 @@ contract Trader is Module {
     ///         Note, you don't need to pay for gas to learn if tx will apply!
     error Trader__WrongHeight();
 
-    /// @notice This error indicates that contract has spent more ETH than allowed.
+    /// @notice This error indicates that contract has spent more than allowed.
     ///         Retry tx in the next block.
     error Trader__SpendingTooMuch();
 
@@ -57,9 +66,10 @@ contract Trader is Module {
 
     function setUp(bytes memory initializeParams) public override initializer {
         (address _owner, bytes memory data) = abi.decode(initializeParams, (address, bytes));
-        (uint256 _chance, uint256 _spendADay, uint256 _low, uint256 _high) =
-            abi.decode(data, (uint256, uint256, uint256, uint256));
+        (address _token, uint256 _chance, uint256 _spendADay, uint256 _low, uint256 _high) =
+            abi.decode(data, (address, uint256, uint256, uint256, uint256));
         __Ownable_init(msg.sender);
+        token = _token;
         setSpendADay(_chance, _spendADay, _low, _high);
         setAvatar(_owner);
         setTarget(_owner);
@@ -80,9 +90,12 @@ contract Trader is Module {
 
         spent = spent + saleValue;
 
-        // this simulates sending ETH to swapper
-        (bool success,) = payable(owner()).call{value: saleValue}("");
-        require(success);
+        if (token == ETH) {
+            (bool success,) = payable(owner()).call{value: saleValue}("");
+            require(success);
+        } else {
+            IERC20(token).safeTransfer(owner(), saleValue);
+        }
     }
 
     function canTrade(uint256 height) public view returns (bool) {
@@ -95,11 +108,11 @@ contract Trader is Module {
         return (spent > (height - startingBlock) * (spendADay / blocksADay));
     }
 
-    /// @notice Sets ETH spending limits.
+    /// @notice Sets spending limits.
     /// @param chance_ Chance determines how often on average trades can be performed
-    /// @param spendADay_ determines how much ETH on average can Trader sell
-    /// @param low_ is a lower bound of sold ETH for a single trade
-    /// @param high_ is a higher bound of sold ETH for a single trade
+    /// @param spendADay_ determines how much on average can Trader sell
+    /// @param low_ is a lower bound of sold amount for a single trade
+    /// @param high_ is a higher bound of sold amount for a single trade
     function setSpendADay(uint256 chance_, uint256 spendADay_, uint256 low_, uint256 high_) public onlyOwner {
         chance = chance_;
         spendADay = spendADay_;
