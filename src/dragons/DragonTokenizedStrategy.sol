@@ -104,6 +104,19 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     }
 
     /**
+     * @notice Returns the remaining cooldown time in seconds for a user's lock
+     * @param user The address to check
+     * @return remainingTime The time remaining in seconds until unlock (0 if already unlocked)
+     */
+    function getRemainingCooldown(address user) public view returns (uint256 remainingTime) {
+        uint256 unlockTime = _strategyStorage().voluntaryLockups[user].unlockTime;
+        if (unlockTime <= block.timestamp) {
+            return 0;
+        }
+        return unlockTime - block.timestamp;
+    }
+
+    /**
      * @notice Returns detailed information about a user's lockup status
      * @param user The address to check
      * @return unlockTime The timestamp when shares unlock
