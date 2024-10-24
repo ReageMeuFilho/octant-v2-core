@@ -7,29 +7,38 @@ We are forking the Yearn Tokenized Strategy to support yield donations that are 
 2) Yield tracking: The strategy should earn yield as before but Yield must be tracked separately from the principal.
 3) Yield withdrawal: Accumulated yield should not be withdrawable by the depositor. Instead, profits can be withdrawn by a special role (to be held by DragonVault).
 
-### Gap Analysis:
+### Core Functionality:
 
-Principal preservation:
-- Current: TotalAssets fluctuates based on profits/losses.
-- Needed: TotalAssets should always equal totalSupply of shares.
+1. Yield Donation Mechanism
+The yield donation mechanism allows users to deposit assets while automatically donating any earned yield. Think of it like a savings account where you keep your principal but donate all the interest earned. Here's how it works:
 
-Yield separation:
-- Current: Profits are locked and gradually released to all shareholders.
-- Needed: Profits should be kept separate and not affect share value.
+- Simplified Accounting: Direct tracking of yield separate from principal without profit unlocking mechanism
+- Principal Preservation: TotalAssets maintains a 1:1 ratio with totalSupply of shares, ensuring depositor's principal is always preserved, if a loss is registered burn shares from Dragon Router before realizing loss in principal.
+- Yield Withdrawal: Special keeper role (DragonRouter) has exclusive access to withdraw accumulated yield
 
-Yield withdrawal:
-- Current: No specific function for yield-only withdrawal.
-- Needed: New role and gated function to withdraw all accumulated yield.
+2. Voluntary Lockup Mechanism
+The lockup mechanism is like putting your money in a time-locked safe. You choose to lock your funds for at least 90 days, showing your commitment to the protocol. This helps create stability for the protocol while giving users flexibility in how long they want to commit their assets.
 
-Accounting:
-- Current: Uses profit unlocking mechanism.
-- Needed: Simpler accounting separating principal and yield.
+- Users can lock their strategy shares for a minimum period of 90 days (MINIMUM_LOCKUP_DURATION)
+- Lockups can be created during deposit/mint operations using depositWithLockup() or mintWithLockup()
+- Locked shares cannot be withdrawn until the lockup period expires
+- Users can extend existing lockups with additional duration
+- Each user can have one active lockup tracked via the LockupInfo struct
 
-Share price:
-- Current: Share price can increase over time.
-- Needed: Share price should remain constant (1:1 with asset), yield withdraws should NEVER affect share price, principal should always be safe.
+3. Rage Quit Mechanism
+The rage quit feature acts as a safety valve, allowing users to exit their position if they need to, even during a lockup period. Think of it as an emergency exit ramp that lets you gradually withdraw your funds over 3 months, rather than being completely locked in.
+- Allows users with locked shares to initiate a gradual withdrawal over 3 months
+- Once initiated via initiateRageQuit():
+  - Sets a new 3-month lockup period
+  - Enables proportional unlocking of shares over time
+  - Cannot be reversed once started
+- Unlocked shares calculation during rage quit:
+  - Based on time elapsed since rage quit initiation
+  - Linear unlocking over the 3 month period
+  - Formula: unlockedPortion = (timeElapsed * lockedShares) / MINIMUM_LOCKUP_DURATION
 
-#### TODO (I will remove this as I go and add audit documentation explaining implementation): 
+
+### Changes from original yearn implementation
 Modify TokenizedStrategy.sol:
 - Remove profit unlocking mechanism.
 - Add a separate yield tracking variable.
