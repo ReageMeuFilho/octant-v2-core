@@ -29,29 +29,38 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @param lockupDuration The amount of time to set or extend a user's lockup.
      * @param totalSharesLocked The amount of shares to lock.
      */
-    function _setOrExtendLockup(address user, uint256 lockupDuration, uint256 totalSharesLocked) internal {
-        if (lockupDuration == 0) revert ZeroLockupDuration();
-
-        LockupInfo storage lockup = _strategyStorage().voluntaryLockups[user];
+    function _setOrExtendLockup(
+        StrategyData storage S,
+        address user,
+        uint256 lockupDuration,
+        uint256 totalSharesLocked
+    ) internal returns (uint256) {
+        LockupInfo storage lockup = S.voluntaryLockups[user];
         uint256 currentTime = block.timestamp;
 
-        if (lockup.unlockTime <= currentTime) {
+        // NOTE: if there is no lockup, and the lockup duration not 0 then set a new lockup
+        if (lockup.unlockTime <= currentTime && lockupDuration > 0) {
             lockup.unlockTime = currentTime + lockupDuration;
-
+            // NOTE: enforce minimum lockup duration for new lockups
             if (lockupDuration <= MINIMUM_LOCKUP_DURATION) revert InsufficientLockupDuration();
 
             lockup.lockedShares = totalSharesLocked;
         } else {
-            // Extend existing lockup
-            uint256 newUnlockTime = lockup.unlockTime + lockupDuration;
-            // Ensure the new unlock time is at least 3 months in the future
-            if (newUnlockTime < currentTime + MINIMUM_LOCKUP_DURATION) revert InsufficientLockupDuration();
-
-            lockup.unlockTime = newUnlockTime;
+            // NOTE: update the locked shares
             lockup.lockedShares = totalSharesLocked;
+            // NOTE: if there is a lock up and the lockUpDuration is greater than 0 then extend the lockup ensuring it's more than minimum lockup duration
+            if (lockupDuration > 0) {
+                // Extend existing lockup
+                uint256 newUnlockTime = lockup.unlockTime + lockupDuration;
+                // Ensure the new unlock time is at least 3 months in the future
+                if (newUnlockTime < currentTime + MINIMUM_LOCKUP_DURATION) revert InsufficientLockupDuration();
+
+                lockup.unlockTime = newUnlockTime;
+            }
         }
 
         emit NewLockupSet(user, lockup.unlockTime, lockup.lockedShares);
+        return lockup.lockedShares;
     }
 
     /**
@@ -153,8 +162,6 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         LockupInfo memory lockup = S.voluntaryLockups[_owner];
 
         if (block.timestamp < lockup.unlockTime) revert SharesStillLocked();
-
-        if (shares > _balanceOf(S, _owner) - lockup.lockedShares) revert CantWithdrawLockedShares();
 
         return super._withdraw(S, receiver, _owner, assets, shares, maxLoss);
     }
@@ -267,6 +274,57 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     }
 
     /**
+     * @notice Mints `shares` of strategy shares to `receiver` by
+     * depositing exactly `assets` of underlying tokens.
+     * @param assets The amount of underlying to deposit in.
+     * @param receiver The address to receive the `shares`.
+     * @return shares The actual amount of shares issued.
+     */
+    function deposit(
+        uint256 assets,
+        address receiver
+    ) external payable override nonReentrant onlyOwner returns (uint256 shares) {
+        // Get the storage slot for all following calls.
+        StrategyData storage S = _strategyStorage();
+
+        // Deposit full balance if using max uint.
+        if (assets == type(uint256).max) {
+            assets = S.asset.balanceOf(msg.sender);
+        }
+
+        // Checking max deposit will also check if shutdown.
+        require(assets <= _maxDeposit(S, receiver), "ERC4626: deposit more than max");
+        // Check for rounding error.
+        require((shares = _convertToShares(S, assets, Math.Rounding.Floor)) != 0, "ZERO_SHARES");
+
+        _deposit(S, receiver, assets, shares);
+        _setOrExtendLockup(S, receiver, 0, _balanceOf(S, receiver));
+    }
+
+    /**
+     * @notice Mints exactly `shares` of strategy shares to
+     * `receiver` by depositing `assets` of underlying tokens.
+     * @param shares The amount of strategy shares mint.
+     * @param receiver The address to receive the `shares`.
+     * @return assets The actual amount of asset deposited.
+     */
+    function mint(
+        uint256 shares,
+        address receiver
+    ) external payable override nonReentrant onlyOwner returns (uint256 assets) {
+        // Get the storage slot for all following calls.
+        StrategyData storage S = _strategyStorage();
+
+        // Checking max mint will also check if shutdown.
+        require(shares <= _maxMint(S, receiver), "ERC4626: mint more than max");
+        // Check for rounding error.
+        require((assets = _convertToAssets(S, shares, Math.Rounding.Ceil)) != 0, "ZERO_ASSETS");
+
+        _deposit(S, receiver, assets, shares);
+        _setOrExtendLockup(S, receiver, 0, _balanceOf(S, receiver));
+    }
+
+    /**
      * @dev Mints `shares` of strategy shares to `receiver` by depositing exactly `assets` of underlying tokens with a lock up
      * @param assets The amount of assets to deposit.
      * @param receiver The receiver of the shares.
@@ -294,7 +352,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
 
         _deposit(S, receiver, assets, shares);
 
-        _setOrExtendLockup(receiver, lockupDuration, _balanceOf(S, receiver));
+        _setOrExtendLockup(S, receiver, lockupDuration, _balanceOf(S, receiver));
 
         return shares;
     }
@@ -345,7 +403,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
 
         _deposit(S, receiver, assets, shares);
 
-        _setOrExtendLockup(receiver, lockupDuration, _balanceOf(S, receiver));
+        _setOrExtendLockup(S, receiver, lockupDuration, _balanceOf(S, receiver));
 
         return assets;
     }

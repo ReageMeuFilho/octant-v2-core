@@ -198,4 +198,67 @@ contract LockupsTest is Setup {
         assertEq(strategy.unlockedShares(user), depositAmount, "All shares should be unlocked after lockup period");
         vm.stopPrank();
     }
+
+    function test_withdrawWithLockup() public {
+        uint256 lockupDuration = 100 days;
+        uint256 depositAmount = 10_000e18;
+
+        vm.startPrank(user);
+        strategy.depositWithLockup(depositAmount, user, lockupDuration);
+
+        // Try to withdraw during lockup
+        vm.expectRevert("ERC4626: withdraw more than max");
+        strategy.withdraw(depositAmount, user, user);
+
+        // Skip past lockup
+        skip(lockupDuration + 1);
+
+        // Should be able to withdraw after lockup
+        uint256 withdrawAmount = depositAmount / 2;
+        strategy.withdraw(withdrawAmount, user, user);
+
+        assertEq(strategy.balanceOf(user), depositAmount - withdrawAmount, "Incorrect remaining balance");
+        vm.stopPrank();
+    }
+
+    function test_maxRedeem() public {
+        uint256 lockupDuration = 100 days;
+        uint256 depositAmount = 10_000e18;
+
+        vm.startPrank(user);
+        strategy.depositWithLockup(depositAmount, user, lockupDuration);
+
+        // During lockup, maxRedeem should be 0
+        assertEq(strategy.maxRedeem(user), 0, "Should not be able to redeem during lockup");
+
+        // Skip past lockup
+        skip(lockupDuration + 1);
+
+        // After lockup, should be able to redeem full amount
+        assertEq(strategy.maxRedeem(user), depositAmount, "Should be able to redeem full amount after lockup");
+        vm.stopPrank();
+    }
+
+    function test_revertWithdrawLockedShares() public {
+        uint256 lockupDuration = 100 days;
+        uint256 depositAmount = 10_000e18;
+        uint256 additionalDeposit = 5_000e18;
+
+        vm.startPrank(user);
+        // First deposit with lockup
+        strategy.depositWithLockup(depositAmount, user, lockupDuration);
+
+        // Second deposit without lockup
+        strategy.deposit(additionalDeposit, user);
+
+        // Try to withdraw more than unlocked shares
+        vm.expectRevert("ERC4626: withdraw more than max");
+        strategy.withdraw(depositAmount + 1, user, user);
+
+        // Should be able to withdraw unlocked shares
+        vm.expectRevert("ERC4626: withdraw more than max");
+
+        strategy.withdraw(additionalDeposit, user, user);
+        vm.stopPrank();
+    }
 }

@@ -340,7 +340,7 @@ contract TokenizedStrategy {
     function deposit(
         uint256 assets,
         address receiver
-    ) external payable nonReentrant onlyOwner returns (uint256 shares) {
+    ) external payable virtual nonReentrant onlyOwner returns (uint256 shares) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
 
@@ -364,7 +364,10 @@ contract TokenizedStrategy {
      * @param receiver The address to receive the `shares`.
      * @return assets The actual amount of asset deposited.
      */
-    function mint(uint256 shares, address receiver) external payable nonReentrant onlyOwner returns (uint256 assets) {
+    function mint(
+        uint256 shares,
+        address receiver
+    ) external payable virtual nonReentrant onlyOwner returns (uint256 assets) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
 
