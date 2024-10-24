@@ -3,17 +3,7 @@ pragma solidity 0.8.25;
 
 import { TokenizedStrategy, IBaseStrategy, Math, ERC20 } from "./TokenizedStrategy.sol";
 import { IDragonModule } from "../interfaces/IDragonModule.sol";
-import { VaultSharesNotTransferable, MaxUnlockIsAlwaysZero, CantWithdrawLockedShares } from "src/errors.sol";
-
-error ZeroLockupDuration();
-error InsufficientLockupDuration();
-error ZeroShares();
-error ZeroAssets();
-error DepositMoreThanMax();
-error MintMoreThanMax();
-error WithdrawMoreThanMax();
-error RedeemMoreThanMax();
-error SharesStillLocked();
+import { VaultSharesNotTransferable, MaxUnlockIsAlwaysZero, CantWithdrawLockedShares, ZeroLockupDuration, InsufficientLockupDuration, SharesStillLocked } from "src/errors.sol";
 
 contract DragonTokenizedStrategy is TokenizedStrategy {
     event NewLockupSet(address indexed user, uint256 indexed unlockTime, uint256 indexed lockedShares);

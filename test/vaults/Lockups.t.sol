@@ -3,6 +3,8 @@ pragma solidity ^0.8.18;
 
 import "forge-std/console.sol";
 import { Setup } from "./Setup.sol";
+import { InsufficientLockupDuration } from "src/errors.sol";
+
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract LockupsTest is Setup {
@@ -84,7 +86,7 @@ contract LockupsTest is Setup {
         uint256 depositAmount = 10_000e18;
 
         vm.startPrank(user);
-        vm.expectRevert("InsufficientLockupDuration");
+        vm.expectRevert(abi.encodeWithSelector(InsufficientLockupDuration.selector));
         strategy.depositWithLockup(depositAmount, user, lockupDuration);
         vm.stopPrank();
     }
@@ -197,4 +199,3 @@ contract LockupsTest is Setup {
         vm.stopPrank();
     }
 }
-
