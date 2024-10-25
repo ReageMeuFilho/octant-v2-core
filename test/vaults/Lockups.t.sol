@@ -435,4 +435,104 @@ contract LockupsTest is Setup {
 
         vm.stopPrank();
     }
+
+    function test_getUnlockTime_comprehensive() public {
+        // Initially should be 0 for unused address
+        assertEq(strategy.getUnlockTime(user), 0, "Initial unlock time should be 0");
+        assertEq(strategy.getUnlockTime(address(0xdead)), 0, "Should be 0 for unused address");
+
+        uint256 lockupDuration = 100 days;
+        uint256 depositAmount = 10_000e18;
+
+        vm.startPrank(user);
+        // Set initial lockup
+        strategy.depositWithLockup(depositAmount, user, lockupDuration);
+        uint256 expectedUnlock = block.timestamp + lockupDuration;
+        assertEq(strategy.getUnlockTime(user), expectedUnlock, "Incorrect initial unlock time");
+
+        // Additional deposit with longer lockup
+        uint256 longerLockup = 200 days;
+        strategy.depositWithLockup(depositAmount, user, longerLockup);
+        expectedUnlock = expectedUnlock + longerLockup;
+        assertEq(strategy.getUnlockTime(user), expectedUnlock, "Incorrect extended unlock time");
+
+        // Additional deposit with shorter lockup (should still maintain longer unlock)
+        uint256 shorterLockup = 50 days;
+        strategy.depositWithLockup(depositAmount, user, shorterLockup);
+        expectedUnlock = expectedUnlock + shorterLockup;
+
+        assertEq(strategy.getUnlockTime(user), expectedUnlock, "Unlock time should not decrease");
+
+        // Skip past unlock time
+        skip(expectedUnlock + 1);
+        // Should still return the same timestamp even after expiry
+        assertEq(strategy.getUnlockTime(user), expectedUnlock, "Unlock time should not change after expiry");
+
+        // Test during rage quit
+        strategy.depositWithLockup(depositAmount, user, lockupDuration);
+        strategy.initiateRageQuit();
+        assertEq(
+            strategy.getUnlockTime(user),
+            block.timestamp + MINIMUM_LOCKUP_DURATION,
+            "Incorrect unlock time after rage quit"
+        );
+
+        vm.stopPrank();
+    }
+
+    function test_getRemainingCooldown_comprehensive() public {
+        // Initially should be 0
+        assertEq(strategy.getRemainingCooldown(user), 0, "Initial cooldown should be 0");
+        assertEq(strategy.getRemainingCooldown(address(0xdead)), 0, "Should be 0 for unused address");
+
+        uint256 lockupDuration = 100 days;
+        uint256 depositAmount = 10_000e18;
+
+        vm.startPrank(user);
+
+        // Set initial lockup and check cooldown
+        strategy.depositWithLockup(depositAmount, user, lockupDuration);
+        assertEq(strategy.getRemainingCooldown(user), lockupDuration, "Initial cooldown incorrect");
+
+        // Check cooldown reduces over time
+        skip(10 days);
+        assertEq(strategy.getRemainingCooldown(user), lockupDuration - 10 days, "Cooldown not decreasing correctly");
+
+        // Additional deposit extending lockup
+        uint256 extensionPeriod = 50 days;
+        strategy.depositWithLockup(depositAmount, user, extensionPeriod);
+        // Should now be original remaining time + extension
+        assertEq(
+            strategy.getRemainingCooldown(user),
+            lockupDuration - 10 days + extensionPeriod,
+            "Extended cooldown incorrect"
+        );
+
+        // Skip to end of cooldown
+        skip(lockupDuration + extensionPeriod);
+        assertEq(strategy.getRemainingCooldown(user), 0, "Cooldown should be 0 after completion");
+
+        // Test rage quit cooldown
+        strategy.depositWithLockup(depositAmount, user, lockupDuration);
+        strategy.initiateRageQuit();
+        assertEq(strategy.getRemainingCooldown(user), MINIMUM_LOCKUP_DURATION, "Incorrect cooldown after rage quit");
+
+        // Check rage quit cooldown decreases
+        skip(45 days);
+        assertEq(
+            strategy.getRemainingCooldown(user),
+            MINIMUM_LOCKUP_DURATION - 45 days,
+            "Rage quit cooldown not decreasing correctly"
+        );
+
+        // Deposit during rage quit should not affect cooldown
+        strategy.deposit(depositAmount, user);
+        assertEq(
+            strategy.getRemainingCooldown(user),
+            MINIMUM_LOCKUP_DURATION - 45 days,
+            "Regular deposit should not affect rage quit cooldown"
+        );
+
+        vm.stopPrank();
+    }
 }

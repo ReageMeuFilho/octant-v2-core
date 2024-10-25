@@ -30,4 +30,6 @@ interface IDragonTokenizedStrategy is ITokenizedStrategy {
     function initiateRageQuit() external;
 
     function mintWithLockup(uint256 shares, address receiver, uint256 lockupDuration) external returns (uint256 assets);
+
+    function getRemainingCooldown(address user) external view returns (uint256 remainingTime);
 }
