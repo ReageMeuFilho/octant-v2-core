@@ -371,8 +371,9 @@ contract LockupsTest is Setup {
 
         // Should be able to withdraw ~50% of assets
         uint256 expectedWithdraw = (depositAmount * 45 days) / MINIMUM_LOCKUP_DURATION;
+        uint256 actualWithdraw = strategy.maxWithdraw(user);
         assertApproxEqRel(
-            strategy.maxWithdraw(user),
+            actualWithdraw,
             expectedWithdraw,
             0.01e18, // 1% tolerance for rounding
             "Incorrect partial withdraw amount during rage quit"
@@ -410,11 +411,8 @@ contract LockupsTest is Setup {
 
         // Test after lockup expires
         skip(lockupDuration + 1);
-        assertEq(
-            strategy.maxRedeem(user),
-            depositAmount + topUpDeposit,
-            "Should be able to redeem all shares after lockup"
-        );
+        uint256 actualRedeem = strategy.maxRedeem(user);
+        assertEq(actualRedeem, depositAmount + topUpDeposit, "Should be able to redeem all shares after lockup");
 
         strategy.withdraw(strategy.maxRedeem(user), user, user);
 
@@ -447,8 +445,9 @@ contract LockupsTest is Setup {
         vm.startPrank(user);
         // Set initial lockup
         strategy.depositWithLockup(depositAmount, user, lockupDuration);
+        uint256 actualUnlock = strategy.getUnlockTime(user);
         uint256 expectedUnlock = block.timestamp + lockupDuration;
-        assertEq(strategy.getUnlockTime(user), expectedUnlock, "Incorrect initial unlock time");
+        assertEq(actualUnlock, expectedUnlock, "Incorrect initial unlock time");
 
         // Additional deposit with longer lockup
         uint256 longerLockup = 200 days;
@@ -492,7 +491,8 @@ contract LockupsTest is Setup {
 
         // Set initial lockup and check cooldown
         strategy.depositWithLockup(depositAmount, user, lockupDuration);
-        assertEq(strategy.getRemainingCooldown(user), lockupDuration, "Initial cooldown incorrect");
+        uint256 actualCooldown = strategy.getRemainingCooldown(user);
+        assertEq(actualCooldown, lockupDuration, "Initial cooldown incorrect");
 
         // Check cooldown reduces over time
         skip(10 days);
