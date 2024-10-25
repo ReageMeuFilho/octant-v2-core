@@ -90,6 +90,7 @@ contract TokenizedStrategy {
     //////////////////////////////////////////////////////////////*/
 
     struct LockupInfo {
+        uint256 lockupTime;
         uint256 unlockTime;
         uint256 lockedShares;
         bool isRageQuit;

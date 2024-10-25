@@ -19,6 +19,8 @@ contract LockupsTest is Setup {
         super.setUp();
         // Mint initial tokens to user for testing
         asset.mint(user, INITIAL_DEPOSIT);
+        asset.mint(ben, INITIAL_DEPOSIT);
+
         vm.prank(user);
         asset.approve(address(strategy), type(uint256).max);
     }
@@ -417,7 +419,7 @@ contract LockupsTest is Setup {
         strategy.withdraw(strategy.maxRedeem(user), user, user);
 
         // Test during rage quit
-        uint256 newLockupAmount = 15_000e18;
+        uint256 newLockupAmount = 100_000e18;
         strategy.depositWithLockup(newLockupAmount, user, 180 days);
         strategy.initiateRageQuit();
 
@@ -430,6 +432,15 @@ contract LockupsTest is Setup {
             0.01e18,
             "Incorrect redeemable shares during rage quit"
         );
+        strategy.withdraw(expectedRedeem, user, user);
+
+        vm.expectRevert("ERC4626: withdraw more than max");
+        strategy.withdraw(expectedRedeem, user, user);
+        assertApproxEqRel(strategy.maxRedeem(user), 0, 0.01e18, "Incorrect redeemable shares during rage quit");
+
+        skip(45 days / 2);
+
+        strategy.withdraw(expectedRedeem / 2, user, user);
 
         vm.stopPrank();
     }
@@ -534,5 +545,184 @@ contract LockupsTest is Setup {
         );
 
         vm.stopPrank();
+    }
+
+    function test_revert_initiateRageQuit_noShares() public {
+        // Try to rage quit without any shares
+        vm.prank(user);
+        vm.expectRevert("No shares to rage quit");
+        strategy.initiateRageQuit();
+
+        // Deposit without lockup and check it still fails
+        uint256 depositAmount = 10_000e18;
+        vm.startPrank(user);
+        strategy.deposit(depositAmount, user);
+
+        // skip any cooldown
+        skip(1 days);
+
+        // Should fail because no locked shares
+        vm.expectRevert("Shares already unlocked");
+        strategy.initiateRageQuit();
+        vm.stopPrank();
+
+        // Check with different users
+        vm.prank(address(0xdead));
+        vm.expectRevert("No shares to rage quit");
+        strategy.initiateRageQuit();
+    }
+
+    function test_revert_initiateRageQuit_alreadyInRageQuit() public {
+        uint256 lockupDuration = 180 days;
+        uint256 depositAmount = 10_000e18;
+
+        // Set up initial locked position
+        vm.startPrank(user);
+        strategy.depositWithLockup(depositAmount, user, lockupDuration);
+
+        // First rage quit should succeed
+        strategy.initiateRageQuit();
+
+        // Second rage quit should fail
+        vm.expectRevert("Already in rage quit");
+        strategy.initiateRageQuit();
+
+        // Additional deposits shouldn't change this
+        strategy.deposit(depositAmount, user);
+        vm.expectRevert("Already in rage quit");
+        strategy.initiateRageQuit();
+
+        // Skip some time and try again
+        skip(45 days);
+        vm.expectRevert("Already in rage quit");
+        strategy.initiateRageQuit();
+
+        // Skip to end of rage quit period and try again
+        skip(MINIMUM_LOCKUP_DURATION + 1);
+        vm.expectRevert("Shares already unlocked");
+        strategy.initiateRageQuit();
+        vm.stopPrank();
+    }
+
+    function test_revert_initiateRageQuit_sharesAlreadyUnlocked() public {
+        uint256 lockupDuration = 100 days;
+        uint256 depositAmount = 10_000e18;
+
+        vm.startPrank(user);
+
+        vm.expectRevert("No shares to rage quit");
+        strategy.initiateRageQuit();
+
+        // Test with standard deposit (no lockup)
+        strategy.deposit(depositAmount, user);
+        assertEq(strategy.getUnlockTime(user), 0, "Unlock time should be 0 for unlocked shares");
+        vm.expectRevert("Shares already unlocked");
+        strategy.initiateRageQuit();
+
+        // Test with expired lockup
+        strategy.depositWithLockup(depositAmount, user, lockupDuration);
+        skip(lockupDuration + 1);
+        vm.expectRevert("Shares already unlocked");
+        strategy.initiateRageQuit();
+
+        // Test with mixed locked and unlocked shares that are expired
+        strategy.deposit(depositAmount, user);
+        vm.expectRevert("Shares already unlocked");
+        strategy.initiateRageQuit();
+
+        // Test after completing a rage quit period
+        uint256 newAmount = 5_000e18;
+        strategy.depositWithLockup(newAmount, user, lockupDuration);
+        strategy.initiateRageQuit();
+        skip(MINIMUM_LOCKUP_DURATION + 1);
+        vm.expectRevert("Shares already unlocked");
+        strategy.initiateRageQuit();
+
+        vm.stopPrank();
+    }
+
+    function test_revert_initiateRageQuit_unlockStates() public {
+        uint256 depositAmount = 10_000e18;
+
+        vm.startPrank(user);
+
+        // Test zero lockup
+        strategy.deposit(depositAmount, user);
+        vm.expectRevert("Shares already unlocked");
+        strategy.initiateRageQuit();
+
+        // Test with locked shares
+        uint256 lockupDuration = 100 days;
+        strategy.depositWithLockup(depositAmount, user, lockupDuration);
+
+        // Skip to just before unlock
+        skip(lockupDuration - 1);
+        // Should succeed
+        strategy.initiateRageQuit();
+
+        // Should fail since already in rage quit
+        vm.expectRevert("Already in rage quit");
+        strategy.depositWithLockup(depositAmount, user, lockupDuration);
+
+        vm.stopPrank();
+    }
+
+    function test_end_to_end_workflow() public {
+        // Initial user setup
+        vm.prank(user);
+        asset.approve(address(strategy), type(uint256).max);
+
+        // ======== Standard Deposit/Withdraw (No Lockup) ========
+        uint256 standardDeposit = 10_000e18;
+        vm.startPrank(user);
+
+        // Test standard deposit
+        uint256 sharesBefore = strategy.totalSupply();
+        strategy.deposit(standardDeposit, user);
+        uint256 sharesAfter = strategy.totalSupply();
+        uint256 standardShares = sharesAfter - sharesBefore;
+
+        // Verify standard deposit state
+        (uint256 unlockTime, uint256 lockedShares, bool isRageQuit, , ) = strategy.getUserLockupInfo(user);
+        assertEq(unlockTime, 0, "No unlock time should be set");
+        assertEq(lockedShares, 0, "No shares should be locked");
+        assertFalse(isRageQuit, "Should not be in rage quit");
+
+        // Test standard withdraw
+        strategy.withdraw(standardDeposit / 2, user, user, 0); // Withdraw half
+        assertEq(strategy.balanceOf(user), standardShares / 2, "Incorrect remaining balance after withdraw");
+
+        vm.stopPrank();
+
+        // ======== Mint with Lockup ========
+        uint256 sharesToMint = 20_000e18;
+        uint256 lockupDuration = 100 days;
+
+        vm.startPrank(user);
+        strategy.mintWithLockup(sharesToMint, user, lockupDuration);
+
+        // Verify locked mint state
+        (unlockTime, lockedShares, isRageQuit, , ) = strategy.getUserLockupInfo(user);
+        assertEq(unlockTime, block.timestamp + lockupDuration, "Incorrect unlock time");
+        assertEq(lockedShares, standardShares / 2 + sharesToMint, "Incorrect locked shares");
+        assertFalse(isRageQuit, "Should not be in rage quit");
+
+        // Verify withdraw/redeem restrictions
+        assertEq(strategy.maxWithdraw(user), 0, "Should not be able to withdraw locked shares");
+        assertEq(strategy.maxRedeem(user), 0, "Should not be able to redeem locked shares");
+
+        // ======== Initiate Rage Quit for user ========
+        strategy.initiateRageQuit();
+
+        // Verify rage quit state
+        (unlockTime, lockedShares, isRageQuit, , ) = strategy.getUserLockupInfo(user);
+        assertTrue(isRageQuit, "Should be in rage quit");
+        assertEq(unlockTime, block.timestamp + 90 days, "Incorrect rage quit duration");
+
+        // Test partial withdrawal during rage quit
+        skip(45 days); // Half of rage quit period
+        uint256 expectedUnlock = ((standardShares / 2 + sharesToMint) * 45 days) / 90 days;
+        uint256 actualMaxRedeem = strategy.maxRedeem(user);
+        assertApproxEqRel(actualMaxRedeem, expectedUnlock, 0.01e18, "Incorrect unlocked amount during rage quit");
     }
 }
