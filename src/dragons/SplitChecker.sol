@@ -1,13 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-struct Split {
-    address[] recipients; // [r1, r2, ..., opexVault, metapool]
-    uint256[] allocations; // should be in SPLIT_PRECISION terms
-    uint256 totalAllocations; // should be in SPLIT_PRECISION terms
-}
+import "src/interfaces/ISplitChecker.sol";
 
-contract SplitChecker {
+contract SplitChecker is ISplitChecker {
     address public goverance;
 
     uint256 private constant SPLIT_PRECISION = 1e18;
@@ -47,7 +43,7 @@ contract SplitChecker {
         maxOpexSplit = _maxOpexSplit;
     }
 
-    function checkSplit(Split memory split, address opexVault, address metapool) external {
+    function checkSplit(Split memory split, address opexVault, address metapool) external view override {
         require(split.recipients.length == split.allocations.length);
         bool flag;
         uint256 calculatedTotalAllocation;

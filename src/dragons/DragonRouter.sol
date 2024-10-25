@@ -7,14 +7,8 @@ import {AccessControlUpgradeable} from "openzeppelin-upgradeable/access/AccessCo
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ITokenizedStrategy} from "src/interfaces/ITokenizedStrategy.sol";
-import {ISplitChecker} from "src/interfaces/ISplitChecker.sol";
+import "src/interfaces/ISplitChecker.sol";
 import {ITransformer} from "src/interfaces/ITransformer.sol";
-
-struct Split {
-    address[] recipients; // [r1, r2, ..., opexVault, metapool]
-    uint256[] allocations; // should be in SPLIT_PRECISION terms
-    uint256 totalAllocations; // should be in SPLIT_PRECISION terms
-}
 
 /**
  * @title Advanced Non-Transferable Single Token Split Vault
