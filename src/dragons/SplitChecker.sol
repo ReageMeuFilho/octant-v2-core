@@ -51,17 +51,17 @@ contract SplitChecker {
         require(split.recipients.length == split.allocations.length);
         bool flag;
         uint256 calculatedTotalAllocation;
-        for(uint256 i = 0; i < split.recipients.length; i++) {
-            if(split.recipients[i] == opexVault) {
+        for (uint256 i = 0; i < split.recipients.length; i++) {
+            if (split.recipients[i] == opexVault) {
                 require(split.allocations[i] * SPLIT_PRECISION / split.totalAllocations <= maxOpexSplit);
             }
-            if(split.recipients[i] == metapool) {
+            if (split.recipients[i] == metapool) {
                 require(split.allocations[i] * SPLIT_PRECISION / split.totalAllocations > minMetapoolSplit);
                 flag = true;
             }
             calculatedTotalAllocation += split.allocations[i];
         }
-        if(!flag) revert("Metapool Split undefined");
+        if (!flag) revert("Metapool Split undefined");
         require(calculatedTotalAllocation == split.totalAllocations);
     }
 }

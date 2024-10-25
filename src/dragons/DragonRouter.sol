@@ -1,26 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuardUpgradeable} from "openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {AccessControlUpgradeable} from "openzeppelin-upgradeable/access/AccessControlUpgradeable.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ITokenizedStrategy} from "src/interfaces/ITokenizedStrategy.sol";
+import {ISplitChecker} from "src/interfaces/ISplitChecker.sol";
+import {ITransformer} from "src/interfaces/ITransformer.sol";
 
 struct Split {
     address[] recipients; // [r1, r2, ..., opexVault, metapool]
     uint256[] allocations; // should be in SPLIT_PRECISION terms
     uint256 totalAllocations; // should be in SPLIT_PRECISION terms
-}
-
-interface ITransformer {
-    function transform(address fromToken, address toToken, uint256 amount) external payable returns (uint256);
-}
-
-interface ISplitChecker {
-    function checkSplit(Split memory split, address opexVault, address metapool) external;
 }
 
 /**
@@ -91,8 +84,13 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
     function setUp(bytes memory initializeParams) public initializer {
         (address _owner, bytes memory data) = abi.decode(initializeParams, (address, bytes));
 
-        (address[] memory _strategy, address[] memory _asset, address _splitChecker, address _opexVault, address _metapool) =
-            abi.decode(data, (address[], address[], address, address, address));
+        (
+            address[] memory _strategy,
+            address[] memory _asset,
+            address _splitChecker,
+            address _opexVault,
+            address _metapool
+        ) = abi.decode(data, (address[], address[], address, address, address));
 
         __AccessControl_init();
         __ReentrancyGuard_init();
@@ -211,6 +209,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      */
     function fundFromSource(address strategy, uint256 amount) external onlyRole(SPLIT_DISTRIBUTOR_ROLE) nonReentrant {
         StrategyData storage data = strategyData[strategy];
+        require(data.asset != address(0));
 
         ITokenizedStrategy(strategy).withdraw(amount, address(this), address(this), 0);
 
