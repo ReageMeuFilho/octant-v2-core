@@ -261,4 +261,178 @@ contract LockupsTest is Setup {
         strategy.withdraw(additionalDeposit, user, user);
         vm.stopPrank();
     }
+
+    function test_getUnlockTime() public {
+        // Initially should be 0
+        assertEq(strategy.getUnlockTime(user), 0, "Initial unlock time should be 0");
+
+        uint256 lockupDuration = 100 days;
+        uint256 depositAmount = 10_000e18;
+
+        vm.startPrank(user);
+        strategy.depositWithLockup(depositAmount, user, lockupDuration);
+
+        // Check unlock time is set correctly
+        assertEq(strategy.getUnlockTime(user), block.timestamp + lockupDuration, "Unlock time not set correctly");
+
+        // Skip past lockup
+        skip(lockupDuration + 1);
+
+        // Unlock time should remain the same even after expiry
+        assertEq(strategy.getUnlockTime(user), block.timestamp - 1, "Unlock time changed unexpectedly");
+
+        // New deposit should update unlock time
+        uint256 newLockupDuration = 120 days;
+        strategy.depositWithLockup(depositAmount, user, newLockupDuration);
+        assertEq(
+            strategy.getUnlockTime(user),
+            block.timestamp + newLockupDuration,
+            "New unlock time not set correctly"
+        );
+
+        vm.stopPrank();
+    }
+
+    function test_maxWithdraw() public {
+        uint256 lockupDuration = 100 days;
+        uint256 depositAmount = 10_000e18;
+
+        vm.startPrank(user);
+
+        // Initial deposit with lockup
+        strategy.depositWithLockup(depositAmount, user, lockupDuration);
+
+        // During lockup, max withdraw should be 0
+        assertEq(strategy.maxWithdraw(user), 0, "Should not be able to withdraw during lockup");
+
+        // Additional deposit without lockup has the current lockup applied to it
+        uint256 topUpDepositLock = 5_000e18;
+        strategy.deposit(topUpDepositLock, user);
+
+        // Should be able to withdraw topUpDepositLock amount
+        assertEq(strategy.maxWithdraw(user), 0, "Should be able to withdraw topUpDepositLock amount");
+
+        // Skip past lockup
+        skip(lockupDuration + 1);
+
+        // After lockup, should be able to withdraw everything
+        assertEq(
+            strategy.maxWithdraw(user),
+            depositAmount + topUpDepositLock,
+            "Should be able to withdraw full amount after lockup"
+        );
+
+        vm.stopPrank();
+    }
+
+    function test_maxWithdrawWithMaxLoss() public {
+        uint256 lockupDuration = 100 days;
+        uint256 depositAmount = 10_000e18;
+        uint256 maxLoss = 100; // 1% max loss
+
+        vm.startPrank(user);
+        strategy.depositWithLockup(depositAmount, user, lockupDuration);
+
+        // During lockup
+        assertEq(
+            strategy.maxWithdraw(user, maxLoss),
+            0,
+            "Should not be able to withdraw during lockup even with maxLoss"
+        );
+
+        // Skip past lockup
+        skip(lockupDuration + 1);
+
+        // After lockup - maxLoss parameter should be ignored as per the implementation
+        assertEq(
+            strategy.maxWithdraw(user, maxLoss),
+            strategy.maxWithdraw(user),
+            "maxWithdraw with and without maxLoss should be equal"
+        );
+
+        vm.stopPrank();
+    }
+
+    function test_maxWithdrawRageQuit() public {
+        uint256 lockupDuration = 180 days;
+        uint256 depositAmount = 10_000e18;
+
+        vm.startPrank(user);
+        strategy.depositWithLockup(depositAmount, user, lockupDuration);
+
+        // Initiate rage quit
+        strategy.initiateRageQuit();
+
+        // Initially should be 0
+        assertEq(strategy.maxWithdraw(user), 0, "Should start at 0 withdraw amount");
+
+        // Skip 45 days (half of MINIMUM_LOCKUP_DURATION)
+        skip(45 days);
+
+        // Should be able to withdraw ~50% of assets
+        uint256 expectedWithdraw = (depositAmount * 45 days) / MINIMUM_LOCKUP_DURATION;
+        assertApproxEqRel(
+            strategy.maxWithdraw(user),
+            expectedWithdraw,
+            0.01e18, // 1% tolerance for rounding
+            "Incorrect partial withdraw amount during rage quit"
+        );
+
+        // Skip to end of rage quit period
+        skip(45 days);
+        assertEq(
+            strategy.maxWithdraw(user),
+            depositAmount,
+            "Should be able to withdraw full amount after rage quit period"
+        );
+
+        vm.stopPrank();
+    }
+
+    function test_maxRedeem_flow() public {
+        uint256 lockupDuration = 100 days;
+        uint256 depositAmount = 10_000e18;
+
+        vm.startPrank(user);
+
+        // Test initial state
+        assertEq(strategy.maxRedeem(user), 0, "Should start with 0 redeemable shares");
+
+        // Test during lockup
+        strategy.depositWithLockup(depositAmount, user, lockupDuration);
+        assertEq(strategy.maxRedeem(user), 0, "Should have 0 redeemable shares during lockup");
+        assertEq(strategy.maxRedeem(user, 100), 0, "MaxLoss parameter should not affect lockup");
+
+        // Test mixed locked and topUpDepositLock shares
+        uint256 topUpDeposit = 5_000e18;
+        strategy.deposit(topUpDeposit, user);
+        assertEq(strategy.maxRedeem(user), 0, "Should be able to redeem topUpDepositLock shares");
+
+        // Test after lockup expires
+        skip(lockupDuration + 1);
+        assertEq(
+            strategy.maxRedeem(user),
+            depositAmount + topUpDeposit,
+            "Should be able to redeem all shares after lockup"
+        );
+
+        strategy.withdraw(strategy.maxRedeem(user), user, user);
+
+        // Test during rage quit
+        uint256 newLockupAmount = 15_000e18;
+        strategy.depositWithLockup(newLockupAmount, user, 180 days);
+        strategy.initiateRageQuit();
+
+        // Skip 45 days (half of MINIMUM_LOCKUP_DURATION)
+        skip(45 days);
+        uint256 expectedRedeem = (newLockupAmount * 45 days) / MINIMUM_LOCKUP_DURATION;
+        assertApproxEqRel(
+            strategy.maxRedeem(user),
+            expectedRedeem,
+            0.01e18,
+            "Incorrect redeemable shares during rage quit"
+        );
+
+        vm.stopPrank();
+    }
 }
