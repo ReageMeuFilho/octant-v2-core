@@ -1,0 +1,408 @@
+<?xml version="1.0" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="805pt" height="1605pt" viewBox="0.00 0.00 805.29 1605.00">
+<g id="graph0" class="graph" transform="translate(11.305393692117775,1490.2248592802866) scale(0.814131274258087)" data-name="G">
+
+<polygon fill="#2e3e56" stroke="none" points="-4,4 -4,-1601 801.29,-1601 801.29,4 -4,4" style=""/>
+<g id="clust1" class="cluster" data-name="clusterBaseStrategy">
+
+<path fill="#445773" stroke="#445773" d="M20,-479C20,-479 529.98,-479 529.98,-479 535.98,-479 541.98,-485 541.98,-491 541.98,-491 541.98,-1440 541.98,-1440 541.98,-1446 535.98,-1452 529.98,-1452 529.98,-1452 20,-1452 20,-1452 14,-1452 8,-1446 8,-1440 8,-1440 8,-491 8,-491 8,-485 14,-479 20,-479" style=""/>
+<text text-anchor="middle" x="274.99" y="-1435.4" font-family="Times,serif" font-size="14.00" fill="#f0f0f0" style="">BaseStrategy</text>
+</g>
+<g id="clust2" class="cluster" data-name="clusterITokenizedStrategy">
+
+<path fill="#3b4b63" stroke="#e8726d" stroke-dasharray="5,2" d="M314.29,-178C314.29,-178 560,-178 560,-178 566,-178 572,-184 572,-190 572,-190 572,-459 572,-459 572,-465 566,-471 560,-471 560,-471 314.29,-471 314.29,-471 308.29,-471 302.29,-465 302.29,-459 302.29,-459 302.29,-190 302.29,-190 302.29,-184 308.29,-178 314.29,-178" style=""/>
+<text text-anchor="middle" x="437.14" y="-454.4" font-family="Times,serif" font-size="14.00" fill="#f0f0f0" style="">ITokenizedStrategy</text>
+</g>
+<g id="clust3" class="cluster" data-name="clusterabi">
+
+<path fill="#3b4b63" stroke="#e8726d" stroke-dasharray="5,2" d="M386.67,-93C386.67,-93 487.62,-93 487.62,-93 493.62,-93 499.62,-99 499.62,-105 499.62,-105 499.62,-158 499.62,-158 499.62,-164 493.62,-170 487.62,-170 487.62,-170 386.67,-170 386.67,-170 380.67,-170 374.67,-164 374.67,-158 374.67,-158 374.67,-105 374.67,-105 374.67,-99 380.67,-93 386.67,-93" style=""/>
+<text text-anchor="middle" x="437.14" y="-153.4" font-family="Times,serif" font-size="14.00" fill="#f0f0f0" style="">abi</text>
+</g>
+<g id="clust4" class="cluster" data-name="clusterERC20">
+
+<path fill="#3b4b63" stroke="#e8726d" stroke-dasharray="5,2" d="M390.43,-8C390.43,-8 483.86,-8 483.86,-8 489.86,-8 495.86,-14 495.86,-20 495.86,-20 495.86,-73 495.86,-73 495.86,-79 489.86,-85 483.86,-85 483.86,-85 390.43,-85 390.43,-85 384.43,-85 378.43,-79 378.43,-73 378.43,-73 378.43,-20 378.43,-20 378.43,-14 384.43,-8 390.43,-8" style=""/>
+<text text-anchor="middle" x="437.14" y="-68.4" font-family="Times,serif" font-size="14.00" fill="#f0f0f0" style="">ERC20</text>
+</g>
+<g id="clust5" class="cluster" data-name="clustertokenizedStrategyImplementation">
+
+<path fill="#3b4b63" stroke="#e8726d" stroke-dasharray="5,2" d="M604,-1267C604,-1267 785.29,-1267 785.29,-1267 791.29,-1267 797.29,-1273 797.29,-1279 797.29,-1279 797.29,-1332 797.29,-1332 797.29,-1338 791.29,-1344 785.29,-1344 785.29,-1344 604,-1344 604,-1344 598,-1344 592,-1338 592,-1332 592,-1332 592,-1279 592,-1279 592,-1273 598,-1267 604,-1267" style=""/>
+<text text-anchor="middle" x="694.65" y="-1327.4" font-family="Times,serif" font-size="14.00" fill="#f0f0f0" style="">tokenizedStrategyImplementation</text>
+</g>
+<g id="clust6" class="cluster" data-name="cluster_01">
+
+<polygon fill="#2e3e56" stroke="black" points="72.14,-1460 72.14,-1589 472.14,-1589 472.14,-1460 72.14,-1460" style=""/>
+<text text-anchor="middle" x="272.14" y="-1572.4" font-family="Times,serif" font-size="14.00" style="">Legend</text>
+</g>
+<!-- BaseStrategy.onlySelf -->
+<g id="node1" class="node" pointer-events="visible" data-name="BaseStrategy.onlySelf">
+
+<polygon fill="#edad56" stroke="#1bc6a6" stroke-width="3" points="192.39,-1389.54 192.39,-1404.46 164.71,-1415 125.57,-1415 97.9,-1404.46 97.9,-1389.54 125.57,-1379 164.71,-1379 192.39,-1389.54" style=""/>
+<polygon fill="none" stroke="#1bc6a6" stroke-width="3" points="196.38,-1386.79 196.38,-1407.21 165.44,-1419 124.84,-1419 93.91,-1407.21 93.91,-1386.79 124.84,-1375 165.44,-1375 196.38,-1386.79" style=""/>
+<text text-anchor="middle" x="145.14" y="-1392.8" font-family="Times,serif" font-size="14.00" style="">onlySelf</text>
+</g>
+<!-- BaseStrategy._onlySelf -->
+<g id="node5" class="node" pointer-events="visible" data-name="BaseStrategy._onlySelf">
+
+<ellipse fill="#edad56" stroke="#edad56" stroke-width="3" cx="437.14" cy="-1401" rx="48.68" ry="18" style=""/>
+<text text-anchor="middle" x="437.14" y="-1396.8" font-family="Times,serif" font-size="14.00" style="">_onlySelf</text>
+</g>
+<!-- BaseStrategy.onlySelf&#45;&gt;BaseStrategy._onlySelf -->
+<g id="edge1" class="edge" data-name="BaseStrategy.onlySelf-&gt;BaseStrategy._onlySelf">
+
+<path fill="none" stroke="#1bc6a6" stroke-width="2" d="M197.66,-1397.71C247.02,-1398.39 321.59,-1399.42 374.18,-1400.15" style=""/>
+<polygon fill="#1bc6a6" stroke="#1bc6a6" stroke-width="2" points="373.97,-1403.64 384.02,-1400.28 374.07,-1396.64 373.97,-1403.64" style=""/>
+</g>
+<!-- BaseStrategy.onlyManagement -->
+<g id="node2" class="node" pointer-events="visible" data-name="BaseStrategy.onlyManagement">
+
+<polygon fill="#edad56" stroke="#1bc6a6" stroke-width="3" points="230.33,-671.54 230.33,-686.46 180.43,-697 109.86,-697 59.96,-686.46 59.96,-671.54 109.86,-661 180.43,-661 230.33,-671.54" style=""/>
+<polygon fill="none" stroke="#1bc6a6" stroke-width="3" points="234.33,-668.3 234.33,-689.7 180.85,-701 109.44,-701 55.96,-689.7 55.96,-668.3 109.44,-657 180.85,-657 234.33,-668.3" style=""/>
+<text text-anchor="middle" x="145.14" y="-674.8" font-family="Times,serif" font-size="14.00" style="">onlyManagement</text>
+</g>
+<!-- ITokenizedStrategy.requireManagement -->
+<g id="node29" class="node" pointer-events="visible" data-name="ITokenizedStrategy.requireManagement">
+
+<ellipse fill="#edad56" stroke="#edad56" stroke-width="3" cx="437.14" cy="-366" rx="88.58" ry="18" style=""/>
+<text text-anchor="middle" x="437.14" y="-361.8" font-family="Times,serif" font-size="14.00" style="">requireManagement</text>
+</g>
+<!-- BaseStrategy.onlyManagement&#45;&gt;ITokenizedStrategy.requireManagement -->
+<g id="edge2" class="edge" data-name="BaseStrategy.onlyManagement-&gt;ITokenizedStrategy.requireManagement">
+
+<path fill="none" stroke="white" stroke-width="2" d="M235.66,-672.2C250.35,-667.24 264.08,-659.6 274.29,-648 349.59,-562.39 225.36,-477.15 302.29,-393 311.32,-383.12 322.87,-376.29 335.41,-371.63" style=""/>
+<polygon fill="white" stroke="white" stroke-width="2" points="336.27,-375.03 344.78,-368.71 334.19,-368.35 336.27,-375.03" style=""/>
+</g>
+<!-- BaseStrategy.onlyKeepers -->
+<g id="node3" class="node" pointer-events="visible" data-name="BaseStrategy.onlyKeepers">
+
+<polygon fill="#edad56" stroke="#1bc6a6" stroke-width="3" points="209.7,-609.54 209.7,-624.46 171.88,-635 118.4,-635 80.59,-624.46 80.59,-609.54 118.4,-599 171.88,-599 209.7,-609.54" style=""/>
+<polygon fill="none" stroke="#1bc6a6" stroke-width="3" points="213.68,-606.5 213.68,-627.5 172.43,-639 117.86,-639 76.6,-627.5 76.6,-606.5 117.86,-595 172.43,-595 213.68,-606.5" style=""/>
+<text text-anchor="middle" x="145.14" y="-612.8" font-family="Times,serif" font-size="14.00" style="">onlyKeepers</text>
+</g>
+<!-- ITokenizedStrategy.requireKeeperOrManagement -->
+<g id="node30" class="node" pointer-events="visible" data-name="ITokenizedStrategy.requireKeeperOrManagement">
+
+<ellipse fill="#edad56" stroke="#edad56" stroke-width="3" cx="437.14" cy="-312" rx="126.72" ry="18" style=""/>
+<text text-anchor="middle" x="437.14" y="-307.8" font-family="Times,serif" font-size="14.00" style="">requireKeeperOrManagement</text>
+</g>
+<!-- BaseStrategy.onlyKeepers&#45;&gt;ITokenizedStrategy.requireKeeperOrManagement -->
+<g id="edge3" class="edge" data-name="BaseStrategy.onlyKeepers-&gt;ITokenizedStrategy.requireKeeperOrManagement">
+
+<path fill="none" stroke="white" stroke-width="2" d="M215.03,-615.43C236.96,-611.39 259.37,-602.9 274.29,-586 347.4,-503.17 227.6,-420.41 302.29,-339 306.07,-334.87 310.3,-331.28 314.85,-328.15" style=""/>
+<polygon fill="white" stroke="white" stroke-width="2" points="316.51,-331.24 323.4,-323.19 313,-325.18 316.51,-331.24" style=""/>
+</g>
+<!-- BaseStrategy.onlyEmergencyAuthorized -->
+<g id="node4" class="node" pointer-events="visible" data-name="BaseStrategy.onlyEmergencyAuthorized">
+
+<polygon fill="#edad56" stroke="#1bc6a6" stroke-width="3" points="270.43,-733.54 270.43,-748.46 197.04,-759 93.25,-759 19.86,-748.46 19.86,-733.54 93.25,-723 197.04,-723 270.43,-733.54" style=""/>
+<polygon fill="none" stroke="#1bc6a6" stroke-width="3" points="274.43,-730.08 274.43,-751.92 197.32,-763 92.96,-763 15.86,-751.92 15.86,-730.08 92.96,-719 197.32,-719 274.43,-730.08" style=""/>
+<text text-anchor="middle" x="145.14" y="-736.8" font-family="Times,serif" font-size="14.00" style="">onlyEmergencyAuthorized</text>
+</g>
+<!-- ITokenizedStrategy.requireEmergencyAuthorized -->
+<g id="node31" class="node" pointer-events="visible" data-name="ITokenizedStrategy.requireEmergencyAuthorized">
+
+<ellipse fill="#edad56" stroke="#edad56" stroke-width="3" cx="437.14" cy="-420" rx="125.59" ry="18" style=""/>
+<text text-anchor="middle" x="437.14" y="-415.8" font-family="Times,serif" font-size="14.00" style="">requireEmergencyAuthorized</text>
+</g>
+<!-- BaseStrategy.onlyEmergencyAuthorized&#45;&gt;ITokenizedStrategy.requireEmergencyAuthorized -->
+<g id="edge4" class="edge" data-name="BaseStrategy.onlyEmergencyAuthorized-&gt;ITokenizedStrategy.requireEmergencyAuthorized">
+
+<path fill="none" stroke="white" stroke-width="2" d="M254.39,-725.83C261.81,-721.62 268.59,-716.42 274.29,-710 344.12,-631.34 238.65,-558.75 302.29,-475 314.07,-459.49 330.99,-448.33 348.86,-440.31" style=""/>
+<polygon fill="white" stroke="white" stroke-width="2" points="349.95,-443.64 357.89,-436.62 347.31,-437.16 349.95,-443.64" style=""/>
+</g>
+<!-- BaseStrategy.__BaseStrategy_init -->
+<g id="node6" class="node" pointer-events="visible" data-name="BaseStrategy.__BaseStrategy_init">
+
+<ellipse fill="#f2c383" stroke="#f2c383" stroke-width="3" cx="145.14" cy="-1339" rx="89.21" ry="18" style=""/>
+<text text-anchor="middle" x="145.14" y="-1334.8" font-family="Times,serif" font-size="14.00" style="">__BaseStrategy_init</text>
+</g>
+<!-- BaseStrategy._delegateCall -->
+<g id="node24" class="node" pointer-events="visible" data-name="BaseStrategy._delegateCall">
+
+<ellipse fill="#edad56" stroke="#edad56" stroke-width="3" cx="437.14" cy="-1293" rx="64.25" ry="18" style=""/>
+<text text-anchor="middle" x="437.14" y="-1288.8" font-family="Times,serif" font-size="14.00" style="">_delegateCall</text>
+</g>
+<!-- BaseStrategy.__BaseStrategy_init&#45;&gt;BaseStrategy._delegateCall -->
+<g id="edge7" class="edge" data-name="BaseStrategy.__BaseStrategy_init-&gt;BaseStrategy._delegateCall">
+
+<path fill="none" stroke="#1bc6a6" stroke-width="2" d="M218.2,-1327.57C263.39,-1320.4 321.37,-1311.21 366.16,-1304.1" style=""/>
+<polygon fill="#1bc6a6" stroke="#1bc6a6" stroke-width="2" points="366.7,-1307.56 376.03,-1302.54 365.6,-1300.65 366.7,-1307.56" style=""/>
+</g>
+<!-- BaseStrategy.ERC20 -->
+<g id="node26" class="node" pointer-events="visible" data-name="BaseStrategy.ERC20">
+
+<ellipse fill="#edad56" stroke="#edad56" stroke-width="3" cx="437.14" cy="-1347" rx="39.45" ry="18" style=""/>
+<text text-anchor="middle" x="437.14" y="-1342.8" font-family="Times,serif" font-size="14.00" style="">ERC20</text>
+</g>
+<!-- BaseStrategy.__BaseStrategy_init&#45;&gt;BaseStrategy.ERC20 -->
+<g id="edge5" class="edge" data-name="BaseStrategy.__BaseStrategy_init-&gt;BaseStrategy.ERC20">
+
+<path fill="none" stroke="#1bc6a6" stroke-width="2" d="M235.12,-1341.45C283.8,-1342.8 342.43,-1344.41 383.78,-1345.56" style=""/>
+<polygon fill="#1bc6a6" stroke="#1bc6a6" stroke-width="2" points="383.44,-1349.05 393.53,-1345.82 383.63,-1342.05 383.44,-1349.05" style=""/>
+</g>
+<!-- BaseStrategy.ITokenizedStrategy -->
+<g id="node27" class="node" pointer-events="visible" data-name="BaseStrategy.ITokenizedStrategy">
+
+<ellipse fill="#edad56" stroke="#edad56" stroke-width="3" cx="437.14" cy="-1239" rx="87.38" ry="18" style=""/>
+<text text-anchor="middle" x="437.14" y="-1234.8" font-family="Times,serif" font-size="14.00" style="">ITokenizedStrategy</text>
+</g>
+<!-- BaseStrategy.__BaseStrategy_init&#45;&gt;BaseStrategy.ITokenizedStrategy -->
+<g id="edge6" class="edge" data-name="BaseStrategy.__BaseStrategy_init-&gt;BaseStrategy.ITokenizedStrategy">
+
+<path fill="none" stroke="#1bc6a6" stroke-width="2" d="M229.2,-1331.77C245.16,-1327.64 261.02,-1321.39 274.29,-1312 293.82,-1298.17 282.69,-1279.74 302.29,-1266 313.58,-1258.08 326.66,-1252.37 340.12,-1248.26" style=""/>
+<polygon fill="#1bc6a6" stroke="#1bc6a6" stroke-width="2" points="340.88,-1251.68 349.63,-1245.72 339.07,-1244.92 340.88,-1251.68" style=""/>
+</g>
+<!-- abi.encodeCall -->
+<g id="node34" class="node" pointer-events="visible" data-name="abi.encodeCall">
+
+<ellipse fill="#edad56" stroke="#edad56" stroke-width="3" cx="437.14" cy="-119" rx="54.45" ry="18" style=""/>
+<text text-anchor="middle" x="437.14" y="-114.8" font-family="Times,serif" font-size="14.00" style="">encodeCall</text>
+</g>
+<!-- BaseStrategy.__BaseStrategy_init&#45;&gt;abi.encodeCall -->
+<g id="edge8" class="edge" data-name="BaseStrategy.__BaseStrategy_init-&gt;abi.encodeCall">
+
+<path fill="none" stroke="white" stroke-width="2" d="M234.66,-1336.33C249.92,-1331.8 264.11,-1324.24 274.29,-1312 314.73,-1263.38 266.43,-226.1 302.29,-174 318.46,-150.5 346.61,-137.03 372.93,-129.31" style=""/>
+<polygon fill="white" stroke="white" stroke-width="2" points="373.55,-132.77 382.32,-126.83 371.76,-126 373.55,-132.77" style=""/>
+</g>
+<!-- BaseStrategy._deployFunds -->
+<g id="node7" class="node" pointer-events="visible" data-name="BaseStrategy._deployFunds">
+
+<ellipse fill="#edad56" stroke="#edad56" stroke-width="3" cx="437.14" cy="-1015" rx="65.53" ry="18" style=""/>
+<text text-anchor="middle" x="437.14" y="-1010.8" font-family="Times,serif" font-size="14.00" style="">_deployFunds</text>
+</g>
+<!-- BaseStrategy._freeFunds -->
+<g id="node8" class="node" pointer-events="visible" data-name="BaseStrategy._freeFunds">
+
+<ellipse fill="#edad56" stroke="#edad56" stroke-width="3" cx="437.14" cy="-961" rx="54.47" ry="18" style=""/>
+<text text-anchor="middle" x="437.14" y="-956.8" font-family="Times,serif" font-size="14.00" style="">_freeFunds</text>
+</g>
+<!-- BaseStrategy._harvestAndReport -->
+<g id="node9" class="node" pointer-events="visible" data-name="BaseStrategy._harvestAndReport">
+
+<ellipse fill="#edad56" stroke="#edad56" stroke-width="3" cx="437.14" cy="-907" rx="86.83" ry="18" style=""/>
+<text text-anchor="middle" x="437.14" y="-902.8" font-family="Times,serif" font-size="14.00" style="">_harvestAndReport</text>
+</g>
+<!-- BaseStrategy.liquidatePosition -->
+<g id="node10" class="node" pointer-events="visible" data-name="BaseStrategy.liquidatePosition">
+
+<ellipse fill="#ffbdb9" stroke="#ffbdb9" stroke-width="3" cx="145.14" cy="-1123" rx="76.48" ry="18" style=""/>
+<text text-anchor="middle" x="145.14" y="-1118.8" font-family="Times,serif" font-size="14.00" style="">liquidatePosition</text>
+</g>
+<!-- BaseStrategy.adjustPosition -->
+<g id="node11" class="node" pointer-events="visible" data-name="BaseStrategy.adjustPosition">
+
+<ellipse fill="#ffbdb9" stroke="#ffbdb9" stroke-width="3" cx="145.14" cy="-1069" rx="65.53" ry="18" style=""/>
+<text text-anchor="middle" x="145.14" y="-1064.8" font-family="Times,serif" font-size="14.00" style="">adjustPosition</text>
+</g>
+<!-- BaseStrategy._tend -->
+<g id="node12" class="node" pointer-events="visible" data-name="BaseStrategy._tend">
+
+<ellipse fill="#edad56" stroke="#edad56" stroke-width="3" cx="437.14" cy="-853" rx="32.48" ry="18" style=""/>
+<text text-anchor="middle" x="437.14" y="-848.8" font-family="Times,serif" font-size="14.00" style="">_tend</text>
+</g>
+<!-- BaseStrategy._tendTrigger -->
+<g id="node13" class="node" pointer-events="visible" data-name="BaseStrategy._tendTrigger">
+
+<ellipse fill="#edad56" stroke="#edad56" stroke-width="3" cx="437.14" cy="-1185" rx="61.4" ry="18" style=""/>
+<text text-anchor="middle" x="437.14" y="-1180.8" font-family="Times,serif" font-size="14.00" style="">_tendTrigger</text>
+</g>
+<!-- BaseStrategy.tendTrigger -->
+<g id="node14" class="node" pointer-events="visible" data-name="BaseStrategy.tendTrigger">
+
+<ellipse fill="#ffbdb9" stroke="#ffbdb9" stroke-width="3" cx="145.14" cy="-1285" rx="56.74" ry="18" style=""/>
+<text text-anchor="middle" x="145.14" y="-1280.8" font-family="Times,serif" font-size="14.00" style="">tendTrigger</text>
+</g>
+<!-- BaseStrategy.tendTrigger&#45;&gt;BaseStrategy._tendTrigger -->
+<g id="edge9" class="edge" data-name="BaseStrategy.tendTrigger-&gt;BaseStrategy._tendTrigger">
+
+<path fill="none" stroke="#1bc6a6" stroke-width="2" d="M202.76,-1282.9C226.62,-1279.65 253.59,-1272.64 274.29,-1258 293.82,-1244.17 282.69,-1225.74 302.29,-1212 319.65,-1199.83 341.22,-1192.86 361.93,-1188.96" style=""/>
+<polygon fill="#1bc6a6" stroke="#1bc6a6" stroke-width="2" points="362.37,-1192.43 371.69,-1187.38 361.26,-1185.52 362.37,-1192.43" style=""/>
+</g>
+<!-- BaseStrategy.availableDepositLimit -->
+<g id="node15" class="node" pointer-events="visible" data-name="BaseStrategy.availableDepositLimit">
+
+<ellipse fill="#ff9797" stroke="#ff9797" stroke-width="3" cx="145.14" cy="-1177" rx="97.28" ry="18" style=""/>
+<text text-anchor="middle" x="145.14" y="-1172.8" font-family="Times,serif" font-size="14.00" style="">availableDepositLimit</text>
+</g>
+<!-- BaseStrategy.type -->
+<g id="node28" class="node" pointer-events="visible" data-name="BaseStrategy.type">
+
+<ellipse fill="#edad56" stroke="#edad56" stroke-width="3" cx="437.14" cy="-1131" rx="27.83" ry="18" style=""/>
+<text text-anchor="middle" x="437.14" y="-1126.8" font-family="Times,serif" font-size="14.00" style="">type</text>
+</g>
+<!-- BaseStrategy.availableDepositLimit&#45;&gt;BaseStrategy.type -->
+<g id="edge10" class="edge" data-name="BaseStrategy.availableDepositLimit-&gt;BaseStrategy.type">
+
+<path fill="none" stroke="#1bc6a6" stroke-width="2" d="M222.34,-1164.91C278.12,-1156.07 351.59,-1144.41 396.27,-1137.33" style=""/>
+<polygon fill="#1bc6a6" stroke="#1bc6a6" stroke-width="2" points="396.57,-1140.82 405.9,-1135.8 395.47,-1133.91 396.57,-1140.82" style=""/>
+</g>
+<!-- BaseStrategy.availableWithdrawLimit -->
+<g id="node16" class="node" pointer-events="visible" data-name="BaseStrategy.availableWithdrawLimit">
+
+<ellipse fill="#ff9797" stroke="#ff9797" stroke-width="3" cx="145.14" cy="-1231" rx="105.92" ry="18" style=""/>
+<text text-anchor="middle" x="145.14" y="-1226.8" font-family="Times,serif" font-size="14.00" style="">availableWithdrawLimit</text>
+</g>
+<!-- BaseStrategy.availableWithdrawLimit&#45;&gt;BaseStrategy.type -->
+<g id="edge11" class="edge" data-name="BaseStrategy.availableWithdrawLimit-&gt;BaseStrategy.type">
+
+<path fill="none" stroke="#1bc6a6" stroke-width="2" d="M237.88,-1221.3C250.84,-1217.26 263.43,-1211.68 274.29,-1204 293.82,-1190.17 282.69,-1171.74 302.29,-1158 329.43,-1138.97 366.87,-1132.67 395.25,-1130.88" style=""/>
+<polygon fill="#1bc6a6" stroke="#1bc6a6" stroke-width="2" points="395.11,-1134.38 404.95,-1130.46 394.81,-1127.39 395.11,-1134.38" style=""/>
+</g>
+<!-- BaseStrategy._emergencyWithdraw -->
+<g id="node17" class="node" pointer-events="visible" data-name="BaseStrategy._emergencyWithdraw">
+
+<ellipse fill="#edad56" stroke="#edad56" stroke-width="3" cx="437.14" cy="-799" rx="96.67" ry="18" style=""/>
+<text text-anchor="middle" x="437.14" y="-794.8" font-family="Times,serif" font-size="14.00" style="">_emergencyWithdraw</text>
+</g>
+<!-- BaseStrategy.deployFunds -->
+<g id="node18" class="node" pointer-events="visible" data-name="BaseStrategy.deployFunds">
+
+<ellipse fill="#ffbdb9" stroke="brown" stroke-width="3" cx="145.14" cy="-1015" rx="60.87" ry="18" style=""/>
+<text text-anchor="middle" x="145.14" y="-1010.8" font-family="Times,serif" font-size="14.00" style="">deployFunds</text>
+</g>
+<!-- BaseStrategy.deployFunds&#45;&gt;BaseStrategy._deployFunds -->
+<g id="edge12" class="edge" data-name="BaseStrategy.deployFunds-&gt;BaseStrategy._deployFunds">
+
+<path fill="none" stroke="#1bc6a6" stroke-width="2" d="M207.29,-1015C250.96,-1015 310.09,-1015 357.31,-1015" style=""/>
+<polygon fill="#1bc6a6" stroke="#1bc6a6" stroke-width="2" points="357.26,-1018.5 367.26,-1015 357.26,-1011.5 357.26,-1018.5" style=""/>
+</g>
+<!-- BaseStrategy.freeFunds -->
+<g id="node19" class="node" pointer-events="visible" data-name="BaseStrategy.freeFunds">
+
+<ellipse fill="#ffbdb9" stroke="#ffbdb9" stroke-width="3" cx="145.14" cy="-961" rx="49.81" ry="18" style=""/>
+<text text-anchor="middle" x="145.14" y="-956.8" font-family="Times,serif" font-size="14.00" style="">freeFunds</text>
+</g>
+<!-- BaseStrategy.freeFunds&#45;&gt;BaseStrategy._freeFunds -->
+<g id="edge13" class="edge" data-name="BaseStrategy.freeFunds-&gt;BaseStrategy._freeFunds">
+
+<path fill="none" stroke="#1bc6a6" stroke-width="2" d="M196.33,-961C243.93,-961 315.8,-961 368.45,-961" style=""/>
+<polygon fill="#1bc6a6" stroke="#1bc6a6" stroke-width="2" points="368.37,-964.5 378.37,-961 368.37,-957.5 368.37,-964.5" style=""/>
+</g>
+<!-- BaseStrategy.harvestTrigger -->
+<g id="node20" class="node" pointer-events="visible" data-name="BaseStrategy.harvestTrigger">
+
+<ellipse fill="#ffbdb9" stroke="#ffbdb9" stroke-width="3" cx="145.14" cy="-559" rx="67.76" ry="18" style=""/>
+<text text-anchor="middle" x="145.14" y="-554.8" font-family="Times,serif" font-size="14.00" style="">harvestTrigger</text>
+</g>
+<!-- ITokenizedStrategy.totalAssets -->
+<g id="node32" class="node" pointer-events="visible" data-name="ITokenizedStrategy.totalAssets">
+
+<ellipse fill="#edad56" stroke="#edad56" stroke-width="3" cx="437.14" cy="-204" rx="53.34" ry="18" style=""/>
+<text text-anchor="middle" x="437.14" y="-199.8" font-family="Times,serif" font-size="14.00" style="">totalAssets</text>
+</g>
+<!-- BaseStrategy.harvestTrigger&#45;&gt;ITokenizedStrategy.totalAssets -->
+<g id="edge14" class="edge" data-name="BaseStrategy.harvestTrigger-&gt;ITokenizedStrategy.totalAssets">
+
+<path fill="none" stroke="white" stroke-width="2" d="M214.05,-560.05C236.3,-556.81 259.16,-548.97 274.29,-532 318.98,-481.85 257.37,-280.96 302.29,-231 319.36,-212.01 345.77,-204.22 370.63,-201.57" style=""/>
+<polygon fill="white" stroke="white" stroke-width="2" points="370.7,-205.07 380.41,-200.84 370.18,-198.09 370.7,-205.07" style=""/>
+</g>
+<!-- ITokenizedStrategy.lastReport -->
+<g id="node33" class="node" pointer-events="visible" data-name="ITokenizedStrategy.lastReport">
+
+<ellipse fill="#edad56" stroke="#edad56" stroke-width="3" cx="437.14" cy="-258" rx="50.96" ry="18" style=""/>
+<text text-anchor="middle" x="437.14" y="-253.8" font-family="Times,serif" font-size="14.00" style="">lastReport</text>
+</g>
+<!-- BaseStrategy.harvestTrigger&#45;&gt;ITokenizedStrategy.lastReport -->
+<g id="edge15" class="edge" data-name="BaseStrategy.harvestTrigger-&gt;ITokenizedStrategy.lastReport">
+
+<path fill="none" stroke="white" stroke-width="2" d="M214.2,-559.83C236.32,-556.54 259.07,-548.74 274.29,-532 348.62,-450.26 227.6,-366.41 302.29,-285 320.04,-265.65 347.5,-257.99 372.93,-255.52" style=""/>
+<polygon fill="white" stroke="white" stroke-width="2" points="372.83,-259.04 382.57,-254.89 372.37,-252.05 372.83,-259.04" style=""/>
+</g>
+<!-- ERC20.balanceOf -->
+<g id="node35" class="node" pointer-events="visible" data-name="ERC20.balanceOf">
+
+<ellipse fill="#edad56" stroke="#edad56" stroke-width="3" cx="437.14" cy="-34" rx="50.92" ry="18" style=""/>
+<text text-anchor="middle" x="437.14" y="-29.8" font-family="Times,serif" font-size="14.00" style="">balanceOf</text>
+</g>
+<!-- BaseStrategy.harvestTrigger&#45;&gt;ERC20.balanceOf -->
+<g id="edge16" class="edge" data-name="BaseStrategy.harvestTrigger-&gt;ERC20.balanceOf">
+
+<path fill="none" stroke="white" stroke-width="2" d="M214,-560.34C236.38,-557.16 259.34,-549.28 274.29,-532 338.82,-457.4 244.81,-169.17 302.29,-89 319.41,-65.12 348.83,-51.57 375.74,-43.91" style=""/>
+<polygon fill="white" stroke="white" stroke-width="2" points="376.53,-47.32 385.34,-41.45 374.79,-40.54 376.53,-47.32" style=""/>
+</g>
+<!-- BaseStrategy.harvestAndReport -->
+<g id="node21" class="node" pointer-events="visible" data-name="BaseStrategy.harvestAndReport">
+
+<ellipse fill="#ffbdb9" stroke="#ffbdb9" stroke-width="3" cx="145.14" cy="-907" rx="81.67" ry="18" style=""/>
+<text text-anchor="middle" x="145.14" y="-902.8" font-family="Times,serif" font-size="14.00" style="">harvestAndReport</text>
+</g>
+<!-- BaseStrategy.harvestAndReport&#45;&gt;BaseStrategy._harvestAndReport -->
+<g id="edge17" class="edge" data-name="BaseStrategy.harvestAndReport-&gt;BaseStrategy._harvestAndReport">
+
+<path fill="none" stroke="#1bc6a6" stroke-width="2" d="M228.08,-907C261.65,-907 300.81,-907 336.05,-907" style=""/>
+<polygon fill="#1bc6a6" stroke="#1bc6a6" stroke-width="2" points="335.81,-910.5 345.81,-907 335.81,-903.5 335.81,-910.5" style=""/>
+</g>
+<!-- BaseStrategy.tendThis -->
+<g id="node22" class="node" pointer-events="visible" data-name="BaseStrategy.tendThis">
+
+<ellipse fill="#ffbdb9" stroke="#ffbdb9" stroke-width="3" cx="145.14" cy="-853" rx="44.66" ry="18" style=""/>
+<text text-anchor="middle" x="145.14" y="-848.8" font-family="Times,serif" font-size="14.00" style="">tendThis</text>
+</g>
+<!-- BaseStrategy.tendThis&#45;&gt;BaseStrategy._tend -->
+<g id="edge18" class="edge" data-name="BaseStrategy.tendThis-&gt;BaseStrategy._tend">
+
+<path fill="none" stroke="#1bc6a6" stroke-width="2" d="M191.14,-853C245.37,-853 336,-853 390.51,-853" style=""/>
+<polygon fill="#1bc6a6" stroke="#1bc6a6" stroke-width="2" points="390.2,-856.5 400.2,-853 390.2,-849.5 390.2,-856.5" style=""/>
+</g>
+<!-- BaseStrategy.shutdownWithdraw -->
+<g id="node23" class="node" pointer-events="visible" data-name="BaseStrategy.shutdownWithdraw">
+
+<ellipse fill="#ffbdb9" stroke="#ffbdb9" stroke-width="3" cx="145.14" cy="-799" rx="87.42" ry="18" style=""/>
+<text text-anchor="middle" x="145.14" y="-794.8" font-family="Times,serif" font-size="14.00" style="">shutdownWithdraw</text>
+</g>
+<!-- BaseStrategy.shutdownWithdraw&#45;&gt;BaseStrategy._emergencyWithdraw -->
+<g id="edge19" class="edge" data-name="BaseStrategy.shutdownWithdraw-&gt;BaseStrategy._emergencyWithdraw">
+
+<path fill="none" stroke="#1bc6a6" stroke-width="2" d="M233.94,-799C262.97,-799 295.64,-799 326.12,-799" style=""/>
+<polygon fill="#1bc6a6" stroke="#1bc6a6" stroke-width="2" points="326,-802.5 336,-799 326,-795.5 326,-802.5" style=""/>
+</g>
+<!-- tokenizedStrategyImplementation.delegatecall -->
+<g id="node36" class="node" pointer-events="visible" data-name="tokenizedStrategyImplementation.delegatecall">
+
+<ellipse fill="#edad56" stroke="#edad56" stroke-width="3" cx="694.15" cy="-1293" rx="57.29" ry="18" style=""/>
+<text text-anchor="middle" x="694.15" y="-1288.8" font-family="Times,serif" font-size="14.00" style="">delegatecall</text>
+</g>
+<!-- BaseStrategy._delegateCall&#45;&gt;tokenizedStrategyImplementation.delegatecall -->
+<g id="edge20" class="edge" data-name="BaseStrategy._delegateCall-&gt;tokenizedStrategyImplementation.delegatecall">
+
+<path fill="none" stroke="white" stroke-width="2" d="M502.82,-1293C539.38,-1293 585.13,-1293 622.61,-1293" style=""/>
+<polygon fill="white" stroke="white" stroke-width="2" points="622.47,-1296.5 632.47,-1293 622.47,-1289.5 622.47,-1296.5" style=""/>
+</g>
+<!-- BaseStrategy.&lt;Fallback&gt; -->
+<g id="node25" class="node" pointer-events="visible" data-name="BaseStrategy.&lt;Fallback&gt;">
+
+<ellipse fill="#ffbdb9" stroke="brown" stroke-width="3" cx="145.14" cy="-505" rx="55.36" ry="18" style=""/>
+<text text-anchor="middle" x="145.14" y="-500.8" font-family="Times,serif" font-size="14.00" style="">&lt;Fallback&gt;</text>
+</g>
+<!-- key -->
+<g id="node37" class="node" pointer-events="visible" data-name="key">
+
+<polygon fill="#edad56" stroke="none" stroke-width="3" points="210.14,-1556 80.14,-1556 80.14,-1468 210.14,-1468 210.14,-1556" style=""/>
+<text text-anchor="start" x="129.78" y="-1537.4" font-family="Times,serif" font-size="14.00" style="">Internal Call</text>
+<text text-anchor="start" x="125.89" y="-1517.4" font-family="Times,serif" font-size="14.00" style="">External Call</text>
+<text text-anchor="start" x="103.35" y="-1497.4" font-family="Times,serif" font-size="14.00" style="">Defined Contract</text>
+<text text-anchor="start" x="89.74" y="-1477.4" font-family="Times,serif" font-size="14.00" style="">Undefined Contract</text>
+</g>
+<!-- key2 -->
+<g id="node38" class="node" pointer-events="visible" data-name="key2">
+
+<polygon fill="#edad56" stroke="none" stroke-width="3" points="464.14,-1556 410.14,-1556 410.14,-1468 464.14,-1468 464.14,-1556" style=""/>
+<text text-anchor="start" x="427.14" y="-1537.4" font-family="Times,serif" font-size="14.00" style="">   </text>
+<text text-anchor="start" x="427.14" y="-1517.4" font-family="Times,serif" font-size="14.00" style="">   </text>
+<polygon fill="#445773" stroke="none" points="425.14,-1492 425.14,-1512 450.14,-1512 450.14,-1492 425.14,-1492" style=""/>
+<text text-anchor="start" x="427.14" y="-1497.4" font-family="Times,serif" font-size="14.00" style="">   </text>
+<polygon fill="none" stroke="#e8726d" points="427.14,-1474 427.14,-1490 448.14,-1490 448.14,-1474 427.14,-1474" style=""/>
+</g>
+<!-- key&#45;&gt;key2 -->
+<g id="edge21" class="edge" data-name="key-&gt;key2">
+
+<path fill="none" stroke="#1bc6a6" stroke-width="2" d="M203.14,-1542C296.95,-1542 323.57,-1542 411.34,-1542" style=""/>
+<polygon fill="#1bc6a6" stroke="#1bc6a6" stroke-width="2" points="411.12,-1545.5 421.12,-1542 411.12,-1538.5 411.12,-1545.5" style=""/>
+</g>
+<!-- key&#45;&gt;key2 -->
+<g id="edge22" class="edge" data-name="key-&gt;key2">
+
+<path fill="none" stroke="white" stroke-width="2" d="M203.14,-1522C296.95,-1522 323.57,-1522 411.34,-1522" style=""/>
+<polygon fill="white" stroke="white" stroke-width="2" points="411.12,-1525.5 421.12,-1522 411.12,-1518.5 411.12,-1525.5" style=""/>
+</g>
+</g>
+</svg>
