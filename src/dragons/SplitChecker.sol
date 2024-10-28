@@ -20,8 +20,8 @@ contract SplitChecker is ISplitChecker, Initializable {
     // =============================================================
 
     address public goverance;
-    uint256 public maxOpexSplit;
-    uint256 public minMetapoolSplit;
+    uint256 public maxOpexSplit; /// @dev in precision of 1e18
+    uint256 public minMetapoolSplit; /// @dev in precision of 1e18
 
     // =============================================================
     //                            ERRORS
