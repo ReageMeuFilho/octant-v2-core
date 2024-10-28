@@ -689,8 +689,10 @@ contract LockupsTest is Setup {
         assertFalse(isRageQuit, "Should not be in rage quit");
 
         // Test standard withdraw
-        strategy.withdraw(standardDeposit / 2, user, user, 0); // Withdraw half
+        uint256 assetsBefore = asset.balanceOf(user);
+        uint256 assets = strategy.withdraw(standardDeposit / 2, user, user, 0); // Withdraw half
         assertEq(strategy.balanceOf(user), standardShares / 2, "Incorrect remaining balance after withdraw");
+        assertEq(assetsBefore + assets, asset.balanceOf(user), "Incorrect remaining assets after withdraw");
 
         vm.stopPrank();
 
@@ -928,5 +930,53 @@ contract LockupsTest is Setup {
         strategy.mintWithLockup(mintAmount, user, 100 days);
 
         vm.stopPrank();
+    }
+
+    function test_redeem_during_ragequit() public {
+        uint256 lockupDuration = 180 days;
+        uint256 depositAmount = 10_000e18;
+
+        vm.startPrank(user);
+
+        // Initial setup
+        uint256 shares = strategy.depositWithLockup(depositAmount, user, lockupDuration);
+
+        // Get initial state
+        (uint256 unlockTime, , , , ) = strategy.getUserLockupInfo(user);
+
+        // Initiate rage quit
+        strategy.initiateRageQuit();
+
+        // Get rage quit state
+        (
+            uint256 rageQuitUnlockTime,
+            uint256 initialLockedShares,
+            bool isRageQuit,
+            uint256 totalShares,
+            uint256 withdrawableShares
+        ) = strategy.getUserLockupInfo(user);
+
+        // Verify initial rage quit state
+        assertTrue(isRageQuit, "Should be in rage quit");
+        assertEq(rageQuitUnlockTime, block.timestamp + MINIMUM_LOCKUP_DURATION, "Incorrect rage quit duration");
+        assertEq(initialLockedShares, depositAmount, "Initial locked shares incorrect");
+        assertEq(totalShares, shares, "Total shares incorrect");
+        assertEq(withdrawableShares, 0, "Should start with 0 withdrawable shares");
+
+        // Skip to 25% through rage quit
+        skip(MINIMUM_LOCKUP_DURATION / 4);
+
+        // Calculate expected unlocked amount (25% should be unlocked)
+        uint256 expectedUnlocked = (depositAmount * (MINIMUM_LOCKUP_DURATION / 4)) / MINIMUM_LOCKUP_DURATION;
+        uint256 actualUnlocked = strategy.maxRedeem(user);
+        assertApproxEqRel(actualUnlocked, expectedUnlocked, 0.01e18, "Incorrect unlock amount at 25%");
+
+        // Redeem half of available amount
+        uint256 redeemAmount = actualUnlocked / 2;
+        strategy.redeem(redeemAmount, user, user, 0);
+
+        // Verify balances and state after first redeem
+        (, uint256 remainingLockedShares, , uint256 newTotalShares, uint256 newWithdrawableShares) = strategy
+            .getUserLockupInfo(user);
     }
 }
