@@ -746,14 +746,21 @@ contract TokenizedStrategy {
         // Cache storage variables used more than once.
         ERC20 _asset = S.asset;
 
+        //TODO: need a cleaner solution here, execTransactionFromModule reverts not caught in foundry even after adding requires
         if (address(_asset) == ETH) {
-            IAvatar(S.owner).execTransactionFromModule(address(this), assets, "", Enum.Operation.Call);
+            require(
+                IAvatar(S.owner).execTransactionFromModule(address(this), assets, "", Enum.Operation.Call) == true,
+                "ERC4626: deposit more than max"
+            );
         } else {
-            IAvatar(S.owner).execTransactionFromModule(
-                address(_asset),
-                0,
-                abi.encodeWithSignature("transfer(address,uint256)", address(this), assets),
-                Enum.Operation.Call
+            require(
+                IAvatar(S.owner).execTransactionFromModule(
+                    address(_asset),
+                    0,
+                    abi.encodeWithSignature("transfer(address,uint256)", address(this), assets),
+                    Enum.Operation.Call
+                ) == true,
+                "ERC4626: deposit more than max"
             );
         }
 

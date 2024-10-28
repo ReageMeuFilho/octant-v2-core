@@ -472,7 +472,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
                 profit = newTotalAssets - oldTotalAssets;
             }
 
-            _deposit(S, _dragonRouter, profit, _convertToShares(S, profit, Math.Rounding.Floor));
+            _mint(S, _dragonRouter, _convertToShares(S, profit, Math.Rounding.Floor));
         } else {
             // Expect we have a loss.
             unchecked {
