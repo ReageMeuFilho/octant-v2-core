@@ -725,4 +725,82 @@ contract LockupsTest is Setup {
         uint256 actualMaxRedeem = strategy.maxRedeem(user);
         assertApproxEqRel(actualMaxRedeem, expectedUnlock, 0.01e18, "Incorrect unlocked amount during rage quit");
     }
+
+    function test_revert_withdraw() public {
+        uint256 lockupDuration = 100 days;
+        uint256 depositAmount = 10_000e18;
+
+        vm.startPrank(user);
+
+        // Test withdraw with no balance
+        vm.expectRevert("ERC4626: withdraw more than max");
+        strategy.withdraw(depositAmount, user, user, 0);
+
+        // Setup initial deposit with lockup
+        strategy.depositWithLockup(depositAmount, user, lockupDuration);
+
+        // Test withdraw before unlock time
+        vm.expectRevert("ERC4626: withdraw more than max");
+        strategy.withdraw(depositAmount, user, user, 0);
+
+        // Test withdraw more than max
+        skip(lockupDuration + 1);
+        vm.expectRevert("ERC4626: withdraw more than max");
+        strategy.withdraw(depositAmount + 1, user, user, 0);
+
+        // Test withdraw zero amount
+        vm.expectRevert("ZERO_SHARES");
+        strategy.withdraw(0, user, user, 0);
+
+        vm.stopPrank();
+    }
+
+    function test_revert_redeem() public {
+        uint256 lockupDuration = 100 days;
+        uint256 depositAmount = 10_000e18;
+
+        vm.startPrank(user);
+
+        // Test redeem with no balance
+        vm.expectRevert("ERC4626: redeem more than max");
+        strategy.redeem(depositAmount, user, user, 0);
+
+        // Setup initial deposit with lockup
+        strategy.depositWithLockup(depositAmount, user, lockupDuration);
+
+        // Test redeem before unlock time
+        vm.expectRevert("ERC4626: redeem more than max");
+        strategy.redeem(depositAmount, user, user, 0);
+
+        // Test redeem more than max
+        skip(lockupDuration + 1);
+        vm.expectRevert("ERC4626: redeem more than max");
+        strategy.redeem(depositAmount + 1, user, user, 0);
+
+        // Test redeem zero amount
+        vm.expectRevert("ZERO_ASSETS");
+        strategy.redeem(0, user, user, 0);
+
+        vm.stopPrank();
+    }
+
+    function test_revert_redeem_and_withdraw_precision() public {
+        uint256 lockupDuration = 100 days;
+        uint256 depositAmount = 10_000e18;
+
+        vm.startPrank(user);
+        strategy.depositWithLockup(depositAmount, user, lockupDuration);
+        skip(lockupDuration + 1);
+
+        // Test very small amounts that might cause precision issues
+        uint256 tinyAmount = 1;
+        strategy.withdraw(tinyAmount, user, user, 0);
+
+        strategy.depositWithLockup(depositAmount, user, lockupDuration);
+        skip(lockupDuration + 1);
+
+        strategy.redeem(tinyAmount, user, user, 0);
+
+        vm.stopPrank();
+    }
 }
