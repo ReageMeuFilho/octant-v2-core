@@ -1,63 +1,140 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
+import {Initializable} from "solady/src/utils/Initializable.sol";
 import "src/interfaces/ISplitChecker.sol";
 
-contract SplitChecker is ISplitChecker {
-    address public goverance;
+/// @title SplitChecker
+/// @notice Validates split configurations for revenue distribution
+/// @dev Ensures splits meet requirements for opex and metapool allocations
+contract SplitChecker is ISplitChecker, Initializable {
+
+    // =============================================================
+    //                            CONSTANTS
+    // =============================================================
 
     uint256 private constant SPLIT_PRECISION = 1e18;
+
+    // =============================================================
+    //                            STORAGE
+    // =============================================================
+
+    address public goverance;
     uint256 public maxOpexSplit;
     uint256 public minMetapoolSplit;
 
+    // =============================================================
+    //                            ERRORS
+    // =============================================================
+
+    /// @notice Thrown when the split configuration is invalid
+    error InvalidSplit();
+
+    // =============================================================
+    //                            EVENTS
+    // =============================================================
+
+    /// @notice Emitted when the maximum opex split is updated
+    /// @param newMaxOpexSplit The new maximum opex split value
+    event MaxOpexSplitUpdated(uint256 newMaxOpexSplit);
+
+    /// @notice Emitted when the minimum metapool split is updated
+    /// @param newMinMetapoolSplit The new minimum metapool split value
+    event MinMetapoolSplitUpdated(uint256 newMinMetapoolSplit);
+
+    // =============================================================
+    //                            MODIFIERS
+    // =============================================================
+
+    /// @notice Restricts function access to governance address
+    /// @dev Throws if called by any account other than governance
     modifier onlyGovernance() {
         require(msg.sender == goverance, "!Authorized");
         _;
     }
 
-    constructor(address _goverance, uint256 _maxOpexSplit, uint256 _minMetapoolSplit) {
+    // =============================================================
+    //                         INITIALIZATION
+    // =============================================================
+
+    /// @notice Initializes the SplitChecker contract
+    /// @param _goverance Address of the governance controller
+    /// @param _maxOpexSplit Maximum allowed split for operational expenses (scaled by 1e18)
+    /// @param _minMetapoolSplit Minimum required split for metapool (scaled by 1e18)
+    function initialize(
+        address _goverance,
+        uint256 _maxOpexSplit,
+        uint256 _minMetapoolSplit
+    ) external initializer {
         goverance = _goverance;
         _setMaxOpexSplit(_maxOpexSplit);
         _setMinMetapoolSplit(_minMetapoolSplit);
     }
 
+    // =============================================================
+    //                         GOVERNANCE
+    // =============================================================
+
+    /// @notice Updates the minimum required metapool split
+    /// @param _minMetapoolSplit New minimum split value (scaled by 1e18)
     function setMinMetapoolSplit(uint256 _minMetapoolSplit) external onlyGovernance {
         _setMinMetapoolSplit(_minMetapoolSplit);
+        emit MinMetapoolSplitUpdated(_minMetapoolSplit);
     }
 
-    function _setMinMetapoolSplit(uint256 _minMetapoolSplit) internal {
-        require(_minMetapoolSplit <= 1e18);
-        // emit MetapoolUpdated(metapool, _metapool);
-
-        minMetapoolSplit = _minMetapoolSplit;
-    }
-
+    /// @notice Updates the maximum allowed opex split
+    /// @param _maxOpexSplit New maximum split value (scaled by 1e18)
     function setMaxOpexSplit(uint256 _maxOpexSplit) external onlyGovernance {
         _setMaxOpexSplit(_maxOpexSplit);
+        emit MaxOpexSplitUpdated(_maxOpexSplit);
     }
 
-    function _setMaxOpexSplit(uint256 _maxOpexSplit) internal {
-        require(_maxOpexSplit <= 1e18);
-        // emit MetapoolUpdated(metapool, _metapool);
+    // =============================================================
+    //                         VALIDATION
+    // =============================================================
 
-        maxOpexSplit = _maxOpexSplit;
-    }
-
+    /// @notice Validates split configuration for revenue distribution
+    /// @param split Split configuration to validate
+    /// @param opexVault Address of the operational expenses vault
+    /// @param metapool Address of the metapool
+    /// @dev Ensures splits meet requirements for opex and metapool allocations
     function checkSplit(Split memory split, address opexVault, address metapool) external view override {
         require(split.recipients.length == split.allocations.length);
         bool flag;
         uint256 calculatedTotalAllocation;
         for (uint256 i = 0; i < split.recipients.length; i++) {
             if (split.recipients[i] == opexVault) {
-                require(split.allocations[i] * SPLIT_PRECISION / split.totalAllocations <= maxOpexSplit);
+                if(split.allocations[i] * SPLIT_PRECISION / split.totalAllocations > maxOpexSplit) revert InvalidSplit();
             }
             if (split.recipients[i] == metapool) {
-                require(split.allocations[i] * SPLIT_PRECISION / split.totalAllocations > minMetapoolSplit);
+                if(split.allocations[i] * SPLIT_PRECISION / split.totalAllocations <= minMetapoolSplit) revert InvalidSplit();
                 flag = true;
             }
             calculatedTotalAllocation += split.allocations[i];
         }
-        if (!flag) revert("Metapool Split undefined");
+        if (!flag) revert InvalidSplit();
         require(calculatedTotalAllocation == split.totalAllocations);
+    }
+
+    // =============================================================
+    //                         INTERNAL
+    // =============================================================
+
+    /// @notice Internal function to set maximum opex split
+    /// @param _maxOpexSplit New maximum split value (scaled by 1e18)
+    /// @dev Validates that split doesn't exceed 100% (1e18)
+    function _setMaxOpexSplit(uint256 _maxOpexSplit) internal {
+        require(_maxOpexSplit <= 1e18);
+        maxOpexSplit = _maxOpexSplit;
+        emit MaxOpexSplitUpdated(_maxOpexSplit);
+    }
+
+    /// @notice Internal function to set minimum metapool split
+    /// @param _minMetapoolSplit New minimum split value (scaled by 1e18)
+    /// @dev Validates that split doesn't exceed 100% (1e18)
+    function _setMinMetapoolSplit(uint256 _minMetapoolSplit) internal {
+        require(_minMetapoolSplit <= 1e18);
+        minMetapoolSplit = _minMetapoolSplit;
+        emit MinMetapoolSplitUpdated(_minMetapoolSplit);
     }
 }
