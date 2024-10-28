@@ -3,7 +3,7 @@ pragma solidity ^0.8.18;
 
 import "forge-std/console.sol";
 import { Setup } from "./Setup.sol";
-import { InsufficientLockupDuration } from "src/errors.sol";
+import { InsufficientLockupDuration, SharesStillLocked } from "src/errors.sol";
 
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
@@ -257,10 +257,10 @@ contract LockupsTest is Setup {
         vm.expectRevert("ERC4626: withdraw more than max");
         strategy.withdraw(depositAmount + 1, user, user);
 
-        // Should be able to withdraw unlocked shares
+        // Should not be able to withdraw locked shares
         vm.expectRevert("ERC4626: withdraw more than max");
 
-        strategy.withdraw(additionalDeposit, user, user);
+        strategy.withdraw(additionalDeposit, user, user,0);
         vm.stopPrank();
     }
 
@@ -441,6 +441,59 @@ contract LockupsTest is Setup {
         skip(45 days / 2);
 
         strategy.withdraw(expectedRedeem / 2, user, user);
+
+        vm.stopPrank();
+    }
+
+    function test_maxRedeem_flow_slippage() public {
+        uint256 lockupDuration = 100 days;
+        uint256 depositAmount = 10_000e18;
+
+        vm.startPrank(user);
+
+        // Test initial state
+        assertEq(strategy.maxRedeem(user), 0, "Should start with 0 redeemable shares");
+
+        // Test during lockup
+        strategy.depositWithLockup(depositAmount, user, lockupDuration);
+        assertEq(strategy.maxRedeem(user), 0, "Should have 0 redeemable shares during lockup");
+        assertEq(strategy.maxRedeem(user, 100), 0, "MaxLoss parameter should not affect lockup");
+
+        // Test mixed locked and topUpDepositLock shares
+        uint256 topUpDeposit = 5_000e18;
+        strategy.deposit(topUpDeposit, user);
+        assertEq(strategy.maxRedeem(user), 0, "Should be able to redeem topUpDepositLock shares");
+
+        // Test after lockup expires
+        skip(lockupDuration + 1);
+        uint256 actualRedeem = strategy.maxRedeem(user);
+        assertEq(actualRedeem, depositAmount + topUpDeposit, "Should be able to redeem all shares after lockup");
+
+        strategy.withdraw(strategy.maxRedeem(user), user, user, 0);
+
+        // Test during rage quit
+        uint256 newLockupAmount = 100_000e18;
+        strategy.depositWithLockup(newLockupAmount, user, 180 days);
+        strategy.initiateRageQuit();
+
+        // Skip 45 days (half of MINIMUM_LOCKUP_DURATION)
+        skip(45 days);
+        uint256 expectedRedeem = (newLockupAmount * 45 days) / MINIMUM_LOCKUP_DURATION;
+        assertApproxEqRel(
+            strategy.maxRedeem(user),
+            expectedRedeem,
+            0.01e18,
+            "Incorrect redeemable shares during rage quit"
+        );
+        strategy.withdraw(expectedRedeem, user, user, 0);
+
+        vm.expectRevert("ERC4626: withdraw more than max");
+        strategy.withdraw(expectedRedeem, user, user, 0);
+        assertApproxEqRel(strategy.maxRedeem(user), 0, 0.01e18, "Incorrect redeemable shares during rage quit");
+
+        skip(45 days / 2);
+
+        strategy.withdraw(expectedRedeem / 2, user, user, 0);
 
         vm.stopPrank();
     }
@@ -713,6 +766,11 @@ contract LockupsTest is Setup {
         assertEq(strategy.maxWithdraw(user), 0, "Should not be able to withdraw locked shares");
         assertEq(strategy.maxRedeem(user), 0, "Should not be able to redeem locked shares");
 
+        vm.expectRevert(abi.encodeWithSelector(SharesStillLocked.selector));
+        strategy.withdraw(0, user, user, 0);
+        vm.expectRevert(abi.encodeWithSelector(SharesStillLocked.selector));
+        strategy.redeem(0, user, user, 0);
+
         // ======== Initiate Rage Quit for user ========
         strategy.initiateRageQuit();
 
@@ -968,7 +1026,7 @@ contract LockupsTest is Setup {
 
         // Calculate expected unlocked amount (25% should be unlocked)
         uint256 expectedUnlocked = (depositAmount * (MINIMUM_LOCKUP_DURATION / 4)) / MINIMUM_LOCKUP_DURATION;
-        uint256 actualUnlocked = strategy.maxRedeem(user);
+        uint256 actualUnlocked = strategy.maxRedeem(user, 0);
         assertApproxEqRel(actualUnlocked, expectedUnlocked, 0.01e18, "Incorrect unlock amount at 25%");
 
         // Redeem half of available amount
