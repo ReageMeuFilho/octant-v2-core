@@ -332,6 +332,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     ) external payable override nonReentrant onlyOwner returns (uint256 shares) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
+        //TODO: should this revert on ragequit?
 
         // Deposit full balance if using max uint.
         if (assets == type(uint256).max) {
@@ -466,6 +467,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
 
         address _dragonRouter = S.dragonRouter;
         // Calculate profit/loss.
+        // TODO: Dragon vault loss protection / insurance internal function functions as a security buffer for the dragon principal
         if (newTotalAssets > oldTotalAssets) {
             // We have a profit.
             unchecked {

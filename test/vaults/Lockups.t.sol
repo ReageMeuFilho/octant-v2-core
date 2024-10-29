@@ -260,7 +260,7 @@ contract LockupsTest is Setup {
         // Should not be able to withdraw locked shares
         vm.expectRevert("ERC4626: withdraw more than max");
 
-        strategy.withdraw(additionalDeposit, user, user,0);
+        strategy.withdraw(additionalDeposit, user, user, 0);
         vm.stopPrank();
     }
 
@@ -879,9 +879,9 @@ contract LockupsTest is Setup {
 
         // Test max uint deposit without enough balance
         uint256 sharesBefore = strategy.balanceOf(user);
-        //vm.expectRevert("ERC20: transfer amount exceeds balance");
-        //NOTE: this reverts but foundry doesn't catch it because its a delegated call within a delegated call
-        //strategy.depositWithLockup(asset.balanceOf(user) * 2, user, 100 days);
+        uint256 assetsBefore = asset.balanceOf(user);
+        vm.expectRevert("ERC4626: deposit more than max");
+        strategy.depositWithLockup(assetsBefore * 2, user, 100 days);
         //assertEq(asset.balanceOf(user), 0, "Should have no balance left after max deposit");
         assertEq(strategy.balanceOf(user), sharesBefore, "Should not have minted any shares");
 
