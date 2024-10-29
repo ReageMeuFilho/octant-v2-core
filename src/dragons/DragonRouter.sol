@@ -87,6 +87,18 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
     event SplitClaimed(address indexed user, address indexed strategy, uint256 amount);
 
     /*//////////////////////////////////////////////////////////////
+                            CUSTOM ERRORS
+    //////////////////////////////////////////////////////////////*/
+
+    error AlreadyAdded();
+    error StrategyNotDefined();
+    error InvalidAmount();
+    error ZeroAddress();
+    error NoShares();
+    error CooldownPeriodNotPassed();
+    error TransferFailed();
+
+    /*//////////////////////////////////////////////////////////////
                             INITIALIZER
     //////////////////////////////////////////////////////////////*/
 
@@ -139,7 +151,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      */
     function addStrategy(address _strategy) external onlyRole(OWNER_ROLE) {
         StrategyData storage _stratData = strategyData[_strategy];
-        require(_stratData.asset == address(0), "Already Added");
+        if (_stratData.asset != address(0)) revert AlreadyAdded();
 
         for (uint256 i = 0; i < split.recipients.length; i++) {
             userData[split.recipients[i]][_strategy].splitPerShare = split.allocations[i];
@@ -159,7 +171,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      */
     function removeStrategy(address _strategy) external onlyRole(OWNER_ROLE) {
         StrategyData storage _stratData = strategyData[_strategy];
-        require(_stratData.asset != address(0), "Strategy not defined");
+        if (_stratData.asset == address(0)) revert StrategyNotDefined();
 
         for (uint256 i = 0; i < strategies.length; i++) {
             if (strategies[i] == _strategy) {
@@ -229,7 +241,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      * @param targetToken The address of the token to transform into.
      */
     function setTransformer(address strategy, address transformer, address targetToken) external {
-        require(balanceOf(msg.sender, strategy) > 0, "Must have shares to set transformer");
+        if (balanceOf(msg.sender, strategy) == 0) revert NoShares();
         userData[msg.sender][strategy].transformer = Transformer(ITransformer(transformer), targetToken);
 
         emit UserTransformerSet(msg.sender, transformer, targetToken);
@@ -262,7 +274,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      */
     function fundFromSource(address strategy, uint256 amount) external onlyRole(SPLIT_DISTRIBUTOR_ROLE) nonReentrant {
         StrategyData storage data = strategyData[strategy];
-        require(data.asset != address(0));
+        if(data.asset == address(0)) revert ZeroAddress();
 
         ITokenizedStrategy(strategy).withdraw(amount, address(this), address(this), 0);
 
@@ -276,7 +288,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      * @dev Only callable by accounts with OWNER_ROLE
      */
     function setSplit(Split memory _split) external onlyRole(OWNER_ROLE) {
-        require(block.timestamp - lastSetSplitTime >= COOL_DOWN_PERIOD);
+        if(block.timestamp - lastSetSplitTime < COOL_DOWN_PERIOD) revert CooldownPeriodNotPassed();
         splitChecker.checkSplit(_split, opexVault, metapool);
 
         for (uint256 i = 0; i < strategies.length; i++) {
@@ -313,7 +325,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      * @param _amount The amount of split to claim
      */
     function claimSplit(address _strategy, uint256 _amount) external nonReentrant {
-        require(_amount > 0 && balanceOf(msg.sender, _strategy) >= _amount, "Invalid Amount");
+        if (_amount == 0 || balanceOf(msg.sender, _strategy) < _amount) revert InvalidAmount();
         _updateUserSplit(msg.sender, _strategy, _amount);
 
         _transferSplit(msg.sender, _strategy, _amount);
@@ -366,7 +378,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      * @dev Validates the new address is not zero
      */
     function _setSplitChecker(address _splitChecker) internal {
-        require(_splitChecker != address(0), "Zero address");
+        if (_splitChecker == address(0)) revert ZeroAddress();
         emit SplitCheckerUpdated(address(splitChecker), _splitChecker);
         splitChecker = ISplitChecker(_splitChecker);
     }
@@ -377,7 +389,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      * @dev Validates the new address is not zero
      */
     function _setMetapool(address _metapool) internal {
-        require(_metapool != address(0));
+        if (_metapool == address(0)) revert ZeroAddress();
         emit MetapoolUpdated(metapool, _metapool);
 
         metapool = _metapool;
@@ -398,7 +410,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      * @dev Validates the new address is not zero
      */
     function _setOpexVault(address _opexVault) internal {
-        require(_opexVault != address(0));
+        if (_opexVault == address(0)) revert ZeroAddress();
         emit OpexVaultUpdated(opexVault, _opexVault);
 
         opexVault = _opexVault;
@@ -420,14 +432,14 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
                 : userTransformer.transformer.transform(_asset, userTransformer.targetToken, _amount);
             if (userTransformer.targetToken == NATIVE_TOKEN) {
                 (bool success,) = _user.call{value: _transformedAmount}("");
-                require(success);
+                if(!success) revert TransferFailed();
             } else {
                 IERC20(userTransformer.targetToken).safeTransfer(_user, _transformedAmount);
             }
         } else {
             if (_asset == NATIVE_TOKEN) {
                 (bool success,) = _user.call{value: _amount}("");
-                require(success);
+                if(!success) revert TransferFailed();
             } else {
                 IERC20(_asset).safeTransfer(_user, _amount);
             }

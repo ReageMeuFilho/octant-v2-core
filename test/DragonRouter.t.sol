@@ -3,9 +3,11 @@ pragma solidity ^0.8.25;
 
 import "forge-std/Test.sol";
 import {DragonRouter} from "src/dragons/DragonRouter.sol";
-import {SplitChecker} from "src/dragons/SplitChecker.sol";
-import {ITokenizedStrategy} from "src/interfaces/ITokenizedStrategy.sol";
+import "src/dragons/SplitChecker.sol";
+import {MockStrategy} from "./mocks/MockStrategy.sol";
+
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ITokenizedStrategy} from "src/interfaces/ITokenizedStrategy.sol";
 
 contract DragonRouterTest is Test {
     DragonRouter public router;
@@ -61,14 +63,7 @@ contract DragonRouterTest is Test {
             
             // Deploy mock strategy
             MockStrategy strategy = new MockStrategy();
-            strategy.initialize(
-                _assets[i],
-                string.concat("Strategy ", vm.toString(i)),
-                owner,
-                owner, // management
-                owner, // keeper
-                address(router)
-            );
+            
             _strategies[i] = address(strategy);
         }
 
@@ -101,7 +96,7 @@ contract DragonRouterTest is Test {
         allocations[1] = 60; // 60% to metapool
         
         vm.startPrank(governance);
-        router.setSplit(DragonRouter.Split({
+        router.setSplit(Split({
             recipients: recipients,
             allocations: allocations,
             totalAllocations: 100

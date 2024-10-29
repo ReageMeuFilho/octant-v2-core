@@ -30,6 +30,15 @@ contract SplitChecker is ISplitChecker, Initializable {
     /// @notice Thrown when the split configuration is invalid
     error InvalidSplit();
 
+    /// @notice Thrown when the caller is not authorized
+    error NotAuthorized();
+
+    /// @notice Thrown when a value exceeds the allowed maximum
+    error ValueExceedsMaximum();
+
+    /// @notice Thrown when a value is below the required minimum
+    error ValueBelowMinimum();
+
     // =============================================================
     //                            EVENTS
     // =============================================================
@@ -49,7 +58,7 @@ contract SplitChecker is ISplitChecker, Initializable {
     /// @notice Restricts function access to governance address
     /// @dev Throws if called by any account other than governance
     modifier onlyGovernance() {
-        require(msg.sender == goverance, "!Authorized");
+        if (msg.sender != goverance) revert NotAuthorized();
         _;
     }
 
@@ -99,21 +108,21 @@ contract SplitChecker is ISplitChecker, Initializable {
     /// @param metapool Address of the metapool
     /// @dev Ensures splits meet requirements for opex and metapool allocations
     function checkSplit(Split memory split, address opexVault, address metapool) external view override {
-        require(split.recipients.length == split.allocations.length);
+        if (split.recipients.length != split.allocations.length) revert InvalidSplit();
         bool flag;
         uint256 calculatedTotalAllocation;
         for (uint256 i = 0; i < split.recipients.length; i++) {
             if (split.recipients[i] == opexVault) {
-                if(split.allocations[i] * SPLIT_PRECISION / split.totalAllocations > maxOpexSplit) revert InvalidSplit();
+                if (split.allocations[i] * SPLIT_PRECISION / split.totalAllocations > maxOpexSplit) revert ValueExceedsMaximum();
             }
             if (split.recipients[i] == metapool) {
-                if(split.allocations[i] * SPLIT_PRECISION / split.totalAllocations <= minMetapoolSplit) revert InvalidSplit();
+                if (split.allocations[i] * SPLIT_PRECISION / split.totalAllocations <= minMetapoolSplit) revert ValueBelowMinimum();
                 flag = true;
             }
             calculatedTotalAllocation += split.allocations[i];
         }
         if (!flag) revert InvalidSplit();
-        require(calculatedTotalAllocation == split.totalAllocations);
+        if (calculatedTotalAllocation != split.totalAllocations) revert InvalidSplit();
     }
 
     // =============================================================
@@ -124,7 +133,7 @@ contract SplitChecker is ISplitChecker, Initializable {
     /// @param _maxOpexSplit New maximum split value (scaled by 1e18)
     /// @dev Validates that split doesn't exceed 100% (1e18)
     function _setMaxOpexSplit(uint256 _maxOpexSplit) internal {
-        require(_maxOpexSplit <= 1e18);
+        if (_maxOpexSplit > 1e18) revert ValueExceedsMaximum();
         maxOpexSplit = _maxOpexSplit;
         emit MaxOpexSplitUpdated(_maxOpexSplit);
     }
@@ -133,7 +142,7 @@ contract SplitChecker is ISplitChecker, Initializable {
     /// @param _minMetapoolSplit New minimum split value (scaled by 1e18)
     /// @dev Validates that split doesn't exceed 100% (1e18)
     function _setMinMetapoolSplit(uint256 _minMetapoolSplit) internal {
-        require(_minMetapoolSplit <= 1e18);
+        if (_minMetapoolSplit > 1e18) revert ValueExceedsMaximum();
         minMetapoolSplit = _minMetapoolSplit;
         emit MinMetapoolSplitUpdated(_minMetapoolSplit);
     }
