@@ -60,7 +60,7 @@ contract MockStrategy is Module, BaseStrategy {
 
     function _harvestAndReport() internal override returns (uint256) {
         uint256 amount = 0.1 ether;
-        MockYieldSource(yieldSource).simulateHarvestRewards(0.1 ether);
+        MockYieldSource(yieldSource).simulateHarvestRewards(amount);
         uint256 balance = address(asset) == ETH ? address(this).balance : ERC20(asset).balanceOf(address(this));
         return MockYieldSource(yieldSource).balance() + balance;
     }

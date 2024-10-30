@@ -481,6 +481,8 @@ abstract contract BaseStrategy {
         return result;
     }
 
+    receive() external payable {}
+    
     /**
      * @dev Execute a function on the TokenizedStrategy and return any value.
      *
