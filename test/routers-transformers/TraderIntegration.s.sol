@@ -19,36 +19,43 @@ contract TestTraderIntegrationETH is BaseTest {
     address swapper = makeAddr("swapper");
 
     function setUp() public {
-        helperConfig = new HelperConfig();
         _configure(true);
+        helperConfig = new HelperConfig();
         moduleImplementation = new Trader();
-        temps = _testTemps(address(moduleImplementation), abi.encode(ETH, swapper, 0, 0, 0.6 ether, 1.4 ether));
+        temps = _testTemps(address(moduleImplementation), abi.encode(ETH, swapper));
         trader = Trader(payable(temps.module));
     }
 
     function testCheckModuleInitialization() public view {
         assertTrue(trader.owner() == temps.safe);
         assertTrue(trader.swapper() == swapper);
-        assertTrue(trader.chance() == 0);
-        assertTrue(trader.spendADay() == 0);
-        assertTrue(trader.saleValueLow() == 0.6 ether);
-        assertTrue(trader.saleValueHigh() == 1.4 ether);
+    }
+
+    function testConfiguration() public {
+        vm.startPrank(temps.safe);
+        trader.setSpendADay(1 ether, 1 ether, 1 ether, block.number + 102);
+        vm.stopPrank();
+        assertEq(trader.getSafetyBlocks(), 1);
+        assertEq(trader.deadline(), block.number + 102);
+        assertEq(trader.remainingBlocks(), 101);
+        assertTrue(trader.chance() > 0);
+        assertTrue(trader.saleValueLow() == 1 ether);
+        assertTrue(trader.saleValueHigh() == 1 ether);
     }
 
     receive() external payable {}
 
     function test_sellEth() external {
-        vm.deal(address(trader), 10_000 ether);
-        // effectively disable randomness check
-        uint256 chance = type(uint256).max;
-        // effectively disable upper bound check
-        uint256 spendADay = 1_000_000_000_000 ether;
+        // effectively disable upper bound check and randomness check
+        uint256 fakeBudget = 1 ether;
+        vm.deal(address(trader), 2 ether);
+
         vm.startPrank(temps.safe);
-        trader.setSpendADay(chance, spendADay, 1 ether, 1 ether);
+        trader.setSpendADay(1 ether, 1 ether, fakeBudget, block.number + 101);
         vm.stopPrank();
-        vm.roll(block.number + 100);
 
         uint256 oldBalance = swapper.balance;
+        vm.roll(block.number + 100);
         trader.convert(block.number - 2);
         assertEq(trader.spent(), 1 ether);
         assertGt(swapper.balance, oldBalance);
@@ -74,7 +81,7 @@ contract TestTraderIntegrationIERC20 is BaseTest {
         _configure(true);
         moduleImplementation = new Trader();
 
-        temps = _testTemps(address(moduleImplementation), abi.encode(address(token), swapper, 0, 0, 0.6 ether, 1.4 ether));
+        temps = _testTemps(address(moduleImplementation), abi.encode(address(token), swapper));
         trader = Trader(payable(temps.module));
     }
 
@@ -85,14 +92,11 @@ contract TestTraderIntegrationIERC20 is BaseTest {
     receive() external payable {}
 
     function test_sellERC20() external {
-        token.mint(address(trader), 10_000 ether);
+        uint256 fakeBudget = 1 ether;
+        token.mint(address(trader), 2 ether);
 
-        // effectively disable randomness check
-        uint256 chance = type(uint256).max;
-        // effectively disable upper bound check
-        uint256 spendADay = 1_000_000_000_000 ether;
         vm.startPrank(temps.safe);
-        trader.setSpendADay(chance, spendADay, 1 ether, 1 ether);
+        trader.setSpendADay(1 ether, 1 ether, fakeBudget, block.number + 101);
         vm.stopPrank();
         vm.roll(block.number + 100);
 
