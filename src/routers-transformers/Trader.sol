@@ -7,12 +7,14 @@ import "solady/src/utils/SafeCastLib.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "solady/src/utils/FixedPointMathLib.sol";
+/* import {ITrader} from "../interfaces/ITrader.sol"; */
+
 
 /// @author .
 /// @title Octant Trader
 /// @notice Octant Trader is a contract that performs "DCA" in terms of sold token into another token.
 /// @dev This contract performs trades in a random times, attempting to isolate the deployer from risks of insider trading.
-contract Trader is Module {
+contract Trader is Module/* , ITrader */ {
     using SafeERC20 for IERC20;
     using FixedPointMathLib for uint256;
 
@@ -147,7 +149,7 @@ contract Trader is Module {
         if (getSafetyBlocks() > (deadline - block.number)) revert Trader__ImpossibleConfiguration();
     }
 
-    function setSwapper(address swapper_) public onlyOwner {
+    function setSwapper(address swapper_) external onlyOwner {
         emit SwapperChanged(swapper, swapper_);
         swapper = payable(swapper_);
     }
@@ -172,7 +174,7 @@ contract Trader is Module {
     }
 
     /// @return average amount of ETH in wei to be sold in 24 hours at average
-    function spendADay() public view returns (uint256) {
+    function spendADay() external view returns (uint256) {
         return budget / ((deadline - block.number) / blocksADay);
     }
 
