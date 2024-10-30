@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity 0.8.25;
 
-import {TokenizedStrategy, IBaseStrategy, Math, ERC20} from "./TokenizedStrategy.sol";
-import {IDragonModule} from "../interfaces/IDragonModule.sol";
-import {VaultSharesNotTransferable, MaxUnlockIsAlwaysZero, CantWithdrawLockedShares} from "src/errors.sol";
+import { TokenizedStrategy, IBaseStrategy, Math, ERC20 } from "./TokenizedStrategy.sol";
+import { IDragonModule } from "../interfaces/IDragonModule.sol";
+import { VaultSharesNotTransferable, MaxUnlockIsAlwaysZero, CantWithdrawLockedShares, ZeroLockupDuration, InsufficientLockupDuration, SharesStillLocked } from "src/errors.sol";
 
 contract DragonTokenizedStrategy is TokenizedStrategy {
     event NewLockupSet(address indexed user, uint256 indexed unlockTime, uint256 indexed lockedShares);
+    event RageQuitInitiated(address indexed user, uint256 indexed unlockTime);
+
+    // Minimum lockup duration of 3 months (in seconds)
+    uint256 private constant MINIMUM_LOCKUP_DURATION = 90 days;
 
     function initialize(
         address _asset,
@@ -25,21 +29,40 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @param lockupDuration The amount of time to set or extend a user's lockup.
      * @param totalSharesLocked The amount of shares to lock.
      */
-    function _setOrExtendLockup(address user, uint256 lockupDuration, uint256 totalSharesLocked) internal {
-        LockupInfo storage lockup = _strategyStorage().voluntaryLockups[user];
+    function _setOrExtendLockup(
+        StrategyData storage S,
+        address user,
+        uint256 lockupDuration,
+        uint256 totalSharesLocked
+    ) internal returns (uint256) {
+        LockupInfo storage lockup = S.voluntaryLockups[user];
         uint256 currentTime = block.timestamp;
 
+        // NOTE: if there is no lockup, and the lockup duration not 0 then set a new lockup
         if (lockup.unlockTime <= currentTime) {
-            // Start a new lockup
+            if (lockupDuration == 0) return 0;
+            lockup.lockupTime = currentTime;
             lockup.unlockTime = currentTime + lockupDuration;
+            // NOTE: enforce minimum lockup duration for new lockups
+            if (lockupDuration <= MINIMUM_LOCKUP_DURATION) revert InsufficientLockupDuration();
+
             lockup.lockedShares = totalSharesLocked;
         } else {
-            // Extend existing lockup
-            lockup.unlockTime += lockupDuration;
+            // NOTE: update the locked shares
             lockup.lockedShares = totalSharesLocked;
+            // NOTE: if there is a lock up and the lockUpDuration is greater than 0 then extend the lockup ensuring it's more than minimum lockup duration
+            if (lockupDuration > 0) {
+                // Extend existing lockup
+                uint256 newUnlockTime = lockup.unlockTime + lockupDuration;
+                // Ensure the new unlock time is at least 3 months in the future
+                if (newUnlockTime < currentTime + MINIMUM_LOCKUP_DURATION) revert InsufficientLockupDuration();
+
+                lockup.unlockTime = newUnlockTime;
+            }
         }
 
         emit NewLockupSet(user, lockup.unlockTime, lockup.lockedShares);
+        return lockup.lockedShares;
     }
 
     /**
@@ -49,11 +72,17 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      */
     function _userUnlockedShares(StrategyData storage S, address user) internal view returns (uint256) {
         LockupInfo memory lockup = _strategyStorage().voluntaryLockups[user];
+        uint256 balance = _balanceOf(S, user);
 
         if (block.timestamp >= lockup.unlockTime) {
-            return _balanceOf(S, user);
+            return balance;
+        } else if (lockup.isRageQuit) {
+            // Calculate unlocked portion based on time elapsed
+            uint256 timeElapsed = block.timestamp - lockup.lockupTime;
+            uint256 unlockedPortion = (timeElapsed * lockup.lockedShares) / (lockup.unlockTime - lockup.lockupTime);
+            return Math.min(unlockedPortion, balance);
         } else {
-            return _balanceOf(S, user) - lockup.lockedShares;
+            return balance - lockup.lockedShares;
         }
     }
 
@@ -76,13 +105,80 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         return _strategyStorage().voluntaryLockups[user].unlockTime;
     }
 
-    /// @dev Internal implementation of {maxWithdraw}.
-    function _maxWithdraw(StrategyData storage S, address _owner)
-        internal
+    /**
+     * @notice Returns the remaining cooldown time in seconds for a user's lock
+     * @param user The address to check
+     * @return remainingTime The time remaining in seconds until unlock (0 if already unlocked)
+     */
+    function getRemainingCooldown(address user) public view returns (uint256 remainingTime) {
+        uint256 unlockTime = _strategyStorage().voluntaryLockups[user].unlockTime;
+        if (unlockTime <= block.timestamp) {
+            return 0;
+        }
+        return unlockTime - block.timestamp;
+    }
+
+    /**
+     * @notice Returns detailed information about a user's lockup status
+     * @param user The address to check
+     * @return unlockTime The timestamp when shares unlock
+     * @return lockedShares The amount of shares that are locked
+     * @return isRageQuit Whether the user is in rage quit mode
+     * @return totalShares Total shares owned by user
+     * @return withdrawableShares Amount of shares that can be withdrawn now
+     */
+    function getUserLockupInfo(
+        address user
+    )
+        external
         view
-        override
-        returns (uint256 maxWithdraw_)
+        returns (
+            uint256 unlockTime,
+            uint256 lockedShares,
+            bool isRageQuit,
+            uint256 totalShares,
+            uint256 withdrawableShares
+        )
     {
+        StrategyData storage S = _strategyStorage();
+        LockupInfo memory lockup = S.voluntaryLockups[user];
+
+        return (
+            lockup.unlockTime,
+            lockup.lockedShares,
+            lockup.isRageQuit,
+            _balanceOf(S, user),
+            _userUnlockedShares(S, user)
+        );
+    }
+
+    /**
+     * @notice Initiates a rage quit, allowing gradual withdrawal over 3 months
+     * @dev Sets a 3-month lockup and enables proportional withdrawals
+     */
+    function initiateRageQuit() external {
+        StrategyData storage S = _strategyStorage();
+        LockupInfo storage lockup = S.voluntaryLockups[msg.sender];
+
+        // Can't rage quit if no shares or already in rage quit
+        require(_balanceOf(S, msg.sender) > 0, "No shares to rage quit");
+        require(block.timestamp < lockup.unlockTime, "Shares already unlocked");
+        require(!lockup.isRageQuit, "Already in rage quit");
+
+        // Set 3-month lockup
+        lockup.lockupTime = block.timestamp;
+        lockup.unlockTime = block.timestamp + MINIMUM_LOCKUP_DURATION;
+        lockup.lockedShares = _balanceOf(S, msg.sender);
+        lockup.isRageQuit = true;
+
+        emit RageQuitInitiated(msg.sender, lockup.unlockTime);
+    }
+
+    /// @dev Internal implementation of {maxWithdraw}.
+    function _maxWithdraw(
+        StrategyData storage S,
+        address _owner
+    ) internal view override returns (uint256 maxWithdraw_) {
         // Get the max the owner could withdraw currently.
 
         maxWithdraw_ = IBaseStrategy(address(this)).availableWithdrawLimit(_owner);
@@ -100,17 +196,6 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         uint256 shares,
         uint256 maxLoss
     ) internal override returns (uint256) {
-        LockupInfo memory lockup = S.voluntaryLockups[_owner];
-        require(
-            block.timestamp >= lockup.unlockTime || shares <= _balanceOf(S, _owner) - lockup.lockedShares,
-            "Shares are locked"
-        );
-
-        if (shares > _balanceOf(S, _owner) - lockup.lockedShares) {
-            revert CantWithdrawLockedShares();
-
-            // Withdrawing unlocked shares
-        }
         return super._withdraw(S, receiver, _owner, assets, shares, maxLoss);
     }
 
@@ -142,7 +227,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @dev Accepts a `maxLoss` variable in order to match the multi
      * strategy vaults ABI.
      */
-    function maxWithdraw(address _owner, uint256 /*maxLoss*/ ) external view override returns (uint256) {
+    function maxWithdraw(address _owner, uint256 /*maxLoss*/) external view override returns (uint256) {
         return _maxWithdraw(_strategyStorage(), _owner);
     }
 
@@ -156,19 +241,24 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @param maxLoss The amount of acceptable loss in Basis points.
      * @return shares The actual amount of shares burnt.
      */
-    function withdraw(uint256 assets, address receiver, address _owner, uint256 maxLoss)
-        public
-        override
-        nonReentrant
-        returns (uint256 shares)
-    {
+    function withdraw(
+        uint256 assets,
+        address receiver,
+        address _owner,
+        uint256 maxLoss
+    ) public override nonReentrant returns (uint256 shares) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
-
+        LockupInfo storage lockup = S.voluntaryLockups[_owner];
         require(assets <= _maxWithdraw(S, _owner), "ERC4626: withdraw more than max");
+        if (block.timestamp < lockup.unlockTime && !lockup.isRageQuit) revert SharesStillLocked();
+
         // Check for rounding error or 0 value.
         require((shares = _convertToShares(S, assets, Math.Rounding.Ceil)) != 0, "ZERO_SHARES");
-
+        if (lockup.isRageQuit) {
+            lockup.lockedShares -= shares;
+            lockup.lockupTime = block.timestamp;
+        }
         // Withdraw and track the actual amount withdrawn for loss check.
         _withdraw(S, receiver, _owner, assets, shares, maxLoss);
     }
@@ -190,7 +280,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @dev Accepts a `maxLoss` variable in order to match the multi
      * strategy vaults ABI.
      */
-    function maxRedeem(address _owner, uint256 /*maxLoss*/ ) external view override returns (uint256) {
+    function maxRedeem(address _owner, uint256 /*maxLoss*/) external view override returns (uint256) {
         return _maxRedeem(_strategyStorage(), _owner);
     }
 
@@ -204,15 +294,23 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @param maxLoss The amount of acceptable loss in Basis points.
      * @return . The actual amount of underlying withdrawn.
      */
-    function redeem(uint256 shares, address receiver, address _owner, uint256 maxLoss)
-        public
-        override
-        nonReentrant
-        returns (uint256)
-    {
+    function redeem(
+        uint256 shares,
+        address receiver,
+        address _owner,
+        uint256 maxLoss
+    ) public override nonReentrant returns (uint256) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
+        LockupInfo storage lockup = S.voluntaryLockups[_owner];
+
         require(shares <= _maxRedeem(S, _owner), "ERC4626: redeem more than max");
+        if (block.timestamp < lockup.unlockTime && !lockup.isRageQuit) revert SharesStillLocked();
+        if (lockup.isRageQuit) {
+            lockup.lockedShares -= shares;
+            lockup.lockupTime = block.timestamp;
+        }
+
         uint256 assets;
         // Check for rounding error or 0 value.
         require((assets = _convertToAssets(S, shares, Math.Rounding.Floor)) != 0, "ZERO_ASSETS");
@@ -222,20 +320,73 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     }
 
     /**
+     * @notice Mints `shares` of strategy shares to `receiver` by
+     * depositing exactly `assets` of underlying tokens.
+     * @param assets The amount of underlying to deposit in.
+     * @param receiver The address to receive the `shares`.
+     * @return shares The actual amount of shares issued.
+     */
+    function deposit(
+        uint256 assets,
+        address receiver
+    ) external payable override nonReentrant onlyOwner returns (uint256 shares) {
+        // Get the storage slot for all following calls.
+        StrategyData storage S = _strategyStorage();
+        //TODO: should this revert on ragequit?
+
+        // Deposit full balance if using max uint.
+        if (assets == type(uint256).max) {
+            assets = S.asset.balanceOf(msg.sender);
+        }
+
+        // Checking max deposit will also check if shutdown.
+        require(assets <= _maxDeposit(S, receiver), "ERC4626: deposit more than max");
+        // Check for rounding error.
+        require((shares = _convertToShares(S, assets, Math.Rounding.Floor)) != 0, "ZERO_SHARES");
+
+        _deposit(S, receiver, assets, shares);
+        _setOrExtendLockup(S, receiver, 0, _balanceOf(S, receiver));
+    }
+
+    /**
+     * @notice Mints exactly `shares` of strategy shares to
+     * `receiver` by depositing `assets` of underlying tokens.
+     * @param shares The amount of strategy shares mint.
+     * @param receiver The address to receive the `shares`.
+     * @return assets The actual amount of asset deposited.
+     */
+    function mint(
+        uint256 shares,
+        address receiver
+    ) external payable override nonReentrant onlyOwner returns (uint256 assets) {
+        // Get the storage slot for all following calls.
+        StrategyData storage S = _strategyStorage();
+
+        // Checking max mint will also check if shutdown.
+        require(shares <= _maxMint(S, receiver), "ERC4626: mint more than max");
+        // Check for rounding error.
+        require((assets = _convertToAssets(S, shares, Math.Rounding.Ceil)) != 0, "ZERO_ASSETS");
+
+        _deposit(S, receiver, assets, shares);
+        _setOrExtendLockup(S, receiver, 0, _balanceOf(S, receiver));
+    }
+
+    /**
      * @dev Mints `shares` of strategy shares to `receiver` by depositing exactly `assets` of underlying tokens with a lock up
      * @param assets The amount of assets to deposit.
      * @param receiver The receiver of the shares.
      * @param lockupDuration The duration of the lockup in seconds.
      * @return shares The amount of shares minted.
      */
-    function depositWithLockup(uint256 assets, address receiver, uint256 lockupDuration)
-        public
-        onlyOwner
-        returns (uint256 shares)
-    {
+    function depositWithLockup(
+        uint256 assets,
+        address receiver,
+        uint256 lockupDuration
+    ) public onlyOwner returns (uint256 shares) {
         require(lockupDuration > 0, "Lockup duration must be greater than 0");
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
+        require(!S.voluntaryLockups[msg.sender].isRageQuit, "Already in rage quit");
 
         // Deposit full balance if using max uint.
         if (assets == type(uint256).max) {
@@ -249,7 +400,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
 
         _deposit(S, receiver, assets, shares);
 
-        _setOrExtendLockup(receiver, lockupDuration, _balanceOf(S, receiver));
+        _setOrExtendLockup(S, receiver, lockupDuration, _balanceOf(S, receiver));
 
         return shares;
     }
@@ -261,15 +412,16 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @param lockupDuration The duration of the lockup in seconds.
      * @return assets The actual amount of asset deposited.
      */
-    function mintWithLockup(uint256 shares, address receiver, uint256 lockupDuration)
-        public
-        onlyOwner
-        returns (uint256 assets)
-    {
+    function mintWithLockup(
+        uint256 shares,
+        address receiver,
+        uint256 lockupDuration
+    ) public onlyOwner returns (uint256 assets) {
         require(lockupDuration > 0, "Lockup duration must be greater than 0");
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
 
+        require(!S.voluntaryLockups[msg.sender].isRageQuit, "Already in rage quit");
         // Checking max mint will also check if shutdown.
         require(shares <= _maxMint(S, receiver), "ERC4626: mint more than max");
         // Check for rounding error.
@@ -277,7 +429,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
 
         _deposit(S, receiver, assets, shares);
 
-        _setOrExtendLockup(receiver, lockupDuration, _balanceOf(S, receiver));
+        _setOrExtendLockup(S, receiver, lockupDuration, _balanceOf(S, receiver));
 
         return assets;
     }
@@ -315,13 +467,14 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
 
         address _dragonRouter = S.dragonRouter;
         // Calculate profit/loss.
+        // TODO: Dragon vault loss protection / insurance internal function functions as a security buffer for the dragon principal
         if (newTotalAssets > oldTotalAssets) {
             // We have a profit.
             unchecked {
                 profit = newTotalAssets - oldTotalAssets;
             }
 
-            _deposit(S, _dragonRouter, profit, _convertToShares(S, profit, Math.Rounding.Floor));
+            _mint(S, _dragonRouter, _convertToShares(S, profit, Math.Rounding.Floor));
         } else {
             // Expect we have a loss.
             unchecked {

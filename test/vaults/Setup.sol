@@ -3,19 +3,19 @@ pragma solidity >=0.8.25;
 
 import "forge-std/console.sol";
 
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {ERC20Mock} from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import { ERC20Mock } from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 
-import {ExtendedTest} from "./ExtendedTest.sol";
-import {MockStrategy} from "../mocks/MockStrategy2.sol";
-import {MockYieldSource} from "../mocks/MockYieldSource.sol";
-import {MockDragonRouter} from "../mocks/MockDragonRouter.sol";
-import {ModuleProxyFactory} from "src/dragons/ModuleProxyFactory.sol";
-import {DragonTokenizedStrategy} from "src/dragons/DragonTokenizedStrategy.sol";
-import {TestERC20} from "src/test/TestERC20.sol";
+import { ExtendedTest } from "./ExtendedTest.sol";
+import { MockStrategy } from "../mocks/MockStrategy2.sol";
+import { MockYieldSource } from "../mocks/MockYieldSource.sol";
+import { MockDragonRouter } from "../mocks/MockDragonRouter.sol";
+import { ModuleProxyFactory } from "src/dragons/ModuleProxyFactory.sol";
+import { DragonTokenizedStrategy } from "src/dragons/DragonTokenizedStrategy.sol";
+import { TestERC20 } from "src/test/TestERC20.sol";
 
-import {IEvents} from "src/interfaces/IEvents.sol";
-import {IMockStrategy} from "../mocks/IMockStrategy.sol";
+import { IEvents } from "src/interfaces/IEvents.sol";
+import { IMockStrategy } from "../mocks/IMockStrategy.sol";
 
 contract Setup is ExtendedTest, IEvents {
     // Contract instances that we will use repeatedly.
@@ -31,6 +31,8 @@ contract Setup is ExtendedTest, IEvents {
 
     // Addresses for different roles we will use repeatedly.
     address public user;
+    address public alice = address(1);
+    address public ben = address(2);
     address public keeper = address(2);
     address public management = address(3);
     address public emergencyAdmin = address(4);
@@ -124,10 +126,12 @@ contract Setup is ExtendedTest, IEvents {
     }
 
     // For checks without totalSupply while profit is unlocking
-    function checkStrategyTotals(IMockStrategy _strategy, uint256 _totalAssets, uint256 _totalDebt, uint256 _totalIdle)
-        public
-        view
-    {
+    function checkStrategyTotals(
+        IMockStrategy _strategy,
+        uint256 _totalAssets,
+        uint256 _totalDebt,
+        uint256 _totalIdle
+    ) public view {
         uint256 _assets = _strategy.totalAssets();
         uint256 _balance = ERC20Mock(_strategy.asset()).balanceOf(address(_strategy));
         uint256 _idle = _balance > _assets ? _assets : _balance;
