@@ -9,7 +9,7 @@ contract UniswapLiquidityHelperDeployer is Script {
     function run() external {
         HelperConfig helperConfig = new HelperConfig();
 
-        (address glmToken, address wethToken, address nonfungiblePositionManager, uint256 deployerKey,,,) =
+        (address glmToken, address wethToken, address nonfungiblePositionManager, uint256 deployerKey,,,,,,) =
             helperConfig.activeNetworkConfig();
         console.log("Glm Token: ", glmToken);
         console.log("Weth Token: ", wethToken);

@@ -6,9 +6,9 @@ import {Enum} from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 import "solady/src/utils/SafeCastLib.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {OracleParams} from "../vendor/0xSplits/OracleParams.sol";
 import "solady/src/utils/FixedPointMathLib.sol";
 /* import {ITrader} from "../interfaces/ITrader.sol"; */
-
 
 /// @author .
 /// @title Octant Trader

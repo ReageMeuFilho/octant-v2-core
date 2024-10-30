@@ -7,7 +7,7 @@ import {Trader} from "../src/routers-transformers/Trader.sol";
 
 contract DeployTraderHelper is Script {
     function run() external {
-        (,,, uint256 deployerKey,,, address traderAddress) = new HelperConfig().activeNetworkConfig();
+        (,,, uint256 deployerKey,,, address traderAddress,,,) = new HelperConfig().activeNetworkConfig();
 
         console.log("Trader at ", traderAddress);
         assert(traderAddress != address(0));

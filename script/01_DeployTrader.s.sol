@@ -7,7 +7,7 @@ import {Trader} from "../src/routers-transformers/Trader.sol";
 
 contract DeployTraderHelper is Script {
     function run() external {
-        (,,, uint256 deployerKey,,,) = new HelperConfig().activeNetworkConfig();
+        (,,, uint256 deployerKey,,,,,,) = new HelperConfig().activeNetworkConfig();
 
         vm.startBroadcast(deployerKey);
 
