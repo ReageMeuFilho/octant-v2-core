@@ -6,13 +6,13 @@ interface ITrader {
     function convert(uint256 _height) external;
     function setSwapper(address _swapper) external;
 
-    function token() public view returns (address);
-    function swapper() public view returns (address);
+    function token() external view returns (address);
+    function swapper() external view returns (address);
 
-    function budget() public view returns (uint256);
-    function deadline() public view returns (uint256);
-    function spent() public view returns (uint256);
+    function budget() external view returns (uint256);
+    function deadline() external view returns (uint256);
+    function spent() external view returns (uint256);
 
-    function saleValueLow() public view returns (uint256);
-    function saleValueHigh() public view returns (uint256);
+    function saleValueLow() external view returns (uint256);
+    function saleValueHigh() external view returns (uint256);
 }
