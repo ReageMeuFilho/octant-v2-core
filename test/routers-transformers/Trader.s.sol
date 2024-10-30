@@ -7,7 +7,6 @@ import "src/routers-transformers/Trader.sol";
 import {HelperConfig} from "script/helpers/HelperConfig.s.sol";
 
 contract TestTraderRandomness is BaseTest {
-    uint256 public budget = 10_000 ether;
     HelperConfig helperConfig = new HelperConfig();
 
     address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
@@ -17,13 +16,13 @@ contract TestTraderRandomness is BaseTest {
     Trader public trader;
 
     address swapper = makeAddr("swapper");
+    string constant deadlineFn = "./cache/test-artifacts/deadline.csv";
 
     function setUp() public {
         _configure(false);
         moduleImplementation = new Trader();
-        temps = _testTemps(address(moduleImplementation), abi.encode(ETH, swapper, 0, 0, 0.6 ether, 1.4 ether));
+        temps = _testTemps(address(moduleImplementation), abi.encode(ETH, swapper));
         trader = Trader(payable(temps.module));
-        vm.deal(address(trader), budget);
     }
 
     receive() external payable {}
@@ -32,8 +31,10 @@ contract TestTraderRandomness is BaseTest {
     function wrapBuy() public returns (bool) {
         vm.roll(block.number + 1);
         try trader.convert(block.number - 1) {
+            string memory currentBudget = vm.toString((trader.budget() - trader.spent()) / 1e15);
+            vm.writeLine(deadlineFn, string(abi.encodePacked(vm.toString(block.number), ",", currentBudget)));
             return true;
-        } catch (bytes memory reason) /*lowLevelData*/ {
+        } catch (bytes memory) /*lowLevelData*/ {
             return false;
         }
     }
@@ -43,56 +44,102 @@ contract TestTraderRandomness is BaseTest {
         require(sent, "Failed to send Ether");
     }
 
-    function test_wrapBuyBounded() external {
-        uint256 chance = type(uint256).max / uint256(4000); // corresponds to 0.00025 chance
-        uint256 spendADay = 1 ether;
-
-        vm.startPrank(temps.safe);
-        trader.setSpendADay(chance, spendADay, 1 ether, 1 ether);
-        vm.stopPrank();
-        vm.roll(block.number + 10);
-        uint256 blocks = 100;
-        for (uint256 i = 0; i < blocks; i++) {
-            wrapBuy();
-        }
-
-        /* check if spending below target plus one buy */
-        assertLt(trader.spent(), 1 ether + ((blocks * 1 ether) / trader.blocksADay()));
+    function concat(string memory _a, string memory _b) public pure returns (string memory) {
+        return string(abi.encodePacked(_a, _b));
     }
 
-    function test_wrapBuyBoundedWithRange() external {
-        uint256 chance = type(uint256).max / uint256(4000); // corresponds to 0.00025 chance
-        uint256 spendADay = 1 ether;
-        vm.startPrank(temps.safe);
-        trader.setSpendADay(chance, spendADay, 0.6 ether, 1.4 ether);
-        vm.stopPrank();
+    function test_deadline() external {
+        uint256 budget = 10_000 ether;
+        vm.deal(address(trader), budget);
+        if (vm.exists(deadlineFn)) {
+            vm.removeFile(deadlineFn);
+        }
         uint256 blocks = 100_000;
+        vm.startPrank(temps.safe);
+        trader.setSpendADay(0.6 ether, 1.4 ether, budget, block.number + blocks);
+        vm.stopPrank();
+        assertEq(address(trader).balance, budget);
+        assertEq(trader.budget(), budget);
+        assertEq(trader.spent(), 0);
         for (uint256 i = 0; i < blocks; i++) {
             wrapBuy();
         }
-
-        // check if spending above target minus two buys
-        assertLt(((blocks * 1 ether) / trader.blocksADay()) - 2 ether, trader.spent());
-
-        // check if spending below target plus one buy
-        assertLt(trader.spent(), 1.4 ether + ((blocks * 1 ether) / trader.blocksADay()));
+        assertEq(trader.budget(), trader.spent());
     }
 
-    function test_wrapBuyUnbounded() external {
-        uint256 chance = type(uint256).max / uint256(4000); // corresponds to 0.00025 chance
-        uint256 spendADay = 100 ether;
+    function test_safety_blocks_value() external {
+        uint256 blocks = 1_000_000;
         vm.startPrank(temps.safe);
-        trader.setSpendADay(chance, spendADay, 1 ether, 1 ether);
+        trader.setSpendADay(1 ether, 1 ether, 100_000 ether, block.number + blocks);
         vm.stopPrank();
-        uint256 blocks = 100_000;
-        for (uint256 i = 0; i < blocks; i++) {
+        assertEq(trader.getSafetyBlocks(), 100_000);
+    }
+
+    function test_safety_blocks_chance() external {
+        uint256 blocks = 1000;
+        vm.startPrank(temps.safe);
+        trader.setSpendADay(1 ether, 1 ether, 1000 ether, block.number + blocks);
+        vm.stopPrank();
+        vm.roll(block.number + blocks - trader.getSafetyBlocks());
+        assertEq(type(uint256).max, trader.chance());
+        vm.roll(block.number + blocks - 1);
+        assertEq(type(uint256).max, trader.chance());
+    }
+
+    function test_overspend_protection() external {
+        // This test will attempt to overspend, simulating validator griding hash values.
+        // Since forge doesn't allow to manipulate blockhash directly, overspending
+        // is done by manipulating return value of `chance()` function.
+        uint256 blocks = 1000;
+        vm.startPrank(temps.safe);
+        uint256 budget_value = 100 ether;
+        trader.setSpendADay(1 ether, 1 ether, budget_value, block.number + blocks);
+        vm.stopPrank();
+
+        // mock chance
+        vm.mockCall(address(trader), abi.encodeWithSelector(Trader.chance.selector), abi.encode(type(uint256).max - 1));
+
+        // sanity check
+        assertEq(type(uint256).max - 1, trader.chance());
+
+        /* run trader */
+        for (uint256 i = 0; i < blocks / 2; i++) {
             wrapBuy();
         }
 
-        // comparing to bounded test, average spending will be significantly higher
-        // proving that bounding with `spendADay` works
-        assertLt(((blocks * 1.4 ether) / trader.blocksADay()) - 2 ether, trader.spent());
-        assertLt(trader.spent(), 2 ether + ((blocks * 1.5 ether) / trader.blocksADay()));
+        assertLe(trader.spent(), trader.budget() / 2);
+    }
+
+    function test_chance_high() external {
+        uint256 blocks = 1_000_000;
+        vm.startPrank(temps.safe);
+        trader.setSpendADay(1 ether, 1 ether, 100_000 ether, block.number + blocks);
+        vm.stopPrank();
+        assertLt(trader.chance(), type(uint256).max / 9);
+    }
+
+    function test_chance_low() external {
+        uint256 blocks = 1_000_000;
+        vm.startPrank(temps.safe);
+        trader.setSpendADay(1 ether, 1 ether, 100_000 ether, block.number + blocks);
+        vm.stopPrank();
+        assertGt(trader.chance(), type(uint256).max / 11);
+    }
+
+    function test_avg_sale_chance_high() external {
+        uint256 blocks = 1_000_000;
+        vm.startPrank(temps.safe);
+        trader.setSpendADay(1 ether, 3 ether, 100_000 ether, block.number + blocks);
+        vm.stopPrank();
+        assertLt(trader.chance(), type(uint256).max / 18);
+    }
+
+    function test_avg_sale_chance_low() external {
+        uint256 blocks = 1_000_000;
+        vm.startPrank(temps.safe);
+        trader.setSpendADay(1 ether, 3 ether, 100_000 ether, block.number + blocks);
+        vm.stopPrank();
+        assertGt(trader.chance(), type(uint256).max / 20);
     }
 
     function test_division() external pure {
