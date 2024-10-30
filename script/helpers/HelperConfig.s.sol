@@ -14,6 +14,9 @@ contract HelperConfig is Script {
         address uniswapV3Router;
         address uniswapGlmWeth10000Pool;
         address trader;
+        address swapperFactory;
+        address oracleFactory;
+        address uniV3Swap;
     }
 
     uint256 public constant DEFAULT_ANVIL_KEY = 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80;
@@ -33,7 +36,7 @@ contract HelperConfig is Script {
 
     function getSepoliaEthConfig() public view returns (NetworkConfig memory) {
         return
-        // factory at 0x7eb12e415F88477B3Ef2f0D839161Ffa0f5329a0
+        // UniswapV3Factory at 0x7eb12e415F88477B3Ef2f0D839161Ffa0f5329a0
         NetworkConfig({
             glmToken: 0x71432DD1ae7DB41706ee6a22148446087BdD0906,
             wethToken: 0xeA438fB469540f1Ba54Ad2D2342d2dBCb191cE29,
@@ -41,8 +44,11 @@ contract HelperConfig is Script {
             uniswapV3Router: 0xD6601e25cF43CAc433A23cB95a39D38012B2e9f0,
             uniswapGlmWeth10000Pool: 0x1985134644683848EF81bdd9B1F4b16DDC647EF3,
             deployerKey: vm.envUint("PRIVATE_KEY"),
-            trader: 0xc654a254EEab4c65F8a786f8c1516ea7e9824daF
-        });
+            trader: 0xc654a254EEab4c65F8a786f8c1516ea7e9824daF,
+            swapperFactory: 0xa244bbe019cf1BA177EE5A532250be2663Fb55cA,
+            oracleFactory: 0x074827E8bD77B0A66c6008a51AF9BD1F33105caf,
+            uniV3Swap: 0x981a6aC55c7D39f50666938CcD0df53D59797e87
+            });
     }
 
     function getMainnetEthConfig() public view returns (NetworkConfig memory) {
@@ -53,7 +59,10 @@ contract HelperConfig is Script {
             uniswapV3Router: 0xE592427A0AEce92De3Edee1F18E0157C05861564,
             uniswapGlmWeth10000Pool: 0x531b6A4b3F962208EA8Ed5268C642c84BB29be0b,
             deployerKey: vm.envUint("PRIVATE_KEY"),
-            trader: address(0)
+            trader: address(0),
+            swapperFactory: 0xa244bbe019cf1BA177EE5A532250be2663Fb55cA,
+            oracleFactory: 0x498f316fEB85a250fdC64B859a130515491EC888,
+            uniV3Swap: 0x981a6aC55c7D39f50666938CcD0df53D59797e87
         });
     }
 
@@ -76,7 +85,10 @@ contract HelperConfig is Script {
             uniswapV3Router: address(0),
             uniswapGlmWeth10000Pool: address(0),
             deployerKey: DEFAULT_ANVIL_KEY,
-            trader: address(0)
+            trader: address(0),
+            swapperFactory: address(0),
+            oracleFactory: address(0),
+            uniV3Swap: address(0)
         });
     }
 }
