@@ -8,13 +8,14 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {OracleParams} from "../vendor/0xSplits/OracleParams.sol";
 import "solady/src/utils/FixedPointMathLib.sol";
+import {ITransformer} from "../interfaces/ITransformer.sol";
 /* import {ITrader} from "../interfaces/ITrader.sol"; */
 
 /// @author .
 /// @title Octant Trader
 /// @notice Octant Trader is a contract that performs "DCA" in terms of sold token into another token.
 /// @dev This contract performs trades in a random times, attempting to isolate the deployer from risks of insider trading.
-contract Trader is Module /* , ITrader */ {
+contract Trader is Module, ITransformer /* , ITrader */ {
     using SafeERC20 for IERC20;
     using FixedPointMathLib for uint256;
 
@@ -29,7 +30,10 @@ contract Trader is Module /* , ITrader */ {
     address public swapper;
 
     /// @notice Token to be sold.
-    address public token;
+    address public base;
+
+    /// @notice Token to be bought.
+    address public quote;
 
     /// @notice Deadline for all of budget to be sold.
     uint256 public deadline = block.number;
@@ -76,13 +80,25 @@ contract Trader is Module /* , ITrader */ {
 
     function setUp(bytes memory initializeParams) public override initializer {
         (address _owner, bytes memory data) = abi.decode(initializeParams, (address, bytes));
-        (address _token, address _swapper) = abi.decode(data, (address, address));
+        (address _base, address _quote, address _swapper) = abi.decode(data, (address, address, address));
         __Ownable_init(msg.sender);
-        token = _token;
+        base = _base;
+        quote = _quote;
         swapper = _swapper;
         setAvatar(_owner);
         setTarget(_owner);
         transferOwnership(_owner);
+    }
+
+    function transform(address fromToken, address toToken, uint256 amount) external payable returns (uint256) {
+        if ((fromToken != base) || (toToken != quote)) revert Trader__ImpossibleConfiguration();
+        if (fromToken == ETH) {
+            if (msg.value != amount) revert Trader__ImpossibleConfiguration();
+        } else {
+            IERC20(base).safeTransferFrom(msg.sender, address(this), amount);
+        }
+        budget = budget + amount;
+        return 0;
     }
 
     /// @notice Transfers funds that are to be converted by to target token by external converter.
@@ -99,8 +115,8 @@ contract Trader is Module /* , ITrader */ {
         if (saleValue > saleValueHigh) revert Trader__SoftwareError();
 
         uint256 balance = address(this).balance;
-        if (token != ETH) {
-            balance = IERC20(token).balanceOf(address(this));
+        if (base != ETH) {
+            balance = IERC20(base).balanceOf(address(this));
         }
 
         if (saleValue > balance) {
@@ -109,11 +125,11 @@ contract Trader is Module /* , ITrader */ {
         if (saleValue > budget - spent) {
             saleValue = budget - spent;
         }
-        if (token == ETH) {
+        if (base == ETH) {
             (bool success,) = payable(swapper).call{value: saleValue}("");
             require(success);
         } else {
-            IERC20(token).safeTransfer(swapper, saleValue);
+            IERC20(base).safeTransfer(swapper, saleValue);
         }
 
         spent = spent + saleValue;
