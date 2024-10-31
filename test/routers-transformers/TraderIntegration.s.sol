@@ -45,24 +45,20 @@ contract TestTraderIntegrationETH is BaseTest {
     function setUp() public {
         _configure(true);
         helperConfig = new HelperConfig();
-        (address glmToken, address wethToken,,, address v3router,,, address swapperFactory,, address uniV3Swap) =
+        (address glmToken, address wethToken,,,,,,,, address uniV3Swap) =
             helperConfig.activeNetworkConfig();
-        emit log_named_address("glmToken", glmToken);
-        emit log_named_address("wethToken", wethToken);
 
         glmAddress = glmToken;
         wethAddress = wethToken;
 
         initializer = UniV3Swap(payable(uniV3Swap));
-        /* initializer = new UniV3Swap(ISwapperFactory(swapperFactory), ISwapRouter(v3router), WETH(payable(wethToken))); */
 
         beneficiary = address(this); // FIXME
-        emit log_named_address("beneficiary", beneficiary);
         tokenToBeneficiary = glmToken;
         swapper = deploySwapper();
         moduleImplementation = new Trader();
 
-        temps = _testTemps(address(moduleImplementation), abi.encode(ETH, swapper));
+        temps = _testTemps(address(moduleImplementation), abi.encode(ETH, glmAddress, swapper));
         trader = Trader(payable(temps.module));
     }
 
@@ -93,7 +89,6 @@ contract TestTraderIntegrationETH is BaseTest {
             helperConfig.activeNetworkConfig();
         IOracleFactory oracleFactory = IOracleFactory(oracleFactoryAddress);
         ISwapperFactory swapperFactory = ISwapperFactory(swapperFactoryAddress);
-        ISwapperImpl swapperImpl = swapperFactory.swapperImpl();
 
         address ethAddress = address(0); // address that represents native ETH in Splits Oracle system
         ethGLM = QuotePair({base: ethAddress, quote: glmToken});
@@ -124,10 +119,7 @@ contract TestTraderIntegrationETH is BaseTest {
         oracle = oracleFactory.createUniV3Oracle(initOracleParams);
         oracleParams.oracle = oracle;
 
-        emit log_named_address("tokenToBeneficiary", tokenToBeneficiary);
-
         // setup LibCloneBase
-        address impl = address(swapperImpl);
         address clone = address(swapperFactory.createSwapper(_createSwapperParams()));
         return clone;
     }
@@ -173,14 +165,18 @@ contract TestTraderIntegrationETH is BaseTest {
         
         uint256 oldGlmBalance = IERC20(glmAddress).balanceOf(address(this));
 
-        address ethAddress = address(0); // address that represents native ETH in Splits Oracle system
+        // now, do the actual swap
+        // notes:
+        // 1. swapper will wrap ETH, this is why we use WETH/GLM pair
+        // 2. 
+
         delete exactInputParams;
         exactInputParams.push(
             ISwapRouter.ExactInputParams({
                 path: abi.encodePacked(wethAddress, uint24(10_000), glmAddress),
                 recipient: address(initializer),
                 deadline: block.timestamp + 100,
-                amountIn: uint256(swapper.balance / 2),
+                amountIn: uint256(swapper.balance),
                 amountOutMinimum: 0
             })
         );
@@ -189,7 +185,7 @@ contract TestTraderIntegrationETH is BaseTest {
         quoteParams.push(
             QuoteParams({
                 quotePair: ethGLM,
-                baseAmount: uint128(swapper.balance / 2),
+                baseAmount: uint128(swapper.balance),
                 data: abi.encode(exactInputParams)
             })
         );

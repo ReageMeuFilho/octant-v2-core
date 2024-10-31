@@ -21,7 +21,7 @@ contract TestTraderRandomness is BaseTest {
     function setUp() public {
         _configure(false);
         moduleImplementation = new Trader();
-        temps = _testTemps(address(moduleImplementation), abi.encode(ETH, swapper));
+        temps = _testTemps(address(moduleImplementation), abi.encode(ETH, token, swapper));
         trader = Trader(payable(temps.module));
     }
 
