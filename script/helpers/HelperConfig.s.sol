@@ -48,7 +48,7 @@ contract HelperConfig is Script {
             swapperFactory: 0xa244bbe019cf1BA177EE5A532250be2663Fb55cA,
             oracleFactory: 0x074827E8bD77B0A66c6008a51AF9BD1F33105caf,
             uniV3Swap: 0x981a6aC55c7D39f50666938CcD0df53D59797e87
-            });
+        });
     }
 
     function getMainnetEthConfig() public view returns (NetworkConfig memory) {

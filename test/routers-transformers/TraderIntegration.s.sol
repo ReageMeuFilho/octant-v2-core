@@ -45,7 +45,7 @@ contract TestTraderIntegrationETH is BaseTest {
     function setUp() public {
         _configure(true);
         helperConfig = new HelperConfig();
-        (address glmToken,address wethToken,,,address v3router,,,address swapperFactory,,address uniV3Swap) =
+        (address glmToken, address wethToken,,, address v3router,,, address swapperFactory,, address uniV3Swap) =
             helperConfig.activeNetworkConfig();
         emit log_named_address("glmToken", glmToken);
         emit log_named_address("wethToken", wethToken);
@@ -72,7 +72,7 @@ contract TestTraderIntegrationETH is BaseTest {
             paused: false,
             defaultPeriod: 30 minutes,
             pairDetails: oraclePairDetails
-            });
+        });
     }
 
     function _createSwapperParams() internal view returns (ISwapperFactory.CreateSwapperParams memory) {
@@ -89,7 +89,7 @@ contract TestTraderIntegrationETH is BaseTest {
 
     function deploySwapper() public returns (address) {
         helperConfig = new HelperConfig();
-        (address glmToken,,,,,address glmPool,,address swapperFactoryAddress,address oracleFactoryAddress,) =
+        (address glmToken,,,,, address glmPool,, address swapperFactoryAddress, address oracleFactoryAddress,) =
             helperConfig.activeNetworkConfig();
         IOracleFactory oracleFactory = IOracleFactory(oracleFactoryAddress);
         ISwapperFactory swapperFactory = ISwapperFactory(swapperFactoryAddress);
@@ -100,13 +100,13 @@ contract TestTraderIntegrationETH is BaseTest {
 
         delete oraclePairDetails;
         oraclePairDetails.push(
-                                IUniV3OracleImpl.SetPairDetailParams({
-                                    quotePair: ethGLM,
-                                    pairDetail: IUniV3OracleImpl.PairDetail({
-                                        pool: glmPool,
-                                        period: 0 // no override
-                                        })
-                                    })
+            IUniV3OracleImpl.SetPairDetailParams({
+                quotePair: ethGLM,
+                pairDetail: IUniV3OracleImpl.PairDetail({
+                    pool: glmPool,
+                    period: 0 // no override
+                })
+            })
         );
 
         delete pairScaledOfferFactors;
@@ -175,22 +175,32 @@ contract TestTraderIntegrationETH is BaseTest {
 
         address ethAddress = address(0); // address that represents native ETH in Splits Oracle system
         delete exactInputParams;
-        exactInputParams.push(ISwapRouter.ExactInputParams({
+        exactInputParams.push(
+            ISwapRouter.ExactInputParams({
                 path: abi.encodePacked(wethAddress, uint24(10_000), glmAddress),
                 recipient: address(initializer),
                 deadline: block.timestamp + 100,
                 amountIn: uint256(swapper.balance / 2),
                 amountOutMinimum: 0
-                }));
+            })
+        );
 
         delete quoteParams;
-        quoteParams.push(QuoteParams({quotePair: ethGLM, baseAmount: uint128(swapper.balance / 2), data: abi.encode(exactInputParams)}));
-        UniV3Swap.FlashCallbackData memory data = UniV3Swap.FlashCallbackData({exactInputParams: exactInputParams, excessRecipient: address(oracle)});
-        UniV3Swap.InitFlashParams memory params = UniV3Swap.InitFlashParams({quoteParams: quoteParams, flashCallbackData: data});
+        quoteParams.push(
+            QuoteParams({
+                quotePair: ethGLM,
+                baseAmount: uint128(swapper.balance / 2),
+                data: abi.encode(exactInputParams)
+            })
+        );
+        UniV3Swap.FlashCallbackData memory data =
+            UniV3Swap.FlashCallbackData({exactInputParams: exactInputParams, excessRecipient: address(oracle)});
+        UniV3Swap.InitFlashParams memory params =
+            UniV3Swap.InitFlashParams({quoteParams: quoteParams, flashCallbackData: data});
         initializer.initFlash(ISwapperImpl(swapper), params);
 
+        // check if beneficiary received some GLM
         uint256 newGlmBalance = IERC20(glmAddress).balanceOf(address(this));
-
         assertGt(newGlmBalance, oldGlmBalance);
     }
 

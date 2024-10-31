@@ -14,7 +14,7 @@ import "solady/src/utils/FixedPointMathLib.sol";
 /// @title Octant Trader
 /// @notice Octant Trader is a contract that performs "DCA" in terms of sold token into another token.
 /// @dev This contract performs trades in a random times, attempting to isolate the deployer from risks of insider trading.
-contract Trader is Module/* , ITrader */ {
+contract Trader is Module /* , ITrader */ {
     using SafeERC20 for IERC20;
     using FixedPointMathLib for uint256;
 

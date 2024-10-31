@@ -16,9 +16,9 @@ interface ISwapperImpl {
     }
 
     struct SetPairScaledOfferFactorParams {
-            QuotePair quotePair;
-            uint32 scaledOfferFactor;
-        }
+        QuotePair quotePair;
+        uint32 scaledOfferFactor;
+    }
 
     function flash(QuoteParams[] calldata quoteParams_, bytes calldata callbackData_) external returns (uint256);
 
