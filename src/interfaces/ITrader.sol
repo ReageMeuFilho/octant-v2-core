@@ -6,7 +6,8 @@ interface ITrader {
     function convert(uint256 _height) external;
     function setSwapper(address _swapper) external;
 
-    function token() external view returns (address);
+    function base() external view returns (address);
+    function quote() external view returns (address);
     function swapper() external view returns (address);
 
     function budget() external view returns (uint256);
