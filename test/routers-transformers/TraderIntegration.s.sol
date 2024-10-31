@@ -166,6 +166,11 @@ contract TestTraderIntegrationETH is BaseTest {
         assertEq(trader.spent(), 1 ether);
         assertGt(swapper.balance, oldBalance);
 
+        // mock value of quote to avoid problems with stale oracle on CI
+        uint256[] memory unscaledAmountsToBeneficiary = new uint256[](1);
+        unscaledAmountsToBeneficiary[0] = 4228914774285437607589;
+        vm.mockCall(address(oracle), abi.encodeWithSelector(IOracle.getQuoteAmounts.selector), abi.encode(unscaledAmountsToBeneficiary));
+        
         uint256 oldGlmBalance = IERC20(glmAddress).balanceOf(address(this));
 
         address ethAddress = address(0); // address that represents native ETH in Splits Oracle system
