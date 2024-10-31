@@ -22,5 +22,4 @@ interface ISwapperFactory {
 
     function createUniV3Oracle(IUniV3OracleImpl.InitParams calldata params_) external returns (IUniV3OracleImpl);
     function swapperImpl() external returns (ISwapperImpl);
-
 }
