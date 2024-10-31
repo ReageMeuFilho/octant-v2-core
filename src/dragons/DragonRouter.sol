@@ -185,15 +185,11 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
             UserData storage _userData = userData[split.recipients[i]][_strategy];
             uint256 claimableAssets = _claimableAssets(_userData, _strategy);
             _userData.assets += claimableAssets;
-            /// TODO check for precision loss
             _userData.userAssetPerShare = 0;
             _userData.splitPerShare = 0;
         }
 
-        _stratData.asset = address(0);
-        _stratData.assetPerShare = 0;
-        _stratData.totalAssets = 0;
-        _stratData.totalShares = 0;
+        delete strategyData[_strategy];
 
         emit StrategyRemoved(_strategy);
     }
@@ -299,7 +295,6 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
                 UserData storage _userData = userData[split.recipients[j]][strategies[i]];
                 uint256 claimableAssets = _claimableAssets(_userData, strategies[i]);
                 _userData.assets += claimableAssets;
-                /// TODO check for precision loss
                 _userData.userAssetPerShare = 0;
                 _userData.splitPerShare = 0;
             }
@@ -311,7 +306,6 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
 
             data.assetPerShare = 0;
             data.totalAssets = 0;
-            /// TODO check for precision loss
             data.totalShares = _split.totalAllocations;
         }
 
