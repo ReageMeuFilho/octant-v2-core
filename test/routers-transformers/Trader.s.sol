@@ -16,6 +16,7 @@ contract TestTraderRandomness is BaseTest {
     Trader public trader;
 
     address swapper = makeAddr("swapper");
+    bool log_spending = false;
     string constant deadlineFn = "./cache/test-artifacts/deadline.csv";
 
     function setUp() public {
@@ -31,8 +32,10 @@ contract TestTraderRandomness is BaseTest {
     function wrapBuy() public returns (bool) {
         vm.roll(block.number + 1);
         try trader.convert(block.number - 1) {
-            string memory currentBudget = vm.toString((trader.budget() - trader.spent()) / 1e15);
-            vm.writeLine(deadlineFn, string(abi.encodePacked(vm.toString(block.number), ",", currentBudget)));
+            if (log_spending) {
+                string memory currentBudget = vm.toString((trader.budget() - trader.spent()) / 1e15);
+                vm.writeLine(deadlineFn, string(abi.encodePacked(vm.toString(block.number), ",", currentBudget)));
+            }
             return true;
         } catch (bytes memory) /*lowLevelData*/ {
             return false;
@@ -49,12 +52,12 @@ contract TestTraderRandomness is BaseTest {
     }
 
     function test_deadline() external {
-        uint256 budget = 10_000 ether;
+        uint256 budget = 1000 ether;
         vm.deal(address(trader), budget);
         if (vm.exists(deadlineFn)) {
             vm.removeFile(deadlineFn);
         }
-        uint256 blocks = 100_000;
+        uint256 blocks = 10_000;
         vm.startPrank(temps.safe);
         trader.setSpendADay(0.6 ether, 1.4 ether, budget, block.number + blocks);
         vm.stopPrank();
