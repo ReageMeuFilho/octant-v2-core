@@ -72,6 +72,15 @@ contract Trader is Module, ITransformer /* , ITrader */ {
     /// @notice Unsafe randomness seed.
     error Trader__RandomnessUnsafeSeed();
 
+    /// @notice Configuration parameters are impossible: deadline is in the past.
+    error Trader__ImpossibleConfigurationDeadlineInThePast();
+
+    /// @notice Configuration parameters are impossible: saleValueLow can't be zero.
+    error Trader__ImpossibleConfigurationSaleValueLowIsZero();
+
+    /// @notice Configuration parameters are impossible: saleValueLow is too low to allow to sale budget before deadline.
+    error Trader__ImpossibleConfigurationSaleValueLowIsTooLow();
+
     /// @notice Configuration parameters are impossible.
     error Trader__ImpossibleConfiguration();
 
@@ -160,9 +169,9 @@ contract Trader is Module, ITransformer /* , ITrader */ {
         saleValueHigh = high_;
         deadline = deadline_;
         budget = budget_;
-        if (deadline <= block.number) revert Trader__ImpossibleConfiguration();
-        if (saleValueLow == 0) revert Trader__ImpossibleConfiguration();
-        if (getSafetyBlocks() > (deadline - block.number)) revert Trader__ImpossibleConfiguration();
+        if (deadline <= block.number) revert Trader__ImpossibleConfigurationDeadlineInThePast();
+        if (saleValueLow == 0) revert Trader__ImpossibleConfigurationSaleValueLowIsZero();
+        if (getSafetyBlocks() > (deadline - block.number)) revert Trader__ImpossibleConfigurationSaleValueLowIsTooLow();
     }
 
     function setSwapper(address swapper_) external onlyOwner {

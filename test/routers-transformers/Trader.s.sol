@@ -28,6 +28,40 @@ contract TestTraderRandomness is BaseTest {
 
     receive() external payable {}
 
+    function testConfigurationBasic() public {
+        vm.startPrank(temps.safe);
+        trader.setSpendADay(1 ether, 1 ether, 1 ether, block.number + 102);
+        vm.stopPrank();
+        assertEq(trader.getSafetyBlocks(), 1);
+        assertEq(trader.deadline(), block.number + 102);
+        assertEq(trader.remainingBlocks(), 101);
+        assertTrue(trader.chance() > 0);
+        assertTrue(trader.saleValueLow() == 1 ether);
+        assertTrue(trader.saleValueHigh() == 1 ether);
+    }
+
+    function testConfigurationLowSaleIsTooLow() public {
+        vm.startPrank(temps.safe);
+        vm.expectRevert(Trader.Trader__ImpossibleConfigurationSaleValueLowIsTooLow.selector);
+        trader.setSpendADay(1, 1 ether, 1 ether, block.number + 102);
+        vm.stopPrank();
+    }
+
+    function testConfigurationLowIsZero() public {
+        vm.startPrank(temps.safe);
+        vm.expectRevert(Trader.Trader__ImpossibleConfigurationSaleValueLowIsZero.selector);
+        trader.setSpendADay(0, 1 ether, 1 ether, block.number + 102);
+        vm.stopPrank();
+    }
+
+    function testConfigurationDeadlineInPast() public {
+        vm.roll(1000);
+        vm.startPrank(temps.safe);
+        vm.expectRevert(Trader.Trader__ImpossibleConfigurationDeadlineInThePast.selector);
+        trader.setSpendADay(1, 1 ether, 1 ether, 100);
+        vm.stopPrank();
+    }
+
     // sequential call to this function emulate time progression
     function wrapBuy() public returns (bool) {
         vm.roll(block.number + 1);

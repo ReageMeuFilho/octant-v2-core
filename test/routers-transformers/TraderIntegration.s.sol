@@ -129,18 +129,6 @@ contract TestTraderIntegrationETH is BaseTest {
         assertTrue(trader.swapper() == swapper);
     }
 
-    function testConfiguration() public {
-        vm.startPrank(temps.safe);
-        trader.setSpendADay(1 ether, 1 ether, 1 ether, block.number + 102);
-        vm.stopPrank();
-        assertEq(trader.getSafetyBlocks(), 1);
-        assertEq(trader.deadline(), block.number + 102);
-        assertEq(trader.remainingBlocks(), 101);
-        assertTrue(trader.chance() > 0);
-        assertTrue(trader.saleValueLow() == 1 ether);
-        assertTrue(trader.saleValueHigh() == 1 ether);
-    }
-
     receive() external payable {}
 
     function test_sellEth() external {
