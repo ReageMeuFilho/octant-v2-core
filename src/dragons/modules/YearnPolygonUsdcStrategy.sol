@@ -65,14 +65,15 @@ contract YearnPolygonUsdcStrategy is Module, BaseStrategy {
      * shares of dragon router are allocated.
      */
     function _harvestAndReport() internal override returns (uint256) {
-        IStrategy(yieldSource).maxWithdraw(address(this));
+        uint2456 _withdrawAmount = IStrategy(yieldSource).maxWithdraw(address(this));
+        IStrategy(yieldSource).withdraw(_withdrawAmount, address(this), address(this));
         return ERC20(asset).balanceOf(address(this));
     }
 
     function _tend(uint256 /*_idle*/ ) internal override {
         uint256 balance = ERC20(asset).balanceOf(address(this));
         if (balance > 0) {
-            IStrategy(yieldSource).deposit(balance, address(this));
+            IStrategy(yieldSource).deposit(type(uint256).max, address(this));
         }
     }
 
