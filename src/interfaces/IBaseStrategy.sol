@@ -8,6 +8,10 @@ interface IBaseStrategy {
                             IMMUTABLE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
+    function maxReportDelay() external view returns (uint256);
+
+    function tokenizedStrategyImplementation() external view returns (address);
+
     function availableDepositLimit(address _owner) external view returns (uint256);
 
     function availableWithdrawLimit(address _owner) external view returns (uint256);

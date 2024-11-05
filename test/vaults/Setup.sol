@@ -49,7 +49,7 @@ contract Setup is ExtendedTest, IEvents {
     uint256 public profitMaxUnlockTime = 10 days;
 
     function setUp() public virtual {
-        _configure(false);
+        _configure(false, "");
         // Deploy the implementation for deterministic location
         tokenizedStrategy = new DragonTokenizedStrategy();
 

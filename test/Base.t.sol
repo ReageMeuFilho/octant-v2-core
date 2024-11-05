@@ -17,9 +17,9 @@ contract BaseTest is Test, TestPlus {
         address module;
     }
 
-    string TEST_RPC_URL = vm.envString("TEST_RPC_URL");
-    address safeSingleton = vm.envAddress("TEST_SAFE_SINGLETON");
-    address proxyFactory = vm.envAddress("TEST_SAFE_PROXY_FACTORY");
+    string TEST_RPC_URL;
+    address safeSingleton;
+    address proxyFactory;
 
     uint256 threshold = 1;
     uint256 fork;
@@ -27,8 +27,17 @@ contract BaseTest is Test, TestPlus {
     TestERC20 public token;
     address[] public owners;
 
-    function _configure(bool _useFork) internal {
+    function _configure(bool _useFork, string memory _chain) internal {
         if (_useFork) {
+            if (keccak256(abi.encode(_chain)) == keccak256(abi.encode("polygon"))) {
+                TEST_RPC_URL = vm.envString("TEST_RPC_URL_POLYGON");
+                safeSingleton = vm.envAddress("TEST_SAFE_SINGLETON_POLYGON");
+                proxyFactory = vm.envAddress("TEST_SAFE_PROXY_FACTORY_POLYGON");
+            } else if (keccak256(abi.encode(_chain)) == keccak256(abi.encode("eth"))) {
+                TEST_RPC_URL = vm.envString("TEST_RPC_URL");
+                safeSingleton = vm.envAddress("TEST_SAFE_SINGLETON");
+                proxyFactory = vm.envAddress("TEST_SAFE_PROXY_FACTORY");
+            }
             fork = vm.createFork(TEST_RPC_URL);
             vm.selectFork(fork);
         } else {
