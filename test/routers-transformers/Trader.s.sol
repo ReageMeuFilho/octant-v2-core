@@ -112,6 +112,28 @@ contract TestTraderRandomness is BaseTest {
         assertEq(trader.getSafetyBlocks(), 100_000);
     }
 
+    function test_reuse_randomness() external {
+        uint256 blocks = 1000;
+        vm.startPrank(temps.safe);
+        trader.setSpendADay(1 ether, 1 ether, 100 ether, block.number + blocks);
+        vm.stopPrank();
+        bool traded;
+        for (uint256 i = 0; i < blocks; i++) {
+            vm.roll(block.number + 1);
+            bool canTrade = trader.canTrade(block.number - 1);
+            try trader.convert(block.number - 1) {
+                traded = true;
+            } catch (bytes memory) /*lowLevelData*/ {
+                traded = false;
+            }
+            if (traded) {
+                vm.expectRevert(Trader.Trader__RandomnessAlreadyUsed.selector);
+                trader.convert(block.number - 1);
+            }
+            assert(!traded || canTrade); // traded => canTrade;
+        }
+    }
+
     function test_safety_blocks_chance() external {
         uint256 blocks = 1000;
         vm.startPrank(temps.safe);
