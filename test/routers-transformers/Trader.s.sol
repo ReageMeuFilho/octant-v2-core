@@ -112,6 +112,14 @@ contract TestTraderRandomness is BaseTest {
         assertEq(trader.getSafetyBlocks(), 100_000);
     }
 
+    function test_spendADay() external {
+        uint256 blocks = 1_000_000;
+        vm.startPrank(temps.safe);
+        trader.setSpendADay(1 ether, 1 ether, 100_000 ether, block.number + blocks);
+        vm.stopPrank();
+        assertEq(trader.spendADay(), 720 ether);
+    }
+
     function test_reuse_randomness() external {
         uint256 blocks = 1000;
         vm.startPrank(temps.safe);
