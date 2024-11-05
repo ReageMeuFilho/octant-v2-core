@@ -45,8 +45,7 @@ contract TestTraderIntegrationETH is BaseTest {
     function setUp() public {
         _configure(true);
         helperConfig = new HelperConfig();
-        (address glmToken, address wethToken,,,,,,,, address uniV3Swap) =
-            helperConfig.activeNetworkConfig();
+        (address glmToken, address wethToken,,,,,,,, address uniV3Swap) = helperConfig.activeNetworkConfig();
 
         glmAddress = glmToken;
         wethAddress = wethToken;
@@ -149,14 +148,18 @@ contract TestTraderIntegrationETH is BaseTest {
         // mock value of quote to avoid problems with stale oracle on CI
         uint256[] memory unscaledAmountsToBeneficiary = new uint256[](1);
         unscaledAmountsToBeneficiary[0] = 4228914774285437607589;
-        vm.mockCall(address(oracle), abi.encodeWithSelector(IOracle.getQuoteAmounts.selector), abi.encode(unscaledAmountsToBeneficiary));
-        
+        vm.mockCall(
+            address(oracle),
+            abi.encodeWithSelector(IOracle.getQuoteAmounts.selector),
+            abi.encode(unscaledAmountsToBeneficiary)
+        );
+
         uint256 oldGlmBalance = IERC20(glmAddress).balanceOf(address(this));
 
         // now, do the actual swap
         // notes:
         // 1. swapper will wrap ETH, this is why we use WETH/GLM pair
-        // 2. 
+        // 2.
 
         delete exactInputParams;
         exactInputParams.push(
@@ -171,11 +174,7 @@ contract TestTraderIntegrationETH is BaseTest {
 
         delete quoteParams;
         quoteParams.push(
-            QuoteParams({
-                quotePair: ethGLM,
-                baseAmount: uint128(swapper.balance),
-                data: abi.encode(exactInputParams)
-            })
+            QuoteParams({quotePair: ethGLM, baseAmount: uint128(swapper.balance), data: abi.encode(exactInputParams)})
         );
         UniV3Swap.FlashCallbackData memory data =
             UniV3Swap.FlashCallbackData({exactInputParams: exactInputParams, excessRecipient: address(oracle)});
