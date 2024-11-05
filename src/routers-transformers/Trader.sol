@@ -186,15 +186,18 @@ contract Trader is Module, ITransformer /* , ITrader */ {
     /// @return returns probability of a trade normalized to [0, type(uint256).max] range
     function chance() public view returns (uint256) {
         uint256 safetyBlocks = getSafetyBlocks();
-        if (deadline - block.number <= safetyBlocks) return type(uint256).max;
+        if (deadline <= block.number + safetyBlocks) return type(uint256).max;
         uint256 avgSale = (saleValueLow + saleValueHigh) / 2;
         uint256 numberOfSales = (budget - spent).divUp(avgSale);
-        return (type(uint256).max / remainingBlocks()) * numberOfSales;
+        uint256 blocks_left = remainingBlocks();
+        if (blocks_left < numberOfSales) return type(uint256).max;
+        else return (type(uint256).max / blocks_left) * numberOfSales;
     }
 
     /// @return number of blocks before deadline where probability of trade < 1
     function remainingBlocks() public view returns (uint256) {
         uint256 safety_blocks = getSafetyBlocks();
+        if (block.number + safety_blocks > deadline) return 0;
         return deadline - block.number - safety_blocks;
     }
 
