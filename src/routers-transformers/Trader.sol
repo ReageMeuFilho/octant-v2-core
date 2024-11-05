@@ -218,7 +218,7 @@ contract Trader is Module, ITransformer /* , ITrader */ {
 
     /// @return average amount of ETH in wei to be sold in 24 hours at average
     function spendADay() external view returns (uint256) {
-        return budget / ((deadline - block.number) / blocksADay);
+        return (budget / (deadline - startingBlock)) * blocksADay;
     }
 
     /// @notice Get random value for particular blockchain height.
