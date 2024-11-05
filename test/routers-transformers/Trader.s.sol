@@ -134,6 +134,41 @@ contract TestTraderRandomness is BaseTest {
         }
     }
 
+    function test_behavior_after_deadline() external {
+        uint256 blocks = 1000;
+        vm.startPrank(temps.safe);
+        trader.setSpendADay(1 ether, 1 ether, 100 ether, block.number + blocks);
+        vm.stopPrank();
+        bool traded;
+        for (uint256 i = 0; i < blocks; i++) {
+            wrapBuy();
+        }
+        for (uint256 i = 0; i < blocks; i++) {
+            vm.roll(block.number + 1);
+            vm.expectRevert(Trader.Trader__PastDeadline.selector);
+            trader.convert(block.number - 1);
+        }
+    }
+
+    function test_reconfigure() external {
+        uint256 blocks = 1000;
+        vm.startPrank(temps.safe);
+        uint256 deadline = block.number + blocks;
+        trader.setSpendADay(1 ether, 1 ether, 100 ether, deadline);
+        vm.stopPrank();
+        bool traded;
+        for (uint256 i = 0; i < blocks / 2; i++) {
+            wrapBuy();
+        }
+        vm.startPrank(temps.safe);
+        trader.setSpendADay(0.5 ether, 1 ether, address(trader).balance, deadline);
+        vm.stopPrank();
+        for (uint256 i = 0; i < (blocks / 2) + 1; i++) {
+            wrapBuy();
+        }
+        assert(trader.spent() == trader.budget());
+    }
+
     function test_safety_blocks_chance() external {
         uint256 blocks = 1000;
         vm.startPrank(temps.safe);
