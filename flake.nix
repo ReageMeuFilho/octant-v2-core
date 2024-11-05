@@ -13,8 +13,8 @@
     in {
       devShells.default = pkgs.mkShell {
         buildInputs = [
-          pkgs.nodejs
-          pkgs.yarn
+          pkgs.nodejs_22.pkgs.yarn
+          pkgs.nodejs_22
           pkgs.act # enables running GH pipeline locally
         ] ++ darwinInputs;
       };
