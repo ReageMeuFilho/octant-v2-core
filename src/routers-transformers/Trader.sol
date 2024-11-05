@@ -81,6 +81,12 @@ contract Trader is Module, ITransformer /* , ITrader */ {
     /// @notice Configuration parameters are impossible: saleValueLow is too low to allow to sale budget before deadline.
     error Trader__ImpossibleConfigurationSaleValueLowIsTooLow();
 
+    /// @notice It is past deadline. Configure Trader with updated deadline first.
+    error Trader__PastDeadline();
+
+    /// @notice All of budget is already spent.
+    error Trader__BudgetSpent();
+
     /// @notice Configuration parameters are impossible.
     error Trader__ImpossibleConfiguration();
 
@@ -113,10 +119,19 @@ contract Trader is Module, ITransformer /* , ITrader */ {
     /// @notice Transfers funds that are to be converted by to target token by external converter.
     /// @param height that will be used as a source of randomness. One height value can be used only once.
     function convert(uint256 height) external {
+        if (budget == spent) revert Trader__BudgetSpent();
+
+        if (deadline < block.number) revert Trader__PastDeadline();
+
+        // handle randomness
         uint256 rand = getRandomNumber(height);
         uint256 _chance = this.chance();
         if (rand > _chance) revert Trader__WrongHeight();
+
+        // handle overspending
         if (_chance != type(uint256).max && hasOverspent(height)) revert Trader__SpendingTooMuch();
+
+        // don't allow to reuse randomness
         if (lastHeight >= height) revert Trader__RandomnessAlreadyUsed();
         lastHeight = height;
 
