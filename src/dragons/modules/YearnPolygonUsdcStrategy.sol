@@ -43,7 +43,7 @@ contract YearnPolygonUsdcStrategy is Module, BaseStrategy {
 
         ERC20(_asset).approve(yieldSource, type(uint256).max);
         IStrategy(yieldSource).approve(_owner, type(uint256).max);
-        
+
         setAvatar(_owner);
         setTarget(_owner);
         transferOwnership(_owner);
