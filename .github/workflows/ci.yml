@@ -75,8 +75,6 @@ jobs:
   analyze:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
       - name: Setup node
         uses: actions/setup-node@v3
         with:
@@ -89,6 +87,7 @@ jobs:
         run: "npm i"
 
       - name: Run Slither
+        uses: actions/checkout@v4
         uses: crytic/slither-action@v0.4.0
         with:
           target: "src/"
