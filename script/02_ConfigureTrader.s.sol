@@ -17,8 +17,7 @@ contract DeployTraderHelper is Script {
         vm.startBroadcast(deployerKey);
 
         uint256 chance = type(uint256).max / uint256(10); // corresponds to 1 in 10 chance, 720 trades a day
-        uint256 spendADay = 1 ether;
-        trader.setSpendADay(chance, spendADay, 0.00128 ether, 0.00328 ether); // will overspend a bit
+        trader.setSpending(0.00128 ether, 0.00328 ether, 1 ether, block.number + 7200); // will overspend a bit
 
         vm.stopBroadcast();
     }

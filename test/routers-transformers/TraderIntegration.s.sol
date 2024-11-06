@@ -136,7 +136,7 @@ contract TestTraderIntegrationETH is BaseTest {
         vm.deal(address(trader), 2 ether);
 
         vm.startPrank(temps.safe);
-        trader.setSpendADay(1 ether, 1 ether, fakeBudget, block.number + 101);
+        trader.setSpending(1 ether, 1 ether, fakeBudget, block.number + 101);
         vm.stopPrank();
 
         uint256 oldBalance = swapper.balance;

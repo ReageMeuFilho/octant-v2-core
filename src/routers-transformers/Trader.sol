@@ -14,34 +14,41 @@ import {ITransformer} from "../interfaces/ITransformer.sol";
 /// @author .
 /// @title Octant Trader
 /// @notice Octant Trader is a contract that performs "DCA" in terms of sold token into another token.
-/// @dev This contract performs trades in a random times, attempting to isolate the deployer from risks of insider trading.
+/// @dev this contract performs trades in a random times, isolating the deployer from risks of insider trading.
 contract Trader is Module, ITransformer {
     using SafeERC20 for IERC20;
     using FixedPointMathLib for uint256;
 
-    event Traded(uint256 sold);
-    event SwapperChanged(address oldSwapper, address newSwapper);
+    /*//////////////////////////////////////////////////////////////
+                          Constants
+    //////////////////////////////////////////////////////////////*/
 
     uint256 public constant blocksADay = 7200;
 
-    address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE; // using this address to represent native ETH
-
-    /// @notice Swapper is the address which will handle actual selling.
-    address public swapper;
+    /// @notice Address used to represent native ETH.
+    address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
     /// @notice Token to be sold.
     address public base;
 
     /// @notice Token to be bought.
+    /// @dev Please note that contract that deals with quote token is the `swapper`. Here value of `quote` is purely informational.
     address public quote;
+
+    /*//////////////////////////////////////////////////////////////
+                          STATE VARIABLES
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Swapper is the address which will handle actual selling.
+    address public swapper;
 
     /// @notice Deadline for all of budget to be sold.
     uint256 public deadline = block.number;
 
-    /// @notice Total ETH to be spent before deadline.
+    /// @notice Total token to be spent before deadline.
     uint256 public budget = 0;
 
-    /// @notice Spent ETH since startingBlock
+    /// @notice Spent token since startingBlock.
     uint256 public spent = 0;
 
     /// @notice Rules for spending were last updated at this height.
@@ -56,6 +63,19 @@ contract Trader is Module, ITransformer {
 
     /// @notice Height of block hash used as a last source of randomness.
     uint256 public lastHeight;
+
+    /*//////////////////////////////////////////////////////////////
+                               EVENTS
+    //////////////////////////////////////////////////////////////*/
+
+    event Traded(uint256 sold, uint256 left);
+    event SwapperChanged(address oldSwapper, address newSwapper);
+    event SpendingChanged(address base, address quote, uint256 budget, uint256 deadline);
+
+
+    /*//////////////////////////////////////////////////////////////
+                            CUSTOM ERRORS
+    //////////////////////////////////////////////////////////////*/
 
     /// @notice Heights at which `convert()` can be called is decided by randomness.
     ///         If you see `Trader__WrongHeight()` error, retry in the next block.
@@ -93,6 +113,13 @@ contract Trader is Module, ITransformer {
     /// @notice This one indicates software error. Should never happen.
     error Trader__SoftwareError();
 
+    /*//////////////////////////////////////////////////////////////
+      INITIALIZER
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Initialize function
+    /// @dev owner of this module will the safe multisig that calls setUp function
+    /// @param initializeParams Parameters of initialization encoded
     function setUp(bytes memory initializeParams) public override initializer {
         (address _owner, bytes memory data) = abi.decode(initializeParams, (address, bytes));
         (address _base, address _quote, address _swapper) = abi.decode(data, (address, address, address));
@@ -172,11 +199,11 @@ contract Trader is Module, ITransformer {
     }
 
     /// @notice Sets spending limits.
-    /// @param low_ is a lower bound of sold ETH for a single trade
-    /// @param high_ is a higher bound of sold ETH for a single trade
-    /// @param budget_ sets amount of ETH (in wei) to be sold before deadline block height
+    /// @param low_ is a lower bound of sold token (in wei) for a single trade
+    /// @param high_ is a higher bound of sold token (in wei) for a single trade
+    /// @param budget_ sets amount of token (in wei) to be sold before deadline block height
     /// @param deadline_ sets deadline block height
-    function setSpendADay(uint256 low_, uint256 high_, uint256 budget_, uint256 deadline_) public onlyOwner {
+    function setSpending(uint256 low_, uint256 high_, uint256 budget_, uint256 deadline_) public onlyOwner {
         startingBlock = block.number;
         lastHeight = block.number;
         spent = 0;
@@ -189,16 +216,21 @@ contract Trader is Module, ITransformer {
         if (getSafetyBlocks() > (deadline - block.number)) revert Trader__ImpossibleConfigurationSaleValueLowIsTooLow();
     }
 
+    /// @notice Set address of the contract that will receive token (base) to be converted to target token (quote).
+    /// @param swapper_ address of the contract handling the swapping.
     function setSwapper(address swapper_) external onlyOwner {
         emit SwapperChanged(swapper, swapper_);
         swapper = payable(swapper_);
     }
 
+    /// @notice Returns how many blocks are necessary in the worst case to sold remaining budget.
+    /// @dev Please note that the worst case each trade amount will be `saleValueLow`.
     function getSafetyBlocks() public view returns (uint256) {
         return (budget - spent).divUp(saleValueLow);
     }
 
-    /// @return returns probability of a trade normalized to [0, type(uint256).max] range
+    /// @notice Returns probability of a trade normalized to [0, type(uint256).max] range
+    /// @dev Probability of trade changes to make sure that contract will sell all of its budget before the deadline.
     function chance() public view returns (uint256) {
         uint256 safetyBlocks = getSafetyBlocks();
         if (deadline <= block.number + safetyBlocks) return type(uint256).max;
@@ -209,14 +241,16 @@ contract Trader is Module, ITransformer {
         else return (type(uint256).max / blocks_left) * numberOfSales;
     }
 
-    /// @return number of blocks before deadline where probability of trade < 1
+    /// @notice Number of blocks before deadline where probability of trade < 1
+    /// @dev Due to the way this function is used, will return 0 if deadline has passed.
     function remainingBlocks() public view returns (uint256) {
         uint256 safety_blocks = getSafetyBlocks();
         if (block.number + safety_blocks > deadline) return 0;
         return deadline - block.number - safety_blocks;
     }
 
-    /// @return average amount of ETH in wei to be sold in 24 hours at average
+    /// @return Average amount of token in wei to be sold in 24 hours.
+    /// @dev This reads configuration parameters, not current state of swapping process, which may diverge because of randomness.
     function spendADay() external view returns (uint256) {
         return (budget / (deadline - startingBlock)) * blocksADay;
     }
@@ -224,12 +258,14 @@ contract Trader is Module, ITransformer {
     /// @notice Get random value for particular blockchain height.
     /// @param height Height is block height to be used as a source of randomness. Will raise if called for blocks older than 256.
     /// @return a pseudorandom uint256 value in range [0, type(uint256).max]
+    /// @dev Sourcing of randomness in this way enables tx inclusion in block which is different from block with randomness source. This prevents waste of gas on failed calls to `convert` even in absence of FlashBots-like infrastructure.
     function getRandomNumber(uint256 height) public view returns (uint256) {
         uint256 seed = uint256(blockhash(height));
         if (seed == 0) revert Trader__RandomnessUnsafeSeed();
         return apply_domain(seed);
     }
 
+    /// @dev Applies a domain separator to the given random seed. This function is intended to namespace the randomness to prevent cross-domain collisions.
     function apply_domain(uint256 seed) public pure returns (uint256) {
         return uint256(keccak256(abi.encode("Octant", seed)));
     }
