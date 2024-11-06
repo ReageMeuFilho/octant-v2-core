@@ -16,6 +16,7 @@ contract TestTraderRandomness is BaseTest {
     Trader public trader;
 
     address swapper = makeAddr("swapper");
+    address alt_swapper = makeAddr("alt_swapper");
     bool log_spending = false;
     string constant deadlineFn = "./cache/test-artifacts/deadline.csv";
 
@@ -147,7 +148,6 @@ contract TestTraderRandomness is BaseTest {
         vm.startPrank(temps.safe);
         trader.setSpendADay(1 ether, 1 ether, 100 ether, block.number + blocks);
         vm.stopPrank();
-        bool traded;
         for (uint256 i = 0; i < blocks; i++) {
             wrapBuy();
         }
@@ -164,7 +164,6 @@ contract TestTraderRandomness is BaseTest {
         uint256 deadline = block.number + blocks;
         trader.setSpendADay(1 ether, 1 ether, 100 ether, deadline);
         vm.stopPrank();
-        bool traded;
         for (uint256 i = 0; i < blocks / 2; i++) {
             wrapBuy();
         }
@@ -302,5 +301,16 @@ contract TestTraderRandomness is BaseTest {
         assert(blockhash(block.number - 1) != bytes32(0));
         assert(blockhash(block.number) == bytes32(0));
         assert(blockhash(block.number + 1) == bytes32(0));
+    }
+
+    function test_setSwapper() public {
+        assert(trader.swapper() == swapper);
+        vm.expectRevert();
+        trader.setSwapper(alt_swapper);
+        assert(trader.swapper() == swapper);
+        vm.startPrank(temps.safe);
+        trader.setSwapper(alt_swapper);
+        vm.stopPrank();
+        assert(trader.swapper() == alt_swapper);
     }
 }
