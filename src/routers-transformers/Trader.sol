@@ -2,20 +2,20 @@
 pragma solidity ^0.8.23;
 
 import {Module} from "zodiac/core/Module.sol";
-import {Enum} from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 import "solady/src/utils/SafeCastLib.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {OracleParams} from "../vendor/0xSplits/OracleParams.sol";
 import "solady/src/utils/FixedPointMathLib.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Enum} from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
+import {OracleParams} from "../vendor/0xSplits/OracleParams.sol";
+
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ITransformer} from "../interfaces/ITransformer.sol";
-/* import {ITrader} from "../interfaces/ITrader.sol"; */
 
 /// @author .
 /// @title Octant Trader
 /// @notice Octant Trader is a contract that performs "DCA" in terms of sold token into another token.
 /// @dev This contract performs trades in a random times, attempting to isolate the deployer from risks of insider trading.
-contract Trader is Module, ITransformer /* , ITrader */ {
+contract Trader is Module, ITransformer {
     using SafeERC20 for IERC20;
     using FixedPointMathLib for uint256;
 
