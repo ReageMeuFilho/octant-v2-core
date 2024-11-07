@@ -57,7 +57,10 @@ contract TestTraderIntegrationETH is BaseTest {
         swapper = deploySwapper();
         moduleImplementation = new Trader();
 
-        temps = _testTemps(address(moduleImplementation), abi.encode(ETH, glmAddress, swapper));
+        temps = _testTemps(
+            address(moduleImplementation),
+            abi.encode(ETH, glmAddress, wethToken, beneficiary, swapper, uniV3Swap, oracle)
+        );
         trader = Trader(payable(temps.module));
     }
 
@@ -129,6 +132,24 @@ contract TestTraderIntegrationETH is BaseTest {
     }
 
     receive() external payable {}
+
+    function test_transform() external {
+        assert(IERC20(glmAddress).balanceOf(trader.beneficiary()) == 0);
+        // effectively disable upper bound check and randomness check
+        uint256 fakeBudget = 1 ether;
+
+        vm.startPrank(temps.safe);
+        trader.setSpending(0.5 ether, 1.5 ether, fakeBudget, block.number + 101);
+        vm.stopPrank();
+
+        vm.roll(block.number + 100);
+        uint256 saleValue = trader.findSaleValue(1.5 ether);
+        assert(saleValue > 0);
+        uint256 amountToBeneficiary = trader.transform{value: saleValue}(trader.base(), trader.quote(), saleValue);
+        assert(IERC20(glmAddress).balanceOf(trader.beneficiary()) > 0);
+        assert(IERC20(glmAddress).balanceOf(trader.beneficiary()) == amountToBeneficiary);
+        emit log_named_uint("GLM price on Trader.transform(...)", amountToBeneficiary / saleValue);
+    }
 
     function test_sellEth() external {
         // effectively disable upper bound check and randomness check

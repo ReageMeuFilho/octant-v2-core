@@ -6,10 +6,18 @@ import "solady/src/utils/SafeCastLib.sol";
 import "solady/src/utils/FixedPointMathLib.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Enum} from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
-import {OracleParams} from "../vendor/0xSplits/OracleParams.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ITransformer} from "../interfaces/ITransformer.sol";
+
+// initFlash
+import {CreateOracleParams, IOracleFactory, IOracle, OracleParams} from "../../src/vendor/0xSplits/OracleParams.sol";
+import {QuotePair, QuoteParams} from "../../src/vendor/0xSplits/LibQuotes.sol";
+import {OracleParams} from "../vendor/0xSplits/OracleParams.sol";
+import {IUniV3OracleImpl} from "../../src/vendor/0xSplits/IUniV3OracleImpl.sol";
+import {ISwapperImpl} from "../../src/vendor/0xSplits/SwapperImpl.sol";
+import {ISwapRouter} from "../../src/vendor/uniswap/ISwapRouter.sol";
+import {UniV3Swap} from "../../src/vendor/0xSplits/UniV3Swap.sol";
 
 /// @author .
 /// @title Octant Trader
@@ -28,6 +36,9 @@ contract Trader is Module, ITransformer {
     /// @notice Address used to represent native ETH.
     address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
+    /// @notice Address of WETH wrapper
+    address public wethAddress;
+
     /// @notice Token to be sold.
     address public base;
 
@@ -41,6 +52,12 @@ contract Trader is Module, ITransformer {
 
     /// @notice Swapper is the address which will handle actual selling.
     address public swapper;
+
+    /// @notice Account that initializes the swapping.
+    address public uniV3Swap;
+
+    /// @notice Beneficiary will receive quote token after the sale of base token.
+    address public beneficiary;
 
     /// @notice Deadline for all of budget to be sold.
     uint256 public deadline = block.number;
@@ -64,6 +81,16 @@ contract Trader is Module, ITransformer {
     /// @notice Height of block hash used as a last source of randomness.
     uint256 public lastHeight;
 
+    /// private vars
+    bytes uniPath;
+    QuotePair splitsPair;
+    IUniV3OracleImpl.SetPairDetailParams[] oraclePairDetails;
+    OracleParams oracleParams;
+    IOracle oracle;
+    ISwapperImpl.SetPairScaledOfferFactorParams[] pairScaledOfferFactors;
+    ISwapRouter.ExactInputParams[] exactInputParams;
+    QuoteParams[] quoteParams;
+
     /*//////////////////////////////////////////////////////////////
                                EVENTS
     //////////////////////////////////////////////////////////////*/
@@ -71,7 +98,6 @@ contract Trader is Module, ITransformer {
     event Traded(uint256 sold, uint256 left);
     event SwapperChanged(address oldSwapper, address newSwapper);
     event SpendingChanged(address base, address quote, uint256 budget, uint256 deadline);
-
 
     /*//////////////////////////////////////////////////////////////
                             CUSTOM ERRORS
@@ -122,14 +148,70 @@ contract Trader is Module, ITransformer {
     /// @param initializeParams Parameters of initialization encoded
     function setUp(bytes memory initializeParams) public override initializer {
         (address _owner, bytes memory data) = abi.decode(initializeParams, (address, bytes));
-        (address _base, address _quote, address _swapper) = abi.decode(data, (address, address, address));
+        (
+            address _base,
+            address _quote,
+            address _wethAddress,
+            address _beneficiary,
+            address _swapper,
+            address _uniV3Swap,
+            address _oracle
+        ) = abi.decode(data, (address, address, address, address, address, address, address));
         __Ownable_init(msg.sender);
         base = _base;
         quote = _quote;
+        wethAddress = _wethAddress;
+        beneficiary = _beneficiary;
         swapper = _swapper;
+        uniV3Swap = _uniV3Swap;
+        oracle = IOracle(_oracle);
+        splitsPair = QuotePair({base: splitsEthWrapper(base), quote: splitsEthWrapper(quote)});
+        uniPath = abi.encodePacked(uniEthWrapper(base), uint24(10_000), uniEthWrapper(quote));
         setAvatar(_owner);
         setTarget(_owner);
         transferOwnership(_owner);
+    }
+
+    function uniEthWrapper(address token) private view returns (address) {
+        if (token == ETH) return wethAddress;
+        else return token;
+    }
+
+    function splitsEthWrapper(address token) private pure returns (address) {
+        if (token == ETH) return address(0x0);
+        else return token;
+    }
+
+    function callInitFlash(uint256 amount) private returns (uint256) {
+        uint256 oldQuoteBalance = IERC20(quote).balanceOf(beneficiary);
+
+        delete exactInputParams;
+        exactInputParams.push(
+            ISwapRouter.ExactInputParams({
+                path: uniPath,
+                recipient: address(uniV3Swap),
+                deadline: block.timestamp + 60,
+                amountIn: amount,
+                amountOutMinimum: 0
+            })
+        );
+
+        delete quoteParams;
+        quoteParams.push(
+            QuoteParams({quotePair: splitsPair, baseAmount: uint128(amount), data: abi.encode(exactInputParams)})
+        );
+        UniV3Swap.FlashCallbackData memory data =
+            UniV3Swap.FlashCallbackData({exactInputParams: exactInputParams, excessRecipient: address(oracle)});
+        UniV3Swap.InitFlashParams memory params =
+            UniV3Swap.InitFlashParams({quoteParams: quoteParams, flashCallbackData: data});
+        UniV3Swap(payable(uniV3Swap)).initFlash(ISwapperImpl(swapper), params);
+
+        return IERC20(quote).balanceOf(beneficiary) - oldQuoteBalance;
+    }
+
+    function max(uint256 a, uint256 b) private pure returns (uint256) {
+        if (a > b) return a;
+        else return b;
     }
 
     function transform(address fromToken, address toToken, uint256 amount) external payable returns (uint256) {
@@ -139,13 +221,24 @@ contract Trader is Module, ITransformer {
         } else {
             IERC20(base).safeTransferFrom(msg.sender, address(this), amount);
         }
-        budget = budget + amount;
-        return 0;
+
+        uint256 height;
+        uint256 saleValue;
+        for (height = max(block.number - 255, lastHeight + 1); height < block.number; height++) {
+            if (canTrade(height)) {
+                saleValue = convert(height);
+                break;
+            }
+        }
+        assert(saleValue == amount);
+
+        return callInitFlash(amount);
     }
 
     /// @notice Transfers funds that are to be converted by to target token by external converter.
     /// @param height that will be used as a source of randomness. One height value can be used only once.
-    function convert(uint256 height) external {
+    /// @return amount of base token that is transfered to the swapper.
+    function convert(uint256 height) public returns (uint256) {
         if (budget == spent) revert Trader__BudgetSpent();
 
         if (deadline < block.number) revert Trader__PastDeadline();
@@ -162,20 +255,12 @@ contract Trader is Module, ITransformer {
         if (lastHeight >= height) revert Trader__RandomnessAlreadyUsed();
         lastHeight = height;
 
-        uint256 saleValue = getUniformInRange(saleValueLow, saleValueHigh, rand);
-        if (saleValue > saleValueHigh) revert Trader__SoftwareError();
-
         uint256 balance = address(this).balance;
         if (base != ETH) {
             balance = IERC20(base).balanceOf(address(this));
         }
 
-        if (saleValue > balance) {
-            saleValue = balance;
-        }
-        if (saleValue > budget - spent) {
-            saleValue = budget - spent;
-        }
+        uint256 saleValue = getSaleValue(rand, 0);
 
         spent = spent + saleValue;
 
@@ -186,7 +271,35 @@ contract Trader is Module, ITransformer {
             IERC20(base).safeTransfer(swapper, saleValue);
         }
 
-        emit Traded(saleValue);
+        emit Traded(saleValue, balance - saleValue);
+        return saleValue;
+    }
+
+    function getSaleValue(uint256 rand, uint256 transferAmount) private view returns (uint256 saleValue) {
+        saleValue = getUniformInRange(saleValueLow, saleValueHigh, rand);
+        if (saleValue > saleValueHigh) revert Trader__SoftwareError();
+
+        uint256 balance = address(this).balance;
+        if (base != ETH) {
+            balance = IERC20(base).balanceOf(address(this));
+        }
+
+        if (saleValue > balance + transferAmount) {
+            saleValue = balance + transferAmount;
+        }
+        if (saleValue > budget - spent) {
+            saleValue = budget - spent;
+        }
+    }
+
+    function findSaleValue(uint256 transferAmount) public view returns (uint256) {
+        for (uint256 height = max(block.number - 255, lastHeight + 1); height < block.number; height++) {
+            uint256 rand = getRandomNumber(height);
+            if (rand <= chance()) {
+                return getSaleValue(rand, transferAmount);
+            }
+        }
+        revert Trader__WrongHeight();
     }
 
     function canTrade(uint256 height) public view returns (bool) {
