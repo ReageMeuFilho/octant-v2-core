@@ -176,14 +176,15 @@ contract Trader is Module, ITransformer {
         if (saleValue > budget - spent) {
             saleValue = budget - spent;
         }
+
+        spent = spent + saleValue;
+
         if (base == ETH) {
             (bool success,) = payable(swapper).call{value: saleValue}("");
             require(success);
         } else {
             IERC20(base).safeTransfer(swapper, saleValue);
         }
-
-        spent = spent + saleValue;
 
         emit Traded(saleValue);
     }
