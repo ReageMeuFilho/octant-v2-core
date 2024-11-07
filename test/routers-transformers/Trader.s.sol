@@ -15,15 +15,23 @@ contract TestTraderRandomness is BaseTest {
     Trader public moduleImplementation;
     Trader public trader;
 
+    address beneficiary = makeAddr("beneficiary");
     address swapper = makeAddr("swapper");
+    address oracle = makeAddr("oracle");
     address alt_swapper = makeAddr("alt_swapper");
     bool log_spending = false;
     string constant deadlineFn = "./cache/test-artifacts/deadline.csv";
 
     function setUp() public {
         _configure(false);
+
+        helperConfig = new HelperConfig();
+        (, address wethToken,,,,,,,, address uniV3Swap) = helperConfig.activeNetworkConfig();
+
         moduleImplementation = new Trader();
-        temps = _testTemps(address(moduleImplementation), abi.encode(ETH, token, swapper));
+        temps = _testTemps(
+            address(moduleImplementation), abi.encode(ETH, token, wethToken, beneficiary, swapper, uniV3Swap, oracle)
+        );
         trader = Trader(payable(temps.module));
     }
 
