@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.23;
 
-import {Module} from "zodiac/core/Module.sol";
+import "solady/src/auth/Ownable.sol";
 import "solady/src/utils/SafeCastLib.sol";
 import "solady/src/utils/FixedPointMathLib.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -23,7 +23,7 @@ import {UniV3Swap} from "../../src/vendor/0xSplits/UniV3Swap.sol";
 /// @title Octant Trader
 /// @notice Octant Trader is a contract that performs "DCA" in terms of sold token into another token.
 /// @dev this contract performs trades in a random times, isolating the deployer from risks of insider trading.
-contract Trader is Module, ITransformer {
+contract Trader is ITransformer, Ownable {
     using SafeERC20 for IERC20;
     using FixedPointMathLib for uint256;
 
@@ -146,7 +146,7 @@ contract Trader is Module, ITransformer {
     /// @dev Initialize function
     /// @dev owner of this module will the safe multisig that calls setUp function
     /// @param initializeParams Parameters of initialization encoded
-    function setUp(bytes memory initializeParams) public override initializer {
+    function setUp(bytes memory initializeParams) public {
         (address _owner, bytes memory data) = abi.decode(initializeParams, (address, bytes));
         (
             address _base,
@@ -157,7 +157,7 @@ contract Trader is Module, ITransformer {
             address _uniV3Swap,
             address _oracle
         ) = abi.decode(data, (address, address, address, address, address, address, address));
-        __Ownable_init(msg.sender);
+        _initializeOwner(msg.sender);
         base = _base;
         quote = _quote;
         wethAddress = _wethAddress;
@@ -167,8 +167,6 @@ contract Trader is Module, ITransformer {
         oracle = IOracle(_oracle);
         splitsPair = QuotePair({base: splitsEthWrapper(base), quote: splitsEthWrapper(quote)});
         uniPath = abi.encodePacked(uniEthWrapper(base), uint24(10_000), uniEthWrapper(quote));
-        setAvatar(_owner);
-        setTarget(_owner);
         transferOwnership(_owner);
     }
 
