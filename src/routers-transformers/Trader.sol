@@ -212,6 +212,13 @@ contract Trader is ITransformer, Ownable {
         else return b;
     }
 
+    /// @notice Implements Transformer.trader interface. This function can be used to synchroniously convert one token to other token.
+    ///         Please note that amount needs to be carefully chosen (see `findSaleValue(...)`).
+    ///         This function will throw if fromToken and toToken are different from base and quote respectively.
+    /// @param fromToken needs to be set to value of `base()`.
+    /// @param toToken needs to be set to value of `quote()`.
+    /// @param amount needs to be set to what `findSaleValue(...)` returns.
+    /// @return amount of quote token that will be transferred to beneficiery.
     function transform(address fromToken, address toToken, uint256 amount) external payable returns (uint256) {
         if ((fromToken != base) || (toToken != quote)) revert Trader__ImpossibleConfiguration();
         if (fromToken == ETH) {
@@ -273,6 +280,10 @@ contract Trader is ITransformer, Ownable {
         return saleValue;
     }
 
+    /// @dev Returns sale value, in a range from [saleValueLow, saleValueHigh).
+    ///      Returned value is capped so it doesn't exceed available funds.
+    /// @param rand value of randomness for this height
+    /// @param transferAmount value will be added to balance before determining sale value
     function getSaleValue(uint256 rand, uint256 transferAmount) private view returns (uint256 saleValue) {
         saleValue = getUniformInRange(saleValueLow, saleValueHigh, rand);
         if (saleValue > saleValueHigh) revert Trader__SoftwareError();
@@ -290,6 +301,8 @@ contract Trader is ITransformer, Ownable {
         }
     }
 
+    /// @dev Finds a earliest block with unused randomness and returns its sale value. Useful if `transfer(...)` is used instead of `convert(...)`
+    /// @param transferAmount value will be added to balance before determining sale value
     function findSaleValue(uint256 transferAmount) public view returns (uint256) {
         for (uint256 height = max(block.number - 255, lastHeight + 1); height < block.number; height++) {
             uint256 rand = getRandomNumber(height);
@@ -300,11 +313,13 @@ contract Trader is ITransformer, Ownable {
         revert Trader__WrongHeight();
     }
 
+    /// @dev Returns true if trade can be made at passed block height.
     function canTrade(uint256 height) public view returns (bool) {
         uint256 rand = getRandomNumber(height);
         return (rand <= chance());
     }
 
+    /// @dev Returns true if mechanism is overspending. This may happen because randomness. Prevents mechanism from spending too much in a case of attack by a block producer.
     function hasOverspent(uint256 height) public view returns (bool) {
         if (height < startingBlock) return true;
         return (spent > (height - startingBlock) * (budget / (deadline - startingBlock)));
