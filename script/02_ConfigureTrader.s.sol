@@ -16,7 +16,8 @@ contract DeployTraderHelper is Script {
 
         vm.startBroadcast(deployerKey);
 
-        trader.setSpending(0.00128 ether, 0.00328 ether, 1 ether, block.number + 7200);
+        trader.configurePeriod(block.number, 7200);
+        trader.setSpending(0.00128 ether, 0.00328 ether, 1 ether);
 
         vm.stopBroadcast();
     }

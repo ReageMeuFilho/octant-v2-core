@@ -39,7 +39,8 @@ contract TestTraderRandomness is BaseTest {
 
     function testConfigurationBasic() public {
         vm.startPrank(temps.safe);
-        trader.setSpending(1 ether, 1 ether, 1 ether, block.number + 102);
+        trader.configurePeriod(block.number, 102);
+        trader.setSpending(1 ether, 1 ether, 1 ether);
         vm.stopPrank();
         assertEq(trader.getSafetyBlocks(), 1);
         assertEq(trader.deadline(), block.number + 102);
@@ -51,24 +52,25 @@ contract TestTraderRandomness is BaseTest {
 
     function testConfigurationLowSaleIsTooLow() public {
         vm.startPrank(temps.safe);
+        trader.configurePeriod(block.number, 102);
         vm.expectRevert(Trader.Trader__ImpossibleConfigurationSaleValueLowIsTooLow.selector);
-        trader.setSpending(1, 1 ether, 1 ether, block.number + 102);
+        trader.setSpending(1, 1 ether, 1 ether);
         vm.stopPrank();
     }
 
     function testConfigurationLowIsZero() public {
         vm.startPrank(temps.safe);
+        trader.configurePeriod(block.number, 102);
         vm.expectRevert(Trader.Trader__ImpossibleConfigurationSaleValueLowIsZero.selector);
-        trader.setSpending(0, 1 ether, 1 ether, block.number + 102);
+        trader.setSpending(0, 1 ether, 1 ether);
         vm.stopPrank();
     }
 
-    function testConfigurationDeadlineInPast() public {
-        vm.roll(1000);
+    function testNextDeadline() public {
         vm.startPrank(temps.safe);
-        vm.expectRevert(Trader.Trader__ImpossibleConfigurationDeadlineInThePast.selector);
-        trader.setSpending(1, 1 ether, 1 ether, 100);
-        vm.stopPrank();
+        trader.configurePeriod(block.number, 100);
+        trader.setSpending(1 ether, 1 ether, 1 ether);
+        assertEq(trader.deadline(), block.number + 100);
     }
 
     // sequential call to this function emulate time progression
@@ -102,7 +104,8 @@ contract TestTraderRandomness is BaseTest {
         }
         uint256 blocks = 10_000;
         vm.startPrank(temps.safe);
-        trader.setSpending(0.6 ether, 1.4 ether, budget, block.number + blocks);
+        trader.configurePeriod(block.number, blocks);
+        trader.setSpending(0.6 ether, 1.4 ether, budget);
         vm.stopPrank();
         assertEq(address(trader).balance, budget);
         assertEq(trader.budget(), budget);
@@ -116,23 +119,46 @@ contract TestTraderRandomness is BaseTest {
     function test_safety_blocks_value() external {
         uint256 blocks = 1_000_000;
         vm.startPrank(temps.safe);
-        trader.setSpending(1 ether, 1 ether, 100_000 ether, block.number + blocks);
+        trader.configurePeriod(block.number, blocks);
+        trader.setSpending(1 ether, 1 ether, 100_000 ether);
         vm.stopPrank();
         assertEq(trader.getSafetyBlocks(), 100_000);
+    }
+
+    function test_changeOfSpendingAndDeadline() external {
+        uint256 blocks = 1_000;
+        vm.deal(address(trader), 100 ether);
+        vm.startPrank(temps.safe);
+        trader.configurePeriod(block.number, blocks);
+        trader.setSpending(1 ether, 1 ether, 100 ether);
+        vm.stopPrank();
+        for (uint256 i = 0; i < blocks / 2; i++) {
+            wrapBuy();
+        }
+        vm.startPrank(temps.safe);
+        // make more smaller trades
+        trader.setSpending(0.5 ether, 0.5 ether, 100 ether);
+        vm.stopPrank();
+        for (uint256 i = 0; i < blocks / 2; i++) {
+            wrapBuy();
+        }
+        assertEq(address(trader).balance, 0);
     }
 
     function test_spendADay() external {
         uint256 blocks = 1_000_000;
         vm.startPrank(temps.safe);
-        trader.setSpending(1 ether, 1 ether, 100_000 ether, block.number + blocks);
+        trader.configurePeriod(block.number, blocks);
+        trader.setSpending(1 ether, 1 ether, 100_000 ether);
         vm.stopPrank();
-        assertEq(trader.spendADay(), 720 ether);
+        assertApproxEqAbs(trader.spendADay(), 720 ether, 0.1 ether);
     }
 
     function test_reuse_randomness() external {
         uint256 blocks = 1000;
         vm.startPrank(temps.safe);
-        trader.setSpending(1 ether, 1 ether, 100 ether, block.number + blocks);
+        trader.configurePeriod(block.number, blocks);
+        trader.setSpending(1 ether, 1 ether, 100 ether);
         vm.stopPrank();
         bool traded;
         for (uint256 i = 0; i < blocks; i++) {
@@ -151,32 +177,18 @@ contract TestTraderRandomness is BaseTest {
         }
     }
 
-    function test_behavior_after_deadline() external {
-        uint256 blocks = 1000;
-        vm.startPrank(temps.safe);
-        trader.setSpending(1 ether, 1 ether, 100 ether, block.number + blocks);
-        vm.stopPrank();
-        for (uint256 i = 0; i < blocks; i++) {
-            wrapBuy();
-        }
-        for (uint256 i = 0; i < blocks; i++) {
-            vm.roll(block.number + 1);
-            vm.expectRevert(Trader.Trader__PastDeadline.selector);
-            trader.convert(block.number - 1);
-        }
-    }
-
     function test_reconfigure() external {
         uint256 blocks = 1000;
         vm.startPrank(temps.safe);
-        uint256 deadline = block.number + blocks;
-        trader.setSpending(1 ether, 1 ether, 100 ether, deadline);
+        trader.configurePeriod(block.number, blocks);
+        trader.setSpending(1 ether, 1 ether, 100 ether);
         vm.stopPrank();
         for (uint256 i = 0; i < blocks / 2; i++) {
             wrapBuy();
         }
         vm.startPrank(temps.safe);
-        trader.setSpending(0.5 ether, 1 ether, address(trader).balance, deadline);
+        trader.configurePeriod(block.number, blocks);
+        trader.setSpending(0.5 ether, 1 ether, address(trader).balance);
         vm.stopPrank();
         for (uint256 i = 0; i < (blocks / 2) + 1; i++) {
             wrapBuy();
@@ -184,10 +196,29 @@ contract TestTraderRandomness is BaseTest {
         assert(trader.spent() == trader.budget());
     }
 
+    function test_multiple_periods() public {
+        vm.deal(address(trader), 1000 ether);
+        uint256 blocks = 1000;
+        vm.startPrank(temps.safe);
+        trader.configurePeriod(block.number, blocks);
+        trader.setSpending(1 ether, 1 ether, 100 ether);
+        for (uint256 i = 0; i < 5500; i++) {
+            wrapBuy();
+        }
+        assert(trader.deadline() - block.number <= blocks);
+        assert(trader.spent() <= 100 ether);
+        assert(trader.spent() >= 0);
+        assert(trader.budget() <= 100 ether);
+        assert(trader.budget() >= 0);
+        assert(address(trader).balance < 500 ether);
+        assert(address(trader).balance > 100 ether);
+    }
+
     function test_safety_blocks_chance() external {
         uint256 blocks = 1000;
         vm.startPrank(temps.safe);
-        trader.setSpending(1 ether, 1 ether, 1000 ether, block.number + blocks);
+        trader.configurePeriod(block.number, blocks);
+        trader.setSpending(1 ether, 1 ether, 1000 ether);
         vm.stopPrank();
         vm.roll(block.number + blocks - trader.getSafetyBlocks());
         assertEq(type(uint256).max, trader.chance());
@@ -199,10 +230,12 @@ contract TestTraderRandomness is BaseTest {
         // This test will attempt to overspend, simulating validator griding hash values.
         // Since forge doesn't allow to manipulate blockhash directly, overspending
         // is done by manipulating return value of `chance()` function.
+        vm.deal(address(trader), 300 ether);
         uint256 blocks = 1000;
         vm.startPrank(temps.safe);
         uint256 budget_value = 100 ether;
-        trader.setSpending(1 ether, 1 ether, budget_value, block.number + blocks);
+        trader.configurePeriod(block.number, blocks);
+        trader.setSpending(1 ether, 1 ether, budget_value);
         vm.stopPrank();
 
         // mock chance
@@ -212,17 +245,18 @@ contract TestTraderRandomness is BaseTest {
         assertEq(type(uint256).max - 1, trader.chance());
 
         /* run trader */
-        for (uint256 i = 0; i < blocks / 2; i++) {
+        for (uint256 i = 0; i < (blocks / 10) * 25; i++) {
             wrapBuy();
         }
-
         assertLe(trader.spent(), trader.budget() / 2);
+        assertGe(address(trader).balance, 49 ether);
     }
 
     function test_chance_high() external {
         uint256 blocks = 1_000_000;
         vm.startPrank(temps.safe);
-        trader.setSpending(1 ether, 1 ether, 100_000 ether, block.number + blocks);
+        trader.configurePeriod(block.number, blocks);
+        trader.setSpending(1 ether, 1 ether, 100_000 ether);
         vm.stopPrank();
         assertLt(trader.chance(), type(uint256).max / 9);
     }
@@ -230,7 +264,8 @@ contract TestTraderRandomness is BaseTest {
     function test_chance_low() external {
         uint256 blocks = 1_000_000;
         vm.startPrank(temps.safe);
-        trader.setSpending(1 ether, 1 ether, 100_000 ether, block.number + blocks);
+        trader.configurePeriod(block.number, blocks);
+        trader.setSpending(1 ether, 1 ether, 100_000 ether);
         vm.stopPrank();
         assertGt(trader.chance(), type(uint256).max / 11);
     }
@@ -238,7 +273,8 @@ contract TestTraderRandomness is BaseTest {
     function test_avg_sale_chance_high() external {
         uint256 blocks = 1_000_000;
         vm.startPrank(temps.safe);
-        trader.setSpending(1 ether, 3 ether, 100_000 ether, block.number + blocks);
+        trader.configurePeriod(block.number, blocks);
+        trader.setSpending(1 ether, 3 ether, 100_000 ether);
         vm.stopPrank();
         assertLt(trader.chance(), type(uint256).max / 18);
     }
@@ -246,7 +282,8 @@ contract TestTraderRandomness is BaseTest {
     function test_avg_sale_chance_low() external {
         uint256 blocks = 1_000_000;
         vm.startPrank(temps.safe);
-        trader.setSpending(1 ether, 3 ether, 100_000 ether, block.number + blocks);
+        trader.configurePeriod(block.number, blocks);
+        trader.setSpending(1 ether, 3 ether, 100_000 ether);
         vm.stopPrank();
         assertGt(trader.chance(), type(uint256).max / 20);
     }
