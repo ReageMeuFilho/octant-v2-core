@@ -58,6 +58,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
         uint256 userAssetPerShare;
         uint256 splitPerShare;
         Transformer transformer;
+        bool allowBotClaim;
     }
 
     struct Transformer {
@@ -97,6 +98,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
     error NoShares();
     error CooldownPeriodNotPassed();
     error TransferFailed();
+    error NotAllowed();
 
     /*//////////////////////////////////////////////////////////////
                             INITIALIZER
@@ -244,6 +246,15 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
     }
 
     /**
+     * @dev Allows a user to decide if claim function can be called on their behalf for a particular strategy.
+     * @param strategy The address of the strategy to set the transformer for.
+     * @param enable If false, only user will be able to call claim. If true, anyone will be able to do it.
+     */
+    function setClaimAutomation(address strategy, bool enable) external {
+        userData[msg.sender][strategy].allowBotClaim = enable;
+    }
+
+    /**
      * @notice Updates the cool down period
      * @param _coolDownPeriod New cool down period in seconds
      * @dev Only callable by accounts with OWNER_ROLE
@@ -318,13 +329,15 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      * @param _strategy The address of the strategy to claim from
      * @param _amount The amount of split to claim
      */
-    function claimSplit(address _strategy, uint256 _amount) external nonReentrant {
-        if (_amount == 0 || balanceOf(msg.sender, _strategy) < _amount) revert InvalidAmount();
-        _updateUserSplit(msg.sender, _strategy, _amount);
+    function claimSplit(address _user, address _strategy, uint256 _amount) external nonReentrant {
+        if (_amount == 0 || balanceOf(_user, _strategy) < _amount) revert InvalidAmount();
+        if (!(userData[_user][_strategy].allowBotClaim || msg.sender == _user)) revert NotAllowed();
 
-        _transferSplit(msg.sender, _strategy, _amount);
+        _updateUserSplit(_user, _strategy, _amount);
 
-        emit SplitClaimed(msg.sender, _strategy, _amount);
+        _transferSplit(_user, _strategy, _amount);
+
+        emit SplitClaimed(_user, _strategy, _amount);
     }
 
     receive() external payable {}
