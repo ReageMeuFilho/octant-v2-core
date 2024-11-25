@@ -7,7 +7,7 @@ import {Trader} from "../src/routers-transformers/Trader.sol";
 
 contract DeployTraderHelper is Script {
     function run() external {
-        (,,, uint256 deployerKey,,, address traderAddress,,,) = new HelperConfig().activeNetworkConfig();
+        (,,, uint256 deployerKey,,, address traderAddress,,,) = new HelperConfig(false).activeNetworkConfig();
 
         console.log("Trader at ", traderAddress);
         assert(traderAddress != address(0));
@@ -16,8 +16,7 @@ contract DeployTraderHelper is Script {
 
         vm.startBroadcast(deployerKey);
 
-        uint256 chance = type(uint256).max / uint256(10); // corresponds to 1 in 10 chance, 720 trades a day
-        trader.setSpending(0.00128 ether, 0.00328 ether, 1 ether, block.number + 7200); // will overspend a bit
+        trader.setSpending(0.00128 ether, 0.00328 ether, 1 ether, block.number + 7200);
 
         vm.stopBroadcast();
     }

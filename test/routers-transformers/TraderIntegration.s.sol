@@ -44,7 +44,7 @@ contract TestTraderIntegrationETH is BaseTest {
 
     function setUp() public {
         _configure(true);
-        helperConfig = new HelperConfig();
+        helperConfig = new HelperConfig(true);
         (address glmToken, address wethToken,,,,,,,, address uniV3Swap) = helperConfig.activeNetworkConfig();
 
         glmAddress = glmToken;
@@ -86,7 +86,7 @@ contract TestTraderIntegrationETH is BaseTest {
     }
 
     function deploySwapper() public returns (address) {
-        helperConfig = new HelperConfig();
+        helperConfig = new HelperConfig(true);
         (address glmToken,,,,, address glmPool,, address swapperFactoryAddress, address oracleFactoryAddress,) =
             helperConfig.activeNetworkConfig();
         IOracleFactory oracleFactory = IOracleFactory(oracleFactoryAddress);
@@ -145,6 +145,16 @@ contract TestTraderIntegrationETH is BaseTest {
         vm.roll(block.number + 100);
         uint256 saleValue = trader.findSaleValue(1.5 ether);
         assert(saleValue > 0);
+
+        // mock value of quote to avoid problems with stale oracle on CI
+        uint256[] memory unscaledAmountsToBeneficiary = new uint256[](1);
+        unscaledAmountsToBeneficiary[0] = 4228914774285437607589;
+        vm.mockCall(
+            address(oracle),
+            abi.encodeWithSelector(IOracle.getQuoteAmounts.selector),
+            abi.encode(unscaledAmountsToBeneficiary)
+        );
+
         uint256 amountToBeneficiary = trader.transform{value: saleValue}(trader.base(), trader.quote(), saleValue);
         assert(IERC20(glmAddress).balanceOf(trader.beneficiary()) > 0);
         assert(IERC20(glmAddress).balanceOf(trader.beneficiary()) == amountToBeneficiary);
@@ -178,9 +188,6 @@ contract TestTraderIntegrationETH is BaseTest {
         uint256 oldGlmBalance = IERC20(glmAddress).balanceOf(address(this));
 
         // now, do the actual swap
-        // notes:
-        // 1. swapper will wrap ETH, this is why we use WETH/GLM pair
-        // 2.
 
         delete exactInputParams;
         exactInputParams.push(

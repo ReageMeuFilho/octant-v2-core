@@ -17,7 +17,7 @@ contract TraderRun is Script, Test {
     }
 
     function run() external {
-        (,,, uint256 deployerKey,,, address traderAddress,,,) = new HelperConfig().activeNetworkConfig();
+        (,,, uint256 deployerKey,,, address traderAddress,,,) = new HelperConfig(false).activeNetworkConfig();
 
         console.log("ChainID:", block.chainid);
         console.log("Trader at", traderAddress);

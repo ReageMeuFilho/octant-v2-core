@@ -12,7 +12,7 @@ import {Trader} from "../src/routers-transformers/Trader.sol";
 
 contract TraderStatus is Script, Test {
     function run() external {
-        (, address wethToken,,,,, address traderAddress,,,) = new HelperConfig().activeNetworkConfig();
+        (, address wethToken,,,,, address traderAddress,,,) = new HelperConfig(false).activeNetworkConfig();
 
         console.log("ChainID:", block.chainid);
         console.log("Trader at", traderAddress);

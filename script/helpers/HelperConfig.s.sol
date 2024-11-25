@@ -22,19 +22,25 @@ contract HelperConfig is Script {
     uint256 public constant DEFAULT_ANVIL_KEY = 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80;
     NetworkConfig public activeNetworkConfig;
 
-    constructor() {
+    constructor(bool forking) {
         if (block.chainid == 1) {
             // running on mainnet or on a mainnet fork
-            activeNetworkConfig = getMainnetEthConfig();
+            activeNetworkConfig = getMainnetEthConfig(forking);
         }
         if (block.chainid == 11155111) {
-            activeNetworkConfig = getSepoliaEthConfig();
+            activeNetworkConfig = getSepoliaEthConfig(forking);
         } else {
             activeNetworkConfig = getOrCreateAnvilEthConfig();
         }
     }
 
-    function getSepoliaEthConfig() public view returns (NetworkConfig memory) {
+    function getSepoliaEthConfig(bool forking) public view returns (NetworkConfig memory) {
+        uint256 deployerKey;
+        if (forking) {
+            deployerKey = DEFAULT_ANVIL_KEY;
+        } else {
+            deployerKey = vm.envUint("PRIVATE_KEY");
+        }
         return
         // UniswapV3Factory at 0x7eb12e415F88477B3Ef2f0D839161Ffa0f5329a0
         NetworkConfig({
@@ -43,7 +49,7 @@ contract HelperConfig is Script {
             nonfungiblePositionManager: 0xC8118AcDf29cBa90c3142437c0e84AE3902bfA74,
             uniswapV3Router: 0xD6601e25cF43CAc433A23cB95a39D38012B2e9f0,
             uniswapGlmWeth10000Pool: 0x1985134644683848EF81bdd9B1F4b16DDC647EF3,
-            deployerKey: vm.envUint("PRIVATE_KEY"),
+            deployerKey: deployerKey,
             trader: 0xc654a254EEab4c65F8a786f8c1516ea7e9824daF,
             swapperFactory: 0xa244bbe019cf1BA177EE5A532250be2663Fb55cA,
             oracleFactory: 0x074827E8bD77B0A66c6008a51AF9BD1F33105caf,
@@ -51,14 +57,20 @@ contract HelperConfig is Script {
         });
     }
 
-    function getMainnetEthConfig() public view returns (NetworkConfig memory) {
+    function getMainnetEthConfig(bool forking) public view returns (NetworkConfig memory) {
+        uint256 deployerKey;
+        if (forking) {
+            deployerKey = DEFAULT_ANVIL_KEY;
+        } else {
+            deployerKey = vm.envUint("PRIVATE_KEY");
+        }
         return NetworkConfig({
             glmToken: 0x7DD9c5Cba05E151C895FDe1CF355C9A1D5DA6429,
             wethToken: 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2,
             nonfungiblePositionManager: 0xC36442b4a4522E871399CD717aBDD847Ab11FE88,
             uniswapV3Router: 0xE592427A0AEce92De3Edee1F18E0157C05861564,
             uniswapGlmWeth10000Pool: 0x531b6A4b3F962208EA8Ed5268C642c84BB29be0b,
-            deployerKey: vm.envUint("PRIVATE_KEY"),
+            deployerKey: deployerKey,
             trader: address(0),
             swapperFactory: 0xa244bbe019cf1BA177EE5A532250be2663Fb55cA,
             oracleFactory: 0x498f316fEB85a250fdC64B859a130515491EC888,
