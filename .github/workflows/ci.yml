@@ -63,7 +63,8 @@ jobs:
 
       - name: Run tests
         env:
-          TEST_RPC_URL: "https://eth.llamarpc.com"
+          # this key will get rotated
+          TEST_RPC_URL: "https://eth-mainnet.alchemyapi.io/v2/Mb7EMfWKg8dC7_BUbzjRi-G25WUTnR5E"
           TEST_SAFE_SINGLETON: "0x41675C099F32341bf84BFc5382aF534df5C7461a"
           TEST_SAFE_PROXY_FACTORY: "0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67"
         run: forge test -v
