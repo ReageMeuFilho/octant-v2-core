@@ -7,7 +7,7 @@ import {UniswapLiquidityHelper} from "./helpers/UniswapLiquidityHelper.s.sol";
 
 contract UniswapLiquidityHelperDeployer is Script {
     function run() external {
-        HelperConfig helperConfig = new HelperConfig();
+        HelperConfig helperConfig = new HelperConfig(false);
 
         (address glmToken, address wethToken, address nonfungiblePositionManager, uint256 deployerKey,,,,,,) =
             helperConfig.activeNetworkConfig();

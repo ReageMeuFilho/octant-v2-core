@@ -7,7 +7,7 @@ import "src/routers-transformers/Trader.sol";
 import {HelperConfig} from "script/helpers/HelperConfig.s.sol";
 
 contract TestTraderRandomness is BaseTest {
-    HelperConfig helperConfig = new HelperConfig();
+    HelperConfig helperConfig = new HelperConfig(true);
 
     address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
@@ -25,7 +25,7 @@ contract TestTraderRandomness is BaseTest {
     function setUp() public {
         _configure(false);
 
-        helperConfig = new HelperConfig();
+        helperConfig = new HelperConfig(true);
         (, address wethToken,,,,,,,, address uniV3Swap) = helperConfig.activeNetworkConfig();
 
         moduleImplementation = new Trader();
