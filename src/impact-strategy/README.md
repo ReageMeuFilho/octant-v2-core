@@ -67,17 +67,29 @@ The protocol uses an immutable proxy pattern to outsource complex, high-risk, an
 
 To create a new impact strategy:
 
-1. Inherit from BaseImpactStrategy
-2. Implement required functions:
-   ```solidity
-   function _calculateVeTokens(uint256 amount) internal virtual returns (uint256);
-   function _processVote(address voter, address project, uint256 weight) internal virtual returns (bool);
-   ```
+1. **Inherit from BaseImpactStrategy**: Extend the `BaseImpactStrategy` contract to leverage its core functionalities and integrate with the `ImpactStrategy` implementation contract.
 
-3. Optional overrides:
-   - `_beforeVote()` - Pre-vote validation
-   - `_afterVote()` - Post-vote processing
-   - Custom modifiers or validation logic
+2. **Implement Required Functions**:
+   - `_calculateVeTokens(uint256 amount, address user, uint256 lockTime)`: Define the logic for converting deposited assets into veTokens, considering factors like deposit amount, user-specific multipliers, and lock time.
+   - `_processVote(address voter, address project, uint256 weight)`: Implement the mechanism for processing votes, including vote weight calculation, validation, and accounting.
+   - `_calculateShares(uint256 totalVotes, uint256 projectRegistryId)`: Determine the share allocation for projects based on their vote tally, using a proportional or custom formula.
+
+3. **Optional Overrides**:
+   - `availableDepositLimit(address voter)`: Customize deposit limits for users, potentially implementing whitelists or other restrictions.
+   - `availableWithdrawLimit(address project)`: Define withdrawal limits for projects, such as donation caps.
+   - `checkSybilResistance(address voter)`: Implement sybil resistance checks, such as Proof of Humanity verification or GitcoinPassport scoring.
+   - `adjustVoteTally(address project, uint256 rawTally)`: Apply custom vote decay or adjustment logic to the raw vote tally.
+   - `adjustShareAllocation(address project, uint256 baseShares, uint256 projectVotes, uint256 totalVotes)`: Customize share allocation formulas, such as quadratic voting or bonding curves.
+
+4. **Testing and Validation**:
+   - Ensure thorough testing of the strategy, including deposit and veToken minting, vote casting and tracking, share allocation, and sybil resistance checks.
+   - Validate integration with the project registry and ensure accurate project eligibility and share distribution.
+
+5. **Deployment and Upgrades**:
+   - Deploy the strategy with consideration for migration paths and potential upgrades.
+   - Utilize the immutable proxy pattern to separate core logic from strategy-specific implementations, allowing for secure and efficient upgrades.
+
+By following this pattern, developers can create robust and flexible impact strategies that leverage the power of decentralized voting and fund allocation.
 
 ## Standard Flow
 
