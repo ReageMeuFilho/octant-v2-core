@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.20;
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {IImpactStrategy} from "./IImpactStrategy.sol";
+import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 /**
  * @title Base Impact Strategy
@@ -100,8 +99,7 @@ abstract contract BaseImpactStrategy {
      * and always be checked before any integration with the Strategy.
      */
     // NOTE: This is a holder address based on expected deterministic location for testing
-    address public constant impactStrategyAddress =
-        0x2e234DAe75C793f67A35089C9d99245E1C58470b;
+    address public constant impactStrategyAddress = 0x2e234DAe75C793f67A35089C9d99245E1C58470b;
 
     /*//////////////////////////////////////////////////////////////
                             IMMUTABLES
@@ -110,7 +108,7 @@ abstract contract BaseImpactStrategy {
     /**
      * @dev Underlying asset used to calculate veTokens
      */
-    ERC20 internal immutable ASSET; 
+    ERC20 internal immutable ASSET;
 
     /**
      * @dev This variable is set to address(this) during initialization of each strategy.
@@ -144,12 +142,7 @@ abstract contract BaseImpactStrategy {
         ImpactStrategy = IImpactStrategy(address(this));
 
         // Initialize the strategy's storage variables.
-        _delegateCall(
-            abi.encodeCall(
-                IImpactStrategy.initialize,
-                (_asset, _name, msg.sender, msg.sender, msg.sender)
-            )
-        );
+        _delegateCall(abi.encodeCall(IImpactStrategy.initialize, (_asset, _name, msg.sender, msg.sender, msg.sender)));
 
         // Store the impactStrategyAddress at the standard implementation
         // address storage slot so etherscan picks up the interface. This gets
@@ -170,8 +163,8 @@ abstract contract BaseImpactStrategy {
     /**
      * @notice Gets the amount of veTokens that will be minted for a deposit.
      * @dev Defaults to an empty implementation that must be overridden by strategists.
-     * 
-     * This function will be called during deposit to calculate the amount of veTokens 
+     *
+     * This function will be called during deposit to calculate the amount of veTokens
      * to mint based on the deposit amount and lock time. The strategist can implement
      * any custom logic for the conversion rate between assets and veTokens.
      *
@@ -185,14 +178,18 @@ abstract contract BaseImpactStrategy {
      * @param _lockTime The duration the deposit will be locked for
      * @return The amount of veTokens to mint for the deposit
      */
-    function _calculateVeTokens(uint256 _amount, address _user, uint256 _lockTime) internal view virtual returns (uint256);
+    function _calculateVeTokens(
+        uint256 _amount,
+        address _user,
+        uint256 _lockTime
+    ) internal view virtual returns (uint256);
 
     /**
      * @notice Processes a vote for a project in the strategy
      * @dev Defaults to an empty implementation that must be overridden by strategists.
-     * 
+     *
      * This function will be called during vote casting to handle the vote allocation
-     * logic specific to the strategy. The strategist can implement any custom vote 
+     * logic specific to the strategy. The strategist can implement any custom vote
      * processing mechanism.
      *
      * The implementation can handle:
@@ -209,7 +206,7 @@ abstract contract BaseImpactStrategy {
     /**
      * @notice Calculates the shares to be allocated to a project based on votes received
      * @dev Defaults to an empty implementation that must be overridden by strategists.
-     * 
+     *
      * This function will be called during share allocation to determine how many shares
      * each project receives based on their votes. The strategist can implement any custom
      * share calculation logic.
@@ -229,7 +226,7 @@ abstract contract BaseImpactStrategy {
                     OPTIONAL TO OVERRIDE BY STRATEGIST
     //////////////////////////////////////////////////////////////*/
 
-     /**
+    /**
      * @notice Gets the max amount of `asset` that an address can deposit.
      * @dev Defaults to an unlimited amount for any address. But can
      * be overridden by strategists.
@@ -250,9 +247,7 @@ abstract contract BaseImpactStrategy {
      * @param . The address that is depositing into the strategy.
      * @return . The available amount the `_owner` can deposit in terms of `asset`
      */
-    function availableDepositLimit(
-        address /*_voter*/
-    ) public view virtual returns (uint256) {
+    function availableDepositLimit(address /*_voter*/) public view virtual returns (uint256) {
         return type(uint256).max;
     }
 
@@ -271,9 +266,7 @@ abstract contract BaseImpactStrategy {
      * @param . The address that is claiming from the strategy.
      * @return . The available amount that can be claimed in terms of `asset`
      */
-    function availableWithdrawLimit(
-        address /*_project*/
-    ) public view virtual returns (uint256) {
+    function availableWithdrawLimit(address /*_project*/) public view virtual returns (uint256) {
         return type(uint256).max;
     }
 
@@ -283,23 +276,21 @@ abstract contract BaseImpactStrategy {
      * Returns a tuple containing:
      * - bool: whether the address passes the sybil check
      * - uint256: a sybil resistance score (higher is better)
-     * 
+     *
      * Strategists should override this function to implement specific sybil resistance checks such as:
      * - Proof of Humanity verification
      * - GitcoinPassport score
      * - Minimum token holdings
      * - Account age
      * - Previous voting history
-     * 
+     *
      * @param _voter The address to check for sybil resistance
      * @return (bool, uint256) Tuple containing (passes check, sybil resistance score)
      */
-    function checkSybilResistance(
-        address _voter
-    ) public view virtual returns (bool, uint256) {
+    function checkSybilResistance(address _voter) public view virtual returns (bool, uint256) {
         // Default implementation assumes no sybil resistance
         // Returns (true, assetBalance) to allow voting with asset balance
-        return (true, ASSET.totalSupply() /ASSET.balanceOf(_voter));
+        return (true, ASSET.totalSupply() / ASSET.balanceOf(_voter));
     }
 
     /**
@@ -313,11 +304,9 @@ abstract contract BaseImpactStrategy {
      * @param _calldata The abi encoded calldata to use in delegatecall.
      * @return . The return value if the call was successful in bytes.
      */
-    function _delegateCall(
-        bytes memory _calldata
-    ) internal returns (bytes memory) {
+    function _delegateCall(bytes memory _calldata) internal returns (bytes memory) {
         // Delegate call the impact strategy with provided calldata.
-            (bool success, bytes memory result) = impactStrategyAddress.delegatecall(_calldata);
+        (bool success, bytes memory result) = impactStrategyAddress.delegatecall(_calldata);
 
         // If the call reverted. Return the error.
         if (!success) {
@@ -352,14 +341,7 @@ abstract contract BaseImpactStrategy {
             // Copy function selector and any arguments.
             calldatacopy(0, 0, calldatasize())
             // Execute function delegatecall.
-            let result := delegatecall(
-                gas(),
-                _impactStrategyAddress,
-                0,
-                calldatasize(),
-                0,
-                0
-            )
+            let result := delegatecall(gas(), _impactStrategyAddress, 0, calldatasize(), 0, 0)
             // Get any return value
             returndatacopy(0, 0, returndatasize())
             // Return any return value or error back to the caller
@@ -372,4 +354,54 @@ abstract contract BaseImpactStrategy {
             }
         }
     }
-} 
+
+    /**
+     * @notice Adjusts vote tally based on strategy rules
+     * @dev Virtual function that can be overridden to implement vote decay or other adjustments
+     * Default implementation returns unmodified tally
+     * 
+     * Strategists can implement:
+     * - Time-based vote decay
+     * - Quadratic voting weights
+     * - Reputation-based multipliers
+     * - Historical participation bonuses
+     *
+     * @param _project Project address to adjust votes for
+     * @param _rawTally The raw vote count before adjustments
+     * @return The adjusted vote tally
+     */
+    function adjustVoteTally(
+        address _project,
+        uint256 _rawTally
+    ) public view virtual returns (uint256) {
+        // Default implementation returns unmodified tally
+        return _rawTally;
+    }
+
+    /**
+     * @notice Adjusts share allocation based on strategy rules
+     * @dev Virtual function that can be overridden to implement custom allocation formulas
+     * Default implementation returns proportional allocation
+     * 
+     * Strategists can implement:
+     * - Quadratic allocation curves
+     * - Bonding curves
+     * - Minimum thresholds
+     * - Project-specific multipliers
+     *
+     * @param _project Project address
+     * @param _baseShares Linear share allocation
+     * @param _projectVotes Project's vote tally
+     * @param _totalVotes Total votes in system
+     * @return The adjusted share allocation
+     */
+    function adjustShareAllocation(
+        address _project,
+        uint256 _baseShares,
+        uint256 _projectVotes,
+        uint256 _totalVotes
+    ) public view virtual returns (uint256) {
+        // Default implementation returns proportional allocation
+        return _baseShares;
+    }
+}
