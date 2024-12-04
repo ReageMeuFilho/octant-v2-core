@@ -145,6 +145,43 @@ contract TestTraderRandomness is BaseTest {
         assertEq(address(trader).balance, 0);
     }
 
+    function test_emergencyStop() external {
+        uint256 blocks = 1_000;
+        vm.deal(address(trader), 100 ether);
+        vm.startPrank(temps.safe);
+        trader.configurePeriod(block.number, blocks);
+        trader.setSpending(1 ether, 1 ether, 100 ether);
+        vm.stopPrank();
+        uint deadline = trader.deadline();
+        for (uint256 i = 0; i < blocks / 3; i++) {
+            wrapBuy();
+        }
+        uint256 oldBalance = address(trader).balance;
+        uint256 oldSpent = trader.spent();
+
+        vm.startPrank(temps.safe);
+        // stop trading
+        trader.emergencyStop(true);
+        vm.stopPrank();
+
+        for (uint256 i = 0; i < blocks / 3; i++) {
+            wrapBuy();
+        }
+        assertEq(oldBalance, address(trader).balance);
+        assertEq(oldSpent, trader.spent());
+
+        // resume trading
+        vm.startPrank(temps.safe);
+        trader.emergencyStop(false);
+        vm.stopPrank();
+
+        for (uint256 i = 0; i < blocks / 3; i++) {
+            wrapBuy();
+        }
+        assertLt(oldSpent, trader.spent());
+        assertEq(trader.spent(), trader.budget());
+    }
+
     function test_spendADay() external {
         uint256 blocks = 1_000_000;
         vm.startPrank(temps.safe);
