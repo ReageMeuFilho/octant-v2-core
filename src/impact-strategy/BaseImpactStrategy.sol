@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.20;
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-
+import { IImpactStrategy } from "../interfaces/IImpactStrategy.sol";
 /**
  * @title Base Impact Strategy
  * @author yearn.finance
@@ -18,7 +18,7 @@ import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
  *  can only be concerned with writing their strategy specific code.
  *
 *  Required functions to implement:
- *  - `_calculateVeTokens`: Determines veToken minting based on deposits
+ *  - `3`: Determines veToken minting based on deposits
  *  - `_processVote`: Handles vote allocation logic
  *  - `_calculateShares`: Determines share allocation based on votes
  *
@@ -46,14 +46,6 @@ abstract contract BaseImpactStrategy {
      */
     modifier onlySelf() {
         _onlySelf();
-        _;
-    }
-
-    /**
-     * @dev Use to assure that the call is coming from the strategies management.
-     */
-    modifier onlyManagement() {
-        ImpactStrategy.requireManagement(msg.sender);
         _;
     }
 
@@ -333,7 +325,7 @@ abstract contract BaseImpactStrategy {
      * calldata and return any relevant values.
      *
      */
-    fallback() external payable {
+    fallback() external {
         // load our target address
         address _impactStrategyAddress = impactStrategyAddress;
         // Execute external function using delegatecall and return any value.
@@ -359,7 +351,7 @@ abstract contract BaseImpactStrategy {
      * @notice Adjusts vote tally based on strategy rules
      * @dev Virtual function that can be overridden to implement vote decay or other adjustments
      * Default implementation returns unmodified tally
-     * 
+     *
      * Strategists can implement:
      * - Time-based vote decay
      * - Quadratic voting weights
@@ -370,10 +362,7 @@ abstract contract BaseImpactStrategy {
      * @param _rawTally The raw vote count before adjustments
      * @return The adjusted vote tally
      */
-    function adjustVoteTally(
-        address _project,
-        uint256 _rawTally
-    ) public view virtual returns (uint256) {
+    function adjustVoteTally(address _project, uint256 _rawTally) public view virtual returns (uint256) {
         // Default implementation returns unmodified tally
         return _rawTally;
     }
@@ -382,7 +371,7 @@ abstract contract BaseImpactStrategy {
      * @notice Adjusts share allocation based on strategy rules
      * @dev Virtual function that can be overridden to implement custom allocation formulas
      * Default implementation returns proportional allocation
-     * 
+     *
      * Strategists can implement:
      * - Quadratic allocation curves
      * - Bonding curves
