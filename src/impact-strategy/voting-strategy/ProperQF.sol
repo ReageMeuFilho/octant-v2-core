@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-contract QuadraticFunding is BaseImpactStrategy {
+contract ProperQF {
     struct Project {
         uint256 sumContributions; // Sum of contributions (Sum_j)
         uint256 sumSquareRoots; // Sum of square roots (S_j)
@@ -22,13 +22,13 @@ contract QuadraticFunding is BaseImpactStrategy {
      * @param projectId The ID of the project to update.
      * @param contribution The new contribution to add.
      */
-    function _processVote(uint256 projectId, uint256 contribution) external {
+    function _processVote(uint256 projectId, uint256 contribution) internal {
         require(contribution > 0, "Contribution must be positive");
 
         Project storage project = projects[projectId];
 
         // Compute square root of the new contribution
-        uint256 sqrtContribution = sqrt(contribution);
+        uint256 sqrtContribution = _sqrt(contribution);
 
         // Update project sums
         uint256 newSumSquareRoots = project.sumSquareRoots + sqrtContribution;
@@ -55,7 +55,7 @@ contract QuadraticFunding is BaseImpactStrategy {
      * @param x The input number.
      * @return result The square root of the input number.
      */
-    function sqrt(uint256 x) public pure returns (uint256 result) {
+    function _sqrt(uint256 x) internal pure returns (uint256 result) {
         if (x == 0) return 0;
         uint256 z = (x + 1) / 2;
         result = x;

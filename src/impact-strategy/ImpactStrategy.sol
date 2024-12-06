@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-
-
-import {IBaseImpactStrategy} from "./interfaces/IBaseImpactStrategy.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { IProjectRegistry } from "../interfaces/IProjectRegistry.sol";
 /**
  * @title ImpactStrategy
  * @author octant, yearn.finance
@@ -23,22 +21,115 @@ import {IBaseImpactStrategy} from "./interfaces/IBaseImpactStrategy.sol";
  *  This contract implements a 4626-style vault that transforms traditional matching pool
  *  distribution into a voting system:
  *  1. Users deposit assets -> receive veTokens (conversion set by strategist)
- *  2. Users vote with veTokens for projects (vote weight set by strategist) 
+ *  2. Users vote with veTokens for projects (vote weight set by strategist)
  *  3. Projects redeem vault shares for assets based on vote tallies (share calculation set by strategist)
  *  4. The vault's total assets are distributed to projects proportionally to their shares.
  *
  *  A strategist only needs to override a few simple functions that are
  *  focused entirely on the strategy specific needs to easily and cheaply
  *  deploy their own permissionless voting strategy.
- *  
+ *
  * This deviates from the standard 4626 vault in that users cannot withdraw the asset once they have deposited.
- * Instead, users can only use their veToken to decide how the vault's shares are distributed. 
+ * Instead, users can only use their veToken to decide how the vault's shares are distributed.
  */
 contract ImpactStrategy {
     using Math for uint256;
     using SafeERC20 for IERC20;
 
-     /*//////////////////////////////////////////////////////////////
+    /*//////////////////////////////////////////////////////////////
+                                 EVENTS
+    //////////////////////////////////////////////////////////////*/
+    /**
+     * @notice Emitted when a strategy is shutdown.
+     */
+    event StrategyShutdown();
+
+    /**
+     * @notice Emitted on the initialization of any new `strategy` that uses `asset`
+     * with this specific `apiVersion`.
+     */
+    event NewTokenizedStrategy(address indexed strategy, address indexed asset, string apiVersion);
+
+    /**
+     * @notice Emitted when the strategy reports `profit` or `loss` and
+     * `performanceFees` and `protocolFees` are paid out.
+     */
+    event Reported(uint256 profit, uint256 loss, uint256 protocolFees, uint256 performanceFees);
+
+    /**
+     * @notice Emitted when the 'keeper' address is updated to 'newKeeper'.
+     */
+    event UpdateKeeper(address indexed newKeeper);
+
+    /**
+     * @notice Emitted when the 'management' address is updated to 'newManagement'.
+     */
+    event UpdateManagement(address indexed newManagement);
+
+    /**
+     * @notice Emitted when the 'emergencyAdmin' address is updated to 'newEmergencyAdmin'.
+     */
+    event UpdateEmergencyAdmin(address indexed newEmergencyAdmin);
+
+    /**
+     * @notice Emitted when the 'pendingManagement' address is updated to 'newPendingManagement'.
+     */
+    event UpdatePendingManagement(address indexed newPendingManagement);
+
+    /**
+     * @notice Emitted when the allowance of a `spender` for an `owner` is set by
+     * a call to {approve}. `value` is the new allowance.
+     */
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+
+    /**
+     * @notice Emitted when `value` tokens are moved from one account (`from`) to
+     * another (`to`).
+     *
+     * Note that `value` may be zero.
+     */
+    event Transfer(address indexed from, address indexed to, uint256 value);
+
+    /**
+     * @notice Emitted when the `caller` has exchanged `assets` for `shares`,
+     * and transferred those `shares` to `owner`.
+     */
+    event Deposit(address indexed caller, address indexed owner, uint256 assets, uint256 shares);
+
+    /**
+     * @notice Emitted when the `caller` has exchanged `owner`s `shares` for `assets`,
+     * and transferred those `assets` to `receiver`.
+     */
+    event Withdraw(
+        address indexed caller,
+        address indexed receiver,
+        address indexed owner,
+        uint256 assets,
+        uint256 shares
+    );
+
+    /*//////////////////////////////////////////////////////////////
+                               CONSTANTS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice API version this TokenizedStrategy implements.
+    string internal constant API_VERSION = "1.0.0";
+
+    /// @notice Value to set the `entered` flag to during a call.
+    uint8 internal constant ENTERED = 2;
+    /// @notice Value to set the `entered` flag to at the end of the call.
+    uint8 internal constant NOT_ENTERED = 1;
+
+    /// @notice Used for fee calculations.
+    uint256 internal constant MAX_BPS = 10_000;
+    /// @notice Used for profit unlocking rate calculations.
+    uint256 internal constant MAX_BPS_EXTENDED = 1_000_000_000_000;
+
+    /// @notice Seconds per year for max profit unlocking time.
+    uint256 internal constant SECONDS_PER_YEAR = 31_556_952; // 365.2425 days
+
+
+    /*//////////////////////////////////////////////////////////////
                         STORAGE STRUCT
     //////////////////////////////////////////////////////////////*/
 
@@ -61,8 +152,8 @@ contract ImpactStrategy {
     struct StrategyData {
         // The ERC20 compliant underlying asset that will be
         // used by the Strategy
-        ERC20 asset;
-        ERC20 veToken;
+        IERC20  asset;
+        IERC20  veToken;
         address projectRegistry;
         // These are the corresponding ERC20 variables needed for the
         // strategies token that is issued and burned on each deposit or withdraw.
@@ -121,7 +212,7 @@ contract ImpactStrategy {
         _;
     }
 
-     /**
+    /**
      * @dev Prevents a contract from calling itself, directly or indirectly.
      * Placed over all state changing functions for increased safety.
      */
@@ -138,8 +229,8 @@ contract ImpactStrategy {
         // Reset to false (1) once call has finished.
         S.entered = NOT_ENTERED;
     }
-    
-     /**
+
+    /**
      * @notice Require a caller is `management`.
      * @dev Is left public so that it can be used by the Strategy.
      *
@@ -166,26 +257,25 @@ contract ImpactStrategy {
         require(_sender == S.keeper || _sender == S.management, "!keeper");
     }
 
-
-     /*//////////////////////////////////////////////////////////////
+    /*//////////////////////////////////////////////////////////////
                                CONSTANTS
     //////////////////////////////////////////////////////////////*/
 
     /// @notice API version this TokenizedStrategy implements.
-    string internal constant API_VERSION = 0.0.1";
+    string internal constant API_VERSION = "0.0.1";
 
     /// @notice Value to set the `entered` flag to during a call.
     uint8 internal constant ENTERED = 2;
     /// @notice Value to set the `entered` flag to at the end of the call.
     uint8 internal constant NOT_ENTERED = 1;
-    
+
     /// @notice Events
     event Deposit(address indexed user, uint256 assets, uint256 veTokens);
     event VoteCast(address indexed user, address indexed project, uint256 weight);
     event SharesAllocated(address indexed project, uint256 shares);
     event Redeem(address indexed project, uint256 shares, uint256 assets);
 
-       /**
+    /**
      * @dev Custom storage slot that will be used to store the
      * `StrategyData` struct that holds each strategies
      * specific storage variables.
@@ -218,7 +308,7 @@ contract ImpactStrategy {
     function _strategyStorage() internal pure returns (StrategyData storage S) {
         // Since STORAGE_SLOT is a constant, we have to put a variable
         // on the stack to access it from an inline assembly block.
-        bytes32 slot = BASE_STRATEGY_STORAGE;
+        bytes32 slot = BASE_IMPACT_STRATEGY_STORAGE;
         assembly {
             S.slot := slot
         }
@@ -260,22 +350,22 @@ contract ImpactStrategy {
         require(address(S.asset) == address(0), "initialized");
 
         // Set the strategy's underlying asset.
-        S.asset = ERC20(_asset);
+        S.asset = IERC20(_asset);
         // Set the Strategy Tokens name.
         S.name = _name;
         // Set decimals based off the `asset`.
-        S.decimals = ERC20(_asset).decimals();
+        S.decimals = IERC20(_asset).decimals();
 
         // Default to a 10 day profit unlock period.
         S.profitMaxUnlockTime = 10 days;
-        
+
         // Set the default management address. Can't be 0.
         require(_management != address(0), "ZERO ADDRESS");
         S.management = _management;
         // Set the keeper address
         S.keeper = _keeper;
         // Set the project registry address
-        S.projectRegistry = _projectRegistry;   
+        S.projectRegistry = _projectRegistry;
 
         // Emit event to signal a new strategy has been initialized.
         emit NewTokenizedStrategy(address(this), _asset, API_VERSION);
@@ -295,33 +385,31 @@ contract ImpactStrategy {
         uint256 assets
     ) internal returns (uint256 veTokenAmount) {
         // Check sybil resistance
-        (bool passedCheck, ) = checkSybilResistance(receiver);
-        require(passedCheck, "!sybil");
-        
+        // (bool passedCheck, ) = checkSybilResistance(receiver);
+        // require(passedCheck, "!sybil");
+
         // Transfer assets to vault
         S.asset.safeTransferFrom(msg.sender, address(this), assets);
         S.totalAssets += assets;
-        
+
         // Mint veTokens (lockTime = 0 for now, can be updated later)
-        veTokenAmount = _calculateVeTokens(assets, receiver, block.timestamp);
-        S.veToken.mint(receiver, veTokenAmount);
-        
+        // veTokenAmount = _calculateVeTokens(assets, receiver, block.timestamp);
+        // S.veToken.mint(receiver, veTokenAmount);
+
         emit Deposit(receiver, assets, veTokenAmount);
         return veTokenAmount;
     }
 
-/*//////////////////////////////////////////////////////////////
+    /*//////////////////////////////////////////////////////////////
                             DEPLOYMENT
     //////////////////////////////////////////////////////////////*/
 
     /**
      * @dev On contract creation we set `asset` for this contract to address(1).
      * This prevents it from ever being initialized in the future.
-     * @param _factory Address of the factory of the same version for protocol fees.
      */
-    constructor(address _factory) {
-        FACTORY = _factory;
-        _strategyStorage().asset = ERC20(address(1));
+    constructor() {
+        _strategyStorage().asset = IERC20(address(1));
     }
 
     /**
@@ -330,17 +418,14 @@ contract ImpactStrategy {
      * @param _project Address of the project to get votes for
      * @return totalVotes Current valid vote count for the project
      */
-    function _getVoteTally(
-        address _project
-    ) internal view returns (uint256 totalVotes) {
+    function _getVoteTally(address _project) internal view returns (uint256 totalVotes) {
         StrategyData storage S = _strategyStorage();
-        
+
         // Get raw vote count
         totalVotes = S.projectVotes[_project];
 
         return totalVotes;
     }
-    
 
     /**
      * @notice Adjusts vote tally based on strategy rules
@@ -350,10 +435,7 @@ contract ImpactStrategy {
      * @param _rawTally The raw vote count before adjustments
      * @return The adjusted vote tally
      */
-    function adjustVoteTally(
-        address _project,
-        uint256 _rawTally
-    ) public view virtual returns (uint256) {
+    function adjustVoteTally(address _project, uint256 _rawTally) public view virtual returns (uint256) {
         return _rawTally;
     }
 
@@ -363,10 +445,7 @@ contract ImpactStrategy {
      * @param _project Address of the project
      * @return votes Number of votes from user to project
      */
-    function getUserVotes(
-        address _user,
-        address _project
-    ) external view returns (uint256) {
+    function getUserVotes(address _user, address _project) external view returns (uint256) {
         return _strategyStorage().userVotes[_user][_project];
     }
 
@@ -375,9 +454,7 @@ contract ImpactStrategy {
      * @param _project Address of the project
      * @return votes Total number of votes for project
      */
-    function getProjectVotes(
-        address _project
-    ) external view returns (uint256) {
+    function getProjectVotes(address _project) external view returns (uint256) {
         return _getVoteTally(_project);
     }
 
@@ -394,20 +471,17 @@ contract ImpactStrategy {
      * @dev Converts vote weight into proportional share allocation
      * Default implementation uses linear proportion of total votes
      * Strategists can override for custom allocation formulas (e.g. quadratic)
-     * 
+     *
      * @param _project Address of the project
      * @param _owner Project registry ID
      * @return shares Amount of shares to be allocated
      */
-    function _calculateShares(
-        address _project,
-        address _owner
-    ) internal view returns (uint256 shares) {
+    function _calculateShares(address _project, address _owner) internal view returns (uint256 shares) {
         StrategyData storage S = _strategyStorage();
-        
+
         // Get adjusted vote tally for this project
         uint256 projectVotes = _getVoteTally(_project);
-        
+
         // No shares if no votes
         if (projectVotes == 0 || S.totalVotesCast == 0) {
             return 0;
@@ -434,10 +508,9 @@ contract ImpactStrategy {
         uint256 _baseShares,
         uint256 _projectVotes,
         uint256 _totalVotes
-    ) public view virtual returns (uint256) onlyManagement {
+    ) public view virtual onlyManagement returns (uint256) {
         return _baseShares;
     }
-
 
     /*//////////////////////////////////////////////////////////////
                       ERC4626 WRITE METHODS
@@ -449,10 +522,7 @@ contract ImpactStrategy {
      * @param receiver Address to receive the veTokens
      * @return veTokenAmount Amount of veTokens minted
      */
-    function deposit(
-        uint256 assets,
-        address receiver
-    ) external nonReentrant returns (uint256 veTokenAmount) {
+    function deposit(uint256 assets, address receiver) external nonReentrant returns (uint256 veTokenAmount) {
         StrategyData storage S = _strategyStorage();
         require(!S.shutdown, "shutdown");
 
@@ -461,8 +531,6 @@ contract ImpactStrategy {
             assets = S.asset.balanceOf(msg.sender);
         }
 
-        // Check deposit limits
-        require(assets <= availableDepositLimit(receiver), "deposit limit");
         require(assets > 0, "zero assets");
 
         return _deposit(S, receiver, assets);
@@ -484,7 +552,7 @@ contract ImpactStrategy {
         require(!S.shutdown, "shutdown");
         require(_project != address(0), "invalid project");
         require(IProjectRegistry(S.projectRegistry).isRegistered(_project), "!registered");
-        
+
         // Check veToken balance
         uint256 veTokenBalance = S.veToken.balanceOf(msg.sender);
         require(_amount <= veTokenBalance, "insufficient veTokens");
@@ -505,11 +573,7 @@ contract ImpactStrategy {
      * @param _voter Address of voter
      * @param _amount Amount of veTokens to burn
      */
-    function _burnVeTokens(
-        StrategyData storage S,
-        address _voter,
-        uint256 _amount
-    ) internal {
+    function _burnVeTokens(StrategyData storage S, address _voter, uint256 _amount) internal {
         S.veToken.burnFrom(_voter, _amount);
     }
 
@@ -520,19 +584,14 @@ contract ImpactStrategy {
      * @param _project Address of project
      * @param _amount Amount of veTokens voted
      */
-    function _recordVote(
-        StrategyData storage S,
-        address _voter,
-        address _project,
-        uint256 _amount
-    ) internal {
+    function _recordVote(StrategyData storage S, address _voter, address _project, uint256 _amount) internal {
         // Record the permanent vote
         S.userVotes[_voter][_project] += _amount;
         S.projectVotes[_project] += _amount;
         S.totalVotesCast += _amount;
     }
 
-     /**
+    /**
      * @notice Redeems exactly `shares` from `owner` and
      * sends `assets` of underlying tokens to `receiver`.
      * @dev This will default to allowing any loss passed to be realized.
@@ -541,11 +600,7 @@ contract ImpactStrategy {
      * @param owner The address whose shares are burnt.
      * @return assets The actual amount of underlying withdrawn.
      */
-    function redeem(
-        uint256 shares,
-        address receiver,
-        address owner
-    ) external returns (uint256) {
+    function redeem(uint256 shares, address receiver, address owner) external returns (uint256) {
         // We default to not limiting a potential loss.
         return redeem(shares, receiver, owner, MAX_BPS);
     }
@@ -569,28 +624,93 @@ contract ImpactStrategy {
         StrategyData storage S = _strategyStorage();
 
         // Verify owner is a registered project
-        require(
-            IProjectRegistry(S.projectRegistry).isRegistered(owner),
-            "Not a registered project"
-        );
+        require(IProjectRegistry(S.projectRegistry).isRegistered(owner), "Not a registered project");
 
         // Calculate shares based on vote tally
         uint256 voteTally = _getVoteTally(owner);
         uint256 availableShares = _calculateShares(voteTally, owner);
-        
+
         require(shares <= availableShares, "Exceeds available shares");
         require(shares <= _maxRedeem(S, owner), "Exceeds max redeem");
 
         uint256 assets;
-        require(
-            (assets = _convertToAssets(S, shares, Math.Rounding.Down)) != 0,
-            "ZERO_ASSETS"
-        );
+        require((assets = _convertToAssets(S, shares, Math.Rounding.Down)) != 0, "ZERO_ASSETS");
 
         return _withdraw(S, receiver, owner, assets, shares, maxLoss);
     }
+    /*//////////////////////////////////////////////////////////////
+                    INTERNAL 4626 WRITE METHODS
+    //////////////////////////////////////////////////////////////*/
 
-     /*//////////////////////////////////////////////////////////////
+    /**
+     * @dev Function to be called during {deposit} and {mint}.
+     *
+     * This function handles all logic including transfers,
+     * minting and accounting.
+     *
+     * We do all external calls before updating any internal
+     * values to prevent view reentrancy issues from the token
+     * transfers or the _deployFunds() calls.
+     */
+    function _deposit(StrategyData storage S, address receiver, uint256 assets, uint256 shares) internal {
+        // Cache storage variables used more than once.
+        IERC20 _asset = S.asset;
+
+        // take the funds
+        _asset.safeTransferFrom(msg.sender, address(this), assets);
+
+        // Adjust total Assets.
+        S.totalAssets += assets;
+
+        // mint shares
+        _mint(S, receiver, shares);
+
+        emit Deposit(msg.sender, receiver, assets, shares);
+    }
+
+    /**
+     * @dev To be called during {redeem} and {withdraw}.
+     *
+     * This will handle all logic, transfers and accounting
+     * in order to service the withdraw request.
+     *
+     * If we are not able to withdraw the full amount needed, it will
+     * be counted as a loss and passed on to the user.
+     */
+    function _withdraw(
+        StrategyData storage S,
+        address receiver,
+        address owner,
+        uint256 assets,
+        uint256 shares,
+        uint256 maxLoss
+    ) internal virtual returns (uint256) {
+        require(receiver != address(0), "ZERO ADDRESS");
+        
+        // Spend allowance if applicable.
+        if (msg.sender != owner) {
+            _spendAllowance(S, owner, msg.sender, shares);
+        }
+
+        // Cache `asset` since it is used multiple times..
+        IERC20 _asset = S.asset;
+
+        // Update assets based on how much we took.
+        S.totalAssets -= (assets);
+
+        _burn(S, owner, shares);
+
+       
+        _asset.safeTransfer(receiver, assets);
+   
+
+        emit Withdraw(msg.sender, receiver, owner, assets, shares);
+
+        // Return the actual amount of assets withdrawn.
+        return assets;
+    }
+
+    /*//////////////////////////////////////////////////////////////
                     EXTERNAL 4626 VIEW METHODS
     //////////////////////////////////////////////////////////////*/
 
@@ -626,51 +746,39 @@ contract ImpactStrategy {
     //////////////////////////////////////////////////////////////*/
 
     /// @dev Internal implementation of {totalAssets}.
-    function _totalAssets(
-        StrategyData storage S
-    ) internal view returns (uint256) {
+    function _totalAssets(StrategyData storage S) internal view returns (uint256) {
         return S.totalAssets;
     }
 
     /// @dev Internal implementation of {totalSupply}.
-    function _totalSupply(
-        StrategyData storage S
-    ) internal view returns (uint256) {
-        return S.totalSupply - _unlockedShares(S);
+    function _totalSupply(StrategyData storage S) internal view returns (uint256) {
+        return S.totalSupply;
     }
 
     /// @dev Internal implementation of {maxDeposit}.
-    function _maxDeposit(
-        StrategyData storage S,
-        address receiver
-    ) internal view returns (uint256) {
+    function _maxDeposit(StrategyData storage S, address receiver) internal view returns (uint256) {
         // Cannot deposit when shutdown or to the strategy.
         if (S.shutdown || receiver == address(this)) return 0;
 
-        return IBaseStrategy(address(this)).availableDepositLimit(receiver);
+        //return IBaseStrategy(address(this)).availableDepositLimit(receiver);
+        return type(uint256).max;
     }
 
     /// @dev Internal implementation of {maxMint}.
-    function _maxMint(
-        StrategyData storage S,
-        address receiver
-    ) internal view returns (uint256 maxMint_) {
+    function _maxMint(StrategyData storage S, address receiver) internal view returns (uint256 maxMint_) {
         // Cannot mint when shutdown or to the strategy.
         if (S.shutdown || receiver == address(this)) return 0;
 
-        maxMint_ = IBaseStrategy(address(this)).availableDepositLimit(receiver);
+        //maxMint_ = IBaseStrategy(address(this)).availableDepositLimit(receiver);
         if (maxMint_ != type(uint256).max) {
             maxMint_ = _convertToShares(S, maxMint_, Math.Rounding.Down);
         }
     }
 
     /// @dev Internal implementation of {maxRedeem}.
-    function _maxRedeem(
-        StrategyData storage S,
-        address owner
-    ) internal view returns (uint256 maxRedeem_) {
+    function _maxRedeem(StrategyData storage S, address owner) internal view returns (uint256 maxRedeem_) {
         // Get the max the owner could withdraw currently.
-        maxRedeem_ = IBaseStrategy(address(this)).availableWithdrawLimit(owner);
+        // maxRedeem_ = IBaseStrategy(address(this)).availableWithdrawLimit(owner);
 
         // Conversion would overflow and saves a min check if there is no withdrawal limit.
         if (maxRedeem_ == type(uint256).max) {
@@ -684,7 +792,278 @@ contract ImpactStrategy {
         }
     }
 
-     /*//////////////////////////////////////////////////////////////
+    /*//////////////////////////////////////////////////////////////
+                    EXTERNAL 4626 VIEW METHODS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Get the total amount of assets this strategy holds
+     * as of the last report.
+     *
+     * We manually track `totalAssets` to avoid any PPS manipulation.
+     *
+     * @return . Total assets the strategy holds.
+     */
+    function totalAssets() external view returns (uint256) {
+        return _totalAssets(_strategyStorage());
+    }
+
+    /**
+     * @notice Get the current supply of the strategies shares.
+     *
+     * Locked shares issued to the strategy from profits are not
+     * counted towards the full supply until they are unlocked.
+     *
+     * As more shares slowly unlock the totalSupply will decrease
+     * causing the PPS of the strategy to increase.
+     *
+     * @return . Total amount of shares outstanding.
+     */
+    function totalSupply() external view returns (uint256) {
+        return _totalSupply(_strategyStorage());
+    }
+
+    /**
+     * @notice The amount of shares that the strategy would
+     *  exchange for the amount of assets provided, in an
+     * ideal scenario where all the conditions are met.
+     *
+     * @param assets The amount of underlying.
+     * @return . Expected shares that `assets` represents.
+     */
+    function convertToShares(uint256 assets) external view returns (uint256) {
+        return _convertToShares(_strategyStorage(), assets, Math.Rounding.Floor);
+    }
+
+    /**
+     * @notice The amount of assets that the strategy would
+     * exchange for the amount of shares provided, in an
+     * ideal scenario where all the conditions are met.
+     *
+     * @param shares The amount of the strategies shares.
+     * @return . Expected amount of `asset` the shares represents.
+     */
+    function convertToAssets(uint256 shares) external view returns (uint256) {
+        return _convertToAssets(_strategyStorage(), shares, Math.Rounding.Floor);
+    }
+
+    /**
+     * @notice Allows an on-chain or off-chain user to simulate
+     * the effects of their deposit at the current block, given
+     * current on-chain conditions.
+     * @dev This will round down.
+     *
+     * @param assets The amount of `asset` to deposits.
+     * @return . Expected shares that would be issued.
+     */
+    function previewDeposit(uint256 assets) external view returns (uint256) {
+        return _convertToShares(_strategyStorage(), assets, Math.Rounding.Floor);
+    }
+
+    /**
+     * @notice Allows an on-chain or off-chain user to simulate
+     * the effects of their mint at the current block, given
+     * current on-chain conditions.
+     * @dev This is used instead of convertToAssets so that it can
+     * round up for safer mints.
+     *
+     * @param shares The amount of shares to mint.
+     * @return . The needed amount of `asset` for the mint.
+     */
+    function previewMint(uint256 shares) external view returns (uint256) {
+        return _convertToAssets(_strategyStorage(), shares, Math.Rounding.Ceil);
+    }
+
+    /**
+     * @notice Allows an on-chain or off-chain user to simulate
+     * the effects of their withdrawal at the current block,
+     * given current on-chain conditions.
+     * @dev This is used instead of convertToShares so that it can
+     * round up for safer withdraws.
+     *
+     * @param assets The amount of `asset` that would be withdrawn.
+     * @return . The amount of shares that would be burnt.
+     */
+    function previewWithdraw(uint256 assets) external view returns (uint256) {
+        return _convertToShares(_strategyStorage(), assets, Math.Rounding.Ceil);
+    }
+
+    /**
+     * @notice Allows an on-chain or off-chain user to simulate
+     * the effects of their redemption at the current block,
+     * given current on-chain conditions.
+     * @dev This will round down.
+     *
+     * @param shares The amount of shares that would be redeemed.
+     * @return . The amount of `asset` that would be returned.
+     */
+    function previewRedeem(uint256 shares) external view returns (uint256) {
+        return _convertToAssets(_strategyStorage(), shares, Math.Rounding.Floor);
+    }
+
+    /**
+     * @notice Total number of underlying assets that can
+     * be deposited into the strategy, where `receiver`
+     * corresponds to the receiver of the shares of a {deposit} call.
+     *
+     * @param receiver The address receiving the shares.
+     * @return . The max that `receiver` can deposit in `asset`.
+     */
+    function maxDeposit(address receiver) external view returns (uint256) {
+        return _maxDeposit(_strategyStorage(), receiver);
+    }
+
+    /**
+     * @notice Total number of shares that can be minted to `receiver`
+     * of a {mint} call.
+     *
+     * @param receiver The address receiving the shares.
+     * @return _maxMint The max that `receiver` can mint in shares.
+     */
+    function maxMint(address receiver) external view returns (uint256) {
+        return _maxMint(_strategyStorage(), receiver);
+    }
+
+    /**
+     * @notice Total number of underlying assets that can be
+     * withdrawn from the strategy by `owner`, where `owner`
+     * corresponds to the msg.sender of a {redeem} call.
+     *
+     * @param owner The owner of the shares.
+     * @return _maxWithdraw Max amount of `asset` that can be withdrawn.
+     */
+    function maxWithdraw(address owner) external view virtual returns (uint256) {
+        return _maxWithdraw(_strategyStorage(), owner);
+    }
+
+    /**
+     * @notice Variable `maxLoss` is ignored.
+     * @dev Accepts a `maxLoss` variable in order to match the multi
+     * strategy vaults ABI.
+     */
+    function maxWithdraw(address owner, uint256 /*maxLoss*/) external view virtual returns (uint256) {
+        return _maxWithdraw(_strategyStorage(), owner);
+    }
+
+    /**
+     * @notice Total number of strategy shares that can be
+     * redeemed from the strategy by `owner`, where `owner`
+     * corresponds to the msg.sender of a {redeem} call.
+     *
+     * @param owner The owner of the shares.
+     * @return _maxRedeem Max amount of shares that can be redeemed.
+     */
+    function maxRedeem(address owner) external view virtual returns (uint256) {
+        return _maxRedeem(_strategyStorage(), owner);
+    }
+
+    /**
+     * @notice Variable `maxLoss` is ignored.
+     * @dev Accepts a `maxLoss` variable in order to match the multi
+     * strategy vaults ABI.
+     */
+    function maxRedeem(address owner, uint256 /*maxLoss*/) external view virtual returns (uint256) {
+        return _maxRedeem(_strategyStorage(), owner);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    INTERNAL 4626 VIEW METHODS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Internal implementation of {totalAssets}.
+    function _totalAssets(StrategyData storage S) internal view returns (uint256) {
+        return S.totalAssets;
+    }
+
+    /// @dev Internal implementation of {totalSupply}.
+    function _totalSupply(StrategyData storage S) internal view returns (uint256) {
+        return S.totalSupply;
+    }
+
+    /// @dev Internal implementation of {convertToShares}.
+    function _convertToShares(
+        StrategyData storage S,
+        uint256 assets,
+        Math.Rounding _rounding
+    ) internal view returns (uint256) {
+        // Saves an extra SLOAD if values are non-zero.
+        uint256 totalSupply_ = _totalSupply(S);
+        // If supply is 0, PPS = 1.
+        if (totalSupply_ == 0) return assets;
+
+        uint256 totalAssets_ = _totalAssets(S);
+        // If assets are 0 but supply is not PPS = 0.
+        if (totalAssets_ == 0) return 0;
+
+        return assets.mulDiv(totalSupply_, totalAssets_, _rounding);
+    }
+
+    /// @dev Internal implementation of {convertToAssets}.
+    function _convertToAssets(
+        StrategyData storage S,
+        uint256 shares,
+        Math.Rounding _rounding
+    ) internal view returns (uint256) {
+        // Saves an extra SLOAD if totalSupply() is non-zero.
+        uint256 supply = _totalSupply(S);
+
+        return supply == 0 ? shares : shares.mulDiv(_totalAssets(S), supply, _rounding);
+    }
+
+    /// @dev Internal implementation of {maxDeposit}.
+    /// @param S Storage pointer to the strategy's data
+    /// @param receiver The address that will receive the deposit
+    /// @return The maximum amount of assets that can be deposited
+    function _maxDeposit(StrategyData storage S, address receiver) internal view returns (uint256) {
+        // Cannot deposit when shutdown or to the strategy itself
+        if (S.shutdown || receiver == address(this)) return 0;
+
+        // Return max uint256 since base contract will handle actual deposit limits
+        return type(uint256).max;
+    }
+
+    /// @dev Internal implementation of {maxMint}.
+    function _maxMint(StrategyData storage S, address receiver) internal view virtual returns (uint256 maxMint_) {
+        // Cannot mint when shutdown or to the strategy.
+        if (S.shutdown || receiver == address(this)) return 0;
+
+        // maxMint_ = IBaseStrategy(address(this)).availableDepositLimit(receiver);
+        if (maxMint_ != type(uint256).max) {
+            maxMint_ = _convertToShares(S, maxMint_, Math.Rounding.Floor);
+        }
+    }
+
+    /// @dev Internal implementation of {maxWithdraw}.
+    function _maxWithdraw(StrategyData storage S, address owner) internal view virtual returns (uint256 maxWithdraw_) {
+        // Get the max the owner could withdraw currently.
+        // maxWithdraw_ = IBaseStrategy(address(this)).availableWithdrawLimit(owner);
+
+        // If there is no limit enforced.
+        if (maxWithdraw_ == type(uint256).max) {
+            // Saves a min check if there is no withdrawal limit.
+            maxWithdraw_ = _convertToAssets(S, _balanceOf(S, owner), Math.Rounding.Floor);
+        } else {
+            maxWithdraw_ = Math.min(_convertToAssets(S, _balanceOf(S, owner), Math.Rounding.Floor), maxWithdraw_);
+        }
+    }
+
+    /// @dev Internal implementation of {maxRedeem}.
+    function _maxRedeem(StrategyData storage S, address owner) internal view virtual returns (uint256 maxRedeem_) {
+        // Get the max the owner could withdraw currently.
+        //maxRedeem_ = IBaseStrategy(address(this)).availableWithdrawLimit(owner);
+
+        // Conversion would overflow and saves a min check if there is no withdrawal limit.
+        if (maxRedeem_ == type(uint256).max) {
+            maxRedeem_ = _balanceOf(S, owner);
+        } else {
+            maxRedeem_ = Math.min(
+                // Can't redeem more than the balance.
+                _convertToShares(S, maxRedeem_, Math.Rounding.Floor),
+                _balanceOf(S, owner)
+            );
+        }
+    }
+    /*//////////////////////////////////////////////////////////////
                         GETTER FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
@@ -778,7 +1157,7 @@ contract ImpactStrategy {
         return _strategyStorage().profitMaxUnlockTime;
     }
 
-     /*//////////////////////////////////////////////////////////////
+    /*//////////////////////////////////////////////////////////////
                         SETTER FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
@@ -830,9 +1209,7 @@ contract ImpactStrategy {
      *
      * @param _emergencyAdmin New address to set `emergencyAdmin` to.
      */
-    function setEmergencyAdmin(
-        address _emergencyAdmin
-    ) external onlyManagement {
+    function setEmergencyAdmin(address _emergencyAdmin) external onlyManagement {
         _strategyStorage().emergencyAdmin = _emergencyAdmin;
 
         emit UpdateEmergencyAdmin(_emergencyAdmin);
@@ -864,8 +1241,7 @@ contract ImpactStrategy {
      * @return . The symbol the strategy is using for its tokens.
      */
     function symbol() external view returns (string memory) {
-        return
-            string(abi.encodePacked("ys", _strategyStorage().asset.symbol()));
+        return string(abi.encodePacked("ys", _strategyStorage().asset.symbol()));
     }
 
     /**
@@ -888,12 +1264,9 @@ contract ImpactStrategy {
     }
 
     /// @dev Internal implementation of {balanceOf}.
-    function _balanceOf(
-        StrategyData storage S,
-        address account
-    ) internal view returns (uint256) {
+    function _balanceOf(StrategyData storage S, address account) internal view returns (uint256) {
         if (account == address(this)) {
-            return S.balances[account] - _unlockedShares(S);
+            return S.balances[account];
         }
         return S.balances[account];
     }
@@ -926,19 +1299,12 @@ contract ImpactStrategy {
      * @param spender The address who would be moving the owners shares.
      * @return . The remaining amount of shares of `owner` that could be moved by `spender`.
      */
-    function allowance(
-        address owner,
-        address spender
-    ) external view returns (uint256) {
+    function allowance(address owner, address spender) external view returns (uint256) {
         return _allowance(_strategyStorage(), owner, spender);
     }
 
     /// @dev Internal implementation of {allowance}.
-    function _allowance(
-        StrategyData storage S,
-        address owner,
-        address spender
-    ) internal view returns (uint256) {
+    function _allowance(StrategyData storage S, address owner, address spender) internal view returns (uint256) {
         return S.allowances[owner][spender];
     }
 
@@ -998,11 +1364,7 @@ contract ImpactStrategy {
      * @param amount the quantity of shares to move.
      * @return . a boolean value indicating whether the operation succeeded.
      */
-    function transferFrom(
-        address from,
-        address to,
-        uint256 amount
-    ) external returns (bool) {
+    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
         StrategyData storage S = _strategyStorage();
         _spendAllowance(S, from, msg.sender, amount);
         _transfer(S, from, to, amount);
@@ -1025,12 +1387,7 @@ contract ImpactStrategy {
      * - `from` must have a balance of at least `amount`.
      *
      */
-    function _transfer(
-        StrategyData storage S,
-        address from,
-        address to,
-        uint256 amount
-    ) internal {
+    function _transfer(StrategyData storage S, address from, address to, uint256 amount) internal {
         require(from != address(0), "ERC20: transfer from the zero address");
         require(to != address(0), "ERC20: transfer to the zero address");
         require(to != address(this), "ERC20 transfer to strategy");
@@ -1053,11 +1410,7 @@ contract ImpactStrategy {
      * - `account` cannot be the zero address.
      *
      */
-    function _mint(
-        StrategyData storage S,
-        address account,
-        uint256 amount
-    ) internal {
+    function _mint(StrategyData storage S, address account, uint256 amount) internal {
         require(account != address(0), "ERC20: mint to the zero address");
 
         S.totalSupply += amount;
@@ -1078,11 +1431,7 @@ contract ImpactStrategy {
      * - `account` cannot be the zero address.
      * - `account` must have at least `amount` tokens.
      */
-    function _burn(
-        StrategyData storage S,
-        address account,
-        uint256 amount
-    ) internal {
+    function _burn(StrategyData storage S, address account, uint256 amount) internal {
         require(account != address(0), "ERC20: burn from the zero address");
 
         S.balances[account] -= amount;
@@ -1105,12 +1454,7 @@ contract ImpactStrategy {
      * - `owner` cannot be the zero address.
      * - `spender` cannot be the zero address.
      */
-    function _approve(
-        StrategyData storage S,
-        address owner,
-        address spender,
-        uint256 amount
-    ) internal {
+    function _approve(StrategyData storage S, address owner, address spender, uint256 amount) internal {
         require(owner != address(0), "ERC20: approve from the zero address");
         require(spender != address(0), "ERC20: approve to the zero address");
 
@@ -1126,18 +1470,10 @@ contract ImpactStrategy {
      *
      * Might emit an {Approval} event.
      */
-    function _spendAllowance(
-        StrategyData storage S,
-        address owner,
-        address spender,
-        uint256 amount
-    ) internal {
+    function _spendAllowance(StrategyData storage S, address owner, address spender, uint256 amount) internal {
         uint256 currentAllowance = _allowance(S, owner, spender);
         if (currentAllowance != type(uint256).max) {
-            require(
-                currentAllowance >= amount,
-                "ERC20: insufficient allowance"
-            );
+            require(currentAllowance >= amount, "ERC20: insufficient allowance");
             unchecked {
                 _approve(S, owner, spender, currentAllowance - amount);
             }
@@ -1221,10 +1557,7 @@ contract ImpactStrategy {
                 s
             );
 
-            require(
-                recoveredAddress != address(0) && recoveredAddress == owner,
-                "ERC20: INVALID_SIGNER"
-            );
+            require(recoveredAddress != address(0) && recoveredAddress == owner, "ERC20: INVALID_SIGNER");
 
             _approve(_strategyStorage(), recoveredAddress, spender, value);
         }
@@ -1240,9 +1573,7 @@ contract ImpactStrategy {
         return
             keccak256(
                 abi.encode(
-                    keccak256(
-                        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
-                    ),
+                    keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
                     keccak256("Impact Strategy"),
                     keccak256(bytes(API_VERSION)),
                     block.chainid,
@@ -1258,14 +1589,10 @@ contract ImpactStrategy {
     /**
      * @dev On contract creation we set `asset` for this contract to address(1).
      * This prevents it from ever being initialized in the future.
-     * @param _factory Address of the factory of the same version for protocol fees.
      */
-    constructor(address _factory) {
-        FACTORY = _factory;
-        _strategyStorage().asset = ERC20(address(1));
+    constructor() {
+        _strategyStorage().asset = IERC20(address(1));
     }
-
-    
 
     /**
      * @notice Adjusts vote tally based on strategy rules
@@ -1275,10 +1602,7 @@ contract ImpactStrategy {
      * @param _rawTally The raw vote count before adjustments
      * @return The adjusted vote tally
      */
-    function adjustVoteTally(
-        address _project,
-        uint256 _rawTally
-    ) public view virtual returns (uint256) {
+    function adjustVoteTally(address _project, uint256 _rawTally) public view virtual returns (uint256) {
         return _rawTally;
     }
 
@@ -1288,10 +1612,7 @@ contract ImpactStrategy {
      * @param _project Address of the project
      * @return votes Number of votes from user to project
      */
-    function getUserVotes(
-        address _user,
-        address _project
-    ) external view returns (uint256) {
+    function getUserVotes(address _user, address _project) external view returns (uint256) {
         return _strategyStorage().userVotes[_user][_project];
     }
 
@@ -1300,9 +1621,7 @@ contract ImpactStrategy {
      * @param _project Address of the project
      * @return votes Total number of votes for project
      */
-    function getProjectVotes(
-        address _project
-    ) external view returns (uint256) {
+    function getProjectVotes(address _project) external view returns (uint256) {
         return _getVoteTally(_project);
     }
 
@@ -1313,4 +1632,4 @@ contract ImpactStrategy {
     function getTotalVotes() external view returns (uint256) {
         return _strategyStorage().totalVotesCast;
     }
-} 
+}
