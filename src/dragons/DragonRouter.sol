@@ -34,7 +34,6 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
     //////////////////////////////////////////////////////////////*/
 
     uint256 public COOL_DOWN_PERIOD = 30 days;
-    uint256 public SPLIT_DELAY;
     ISplitChecker public splitChecker;
     address public opexVault;
     address public metapool;
@@ -199,7 +198,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      * @param _metapool New metapool address
      * @dev Only callable by accounts with OWNER_ROLE
      */
-    function setMetapool(address _metapool) external onlyRole(OWNER_ROLE) {
+    function setMetapool(address _metapool) external onlyRole(GOVERNANCE_ROLE) {
         _setMetapool(_metapool);
     }
 
@@ -210,15 +209,6 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      */
     function setOpexVault(address _opexVault) external onlyRole(OWNER_ROLE) {
         _setOpexVault(_opexVault);
-    }
-
-    /**
-     * @notice Updates the split delay
-     * @param _splitDelay New split delay in seconds
-     * @dev Only callable by accounts with OWNER_ROLE
-     */
-    function setSplitDelay(uint256 _splitDelay) external onlyRole(OWNER_ROLE) {
-        _setSplitDelay(_splitDelay);
     }
 
     /**
@@ -350,7 +340,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      * @param _userData The user data
      * @param _strategy The strategy address
      * @return The claimable assets
-     */
+     */ 
     function _claimableAssets(UserData memory _userData, address _strategy) internal view returns (uint256) {
         StrategyData memory _stratData = strategyData[_strategy];
         return _userData.splitPerShare * _stratData.totalShares
@@ -387,15 +377,6 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
         emit MetapoolUpdated(metapool, _metapool);
 
         metapool = _metapool;
-    }
-
-    /**
-     * @notice Internal function to set the split delay
-     * @param _splitDelay New split delay in seconds
-     */
-    function _setSplitDelay(uint256 _splitDelay) internal {
-        emit SplitDelayUpdated(SPLIT_DELAY, _splitDelay);
-        SPLIT_DELAY = _splitDelay;
     }
 
     /**

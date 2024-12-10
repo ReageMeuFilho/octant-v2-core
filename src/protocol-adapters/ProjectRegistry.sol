@@ -55,6 +55,7 @@ contract ProjectRegistry is Initializable, ONFT1155 {
         return roles[_user][_role];
     }
 
+    // TODO in mapping use project id. 
     function registerProject(string calldata _metadataURI) external {
         require(!projects[msg.sender].isRegistered, "Project already registered");
         
