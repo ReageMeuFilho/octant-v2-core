@@ -521,7 +521,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      *
      * @return . a boolean value indicating whether the operation succeeded.
      */
-    function transfer(address, /*to*/ uint256 /*amount*/ ) external pure override returns (bool) {
+    function transfer(address, /*to*/ uint256 /*amount*/) external pure override returns (bool) {
         revert VaultSharesNotTransferable();
     }
 
@@ -549,7 +549,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      *
      * @return . a boolean value indicating whether the operation succeeded.
      */
-    function transferFrom(address, /*from*/ address, /*to*/ uint256 /*amount*/ ) external pure override returns (bool) {
+    function transferFrom(address, /*from*/ address, /*to*/ uint256 /*amount*/) external pure override returns (bool) {
         revert VaultSharesNotTransferable();
     }
 }
