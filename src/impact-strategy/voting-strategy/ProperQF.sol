@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 contract ProperQF {
+    using Math for uint256;
     struct Project {
         uint256 sumContributions; // Sum of contributions (Sum_j)
         uint256 sumSquareRoots; // Sum of square roots (S_j)
@@ -22,14 +23,18 @@ contract ProperQF {
     event AlphaUpdated(uint256 oldNumerator, uint256 oldDenominator, uint256 newNumerator, uint256 newDenominator);
 
     /**
-     * @dev Updates a project with a new contribution.
+     * @notice This function is used to process a vote and update the tally for the voting strategy
+     * @dev Implements incremental update quadratic funding algorithm
      * @param projectId The ID of the project to update.
      * @param contribution The new contribution to add.
      */
     function _processVote(uint256 projectId, uint256 contribution, uint256 voteWeight) internal {
         require(contribution > 0, "Contribution must be positive");
         require(voteWeight > 0, "Square root of contribution must be positive");
-        require(voteWeight**2 <= contribution, "Square root of contribution must be less than or equal to contribution"); 
+        require(
+            voteWeight ** 2 <= contribution,
+            "Square root of contribution must be less than or equal to contribution"
+        );
         // should be within 10% of the contribution
 
         Project storage project = projects[projectId];
@@ -51,6 +56,24 @@ contract ProperQF {
         project.sumContributions = newSumContributions;
         project.quadraticFunding = newQuadraticFunding;
         project.linearFunding = newSumContributions;
+    }
+
+    /**
+     * @notice Returns the current funding metrics for a specific project
+     * @dev This function aggregates all the relevant funding data for a project
+     * @param projectId The ID of the project to tally
+     * @return projectShares The total shares allocated to this project
+     * @return totalShares The total shares across all projects
+     */
+    function _tally(uint256 projectId) internal view returns (uint256 projectShares, uint256 totalShares) {
+        // Retrieve the project data from storage
+        Project storage project = projects[projectId];
+
+        // Return all relevant metrics for the project
+        return (
+            project.quadraticFunding.mulDiv(alphaNumerator, alphaDenominator) + project.linearFunding.mulDiv(alphaDenominator - alphaNumerator, alphaDenominator), // Total shares allocated to this project
+            totalQuadraticSum.mulDiv(alphaNumerator, alphaDenominator) + totalLinearSum.mulDiv(alphaDenominator - alphaNumerator, alphaDenominator) // Total shares across all projects
+        );
     }
 
     /**
@@ -77,25 +100,22 @@ contract ProperQF {
      * @return quadraticFunding The quadratic funding component (α * S_j^2)
      * @return linearFunding The linear funding component ((1-α) * Sum_j)
      */
-    function tally(uint256 projectId) 
-        public 
-        view 
-        returns (
-            uint256 sumContributions,
-            uint256 sumSquareRoots,
-            uint256 quadraticFunding,
-            uint256 linearFunding
-        ) 
+    function getTally(
+        uint256 projectId
+    )
+        public
+        view
+        returns (uint256 sumContributions, uint256 sumSquareRoots, uint256 quadraticFunding, uint256 linearFunding)
     {
         // Retrieve the project data from storage
         Project storage project = projects[projectId];
-        
+
         // Return all relevant metrics for the project
         return (
-            project.sumContributions,    // Total contributions
-            project.sumSquareRoots,      // Sum of square roots
-            Math.mulDiv(project.quadraticFunding, alphaNumerator, alphaDenominator),    // Quadratic funding term
-            Math.mulDiv(project.linearFunding, alphaDenominator, alphaDenominator)         // Linear funding term
+            project.sumContributions, // Total contributions
+            project.sumSquareRoots, // Sum of square roots
+            Math.mulDiv(project.quadraticFunding, alphaNumerator, alphaDenominator), // Quadratic funding term
+            Math.mulDiv(project.linearFunding, alphaDenominator, alphaDenominator) // Linear funding term
         );
     }
 
@@ -109,15 +129,15 @@ contract ProperQF {
         // Input validation
         require(newDenominator > 0, "Denominator must be positive");
         require(newNumerator <= newDenominator, "Alpha must be <= 1");
-        
+
         // Store old values for event emission
         uint256 oldNumerator = alphaNumerator;
         uint256 oldDenominator = alphaDenominator;
-        
+
         // Update state
         alphaNumerator = newNumerator;
         alphaDenominator = newDenominator;
-        
+
         // Emit event
         emit AlphaUpdated(oldNumerator, oldDenominator, newNumerator, newDenominator);
     }
