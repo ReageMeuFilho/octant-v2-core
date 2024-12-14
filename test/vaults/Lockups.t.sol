@@ -1034,7 +1034,7 @@ contract LockupsTest is Setup {
         strategy.redeem(redeemAmount, user, user, 0);
 
         // Verify balances and state after first redeem
-        (, uint256 remainingLockedShares, , uint256 newTotalShares, uint256 newWithdrawableShares) = strategy
+        (, uint256 remainingLockedShares, , uint256 newTotalShares, /*uint256 newWithdrawableShares*/  ) = strategy
             .getUserLockupInfo(user);
     }
 }
