@@ -7,6 +7,16 @@ optimizer = true
 optimizer_runs = 10_000_000
 solc = "0.8.25"
 verbosity = 3
+exclude = [
+    "src/test/**/*.sol",     # Exclude all test files
+    "src/mock/**/*.sol",     # Exclude all mock contracts
+    "src/old/**/*.sol",      # Exclude all old contracts
+    "src/yearn-base/**/*.sol",      # Exclude all og yearn contracts
+    "**/*.t.sol",            # Exclude files ending with .t.sol
+    "**/*.test.sol",         # Exclude files ending with .test.sol
+    "**/Test*.sol",          # Exclude files starting with Test
+    "**/Mock*.sol"           # Exclude files starting with Mock
+]
 
 [profile.ci]
 fuzz = { runs = 5000 }
