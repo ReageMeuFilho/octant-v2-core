@@ -4,6 +4,8 @@ pragma solidity >=0.8.25;
 import {IProjectRegistry} from "../../src/interfaces/IProjectRegistry.sol";
 
 contract MockProjectRegistry is IProjectRegistry {
+    uint256 public projectId;
+    mapping(address => uint256) public projectId;
     mapping(address => bool) public registry;
     address[] public projects;
 
@@ -14,11 +16,18 @@ contract MockProjectRegistry is IProjectRegistry {
     function addProject(address _project) external override {
         require(_project != address(0), "ZERO_ADDRESS");
         require(!registry[_project], "ALREADY_REGISTERED");
-        
+
+        projectId++;
+        projectId[_project] = projectId;
+
         registry[_project] = true;
         projects.push(_project);
         
         emit ProjectAdded(_project);
+    }
+
+    function getProjectId(address _project) external view override returns (uint256) {
+        return projectId[_project];
     }
 
     function removeProject(address _project) external override {

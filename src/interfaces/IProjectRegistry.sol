@@ -21,6 +21,13 @@ interface IProjectRegistry {
      */
     function removeProject(address _project) external;
 
+    /** 
+     * @notice Gets the project ID for a given project
+     * @param _project The address of the project to get the ID for
+     * @return uint256 The project ID
+     */
+    function getProjectId(address _project) external view returns (uint256);
+
     /**
      * @notice Gets all registered projects
      * @return address[] Array of registered project addresses
