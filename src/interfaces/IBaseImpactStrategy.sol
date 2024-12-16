@@ -16,6 +16,8 @@ interface IBaseImpactStrategy {
 
     function shutdownWithdraw(uint256 _amount) external;
 
+    function convertToVotes(uint256 _assets) external view returns (uint256);
+
     function processVote(uint256 projectId, uint256 contribution, uint256 voteWeight) external;
 
     function tally(uint256 projectId) external view returns (uint256 projectShares, uint256 totalShares);

@@ -123,7 +123,7 @@ contract YearnTokenizedImpactStrategy is YearnTokenizedStrategy {
     function deposit(
         uint256 assets,
         address receiver
-    ) external nonReentrant returns (uint256 voting) {
+    ) external nonReentrant returns (uint256 votes) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
 
@@ -139,11 +139,11 @@ contract YearnTokenizedImpactStrategy is YearnTokenizedStrategy {
         );
         // Check for rounding error.
         require(
-            (shares = _convertToShares(S, assets, Math.Rounding.Floor)) != 0,
+            (votes = IBaseImpactStrategy(address(this)).convertToVotes(assets)) != 0,
             "ZERO_SHARES"
         );
 
-        _deposit(S, receiver, assets, shares);
+        _deposit(S, receiver, assets, votes);
     }
 
     /**
@@ -317,7 +317,7 @@ contract YearnTokenizedImpactStrategy is YearnTokenizedStrategy {
         StrategyData storage S,
         address receiver,
         uint256 assets,
-        uint256 shares
+        uint256 votes
     ) internal {
         // TODO: change to decouple from shares
         // Cache storage variables used more than once.
@@ -326,16 +326,13 @@ contract YearnTokenizedImpactStrategy is YearnTokenizedStrategy {
         // Need to transfer before minting or ERC777s could reenter.
         _asset.safeTransferFrom(msg.sender, address(this), assets);
 
-        // We can deploy the full loose balance currently held.
-        uint256 votes = IBaseImpactStrategy(address(this)).convertToVotes(assets);
-
         // Adjust total Assets.
         S.totalAssets += assets;
 
         // add voting power
         _addVotingPower(S, receiver, votes);
 
-        emit Deposit(msg.sender, receiver, assets, shares);
+        emit Deposit(msg.sender, receiver, assets, votes);
     }
 
     /**
@@ -481,6 +478,8 @@ contract YearnTokenizedImpactStrategy is YearnTokenizedStrategy {
      * @param voteWeight The square root of the contribution amount (within 10% tolerance)
      */
     function vote(uint256 projectId, uint256 contribution, uint256 voteWeight) external nonReentrant {
+
+        StrategyData storage S = _strategyStorage();
         // Tend the strategy with the current loose balance.
         IBaseImpactStrategy(address(this)).processVote(
             projectId,

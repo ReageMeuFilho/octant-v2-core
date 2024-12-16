@@ -121,6 +121,8 @@ contract YearnTokenizedStrategy {
         // The ERC20 compliant underlying asset that will be
         // used by the Strategy
         ERC20 asset;
+        mapping(address => uint256) votingPower; // Mapping of voting power for each account
+        uint256 totalVotingPower; // Total voting power for the strategy
 
 
         // These are the corresponding ERC20 variables needed for the
@@ -135,6 +137,7 @@ contract YearnTokenizedStrategy {
 
         // We manually track `totalAssets` to prevent PPS manipulation through airdrops.
         uint256 totalAssets;
+        uint256 totalShates;
         address projectRegistry;
 
         // Access management variables.
