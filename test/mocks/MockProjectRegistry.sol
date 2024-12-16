@@ -5,9 +5,9 @@ import {IProjectRegistry} from "../../src/interfaces/IProjectRegistry.sol";
 
 contract MockProjectRegistry is IProjectRegistry {
     uint256 public projectId;
-    mapping(address => uint256) public projectId;
+    mapping(address => uint256) public projectIds;
     mapping(address => bool) public registry;
-    address[] public projects;
+    mapping( uint256 => address) public projects;
 
     function isRegistered(address _project) external view override returns (bool) {
         return registry[_project];
@@ -18,36 +18,28 @@ contract MockProjectRegistry is IProjectRegistry {
         require(!registry[_project], "ALREADY_REGISTERED");
 
         projectId++;
-        projectId[_project] = projectId;
+        projects[projectId] = _project;
 
         registry[_project] = true;
-        projects.push(_project);
+        projectIds[_project] = projectId;
         
         emit ProjectAdded(_project);
     }
 
     function getProjectId(address _project) external view override returns (uint256) {
-        return projectId[_project];
+        return projectIds[_project];
     }
 
     function removeProject(address _project) external override {
         require(registry[_project], "NOT_REGISTERED");
         
         registry[_project] = false;
-        
-        // Remove from projects array
-        for (uint256 i = 0; i < projects.length; i++) {
-            if (projects[i] == _project) {
-                projects[i] = projects[projects.length - 1];
-                projects.pop();
-                break;
-            }
+
+        if (registry[projects[projectId]]) {
+            projects[projectId] = address(0);
         }
+  
         
         emit ProjectRemoved(_project);
-    }
-
-    function getProjects() external view override returns (address[] memory) {
-        return projects;
     }
 } 

@@ -137,7 +137,7 @@ contract YearnTokenizedStrategy {
 
         // We manually track `totalAssets` to prevent PPS manipulation through airdrops.
         uint256 totalAssets;
-        uint256 totalShates;
+        uint256 totalShares;
         address projectRegistry;
 
         // Access management variables.

@@ -29,12 +29,6 @@ interface IProjectRegistry {
     function getProjectId(address _project) external view returns (uint256);
 
     /**
-     * @notice Gets all registered projects
-     * @return address[] Array of registered project addresses
-     */
-    function getProjects() external view returns (address[] memory);
-
-    /**
      * @notice Event emitted when a project is added
      * @param project The address of the added project
      */

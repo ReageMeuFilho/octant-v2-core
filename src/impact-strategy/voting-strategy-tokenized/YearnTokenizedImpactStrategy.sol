@@ -7,6 +7,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {IBaseImpactStrategy} from "src/interfaces/IBaseImpactStrategy.sol";
 import {YearnTokenizedStrategy} from "./YearnTokenizedStrategy.sol";
+import {IProjectRegistry} from "src/interfaces/IProjectRegistry.sol";
 
 
 contract YearnTokenizedImpactStrategy is YearnTokenizedStrategy {
@@ -113,16 +114,16 @@ contract YearnTokenizedImpactStrategy is YearnTokenizedStrategy {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Mints `shares` of strategy shares to `receiver` by
+     * @notice Grants voting power to `receiver` by 
      * depositing exactly `assets` of underlying tokens.
      * @param assets The amount of underlying to deposit in.
      * @param receiver The address to receive the `shares`.
-     * @return shares The actual amount of shares issued.
+     * @return votes The actual amount of shares issued.
      */
     function deposit(
         uint256 assets,
         address receiver
-    ) external nonReentrant returns (uint256 shares) {
+    ) external nonReentrant returns (uint256 votes) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
 
@@ -138,11 +139,11 @@ contract YearnTokenizedImpactStrategy is YearnTokenizedStrategy {
         );
         // Check for rounding error.
         require(
-            (shares = _convertToShares(S, assets, Math.Rounding.Floor)) != 0,
+            (votes = IBaseImpactStrategy(address(this)).convertToVotes(assets)) != 0,
             "ZERO_SHARES"
         );
 
-        _deposit(S, receiver, assets, shares);
+        _deposit(S, receiver, assets, votes);
     }
 
     /**
@@ -190,9 +191,9 @@ contract YearnTokenizedImpactStrategy is YearnTokenizedStrategy {
     function _totalSupply(
         StrategyData storage S
     ) internal view override returns (uint256) {
-        return S.totalSupply;
+        return S.totalShares;
     }
-
+    
     /// @dev Internal implementation of {convertToShares}.
     function _convertToShares(
         StrategyData storage S,
@@ -262,10 +263,13 @@ contract YearnTokenizedImpactStrategy is YearnTokenizedStrategy {
         StrategyData storage S,
         address account
     ) internal view override returns (uint256) {
+        IProjectRegistry projectRegistry = projectRegistry();
+        uint256 projectId = projectRegistry.getProjectId(account);
+        (uint256 projectShares,) = IBaseImpactStrategy(address(this)).tally(projectId);
         if (account == address(this)) {
-            return S.balances[account];
+            return 0;
         }
-        return S.balances[account];
+        return S.balances[account] + projectShares;
     }
 
     /**
@@ -293,13 +297,6 @@ contract YearnTokenizedImpactStrategy is YearnTokenizedStrategy {
         require(from != address(0), "ERC20: transfer from the zero address");
         require(to != address(0), "ERC20: transfer to the zero address");
         require(to != address(this), "ERC20 transfer to strategy");
-
-        S.balances[from] -= amount;
-        unchecked {
-            S.balances[to] += amount;
-        }
-
-        emit Transfer(from, to, amount);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -307,10 +304,10 @@ contract YearnTokenizedImpactStrategy is YearnTokenizedStrategy {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev Function to be called during {deposit} and {mint}.
+     * @dev Function to be called during {deposit}.
      *
      * This function handles all logic including transfers,
-     * minting and accounting.
+     * and accounting.
      *
      * We do all external calls before updating any internal
      * values to prevent view reentrancy issues from the token
@@ -320,26 +317,22 @@ contract YearnTokenizedImpactStrategy is YearnTokenizedStrategy {
         StrategyData storage S,
         address receiver,
         uint256 assets,
-        uint256 shares
+        uint256 votes
     ) internal {
+        // TODO: change to decouple from shares
         // Cache storage variables used more than once.
         ERC20 _asset = S.asset;
 
         // Need to transfer before minting or ERC777s could reenter.
         _asset.safeTransferFrom(msg.sender, address(this), assets);
 
-        // We can deploy the full loose balance currently held.
-        // IBaseImpactStrategy(address(this)).mintWarbonds(
-        //     _asset.balanceOf(address(this))
-        // );
-
         // Adjust total Assets.
         S.totalAssets += assets;
 
-        // mint shares
-        _mint(S, receiver, shares);
+        // add voting power
+        _addVotingPower(S, receiver, votes);
 
-        emit Deposit(msg.sender, receiver, assets, shares);
+        emit Deposit(msg.sender, receiver, assets, votes);
     }
 
     /**
@@ -382,6 +375,40 @@ contract YearnTokenizedImpactStrategy is YearnTokenizedStrategy {
 
         // Return the actual amount of assets withdrawn.
         return assets;
+    }
+
+    /**
+     * @dev Adds voting power to an account
+     * @param account The address to add voting power to
+     * @param votes The amount of voting power to add
+     */
+    function _addVotingPower(
+        StrategyData storage S,
+        address account,
+        uint256 votes
+    ) internal {
+        require(account != address(0), "ZERO ADDRESS");
+        S.totalVotingPower += votes;
+        unchecked {
+            S.votingPower[account] += votes;
+        }
+        //TODO: emit event?
+    }
+
+    /**
+     * @dev Removes voting power from an account
+     * @param account The address to remove voting power from
+     * @param votes The amount of voting power to remove
+     */
+    function _removeVotingPower(
+        StrategyData storage S,
+        address account,
+        uint256 votes
+    ) internal {
+        S.totalVotingPower -= votes;
+        unchecked {
+            S.votingPower[account] -= votes;
+        }
     }
 
     /** @dev Creates `amount` tokens and assigns them to `account`, increasing
@@ -451,17 +478,21 @@ contract YearnTokenizedImpactStrategy is YearnTokenizedStrategy {
      * @param voteWeight The square root of the contribution amount (within 10% tolerance)
      */
     function vote(uint256 projectId, uint256 contribution, uint256 voteWeight) external nonReentrant {
+
+        StrategyData storage S = _strategyStorage();
         // Tend the strategy with the current loose balance.
         IBaseImpactStrategy(address(this)).processVote(
             projectId,
             contribution,
             voteWeight
         );
+        _removeVotingPower(S, msg.sender, contribution);
     }
 
      /**
      * @notice Returns the current funding metrics for a specific project
      * @dev This function aggregates all the relevant funding data for a project
+     * @dev By convention project 0 should return 0 for projectShares
      * @param projectId The ID of the project to tally
      * @return projectShares The total shares allocated to this project
      * @return totalShares The total shares across all projects
@@ -478,8 +509,8 @@ contract YearnTokenizedImpactStrategy is YearnTokenizedStrategy {
      * @notice Get the current address that receives the performance fees.
      * @return . Address of projectRegistry
      */
-    function projectRegistry() external view returns (address) {
-        return _strategyStorage().projectRegistry;
+    function projectRegistry() public view returns (IProjectRegistry) {
+        return IProjectRegistry(_strategyStorage().projectRegistry);
     }
 
 
