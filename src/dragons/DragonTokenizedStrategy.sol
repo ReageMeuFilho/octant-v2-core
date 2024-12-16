@@ -15,11 +15,10 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         address _asset,
         string memory _name,
         address _owner,
-        address _management,
-        address _keeper,
-        address _dragonRouter
+        address _contractRegistry,
+        address _roleRegistry
     ) external {
-        __TokenizedStrategy_init(_asset, _name, _owner, _management, _keeper, _dragonRouter);
+        __TokenizedStrategy_init(_asset, _name, _owner, _contractRegistry, _roleRegistry);
     }
 
     /**
@@ -451,7 +450,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * report in terms of `asset`.
      */
     // solhint-disable-next-line code-complexity
-    function report() external override nonReentrant onlyKeepers returns (uint256 profit, uint256 loss) {
+    function report() external override nonReentrant onlyRole("KEEPER") returns (uint256 profit, uint256 loss) {
         // Cache storage pointer since its used repeatedly.
         StrategyData storage S = _strategyStorage();
 
@@ -464,7 +463,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
 
         uint256 oldTotalAssets = _totalAssets(S);
 
-        address _dragonRouter = S.dragonRouter;
+        address _dragonRouter = dragonRouter();
         // Calculate profit/loss.
         // TODO: Dragon vault loss protection / insurance internal function functions as a security buffer for the dragon principal
         if (newTotalAssets > oldTotalAssets) {

@@ -2,13 +2,14 @@
 pragma solidity ^0.8.25;
 
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ReentrancyGuardUpgradeable} from "openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import {AccessControlUpgradeable} from "openzeppelin-upgradeable/access/AccessControlUpgradeable.sol";
+import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import {ReentrancyGuard} from "@solady/utils/ReentrancyGuard.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ITokenizedStrategy} from "src/interfaces/ITokenizedStrategy.sol";
 import {ITransformer} from "src/interfaces/ITransformer.sol";
 import "src/interfaces/ISplitChecker.sol";
+import {RoleRegistry} from "src/registry/RoleRegistry.sol";
 
 /**
  * @title Dragon Router
@@ -16,7 +17,7 @@ import "src/interfaces/ISplitChecker.sol";
  * with the ability to transform the split token into another token upon withdrawal,
  * and allows authorized pushers to directly distribute splits.
  */
-contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
+contract DragonRouter is Initializable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     /*//////////////////////////////////////////////////////////////
@@ -24,9 +25,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
     //////////////////////////////////////////////////////////////*/
 
     uint256 private constant SPLIT_PRECISION = 1e18;
-    bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
-    bytes32 public constant GOVERNANCE_ROLE = keccak256("OCTANT_GOVERNANCE_ROLE");
-    bytes32 public constant SPLIT_DISTRIBUTOR_ROLE = keccak256("SPLIT_DISTRIBUTOR_ROLE");
+    RoleRegistry public roleRegistry;
     address public constant NATIVE_TOKEN = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
     /*//////////////////////////////////////////////////////////////
@@ -96,6 +95,16 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
     error NoShares();
     error CooldownPeriodNotPassed();
     error TransferFailed();
+    error NoRole();
+
+    /*//////////////////////////////////////////////////////////////
+                            MODIFIERS
+    //////////////////////////////////////////////////////////////*/
+
+    modifier onlyRole(string memory name) {
+        if (!roleRegistry.hasRole(name, msg.sender)) revert NoRole();
+        _;
+    }
 
     /*//////////////////////////////////////////////////////////////
                             INITIALIZER
@@ -105,19 +114,13 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
     /// @dev owner of this module will the safe multisig that calls setUp function
     /// @param initializeParams Parameters of initialization encoded
     function setUp(bytes memory initializeParams) public initializer {
-        (address _owner, bytes memory data) = abi.decode(initializeParams, (address, bytes));
-
         (
             address[] memory _strategy,
             address[] memory _asset,
-            address _governance,
             address _splitChecker,
             address _opexVault,
             address _metapool
-        ) = abi.decode(data, (address[], address[], address, address, address, address));
-
-        __AccessControl_init();
-        __ReentrancyGuard_init();
+        ) = abi.decode(initializeParams, (address[], address[], address, address, address));
 
         _setSplitChecker(_splitChecker);
         _setMetapool(_metapool);
@@ -134,8 +137,6 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
         split.totalAllocations = SPLIT_PRECISION;
 
         strategies = _strategy;
-        _grantRole(OWNER_ROLE, _owner);
-        _grantRole(GOVERNANCE_ROLE, _governance);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -148,7 +149,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      * @dev Only callable by accounts with OWNER_ROLE
      * @dev Strategy must not already be added
      */
-    function addStrategy(address _strategy) external onlyRole(OWNER_ROLE) {
+    function addStrategy(address _strategy) external onlyRole("OCTANT_GOVERNANCE") {
         StrategyData storage _stratData = strategyData[_strategy];
         if (_stratData.asset != address(0)) revert AlreadyAdded();
 
@@ -168,7 +169,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      * @dev Only callable by accounts with OWNER_ROLE
      * @dev Strategy must exist in the router
      */
-    function removeStrategy(address _strategy) external onlyRole(OWNER_ROLE) {
+    function removeStrategy(address _strategy) external onlyRole("OCTANT_GOVERNANCE") {
         StrategyData storage _stratData = strategyData[_strategy];
         if (_stratData.asset == address(0)) revert StrategyNotDefined();
 
@@ -198,7 +199,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      * @param _metapool New metapool address
      * @dev Only callable by accounts with OWNER_ROLE
      */
-    function setMetapool(address _metapool) external onlyRole(GOVERNANCE_ROLE) {
+    function setMetapool(address _metapool) external onlyRole("OCTANT_GOVERNANCE") {
         _setMetapool(_metapool);
     }
 
@@ -207,7 +208,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      * @param _opexVault New opex vault address
      * @dev Only callable by accounts with OWNER_ROLE
      */
-    function setOpexVault(address _opexVault) external onlyRole(OWNER_ROLE) {
+    function setOpexVault(address _opexVault) external onlyRole("DRAGON_GOVERNANCE") {
         _setOpexVault(_opexVault);
     }
 
@@ -216,7 +217,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      * @param _splitChecker New split checker contract address
      * @dev Only callable by accounts with OWNER_ROLE
      */
-    function setSplitChecker(address _splitChecker) external onlyRole(GOVERNANCE_ROLE) {
+    function setSplitChecker(address _splitChecker) external onlyRole("OCTANT_GOVERNANCE") {
         _setSplitChecker(_splitChecker);
     }
 
@@ -238,7 +239,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      * @param _coolDownPeriod New cool down period in seconds
      * @dev Only callable by accounts with OWNER_ROLE
      */
-    function setCoolDownPeriod(uint256 _coolDownPeriod) external onlyRole(GOVERNANCE_ROLE) {
+    function setCoolDownPeriod(uint256 _coolDownPeriod) external onlyRole("OCTANT_GOVERNANCE") {
         _setCoolDownPeriod(_coolDownPeriod);
     }
 
@@ -258,7 +259,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      * @dev Distributes new splits to all shareholders.
      * @param amount The amount of tokens to distribute.
      */
-    function fundFromSource(address strategy, uint256 amount) external onlyRole(SPLIT_DISTRIBUTOR_ROLE) nonReentrant {
+    function fundFromSource(address strategy, uint256 amount) external onlyRole("SPLIT_DISTRIBUTOR") nonReentrant {
         StrategyData storage data = strategyData[strategy];
         if(data.asset == address(0)) revert ZeroAddress();
 
@@ -273,7 +274,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      * @param _split The split to set
      * @dev Only callable by accounts with OWNER_ROLE
      */
-    function setSplit(Split memory _split) external onlyRole(OWNER_ROLE) {
+    function setSplit(Split memory _split) external onlyRole("DRAGON_GOVERNANCE") {
         if(block.timestamp - lastSetSplitTime < COOL_DOWN_PERIOD) revert CooldownPeriodNotPassed();
         splitChecker.checkSplit(_split, opexVault, metapool);
 

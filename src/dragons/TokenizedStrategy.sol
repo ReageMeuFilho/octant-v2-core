@@ -8,6 +8,7 @@ import { Enum } from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 
 import { IBaseStrategy } from "../../src/interfaces/IBaseStrategy.sol";
 import { IAvatar } from "zodiac/interfaces/IAvatar.sol";
+import { IAddressRegistry } from "../../src/interfaces/IAddressRegistry.sol";
 
 contract TokenizedStrategy {
     using Math for uint256;
@@ -101,27 +102,23 @@ contract TokenizedStrategy {
         // used by the Strategy
         ERC20 asset;
         address owner;
-        address dragonRouter;
+        uint8 decimals; // The amount of decimals that `asset` and strategy use.
+        address addressRegistry;
+        uint8 entered; // To prevent reentrancy. Use uint8 for gas savings.
         // These are the corresponding ERC20 variables needed for the
         // strategies token that is issued and burned on each deposit or withdraw.
-        uint8 decimals; // The amount of decimals that `asset` and strategy use.
-        string name; // The name of the token for the strategy.
         uint256 totalSupply; // The total amount of shares currently issued.
+        // We manually track `totalAssets` to prevent PPS manipulation through airdrops.
+        uint256 totalAssets;
+        address roleRegistry;
+        uint96 lastReport; // The last time a {report} was called.
+        // Strategy Status
+        bool shutdown; // Bool that can be used to stop deposits into the strategy.
+        string name; // The name of the token for the strategy.
         mapping(address => uint256) nonces; // Mapping of nonces used for permit functions.
         mapping(address => uint256) balances; // Mapping to track current balances for each account that holds shares.
         mapping(address => mapping(address => uint256)) allowances; // Mapping to track the allowances for the strategies shares.
         mapping(address => LockupInfo) voluntaryLockups; // Mapping allowing us to track lockups.
-        // We manually track `totalAssets` to prevent PPS manipulation through airdrops.
-        uint256 totalAssets;
-        address keeper; // Address given permission to call {report} and {tend}.
-        uint96 lastReport; // The last time a {report} was called.
-        // Access management variables.
-        address management; // Main address that can set all configurable variables.
-        address pendingManagement; // Address that is pending to take over `management`.
-        address emergencyAdmin; // Address to act in emergencies as well as `management`.
-        // Strategy Status
-        uint8 entered; // To prevent reentrancy. Use uint8 for gas savings.
-        bool shutdown; // Bool that can be used to stop deposits into the strategy.
     }
 
     address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE; // using this address to represent native ETH
@@ -135,29 +132,11 @@ contract TokenizedStrategy {
         _;
     }
 
-    /**
-     * @dev Require that the call is coming from the strategies management.
-     */
-    modifier onlyManagement() {
-        requireManagement(msg.sender);
-        _;
-    }
-
-    /**
-     * @dev Require that the call is coming from either the strategies
-     * management or the keeper.
-     */
-    modifier onlyKeepers() {
-        requireKeeperOrManagement(msg.sender);
-        _;
-    }
-
-    /**
-     * @dev Require that the call is coming from either the strategies
-     * management or the emergencyAdmin.
-     */
-    modifier onlyEmergencyAuthorized() {
-        requireEmergencyAuthorized(msg.sender);
+    modifier onlyRole(string memory _name) {
+        (bool success, bytes memory data) = _strategyStorage().roleRegistry.call(
+            abi.encodeWithSignature("hasRole(string,address)", _name, msg.sender)
+        );
+        require(success && abi.decode(data, (bool)), "Unauthorized");
         _;
     }
 
@@ -177,47 +156,6 @@ contract TokenizedStrategy {
 
         // Reset to false (1) once call has finished.
         S.entered = NOT_ENTERED;
-    }
-
-    /**
-     * @notice Require a caller is `management`.
-     * @dev Is left public so that it can be used by the Strategy.
-     *
-     * When the Strategy calls this the msg.sender would be the
-     * address of the strategy so we need to specify the sender.
-     *
-     * @param _sender The original msg.sender.
-     */
-    function requireManagement(address _sender) public view {
-        require(_sender == _strategyStorage().management, "!management");
-    }
-
-    /**
-     * @notice Require a caller is the `keeper` or `management`.
-     * @dev Is left public so that it can be used by the Strategy.
-     *
-     * When the Strategy calls this the msg.sender would be the
-     * address of the strategy so we need to specify the sender.
-     *
-     * @param _sender The original msg.sender.
-     */
-    function requireKeeperOrManagement(address _sender) public view {
-        StrategyData storage S = _strategyStorage();
-        require(_sender == S.keeper || _sender == S.management, "!keeper");
-    }
-
-    /**
-     * @notice Require a caller is the `management` or `emergencyAdmin`.
-     * @dev Is left public so that it can be used by the Strategy.
-     *
-     * When the Strategy calls this the msg.sender would be the
-     * address of the strategy so we need to specify the sender.
-     *
-     * @param _sender The original msg.sender.
-     */
-    function requireEmergencyAuthorized(address _sender) public view {
-        StrategyData storage S = _strategyStorage();
-        require(_sender == S.emergencyAdmin || _sender == S.management, "!emergency authorized");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -294,9 +232,8 @@ contract TokenizedStrategy {
         address _asset,
         string memory _name,
         address _owner,
-        address _management,
-        address _keeper,
-        address _dragonRouter
+        address _addressRegistry,
+        address _roleRegistry
     ) internal {
         // Cache storage pointer.
         StrategyData storage S = _strategyStorage();
@@ -308,7 +245,8 @@ contract TokenizedStrategy {
         S.asset = ERC20(_asset);
 
         S.owner = _owner;
-        S.dragonRouter = _dragonRouter;
+        S.addressRegistry = _addressRegistry;
+        S.roleRegistry = _roleRegistry;
 
         // Set the Strategy Tokens name.
         S.name = _name;
@@ -316,12 +254,6 @@ contract TokenizedStrategy {
         S.decimals = _asset == ETH ? 18 : ERC20(_asset).decimals();
 
         S.lastReport = uint96(block.timestamp);
-
-        // Set the default management address. Can't be 0.
-        require(_management != address(0), "ZERO ADDRESS");
-        S.management = _management;
-        // Set the keeper address
-        S.keeper = _keeper;
 
         // Emit event to signal a new strategy has been initialized.
         emit NewTokenizedStrategy(address(this), _asset, API_VERSION);
@@ -386,11 +318,11 @@ contract TokenizedStrategy {
      * @dev This will default to not allowing any loss to be taken.
      * @param assets The amount of underlying to withdraw.
      * @param receiver The address to receive `assets`.
-     * @param owner The address whose shares are burnt.
+     * @param _owner The address whose shares are burnt.
      * @return shares The actual amount of shares burnt.
      */
-    function withdraw(uint256 assets, address receiver, address owner) external returns (uint256 shares) {
-        return withdraw(assets, receiver, owner, 0);
+    function withdraw(uint256 assets, address receiver, address _owner) external returns (uint256 shares) {
+        return withdraw(assets, receiver, _owner, 0);
     }
 
     /**
@@ -399,24 +331,24 @@ contract TokenizedStrategy {
      * @dev This includes an added parameter to allow for losses.
      * @param assets The amount of underlying to withdraw.
      * @param receiver The address to receive `assets`.
-     * @param owner The address whose shares are burnt.
+     * @param _owner The address whose shares are burnt.
      * @param maxLoss The amount of acceptable loss in Basis points.
      * @return shares The actual amount of shares burnt.
      */
     function withdraw(
         uint256 assets,
         address receiver,
-        address owner,
+        address _owner,
         uint256 maxLoss
     ) public virtual nonReentrant returns (uint256 shares) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
-        require(assets <= _maxWithdraw(S, owner), "ERC4626: withdraw more than max");
+        require(assets <= _maxWithdraw(S, _owner), "ERC4626: withdraw more than max");
         // Check for rounding error or 0 value.
         require((shares = _convertToShares(S, assets, Math.Rounding.Ceil)) != 0, "ZERO_SHARES");
 
         // Withdraw and track the actual amount withdrawn for loss check.
-        _withdraw(S, receiver, owner, assets, shares, maxLoss);
+        _withdraw(S, receiver, _owner, assets, shares, maxLoss);
     }
 
     /**
@@ -425,12 +357,12 @@ contract TokenizedStrategy {
      * @dev This will default to allowing any loss passed to be realized.
      * @param shares The amount of shares burnt.
      * @param receiver The address to receive `assets`.
-     * @param owner The address whose shares are burnt.
+     * @param _owner The address whose shares are burnt.
      * @return assets The actual amount of underlying withdrawn.
      */
-    function redeem(uint256 shares, address receiver, address owner) external returns (uint256) {
+    function redeem(uint256 shares, address receiver, address _owner) external returns (uint256) {
         // We default to not limiting a potential loss.
-        return redeem(shares, receiver, owner, MAX_BPS);
+        return redeem(shares, receiver, _owner, MAX_BPS);
     }
 
     /**
@@ -439,25 +371,25 @@ contract TokenizedStrategy {
      * @dev This includes an added parameter to allow for losses.
      * @param shares The amount of shares burnt.
      * @param receiver The address to receive `assets`.
-     * @param owner The address whose shares are burnt.
+     * @param _owner The address whose shares are burnt.
      * @param maxLoss The amount of acceptable loss in Basis points.
      * @return . The actual amount of underlying withdrawn.
      */
     function redeem(
         uint256 shares,
         address receiver,
-        address owner,
+        address _owner,
         uint256 maxLoss
     ) public virtual nonReentrant returns (uint256) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
-        require(shares <= _maxRedeem(S, owner), "ERC4626: redeem more than max");
+        require(shares <= _maxRedeem(S, _owner), "ERC4626: redeem more than max");
         uint256 assets;
         // Check for rounding error or 0 value.
         require((assets = _convertToAssets(S, shares, Math.Rounding.Floor)) != 0, "ZERO_ASSETS");
 
         // We need to return the actual amount withdrawn in case of a loss.
-        return _withdraw(S, receiver, owner, assets, shares, maxLoss);
+        return _withdraw(S, receiver, _owner, assets, shares, maxLoss);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -597,11 +529,11 @@ contract TokenizedStrategy {
      * withdrawn from the strategy by `owner`, where `owner`
      * corresponds to the msg.sender of a {redeem} call.
      *
-     * @param owner The owner of the shares.
+     * @param _owner The owner of the shares.
      * @return _maxWithdraw Max amount of `asset` that can be withdrawn.
      */
-    function maxWithdraw(address owner) external view virtual returns (uint256) {
-        return _maxWithdraw(_strategyStorage(), owner);
+    function maxWithdraw(address _owner) external view virtual returns (uint256) {
+        return _maxWithdraw(_strategyStorage(), _owner);
     }
 
     /**
@@ -609,8 +541,8 @@ contract TokenizedStrategy {
      * @dev Accepts a `maxLoss` variable in order to match the multi
      * strategy vaults ABI.
      */
-    function maxWithdraw(address owner, uint256 /*maxLoss*/) external view virtual returns (uint256) {
-        return _maxWithdraw(_strategyStorage(), owner);
+    function maxWithdraw(address _owner, uint256 /*maxLoss*/) external view virtual returns (uint256) {
+        return _maxWithdraw(_strategyStorage(), _owner);
     }
 
     /**
@@ -618,11 +550,11 @@ contract TokenizedStrategy {
      * redeemed from the strategy by `owner`, where `owner`
      * corresponds to the msg.sender of a {redeem} call.
      *
-     * @param owner The owner of the shares.
+     * @param _owner The owner of the shares.
      * @return _maxRedeem Max amount of shares that can be redeemed.
      */
-    function maxRedeem(address owner) external view virtual returns (uint256) {
-        return _maxRedeem(_strategyStorage(), owner);
+    function maxRedeem(address _owner) external view virtual returns (uint256) {
+        return _maxRedeem(_strategyStorage(), _owner);
     }
 
     /**
@@ -630,8 +562,8 @@ contract TokenizedStrategy {
      * @dev Accepts a `maxLoss` variable in order to match the multi
      * strategy vaults ABI.
      */
-    function maxRedeem(address owner, uint256 /*maxLoss*/) external view virtual returns (uint256) {
-        return _maxRedeem(_strategyStorage(), owner);
+    function maxRedeem(address _owner, uint256 /*maxLoss*/) external view virtual returns (uint256) {
+        return _maxRedeem(_strategyStorage(), _owner);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -790,7 +722,7 @@ contract TokenizedStrategy {
     function _withdraw(
         StrategyData storage S,
         address receiver,
-        address owner,
+        address _owner,
         uint256 assets,
         uint256 shares,
         uint256 maxLoss
@@ -799,8 +731,8 @@ contract TokenizedStrategy {
         require(maxLoss <= MAX_BPS, "exceeds MAX_BPS");
 
         // Spend allowance if applicable.
-        if (msg.sender != owner) {
-            _spendAllowance(S, owner, msg.sender, shares);
+        if (msg.sender != _owner) {
+            _spendAllowance(S, _owner, msg.sender, shares);
         }
 
         // Cache `asset` since it is used multiple times..
@@ -836,7 +768,7 @@ contract TokenizedStrategy {
         // Update assets based on how much we took.
         S.totalAssets -= (assets + loss);
 
-        _burn(S, owner, shares);
+        _burn(S, _owner, shares);
 
         if (address(S.asset) == ETH) {
             (bool success, ) = receiver.call{ value: assets }("");
@@ -846,7 +778,7 @@ contract TokenizedStrategy {
             _asset.safeTransfer(receiver, assets);
         }
 
-        emit Withdraw(msg.sender, receiver, owner, assets, shares);
+        emit Withdraw(msg.sender, receiver, _owner, assets, shares);
 
         // Return the actual amount of assets withdrawn.
         return assets;
@@ -856,19 +788,22 @@ contract TokenizedStrategy {
                         PROFIT REPORTING
     //////////////////////////////////////////////////////////////*/
 
-    function report() external virtual nonReentrant onlyKeepers returns (uint256 profit, uint256 loss) {
+    function report() external virtual nonReentrant onlyRole("KEEPER") returns (uint256 profit, uint256 loss) {
         // Cache storage pointer since its used repeatedly.
         StrategyData storage S = _strategyStorage();
 
         uint256 _oldTotalAssets = S.totalAssets;
         uint256 _newTotalAssets = IBaseStrategy(address(this)).harvestAndReport();
+        
+        (, bytes memory data) = S.addressRegistry.call(abi.encodeWithSignature("getAddress(bytes32,address)", bytes32("DRAGON_ROUTER")));
+        address dragonRouter_ = abi.decode(data, (address));
 
         if (address(S.asset) == ETH) {
-            (bool success, ) = S.dragonRouter.call{ value: _newTotalAssets - _oldTotalAssets }("");
+            (bool success, ) = dragonRouter_.call{ value: _newTotalAssets - _oldTotalAssets }("");
             require(success, "Transfer Failed");
         } else {
             // Transfer the amount of underlying to the receiver.
-            S.asset.safeTransfer(S.dragonRouter, _newTotalAssets - _oldTotalAssets);
+            S.asset.safeTransfer(dragonRouter_, _newTotalAssets - _oldTotalAssets);
         }
 
         S.totalAssets = _newTotalAssets;
@@ -908,9 +843,9 @@ contract TokenizedStrategy {
      *
      * A report() call will be needed to record any profits or losses.
      */
-    function tend() external nonReentrant onlyKeepers {
-        ERC20 asset = _strategyStorage().asset;
-        uint256 balance = address(asset) == ETH ? address(this).balance : asset.balanceOf(address(this));
+    function tend() external onlyRole("KEEPER") nonReentrant {
+        ERC20 _asset = _strategyStorage().asset;
+        uint256 balance = address(_asset) == ETH ? address(this).balance : _asset.balanceOf(address(this));
         // Tend the strategy with the current loose balance.
         IBaseStrategy(address(this)).tendThis(balance);
     }
@@ -931,7 +866,7 @@ contract TokenizedStrategy {
      *
      * This is a one way switch and can never be set back once shutdown.
      */
-    function shutdownStrategy() external onlyEmergencyAuthorized {
+    function shutdownStrategy() external onlyRole("EMERGENCY_ADMIN") {
         _strategyStorage().shutdown = true;
 
         emit StrategyShutdown();
@@ -950,7 +885,7 @@ contract TokenizedStrategy {
      *
      * @param amount The amount of asset to attempt to free.
      */
-    function emergencyWithdraw(uint256 amount) external nonReentrant onlyEmergencyAuthorized {
+    function emergencyWithdraw(uint256 amount) external onlyRole("EMERGENCY_ADMIN") nonReentrant {
         // Make sure the strategy has been shutdown.
         require(_strategyStorage().shutdown, "not shutdown");
 
@@ -983,23 +918,15 @@ contract TokenizedStrategy {
      * @return . Address of management
      */
     function management() external view returns (address) {
-        return _strategyStorage().management;
-    }
-
-    /**
-     * @notice Get the current pending management address if any.
-     * @return . Address of pendingManagement
-     */
-    function pendingManagement() external view returns (address) {
-        return _strategyStorage().pendingManagement;
+        return IAddressRegistry(_strategyStorage().addressRegistry).getAddress(bytes32("MANAGEMENT"));
     }
 
     function owner() public view returns (address) {
         return _strategyStorage().owner;
     }
 
-    function dragonRouter() external view returns (address) {
-        return _strategyStorage().dragonRouter;
+    function dragonRouter() public view returns (address) {
+        return IAddressRegistry(_strategyStorage().addressRegistry).getAddress(bytes32("DRAGON_ROUTER"));
     }
 
     /**
@@ -1008,7 +935,7 @@ contract TokenizedStrategy {
      */
 
     function keeper() external view returns (address) {
-        return _strategyStorage().keeper;
+        return IAddressRegistry(_strategyStorage().addressRegistry).getAddress(bytes32("KEEPER"));
     }
 
     /**
@@ -1016,7 +943,7 @@ contract TokenizedStrategy {
      * @return . Address of the emergencyAdmin
      */
     function emergencyAdmin() external view returns (address) {
-        return _strategyStorage().emergencyAdmin;
+        return IAddressRegistry(_strategyStorage().addressRegistry).getAddress(bytes32("EMERGENCY_ADMIN"));
     }
 
     /**
@@ -1052,64 +979,10 @@ contract TokenizedStrategy {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Step one of two to set a new address to be in charge of the strategy.
-     * @dev Can only be called by the current `management`. The address is
-     * set to pending management and will then have to call {acceptManagement}
-     * in order for the 'management' to officially change.
-     *
-     * Cannot set `management` to address(0).
-     *
-     * @param _management New address to set `pendingManagement` to.
-     */
-    function setPendingManagement(address _management) external onlyManagement {
-        require(_management != address(0), "ZERO ADDRESS");
-        _strategyStorage().pendingManagement = _management;
-
-        emit UpdatePendingManagement(_management);
-    }
-
-    /**
-     * @notice Step two of two to set a new 'management' of the strategy.
-     * @dev Can only be called by the current `pendingManagement`.
-     */
-    function acceptManagement() external {
-        StrategyData storage S = _strategyStorage();
-        require(msg.sender == S.pendingManagement, "!pending");
-        S.management = msg.sender;
-        S.pendingManagement = address(0);
-
-        emit UpdateManagement(msg.sender);
-    }
-
-    /**
-     * @notice Sets a new address to be in charge of tend and reports.
-     * @dev Can only be called by the current `management`.
-     *
-     * @param _keeper New address to set `keeper` to.
-     */
-    function setKeeper(address _keeper) external onlyManagement {
-        _strategyStorage().keeper = _keeper;
-
-        emit UpdateKeeper(_keeper);
-    }
-
-    /**
-     * @notice Sets a new address to be able to shutdown the strategy.
-     * @dev Can only be called by the current `management`.
-     *
-     * @param _emergencyAdmin New address to set `emergencyAdmin` to.
-     */
-    function setEmergencyAdmin(address _emergencyAdmin) external onlyManagement {
-        _strategyStorage().emergencyAdmin = _emergencyAdmin;
-
-        emit UpdateEmergencyAdmin(_emergencyAdmin);
-    }
-
-    /**
      * @notice Updates the name for the strategy.
      * @param _name The new name for the strategy.
      */
-    function setName(string calldata _name) external virtual onlyManagement {
+    function setName(string calldata _name) external virtual onlyRole("MANAGEMENT") {
         _strategyStorage().name = _name;
     }
 
@@ -1182,17 +1055,17 @@ contract TokenizedStrategy {
      * zero by default.
      *
      * This value changes when {approve} or {transferFrom} are called.
-     * @param owner The address who owns the shares.
-     * @param spender The address who would be moving the owners shares.
-     * @return . The remaining amount of shares of `owner` that could be moved by `spender`.
+     * @param _owner The address who owns the shares.
+     * @param _spender The address who would be moving the owners shares.
+     * @return . The remaining amount of shares of `_owner` that could be moved by `_spender`.
      */
-    function allowance(address owner, address spender) external view returns (uint256) {
-        return _allowance(_strategyStorage(), owner, spender);
+    function allowance(address _owner, address _spender) external view returns (uint256) {
+        return _allowance(_strategyStorage(), _owner, _spender);
     }
 
     /// @dev Internal implementation of {allowance}.
-    function _allowance(StrategyData storage S, address owner, address spender) internal view returns (uint256) {
-        return S.allowances[owner][spender];
+    function _allowance(StrategyData storage S, address _owner, address _spender) internal view returns (uint256) {
+        return S.allowances[_owner][_spender];
     }
 
     /**
