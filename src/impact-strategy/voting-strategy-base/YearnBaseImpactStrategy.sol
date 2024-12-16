@@ -112,6 +112,23 @@ abstract contract YearnBaseImpactStrategy is YearnBaseStrategy {
      */
     function _tally(uint256 projectId) internal view virtual returns (uint256 projectShares, uint256 totalShares){}
 
+    /**
+     * @notice Finalizes the allocation of assets to a project
+     * @dev This function is called when the allocation is finalized and voting is closed
+     */
+    function _finalize() internal virtual{}
+
+    /**
+     * @notice Can convert assets to votes
+     * @dev This function is used to convert assets to votes, defaults to 1:1 conversion
+     * @param assets The amount of assets to convert
+     * @param _rounding The rounding mode
+     * @return The amount of votes
+     */
+    function _convertToVotes(uint256 assets, Math.Rounding _rounding) internal view virtual returns (uint256) {
+        return assets;
+    }
+
     /*//////////////////////////////////////////////////////////////
                         TokenizedStrategy HOOKS 
     //////////////////////////////////////////////////////////////*/
@@ -129,4 +146,12 @@ abstract contract YearnBaseImpactStrategy is YearnBaseStrategy {
     function tally(uint256 projectId) external view virtual onlySelf returns (uint256 projectShares, uint256 totalShares) {
         return _tally(projectId);
     }
+
+    /**
+     * @notice Can convert assets to votes
+     */
+    function convertToVotes(uint256 assets, Math.Rounding _rounding) external view virtual onlySelf returns (uint256) {
+        return _convertToVotes(assets, _rounding);
+    }
+    
 }
