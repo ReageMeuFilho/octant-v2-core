@@ -9,9 +9,12 @@ interface ISafe {
      * @param data Data payload of module transaction.
      * @param operation Operation type of module transaction.
      */
-    function execTransactionFromModule(address to, uint256 value, bytes memory data, uint8 operation)
-        external
-        returns (bool success);
+    function execTransactionFromModule(
+        address to,
+        uint256 value,
+        bytes memory data,
+        uint8 operation
+    ) external returns (bool success);
 
     /**
      * @notice Execute `operation` (0: Call, 1: DelegateCall) to `to` with `value` (Native Token) and return data
@@ -22,9 +25,12 @@ interface ISafe {
      * @return success Boolean flag indicating if the call succeeded.
      * @return returnData Data returned by the call.
      */
-    function execTransactionFromModuleReturnData(address to, uint256 value, bytes memory data, uint8 operation)
-        external
-        returns (bool success, bytes memory returnData);
+    function execTransactionFromModuleReturnData(
+        address to,
+        uint256 value,
+        bytes memory data,
+        uint8 operation
+    ) external returns (bool success, bytes memory returnData);
 
     /**
      * @dev Checks whether the signature provided is valid for the provided data, hash. Will revert otherwise.
@@ -47,10 +53,10 @@ interface ISafe {
      * @return array Array of modules.
      * @return next Start of the next page.
      */
-    function getModulesPaginated(address start, uint256 pageSize)
-        external
-        view
-        returns (address[] memory array, address next);
+    function getModulesPaginated(
+        address start,
+        uint256 pageSize
+    ) external view returns (address[] memory array, address next);
 
     /**
      * @notice Enables the module `module` for the Safe.

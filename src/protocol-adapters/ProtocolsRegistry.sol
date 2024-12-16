@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.23;
 
-import {IProtocolRegistry} from "../interfaces/IProtocolsRegistry.sol";
+import { IProtocolRegistry } from "../interfaces/IProtocolsRegistry.sol";
 
 /**
  * @author  .

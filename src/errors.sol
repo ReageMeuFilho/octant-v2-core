@@ -10,3 +10,13 @@ error PerformanceFeeDisabled();
 error MaxUnlockIsAlwaysZero();
 
 error CantWithdrawLockedShares();
+
+error ZeroLockupDuration();
+error InsufficientLockupDuration();
+error ZeroShares();
+error ZeroAssets();
+error DepositMoreThanMax();
+error MintMoreThanMax();
+error WithdrawMoreThanMax();
+error RedeemMoreThanMax();
+error SharesStillLocked();

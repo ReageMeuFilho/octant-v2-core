@@ -16,6 +16,8 @@ interface IBaseStrategy {
 
     function freeFunds(uint256 _amount) external;
 
+    function harvestTrigger() external view returns (bool);
+
     function harvestAndReport() external returns (uint256);
 
     function tendThis(uint256 _totalIdle) external;
@@ -23,4 +25,8 @@ interface IBaseStrategy {
     function shutdownWithdraw(uint256 _amount) external;
 
     function tendTrigger() external view returns (bool, bytes memory);
+
+    function adjustPosition(uint256 _debtOutstanding) external;
+
+    function liquidatePosition(uint256 _amountNeeded) external returns (uint256 _liquidatedAmount, uint256 _loss);
 }

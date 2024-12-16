@@ -92,7 +92,6 @@ contract BaseStrategyTest is BaseTest {
         vm.startPrank(temps.safe);
 
         assertTrue(module.availableWithdrawLimit(temps.safe) == type(uint256).max);
-
         assertTrue(ITokenizedStrategy(address(module)).balanceOf(temps.safe) == amount);
         assertTrue(address(yieldSource).balance == amount);
         ITokenizedStrategy(address(module)).withdraw(withdrawAmount, temps.safe, temps.safe, type(uint256).max);
@@ -109,7 +108,6 @@ contract BaseStrategyTest is BaseTest {
         // deposit funds in the strategy
         uint256 amount = 1 ether;
         _deposit(amount);
-
         // should return false if strategy has funds but report has been called recently
         assertTrue(!module.harvestTrigger());
 
@@ -139,6 +137,7 @@ contract BaseStrategyTest is BaseTest {
         ITokenizedStrategy(address(module)).tend();
 
         vm.startPrank(keeper);
+
 
         uint256 idleFunds = 1 ether;
         vm.deal(address(module), idleFunds);
