@@ -46,13 +46,15 @@ contract Trader is ITransformer, Ownable, Pausable {
                           PRIVATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
+    /// @dev Uniswap path between base and quote tokens, includes pool provision.
     bytes private uniPath;
+    /// @dev Base-to-quote pair encoded for price oracle used by splits.
     QuotePair private splitsPair;
-    IUniV3OracleImpl.SetPairDetailParams[] private oraclePairDetails;
-    OracleParams private oracleParams;
+    /// @dev Price oracle used by splits to make sure that Trader gets fair price.
     IOracle private oracle;
-    ISwapperImpl.SetPairScaledOfferFactorParams[] private pairScaledOfferFactors;
+    /// @dev Parameters for the swap.
     ISwapRouter.ExactInputParams[] private exactInputParams;
+    /// @dev Parameters for the oracle.
     QuoteParams[] private quoteParams;
 
     /*//////////////////////////////////////////////////////////////
@@ -91,7 +93,8 @@ contract Trader is ITransformer, Ownable, Pausable {
 
     event Traded(uint256 sold, uint256 left);
     event SwapperChanged(address oldSwapper, address newSwapper);
-    event SpendingChanged(address base, address quote, uint256 budget, uint256 deadline);
+    event SpendingChanged(uint256 low, uint256 high, uint256 spent, uint256 budget);
+    event PeriodsChanged(uint256 height, uint256 length, uint256 deadline);
 
     /*//////////////////////////////////////////////////////////////
                             CUSTOM ERRORS
@@ -343,8 +346,8 @@ contract Trader is ITransformer, Ownable, Pausable {
         saleValueHigh = high_;
         budget = budget_;
         if (spent > budget) spent = budget;
-        deadline = nextDeadline();
         _sanityCheck();
+        emit SpendingChanged(low_, high_, spent, budget);
     }
 
     /// @notice Configures spending periods. Budget needs to be fully spend before the end of each period.
@@ -357,6 +360,7 @@ contract Trader is ITransformer, Ownable, Pausable {
         if (budget > 0) {
             _sanityCheck();
         }
+        emit PeriodsChanged(height_, length_, deadline);
     }
 
     function emergencyStop(bool enable) external onlyOwner {
@@ -372,8 +376,8 @@ contract Trader is ITransformer, Ownable, Pausable {
     /// @notice Set address of the contract that will receive token (base) to be converted to target token (quote).
     /// @param swapper_ address of the contract handling the swapping.
     function setSwapper(address swapper_) external onlyOwner {
-        emit SwapperChanged(swapper, swapper_);
         swapper = payable(swapper_);
+        emit SwapperChanged(swapper, swapper_);
     }
 
     /// @notice Returns upper bound of number of blocks enough to sold remaining budget.
