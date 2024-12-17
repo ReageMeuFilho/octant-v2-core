@@ -36,7 +36,7 @@ contract TraderStatus is Script, Test {
         uint256 spent = trader.spent();
         emit log_named_decimal_uint("Spent (ETH)", spent, 18);
 
-        uint256 height = block.number - trader.startingBlock();
+        uint256 height = block.number - trader.spentResetBlock();
         emit log_named_uint("Configured for (blocks)", height);
 
         WETH weth = WETH(payable(wethToken));
@@ -44,8 +44,9 @@ contract TraderStatus is Script, Test {
         emit log_named_decimal_uint("Contract balance (ETH)", traderAddress.balance, 18);
         emit log_named_decimal_uint("Contract balance (WETH)", weth.balanceOf(traderAddress), 18);
 
-        int256 spendable =
-            int256((block.number - trader.startingBlock()) * (trader.spendADay() / trader.blocksADay())) - int256(spent);
+        int256 spendable = int256(
+            (block.number - trader.spentResetBlock()) * (trader.spendADay() / trader.blocksADay())
+        ) - int256(spent);
         emit log_named_decimal_int("Spendable (ETH)", spendable, 18);
 
         emit log_named_decimal_uint("Min trade (ETH)", trader.saleValueLow(), 18);

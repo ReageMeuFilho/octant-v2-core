@@ -139,7 +139,8 @@ contract TestTraderIntegrationETH is BaseTest {
         uint256 fakeBudget = 1 ether;
 
         vm.startPrank(temps.safe);
-        trader.setSpending(0.5 ether, 1.5 ether, fakeBudget, block.number + 101);
+        trader.configurePeriod(block.number, 101);
+        trader.setSpending(0.5 ether, 1.5 ether, fakeBudget);
         vm.stopPrank();
 
         vm.roll(block.number + 100);
@@ -167,7 +168,8 @@ contract TestTraderIntegrationETH is BaseTest {
         vm.deal(address(trader), 2 ether);
 
         vm.startPrank(temps.safe);
-        trader.setSpending(1 ether, 1 ether, fakeBudget, block.number + 101);
+        trader.configurePeriod(block.number, 101);
+        trader.setSpending(1 ether, 1 ether, fakeBudget);
         vm.stopPrank();
 
         uint256 oldBalance = swapper.balance;

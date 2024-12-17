@@ -29,7 +29,6 @@ contract BaseTest is Test, TestPlus {
 
     function _configure(bool _useFork) internal {
         if (_useFork) {
-            emit log_named_string("TEST_RPC_URL", TEST_RPC_URL);
             fork = vm.createFork(TEST_RPC_URL);
             vm.selectFork(fork);
         } else {
