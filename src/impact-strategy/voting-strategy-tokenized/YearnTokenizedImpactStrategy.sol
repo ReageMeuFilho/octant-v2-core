@@ -188,10 +188,14 @@ contract YearnTokenizedImpactStrategy is YearnTokenizedStrategy {
     }
 
     /// @dev Internal implementation of {totalSupply}.
+    /// @notice Returns totalShares if finalized, otherwise returns zero
+    /// @dev Returns totalShares if finalized, otherwise returns totalAssets
+    /// @dev totalShares is capped at type(uint256).max to prevent overflow
     function _totalSupply(
         StrategyData storage S
     ) internal view override returns (uint256) {
-        return S.totalShares;
+        // If finalized, return totalShares capped at max uint256, otherwise return totalAssets
+        return S.finalized ? S.finalizedTotalShares : 0;
     }
     
     /// @dev Internal implementation of {convertToShares}.
@@ -294,9 +298,7 @@ contract YearnTokenizedImpactStrategy is YearnTokenizedStrategy {
         address to,
         uint256 amount
     ) internal override {
-        require(from != address(0), "ERC20: transfer from the zero address");
-        require(to != address(0), "ERC20: transfer to the zero address");
-        require(to != address(this), "ERC20 transfer to strategy");
+        require(false, "cannot transfer shares");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -352,6 +354,7 @@ contract YearnTokenizedImpactStrategy is YearnTokenizedStrategy {
         uint256 shares,
         uint256 maxLoss
     ) internal returns (uint256) {
+        require(S.finalizedTally, "tally not finalized");
         require(receiver != address(0), "ZERO ADDRESS");
         require(maxLoss <= MAX_BPS, "exceeds MAX_BPS");
 
@@ -387,6 +390,7 @@ contract YearnTokenizedImpactStrategy is YearnTokenizedStrategy {
         address account,
         uint256 votes
     ) internal {
+        require(!S.finalizedTally, "tally finalized");
         require(account != address(0), "ZERO ADDRESS");
         S.totalVotingPower += votes;
         unchecked {
@@ -426,6 +430,7 @@ contract YearnTokenizedImpactStrategy is YearnTokenizedStrategy {
         address account,
         uint256 amount
     ) internal override {
+        require(!S.finalizedTally, "tally finalized");
         require(account != address(0), "ERC20: mint to the zero address");
 
         S.totalSupply += amount;
@@ -466,7 +471,7 @@ contract YearnTokenizedImpactStrategy is YearnTokenizedStrategy {
 
     /**
      * @notice Process a vote for a project with a contribution amount and vote weight
-     * @dev This function validates and processes votes according to the quadratic funding formula
+     * @dev This function validates and processes votes according to the implemented formula
      * @dev Must check that the voteWeight is appropriate for the contribution amount in _processVote
      * @dev Must check if the user can vote in _processVote
      * @dev Must check if the project exists in _processVote
@@ -475,7 +480,7 @@ contract YearnTokenizedImpactStrategy is YearnTokenizedStrategy {
      *
      * @param projectId The ID of the project being voted for
      * @param contribution The amount being contributed to the project
-     * @param voteWeight The square root of the contribution amount (within 10% tolerance)
+     * @param voteWeight the weight of the vote, must be checked in _processVote by strategist
      */
     function vote(uint256 projectId, uint256 contribution, uint256 voteWeight) external nonReentrant {
 
@@ -497,8 +502,15 @@ contract YearnTokenizedImpactStrategy is YearnTokenizedStrategy {
      * @return projectShares The total shares allocated to this project
      * @return totalShares The total shares across all projects
      */
-    function tally(uint256 projectId) internal view returns (uint256 projectShares, uint256 totalShares) {
+    function projectTally(uint256 projectId) external view returns (uint256 projectShares, uint256 totalShares) {
         return IBaseImpactStrategy(address(this)).tally(projectId);
+    }
+
+        /// @notice finalize the tally by assigning the totalShares to the totalAssets and setting the finalizedTally to true
+    function finalizeTally(uint256 totalShares) external onlyManagement() {
+        uint256 finalizedTotalShares = IBaseImpactStrategy(address(this)).finalize(totalShares);
+        _strategyStorage().finalizedTotalShares = totalShares;
+        _strategyStorage().finalizedTally = true;
     }
 
     /*//////////////////////////////////////////////////////////////
