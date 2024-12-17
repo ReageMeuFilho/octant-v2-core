@@ -1,29 +1,29 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.23;
 
-import "solady/src/auth/Ownable.sol";
-import "solady/src/utils/SafeCastLib.sol";
-import "solady/src/utils/FixedPointMathLib.sol";
+import {Ownable} from "solady/src/auth/Ownable.sol";
+import {SafeCastLib} from "solady/src/utils/SafeCastLib.sol";
+import {FixedPointMathLib} from "solady/src/utils/FixedPointMathLib.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Enum} from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
-
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {ITransformer} from "../interfaces/ITransformer.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 
-// initFlash
 import {CreateOracleParams, IOracleFactory, IOracle, OracleParams} from "../../src/vendor/0xSplits/OracleParams.sol";
 import {QuotePair, QuoteParams} from "../../src/vendor/0xSplits/LibQuotes.sol";
 import {OracleParams} from "../vendor/0xSplits/OracleParams.sol";
+import {UniV3Swap} from "../../src/vendor/0xSplits/UniV3Swap.sol";
+
+import {ITransformer} from "../interfaces/ITransformer.sol";
 import {IUniV3OracleImpl} from "../../src/vendor/0xSplits/IUniV3OracleImpl.sol";
 import {ISwapperImpl} from "../../src/vendor/0xSplits/SwapperImpl.sol";
 import {ISwapRouter} from "../../src/vendor/uniswap/ISwapRouter.sol";
-import {UniV3Swap} from "../../src/vendor/0xSplits/UniV3Swap.sol";
 
 /// @author .
 /// @title Octant Trader
 /// @notice Octant Trader is a contract that performs "DCA" in terms of sold token into another token.
 /// @dev this contract performs trades in a random times, isolating the deployer from risks of insider trading.
-contract Trader is ITransformer, Ownable {
+contract Trader is ITransformer, Ownable, Pausable {
     using SafeERC20 for IERC20;
     using FixedPointMathLib for uint256;
 
@@ -32,19 +32,28 @@ contract Trader is ITransformer, Ownable {
     //////////////////////////////////////////////////////////////*/
 
     uint256 public constant blocksADay = 7200;
-
     /// @notice Address used to represent native ETH.
     address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
-
     /// @notice Address of WETH wrapper
     address public wethAddress;
-
     /// @notice Token to be sold.
     address public base;
-
     /// @notice Token to be bought.
     /// @dev Please note that contract that deals with quote token is the `swapper`. Here value of `quote` is purely informational.
-    address public quote;
+    address public quote; 
+
+    /*//////////////////////////////////////////////////////////////
+                          PRIVATE VARIABLES
+    //////////////////////////////////////////////////////////////*/
+    
+    bytes private uniPath;
+    QuotePair private splitsPair;
+    IUniV3OracleImpl.SetPairDetailParams[] private oraclePairDetails;
+    OracleParams private oracleParams;
+    IOracle private oracle;
+    ISwapperImpl.SetPairScaledOfferFactorParams[] private pairScaledOfferFactors;
+    ISwapRouter.ExactInputParams[] private exactInputParams;
+    QuoteParams[] private quoteParams;
 
     /*//////////////////////////////////////////////////////////////
                           STATE VARIABLES
@@ -52,44 +61,29 @@ contract Trader is ITransformer, Ownable {
 
     /// @notice Swapper is the address which will handle actual selling.
     address public swapper;
-
     /// @notice Account that initializes the swapping.
     address public uniV3Swap;
-
     /// @notice Beneficiary will receive quote token after the sale of base token.
     address public beneficiary;
-
-    /// @notice Deadline for all of budget to be sold.
-    uint256 public deadline = block.number;
-
+    /// @notice `budget` needs to be spend before the end of the period (in blocks).
+    uint256 public periodLength;
     /// @notice Total token to be spent before deadline.
-    uint256 public budget = 0;
-
-    /// @notice Spent token since startingBlock.
-    uint256 public spent = 0;
-
+    uint256 public budget;
+    /// @notice Spent token since spentResetBlock.
+    uint256 public spent;
+    /// @notice Current deadline (defined by periodZero and periodLength).
+    uint256 public deadline;
     /// @notice Rules for spending were last updated at this height.
-    uint256 public startingBlock = block.number;
-
+    uint256 public spentResetBlock = block.number;
+    /// @notice Block which starts the periods.
+    uint256 public periodZero = block.number;
     /// @notice Lowest allowed size of a sale.
     uint256 public saleValueLow;
-
     /// @notice Highest allowed size of a sale.
     /// @dev Technically, this value minus one wei.
     uint256 public saleValueHigh;
-
     /// @notice Height of block hash used as a last source of randomness.
     uint256 public lastHeight;
-
-    /// private vars
-    bytes uniPath;
-    QuotePair splitsPair;
-    IUniV3OracleImpl.SetPairDetailParams[] oraclePairDetails;
-    OracleParams oracleParams;
-    IOracle oracle;
-    ISwapperImpl.SetPairScaledOfferFactorParams[] pairScaledOfferFactors;
-    ISwapRouter.ExactInputParams[] exactInputParams;
-    QuoteParams[] quoteParams;
 
     /*//////////////////////////////////////////////////////////////
                                EVENTS
@@ -126,9 +120,6 @@ contract Trader is ITransformer, Ownable {
 
     /// @notice Configuration parameters are impossible: saleValueLow is too low to allow to sale budget before deadline.
     error Trader__ImpossibleConfigurationSaleValueLowIsTooLow();
-
-    /// @notice It is past deadline. Configure Trader with updated deadline first.
-    error Trader__PastDeadline();
 
     /// @notice All of budget is already spent.
     error Trader__BudgetSpent();
@@ -243,10 +234,14 @@ contract Trader is ITransformer, Ownable {
     /// @notice Transfers funds that are to be converted by to target token by external converter.
     /// @param height that will be used as a source of randomness. One height value can be used only once.
     /// @return amount of base token that is transfered to the swapper.
-    function convert(uint256 height) public returns (uint256) {
-        if (budget == spent) revert Trader__BudgetSpent();
+    function convert(uint256 height) public whenNotPaused returns (uint256) {
+        if (deadline < block.number) {
+            deadline = nextDeadline();
+            spent = 0;
+            spentResetBlock = deadline - periodLength;
+        }
 
-        if (deadline < block.number) revert Trader__PastDeadline();
+        if (budget == spent) revert Trader__BudgetSpent();
 
         // handle randomness
         uint256 rand = getRandomNumber(height);
@@ -278,6 +273,15 @@ contract Trader is ITransformer, Ownable {
 
         emit Traded(saleValue, balance - saleValue);
         return saleValue;
+    }
+
+    /// @dev Compute next deadline. If cached deadline (`deadline`) differs, `spent` needs to be reset.
+    function nextDeadline() public view returns (uint256) {
+        uint256 nextPeriodNo = (block.number - periodZero).divUp(periodLength);
+        if (nextPeriodNo == (block.number - periodZero) / periodLength) {
+            nextPeriodNo = nextPeriodNo + 1;
+        }
+        return periodZero + (periodLength * nextPeriodNo);
     }
 
     /// @dev Returns sale value, in a range from [saleValueLow, saleValueHigh).
@@ -321,24 +325,42 @@ contract Trader is ITransformer, Ownable {
 
     /// @dev Returns true if mechanism is overspending. This may happen because randomness. Prevents mechanism from spending too much in a case of attack by a block producer.
     function hasOverspent(uint256 height) public view returns (bool) {
-        if (height < startingBlock) return true;
-        return (spent > (height - startingBlock) * (budget / (deadline - startingBlock)));
+        if (height < spentResetBlock) return true;
+        return (spent > (height - spentResetBlock) * (budget / (deadline - spentResetBlock)));
     }
 
     /// @notice Sets spending limits.
     /// @param low_ is a lower bound of sold token (in wei) for a single trade
     /// @param high_ is a higher bound of sold token (in wei) for a single trade
     /// @param budget_ sets amount of token (in wei) to be sold before deadline block height
-    /// @param deadline_ sets deadline block height
-    function setSpending(uint256 low_, uint256 high_, uint256 budget_, uint256 deadline_) public onlyOwner {
-        startingBlock = block.number;
+    function setSpending(uint256 low_, uint256 high_, uint256 budget_) public onlyOwner {
         lastHeight = block.number;
-        spent = 0;
         saleValueLow = low_;
         saleValueHigh = high_;
-        deadline = deadline_;
         budget = budget_;
-        if (deadline <= block.number) revert Trader__ImpossibleConfigurationDeadlineInThePast();
+        if (spent > budget) spent = budget;
+        deadline = nextDeadline();
+        _sanityCheck();
+    }
+
+    /// @notice Configures spending periods. Budget needs to be fully spend before the end of each period.
+    /// @param length_ is length of a period in blocks.
+    /// @param height_ is a block height remarking the beginning of a period.
+    function configurePeriod(uint256 height_, uint256 length_) public onlyOwner {
+        periodZero = height_;
+        periodLength = length_;
+        deadline = nextDeadline();
+        if (budget > 0) {
+            _sanityCheck();
+        }
+    }
+
+    function emergencyStop(bool enable) external onlyOwner {
+        if (enable) _pause();
+        else _unpause();
+    }
+
+    function _sanityCheck() private view {
         if (saleValueLow == 0) revert Trader__ImpossibleConfigurationSaleValueLowIsZero();
         if (getSafetyBlocks() > (deadline - block.number)) revert Trader__ImpossibleConfigurationSaleValueLowIsTooLow();
     }
@@ -350,8 +372,8 @@ contract Trader is ITransformer, Ownable {
         swapper = payable(swapper_);
     }
 
-    /// @notice Returns how many blocks are necessary in the worst case to sold remaining budget.
-    /// @dev Please note that the worst case each trade amount will be `saleValueLow`.
+    /// @notice Returns upper bound of number of blocks enough to sold remaining budget.
+    /// @dev Please note that in the worst case each trade amount will be `saleValueLow`.
     function getSafetyBlocks() public view returns (uint256) {
         return (budget - spent).divUp(saleValueLow);
     }
@@ -379,7 +401,7 @@ contract Trader is ITransformer, Ownable {
     /// @return Average amount of token in wei to be sold in 24 hours.
     /// @dev This reads configuration parameters, not current state of swapping process, which may diverge because of randomness.
     function spendADay() external view returns (uint256) {
-        return (budget / (deadline - startingBlock)) * blocksADay;
+        return (budget / (deadline - spentResetBlock)) * blocksADay;
     }
 
     /// @notice Get random value for particular blockchain height.

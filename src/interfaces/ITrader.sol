@@ -2,7 +2,7 @@
 pragma solidity >=0.8.18;
 
 interface ITrader {
-    function setSpending(uint256 _low, uint256 _high, uint256 _budget, uint256 _deadline) external;
+    function setSpending(uint256 _low, uint256 _high, uint256 _budget) external;
     function convert(uint256 _height) external;
     function setSwapper(address _swapper) external;
 
