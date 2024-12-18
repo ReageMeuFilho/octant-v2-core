@@ -23,6 +23,7 @@ contract TestTraderIntegrationETH is BaseTest {
     testTemps temps;
     Trader public moduleImplementation;
     Trader public trader;
+    address public glmAddress;
 
     address public swapper;
 
@@ -34,12 +35,12 @@ contract TestTraderIntegrationETH is BaseTest {
     IOracle oracle;
     ISwapperImpl.SetPairScaledOfferFactorParams[] pairScaledOfferFactors;
     ISwapRouter.ExactInputParams[] exactInputParams;
-    QuotePair ethGLM;
+    QuotePair fromTo;
     QuoteParams[] quoteParams;
-    address glmAddress;
+    address baseAddress;
+    address quoteAddress;
     address wethAddress;
     address beneficiary;
-    address tokenToBeneficiary;
     uint32 defaultScaledOfferFactor = 99_00_00; // TODO: check if represents 1% MEV reward to searchers?
 
     function setUp() public {
@@ -48,18 +49,21 @@ contract TestTraderIntegrationETH is BaseTest {
         (address glmToken, address wethToken,,,,,,,, address uniV3Swap) = helperConfig.activeNetworkConfig();
 
         glmAddress = glmToken;
+
         wethAddress = wethToken;
-
-        initializer = UniV3Swap(payable(uniV3Swap));
-
         beneficiary = address(this); // FIXME
-        tokenToBeneficiary = glmToken;
-        swapper = deploySwapper();
-        moduleImplementation = new Trader();
+        initializer = UniV3Swap(payable(uniV3Swap));
+    }
 
+    function configureTrader(address _base, address _quote) public {
+        baseAddress = _base;
+        quoteAddress = _quote;
+        swapper = deploySwapper();
+
+        moduleImplementation = new Trader();
         temps = _testTemps(
             address(moduleImplementation),
-            abi.encode(ETH, glmAddress, wethToken, beneficiary, swapper, uniV3Swap, oracle)
+            abi.encode(baseAddress, quoteAddress, wethAddress, beneficiary, swapper, address(initializer), oracle)
         );
         trader = Trader(payable(temps.module));
     }
@@ -78,7 +82,7 @@ contract TestTraderIntegrationETH is BaseTest {
             owner: temps.safe,
             paused: false,
             beneficiary: beneficiary,
-            tokenToBeneficiary: tokenToBeneficiary,
+            tokenToBeneficiary: quoteAddress,
             oracleParams: oracleParams,
             defaultScaledOfferFactor: defaultScaledOfferFactor,
             pairScaledOfferFactors: pairScaledOfferFactors
@@ -87,20 +91,19 @@ contract TestTraderIntegrationETH is BaseTest {
 
     function deploySwapper() public returns (address) {
         helperConfig = new HelperConfig(true);
-        (address glmToken,,,,, address glmPool,, address swapperFactoryAddress, address oracleFactoryAddress,) =
+        (,,,,, address glmPool,, address swapperFactoryAddress, address oracleFactoryAddress,) =
             helperConfig.activeNetworkConfig();
         IOracleFactory oracleFactory = IOracleFactory(oracleFactoryAddress);
         ISwapperFactory swapperFactory = ISwapperFactory(swapperFactoryAddress);
 
-        address ethAddress = address(0); // address that represents native ETH in Splits Oracle system
-        ethGLM = QuotePair({base: ethAddress, quote: glmToken});
+        fromTo = QuotePair({base: splitsEthWrapper(baseAddress), quote: splitsEthWrapper(quoteAddress)});
 
         delete oraclePairDetails;
         oraclePairDetails.push(
             IUniV3OracleImpl.SetPairDetailParams({
-                quotePair: ethGLM,
+                quotePair: fromTo,
                 pairDetail: IUniV3OracleImpl.PairDetail({
-                    pool: glmPool,
+                    pool: glmPool, //FIXME
                     period: 0 // no override
                 })
             })
@@ -109,7 +112,7 @@ contract TestTraderIntegrationETH is BaseTest {
         delete pairScaledOfferFactors;
         pairScaledOfferFactors.push(
             ISwapperImpl.SetPairScaledOfferFactorParams({
-                quotePair: ethGLM,
+                quotePair: fromTo,
                 scaledOfferFactor: 98_00_00 // TODO: What this "no discount" refers to exactly? What value should be here?
             })
         );
@@ -126,15 +129,27 @@ contract TestTraderIntegrationETH is BaseTest {
         return clone;
     }
 
-    function testCheckModuleInitialization() public view {
-        assertTrue(trader.owner() == temps.safe);
-        assertTrue(trader.swapper() == swapper);
+    function uniEthWrapper(address token) private view returns (address) {
+        if (token == ETH) return wethAddress;
+        else return token;
+    }
+
+    function splitsEthWrapper(address token) private pure returns (address) {
+        if (token == ETH) return address(0x0);
+        else return token;
     }
 
     receive() external payable {}
 
+    function testCheckModuleInitialization() public {
+        configureTrader(ETH, glmAddress);
+        assertTrue(trader.owner() == temps.safe);
+        assertTrue(trader.swapper() == swapper);
+    }
+
     function test_transform() external {
-        assert(IERC20(glmAddress).balanceOf(trader.beneficiary()) == 0);
+        configureTrader(ETH, glmAddress);
+        assert(IERC20(quoteAddress).balanceOf(trader.beneficiary()) == 0);
         // effectively disable upper bound check and randomness check
         uint256 fakeBudget = 1 ether;
 
@@ -157,12 +172,14 @@ contract TestTraderIntegrationETH is BaseTest {
         );
 
         uint256 amountToBeneficiary = trader.transform{value: saleValue}(trader.base(), trader.quote(), saleValue);
-        assert(IERC20(glmAddress).balanceOf(trader.beneficiary()) > 0);
-        assert(IERC20(glmAddress).balanceOf(trader.beneficiary()) == amountToBeneficiary);
+        assert(IERC20(quoteAddress).balanceOf(trader.beneficiary()) > 0);
+        assert(IERC20(quoteAddress).balanceOf(trader.beneficiary()) == amountToBeneficiary);
         emit log_named_uint("GLM price on Trader.transform(...)", amountToBeneficiary / saleValue);
     }
 
     function test_sellEth() external {
+        configureTrader(ETH, glmAddress);
+
         // effectively disable upper bound check and randomness check
         uint256 fakeBudget = 1 ether;
         vm.deal(address(trader), 2 ether);
@@ -187,14 +204,14 @@ contract TestTraderIntegrationETH is BaseTest {
             abi.encode(unscaledAmountsToBeneficiary)
         );
 
-        uint256 oldGlmBalance = IERC20(glmAddress).balanceOf(address(this));
+        uint256 oldGlmBalance = IERC20(quoteAddress).balanceOf(address(this));
 
         // now, do the actual swap
 
         delete exactInputParams;
         exactInputParams.push(
             ISwapRouter.ExactInputParams({
-                path: abi.encodePacked(wethAddress, uint24(10_000), glmAddress),
+                path: abi.encodePacked(wethAddress, uint24(10_000), quoteAddress), // FIXME with wrapper function
                 recipient: address(initializer),
                 deadline: block.timestamp + 100,
                 amountIn: uint256(swapper.balance),
@@ -204,7 +221,7 @@ contract TestTraderIntegrationETH is BaseTest {
 
         delete quoteParams;
         quoteParams.push(
-            QuoteParams({quotePair: ethGLM, baseAmount: uint128(swapper.balance), data: abi.encode(exactInputParams)})
+            QuoteParams({quotePair: fromTo, baseAmount: uint128(swapper.balance), data: abi.encode(exactInputParams)})
         );
         UniV3Swap.FlashCallbackData memory data =
             UniV3Swap.FlashCallbackData({exactInputParams: exactInputParams, excessRecipient: address(oracle)});
@@ -212,8 +229,8 @@ contract TestTraderIntegrationETH is BaseTest {
             UniV3Swap.InitFlashParams({quoteParams: quoteParams, flashCallbackData: data});
         initializer.initFlash(ISwapperImpl(swapper), params);
 
-        // check if beneficiary received some GLM
-        uint256 newGlmBalance = IERC20(glmAddress).balanceOf(address(this));
+        // check if beneficiary received some quote token
+        uint256 newGlmBalance = IERC20(quoteAddress).balanceOf(address(this));
         assertGt(newGlmBalance, oldGlmBalance);
     }
 
