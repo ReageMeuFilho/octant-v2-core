@@ -21,4 +21,6 @@ interface IBaseImpactStrategy {
     function processVote(uint256 projectId, uint256 contribution, uint256 voteWeight) external;
 
     function tally(uint256 projectId) external view returns (uint256 projectShares, uint256 totalShares);
+
+    function finalize(uint256 totalShares) external view returns (uint256 finalizedTotalShares);
 }
