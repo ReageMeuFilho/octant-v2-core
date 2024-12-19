@@ -24,7 +24,7 @@ import {IBaseImpactStrategy} from "src/interfaces/IBaseImpactStrategy.sol";
  *  focused entirely on the strategy specific needs to easily and cheaply
  *  deploy their own permissionless 4626 compliant vault.
  */
-contract YearnTokenizedStrategy {
+contract TokenizedStrategy {
     using Math for uint256;
     using SafeERC20 for ERC20;
 

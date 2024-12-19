@@ -1,8 +1,8 @@
-# YearnTokenizedStrategy.sol
+# TokenizedStrategy.sol
 
 ## High-Level Overview
 
-YearnTokenizedStrategy is a foundational contract that borrows heavily from Yearn's tokenized vault strategy pattern. It provides the core infrastructure for psuedo-ERC4626-compliant tokenized vaults with additional features for strategy-specific implementations. The contract serves as the base layer for more specialized strategies like YearnTokenizedImpactStrategy with the goal here being able to reuse as much of the logic as possible. Unlike traditional Yearn ERC4626 vaults, this contract uses a unique storage pattern and implements custom transfer restrictions.
+TokenizedStrategy is a foundational contract that borrows heavily from Yearn's tokenized vault strategy pattern. It provides the core infrastructure for psuedo-ERC4626-compliant tokenized vaults with additional features for strategy-specific implementations. The contract serves as the base layer for more specialized strategies like YearnTokenizedImpactStrategy with the goal here being able to reuse as much of the logic as possible. Unlike traditional Yearn ERC4626 vaults, this contract uses a unique storage pattern and implements custom transfer restrictions.
 
 The contract's architecture utilizes:
 
@@ -85,7 +85,7 @@ The contract provides these foundational functions:
 
 ## Inherited By
 
-### YearnTokenizedImpactStrategy:
+### TokenizedImpactStrategy:
 - Extends base functionality with voting mechanics
 - Adds project funding distribution
 - Implements specialized share accounting

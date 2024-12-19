@@ -1,11 +1,11 @@
-# YearnTokenizedImpactStrategy.sol
+# TokenizedImpactStrategy.sol
 
 # High-Level Overview
 
 YearnTokenizedImpactStrategy is a specialized implementation of Yearn's TokenizedStrategy that enables different types of funding for impact projects. It combines ERC4626-compliant tokenized vault functionality with voting mechanics to allow depositors to allocate their voting power to different impact projects.
 
 The contract's architecture separates three key concerns:
-1. Asset management (inherited from YearnTokenizedStrategy)
+1. Asset management (inherited from TokenizedStrategy)
 2. Voting power allocation (unique to an implementation)
 3. Share distribution (immutable once finalized)
 
@@ -18,7 +18,7 @@ The contract implements a two-phase system: deposit/voting phase and redemption 
    - Voting power can be used to support projects through the implemented voting strategy
    - Votes are processed and tracked until tally finalization
    - Security measures prevent double voting and ensure proper vote weight calculation
-
+ vfr4
 2. **Share Distribution System**:
    - After voting period ends, management finalizes the tally
    - Project shares are calculated based on the voting tally and implemented strategy
@@ -47,7 +47,7 @@ The contract provides the following main functions:
 
 ## Inherited Contracts
 
-- **[YearnTokenizedStrategy](./YearnTokenizedStrategy.sol)**: Base implementation of Yearn's tokenized vault strategy
+- **[TokenizedStrategy](./TokenizedStrategy.sol)**: Base implementation of Yearn's tokenized vault strategy
    - Provides pseudo-ERC4626 compliant vault functionality
    - Handles asset custody and accounting
    - Implements access control and emergency procedures
@@ -57,7 +57,7 @@ The contract provides the following main functions:
 
 ### Storage Layout
 
-The contract inherits storage layout from YearnTokenizedStrategy and adds:
+The contract inherits storage layout from TokenizedStrategy and adds:
 ```solidity
 struct StrategyData {
         ERC20 asset;

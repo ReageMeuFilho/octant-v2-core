@@ -6,11 +6,11 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IBaseImpactStrategy} from "src/interfaces/IBaseImpactStrategy.sol";
-import {YearnTokenizedStrategy} from "./YearnTokenizedStrategy.sol";
+import {TokenizedStrategy} from "./TokenizedStrategy.sol";
 import {IProjectRegistry} from "src/interfaces/IProjectRegistry.sol";
 
 
-contract YearnTokenizedImpactStrategy is YearnTokenizedStrategy {
+contract TokenizedImpactStrategy is TokenizedStrategy {
     using Math for uint256;
     using SafeERC20 for ERC20;
 
