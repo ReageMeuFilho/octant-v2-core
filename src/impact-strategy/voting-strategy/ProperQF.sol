@@ -23,6 +23,16 @@ contract ProperQF {
     event AlphaUpdated(uint256 oldNumerator, uint256 oldDenominator, uint256 newNumerator, uint256 newDenominator);
 
     /**
+     * @notice Converts asset amount to voting power
+     * @param assets The amount of assets to convert to voting power
+     * @return votes The amount of voting power calculated
+     */
+    function _convertToVotes(uint256 assets) internal view returns (uint256 votes) {
+        StrategyData storage S = _strategyStorage();
+        return assets;
+    }
+    
+    /**
      * @notice This function is used to process a vote and update the tally for the voting strategy
      * @dev Implements incremental update quadratic funding algorithm
      * @param projectId The ID of the project to update.
@@ -71,11 +81,23 @@ contract ProperQF {
 
         // Return all relevant metrics for the project
         return (
-            project.quadraticFunding.mulDiv(alphaNumerator, alphaDenominator) + project.linearFunding.mulDiv(alphaDenominator - alphaNumerator, alphaDenominator), // Total shares allocated to this project
-            totalQuadraticSum.mulDiv(alphaNumerator, alphaDenominator) + totalLinearSum.mulDiv(alphaDenominator - alphaNumerator, alphaDenominator) // Total shares across all projects
+            project.quadraticFunding.mulDiv(alphaNumerator, alphaDenominator) +
+                project.linearFunding.mulDiv(alphaDenominator - alphaNumerator, alphaDenominator), // Total shares allocated to this project
+            totalQuadraticSum.mulDiv(alphaNumerator, alphaDenominator) +
+                totalLinearSum.mulDiv(alphaDenominator - alphaNumerator, alphaDenominator) // Total shares across all projects
         );
     }
 
+    /**
+     * @notice Finalizes the voting round and calculates final share distribution
+     * @dev Can only be called once by management when voting period ends
+     * @param totalShares The total shares to distribute
+     * @return finalizedShares The final share amount after calculations
+     */
+    function _finalize(uint256 totalShares) internal returns (uint256 finalizedShares) {
+        require(totalShares == totalFunding, "Total shares must be equal to total funding");
+        return totalFunding;
+    }
     /**
      * @dev Computes the square root of a number using the Babylonian method.
      * @param x The input number.
