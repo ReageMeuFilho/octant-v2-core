@@ -40,7 +40,7 @@ contract TestTraderIntegrationETH is BaseTest {
     address baseAddress;
     address quoteAddress;
     address wethAddress;
-    address beneficiary;
+    address public beneficiary;
     uint32 defaultScaledOfferFactor = 99_00_00; // TODO: check if represents 1% MEV reward to searchers?
 
     function setUp() public {
@@ -82,7 +82,7 @@ contract TestTraderIntegrationETH is BaseTest {
             owner: temps.safe,
             paused: false,
             beneficiary: beneficiary,
-            tokenToBeneficiary: quoteAddress,
+            tokenToBeneficiary: splitsEthWrapper(quoteAddress),
             oracleParams: oracleParams,
             defaultScaledOfferFactor: defaultScaledOfferFactor,
             pairScaledOfferFactors: pairScaledOfferFactors
@@ -147,8 +147,9 @@ contract TestTraderIntegrationETH is BaseTest {
         assertTrue(trader.swapper() == swapper);
     }
 
-    function test_transform() external {
+    function test_transform_eth_to_glm() external {
         configureTrader(ETH, glmAddress);
+        assert(address(trader).balance == 0);
         assert(IERC20(quoteAddress).balanceOf(trader.beneficiary()) == 0);
         // effectively disable upper bound check and randomness check
         uint256 fakeBudget = 1 ether;
@@ -172,12 +173,13 @@ contract TestTraderIntegrationETH is BaseTest {
         );
 
         uint256 amountToBeneficiary = trader.transform{value: saleValue}(trader.base(), trader.quote(), saleValue);
+
         assert(IERC20(quoteAddress).balanceOf(trader.beneficiary()) > 0);
         assert(IERC20(quoteAddress).balanceOf(trader.beneficiary()) == amountToBeneficiary);
         emit log_named_uint("GLM price on Trader.transform(...)", amountToBeneficiary / saleValue);
     }
 
-    function test_sellEth() external {
+    function test_convert_eth_to_glm() external {
         configureTrader(ETH, glmAddress);
 
         // effectively disable upper bound check and randomness check
@@ -211,7 +213,7 @@ contract TestTraderIntegrationETH is BaseTest {
         delete exactInputParams;
         exactInputParams.push(
             ISwapRouter.ExactInputParams({
-                path: abi.encodePacked(wethAddress, uint24(10_000), quoteAddress), // FIXME with wrapper function
+                path: abi.encodePacked(uniEthWrapper(baseAddress), uint24(10_000), uniEthWrapper(quoteAddress)),
                 recipient: address(initializer),
                 deadline: block.timestamp + 100,
                 amountIn: uint256(swapper.balance),
@@ -232,11 +234,71 @@ contract TestTraderIntegrationETH is BaseTest {
         // check if beneficiary received some quote token
         uint256 newGlmBalance = IERC20(quoteAddress).balanceOf(address(this));
         assertGt(newGlmBalance, oldGlmBalance);
+
+        emit log_named_uint("oldGlmBalance", oldGlmBalance);
+        emit log_named_uint("newGlmBalance", newGlmBalance);
+        emit log_named_int("glm delta", int256(newGlmBalance) - int256(oldGlmBalance));
     }
 
     function test_receivesEth() external {
         vm.deal(address(this), 10_000 ether);
         (bool sent,) = payable(address(trader)).call{value: 100 ether}("");
         require(sent, "Failed to send Ether");
+    }
+
+    function test_transform_wrong_base() external {
+        configureTrader(glmAddress, ETH);
+
+        // check if trader will reject unexpected ETH
+        vm.expectRevert(Trader.Trader__ImpossibleConfiguration.selector);
+        trader.transform(address(token), glmAddress, 10 ether);
+    }
+
+    function test_transform_wrong_quote() external {
+        configureTrader(glmAddress, ETH);
+
+        // check if trader will reject unexpected ETH
+        vm.expectRevert(Trader.Trader__ImpossibleConfiguration.selector);
+        trader.transform(glmAddress, address(token), 10 ether);
+    }
+
+    function test_transform_wrong_eth_value() external {
+        configureTrader(ETH, glmAddress);
+        assert(address(trader).balance == 0);
+        vm.expectRevert(Trader.Trader__ImpossibleConfiguration.selector);
+        trader.transform{value: 1 ether}(ETH, glmAddress, 2 ether);
+    }
+
+    function test_transform_unexpected_value() external {
+        configureTrader(glmAddress, ETH);
+
+        // check if trader will reject unexpected ETH
+        vm.expectRevert(Trader.Trader__UnexpectedETH.selector);
+        trader.transform{value: 1 ether}(glmAddress, ETH, 10 ether);
+    }
+
+    function test_transform_glm_to_eth() external {
+        configureTrader(glmAddress, ETH);
+        uint256 initialETHBalance = address(this).balance;
+        // effectively disable upper bound check and randomness check
+        uint256 fakeBudget = 50 ether;
+        deal(glmAddress, address(this), fakeBudget, false);
+        ERC20(glmAddress).approve(address(trader), fakeBudget);
+
+        vm.startPrank(temps.safe);
+        trader.configurePeriod(block.number, 101);
+        trader.setSpending(5 ether, 15 ether, fakeBudget);
+        vm.stopPrank();
+
+        vm.roll(block.number + 100);
+        uint256 saleValue = trader.findSaleValue(15 ether);
+        assert(saleValue > 0);
+
+        // do actual attempt to convert ERC20 to ETH
+        uint256 amountToBeneficiary = trader.transform(glmAddress, ETH, saleValue);
+
+        assert(address(this).balance > initialETHBalance);
+        assert(address(this).balance == initialETHBalance + amountToBeneficiary);
+        emit log_named_uint("ETH (in GLM) price on Trader.transform(...)", saleValue / amountToBeneficiary);
     }
 }
