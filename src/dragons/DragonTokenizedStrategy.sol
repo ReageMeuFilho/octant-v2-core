@@ -331,7 +331,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     ) external payable override nonReentrant onlyOwner returns (uint256 shares) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
-        //TODO: should this revert on ragequit?
+        require(!S.voluntaryLockups[msg.sender].isRageQuit, "Already in rage quit");
 
         // Deposit full balance if using max uint.
         if (assets == type(uint256).max) {

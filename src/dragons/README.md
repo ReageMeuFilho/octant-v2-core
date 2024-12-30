@@ -32,6 +32,7 @@ The rage quit feature acts as a safety valve, allowing users to exit their posit
   - Sets a new 3-month lockup period
   - Enables proportional unlocking of shares over time
   - Cannot be reversed once started
+  - Forbids deposits after the rage quit
 - Unlocked shares calculation during rage quit:
   - Based on time elapsed since rage quit initiation
   - Linear unlocking over the 3 month period

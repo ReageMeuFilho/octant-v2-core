@@ -151,6 +151,34 @@ contract LockupsTest is Setup {
         vm.stopPrank();
     }
 
+    function test_rageQuit_cant_deposit_more() public {
+        // Initial deposit with lockup
+        uint256 initialLockup = 240 days;
+        uint256 rageQuitPeriod = 180 days;
+        uint256 depositAmount = 10_000e18;
+
+        vm.startPrank(user);
+        strategy.depositWithLockup(depositAmount, user, initialLockup);
+
+        // Initiate rage quit
+        vm.expectEmit(true, true, true, true, address(strategy));
+        emit RageQuitInitiated(user, block.timestamp + MINIMUM_LOCKUP_DURATION);
+
+        strategy.initiateRageQuit();
+
+        // Attempt to deposit again during the rage quit period
+        vm.expectRevert("Already in rage quit");
+        strategy.deposit(depositAmount, user);
+
+
+        // Can't deposit even after the end of the rage quit period
+        skip(MINIMUM_LOCKUP_DURATION + 1 days);
+        vm.expectRevert("Already in rage quit");
+        strategy.deposit(depositAmount, user);
+
+        vm.stopPrank();
+    }
+
     function test_revertRageQuitWithUnlockedShares() public {
         uint256 lockupDuration = 100 days;
         uint256 depositAmount = 10_000e18;
