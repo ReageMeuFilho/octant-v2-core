@@ -20,3 +20,6 @@ error MintMoreThanMax();
 error WithdrawMoreThanMax();
 error RedeemMoreThanMax();
 error SharesStillLocked();
+error InvalidLockupDuration();
+error InvalidRageQuitCooldownPeriod();
+
