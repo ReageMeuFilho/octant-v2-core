@@ -172,6 +172,43 @@ contract LockupsTest is Setup {
         vm.stopPrank();
     }
 
+    function test_rageQuit_cant_deposit_after_end_of_rage_quit_lockup() public {
+        // Initial deposit with lockup
+        uint256 initialLockup = 240 days;
+        uint256 depositAmount = 10_000e18;
+
+        vm.startPrank(user);
+        strategy.depositWithLockup(depositAmount, user, initialLockup);
+
+        // Initiate rage quit
+        vm.expectEmit(true, true, true, true, address(strategy));
+        emit RageQuitInitiated(user, block.timestamp + MINIMUM_LOCKUP_DURATION);
+
+        strategy.initiateRageQuit();
+
+        skip(MINIMUM_LOCKUP_DURATION + 1 days);
+
+        // Can't deposit even after the end of the rage quit period
+        vm.expectRevert("Already in rage quit");
+        strategy.deposit(depositAmount, user);
+
+        (
+            uint256 unlockTime,
+            uint256 lockedShares,
+            bool isRageQuit,
+            uint256 totalShares,
+            uint256 withdrawableShares
+        ) = strategy.getUserLockupInfo(user);
+
+        assertEq(lockedShares, depositAmount, "Incorrect locked shares");
+        assertEq(withdrawableShares, depositAmount, "Incorrect unlocked shares");
+        assertTrue(isRageQuit, "Not in rage quit state");
+        assertEq(totalShares, depositAmount, "Incorrect total shares");
+
+        assertEq(strategy.maxRedeem(user), withdrawableShares, "After end of rage quit period all shares should be redeemable");
+
+        vm.stopPrank();
+    }
 
     function test_revertRageQuitWithUnlockedShares() public {
         uint256 lockupDuration = 100 days;
