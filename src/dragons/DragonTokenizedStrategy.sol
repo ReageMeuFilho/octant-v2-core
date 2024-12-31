@@ -321,6 +321,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     /**
      * @notice Mints `shares` of strategy shares to `receiver` by
      * depositing exactly `assets` of underlying tokens.
+     * @dev Please note that deposits are forbidden if rage quit was triggered.
      * @param assets The amount of underlying to deposit in.
      * @param receiver The address to receive the `shares`.
      * @return shares The actual amount of shares issued.
@@ -372,6 +373,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
 
     /**
      * @dev Mints `shares` of strategy shares to `receiver` by depositing exactly `assets` of underlying tokens with a lock up
+     * @dev Please note that deposits are forbidden if rage quit was triggered.
      * @param assets The amount of assets to deposit.
      * @param receiver The receiver of the shares.
      * @param lockupDuration The duration of the lockup in seconds.
