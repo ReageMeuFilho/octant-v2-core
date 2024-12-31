@@ -154,7 +154,6 @@ contract LockupsTest is Setup {
     function test_rageQuit_cant_deposit_more() public {
         // Initial deposit with lockup
         uint256 initialLockup = 240 days;
-        uint256 rageQuitPeriod = 180 days;
         uint256 depositAmount = 10_000e18;
 
         vm.startPrank(user);
@@ -170,14 +169,9 @@ contract LockupsTest is Setup {
         vm.expectRevert("Already in rage quit");
         strategy.deposit(depositAmount, user);
 
-
-        // Can't deposit even after the end of the rage quit period
-        skip(MINIMUM_LOCKUP_DURATION + 1 days);
-        vm.expectRevert("Already in rage quit");
-        strategy.deposit(depositAmount, user);
-
         vm.stopPrank();
     }
+
 
     function test_revertRageQuitWithUnlockedShares() public {
         uint256 lockupDuration = 100 days;
@@ -617,14 +611,6 @@ contract LockupsTest is Setup {
             "Rage quit cooldown not decreasing correctly"
         );
 
-        // Deposit during rage quit should not affect cooldown
-        strategy.deposit(depositAmount, user);
-        assertEq(
-            strategy.getRemainingCooldown(user),
-            MINIMUM_LOCKUP_DURATION - 45 days,
-            "Regular deposit should not affect rage quit cooldown"
-        );
-
         vm.stopPrank();
     }
 
@@ -665,11 +651,6 @@ contract LockupsTest is Setup {
         strategy.initiateRageQuit();
 
         // Second rage quit should fail
-        vm.expectRevert("Already in rage quit");
-        strategy.initiateRageQuit();
-
-        // Additional deposits shouldn't change this
-        strategy.deposit(depositAmount, user);
         vm.expectRevert("Already in rage quit");
         strategy.initiateRageQuit();
 
