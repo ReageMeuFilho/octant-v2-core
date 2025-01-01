@@ -35,7 +35,8 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
         address _owner,
         address _management,
         address _keeper,
-        address _dragonRouter
+        address _dragonRouter,
+        address _regenGovernance
     ) external;
 
     /*//////////////////////////////////////////////////////////////

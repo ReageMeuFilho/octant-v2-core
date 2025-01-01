@@ -18,19 +18,8 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     event NewLockupSet(address indexed user, uint256 indexed unlockTime, uint256 indexed lockedShares);
     event RageQuitInitiated(address indexed user, uint256 indexed unlockTime);
 
-    uint256 internal MINIMUM_LOCKUP_DURATION = 90 days;
-    uint256 internal RAGE_QUIT_COOLDOWN_PERIOD = 90 days;
-    address internal REGEN_GOVERNANCE;
-
-    // contraints for regen governance to set the lockup duration and rage quit cooldown period
-    // TODO: @quentin decide these ranges with artem
-    uint256 internal RANGE_MINIMUM_LOCKUP_DURATION = 30 days;
-    uint256 internal RANGE_MAXIMUM_LOCKUP_DURATION = 365 days;
-    uint256 internal RANGE_MINIMUM_RAGE_QUIT_COOLDOWN_PERIOD = 30 days;
-    uint256 internal RANGE_MAXIMUM_RAGE_QUIT_COOLDOWN_PERIOD = 365 days;
-
     modifier onlyRegenGovernance() {
-        if (msg.sender != REGEN_GOVERNANCE) revert Unauthorized();
+        if (msg.sender != _strategyStorage().REGEN_GOVERNANCE) revert Unauthorized();
         _;
     }
 
@@ -43,23 +32,35 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         address _dragonRouter,
         address _regenGovernance
     ) external {
-        __TokenizedStrategy_init(_asset, _name, _owner, _management, _keeper, _dragonRouter);
-        REGEN_GOVERNANCE = _regenGovernance;
+        __TokenizedStrategy_init(_asset, _name, _owner, _management, _keeper, _dragonRouter, _regenGovernance);
+        
     }
 
     function setLockupDuration(uint256 _lockupDuration) external onlyRegenGovernance {
-        if (_lockupDuration < RANGE_MINIMUM_LOCKUP_DURATION || _lockupDuration > RANGE_MAXIMUM_LOCKUP_DURATION) {
+        if (_lockupDuration < _strategyStorage().RANGE_MINIMUM_LOCKUP_DURATION || _lockupDuration > _strategyStorage().RANGE_MAXIMUM_LOCKUP_DURATION) {
             revert InvalidLockupDuration();
         }
-        MINIMUM_LOCKUP_DURATION = _lockupDuration;
+        _strategyStorage().MINIMUM_LOCKUP_DURATION = _lockupDuration;
     }
 
     function setRageQuitCooldownPeriod(uint256 _rageQuitCooldownPeriod) external onlyRegenGovernance {
         if (
-            _rageQuitCooldownPeriod < RANGE_MINIMUM_RAGE_QUIT_COOLDOWN_PERIOD
-                || _rageQuitCooldownPeriod > RANGE_MAXIMUM_RAGE_QUIT_COOLDOWN_PERIOD
+            _rageQuitCooldownPeriod < _strategyStorage().RANGE_MINIMUM_RAGE_QUIT_COOLDOWN_PERIOD
+                || _rageQuitCooldownPeriod > _strategyStorage().RANGE_MAXIMUM_RAGE_QUIT_COOLDOWN_PERIOD
         ) revert InvalidRageQuitCooldownPeriod();
-        RAGE_QUIT_COOLDOWN_PERIOD = _rageQuitCooldownPeriod;
+        _strategyStorage().RAGE_QUIT_COOLDOWN_PERIOD = _rageQuitCooldownPeriod;
+    }
+
+    function minimumLockupDuration() external view returns (uint256) {
+        return _strategyStorage().MINIMUM_LOCKUP_DURATION;
+    }
+
+    function rageQuitCooldownPeriod() external view returns (uint256) {
+        return _strategyStorage().RAGE_QUIT_COOLDOWN_PERIOD;
+    }
+
+    function regenGovernance() external view returns (address) {
+        return _strategyStorage().REGEN_GOVERNANCE;
     }
 
     /**
@@ -81,7 +82,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
             lockup.lockupTime = currentTime;
             lockup.unlockTime = currentTime + lockupDuration;
             // NOTE: enforce minimum lockup duration for new lockups
-            if (lockupDuration <= MINIMUM_LOCKUP_DURATION) revert InsufficientLockupDuration();
+            if (lockupDuration <= _strategyStorage().MINIMUM_LOCKUP_DURATION) revert InsufficientLockupDuration();
 
             lockup.lockedShares = totalSharesLocked;
         } else {
@@ -92,7 +93,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
                 // Extend existing lockup
                 uint256 newUnlockTime = lockup.unlockTime + lockupDuration;
                 // Ensure the new unlock time is at least 3 months in the future
-                if (newUnlockTime < currentTime + MINIMUM_LOCKUP_DURATION) revert InsufficientLockupDuration();
+                if (newUnlockTime < currentTime + _strategyStorage().MINIMUM_LOCKUP_DURATION) revert InsufficientLockupDuration();
 
                 lockup.unlockTime = newUnlockTime;
             }
@@ -198,7 +199,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
 
         // Set 3-month lockup
         lockup.lockupTime = block.timestamp;
-        lockup.unlockTime = block.timestamp + RAGE_QUIT_COOLDOWN_PERIOD;
+        lockup.unlockTime = block.timestamp + _strategyStorage().RAGE_QUIT_COOLDOWN_PERIOD;
         lockup.lockedShares = _balanceOf(S, msg.sender);
         lockup.isRageQuit = true;
 
