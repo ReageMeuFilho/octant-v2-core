@@ -1,8 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity 0.8.25;
 
-import { TokenizedStrategy, IBaseStrategy, Math, ERC20 } from "./TokenizedStrategy.sol";
-import { VaultSharesNotTransferable, MaxUnlockIsAlwaysZero, CantWithdrawLockedShares, ZeroLockupDuration, InsufficientLockupDuration, SharesStillLocked } from "src/errors.sol";
+import {TokenizedStrategy, IBaseStrategy, Math, ERC20} from "./TokenizedStrategy.sol";
+import {
+    VaultSharesNotTransferable,
+    MaxUnlockIsAlwaysZero,
+    CantWithdrawLockedShares,
+    ZeroLockupDuration,
+    InsufficientLockupDuration,
+    SharesStillLocked,
+    RageQuitInProgress
+} from "src/errors.sol";
 
 contract DragonTokenizedStrategy is TokenizedStrategy {
     event NewLockupSet(address indexed user, uint256 indexed unlockTime, uint256 indexed lockedShares);
@@ -162,7 +170,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         // Can't rage quit if no shares or already in rage quit
         require(_balanceOf(S, msg.sender) > 0, "No shares to rage quit");
         require(block.timestamp < lockup.unlockTime, "Shares already unlocked");
-        require(!lockup.isRageQuit, "Already in rage quit");
+        if (lockup.isRageQuit) revert RageQuitInProgress();
 
         // Set 3-month lockup
         lockup.lockupTime = block.timestamp;
@@ -321,6 +329,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     /**
      * @notice Mints `shares` of strategy shares to `receiver` by
      * depositing exactly `assets` of underlying tokens.
+     * @dev Please note that deposits are forbidden if rage quit was triggered.
      * @param assets The amount of underlying to deposit in.
      * @param receiver The address to receive the `shares`.
      * @return shares The actual amount of shares issued.
@@ -331,7 +340,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     ) external payable override nonReentrant onlyOwner returns (uint256 shares) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
-        //TODO: should this revert on ragequit?
+        if (S.voluntaryLockups[msg.sender].isRageQuit) revert RageQuitInProgress();
 
         // Deposit full balance if using max uint.
         if (assets == type(uint256).max) {
@@ -372,6 +381,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
 
     /**
      * @dev Mints `shares` of strategy shares to `receiver` by depositing exactly `assets` of underlying tokens with a lock up
+     * @dev Please note that deposits are forbidden if rage quit was triggered.
      * @param assets The amount of assets to deposit.
      * @param receiver The receiver of the shares.
      * @param lockupDuration The duration of the lockup in seconds.
@@ -385,7 +395,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         require(lockupDuration > 0, "Lockup duration must be greater than 0");
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
-        require(!S.voluntaryLockups[msg.sender].isRageQuit, "Already in rage quit");
+        if (S.voluntaryLockups[msg.sender].isRageQuit) revert RageQuitInProgress();
 
         // Deposit full balance if using max uint.
         if (assets == type(uint256).max) {
@@ -420,7 +430,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
 
-        require(!S.voluntaryLockups[msg.sender].isRageQuit, "Already in rage quit");
+        if (S.voluntaryLockups[msg.sender].isRageQuit) revert RageQuitInProgress();
         // Checking max mint will also check if shutdown.
         require(shares <= _maxMint(S, receiver), "ERC4626: mint more than max");
         // Check for rounding error.

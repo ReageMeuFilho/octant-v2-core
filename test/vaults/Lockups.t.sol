@@ -3,7 +3,7 @@ pragma solidity ^0.8.18;
 
 import "forge-std/console.sol";
 import { Setup } from "./Setup.sol";
-import { InsufficientLockupDuration, SharesStillLocked } from "src/errors.sol";
+import { InsufficientLockupDuration, RageQuitInProgress, SharesStillLocked } from "src/errors.sol";
 
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
@@ -151,6 +151,65 @@ contract LockupsTest is Setup {
         vm.stopPrank();
     }
 
+    function test_rageQuit_cant_deposit_more() public {
+        // Initial deposit with lockup
+        uint256 initialLockup = 240 days;
+        uint256 depositAmount = 10_000e18;
+
+        vm.startPrank(user);
+        strategy.depositWithLockup(depositAmount, user, initialLockup);
+
+        // Initiate rage quit
+        vm.expectEmit(true, true, true, true, address(strategy));
+        emit RageQuitInitiated(user, block.timestamp + MINIMUM_LOCKUP_DURATION);
+
+        strategy.initiateRageQuit();
+
+        // Attempt to deposit again during the rage quit period
+        vm.expectRevert(RageQuitInProgress.selector);
+        strategy.deposit(depositAmount, user);
+
+        vm.stopPrank();
+    }
+
+    function test_rageQuit_cant_deposit_after_end_of_rage_quit_lockup() public {
+        // Initial deposit with lockup
+        uint256 initialLockup = 240 days;
+        uint256 depositAmount = 10_000e18;
+
+        vm.startPrank(user);
+        strategy.depositWithLockup(depositAmount, user, initialLockup);
+
+        // Initiate rage quit
+        vm.expectEmit(true, true, true, true, address(strategy));
+        emit RageQuitInitiated(user, block.timestamp + MINIMUM_LOCKUP_DURATION);
+
+        strategy.initiateRageQuit();
+
+        skip(MINIMUM_LOCKUP_DURATION + 1 days);
+
+        // Can't deposit even after the end of the rage quit period
+        vm.expectRevert(RageQuitInProgress.selector);
+        strategy.deposit(depositAmount, user);
+
+        (
+            uint256 unlockTime,
+            uint256 lockedShares,
+            bool isRageQuit,
+            uint256 totalShares,
+            uint256 withdrawableShares
+        ) = strategy.getUserLockupInfo(user);
+
+        assertEq(lockedShares, depositAmount, "Incorrect locked shares");
+        assertEq(withdrawableShares, depositAmount, "Incorrect unlocked shares");
+        assertTrue(isRageQuit, "Not in rage quit state");
+        assertEq(totalShares, depositAmount, "Incorrect total shares");
+
+        assertEq(strategy.maxRedeem(user), withdrawableShares, "After end of rage quit period all shares should be redeemable");
+
+        vm.stopPrank();
+    }
+
     function test_revertRageQuitWithUnlockedShares() public {
         uint256 lockupDuration = 100 days;
         uint256 depositAmount = 10_000e18;
@@ -176,7 +235,7 @@ contract LockupsTest is Setup {
 
         strategy.initiateRageQuit();
 
-        vm.expectRevert("Already in rage quit");
+        vm.expectRevert(RageQuitInProgress.selector);
         strategy.initiateRageQuit();
         vm.stopPrank();
     }
@@ -589,14 +648,6 @@ contract LockupsTest is Setup {
             "Rage quit cooldown not decreasing correctly"
         );
 
-        // Deposit during rage quit should not affect cooldown
-        strategy.deposit(depositAmount, user);
-        assertEq(
-            strategy.getRemainingCooldown(user),
-            MINIMUM_LOCKUP_DURATION - 45 days,
-            "Regular deposit should not affect rage quit cooldown"
-        );
-
         vm.stopPrank();
     }
 
@@ -637,17 +688,12 @@ contract LockupsTest is Setup {
         strategy.initiateRageQuit();
 
         // Second rage quit should fail
-        vm.expectRevert("Already in rage quit");
-        strategy.initiateRageQuit();
-
-        // Additional deposits shouldn't change this
-        strategy.deposit(depositAmount, user);
-        vm.expectRevert("Already in rage quit");
+        vm.expectRevert(RageQuitInProgress.selector);
         strategy.initiateRageQuit();
 
         // Skip some time and try again
         skip(45 days);
-        vm.expectRevert("Already in rage quit");
+        vm.expectRevert(RageQuitInProgress.selector);
         strategy.initiateRageQuit();
 
         // Skip to end of rage quit period and try again
@@ -714,7 +760,7 @@ contract LockupsTest is Setup {
         strategy.initiateRageQuit();
 
         // Should fail since already in rage quit
-        vm.expectRevert("Already in rage quit");
+        vm.expectRevert(RageQuitInProgress.selector);
         strategy.depositWithLockup(depositAmount, user, lockupDuration);
 
         vm.stopPrank();
