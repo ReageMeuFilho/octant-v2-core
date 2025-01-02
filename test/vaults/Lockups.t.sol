@@ -1036,6 +1036,22 @@ contract LockupsTest is Setup {
         vm.stopPrank();
     }
 
+    function test_revert_deposit_shutdown() public {
+        uint256 depositAmount = 10_000e18;
+
+        // Shutdown the strategy
+        vm.prank(management);
+        strategy.shutdownStrategy();
+
+        vm.startPrank(user);
+
+        // Try to deposit after shutdown
+        vm.expectRevert("ERC4626: mint more than max");
+        strategy.deposit(depositAmount, user);
+
+        vm.stopPrank();
+    }
+
     function test_redeem_during_ragequit() public {
         uint256 lockupDuration = 180 days;
         uint256 depositAmount = 10_000e18;
