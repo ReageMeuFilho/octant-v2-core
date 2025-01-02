@@ -3,7 +3,7 @@ pragma solidity ^0.8.18;
 
 import "forge-std/console.sol";
 import { Setup } from "./Setup.sol";
-import { InsufficientLockupDuration, SharesStillLocked } from "src/errors.sol";
+import { InsufficientLockupDuration, RageQuitInProgress, SharesStillLocked } from "src/errors.sol";
 
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
@@ -166,7 +166,7 @@ contract LockupsTest is Setup {
         strategy.initiateRageQuit();
 
         // Attempt to deposit again during the rage quit period
-        vm.expectRevert("Already in rage quit");
+        vm.expectRevert(RageQuitInProgress.selector);
         strategy.deposit(depositAmount, user);
 
         vm.stopPrank();
@@ -189,7 +189,7 @@ contract LockupsTest is Setup {
         skip(MINIMUM_LOCKUP_DURATION + 1 days);
 
         // Can't deposit even after the end of the rage quit period
-        vm.expectRevert("Already in rage quit");
+        vm.expectRevert(RageQuitInProgress.selector);
         strategy.deposit(depositAmount, user);
 
         (
@@ -235,7 +235,7 @@ contract LockupsTest is Setup {
 
         strategy.initiateRageQuit();
 
-        vm.expectRevert("Already in rage quit");
+        vm.expectRevert(RageQuitInProgress.selector);
         strategy.initiateRageQuit();
         vm.stopPrank();
     }
@@ -688,12 +688,12 @@ contract LockupsTest is Setup {
         strategy.initiateRageQuit();
 
         // Second rage quit should fail
-        vm.expectRevert("Already in rage quit");
+        vm.expectRevert(RageQuitInProgress.selector);
         strategy.initiateRageQuit();
 
         // Skip some time and try again
         skip(45 days);
-        vm.expectRevert("Already in rage quit");
+        vm.expectRevert(RageQuitInProgress.selector);
         strategy.initiateRageQuit();
 
         // Skip to end of rage quit period and try again
@@ -760,7 +760,7 @@ contract LockupsTest is Setup {
         strategy.initiateRageQuit();
 
         // Should fail since already in rage quit
-        vm.expectRevert("Already in rage quit");
+        vm.expectRevert(RageQuitInProgress.selector);
         strategy.depositWithLockup(depositAmount, user, lockupDuration);
 
         vm.stopPrank();
