@@ -9,6 +9,7 @@ import {
     ZeroLockupDuration,
     InsufficientLockupDuration,
     SharesStillLocked,
+    StrategyInShutdown,
     RageQuitInProgress
 } from "src/errors.sol";
 
@@ -347,6 +348,8 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
             assets = S.asset.balanceOf(msg.sender);
         }
 
+        // Check for shutdown first to enable better error msg.
+        if (S.shutdown) revert StrategyInShutdown();
         // Checking max deposit will also check if shutdown.
         require(assets <= _maxDeposit(S, receiver), "ERC4626: deposit more than max");
         // Check for rounding error.
@@ -370,6 +373,8 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
 
+        // Check for shutdown first to enable better error msg.
+        if (S.shutdown) revert StrategyInShutdown();
         // Checking max mint will also check if shutdown.
         require(shares <= _maxMint(S, receiver), "ERC4626: mint more than max");
         // Check for rounding error.
@@ -402,6 +407,8 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
             assets = S.asset.balanceOf(msg.sender);
         }
 
+        // Check for shutdown first to enable better error msg.
+        if (S.shutdown) revert StrategyInShutdown();
         // Checking max deposit will also check if shutdown.
         require(assets <= _maxDeposit(S, receiver), "ERC4626: deposit more than max");
         // Check for rounding error.
@@ -431,6 +438,9 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         StrategyData storage S = _strategyStorage();
 
         if (S.voluntaryLockups[msg.sender].isRageQuit) revert RageQuitInProgress();
+
+        // Check for shutdown first to enable better error msg.
+        if (S.shutdown) revert StrategyInShutdown();
         // Checking max mint will also check if shutdown.
         require(shares <= _maxMint(S, receiver), "ERC4626: mint more than max");
         // Check for rounding error.
