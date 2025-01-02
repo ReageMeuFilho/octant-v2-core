@@ -3,7 +3,7 @@ pragma solidity ^0.8.18;
 
 import "forge-std/console.sol";
 import { Setup } from "./Setup.sol";
-import { InsufficientLockupDuration, RageQuitInProgress, SharesStillLocked } from "src/errors.sol";
+import { InsufficientLockupDuration, RageQuitInProgress, SharesStillLocked, StrategyInShutdown } from "src/errors.sol";
 
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
@@ -1014,7 +1014,7 @@ contract LockupsTest is Setup {
         vm.startPrank(user);
 
         // Try to deposit after shutdown
-        vm.expectRevert("ERC4626: deposit more than max");
+        vm.expectRevert(StrategyInShutdown.selector);
         strategy.depositWithLockup(depositAmount, user, 100 days);
 
         vm.stopPrank();
@@ -1030,7 +1030,7 @@ contract LockupsTest is Setup {
         vm.startPrank(user);
 
         // Try to mint after shutdown
-        vm.expectRevert("ERC4626: mint more than max");
+        vm.expectRevert(StrategyInShutdown.selector);
         strategy.mintWithLockup(mintAmount, user, 100 days);
 
         vm.stopPrank();
@@ -1046,7 +1046,7 @@ contract LockupsTest is Setup {
         vm.startPrank(user);
 
         // Try to deposit after shutdown
-        vm.expectRevert("ERC4626: mint more than max");
+        vm.expectRevert(StrategyInShutdown.selector);
         strategy.deposit(depositAmount, user);
 
         vm.stopPrank();

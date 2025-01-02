@@ -21,3 +21,5 @@ error WithdrawMoreThanMax();
 error RedeemMoreThanMax();
 error SharesStillLocked();
 error RageQuitInProgress();
+
+error StrategyInShutdown();
