@@ -33,7 +33,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
-    uint256 public COOL_DOWN_PERIOD = 30 days;
+    uint256 public DRAGON_SPLIT_COOLDOWN_PERIOD = 30 days;
     uint256 public SPLIT_DELAY;
     ISplitChecker public splitChecker;
     address public opexVault;
@@ -295,7 +295,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      * @dev Only callable by accounts with OWNER_ROLE
      */
     function setSplit(Split memory _split) external onlyRole(OWNER_ROLE) {
-        if (block.timestamp - lastSetSplitTime < COOL_DOWN_PERIOD) revert CooldownPeriodNotPassed();
+        if(block.timestamp - lastSetSplitTime < DRAGON_SPLIT_COOLDOWN_PERIOD) revert CooldownPeriodNotPassed();
         splitChecker.checkSplit(_split, opexVault, metapool);
 
         for (uint256 i = 0; i < strategies.length; i++) {
@@ -377,8 +377,8 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      * @param _coolDownPeriod New cool down period in seconds
      */
     function _setCoolDownPeriod(uint256 _coolDownPeriod) internal {
-        emit CoolDownPeriodUpdated(COOL_DOWN_PERIOD, _coolDownPeriod);
-        COOL_DOWN_PERIOD = _coolDownPeriod;
+        emit CoolDownPeriodUpdated(DRAGON_SPLIT_COOLDOWN_PERIOD, _coolDownPeriod);
+        DRAGON_SPLIT_COOLDOWN_PERIOD = _coolDownPeriod;
     }
 
     /**
