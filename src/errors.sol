@@ -8,9 +8,7 @@ error VaultSharesNotTransferable();
 error PerformanceFeeIsAlwaysZero();
 error PerformanceFeeDisabled();
 error MaxUnlockIsAlwaysZero();
-
 error CantWithdrawLockedShares();
-
 error ZeroLockupDuration();
 error InsufficientLockupDuration();
 error ZeroShares();
@@ -22,4 +20,5 @@ error RedeemMoreThanMax();
 error SharesStillLocked();
 error InvalidLockupDuration();
 error InvalidRageQuitCooldownPeriod();
-
+error RageQuitInProgress();
+error StrategyInShutdown();
