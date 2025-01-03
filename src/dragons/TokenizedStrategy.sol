@@ -122,16 +122,6 @@ contract TokenizedStrategy {
         // Strategy Status
         uint8 entered; // To prevent reentrancy. Use uint8 for gas savings.
         bool shutdown; // Bool that can be used to stop deposits into the strategy.
-        
-        uint256 MINIMUM_LOCKUP_DURATION;
-        uint256 RAGE_QUIT_COOLDOWN_PERIOD;
-        address REGEN_GOVERNANCE;
-
-        // contraints for regen governance to set the lockup duration and rage quit cooldown period
-        uint256 RANGE_MINIMUM_LOCKUP_DURATION;
-        uint256 RANGE_MAXIMUM_LOCKUP_DURATION;
-        uint256 RANGE_MINIMUM_RAGE_QUIT_COOLDOWN_PERIOD;
-        uint256 RANGE_MAXIMUM_RAGE_QUIT_COOLDOWN_PERIOD;
     }
 
     address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE; // using this address to represent native ETH
@@ -306,8 +296,7 @@ contract TokenizedStrategy {
         address _owner,
         address _management,
         address _keeper,
-        address _dragonRouter,
-        address _regenGovernance
+        address _dragonRouter
     ) internal {
         // Cache storage pointer.
         StrategyData storage S = _strategyStorage();
@@ -333,14 +322,6 @@ contract TokenizedStrategy {
         S.management = _management;
         // Set the keeper address
         S.keeper = _keeper;
-
-        S.REGEN_GOVERNANCE = _regenGovernance;
-        S.MINIMUM_LOCKUP_DURATION = 90 days;
-        S.RAGE_QUIT_COOLDOWN_PERIOD = 90 days;
-        S.RANGE_MINIMUM_LOCKUP_DURATION = 30 days;
-        S.RANGE_MAXIMUM_LOCKUP_DURATION = 3650 days;
-        S.RANGE_MINIMUM_RAGE_QUIT_COOLDOWN_PERIOD = 30 days;
-        S.RANGE_MAXIMUM_RAGE_QUIT_COOLDOWN_PERIOD = 3650 days;
 
         // Emit event to signal a new strategy has been initialized.
         emit NewTokenizedStrategy(address(this), _asset, API_VERSION);

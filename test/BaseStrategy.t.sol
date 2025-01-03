@@ -4,7 +4,7 @@ pragma solidity ^0.8.13;
 import "./Base.t.sol";
 import {MockStrategy} from "./mocks/MockStrategy.sol";
 import {MockYieldSource} from "./mocks/MockYieldSource.sol";
-import {DragonTokenizedStrategy} from "src/dragons/DragonTokenizedStrategy.sol";
+import {MockTokenizedStrategy} from "./mocks/MockTokenizedStrategy.sol";
 
 import {ITokenizedStrategy} from "../src/interfaces/ITokenizedStrategy.sol";
 
@@ -13,13 +13,12 @@ contract BaseStrategyTest is BaseTest {
     address treasury = makeAddr("treasury");
     address dragonRouter = makeAddr("dragonRouter");
     address management = makeAddr("management");
-    address regenGovernance = makeAddr("regenGovernance");
 
     testTemps temps;
     MockStrategy moduleImplementation;
     MockStrategy module;
     MockYieldSource yieldSource;
-    DragonTokenizedStrategy tokenizedStrategyImplementation;
+    MockTokenizedStrategy tokenizedStrategyImplementation;
 
     string public name = "Test Mock Strategy";
     uint256 public maxReportDelay = 9;
@@ -31,7 +30,7 @@ contract BaseStrategyTest is BaseTest {
 
         moduleImplementation = new MockStrategy();
         yieldSource = new MockYieldSource(ETH);
-        tokenizedStrategyImplementation = new DragonTokenizedStrategy();
+        tokenizedStrategyImplementation = new MockTokenizedStrategy();
         temps = _testTemps(
             address(moduleImplementation),
             abi.encode(
@@ -42,8 +41,7 @@ contract BaseStrategyTest is BaseTest {
                 keeper,
                 dragonRouter,
                 maxReportDelay,
-                name,
-                regenGovernance
+                name
             )
         );
         module = MockStrategy(payable(temps.module));
@@ -87,13 +85,16 @@ contract BaseStrategyTest is BaseTest {
         _deposit(amount);
 
         uint256 withdrawAmount = 0.5 ether;
+        // only safe can call withdraw function
+        vm.expectRevert("Unauthorized");
+        ITokenizedStrategy(address(module)).withdraw(withdrawAmount, temps.safe, temps.safe, type(uint256).max);
 
         vm.startPrank(temps.safe);
 
         assertTrue(module.availableWithdrawLimit(temps.safe) == type(uint256).max);
         assertTrue(ITokenizedStrategy(address(module)).balanceOf(temps.safe) == amount);
         assertTrue(address(yieldSource).balance == amount);
-        ITokenizedStrategy(address(module)).withdraw(withdrawAmount, temps.safe, temps.safe, 10000);
+        ITokenizedStrategy(address(module)).withdraw(withdrawAmount, temps.safe, temps.safe, type(uint256).max);
         assertTrue(ITokenizedStrategy(address(module)).balanceOf(temps.safe) == amount - withdrawAmount);
         assertTrue(address(yieldSource).balance == amount - withdrawAmount);
 
@@ -124,11 +125,10 @@ contract BaseStrategyTest is BaseTest {
         uint256 amount = 1 ether;
         _deposit(amount);
 
-        vm.startPrank(keeper);
         uint256 harvestedAmount = 0.1 ether;
         vm.deal(address(yieldSource), amount + harvestedAmount);
         ITokenizedStrategy(address(module)).report();
-        vm.stopPrank();
+        assertTrue(dragonRouter.balance == harvestedAmount);
     }
 
     function testTendThis() public {

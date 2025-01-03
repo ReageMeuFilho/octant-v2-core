@@ -3,7 +3,7 @@ pragma solidity >=0.8.18;
 
 import "forge-std/console.sol";
 import {Setup} from "./Setup.sol";
-import {PerformanceFeeDisabled, MaxUnlockIsAlwaysZero, Unauthorized, InvalidLockupDuration, InvalidRageQuitCooldownPeriod} from "src/errors.sol";
+import {PerformanceFeeDisabled, MaxUnlockIsAlwaysZero} from "src/errors.sol";
 
 contract AccessControlTest is Setup {
     function setUp() public override {
@@ -129,7 +129,7 @@ contract AccessControlTest is Setup {
         assertEq(tokenizedStrategy.keeper(), address(0));
 
         vm.expectRevert("initialized");
-        tokenizedStrategy.initialize(address(asset), name_, _address, _address, _address, address(mockDragonRouter), regenGovernance);
+        tokenizedStrategy.initialize(address(asset), name_, _address, _address, _address, address(mockDragonRouter));
 
         assertEq(tokenizedStrategy.management(), address(0));
         assertEq(tokenizedStrategy.keeper(), address(0));
@@ -258,70 +258,5 @@ contract AccessControlTest is Setup {
         strategy.setName(newName);
 
         assertEq(strategy.name(), newName);
-    }
-
-    function test_setLockupDuration() public {
-        uint256 newDuration = 180 days;
-        
-        vm.prank(regenGovernance);
-        strategy.setLockupDuration(newDuration);
-        
-        // Test successful change
-        assertEq(strategy.minimumLockupDuration(), newDuration);
-    }
-
-    function test_setLockupDuration_reverts(address _address) public {
-        vm.assume(_address != regenGovernance);
-        uint256 newDuration = 180 days;
-        
-        // Test unauthorized access
-        vm.startPrank(_address);
-        vm.expectRevert(Unauthorized.selector);
-        strategy.setLockupDuration(newDuration);
-        vm.stopPrank();
-        
-        // Test invalid duration below minimum
-        vm.startPrank(regenGovernance);
-        vm.expectRevert(InvalidLockupDuration.selector);
-        strategy.setLockupDuration(29 days); // Below RANGE_MINIMUM_LOCKUP_DURATION
-        vm.stopPrank();
-        // Test invalid duration above maximum
-        vm.startPrank(regenGovernance);
-        vm.expectRevert(InvalidLockupDuration.selector);
-        strategy.setLockupDuration(3651 days); // Above RANGE_MAXIMUM_LOCKUP_DURATION
-        vm.stopPrank();
-    }
-
-    function test_setRageQuitCooldownPeriod() public {
-        uint256 newPeriod = 180 days;
-        
-        vm.prank(regenGovernance);
-        strategy.setRageQuitCooldownPeriod(newPeriod);
-        
-        // Test successful change
-        assertEq(strategy.rageQuitCooldownPeriod(), newPeriod);
-    }
-
-    function test_setRageQuitCooldownPeriod_reverts(address _address) public {
-        vm.assume(_address != regenGovernance);
-        uint256 newPeriod = 180 days;
-        
-        // Test unauthorized access
-        vm.startPrank(_address);
-        vm.expectRevert(Unauthorized.selector);
-        strategy.setRageQuitCooldownPeriod(newPeriod);
-        vm.stopPrank();
-        
-        // Test invalid period below minimum
-        vm.startPrank(regenGovernance);
-        vm.expectRevert(InvalidRageQuitCooldownPeriod.selector);
-        strategy.setRageQuitCooldownPeriod(29 days); // Below RANGE_MINIMUM_RAGE_QUIT_COOLDOWN_PERIOD
-        vm.stopPrank();
-        
-        // Test invalid period above maximum
-        vm.startPrank(regenGovernance);
-        vm.expectRevert(InvalidRageQuitCooldownPeriod.selector);
-        strategy.setRageQuitCooldownPeriod(3651 days); // Above RANGE_MAXIMUM_RAGE_QUIT_COOLDOWN_PERIOD
-        vm.stopPrank();
     }
 }
