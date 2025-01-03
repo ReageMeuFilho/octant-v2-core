@@ -37,6 +37,7 @@ contract Setup is ExtendedTest, IEvents {
     address public management = address(3);
     address public emergencyAdmin = address(4);
     address public metaPool = address(7);
+    address public regenGovernance = address(15);
 
     // Integer variables that will be used repeatedly.
     uint256 public decimals = 18;
@@ -77,6 +78,7 @@ contract Setup is ExtendedTest, IEvents {
         vm.label(emergencyAdmin, "emergency admin");
         vm.label(address(yieldSource), "Mock Yield Source");
         vm.label(address(tokenizedStrategy), "tokenized Logic");
+        vm.label(regenGovernance, "regen governance");
     }
 
     function setUpStrategy() public returns (address) {
@@ -90,7 +92,8 @@ contract Setup is ExtendedTest, IEvents {
                 keeper,
                 address(mockDragonRouter),
                 maxReportDelay,
-                name
+                name,
+                regenGovernance
             )
         );
         user = temps.safe;

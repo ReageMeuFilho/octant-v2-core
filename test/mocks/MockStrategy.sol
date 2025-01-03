@@ -26,8 +26,9 @@ contract MockStrategy is Module, BaseStrategy {
             address _keeper,
             address _dragonRouter,
             uint256 _maxReportDelay,
-            string memory _name
-        ) = abi.decode(data, (address, address, address, address, address, address, uint256, string));
+            string memory _name,
+            address _regenGovernance
+        ) = abi.decode(data, (address, address, address, address, address, address, uint256, string, address));
 
         __Ownable_init(msg.sender);
         __BaseStrategy_init(
@@ -38,7 +39,8 @@ contract MockStrategy is Module, BaseStrategy {
             _keeper,
             _dragonRouter,
             _maxReportDelay,
-            _name
+            _name,
+            _regenGovernance
         );
 
         yieldSource = _yieldSource;
