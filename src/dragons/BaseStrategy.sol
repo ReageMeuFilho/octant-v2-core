@@ -126,7 +126,8 @@ abstract contract BaseStrategy {
         address _keeper,
         address _dragonRouter,
         uint256 _maxReportDelay,
-        string memory _name
+        string memory _name,
+        address _regenGovernance
     ) internal {
         tokenizedStrategyImplementation = _tokenizedStrategyImplementation;
         asset = ERC20(_asset);
@@ -137,7 +138,7 @@ abstract contract BaseStrategy {
 
         // Initialize the strategy's storage variables.
         _delegateCall(
-            abi.encodeCall(ITokenizedStrategy.initialize, (_asset, _name, _owner, _management, _keeper, _dragonRouter))
+            abi.encodeCall(ITokenizedStrategy.initialize, (_asset, _name, _owner, _management, _keeper, _dragonRouter, _regenGovernance))
         );
 
         // Store the tokenizedStrategyImplementation at the standard implementation
