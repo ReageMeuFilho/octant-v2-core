@@ -193,7 +193,7 @@ contract LockupsTest is Setup {
         strategy.deposit(depositAmount, user);
 
         (
-            uint256 unlockTime,
+            ,
             uint256 lockedShares,
             bool isRageQuit,
             uint256 totalShares,
@@ -1061,9 +1061,6 @@ contract LockupsTest is Setup {
         // Initial setup
         uint256 shares = strategy.depositWithLockup(depositAmount, user, lockupDuration);
 
-        // Get initial state
-        (uint256 unlockTime, , , , ) = strategy.getUserLockupInfo(user);
-
         // Initiate rage quit
         strategy.initiateRageQuit();
 
@@ -1098,5 +1095,9 @@ contract LockupsTest is Setup {
         // Verify balances and state after first redeem
         (, uint256 remainingLockedShares, , uint256 newTotalShares, uint256 newWithdrawableShares) = strategy
             .getUserLockupInfo(user);
+
+        assertEq(remainingLockedShares, depositAmount - redeemAmount, "Remaining locked shares incorrect");
+        assertEq(newTotalShares, shares - redeemAmount, "New total shares incorrect");
+        assertEq(newWithdrawableShares, 0, "New withdrawable shares incorrect");
     }
 }

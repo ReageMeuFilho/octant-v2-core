@@ -152,7 +152,6 @@ contract TestTraderRandomness is BaseTest {
         trader.configurePeriod(block.number, blocks);
         trader.setSpending(1 ether, 1 ether, 100 ether);
         vm.stopPrank();
-        uint deadline = trader.deadline();
         for (uint256 i = 0; i < blocks / 3; i++) {
             wrapBuy();
         }

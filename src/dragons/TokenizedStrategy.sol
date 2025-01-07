@@ -405,11 +405,11 @@ contract TokenizedStrategy {
      * @dev This will default to not allowing any loss to be taken.
      * @param assets The amount of underlying to withdraw.
      * @param receiver The address to receive `assets`.
-     * @param owner The address whose shares are burnt.
+     * @param _owner The address whose shares are burnt.
      * @return shares The actual amount of shares burnt.
      */
-    function withdraw(uint256 assets, address receiver, address owner) external returns (uint256 shares) {
-        return withdraw(assets, receiver, owner, 0);
+    function withdraw(uint256 assets, address receiver, address _owner) external returns (uint256 shares) {
+        return withdraw(assets, receiver, _owner, 0);
     }
 
     /**
@@ -418,24 +418,24 @@ contract TokenizedStrategy {
      * @dev This includes an added parameter to allow for losses.
      * @param assets The amount of underlying to withdraw.
      * @param receiver The address to receive `assets`.
-     * @param owner The address whose shares are burnt.
+     * @param _owner The address whose shares are burnt.
      * @param maxLoss The amount of acceptable loss in Basis points.
      * @return shares The actual amount of shares burnt.
      */
     function withdraw(
         uint256 assets,
         address receiver,
-        address owner,
+        address _owner,
         uint256 maxLoss
     ) public virtual nonReentrant returns (uint256 shares) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
-        require(assets <= _maxWithdraw(S, owner), "ERC4626: withdraw more than max");
+        require(assets <= _maxWithdraw(S, _owner), "ERC4626: withdraw more than max");
         // Check for rounding error or 0 value.
         require((shares = _convertToShares(S, assets, Math.Rounding.Ceil)) != 0, "ZERO_SHARES");
 
         // Withdraw and track the actual amount withdrawn for loss check.
-        _withdraw(S, receiver, owner, assets, shares, maxLoss);
+        _withdraw(S, receiver, _owner, assets, shares, maxLoss);
     }
 
     /**
@@ -444,12 +444,12 @@ contract TokenizedStrategy {
      * @dev This will default to allowing any loss passed to be realized.
      * @param shares The amount of shares burnt.
      * @param receiver The address to receive `assets`.
-     * @param owner The address whose shares are burnt.
+     * @param _owner The address whose shares are burnt.
      * @return assets The actual amount of underlying withdrawn.
      */
-    function redeem(uint256 shares, address receiver, address owner) external returns (uint256) {
+    function redeem(uint256 shares, address receiver, address _owner) external returns (uint256) {
         // We default to not limiting a potential loss.
-        return redeem(shares, receiver, owner, MAX_BPS);
+        return redeem(shares, receiver, _owner, MAX_BPS);
     }
 
     /**
@@ -458,25 +458,25 @@ contract TokenizedStrategy {
      * @dev This includes an added parameter to allow for losses.
      * @param shares The amount of shares burnt.
      * @param receiver The address to receive `assets`.
-     * @param owner The address whose shares are burnt.
+     * @param _owner The address whose shares are burnt.
      * @param maxLoss The amount of acceptable loss in Basis points.
      * @return . The actual amount of underlying withdrawn.
      */
     function redeem(
         uint256 shares,
         address receiver,
-        address owner,
+        address _owner,
         uint256 maxLoss
     ) public virtual nonReentrant returns (uint256) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
-        require(shares <= _maxRedeem(S, owner), "ERC4626: redeem more than max");
+        require(shares <= _maxRedeem(S, _owner), "ERC4626: redeem more than max");
         uint256 assets;
         // Check for rounding error or 0 value.
         require((assets = _convertToAssets(S, shares, Math.Rounding.Floor)) != 0, "ZERO_ASSETS");
 
         // We need to return the actual amount withdrawn in case of a loss.
-        return _withdraw(S, receiver, owner, assets, shares, maxLoss);
+        return _withdraw(S, receiver, _owner, assets, shares, maxLoss);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -616,11 +616,11 @@ contract TokenizedStrategy {
      * withdrawn from the strategy by `owner`, where `owner`
      * corresponds to the msg.sender of a {redeem} call.
      *
-     * @param owner The owner of the shares.
+     * @param _owner The owner of the shares.
      * @return _maxWithdraw Max amount of `asset` that can be withdrawn.
      */
-    function maxWithdraw(address owner) external view virtual returns (uint256) {
-        return _maxWithdraw(_strategyStorage(), owner);
+    function maxWithdraw(address _owner) external view virtual returns (uint256) {
+        return _maxWithdraw(_strategyStorage(), _owner);
     }
 
     /**
@@ -628,8 +628,8 @@ contract TokenizedStrategy {
      * @dev Accepts a `maxLoss` variable in order to match the multi
      * strategy vaults ABI.
      */
-    function maxWithdraw(address owner, uint256 /*maxLoss*/) external view virtual returns (uint256) {
-        return _maxWithdraw(_strategyStorage(), owner);
+    function maxWithdraw(address _owner, uint256 /*maxLoss*/) external view virtual returns (uint256) {
+        return _maxWithdraw(_strategyStorage(), _owner);
     }
 
     /**
@@ -637,11 +637,11 @@ contract TokenizedStrategy {
      * redeemed from the strategy by `owner`, where `owner`
      * corresponds to the msg.sender of a {redeem} call.
      *
-     * @param owner The owner of the shares.
+     * @param _owner The owner of the shares.
      * @return _maxRedeem Max amount of shares that can be redeemed.
      */
-    function maxRedeem(address owner) external view virtual returns (uint256) {
-        return _maxRedeem(_strategyStorage(), owner);
+    function maxRedeem(address _owner) external view virtual returns (uint256) {
+        return _maxRedeem(_strategyStorage(), _owner);
     }
 
     /**
@@ -649,8 +649,8 @@ contract TokenizedStrategy {
      * @dev Accepts a `maxLoss` variable in order to match the multi
      * strategy vaults ABI.
      */
-    function maxRedeem(address owner, uint256 /*maxLoss*/) external view virtual returns (uint256) {
-        return _maxRedeem(_strategyStorage(), owner);
+    function maxRedeem(address _owner, uint256 /*maxLoss*/) external view virtual returns (uint256) {
+        return _maxRedeem(_strategyStorage(), _owner);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -717,32 +717,32 @@ contract TokenizedStrategy {
     }
 
     /// @dev Internal implementation of {maxWithdraw}.
-    function _maxWithdraw(StrategyData storage S, address owner) internal view virtual returns (uint256 maxWithdraw_) {
+    function _maxWithdraw(StrategyData storage S, address _owner) internal view virtual returns (uint256 maxWithdraw_) {
         // Get the max the owner could withdraw currently.
-        maxWithdraw_ = IBaseStrategy(address(this)).availableWithdrawLimit(owner);
+        maxWithdraw_ = IBaseStrategy(address(this)).availableWithdrawLimit(_owner);
 
         // If there is no limit enforced.
         if (maxWithdraw_ == type(uint256).max) {
             // Saves a min check if there is no withdrawal limit.
-            maxWithdraw_ = _convertToAssets(S, _balanceOf(S, owner), Math.Rounding.Floor);
+            maxWithdraw_ = _convertToAssets(S, _balanceOf(S, _owner), Math.Rounding.Floor);
         } else {
-            maxWithdraw_ = Math.min(_convertToAssets(S, _balanceOf(S, owner), Math.Rounding.Floor), maxWithdraw_);
+            maxWithdraw_ = Math.min(_convertToAssets(S, _balanceOf(S, _owner), Math.Rounding.Floor), maxWithdraw_);
         }
     }
 
     /// @dev Internal implementation of {maxRedeem}.
-    function _maxRedeem(StrategyData storage S, address owner) internal view virtual returns (uint256 maxRedeem_) {
+    function _maxRedeem(StrategyData storage S, address _owner) internal view virtual returns (uint256 maxRedeem_) {
         // Get the max the owner could withdraw currently.
-        maxRedeem_ = IBaseStrategy(address(this)).availableWithdrawLimit(owner);
+        maxRedeem_ = IBaseStrategy(address(this)).availableWithdrawLimit(_owner);
 
         // Conversion would overflow and saves a min check if there is no withdrawal limit.
         if (maxRedeem_ == type(uint256).max) {
-            maxRedeem_ = _balanceOf(S, owner);
+            maxRedeem_ = _balanceOf(S, _owner);
         } else {
             maxRedeem_ = Math.min(
                 // Can't redeem more than the balance.
                 _convertToShares(S, maxRedeem_, Math.Rounding.Floor),
-                _balanceOf(S, owner)
+                _balanceOf(S, _owner)
             );
         }
     }
@@ -809,7 +809,7 @@ contract TokenizedStrategy {
     function _withdraw(
         StrategyData storage S,
         address receiver,
-        address owner,
+        address _owner,
         uint256 assets,
         uint256 shares,
         uint256 maxLoss
@@ -818,8 +818,8 @@ contract TokenizedStrategy {
         require(maxLoss <= MAX_BPS, "exceeds MAX_BPS");
 
         // Spend allowance if applicable.
-        if (msg.sender != owner) {
-            _spendAllowance(S, owner, msg.sender, shares);
+        if (msg.sender != _owner) {
+            _spendAllowance(S, _owner, msg.sender, shares);
         }
 
         // Cache `asset` since it is used multiple times..
@@ -855,7 +855,7 @@ contract TokenizedStrategy {
         // Update assets based on how much we took.
         S.totalAssets -= (assets + loss);
 
-        _burn(S, owner, shares);
+        _burn(S, _owner, shares);
 
         if (address(S.asset) == ETH) {
             (bool success, ) = receiver.call{ value: assets }("");
@@ -865,7 +865,7 @@ contract TokenizedStrategy {
             _asset.safeTransfer(receiver, assets);
         }
 
-        emit Withdraw(msg.sender, receiver, owner, assets, shares);
+        emit Withdraw(msg.sender, receiver, _owner, assets, shares);
 
         // Return the actual amount of assets withdrawn.
         return assets;
@@ -928,10 +928,10 @@ contract TokenizedStrategy {
      * A report() call will be needed to record any profits or losses.
      */
     function tend() external nonReentrant onlyKeepers {
-        ERC20 asset = _strategyStorage().asset;
-        uint256 balance = address(asset) == ETH ? address(this).balance : asset.balanceOf(address(this));
+        ERC20 _asset = _strategyStorage().asset;
+        uint256 _balance = address(_asset) == ETH ? address(this).balance : _asset.balanceOf(address(this));
         // Tend the strategy with the current loose balance.
-        IBaseStrategy(address(this)).tendThis(balance);
+        IBaseStrategy(address(this)).tendThis(_balance);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -1201,17 +1201,17 @@ contract TokenizedStrategy {
      * zero by default.
      *
      * This value changes when {approve} or {transferFrom} are called.
-     * @param owner The address who owns the shares.
-     * @param spender The address who would be moving the owners shares.
-     * @return . The remaining amount of shares of `owner` that could be moved by `spender`.
+     * @param _owner The address who owns the shares.
+     * @param _spender The address who would be moving the owners shares.
+     * @return . The remaining amount of shares of `_owner` that could be moved by `_spender`.
      */
-    function allowance(address owner, address spender) external view returns (uint256) {
-        return _allowance(_strategyStorage(), owner, spender);
+    function allowance(address _owner, address _spender) external view returns (uint256) {
+        return _allowance(_strategyStorage(), _owner, _spender);
     }
 
     /// @dev Internal implementation of {allowance}.
-    function _allowance(StrategyData storage S, address owner, address spender) internal view returns (uint256) {
-        return S.allowances[owner][spender];
+    function _allowance(StrategyData storage S, address _owner, address _spender) internal view returns (uint256) {
+        return S.allowances[_owner][_spender];
     }
 
     /**
@@ -1361,12 +1361,12 @@ contract TokenizedStrategy {
      * - `owner` cannot be the zero address.
      * - `spender` cannot be the zero address.
      */
-    function _approve(StrategyData storage S, address owner, address spender, uint256 amount) internal {
-        require(owner != address(0), "ERC20: approve from the zero address");
-        require(spender != address(0), "ERC20: approve to the zero address");
+    function _approve(StrategyData storage S, address _owner, address _spender, uint256 amount) internal {
+        require(_owner != address(0), "ERC20: approve from the zero address");
+        require(_spender != address(0), "ERC20: approve to the zero address");
 
-        S.allowances[owner][spender] = amount;
-        emit Approval(owner, spender, amount);
+        S.allowances[_owner][_spender] = amount;
+        emit Approval(_owner, _spender, amount);
     }
 
     /**
@@ -1377,12 +1377,12 @@ contract TokenizedStrategy {
      *
      * Might emit an {Approval} event.
      */
-    function _spendAllowance(StrategyData storage S, address owner, address spender, uint256 amount) internal {
-        uint256 currentAllowance = _allowance(S, owner, spender);
+    function _spendAllowance(StrategyData storage S, address _owner, address _spender, uint256 amount) internal {
+        uint256 currentAllowance = _allowance(S, _owner, _spender);
         if (currentAllowance != type(uint256).max) {
             require(currentAllowance >= amount, "ERC20: insufficient allowance");
             unchecked {
-                _approve(S, owner, spender, currentAllowance - amount);
+                _approve(S, _owner, _spender, currentAllowance - amount);
             }
         }
     }
@@ -1427,15 +1427,15 @@ contract TokenizedStrategy {
      * section].
      */
     function permit(
-        address owner,
-        address spender,
-        uint256 value,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
+        address _owner,
+        address _spender,
+        uint256 _value,
+        uint256 _deadline,
+        uint8 _v,
+        bytes32 _r,
+        bytes32 _s
     ) external {
-        require(deadline >= block.timestamp, "ERC20: PERMIT_DEADLINE_EXPIRED");
+        require(_deadline >= block.timestamp, "ERC20: PERMIT_DEADLINE_EXPIRED");
 
         // Unchecked because the only math done is incrementing
         // the owner's nonce which cannot realistically overflow.
@@ -1450,23 +1450,23 @@ contract TokenizedStrategy {
                                 keccak256(
                                     "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
                                 ),
-                                owner,
-                                spender,
-                                value,
-                                _strategyStorage().nonces[owner]++,
-                                deadline
+                                _owner,
+                                _spender,
+                                _value,
+                                _strategyStorage().nonces[_owner]++,
+                                _deadline
                             )
                         )
                     )
                 ),
-                v,
-                r,
-                s
+                _v,
+                _r,
+                _s
             );
 
-            require(recoveredAddress != address(0) && recoveredAddress == owner, "ERC20: INVALID_SIGNER");
+            require(recoveredAddress != address(0) && recoveredAddress == _owner, "ERC20: INVALID_SIGNER");
 
-            _approve(_strategyStorage(), recoveredAddress, spender, value);
+            _approve(_strategyStorage(), recoveredAddress, _spender, _value);
         }
     }
 
