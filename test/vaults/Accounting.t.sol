@@ -3,6 +3,7 @@ pragma solidity >=0.8.18;
 
 import "forge-std/console.sol";
 import {Setup, IMockStrategy} from "./Setup.sol";
+import {TokenizedStrategy__TooMuchLoss, ZeroShares, ZeroAssets} from "src/errors.sol";
 
 contract AccountingTest is Setup {
     function setUp() public override {
@@ -277,7 +278,7 @@ contract AccountingTest is Setup {
         vm.prank(address(yieldSource));
         asset.transfer(address(69), toLose);
 
-        vm.expectRevert("too much loss");
+        vm.expectRevert(TokenizedStrategy__TooMuchLoss.selector);
         vm.prank(user);
         strategy.withdraw(_amount, user, user);
     }
@@ -341,7 +342,7 @@ contract AccountingTest is Setup {
         vm.prank(address(yieldSource));
         asset.transfer(address(69), toLose);
 
-        vm.expectRevert("too much loss");
+        vm.expectRevert(TokenizedStrategy__TooMuchLoss.selector);
         vm.prank(user);
         strategy.redeem(_amount, user, user, 0);
     }
@@ -361,7 +362,7 @@ contract AccountingTest is Setup {
         uint256 expectedOut = _amount - toLose;
 
         // First set it to just under the expected loss.
-        vm.expectRevert("too much loss");
+        vm.expectRevert(TokenizedStrategy__TooMuchLoss.selector);
         vm.prank(user);
         strategy.redeem(_amount, user, user, _lossFactor - 1);
 
@@ -423,7 +424,7 @@ contract AccountingTest is Setup {
         vm.prank(user);
         asset.approve(address(strategy), _amount);
 
-        vm.expectRevert("ZERO_SHARES");
+        vm.expectRevert(ZeroShares.selector);
         vm.prank(user);
         strategy.deposit(_amount, user);
 
@@ -456,7 +457,7 @@ contract AccountingTest is Setup {
         vm.prank(user);
         asset.approve(address(strategy), _amount);
 
-        vm.expectRevert("ZERO_ASSETS");
+        vm.expectRevert(ZeroAssets.selector);
         vm.prank(user);
         strategy.mint(_amount, user);
 

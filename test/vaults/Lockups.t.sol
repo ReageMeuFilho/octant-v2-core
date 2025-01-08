@@ -2,10 +2,15 @@
 pragma solidity ^0.8.18;
 
 import "forge-std/console.sol";
-import { Setup } from "./Setup.sol";
-import { InsufficientLockupDuration, RageQuitInProgress, SharesStillLocked, StrategyInShutdown } from "src/errors.sol";
+import {Setup} from "./Setup.sol";
+import {
+    DragonTokenizedStrategy__InsufficientLockupDuration,
+    DragonTokenizedStrategy__RageQuitInProgress,
+    DragonTokenizedStrategy__SharesStillLocked,
+    DragonTokenizedStrategy__StrategyInShutdown
+} from "src/errors.sol";
 
-import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract LockupsTest is Setup {
     // Events to track
@@ -43,13 +48,8 @@ contract LockupsTest is Setup {
         assertEq(sharesAfter - sharesBefore, depositAmount, "Incorrect shares minted");
 
         // Verify lockup details
-        (
-            uint256 unlockTime,
-            uint256 lockedShares,
-            bool isRageQuit,
-            uint256 totalShares,
-            uint256 withdrawableShares
-        ) = strategy.getUserLockupInfo(user);
+        (uint256 unlockTime, uint256 lockedShares, bool isRageQuit, uint256 totalShares, uint256 withdrawableShares) =
+            strategy.getUserLockupInfo(user);
 
         assertEq(unlockTime, block.timestamp + lockupDuration, "Incorrect unlock time");
         assertEq(lockedShares, depositAmount, "Incorrect locked shares");
@@ -78,7 +78,7 @@ contract LockupsTest is Setup {
         assertTrue(assetsUsed > 0, "No assets were used");
 
         // Verify lockup details
-        (uint256 unlockTime, uint256 lockedShares, , , ) = strategy.getUserLockupInfo(user);
+        (uint256 unlockTime, uint256 lockedShares,,,) = strategy.getUserLockupInfo(user);
         assertEq(unlockTime, block.timestamp + lockupDuration, "Incorrect unlock time");
         assertEq(lockedShares, sharesToMint, "Incorrect locked shares");
     }
@@ -88,7 +88,7 @@ contract LockupsTest is Setup {
         uint256 depositAmount = 10_000e18;
 
         vm.startPrank(user);
-        vm.expectRevert(abi.encodeWithSelector(InsufficientLockupDuration.selector));
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__InsufficientLockupDuration.selector));
         strategy.depositWithLockup(depositAmount, user, lockupDuration);
         vm.stopPrank();
     }
@@ -102,14 +102,14 @@ contract LockupsTest is Setup {
         strategy.depositWithLockup(depositAmount, user, initialLockup);
 
         // Get initial unlock time
-        (uint256 initialUnlockTime, , , , ) = strategy.getUserLockupInfo(user);
+        (uint256 initialUnlockTime,,,,) = strategy.getUserLockupInfo(user);
 
         // Extend lockup
         uint256 extensionPeriod = 50 days;
         strategy.depositWithLockup(depositAmount, user, extensionPeriod);
 
         // Verify extended lockup
-        (uint256 newUnlockTime, , , , ) = strategy.getUserLockupInfo(user);
+        (uint256 newUnlockTime,,,,) = strategy.getUserLockupInfo(user);
         assertEq(newUnlockTime, initialUnlockTime + extensionPeriod, "Lockup not extended correctly");
         vm.stopPrank();
     }
@@ -129,13 +129,8 @@ contract LockupsTest is Setup {
         strategy.initiateRageQuit();
 
         // Verify rage quit state
-        (
-            uint256 unlockTime,
-            uint256 lockedShares,
-            bool isRageQuit,
-            uint256 totalShares,
-            uint256 withdrawableShares
-        ) = strategy.getUserLockupInfo(user);
+        (uint256 unlockTime, uint256 lockedShares, bool isRageQuit, uint256 totalShares, uint256 withdrawableShares) =
+            strategy.getUserLockupInfo(user);
 
         assertEq(unlockTime, block.timestamp + MINIMUM_LOCKUP_DURATION, "Incorrect rage quit unlock time");
         assertEq(lockedShares, depositAmount, "Incorrect locked shares");
@@ -145,7 +140,7 @@ contract LockupsTest is Setup {
         // Check partial unlocking after some time
         skip(45 days); // Half of MINIMUM_LOCKUP_DURATION
         uint256 expectedUnlocked = (depositAmount * 45 days) / MINIMUM_LOCKUP_DURATION;
-        (, , , , withdrawableShares) = strategy.getUserLockupInfo(user);
+        (,,,, withdrawableShares) = strategy.getUserLockupInfo(user);
         assertEq(withdrawableShares, expectedUnlocked, "Incorrect partial unlock amount");
 
         vm.stopPrank();
@@ -166,7 +161,7 @@ contract LockupsTest is Setup {
         strategy.initiateRageQuit();
 
         // Attempt to deposit again during the rage quit period
-        vm.expectRevert(RageQuitInProgress.selector);
+        vm.expectRevert(DragonTokenizedStrategy__RageQuitInProgress.selector);
         strategy.deposit(depositAmount, user);
 
         vm.stopPrank();
@@ -189,23 +184,22 @@ contract LockupsTest is Setup {
         skip(MINIMUM_LOCKUP_DURATION + 1 days);
 
         // Can't deposit even after the end of the rage quit period
-        vm.expectRevert(RageQuitInProgress.selector);
+        vm.expectRevert(DragonTokenizedStrategy__RageQuitInProgress.selector);
         strategy.deposit(depositAmount, user);
 
-        (
-            ,
-            uint256 lockedShares,
-            bool isRageQuit,
-            uint256 totalShares,
-            uint256 withdrawableShares
-        ) = strategy.getUserLockupInfo(user);
+        (, uint256 lockedShares, bool isRageQuit, uint256 totalShares, uint256 withdrawableShares) =
+            strategy.getUserLockupInfo(user);
 
         assertEq(lockedShares, depositAmount, "Incorrect locked shares");
         assertEq(withdrawableShares, depositAmount, "Incorrect unlocked shares");
         assertTrue(isRageQuit, "Not in rage quit state");
         assertEq(totalShares, depositAmount, "Incorrect total shares");
 
-        assertEq(strategy.maxRedeem(user), withdrawableShares, "After end of rage quit period all shares should be redeemable");
+        assertEq(
+            strategy.maxRedeem(user),
+            withdrawableShares,
+            "After end of rage quit period all shares should be redeemable"
+        );
 
         vm.stopPrank();
     }
@@ -235,7 +229,7 @@ contract LockupsTest is Setup {
 
         strategy.initiateRageQuit();
 
-        vm.expectRevert(RageQuitInProgress.selector);
+        vm.expectRevert(DragonTokenizedStrategy__RageQuitInProgress.selector);
         strategy.initiateRageQuit();
         vm.stopPrank();
     }
@@ -345,11 +339,7 @@ contract LockupsTest is Setup {
         // New deposit should update unlock time
         uint256 newLockupDuration = 120 days;
         strategy.depositWithLockup(depositAmount, user, newLockupDuration);
-        assertEq(
-            strategy.getUnlockTime(user),
-            block.timestamp + newLockupDuration,
-            "New unlock time not set correctly"
-        );
+        assertEq(strategy.getUnlockTime(user), block.timestamp + newLockupDuration, "New unlock time not set correctly");
 
         vm.stopPrank();
     }
@@ -396,9 +386,7 @@ contract LockupsTest is Setup {
 
         // During lockup
         assertEq(
-            strategy.maxWithdraw(user, maxLoss),
-            0,
-            "Should not be able to withdraw during lockup even with maxLoss"
+            strategy.maxWithdraw(user, maxLoss), 0, "Should not be able to withdraw during lockup even with maxLoss"
         );
 
         // Skip past lockup
@@ -443,9 +431,7 @@ contract LockupsTest is Setup {
         // Skip to end of rage quit period
         skip(45 days);
         assertEq(
-            strategy.maxWithdraw(user),
-            depositAmount,
-            "Should be able to withdraw full amount after rage quit period"
+            strategy.maxWithdraw(user), depositAmount, "Should be able to withdraw full amount after rage quit period"
         );
 
         vm.stopPrank();
@@ -486,10 +472,7 @@ contract LockupsTest is Setup {
         skip(45 days);
         uint256 expectedRedeem = (newLockupAmount * 45 days) / MINIMUM_LOCKUP_DURATION;
         assertApproxEqRel(
-            strategy.maxRedeem(user),
-            expectedRedeem,
-            0.01e18,
-            "Incorrect redeemable shares during rage quit"
+            strategy.maxRedeem(user), expectedRedeem, 0.01e18, "Incorrect redeemable shares during rage quit"
         );
         strategy.withdraw(expectedRedeem, user, user);
 
@@ -539,10 +522,7 @@ contract LockupsTest is Setup {
         skip(45 days);
         uint256 expectedRedeem = (newLockupAmount * 45 days) / MINIMUM_LOCKUP_DURATION;
         assertApproxEqRel(
-            strategy.maxRedeem(user),
-            expectedRedeem,
-            0.01e18,
-            "Incorrect redeemable shares during rage quit"
+            strategy.maxRedeem(user), expectedRedeem, 0.01e18, "Incorrect redeemable shares during rage quit"
         );
         strategy.withdraw(expectedRedeem, user, user, 0);
 
@@ -688,12 +668,12 @@ contract LockupsTest is Setup {
         strategy.initiateRageQuit();
 
         // Second rage quit should fail
-        vm.expectRevert(RageQuitInProgress.selector);
+        vm.expectRevert(DragonTokenizedStrategy__RageQuitInProgress.selector);
         strategy.initiateRageQuit();
 
         // Skip some time and try again
         skip(45 days);
-        vm.expectRevert(RageQuitInProgress.selector);
+        vm.expectRevert(DragonTokenizedStrategy__RageQuitInProgress.selector);
         strategy.initiateRageQuit();
 
         // Skip to end of rage quit period and try again
@@ -760,7 +740,7 @@ contract LockupsTest is Setup {
         strategy.initiateRageQuit();
 
         // Should fail since already in rage quit
-        vm.expectRevert(RageQuitInProgress.selector);
+        vm.expectRevert(DragonTokenizedStrategy__RageQuitInProgress.selector);
         strategy.depositWithLockup(depositAmount, user, lockupDuration);
 
         vm.stopPrank();
@@ -782,7 +762,7 @@ contract LockupsTest is Setup {
         uint256 standardShares = sharesAfter - sharesBefore;
 
         // Verify standard deposit state
-        (uint256 unlockTime, uint256 lockedShares, bool isRageQuit, , ) = strategy.getUserLockupInfo(user);
+        (uint256 unlockTime, uint256 lockedShares, bool isRageQuit,,) = strategy.getUserLockupInfo(user);
         assertEq(unlockTime, 0, "No unlock time should be set");
         assertEq(lockedShares, 0, "No shares should be locked");
         assertFalse(isRageQuit, "Should not be in rage quit");
@@ -803,7 +783,7 @@ contract LockupsTest is Setup {
         strategy.mintWithLockup(sharesToMint, user, lockupDuration);
 
         // Verify locked mint state
-        (unlockTime, lockedShares, isRageQuit, , ) = strategy.getUserLockupInfo(user);
+        (unlockTime, lockedShares, isRageQuit,,) = strategy.getUserLockupInfo(user);
         assertEq(unlockTime, block.timestamp + lockupDuration, "Incorrect unlock time");
         assertEq(lockedShares, standardShares / 2 + sharesToMint, "Incorrect locked shares");
         assertFalse(isRageQuit, "Should not be in rage quit");
@@ -812,16 +792,16 @@ contract LockupsTest is Setup {
         assertEq(strategy.maxWithdraw(user), 0, "Should not be able to withdraw locked shares");
         assertEq(strategy.maxRedeem(user), 0, "Should not be able to redeem locked shares");
 
-        vm.expectRevert(abi.encodeWithSelector(SharesStillLocked.selector));
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__SharesStillLocked.selector));
         strategy.withdraw(0, user, user, 0);
-        vm.expectRevert(abi.encodeWithSelector(SharesStillLocked.selector));
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__SharesStillLocked.selector));
         strategy.redeem(0, user, user, 0);
 
         // ======== Initiate Rage Quit for user ========
         strategy.initiateRageQuit();
 
         // Verify rage quit state
-        (unlockTime, lockedShares, isRageQuit, , ) = strategy.getUserLockupInfo(user);
+        (unlockTime, lockedShares, isRageQuit,,) = strategy.getUserLockupInfo(user);
         assertTrue(isRageQuit, "Should be in rage quit");
         assertEq(unlockTime, block.timestamp + 90 days, "Incorrect rage quit duration");
 
@@ -920,7 +900,7 @@ contract LockupsTest is Setup {
         strategy.depositWithLockup(depositAmount, user, 0);
 
         // Test lockup duration less than minimum
-        vm.expectRevert(abi.encodeWithSelector(InsufficientLockupDuration.selector));
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__InsufficientLockupDuration.selector));
         strategy.depositWithLockup(depositAmount, user, MINIMUM_LOCKUP_DURATION - 1);
 
         // Test max uint deposit without enough balance
@@ -948,7 +928,7 @@ contract LockupsTest is Setup {
         skip(90 days);
         // Try to extend with insufficient duration
         uint256 shortExtension = 10 days;
-        vm.expectRevert(abi.encodeWithSelector(InsufficientLockupDuration.selector));
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__InsufficientLockupDuration.selector));
         strategy.depositWithLockup(depositAmount, user, shortExtension);
 
         // Try to extend with zero duration
@@ -994,7 +974,7 @@ contract LockupsTest is Setup {
 
         // Try to extend with insufficient duration
         uint256 shortExtension = 10 days;
-        vm.expectRevert(abi.encodeWithSelector(InsufficientLockupDuration.selector));
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__InsufficientLockupDuration.selector));
         strategy.mintWithLockup(mintAmount, user, shortExtension);
 
         // Try to extend with zero duration
@@ -1014,7 +994,7 @@ contract LockupsTest is Setup {
         vm.startPrank(user);
 
         // Try to deposit after shutdown
-        vm.expectRevert(StrategyInShutdown.selector);
+        vm.expectRevert(DragonTokenizedStrategy__StrategyInShutdown.selector);
         strategy.depositWithLockup(depositAmount, user, 100 days);
 
         vm.stopPrank();
@@ -1030,7 +1010,7 @@ contract LockupsTest is Setup {
         vm.startPrank(user);
 
         // Try to mint after shutdown
-        vm.expectRevert(StrategyInShutdown.selector);
+        vm.expectRevert(DragonTokenizedStrategy__StrategyInShutdown.selector);
         strategy.mintWithLockup(mintAmount, user, 100 days);
 
         vm.stopPrank();
@@ -1046,7 +1026,7 @@ contract LockupsTest is Setup {
         vm.startPrank(user);
 
         // Try to deposit after shutdown
-        vm.expectRevert(StrategyInShutdown.selector);
+        vm.expectRevert(DragonTokenizedStrategy__StrategyInShutdown.selector);
         strategy.deposit(depositAmount, user);
 
         vm.stopPrank();
@@ -1093,8 +1073,8 @@ contract LockupsTest is Setup {
         strategy.redeem(redeemAmount, user, user, 0);
 
         // Verify balances and state after first redeem
-        (, uint256 remainingLockedShares, , uint256 newTotalShares, uint256 newWithdrawableShares) = strategy
-            .getUserLockupInfo(user);
+        (, uint256 remainingLockedShares,, uint256 newTotalShares, uint256 newWithdrawableShares) =
+            strategy.getUserLockupInfo(user);
 
         assertEq(remainingLockedShares, depositAmount - redeemAmount, "Remaining locked shares incorrect");
         assertEq(newTotalShares, shares - redeemAmount, "New total shares incorrect");

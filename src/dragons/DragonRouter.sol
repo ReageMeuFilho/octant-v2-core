@@ -281,7 +281,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      */
     function fundFromSource(address strategy, uint256 amount) external onlyRole(SPLIT_DISTRIBUTOR_ROLE) nonReentrant {
         StrategyData storage data = strategyData[strategy];
-        if(data.asset == address(0)) revert ZeroAddress();
+        if (data.asset == address(0)) revert ZeroAddress();
 
         ITokenizedStrategy(strategy).withdraw(amount, address(this), address(this), 0);
 
@@ -295,7 +295,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      * @dev Only callable by accounts with OWNER_ROLE
      */
     function setSplit(Split memory _split) external onlyRole(OWNER_ROLE) {
-        if(block.timestamp - lastSetSplitTime < COOL_DOWN_PERIOD) revert CooldownPeriodNotPassed();
+        if (block.timestamp - lastSetSplitTime < COOL_DOWN_PERIOD) revert CooldownPeriodNotPassed();
         splitChecker.checkSplit(_split, opexVault, metapool);
 
         for (uint256 i = 0; i < strategies.length; i++) {
@@ -439,14 +439,14 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
                 : userTransformer.transformer.transform(_asset, userTransformer.targetToken, _amount);
             if (userTransformer.targetToken == NATIVE_TOKEN) {
                 (bool success,) = _user.call{value: _transformedAmount}("");
-                if(!success) revert TransferFailed();
+                if (!success) revert TransferFailed();
             } else {
                 IERC20(userTransformer.targetToken).safeTransfer(_user, _transformedAmount);
             }
         } else {
             if (_asset == NATIVE_TOKEN) {
                 (bool success,) = _user.call{value: _amount}("");
-                if(!success) revert TransferFailed();
+                if (!success) revert TransferFailed();
             } else {
                 IERC20(_asset).safeTransfer(_user, _amount);
             }

@@ -3,18 +3,24 @@ pragma solidity 0.8.25;
 
 import {TokenizedStrategy, IBaseStrategy, Math, ERC20} from "./TokenizedStrategy.sol";
 import {
-    VaultSharesNotTransferable,
-    MaxUnlockIsAlwaysZero,
-    CantWithdrawLockedShares,
-    ZeroLockupDuration,
-    InsufficientLockupDuration,
-    SharesStillLocked,
-    InvalidLockupDuration,
-    InvalidRageQuitCooldownPeriod,
     Unauthorized,
-    StrategyInShutdown,
-    RageQuitInProgress
-} from "src/errors.sol";
+    DragonTokenizedStrategy__VaultSharesNotTransferable,
+    DragonTokenizedStrategy__ZeroLockupDuration,
+    DragonTokenizedStrategy__InsufficientLockupDuration,
+    DragonTokenizedStrategy__SharesStillLocked,
+    DragonTokenizedStrategy__InvalidLockupDuration,
+    DragonTokenizedStrategy__InvalidRageQuitCooldownPeriod,
+    DragonTokenizedStrategy__RageQuitInProgress,
+    DragonTokenizedStrategy__StrategyInShutdown,
+    DragonTokenizedStrategy__NoSharesToRageQuit,
+    DragonTokenizedStrategy__SharesAlreadyUnlocked,
+    DragonTokenizedStrategy__DepositMoreThanMax,
+    DragonTokenizedStrategy__MintMoreThanMax,
+    DragonTokenizedStrategy__WithdrawMoreThanMax,
+    DragonTokenizedStrategy__RedeemMoreThanMax,
+    ZeroShares,
+    ZeroAssets
+} from "../errors.sol";
 
 contract DragonTokenizedStrategy is TokenizedStrategy {
     event NewLockupSet(address indexed user, uint256 indexed unlockTime, uint256 indexed lockedShares);
@@ -35,12 +41,14 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         address _regenGovernance
     ) external {
         __TokenizedStrategy_init(_asset, _name, _owner, _management, _keeper, _dragonRouter, _regenGovernance);
-        
     }
 
     function setLockupDuration(uint256 _lockupDuration) external onlyRegenGovernance {
-        if (_lockupDuration < _strategyStorage().RANGE_MINIMUM_LOCKUP_DURATION || _lockupDuration > _strategyStorage().RANGE_MAXIMUM_LOCKUP_DURATION) {
-            revert InvalidLockupDuration();
+        if (
+            _lockupDuration < _strategyStorage().RANGE_MINIMUM_LOCKUP_DURATION
+                || _lockupDuration > _strategyStorage().RANGE_MAXIMUM_LOCKUP_DURATION
+        ) {
+            revert DragonTokenizedStrategy__InvalidLockupDuration();
         }
         _strategyStorage().MINIMUM_LOCKUP_DURATION = _lockupDuration;
     }
@@ -49,7 +57,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         if (
             _rageQuitCooldownPeriod < _strategyStorage().RANGE_MINIMUM_RAGE_QUIT_COOLDOWN_PERIOD
                 || _rageQuitCooldownPeriod > _strategyStorage().RANGE_MAXIMUM_RAGE_QUIT_COOLDOWN_PERIOD
-        ) revert InvalidRageQuitCooldownPeriod();
+        ) revert DragonTokenizedStrategy__InvalidRageQuitCooldownPeriod();
         _strategyStorage().RAGE_QUIT_COOLDOWN_PERIOD = _rageQuitCooldownPeriod;
     }
 
@@ -84,7 +92,9 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
             lockup.lockupTime = currentTime;
             lockup.unlockTime = currentTime + lockupDuration;
             // NOTE: enforce minimum lockup duration for new lockups
-            if (lockupDuration <= _strategyStorage().MINIMUM_LOCKUP_DURATION) revert InsufficientLockupDuration();
+            if (lockupDuration <= _strategyStorage().MINIMUM_LOCKUP_DURATION) {
+                revert DragonTokenizedStrategy__InsufficientLockupDuration();
+            }
 
             lockup.lockedShares = totalSharesLocked;
         } else {
@@ -95,7 +105,9 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
                 // Extend existing lockup
                 uint256 newUnlockTime = lockup.unlockTime + lockupDuration;
                 // Ensure the new unlock time is at least 3 months in the future
-                if (newUnlockTime < currentTime + _strategyStorage().MINIMUM_LOCKUP_DURATION) revert InsufficientLockupDuration();
+                if (newUnlockTime < currentTime + _strategyStorage().MINIMUM_LOCKUP_DURATION) {
+                    revert DragonTokenizedStrategy__InsufficientLockupDuration();
+                }
 
                 lockup.unlockTime = newUnlockTime;
             }
@@ -194,10 +206,9 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         StrategyData storage S = _strategyStorage();
         LockupInfo storage lockup = S.voluntaryLockups[msg.sender];
 
-        // Can't rage quit if no shares or already in rage quit
-        require(_balanceOf(S, msg.sender) > 0, "No shares to rage quit");
-        require(block.timestamp < lockup.unlockTime, "Shares already unlocked");
-        if (lockup.isRageQuit) revert RageQuitInProgress();
+        if (_balanceOf(S, msg.sender) == 0) revert DragonTokenizedStrategy__NoSharesToRageQuit();
+        if (block.timestamp >= lockup.unlockTime) revert DragonTokenizedStrategy__SharesAlreadyUnlocked();
+        if (lockup.isRageQuit) revert DragonTokenizedStrategy__RageQuitInProgress();
 
         // Set 3-month lockup
         lockup.lockupTime = block.timestamp;
@@ -286,11 +297,15 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
         LockupInfo storage lockup = S.voluntaryLockups[_owner];
-        require(assets <= _maxWithdraw(S, _owner), "ERC4626: withdraw more than max");
-        if (block.timestamp < lockup.unlockTime && !lockup.isRageQuit) revert SharesStillLocked();
+        if (assets > _maxWithdraw(S, _owner)) revert DragonTokenizedStrategy__WithdrawMoreThanMax();
+        if (block.timestamp < lockup.unlockTime && !lockup.isRageQuit) {
+            revert DragonTokenizedStrategy__SharesStillLocked();
+        }
 
         // Check for rounding error or 0 value.
-        require((shares = _convertToShares(S, assets, Math.Rounding.Ceil)) != 0, "ZERO_SHARES");
+        if ((shares = _convertToShares(S, assets, Math.Rounding.Ceil)) == 0) {
+            revert ZeroShares();
+        }
         if (lockup.isRageQuit) {
             lockup.lockedShares -= shares;
             lockup.lockupTime = block.timestamp;
@@ -340,8 +355,10 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         StrategyData storage S = _strategyStorage();
         LockupInfo storage lockup = S.voluntaryLockups[_owner];
 
-        require(shares <= _maxRedeem(S, _owner), "ERC4626: redeem more than max");
-        if (block.timestamp < lockup.unlockTime && !lockup.isRageQuit) revert SharesStillLocked();
+        if (shares > _maxRedeem(S, _owner)) revert DragonTokenizedStrategy__RedeemMoreThanMax();
+        if (block.timestamp < lockup.unlockTime && !lockup.isRageQuit) {
+            revert DragonTokenizedStrategy__SharesStillLocked();
+        }
         if (lockup.isRageQuit) {
             lockup.lockedShares -= shares;
             lockup.lockupTime = block.timestamp;
@@ -349,7 +366,9 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
 
         uint256 assets;
         // Check for rounding error or 0 value.
-        require((assets = _convertToAssets(S, shares, Math.Rounding.Floor)) != 0, "ZERO_ASSETS");
+        if ((assets = _convertToAssets(S, shares, Math.Rounding.Floor)) == 0) {
+            revert ZeroAssets();
+        }
 
         // We need to return the actual amount withdrawn in case of a loss.
         return _withdraw(S, receiver, _owner, assets, shares, maxLoss);
@@ -373,7 +392,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
-        if (S.voluntaryLockups[msg.sender].isRageQuit) revert RageQuitInProgress();
+        if (S.voluntaryLockups[msg.sender].isRageQuit) revert DragonTokenizedStrategy__RageQuitInProgress();
 
         // Deposit full balance if using max uint.
         if (assets == type(uint256).max) {
@@ -381,11 +400,13 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         }
 
         // Check for shutdown first to enable better error msg.
-        if (S.shutdown) revert StrategyInShutdown();
+        if (S.shutdown) revert DragonTokenizedStrategy__StrategyInShutdown();
         // Checking max deposit will also check if shutdown.
-        require(assets <= _maxDeposit(S, receiver), "ERC4626: deposit more than max");
+        if (assets > _maxDeposit(S, receiver)) revert DragonTokenizedStrategy__DepositMoreThanMax();
         // Check for rounding error.
-        require((shares = _convertToShares(S, assets, Math.Rounding.Floor)) != 0, "ZERO_SHARES");
+        if ((shares = _convertToShares(S, assets, Math.Rounding.Floor)) == 0) {
+            revert ZeroShares();
+        }
 
         _deposit(S, receiver, assets, shares);
         _setOrExtendLockup(S, receiver, 0, _balanceOf(S, receiver));
@@ -410,11 +431,12 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         StrategyData storage S = _strategyStorage();
 
         // Check for shutdown first to enable better error msg.
-        if (S.shutdown) revert StrategyInShutdown();
+        if (S.shutdown) revert DragonTokenizedStrategy__StrategyInShutdown();
         // Checking max mint will also check if shutdown.
-        require(shares <= _maxMint(S, receiver), "ERC4626: mint more than max");
+        if (shares > _maxMint(S, receiver)) revert DragonTokenizedStrategy__MintMoreThanMax();
         // Check for rounding error.
-        require((assets = _convertToAssets(S, shares, Math.Rounding.Ceil)) != 0, "ZERO_ASSETS");
+        assets = _convertToAssets(S, shares, Math.Rounding.Ceil);
+        if (assets == 0) revert ZeroAssets();
 
         _deposit(S, receiver, assets, shares);
         _setOrExtendLockup(S, receiver, 0, _balanceOf(S, receiver));
@@ -433,10 +455,11 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         onlyOwner
         returns (uint256 shares)
     {
-        require(lockupDuration > 0, "Lockup duration must be greater than 0");
+        if (lockupDuration == 0) revert DragonTokenizedStrategy__ZeroLockupDuration();
+
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
-        if (S.voluntaryLockups[msg.sender].isRageQuit) revert RageQuitInProgress();
+        if (S.voluntaryLockups[msg.sender].isRageQuit) revert DragonTokenizedStrategy__RageQuitInProgress();
 
         // Deposit full balance if using max uint.
         if (assets == type(uint256).max) {
@@ -444,14 +467,14 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         }
 
         // Check for shutdown first to enable better error msg.
-        if (S.shutdown) revert StrategyInShutdown();
+        if (S.shutdown) revert DragonTokenizedStrategy__StrategyInShutdown();
         // Checking max deposit will also check if shutdown.
-        require(assets <= _maxDeposit(S, receiver), "ERC4626: deposit more than max");
+        if (assets > _maxDeposit(S, receiver)) revert DragonTokenizedStrategy__DepositMoreThanMax();
         // Check for rounding error.
-        require((shares = _convertToShares(S, assets, Math.Rounding.Floor)) != 0, "ZERO_SHARES");
+        shares = _convertToShares(S, assets, Math.Rounding.Floor);
+        if (shares == 0) revert ZeroShares();
 
         _deposit(S, receiver, assets, shares);
-
         _setOrExtendLockup(S, receiver, lockupDuration, _balanceOf(S, receiver));
 
         return shares;
@@ -469,24 +492,38 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         onlyOwner
         returns (uint256 assets)
     {
-        require(lockupDuration > 0, "Lockup duration must be greater than 0");
+        if (lockupDuration == 0) revert DragonTokenizedStrategy__ZeroLockupDuration();
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
 
-        if (S.voluntaryLockups[msg.sender].isRageQuit) revert RageQuitInProgress();
+        if (S.voluntaryLockups[msg.sender].isRageQuit) revert DragonTokenizedStrategy__RageQuitInProgress();
 
         // Check for shutdown first to enable better error msg.
-        if (S.shutdown) revert StrategyInShutdown();
+        if (S.shutdown) revert DragonTokenizedStrategy__StrategyInShutdown();
         // Checking max mint will also check if shutdown.
-        require(shares <= _maxMint(S, receiver), "ERC4626: mint more than max");
+        if (shares > _maxMint(S, receiver)) revert DragonTokenizedStrategy__MintMoreThanMax();
         // Check for rounding error.
-        require((assets = _convertToAssets(S, shares, Math.Rounding.Ceil)) != 0, "ZERO_ASSETS");
+        assets = _convertToAssets(S, shares, Math.Rounding.Ceil);
+        if (assets == 0) revert ZeroAssets();
 
         _deposit(S, receiver, assets, shares);
-
         _setOrExtendLockup(S, receiver, lockupDuration, _balanceOf(S, receiver));
 
         return assets;
+    }
+
+    /**
+     * @dev Internal function to handle loss protection for dragon principal
+     * @param loss The amount of loss to protect against
+     */
+    function _handleDragonLossProtection(StrategyData storage S, uint256 loss) internal {
+        // Can only burn up to available shares
+        uint256 sharesBurned = Math.min(_convertToShares(S, loss, Math.Rounding.Floor), S.balances[S.dragonRouter]);
+
+        if (sharesBurned > 0) {
+            // Burn shares from dragon router
+            _burn(S, S.dragonRouter, sharesBurned);
+        }
     }
 
     /**
@@ -511,53 +548,30 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         // Cache storage pointer since its used repeatedly.
         StrategyData storage S = _strategyStorage();
 
-        // Tell the strategy to report the real total assets it has.
-        // It should do all reward selling and redepositing now and
-        // account for deployed and loose `asset` so we can accurately
-        // account for all funds including those potentially airdropped
-        // and then have any profits immediately locked.
         uint256 newTotalAssets = IBaseStrategy(address(this)).harvestAndReport();
-
         uint256 oldTotalAssets = _totalAssets(S);
-
         address _dragonRouter = S.dragonRouter;
-        // Calculate profit/loss.
-        // TODO: Dragon vault loss protection / insurance internal function functions as a security buffer for the dragon principal
+
         if (newTotalAssets > oldTotalAssets) {
-            // We have a profit.
             unchecked {
                 profit = newTotalAssets - oldTotalAssets;
             }
-
             _mint(S, _dragonRouter, _convertToShares(S, profit, Math.Rounding.Floor));
         } else {
-            // Expect we have a loss.
             unchecked {
                 loss = oldTotalAssets - newTotalAssets;
             }
 
-            uint256 sharesToBurn;
-            // Check in case `else` was due to being equal.
             if (loss != 0) {
-                // We will try and burn the dragon router shares first before touching the dragon's shares.
-                sharesToBurn = Math.min(
-                    // Cannot burn more than we have.
-                    S.balances[_dragonRouter],
-                    // Try and burn both the shares already unlocked and the amount for the loss.
-                    _convertToShares(S, loss, Math.Rounding.Floor)
-                );
-            }
-
-            // Check if there is anything to burn.
-            if (sharesToBurn != 0) {
-                _burn(S, _dragonRouter, sharesToBurn);
+                // Handle loss protection
+                _handleDragonLossProtection(S, loss);
             }
         }
-        // Update the new total assets value.
+
+        // Update the new total assets value
         S.totalAssets = newTotalAssets;
         S.lastReport = uint96(block.timestamp);
 
-        // Emit event with info
         emit Reported(
             profit,
             loss,
@@ -578,7 +592,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @return . a boolean value indicating whether the operation succeeded.
      */
     function transfer(address, /*to*/ uint256 /*amount*/ ) external pure override returns (bool) {
-        revert VaultSharesNotTransferable();
+        revert DragonTokenizedStrategy__VaultSharesNotTransferable();
     }
 
     /**
@@ -611,6 +625,6 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         override
         returns (bool)
     {
-        revert VaultSharesNotTransferable();
+        revert DragonTokenizedStrategy__VaultSharesNotTransferable();
     }
 }

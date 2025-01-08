@@ -3,7 +3,7 @@ pragma solidity >=0.8.25;
 
 import "forge-std/console.sol";
 import {Setup, MockStrategy, IMockStrategy} from "./Setup.sol";
-import {VaultSharesNotTransferable} from "src/errors.sol";
+import {DragonTokenizedStrategy__VaultSharesNotTransferable} from "src/errors.sol";
 
 // Adapted from Yearn and Maple finance's ERC20 standard testing packages
 // see: https://github.com/maple-labs/erc20/blob/main/contracts/test/ERC20.t.sol
@@ -58,7 +58,7 @@ contract ERC20BaseTest is Setup {
 
         mintAndDepositIntoStrategy(strategy, user, amount_);
 
-        vm.expectRevert(abi.encodeWithSelector(VaultSharesNotTransferable.selector));
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__VaultSharesNotTransferable.selector));
         strategy.transfer(user, amount_);
 
         assertEq(strategy.totalSupply(), amount_);
@@ -79,7 +79,7 @@ contract ERC20BaseTest is Setup {
         vm.prank(address(owner));
         strategy.approve(self, approval_);
 
-        vm.expectRevert(abi.encodeWithSelector(VaultSharesNotTransferable.selector));
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__VaultSharesNotTransferable.selector));
         strategy.transferFrom(address(owner), recipient_, amount_);
 
         assertEq(strategy.totalSupply(), amount_);
@@ -107,7 +107,7 @@ contract ERC20BaseTest is Setup {
         assertEq(strategy.totalSupply(), amount_);
         assertEq(strategy.allowance(address(owner), self), MAX_UINT256);
 
-        vm.expectRevert(abi.encodeWithSelector(VaultSharesNotTransferable.selector));
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__VaultSharesNotTransferable.selector));
         strategy.transferFrom(address(owner), recipient_, amount_);
 
         assertEq(strategy.totalSupply(), amount_);
@@ -126,11 +126,11 @@ contract ERC20BaseTest is Setup {
         mintAndDepositIntoStrategy(strategy, address(account), amount_ - 1);
         account.erc20_approve(address(strategy), recipient_, amount_);
 
-        vm.expectRevert(abi.encodeWithSelector(VaultSharesNotTransferable.selector));
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__VaultSharesNotTransferable.selector));
         strategy.transfer(recipient_, amount_);
 
         mintAndDepositIntoStrategy(strategy, address(account), 1);
-        vm.expectRevert(abi.encodeWithSelector(VaultSharesNotTransferable.selector));
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__VaultSharesNotTransferable.selector));
         strategy.transfer(recipient_, amount_);
 
         assertEq(strategy.balanceOf(recipient_), 0);
@@ -147,10 +147,10 @@ contract ERC20BaseTest is Setup {
         vm.prank(address(owner));
         strategy.approve(self, amount_);
 
-        vm.expectRevert(abi.encodeWithSelector(VaultSharesNotTransferable.selector));
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__VaultSharesNotTransferable.selector));
         strategy.transferFrom(address(owner), recipient_, amount_);
 
-        vm.expectRevert(abi.encodeWithSelector(VaultSharesNotTransferable.selector));
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__VaultSharesNotTransferable.selector));
         strategy.transferFrom(address(owner), recipient_, amount_);
 
         assertEq(strategy.balanceOf(recipient_), 0);
@@ -165,11 +165,11 @@ contract ERC20BaseTest is Setup {
         mintAndDepositIntoStrategy(strategy, address(owner), amount_ - 1);
         owner.erc20_approve(address(strategy), self, amount_);
 
-        vm.expectRevert(abi.encodeWithSelector(VaultSharesNotTransferable.selector));
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__VaultSharesNotTransferable.selector));
         strategy.transferFrom(address(owner), recipient_, amount_);
 
         mintAndDepositIntoStrategy(strategy, address(owner), 1);
-        vm.expectRevert(abi.encodeWithSelector(VaultSharesNotTransferable.selector));
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__VaultSharesNotTransferable.selector));
         strategy.transferFrom(address(owner), recipient_, amount_);
 
         assertEq(strategy.balanceOf(recipient_), 0);

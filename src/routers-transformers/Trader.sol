@@ -40,12 +40,12 @@ contract Trader is ITransformer, Ownable, Pausable {
     address public base;
     /// @notice Token to be bought.
     /// @dev Please note that contract that deals with quote token is the `swapper`. Here value of `quote` is purely informational.
-    address public quote; 
+    address public quote;
 
     /*//////////////////////////////////////////////////////////////
                           PRIVATE VARIABLES
     //////////////////////////////////////////////////////////////*/
-    
+
     bytes private uniPath;
     QuotePair private splitsPair;
     IUniV3OracleImpl.SetPairDetailParams[] private oraclePairDetails;

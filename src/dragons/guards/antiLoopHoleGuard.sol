@@ -1,8 +1,9 @@
+// SPDX-License-Identifier: agpl-3.0
 pragma solidity ^0.8.23;
 
-import { BaseGuard } from "zodiac/guard/BaseGuard.sol";
-import { Enum } from "zodiac/interfaces/IAvatar.sol";
-import { FactoryFriendly } from "zodiac/factory/FactoryFriendly.sol";
+import {BaseGuard} from "zodiac/guard/BaseGuard.sol";
+import {Enum} from "zodiac/interfaces/IAvatar.sol";
+import {FactoryFriendly} from "zodiac/factory/FactoryFriendly.sol";
 
 contract AntiLoopholeGuard is FactoryFriendly, BaseGuard {
     uint256 public lockEndTime;
@@ -27,16 +28,16 @@ contract AntiLoopholeGuard is FactoryFriendly, BaseGuard {
     // solhint-disable
     function checkTransaction(
         address to,
-        uint256 value,
+        uint256,
         bytes memory data,
         Enum.Operation operation,
-        uint256 safeTxGas,
-        uint256 baseGas,
-        uint256 gasPrice,
-        address gasToken,
-        address payable refundReceiver,
-        bytes memory signatures,
-        address msgSender
+        uint256,
+        uint256,
+        uint256,
+        address,
+        address payable,
+        bytes memory,
+        address
     ) external view virtual override {
         if (isDisabled) {
             return;
