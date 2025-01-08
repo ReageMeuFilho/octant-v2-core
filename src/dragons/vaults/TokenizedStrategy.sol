@@ -287,7 +287,7 @@ contract TokenizedStrategy {
         // Since STORAGE_SLOT is a constant, we have to put a variable
         // on the stack to access it from an inline assembly block.
         bytes32 slot = BASE_STRATEGY_STORAGE;
-        assembly {
+        assembly ("memory-safe") {
             S.slot := slot
         }
     }
