@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity >=0.8.18;
 
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import { BaseStrategy } from "./BaseStrategy.sol";
 // TokenizedStrategy interface used for internal view delegateCalls.
@@ -11,8 +11,6 @@ import { ITokenizedStrategy } from "../../interfaces/ITokenizedStrategy.sol";
  * @title Dragon Base Strategy
  */
 abstract contract DragonBaseStrategy is BaseStrategy {
-   
-
     /*//////////////////////////////////////////////////////////////
                             CONSTANTS
     //////////////////////////////////////////////////////////////*/
@@ -35,7 +33,6 @@ abstract contract DragonBaseStrategy is BaseStrategy {
     uint256 public maxReportDelay;
 
     address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE; // using this address to represent native ETH
-
 
     /**
      * @notice Used to initialize the strategy on deployment.
@@ -90,17 +87,14 @@ abstract contract DragonBaseStrategy is BaseStrategy {
             )
         }
     }
-    
+
     /// @dev Handle the liquidation of strategy assets.
     /// @param _amountNeeded Amount to be liquidated.
     /// @return _liquidatedAmount liquidated amount.
     /// @return _loss loss amount if it resulted in liquidation.
-    function liquidatePosition(uint256 _amountNeeded)
-        external
-        virtual
-        onlyManagement
-        returns (uint256 _liquidatedAmount, uint256 _loss)
-    {}
+    function liquidatePosition(
+        uint256 _amountNeeded
+    ) external virtual onlyManagement returns (uint256 _liquidatedAmount, uint256 _loss) {}
 
     /*//////////////////////////////////////////////////////////////
                     OPTIONAL TO OVERRIDE BY STRATEGIST
@@ -145,7 +139,7 @@ abstract contract DragonBaseStrategy is BaseStrategy {
 
         // If the call reverted. Return the error.
         if (!success) {
-            assembly ("memory-safe"){
+            assembly ("memory-safe") {
                 let ptr := mload(0x40)
                 let size := returndatasize()
                 returndatacopy(ptr, 0, size)
@@ -188,9 +182,12 @@ abstract contract DragonBaseStrategy is BaseStrategy {
             returndatacopy(0, 0, returndatasize())
             // Return any return value or error back to the caller
             switch result
-            case 0 { revert(0, returndatasize()) }
-            default { return(0, returndatasize()) }
+            case 0 {
+                revert(0, returndatasize())
+            }
+            default {
+                return(0, returndatasize())
+            }
         }
     }
-
 }

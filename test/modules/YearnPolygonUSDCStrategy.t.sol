@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import "../Base.t.sol";
-import {DragonTokenizedStrategy} from "src/dragons/DragonTokenizedStrategy.sol";
+import {DragonTokenizedStrategy} from "src/dragons/vaults/DragonTokenizedStrategy.sol";
 import {YearnPolygonUsdcStrategy} from "src/dragons/modules/YearnPolygonUsdcStrategy.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";

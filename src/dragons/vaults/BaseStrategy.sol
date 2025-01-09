@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity >=0.8.18;
 
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 // TokenizedStrategy interface used for internal view delegateCalls.
-import {ITokenizedStrategy} from "src/interfaces/ITokenizedStrategy.sol";
+import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
+import { BaseStrategy__NotSelf } from "src/errors.sol";
 
 /**
  * @title YearnV3 Base Strategy
@@ -46,7 +47,6 @@ abstract contract BaseStrategy {
      */
     ERC20 internal asset;
 
-
     /**
      * @dev This variable is set to address(this) during initialization of each strategy.
      *
@@ -61,8 +61,7 @@ abstract contract BaseStrategy {
      */
     ITokenizedStrategy internal TokenizedStrategy;
 
-    
-     /*//////////////////////////////////////////////////////////////
+    /*//////////////////////////////////////////////////////////////
                             MODIFIERS
     //////////////////////////////////////////////////////////////*/
     /**
@@ -104,9 +103,8 @@ abstract contract BaseStrategy {
      * @dev Require that the msg.sender is this address.
      */
     function _onlySelf() internal view {
-        require(msg.sender == address(this), "!self");
+        if (msg.sender != address(this)) revert BaseStrategy__NotSelf();
     }
-
 
     /*//////////////////////////////////////////////////////////////
                 NEEDED TO BE OVERRIDDEN BY STRATEGIST
@@ -170,10 +168,7 @@ abstract contract BaseStrategy {
      * @return _totalAssets A trusted and accurate account for the total
      * amount of 'asset' the strategy currently holds including idle funds.
      */
-    function _harvestAndReport()
-        internal
-        virtual
-        returns (uint256 _totalAssets);
+    function _harvestAndReport() internal virtual returns (uint256 _totalAssets);
 
     /*//////////////////////////////////////////////////////////////
                     OPTIONAL TO OVERRIDE BY STRATEGIST
@@ -248,9 +243,7 @@ abstract contract BaseStrategy {
      * @param . The address that is depositing into the strategy.
      * @return . The available amount the `_owner` can deposit in terms of `asset`
      */
-    function availableDepositLimit(
-        address /*_owner*/
-    ) public view virtual returns (uint256) {
+    function availableDepositLimit(address /*_owner*/) public view virtual returns (uint256) {
         return type(uint256).max;
     }
 
@@ -272,9 +265,7 @@ abstract contract BaseStrategy {
      * @param . The address that is withdrawing from the strategy.
      * @return . The available amount that can be withdrawn in terms of `asset`
      */
-    function availableWithdrawLimit(
-        address /*_owner*/
-    ) public view virtual returns (uint256) {
+    function availableWithdrawLimit(address /*_owner*/) public view virtual returns (uint256) {
         return type(uint256).max;
     }
 
@@ -385,5 +376,4 @@ abstract contract BaseStrategy {
     function shutdownWithdraw(uint256 _amount) external virtual onlySelf {
         _emergencyWithdraw(_amount);
     }
-
 }

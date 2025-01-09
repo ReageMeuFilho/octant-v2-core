@@ -23,14 +23,14 @@
 
 pragma solidity ^0.8.23;
 
-import {Ownable} from "@solady/auth/Ownable.sol";
-import {ERC20} from "@solady/tokens/ERC20.sol";
+import { Ownable } from "@solady/auth/Ownable.sol";
+import { ERC20 } from "@solady/tokens/ERC20.sol";
 
-import {IDivaEtherToken} from "../vendor/shamirlabs/IDivaEtherToken.sol";
+import { IDivaEtherToken } from "../vendor/shamirlabs/IDivaEtherToken.sol";
 
-import {ICapitalSourceProvider} from "../interfaces/ICapitalSourceProvider.sol";
-import {IPgStaking} from "../interfaces/IPgStaking.sol";
-import {IOctantRouter} from "../interfaces/IOctantRouter.sol";
+import { ICapitalSourceProvider } from "../interfaces/ICapitalSourceProvider.sol";
+import { IPgStaking } from "../interfaces/IPgStaking.sol";
+import { IOctantRouter } from "../interfaces/IOctantRouter.sol";
 
 interface IDivaWithdrawer {
     function requestWithdrawal(uint256 amount) external returns (uint256 withdrawalRequestId);
@@ -76,7 +76,7 @@ contract PgEtherToken is ERC20, Ownable, ICapitalSourceProvider, IPgStaking {
 
     function depositFor(address user, uint256 pgAssets) public payable returns (uint256 shares, uint256 pgShares) {
         if (pgAssets > msg.value) revert PgEtherToken__PgAssetsAboveDeposit();
-        shares = divaToken.depositFor{value: msg.value}(user);
+        shares = divaToken.depositFor{ value: msg.value }(user);
         if (pgAssets > 0) {
             pgShares = divaToken.convertToShares(pgAssets);
             mint(pgShares);
@@ -117,7 +117,7 @@ contract PgEtherToken is ERC20, Ownable, ICapitalSourceProvider, IPgStaking {
 
     function withdrawAccumulatedPgCapital() public returns (uint256 pgAmount) {
         pgAmount = address(this).balance;
-        octantRouter.deposit{value: address(this).balance}(); // @audit-issue store balance as a variable
+        octantRouter.deposit{ value: address(this).balance }(); // @audit-issue store balance as a variable
     }
 
     function claimAndWithdrawAccumulatedPgCapital() external returns (uint256 pgAmount) {
