@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.8.18;
 
-import {BaseStrategy, ERC20} from "../BaseStrategy.sol";
-import {Module} from "zodiac/core/Module.sol";
+import { DragonBaseStrategy, ERC20 } from "src/dragons/vaults/DragonBaseStrategy.sol";
+import { Module } from "zodiac/core/Module.sol";
 
-import {IStrategy} from "../../interfaces/IStrategy.sol";
+import { IStrategy } from "../../interfaces/IStrategy.sol";
 
-contract YearnPolygonUsdcStrategy is Module, BaseStrategy {
+contract YearnPolygonUsdcStrategy is Module, DragonBaseStrategy {
     /// @dev Yearn Polygon Aave V3 USDC Lender Vault
     address public constant yieldSource = 0x52367C8E381EDFb068E9fBa1e7E9B2C847042897;
 
@@ -69,7 +69,7 @@ contract YearnPolygonUsdcStrategy is Module, BaseStrategy {
         return ERC20(asset).balanceOf(address(this));
     }
 
-    function _tend(uint256 /*_idle*/ ) internal override {
+    function _tend(uint256 /*_idle*/) internal override {
         uint256 balance = ERC20(asset).balanceOf(address(this));
         if (balance > 0) {
             IStrategy(yieldSource).deposit(balance, address(this));
