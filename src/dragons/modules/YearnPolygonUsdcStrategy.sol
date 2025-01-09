@@ -15,9 +15,8 @@ contract YearnPolygonUsdcStrategy is Module, BaseStrategy {
     /// @param initializeParams Parameters of initialization encoded
     function setUp(bytes memory initializeParams) public override initializer {
         /// @dev Strategy specific parameters
-        address _asset = 0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359;
         /// @dev USDC Polygon
-        string memory _name = "Octant Polygon USDC Strategy";
+        address _asset = 0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359;
 
         (address _owner, bytes memory data) = abi.decode(initializeParams, (address, bytes));
 
@@ -26,10 +25,12 @@ contract YearnPolygonUsdcStrategy is Module, BaseStrategy {
             address _management,
             address _keeper,
             address _dragonRouter,
-            uint256 _maxReportDelay
-        ) = abi.decode(data, (address, address, address, address, uint256));
+            uint256 _maxReportDelay,
+            address _regenGovernance
+        ) = abi.decode(data, (address, address, address, address, uint256, address));
 
         __Ownable_init(msg.sender);
+        string memory _name = "Octant Polygon USDC Strategy";
         __BaseStrategy_init(
             _tokenizedStrategyImplementation,
             _asset,
@@ -38,7 +39,8 @@ contract YearnPolygonUsdcStrategy is Module, BaseStrategy {
             _keeper,
             _dragonRouter,
             _maxReportDelay,
-            _name
+            _name,
+            _regenGovernance
         );
 
         ERC20(_asset).approve(yieldSource, type(uint256).max);
