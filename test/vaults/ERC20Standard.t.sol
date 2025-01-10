@@ -3,7 +3,7 @@ pragma solidity >=0.8.25;
 
 import "forge-std/console.sol";
 import {Setup, MockStrategy, IMockStrategy} from "./Setup.sol";
-import {DragonTokenizedStrategy__VaultSharesNotTransferable} from "src/errors.sol";
+import {DragonTokenizedStrategy__VaultSharesNotTransferable, TokenizedStrategy__InvalidSigner, TokenizedStrategy__PermitDeadlineExpired} from "src/errors.sol";
 
 // Adapted from Yearn and Maple finance's ERC20 standard testing packages
 // see: https://github.com/maple-labs/erc20/blob/main/contracts/test/ERC20.t.sol
@@ -229,7 +229,7 @@ contract ERC20PermitTest is Setup {
         (uint8 v, bytes32 r, bytes32 s) =
             _getValidPermitSignature(address(strategy), _owner, _spender, 1000, 0, _deadline, _skOwner);
 
-        vm.expectRevert("ERC20: INVALID_SIGNER");
+        vm.expectRevert(TokenizedStrategy__InvalidSigner.selector);
         _user.erc20_permit(address(strategy), address(0), _spender, 1000, _deadline, v, r, s);
     }
 
@@ -238,7 +238,7 @@ contract ERC20PermitTest is Setup {
             _getValidPermitSignature(address(strategy), _owner, address(1111), 1000, 0, _deadline, _skOwner);
 
         // Using permit with unintended spender should fail.
-        vm.expectRevert("ERC20: INVALID_SIGNER");
+        vm.expectRevert(TokenizedStrategy__InvalidSigner.selector);
         _user.erc20_permit(address(strategy), _owner, _spender, 1000, _deadline, v, r, s);
     }
 
@@ -246,7 +246,7 @@ contract ERC20PermitTest is Setup {
         (uint8 v, bytes32 r, bytes32 s) =
             _getValidPermitSignature(address(strategy), _owner, _spender, 1000, 0, _deadline, _skSpender);
 
-        vm.expectRevert("ERC20: INVALID_SIGNER");
+        vm.expectRevert(TokenizedStrategy__InvalidSigner.selector);
         _user.erc20_permit(address(strategy), _owner, _spender, 1000, _deadline, v, r, s);
     }
 
@@ -261,7 +261,7 @@ contract ERC20PermitTest is Setup {
         (uint8 v, bytes32 r, bytes32 s) =
             _getValidPermitSignature(address(strategy), _owner, _spender, 1000, 0, expiry, _skOwner);
 
-        vm.expectRevert("ERC20: PERMIT_DEADLINE_EXPIRED");
+        vm.expectRevert(TokenizedStrategy__PermitDeadlineExpired.selector);
         _user.erc20_permit(address(strategy), _owner, _spender, 1000, expiry, v, r, s);
 
         assertEq(strategy.allowance(_owner, _spender), 0);
@@ -288,7 +288,7 @@ contract ERC20PermitTest is Setup {
         _user.erc20_permit(address(strategy), _owner, _spender, 1000, _deadline, v, r, s);
 
         // Second time nonce has been consumed and should fail
-        vm.expectRevert("ERC20: INVALID_SIGNER");
+        vm.expectRevert(TokenizedStrategy__InvalidSigner.selector);
         _user.erc20_permit(address(strategy), _owner, _spender, 1000, _deadline, v, r, s);
     }
 
@@ -297,7 +297,7 @@ contract ERC20PermitTest is Setup {
             _getValidPermitSignature(address(strategy), _owner, _spender, 1000, 1, _deadline, _skOwner);
 
         // Previous nonce of 0 has not been consumed yet, so nonce of 1 should fail.
-        vm.expectRevert("ERC20: INVALID_SIGNER");
+        vm.expectRevert(TokenizedStrategy__InvalidSigner.selector);
         _user.erc20_permit(address(strategy), _owner, _spender, 1000, _deadline, v, r, s);
     }
 
@@ -308,7 +308,7 @@ contract ERC20PermitTest is Setup {
             _getValidPermitSignature(someToken, _owner, _spender, 1000, 0, _deadline, _skOwner);
 
         // Using permit with unintended verifier should fail.
-        vm.expectRevert("ERC20: INVALID_SIGNER");
+        vm.expectRevert(TokenizedStrategy__InvalidSigner.selector);
         _user.erc20_permit(address(strategy), _owner, _spender, 1000, _deadline, v, r, s);
     }
 
@@ -318,7 +318,7 @@ contract ERC20PermitTest is Setup {
 
         // Send in an s that is above the upper bound.
         bytes32 badS = bytes32(S_VALUE_INCLUSIVE_UPPER_BOUND + 1);
-        vm.expectRevert("ERC20: INVALID_SIGNER");
+        vm.expectRevert(TokenizedStrategy__InvalidSigner.selector);
         _user.erc20_permit(address(strategy), _owner, _spender, 1000, _deadline, v, r, badS);
     }
 
@@ -334,12 +334,12 @@ contract ERC20PermitTest is Setup {
             if (i == type(uint8).max) {
                 break;
             } else if (i != 27 && i != 28) {
-                vm.expectRevert("ERC20: INVALID_SIGNER");
+                vm.expectRevert(TokenizedStrategy__InvalidSigner.selector);
             } else {
                 if (i == v) continue;
 
                 // Should get past the Malleable require check as 27 or 28 are valid values for s.
-                vm.expectRevert("ERC20: INVALID_SIGNER");
+                vm.expectRevert(TokenizedStrategy__InvalidSigner.selector);
             }
 
             _user.erc20_permit(address(strategy), _owner, _spender, 1000, _deadline, i, r, s);

@@ -7,7 +7,16 @@ import {
     DragonTokenizedStrategy__InsufficientLockupDuration,
     DragonTokenizedStrategy__RageQuitInProgress,
     DragonTokenizedStrategy__SharesStillLocked,
-    DragonTokenizedStrategy__StrategyInShutdown
+    DragonTokenizedStrategy__StrategyInShutdown,
+    DragonTokenizedStrategy__SharesAlreadyUnlocked,
+    DragonTokenizedStrategy__NoSharesToRageQuit,
+    DragonTokenizedStrategy__ZeroLockupDuration,
+    DragonTokenizedStrategy__WithdrawMoreThanMax,
+    DragonTokenizedStrategy__RedeemMoreThanMax,
+    ZeroAssets,
+    ZeroShares,
+    DragonTokenizedStrategy__DepositMoreThanMax,
+    DragonTokenizedStrategy__MintMoreThanMax
 } from "src/errors.sol";
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -215,7 +224,7 @@ contract LockupsTest is Setup {
         skip(lockupDuration + 1);
 
         // Try to rage quit
-        vm.expectRevert("Shares already unlocked");
+        vm.expectRevert(DragonTokenizedStrategy__SharesAlreadyUnlocked.selector);
         strategy.initiateRageQuit();
         vm.stopPrank();
     }
@@ -262,7 +271,7 @@ contract LockupsTest is Setup {
         strategy.depositWithLockup(depositAmount, user, lockupDuration);
 
         // Try to withdraw during lockup
-        vm.expectRevert("ERC4626: withdraw more than max");
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__WithdrawMoreThanMax.selector));
         strategy.withdraw(depositAmount, user, user);
 
         // Skip past lockup
@@ -307,11 +316,11 @@ contract LockupsTest is Setup {
         strategy.deposit(additionalDeposit, user);
 
         // Try to withdraw more than unlocked shares
-        vm.expectRevert("ERC4626: withdraw more than max");
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__WithdrawMoreThanMax.selector));
         strategy.withdraw(depositAmount + 1, user, user);
 
         // Should not be able to withdraw locked shares
-        vm.expectRevert("ERC4626: withdraw more than max");
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__WithdrawMoreThanMax.selector));
 
         strategy.withdraw(additionalDeposit, user, user, 0);
         vm.stopPrank();
@@ -476,7 +485,7 @@ contract LockupsTest is Setup {
         );
         strategy.withdraw(expectedRedeem, user, user);
 
-        vm.expectRevert("ERC4626: withdraw more than max");
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__WithdrawMoreThanMax.selector));
         strategy.withdraw(expectedRedeem, user, user);
         assertApproxEqRel(strategy.maxRedeem(user), 0, 0.01e18, "Incorrect redeemable shares during rage quit");
 
@@ -526,7 +535,7 @@ contract LockupsTest is Setup {
         );
         strategy.withdraw(expectedRedeem, user, user, 0);
 
-        vm.expectRevert("ERC4626: withdraw more than max");
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__WithdrawMoreThanMax.selector));
         strategy.withdraw(expectedRedeem, user, user, 0);
         assertApproxEqRel(strategy.maxRedeem(user), 0, 0.01e18, "Incorrect redeemable shares during rage quit");
 
@@ -634,7 +643,7 @@ contract LockupsTest is Setup {
     function test_revert_initiateRageQuit_noShares() public {
         // Try to rage quit without any shares
         vm.prank(user);
-        vm.expectRevert("No shares to rage quit");
+        vm.expectRevert(DragonTokenizedStrategy__NoSharesToRageQuit.selector);
         strategy.initiateRageQuit();
 
         // Deposit without lockup and check it still fails
@@ -646,13 +655,13 @@ contract LockupsTest is Setup {
         skip(1 days);
 
         // Should fail because no locked shares
-        vm.expectRevert("Shares already unlocked");
+        vm.expectRevert(DragonTokenizedStrategy__SharesAlreadyUnlocked.selector);
         strategy.initiateRageQuit();
         vm.stopPrank();
 
         // Check with different users
         vm.prank(address(0xdead));
-        vm.expectRevert("No shares to rage quit");
+        vm.expectRevert(DragonTokenizedStrategy__NoSharesToRageQuit.selector);
         strategy.initiateRageQuit();
     }
 
@@ -678,7 +687,7 @@ contract LockupsTest is Setup {
 
         // Skip to end of rage quit period and try again
         skip(MINIMUM_LOCKUP_DURATION + 1);
-        vm.expectRevert("Shares already unlocked");
+        vm.expectRevert(DragonTokenizedStrategy__SharesAlreadyUnlocked.selector);
         strategy.initiateRageQuit();
         vm.stopPrank();
     }
@@ -689,24 +698,24 @@ contract LockupsTest is Setup {
 
         vm.startPrank(user);
 
-        vm.expectRevert("No shares to rage quit");
+        vm.expectRevert(DragonTokenizedStrategy__NoSharesToRageQuit.selector);
         strategy.initiateRageQuit();
 
         // Test with standard deposit (no lockup)
         strategy.deposit(depositAmount, user);
         assertEq(strategy.getUnlockTime(user), 0, "Unlock time should be 0 for unlocked shares");
-        vm.expectRevert("Shares already unlocked");
+        vm.expectRevert(DragonTokenizedStrategy__SharesAlreadyUnlocked.selector);
         strategy.initiateRageQuit();
 
         // Test with expired lockup
         strategy.depositWithLockup(depositAmount, user, lockupDuration);
         skip(lockupDuration + 1);
-        vm.expectRevert("Shares already unlocked");
+        vm.expectRevert(DragonTokenizedStrategy__SharesAlreadyUnlocked.selector);
         strategy.initiateRageQuit();
 
         // Test with mixed locked and unlocked shares that are expired
         strategy.deposit(depositAmount, user);
-        vm.expectRevert("Shares already unlocked");
+        vm.expectRevert(DragonTokenizedStrategy__SharesAlreadyUnlocked.selector);
         strategy.initiateRageQuit();
 
         // Test after completing a rage quit period
@@ -714,7 +723,7 @@ contract LockupsTest is Setup {
         strategy.depositWithLockup(newAmount, user, lockupDuration);
         strategy.initiateRageQuit();
         skip(MINIMUM_LOCKUP_DURATION + 1);
-        vm.expectRevert("Shares already unlocked");
+        vm.expectRevert(DragonTokenizedStrategy__SharesAlreadyUnlocked.selector);
         strategy.initiateRageQuit();
 
         vm.stopPrank();
@@ -727,7 +736,7 @@ contract LockupsTest is Setup {
 
         // Test zero lockup
         strategy.deposit(depositAmount, user);
-        vm.expectRevert("Shares already unlocked");
+        vm.expectRevert(DragonTokenizedStrategy__SharesAlreadyUnlocked.selector);
         strategy.initiateRageQuit();
 
         // Test with locked shares
@@ -819,23 +828,23 @@ contract LockupsTest is Setup {
         vm.startPrank(user);
 
         // Test withdraw with no balance
-        vm.expectRevert("ERC4626: withdraw more than max");
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__WithdrawMoreThanMax.selector));
         strategy.withdraw(depositAmount, user, user, 0);
 
         // Setup initial deposit with lockup
         strategy.depositWithLockup(depositAmount, user, lockupDuration);
 
         // Test withdraw before unlock time
-        vm.expectRevert("ERC4626: withdraw more than max");
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__WithdrawMoreThanMax.selector));
         strategy.withdraw(depositAmount, user, user, 0);
 
         // Test withdraw more than max
         skip(lockupDuration + 1);
-        vm.expectRevert("ERC4626: withdraw more than max");
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__WithdrawMoreThanMax.selector));
         strategy.withdraw(depositAmount + 1, user, user, 0);
 
         // Test withdraw zero amount
-        vm.expectRevert("ZERO_SHARES");
+        vm.expectRevert(abi.encodeWithSelector(ZeroAssets.selector));
         strategy.withdraw(0, user, user, 0);
 
         vm.stopPrank();
@@ -848,23 +857,23 @@ contract LockupsTest is Setup {
         vm.startPrank(user);
 
         // Test redeem with no balance
-        vm.expectRevert("ERC4626: redeem more than max");
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__RedeemMoreThanMax.selector));
         strategy.redeem(depositAmount, user, user, 0);
 
         // Setup initial deposit with lockup
         strategy.depositWithLockup(depositAmount, user, lockupDuration);
 
         // Test redeem before unlock time
-        vm.expectRevert("ERC4626: redeem more than max");
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__RedeemMoreThanMax.selector));
         strategy.redeem(depositAmount, user, user, 0);
 
         // Test redeem more than max
         skip(lockupDuration + 1);
-        vm.expectRevert("ERC4626: redeem more than max");
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__RedeemMoreThanMax.selector));
         strategy.redeem(depositAmount + 1, user, user, 0);
 
         // Test redeem zero amount
-        vm.expectRevert("ZERO_ASSETS");
+        vm.expectRevert(abi.encodeWithSelector(ZeroAssets.selector));
         strategy.redeem(0, user, user, 0);
 
         vm.stopPrank();
@@ -896,7 +905,7 @@ contract LockupsTest is Setup {
         vm.startPrank(user);
 
         // Test zero lockup duration
-        vm.expectRevert("Lockup duration must be greater than 0");
+        vm.expectRevert(DragonTokenizedStrategy__ZeroLockupDuration.selector);
         strategy.depositWithLockup(depositAmount, user, 0);
 
         // Test lockup duration less than minimum
@@ -906,7 +915,7 @@ contract LockupsTest is Setup {
         // Test max uint deposit without enough balance
         uint256 sharesBefore = strategy.balanceOf(user);
         uint256 assetsBefore = asset.balanceOf(user);
-        vm.expectRevert("ERC4626: deposit more than max");
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__DepositMoreThanMax.selector));
         strategy.depositWithLockup(assetsBefore * 2, user, 100 days);
         //assertEq(asset.balanceOf(user), 0, "Should have no balance left after max deposit");
         assertEq(strategy.balanceOf(user), sharesBefore, "Should not have minted any shares");
@@ -932,7 +941,7 @@ contract LockupsTest is Setup {
         strategy.depositWithLockup(depositAmount, user, shortExtension);
 
         // Try to extend with zero duration
-        vm.expectRevert("Lockup duration must be greater than 0");
+        vm.expectRevert(DragonTokenizedStrategy__ZeroLockupDuration.selector);
         strategy.depositWithLockup(depositAmount, user, 0);
 
         vm.stopPrank();
@@ -944,20 +953,20 @@ contract LockupsTest is Setup {
         vm.startPrank(user);
 
         // Test zero lockup duration
-        vm.expectRevert("Lockup duration must be greater than 0");
+        vm.expectRevert(DragonTokenizedStrategy__ZeroLockupDuration.selector);
         strategy.mintWithLockup(mintAmount, user, 0);
 
         // Test minting zero shares
-        vm.expectRevert("ZERO_ASSETS");
+        vm.expectRevert(abi.encodeWithSelector(ZeroAssets.selector));
         strategy.mintWithLockup(0, user, 100 days);
 
         // Test mint requiring more assets than user has
         uint256 largeAmount = INITIAL_DEPOSIT * 2;
-        vm.expectRevert("ERC4626: deposit more than max");
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__DepositMoreThanMax.selector));
         strategy.mintWithLockup(largeAmount, user, 100 days);
         assertEq(strategy.balanceOf(user), 0, "Should not have minted any shares");
 
-        vm.expectRevert("ERC4626: deposit more than max");
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__DepositMoreThanMax.selector));
         strategy.mintWithLockup(type(uint256).max, user, 100 days);
         vm.stopPrank();
     }
@@ -978,7 +987,7 @@ contract LockupsTest is Setup {
         strategy.mintWithLockup(mintAmount, user, shortExtension);
 
         // Try to extend with zero duration
-        vm.expectRevert("Lockup duration must be greater than 0");
+        vm.expectRevert(DragonTokenizedStrategy__ZeroLockupDuration.selector);
         strategy.mintWithLockup(mintAmount, user, 0);
 
         vm.stopPrank();
