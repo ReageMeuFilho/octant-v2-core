@@ -148,3 +148,74 @@ Handles yield harvesting and assets reporting.
 2. Gets maximum withdrawable amount from vault
 3. Withdraws entire balance from vault
 4. Returns current balance as total assets
+
+Let's analyze all the remaining methods of YearnPolygonUsdcStrategy.
+
+#### Method: _deployFunds
+
+Deposits funds into the Yearn vault.
+
+```solidity
+ 1  function _deployFunds(uint256 _amount) internal override {
+ 2      IStrategy(yieldSource).deposit(_amount, address(this));
+ 3  }
+```
+
+1. Internal function to send assets into the underlying yearn vault strategy
+2. Deposits specified amount to Yearn vault
+
+#### Method: _freeFunds
+
+Withdraws funds from the Yearn vault.
+
+```solidity
+ 1  function _freeFunds(uint256 _amount) internal override {
+ 2      IStrategy(yieldSource).withdraw(_amount, address(this), address(this));
+ 3  }
+```
+
+1. Internal function overriding base strategy's withdrawal method
+2. Withdraws specified amount from underlying vault to this one, setting both recipient and owner as this contract
+
+#### Method: _tend
+
+Manages idle funds by depositing them into the vault.
+
+```solidity
+ 1  function _tend(uint256 /*_idle*/) internal override {
+ 2      uint256 balance = ERC20(asset).balanceOf(address(this));
+ 3      if (balance > 0) {
+ 4          IStrategy(yieldSource).deposit(balance, address(this));
+ 5      }
+ 6  }
+```
+
+1. Internal function overriding base strategy's tend method, idle parameter unused
+2. Gets current USDC balance of the strategy
+3-5. If balance exists, deposits entire amount into Yearn vault, but maybe should check this makes sense and rates are ok
+
+#### Method: _emergencyWithdraw
+
+Emergency withdrawal function to recover funds from vault.
+
+```solidity
+ 1  function _emergencyWithdraw(uint256 _amount) internal override {
+ 2      IStrategy(yieldSource).withdraw(_amount, address(this), address(this));
+ 3  }
+```
+
+1. Internal function overriding base strategy's emergency withdrawal
+2. Withdraws specified amount from vault, similar to _freeFunds but used in emergency scenarios, passes through to underlying, must be called by correct role in exposed version and withdraws amount from the Yearn vault
+
+#### Method: _tendTrigger
+
+Determines if tending should occur.
+
+```solidity
+ 1  function _tendTrigger() internal pure override returns (bool) {
+ 2      return true;
+ 3  }
+```
+
+1. Internal pure function overriding base strategy's tend trigger
+2. Always returns true, indicating tending should always be possible however this could allow keeper to realize losses any time
