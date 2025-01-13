@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity >=0.8.18;
 
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Enum} from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
-
-import { IBaseStrategy } from "../../src/interfaces/IBaseStrategy.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { Enum } from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 import { IAvatar } from "zodiac/interfaces/IAvatar.sol";
-import { ZeroAddress, ZeroShares, ZeroAssets, ReentrancyGuard__ReentrantCall, TokenizedStrategy__NotOwner, TokenizedStrategy__NotManagement, TokenizedStrategy__NotKeeperOrManagement, TokenizedStrategy__NotEmergencyAuthorized, TokenizedStrategy__AlreadyInitialized, TokenizedStrategy__DepositMoreThanMax, TokenizedStrategy__MintMoreThanMax, TokenizedStrategy__InvalidMaxLoss, TokenizedStrategy__TransferFromZeroAddress, TokenizedStrategy__TransferToZeroAddress, TokenizedStrategy__TransferToStrategy, TokenizedStrategy__MintToZeroAddress, TokenizedStrategy__BurnFromZeroAddress, TokenizedStrategy__ApproveFromZeroAddress, TokenizedStrategy__ApproveToZeroAddress, TokenizedStrategy__InsufficientAllowance, TokenizedStrategy__PermitDeadlineExpired, TokenizedStrategy__InvalidSigner, TokenizedStrategy__NotSelf, TokenizedStrategy__WithdrawMoreThanMax, TokenizedStrategy__RedeemMoreThanMax, TokenizedStrategy__TransferFailed, TokenizedStrategy__NotPendingManagement, TokenizedStrategy__StrategyInShutdown, TokenizedStrategy__TooMuchLoss } from "../errors.sol";
+import { ZeroAddress, ZeroShares, ZeroAssets, ReentrancyGuard__ReentrantCall, TokenizedStrategy__NotOwner, TokenizedStrategy__NotManagement, TokenizedStrategy__NotKeeperOrManagement, TokenizedStrategy__NotEmergencyAuthorized, TokenizedStrategy__AlreadyInitialized, TokenizedStrategy__DepositMoreThanMax, TokenizedStrategy__MintMoreThanMax, TokenizedStrategy__InvalidMaxLoss, TokenizedStrategy__TransferFromZeroAddress, TokenizedStrategy__TransferToZeroAddress, TokenizedStrategy__TransferToStrategy, TokenizedStrategy__MintToZeroAddress, TokenizedStrategy__BurnFromZeroAddress, TokenizedStrategy__ApproveFromZeroAddress, TokenizedStrategy__ApproveToZeroAddress, TokenizedStrategy__InsufficientAllowance, TokenizedStrategy__PermitDeadlineExpired, TokenizedStrategy__InvalidSigner, TokenizedStrategy__NotSelf, TokenizedStrategy__WithdrawMoreThanMax, TokenizedStrategy__RedeemMoreThanMax, TokenizedStrategy__TransferFailed, TokenizedStrategy__NotPendingManagement, TokenizedStrategy__StrategyInShutdown, TokenizedStrategy__TooMuchLoss } from "../../errors.sol";
+
+import { IBaseStrategy } from "src/interfaces/IBaseStrategy.sol";
 
 contract TokenizedStrategy {
     using Math for uint256;
@@ -79,7 +79,11 @@ contract TokenizedStrategy {
      * and transferred those `assets` to `receiver`.
      */
     event Withdraw(
-        address indexed caller, address indexed receiver, address indexed owner, uint256 assets, uint256 shares
+        address indexed caller,
+        address indexed receiver,
+        address indexed owner,
+        uint256 assets,
+        uint256 shares
     );
 
     /*//////////////////////////////////////////////////////////////
@@ -286,7 +290,7 @@ contract TokenizedStrategy {
         // Since STORAGE_SLOT is a constant, we have to put a variable
         // on the stack to access it from an inline assembly block.
         bytes32 slot = BASE_STRATEGY_STORAGE;
-        assembly {
+        assembly ("memory-safe") {
             S.slot := slot
         }
     }
@@ -352,14 +356,10 @@ contract TokenizedStrategy {
      * @param receiver The address to receive the `shares`.
      * @return shares The actual amount of shares issued.
      */
-    function deposit(uint256 assets, address receiver)
-        external
-        payable
-        virtual
-        nonReentrant
-        onlyOwner
-        returns (uint256 shares)
-    {
+    function deposit(
+        uint256 assets,
+        address receiver
+    ) external payable virtual nonReentrant onlyOwner returns (uint256 shares) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
 
@@ -384,14 +384,10 @@ contract TokenizedStrategy {
      * @param receiver The address to receive the `shares`.
      * @return assets The actual amount of asset deposited.
      */
-    function mint(uint256 shares, address receiver)
-        external
-        payable
-        virtual
-        nonReentrant
-        onlyOwner
-        returns (uint256 assets)
-    {
+    function mint(
+        uint256 shares,
+        address receiver
+    ) external payable virtual nonReentrant onlyOwner returns (uint256 assets) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
 
@@ -675,11 +671,11 @@ contract TokenizedStrategy {
     }
 
     /// @dev Internal implementation of {convertToShares}.
-    function _convertToShares(StrategyData storage S, uint256 assets, Math.Rounding _rounding)
-        internal
-        view
-        returns (uint256)
-    {
+    function _convertToShares(
+        StrategyData storage S,
+        uint256 assets,
+        Math.Rounding _rounding
+    ) internal view returns (uint256) {
         // Saves an extra SLOAD if values are non-zero.
         uint256 totalSupply_ = _totalSupply(S);
         // If supply is 0, PPS = 1.
@@ -693,11 +689,11 @@ contract TokenizedStrategy {
     }
 
     /// @dev Internal implementation of {convertToAssets}.
-    function _convertToAssets(StrategyData storage S, uint256 shares, Math.Rounding _rounding)
-        internal
-        view
-        returns (uint256)
-    {
+    function _convertToAssets(
+        StrategyData storage S,
+        uint256 shares,
+        Math.Rounding _rounding
+    ) internal view returns (uint256) {
         // Saves an extra SLOAD if totalSupply() is non-zero.
         uint256 supply = _totalSupply(S);
 
@@ -811,6 +807,7 @@ contract TokenizedStrategy {
      * If we are not able to withdraw the full amount needed, it will
      * be counted as a loss and passed on to the user.
      */
+    // solhint-disable-next-line code-complexity
     function _withdraw(
         StrategyData storage S,
         address receiver,
@@ -1481,15 +1478,16 @@ contract TokenizedStrategy {
      * @return . The domain separator that will be used for any {permit} calls.
      */
     function DOMAIN_SEPARATOR() public view returns (bytes32) {
-        return keccak256(
-            abi.encode(
-                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                keccak256("Dragon Vault"),
-                keccak256(bytes(API_VERSION)),
-                block.chainid,
-                address(this)
-            )
-        );
+        return
+            keccak256(
+                abi.encode(
+                    keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                    keccak256("Dragon Vault"),
+                    keccak256(bytes(API_VERSION)),
+                    block.chainid,
+                    address(this)
+                )
+            );
     }
 
     /*//////////////////////////////////////////////////////////////

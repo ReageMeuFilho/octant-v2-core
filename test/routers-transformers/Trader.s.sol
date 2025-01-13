@@ -145,6 +145,24 @@ contract TestTraderRandomness is BaseTest {
         assertEq(address(trader).balance, 0);
     }
 
+    function test_emergecy_stop_stop_throws() external {
+        vm.startPrank(temps.safe);
+        trader.emergencyStop(true);
+        vm.stopPrank();
+
+        vm.startPrank(temps.safe);
+        vm.expectRevert();
+        trader.emergencyStop(true);
+        vm.stopPrank();
+    }
+
+    function test_emergecy_resume_resume_throws() external {
+        vm.startPrank(temps.safe);
+        vm.expectRevert();
+        trader.emergencyStop(false);
+        vm.stopPrank();
+    }
+
     function test_emergencyStop() external {
         uint256 blocks = 1_000;
         vm.deal(address(trader), 100 ether);

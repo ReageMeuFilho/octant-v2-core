@@ -141,6 +141,42 @@ The contract uses a unique storage pattern with a custom storage slot to prevent
 
 ### Security Analysis
 
+INFO:Detectors:
+
+**uses a dangerous strict equality:**
+
+TokenizedStrategy.\_deposit(TokenizedStrategy.StrategyData,address,uint256,uint256) (src/dragons/TokenizedStrategy.sol#805-837)
+
+- `IAvatar(S.owner).execTransactionFromModule(address(this),assets,,Enum.Operation.Call) == false`
+
+(src/dragons/TokenizedStrategy.sol#811)
+
+TokenizedStrategy.\_deposit(TokenizedStrategy.StrategyData,address,uint256,uint256) (src/dragons/TokenizedStrategy.sol#805-837)
+
+- `IAvatar(S.owner).execTransactionFromModule(address(_asset),0,abi.encodeWithSignature(transfer(address,uint256),address(this),assets),Enum.Operation.Call) == false`
+
+(src/dragons/TokenizedStrategy.sol#816-821)
+
+TokenizedStrategy.deposit(uint256,address) (src/dragons/TokenizedStrategy.sol#385-407)
+
+- `(shares = _convertToShares(S,assets,Math.Rounding.Floor)) == 0`
+
+(src/dragons/TokenizedStrategy.sol#404)
+
+TokenizedStrategy.withdraw(uint256,address,address,uint256) (src/dragons/TokenizedStrategy.sol#458-476)
+
+- `shares == 0`
+
+(src/dragons/TokenizedStrategy.sol#472)
+
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#dangerous-strict-equalities
+
+**a local variable never initialized**
+
+TokenizedStrategy.\_withdraw(TokenizedStrategy.StrategyData,address,address,uint256,uint256,uint256).loss (src/dragons/TokenizedStrategy.sol#868)
+
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#uninitialized-local-variables
+
 #### Storage Layout
 
 - `asset`: Underlying ERC20 token
@@ -219,6 +255,54 @@ The key innovation is the balance between commitment (through lockups) and flexi
 - `report() external returns (uint256 profit, uint256 loss)`
 
 ### Security Analysis
+
+INFO:Detectors:
+
+**uses a dangerous strict equality:**
+
+DragonTokenizedStrategy.deposit(uint256,address) (src/dragons/DragonTokenizedStrategy.sol#385-413)
+
+- `(shares = _convertToShares(S,assets,Math.Rounding.Floor)) == 0`
+
+(src/dragons/DragonTokenizedStrategy.sol#407)
+
+DragonTokenizedStrategy.depositWithLockup(uint256,address,uint256) (src/dragons/DragonTokenizedStrategy.sol#453-481)
+
+- `shares == 0`
+
+(src/dragons/DragonTokenizedStrategy.sol#475)
+
+DragonTokenizedStrategy.mint(uint256,address) (src/dragons/DragonTokenizedStrategy.sol#422-443)
+
+- `assets == 0`
+
+(src/dragons/DragonTokenizedStrategy.sol#439)
+
+DragonTokenizedStrategy.mintWithLockup(uint256,address,uint256) (src/dragons/DragonTokenizedStrategy.sol#490-513)
+
+- `assets == 0`
+
+(src/dragons/DragonTokenizedStrategy.sol#507)
+
+DragonTokenizedStrategy.redeem(uint256,address,address,uint256) (src/dragons/DragonTokenizedStrategy.sol#348-375)
+
+- `(assets = _convertToAssets(S,shares,Math.Rounding.Floor)) == 0`
+
+(src/dragons/DragonTokenizedStrategy.sol#369)
+
+DragonTokenizedStrategy.withdraw(uint256,address,address,uint256) (src/dragons/DragonTokenizedStrategy.sol#291-315)
+
+- `(shares = _convertToShares(S,assets,Math.Rounding.Ceil)) == 0`
+
+(src/dragons/DragonTokenizedStrategy.sol#306)
+
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#dangerous-strict-equalities
+
+**a local variable never initialized**
+
+DragonTokenizedStrategy.redeem(uint256,address,address,uint256).assets (src/dragons/DragonTokenizedStrategy.sol#367)
+
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#uninitialized-local-variables
 
 #### Storage Layout
 

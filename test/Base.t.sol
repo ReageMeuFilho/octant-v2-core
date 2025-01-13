@@ -51,6 +51,15 @@ contract BaseTest is Test, TestPlus {
         token = new TestERC20();
     }
 
+    /// @notice Helper function to setup test environment with a Safe and Module
+    /// @dev Creates a new Safe with a single owner and deploys a module through the factory
+    /// @param moduleImplementation The implementation address of the module to deploy
+    /// @param moduleData The initialization data for the module
+    /// @return t A struct containing the test environment addresses and keys
+    ///         - owner: The Safe owner address
+    ///         - ownerPrivateKey: The private key of the owner
+    ///         - safe: The deployed Safe proxy address 
+    ///         - module: The deployed module address
     function _testTemps(address moduleImplementation, bytes memory moduleData) internal returns (testTemps memory t) {
         (t.owner, t.ownerPrivateKey) = _randomSigner();
         owners = [t.owner];

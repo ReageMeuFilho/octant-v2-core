@@ -2,11 +2,12 @@
 pragma solidity ^0.8.13;
 
 import "../Base.t.sol";
-import {DragonTokenizedStrategy} from "src/dragons/DragonTokenizedStrategy.sol";
+import {DragonTokenizedStrategy} from "src/dragons/vaults/DragonTokenizedStrategy.sol";
 import {YearnPolygonUsdcStrategy} from "src/dragons/modules/YearnPolygonUsdcStrategy.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IStrategy} from "src/interfaces/IStrategy.sol";
+import {TokenizedStrategy__NotOwner} from "src/errors.sol";
 
 contract YearnPolygonUsdcStrategyTest is BaseTest {
     address management = makeAddr("management");
@@ -29,7 +30,7 @@ contract YearnPolygonUsdcStrategyTest is BaseTest {
 
         temps = _testTemps(
             moduleImplementation,
-            abi.encode(tokenizedStrategyImplementation, management, keeper, dragonRouter, maxReportDelay)
+            abi.encode(tokenizedStrategyImplementation, management, keeper, dragonRouter, maxReportDelay, management)
         );
         module = IStrategy(payable(temps.module));
     }
@@ -49,7 +50,7 @@ contract YearnPolygonUsdcStrategyTest is BaseTest {
         deal(address(asset), temps.safe, amount, true);
 
         // only safe can call deposit function
-        vm.expectRevert("Unauthorized");
+        vm.expectRevert(abi.encodeWithSelector(TokenizedStrategy__NotOwner.selector));
         module.deposit(amount, temps.safe);
 
         vm.startPrank(temps.safe);

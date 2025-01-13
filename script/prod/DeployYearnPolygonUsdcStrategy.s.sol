@@ -8,7 +8,7 @@ import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxy.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
 
 import {YearnPolygonUsdcStrategy} from "src/dragons/modules/YearnPolygonUsdcStrategy.sol";
-import {DragonTokenizedStrategy} from "src/dragons/DragonTokenizedStrategy.sol";
+import {DragonTokenizedStrategy} from "src/dragons/vaults/DragonTokenizedStrategy.sol";
 import {DeployDragonRouter} from "./DeployDragonRouter.s.sol";
 import {ModuleProxyFactory} from "src/dragons/ModuleProxyFactory.sol";
 

@@ -84,6 +84,10 @@ interface IEvents {
      * and transferred those `assets` to `receiver`.
      */
     event Withdraw(
-        address indexed caller, address indexed receiver, address indexed owner, uint256 assets, uint256 shares
+        address indexed caller,
+        address indexed receiver,
+        address indexed owner,
+        uint256 assets,
+        uint256 shares
     );
 }

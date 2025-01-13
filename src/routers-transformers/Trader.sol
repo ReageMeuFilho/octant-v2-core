@@ -1,23 +1,23 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.23;
 
-import { Ownable } from "solady/src/auth/Ownable.sol";
-import { SafeCastLib } from "solady/src/utils/SafeCastLib.sol";
-import { FixedPointMathLib } from "solady/src/utils/FixedPointMathLib.sol";
-import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { Enum } from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
+import {Ownable} from "solady/src/auth/Ownable.sol";
+import {SafeCastLib} from "solady/src/utils/SafeCastLib.sol";
+import {FixedPointMathLib} from "solady/src/utils/FixedPointMathLib.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Enum} from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 
-import { CreateOracleParams, IOracleFactory, IOracle, OracleParams } from "../../src/vendor/0xSplits/OracleParams.sol";
-import { QuotePair, QuoteParams } from "../../src/vendor/0xSplits/LibQuotes.sol";
-import { OracleParams } from "../vendor/0xSplits/OracleParams.sol";
-import { UniV3Swap } from "../../src/vendor/0xSplits/UniV3Swap.sol";
+import {CreateOracleParams, IOracleFactory, IOracle, OracleParams} from "../../src/vendor/0xSplits/OracleParams.sol";
+import {QuotePair, QuoteParams} from "../../src/vendor/0xSplits/LibQuotes.sol";
+import {OracleParams} from "../vendor/0xSplits/OracleParams.sol";
+import {UniV3Swap} from "../../src/vendor/0xSplits/UniV3Swap.sol";
 
-import { ITransformer } from "../interfaces/ITransformer.sol";
-import { IUniV3OracleImpl } from "../../src/vendor/0xSplits/IUniV3OracleImpl.sol";
-import { ISwapperImpl } from "../../src/vendor/0xSplits/SwapperImpl.sol";
-import { ISwapRouter } from "../../src/vendor/uniswap/ISwapRouter.sol";
+import {ITransformer} from "../interfaces/ITransformer.sol";
+import {IUniV3OracleImpl} from "../../src/vendor/0xSplits/IUniV3OracleImpl.sol";
+import {ISwapperImpl} from "../../src/vendor/0xSplits/SwapperImpl.sol";
+import {ISwapRouter} from "../../src/vendor/uniswap/ISwapRouter.sol";
 
 /// @author .
 /// @title Octant Trader
@@ -31,7 +31,7 @@ contract Trader is ITransformer, Ownable, Pausable {
                           Constants
     //////////////////////////////////////////////////////////////*/
 
-    uint256 public constant blocksADay = 7200;
+    uint256 public constant BLOCKS_PER_DAY = 7200;
     /// @notice Address used to represent native ETH.
     address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     /// @notice Address of WETH wrapper
@@ -46,13 +46,15 @@ contract Trader is ITransformer, Ownable, Pausable {
                           PRIVATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
+    /// @dev Uniswap path between base and quote tokens, includes pool provision.
     bytes private uniPath;
+    /// @dev Base-to-quote pair encoded for price oracle used by splits.
     QuotePair private splitsPair;
-    IUniV3OracleImpl.SetPairDetailParams[] private oraclePairDetails;
-    OracleParams private oracleParams;
+    /// @dev Price oracle used by splits to make sure that Trader gets fair price.
     IOracle private oracle;
-    ISwapperImpl.SetPairScaledOfferFactorParams[] private pairScaledOfferFactors;
+    /// @dev Parameters for the swap.
     ISwapRouter.ExactInputParams[] private exactInputParams;
+    /// @dev Parameters for the oracle.
     QuoteParams[] private quoteParams;
 
     /*//////////////////////////////////////////////////////////////
@@ -91,7 +93,8 @@ contract Trader is ITransformer, Ownable, Pausable {
 
     event Traded(uint256 sold, uint256 left);
     event SwapperChanged(address oldSwapper, address newSwapper);
-    event SpendingChanged(address base, address quote, uint256 budget, uint256 deadline);
+    event SpendingChanged(uint256 low, uint256 high, uint256 spent, uint256 budget);
+    event PeriodsChanged(uint256 height, uint256 length, uint256 deadline);
 
     /*//////////////////////////////////////////////////////////////
                             CUSTOM ERRORS
@@ -111,6 +114,9 @@ contract Trader is ITransformer, Ownable, Pausable {
 
     /// @notice Unsafe randomness seed.
     error Trader__RandomnessUnsafeSeed();
+
+    /// @notice Unexpected ETH passed as value in function call.
+    error Trader__UnexpectedETH();
 
     /// @notice Configuration parameters are impossible: deadline is in the past.
     error Trader__ImpossibleConfigurationDeadlineInThePast();
@@ -156,7 +162,7 @@ contract Trader is ITransformer, Ownable, Pausable {
         swapper = _swapper;
         uniV3Swap = _uniV3Swap;
         oracle = IOracle(_oracle);
-        splitsPair = QuotePair({ base: splitsEthWrapper(base), quote: splitsEthWrapper(quote) });
+        splitsPair = QuotePair({base: splitsEthWrapper(base), quote: splitsEthWrapper(quote)});
         uniPath = abi.encodePacked(uniEthWrapper(base), uint24(10_000), uniEthWrapper(quote));
         transferOwnership(_owner);
     }
@@ -171,8 +177,16 @@ contract Trader is ITransformer, Ownable, Pausable {
         else return token;
     }
 
+    function safeBalanceOf(address token, address owner) private view returns (uint256) {
+        if ((token == ETH) || (token == address(0x0))) {
+            return owner.balance;
+        } else {
+            return IERC20(token).balanceOf(owner);
+        }
+    }
+
     function callInitFlash(uint256 amount) private returns (uint256) {
-        uint256 oldQuoteBalance = IERC20(quote).balanceOf(beneficiary);
+        uint256 oldQuoteBalance = safeBalanceOf(quote, beneficiary);
 
         delete exactInputParams;
         exactInputParams.push(
@@ -187,19 +201,15 @@ contract Trader is ITransformer, Ownable, Pausable {
 
         delete quoteParams;
         quoteParams.push(
-            QuoteParams({ quotePair: splitsPair, baseAmount: uint128(amount), data: abi.encode(exactInputParams) })
+            QuoteParams({quotePair: splitsPair, baseAmount: uint128(amount), data: abi.encode(exactInputParams)})
         );
-        UniV3Swap.FlashCallbackData memory data = UniV3Swap.FlashCallbackData({
-            exactInputParams: exactInputParams,
-            excessRecipient: address(oracle)
-        });
-        UniV3Swap.InitFlashParams memory params = UniV3Swap.InitFlashParams({
-            quoteParams: quoteParams,
-            flashCallbackData: data
-        });
+        UniV3Swap.FlashCallbackData memory data =
+            UniV3Swap.FlashCallbackData({exactInputParams: exactInputParams, excessRecipient: address(beneficiary)});
+        UniV3Swap.InitFlashParams memory params =
+            UniV3Swap.InitFlashParams({quoteParams: quoteParams, flashCallbackData: data});
         UniV3Swap(payable(uniV3Swap)).initFlash(ISwapperImpl(swapper), params);
 
-        return IERC20(quote).balanceOf(beneficiary) - oldQuoteBalance;
+        return safeBalanceOf(quote, beneficiary) - oldQuoteBalance;
     }
 
     function max(uint256 a, uint256 b) private pure returns (uint256) {
@@ -219,6 +229,7 @@ contract Trader is ITransformer, Ownable, Pausable {
         if (fromToken == ETH) {
             if (msg.value != amount) revert Trader__ImpossibleConfiguration();
         } else {
+            if (msg.value != 0) revert Trader__UnexpectedETH();
             IERC20(base).safeTransferFrom(msg.sender, address(this), amount);
         }
 
@@ -269,7 +280,7 @@ contract Trader is ITransformer, Ownable, Pausable {
         spent = spent + saleValue;
 
         if (base == ETH) {
-            (bool success, ) = payable(swapper).call{ value: saleValue }("");
+            (bool success,) = payable(swapper).call{value: saleValue}("");
             require(success);
         } else {
             IERC20(base).safeTransfer(swapper, saleValue);
@@ -343,8 +354,8 @@ contract Trader is ITransformer, Ownable, Pausable {
         saleValueHigh = high_;
         budget = budget_;
         if (spent > budget) spent = budget;
-        deadline = nextDeadline();
         _sanityCheck();
+        emit SpendingChanged(low_, high_, spent, budget);
     }
 
     /// @notice Configures spending periods. Budget needs to be fully spend before the end of each period.
@@ -357,6 +368,7 @@ contract Trader is ITransformer, Ownable, Pausable {
         if (budget > 0) {
             _sanityCheck();
         }
+        emit PeriodsChanged(height_, length_, deadline);
     }
 
     function emergencyStop(bool enable) external onlyOwner {
@@ -372,8 +384,8 @@ contract Trader is ITransformer, Ownable, Pausable {
     /// @notice Set address of the contract that will receive token (base) to be converted to target token (quote).
     /// @param swapper_ address of the contract handling the swapping.
     function setSwapper(address swapper_) external onlyOwner {
-        emit SwapperChanged(swapper, swapper_);
         swapper = payable(swapper_);
+        emit SwapperChanged(swapper, swapper_);
     }
 
     /// @notice Returns upper bound of number of blocks enough to sold remaining budget.
@@ -405,7 +417,7 @@ contract Trader is ITransformer, Ownable, Pausable {
     /// @return Average amount of token in wei to be sold in 24 hours.
     /// @dev This reads configuration parameters, not current state of swapping process, which may diverge because of randomness.
     function spendADay() external view returns (uint256) {
-        return (budget / (deadline - spentResetBlock)) * blocksADay;
+        return (budget / (deadline - spentResetBlock)) * BLOCKS_PER_DAY;
     }
 
     /// @notice Get random value for particular blockchain height.
@@ -414,7 +426,9 @@ contract Trader is ITransformer, Ownable, Pausable {
     /// @dev Sourcing of randomness in this way enables tx inclusion in block which is different from block with randomness source. This prevents waste of gas on failed calls to `convert` even in absence of FlashBots-like infrastructure.
     function getRandomNumber(uint256 height) public view returns (uint256) {
         uint256 seed = uint256(blockhash(height));
-        if (seed == 0) revert Trader__RandomnessUnsafeSeed();
+        if (seed == 0) {
+            revert Trader__RandomnessUnsafeSeed();
+        }
         return apply_domain(seed);
     }
 
