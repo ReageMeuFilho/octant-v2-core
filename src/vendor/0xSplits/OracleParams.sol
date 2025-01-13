@@ -3,8 +3,8 @@ pragma solidity ^0.8.17;
 
 /* import {AddressUtils} from "splits-utils/AddressUtils.sol"; */
 
-import {IOracle} from "./IOracle.sol";
-import {IOracleFactory} from "./IOracleFactory.sol";
+import { IOracle } from "./IOracle.sol";
+import { IOracleFactory } from "./IOracleFactory.sol";
 
 /* using {_parseIntoOracle} for OracleParams global; */
 /* using AddressUtils for address; */

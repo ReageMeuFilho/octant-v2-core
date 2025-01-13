@@ -3,8 +3,8 @@ pragma solidity >=0.8.18;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-import {ITokenizedStrategy} from "../interfaces/ITokenizedStrategy.sol";
-import {BaseStrategy__NotSelf} from "../errors.sol";
+import { ITokenizedStrategy } from "../interfaces/ITokenizedStrategy.sol";
+import { BaseStrategy__NotSelf } from "../errors.sol";
 
 /**
  * @title Dragon Base Strategy

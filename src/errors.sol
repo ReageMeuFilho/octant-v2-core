@@ -7,6 +7,7 @@ error ZeroAddress();
 error ReentrancyGuard__ReentrantCall();
 error ZeroShares();
 error ZeroAssets();
+error ERC20InsufficientBalance();
 
 // TokenizedStrategy specific errors
 error TokenizedStrategy__NotEmergencyAuthorized();

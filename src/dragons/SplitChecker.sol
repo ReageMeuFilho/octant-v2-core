@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {Initializable} from "solady/src/utils/Initializable.sol";
+import { Initializable } from "solady/src/utils/Initializable.sol";
 import "src/interfaces/ISplitChecker.sol";
 
 /// @title SplitChecker
@@ -110,12 +110,12 @@ contract SplitChecker is ISplitChecker, Initializable {
         uint256 calculatedTotalAllocation;
         for (uint256 i = 0; i < split.recipients.length; i++) {
             if (split.recipients[i] == opexVault) {
-                if (split.allocations[i] * SPLIT_PRECISION / split.totalAllocations > maxOpexSplit) {
+                if ((split.allocations[i] * SPLIT_PRECISION) / split.totalAllocations > maxOpexSplit) {
                     revert ValueExceedsMaximum();
                 }
             }
             if (split.recipients[i] == metapool) {
-                if (split.allocations[i] * SPLIT_PRECISION / split.totalAllocations <= minMetapoolSplit) {
+                if ((split.allocations[i] * SPLIT_PRECISION) / split.totalAllocations <= minMetapoolSplit) {
                     revert ValueBelowMinimum();
                 }
                 flag = true;

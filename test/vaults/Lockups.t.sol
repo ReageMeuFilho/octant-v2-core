@@ -13,10 +13,12 @@ import {
     DragonTokenizedStrategy__ZeroLockupDuration,
     DragonTokenizedStrategy__WithdrawMoreThanMax,
     DragonTokenizedStrategy__RedeemMoreThanMax,
+    TokenizedStrategy__TransferFailed,
     ZeroAssets,
     ZeroShares,
     DragonTokenizedStrategy__DepositMoreThanMax,
-    DragonTokenizedStrategy__MintMoreThanMax
+    DragonTokenizedStrategy__MintMoreThanMax,
+    ERC20InsufficientBalance
 } from "src/errors.sol";
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -844,7 +846,7 @@ contract LockupsTest is Setup {
         strategy.withdraw(depositAmount + 1, user, user, 0);
 
         // Test withdraw zero amount
-        vm.expectRevert(abi.encodeWithSelector(ZeroAssets.selector));
+        vm.expectRevert(abi.encodeWithSelector(ZeroShares.selector));
         strategy.withdraw(0, user, user, 0);
 
         vm.stopPrank();
@@ -915,7 +917,7 @@ contract LockupsTest is Setup {
         // Test max uint deposit without enough balance
         uint256 sharesBefore = strategy.balanceOf(user);
         uint256 assetsBefore = asset.balanceOf(user);
-        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__DepositMoreThanMax.selector));
+        vm.expectRevert(abi.encodeWithSelector(TokenizedStrategy__TransferFailed.selector));
         strategy.depositWithLockup(assetsBefore * 2, user, 100 days);
         //assertEq(asset.balanceOf(user), 0, "Should have no balance left after max deposit");
         assertEq(strategy.balanceOf(user), sharesBefore, "Should not have minted any shares");
@@ -962,11 +964,11 @@ contract LockupsTest is Setup {
 
         // Test mint requiring more assets than user has
         uint256 largeAmount = INITIAL_DEPOSIT * 2;
-        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__DepositMoreThanMax.selector));
+        vm.expectRevert(abi.encodeWithSelector(TokenizedStrategy__TransferFailed.selector));
         strategy.mintWithLockup(largeAmount, user, 100 days);
         assertEq(strategy.balanceOf(user), 0, "Should not have minted any shares");
 
-        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__DepositMoreThanMax.selector));
+        vm.expectRevert(abi.encodeWithSelector(TokenizedStrategy__TransferFailed.selector));
         strategy.mintWithLockup(type(uint256).max, user, 100 days);
         vm.stopPrank();
     }

@@ -15,6 +15,9 @@ interface ISwapperFlashCallback {
     /// @param tokenToBeneficiary The token due to the `beneficiary` by the end of `#flash`
     /// @param amountToBeneficiary The amount of `tokenToBeneficiary` due to the `beneficiary` by the end of `#flash`
     /// @param data Any `data` passed through by `msg.sender` of `Swapper#flash`
-    function swapperFlashCallback(address tokenToBeneficiary, uint256 amountToBeneficiary, bytes calldata data)
-        external;
+    function swapperFlashCallback(
+        address tokenToBeneficiary,
+        uint256 amountToBeneficiary,
+        bytes calldata data
+    ) external;
 }

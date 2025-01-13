@@ -6,39 +6,9 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Enum} from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 
-import {IBaseStrategy} from "../../src/interfaces/IBaseStrategy.sol";
-import {IAvatar} from "zodiac/interfaces/IAvatar.sol";
-import {
-    ZeroAddress,
-    ZeroShares,
-    ZeroAssets,
-    ReentrancyGuard__ReentrantCall,
-    TokenizedStrategy__NotOwner,
-    TokenizedStrategy__NotManagement,
-    TokenizedStrategy__NotKeeperOrManagement,
-    TokenizedStrategy__NotEmergencyAuthorized,
-    TokenizedStrategy__AlreadyInitialized,
-    TokenizedStrategy__DepositMoreThanMax,
-    TokenizedStrategy__MintMoreThanMax,
-    TokenizedStrategy__InvalidMaxLoss,
-    TokenizedStrategy__TransferFromZeroAddress,
-    TokenizedStrategy__TransferToZeroAddress,
-    TokenizedStrategy__TransferToStrategy,
-    TokenizedStrategy__MintToZeroAddress,
-    TokenizedStrategy__BurnFromZeroAddress,
-    TokenizedStrategy__ApproveFromZeroAddress,
-    TokenizedStrategy__ApproveToZeroAddress,
-    TokenizedStrategy__InsufficientAllowance,
-    TokenizedStrategy__PermitDeadlineExpired,
-    TokenizedStrategy__InvalidSigner,
-    TokenizedStrategy__NotSelf,
-    TokenizedStrategy__WithdrawMoreThanMax,
-    TokenizedStrategy__RedeemMoreThanMax,
-    TokenizedStrategy__TransferFailed,
-    TokenizedStrategy__NotPendingManagement,
-    TokenizedStrategy__StrategyInShutdown,
-    TokenizedStrategy__TooMuchLoss
-} from "../errors.sol";
+import { IBaseStrategy } from "../../src/interfaces/IBaseStrategy.sol";
+import { IAvatar } from "zodiac/interfaces/IAvatar.sol";
+import { ZeroAddress, ZeroShares, ZeroAssets, ReentrancyGuard__ReentrantCall, TokenizedStrategy__NotOwner, TokenizedStrategy__NotManagement, TokenizedStrategy__NotKeeperOrManagement, TokenizedStrategy__NotEmergencyAuthorized, TokenizedStrategy__AlreadyInitialized, TokenizedStrategy__DepositMoreThanMax, TokenizedStrategy__MintMoreThanMax, TokenizedStrategy__InvalidMaxLoss, TokenizedStrategy__TransferFromZeroAddress, TokenizedStrategy__TransferToZeroAddress, TokenizedStrategy__TransferToStrategy, TokenizedStrategy__MintToZeroAddress, TokenizedStrategy__BurnFromZeroAddress, TokenizedStrategy__ApproveFromZeroAddress, TokenizedStrategy__ApproveToZeroAddress, TokenizedStrategy__InsufficientAllowance, TokenizedStrategy__PermitDeadlineExpired, TokenizedStrategy__InvalidSigner, TokenizedStrategy__NotSelf, TokenizedStrategy__WithdrawMoreThanMax, TokenizedStrategy__RedeemMoreThanMax, TokenizedStrategy__TransferFailed, TokenizedStrategy__NotPendingManagement, TokenizedStrategy__StrategyInShutdown, TokenizedStrategy__TooMuchLoss } from "../errors.sol";
 
 contract TokenizedStrategy {
     using Math for uint256;
@@ -203,7 +173,7 @@ contract TokenizedStrategy {
     modifier nonReentrant() {
         StrategyData storage S = _strategyStorage();
         // On the first call to nonReentrant, `entered` will be false (2)
-        if (S.entered != ENTERED) revert ReentrancyGuard__ReentrantCall();
+        if (S.entered == ENTERED) revert ReentrancyGuard__ReentrantCall();
 
         // Any calls to nonReentrant after this point will fail
         S.entered = ENTERED;
@@ -401,7 +371,8 @@ contract TokenizedStrategy {
         // Checking max deposit will also check if shutdown.
         if (assets > _maxDeposit(S, receiver)) revert TokenizedStrategy__DepositMoreThanMax();
         // Check for rounding error.
-        if ((shares = _convertToShares(S, assets, Math.Rounding.Floor)) == 0) revert ZeroShares();
+        shares = _convertToShares(S, assets, Math.Rounding.Floor);
+        if (shares == 0) revert ZeroShares();
 
         _deposit(S, receiver, assets, shares);
     }
@@ -455,12 +426,12 @@ contract TokenizedStrategy {
      * @param maxLoss The amount of acceptable loss in Basis points.
      * @return shares The actual amount of shares burnt.
      */
-    function withdraw(uint256 assets, address receiver, address _owner, uint256 maxLoss)
-        public
-        virtual
-        nonReentrant
-        returns (uint256 shares)
-    {
+    function withdraw(
+        uint256 assets,
+        address receiver,
+        address _owner,
+        uint256 maxLoss
+    ) public virtual nonReentrant returns (uint256 shares) {
         if (maxLoss > MAX_BPS) revert TokenizedStrategy__InvalidMaxLoss();
         if (receiver == address(0)) revert ZeroAddress();
 
@@ -499,12 +470,12 @@ contract TokenizedStrategy {
      * @param maxLoss The amount of acceptable loss in Basis points.
      * @return . The actual amount of underlying withdrawn.
      */
-    function redeem(uint256 shares, address receiver, address _owner, uint256 maxLoss)
-        public
-        virtual
-        nonReentrant
-        returns (uint256)
-    {
+    function redeem(
+        uint256 shares,
+        address receiver,
+        address _owner,
+        uint256 maxLoss
+    ) public virtual nonReentrant returns (uint256) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
         if (shares > _maxRedeem(S, _owner)) revert TokenizedStrategy__RedeemMoreThanMax();
@@ -664,7 +635,7 @@ contract TokenizedStrategy {
      * @dev Accepts a `maxLoss` variable in order to match the multi
      * strategy vaults ABI.
      */
-    function maxWithdraw(address _owner, uint256 /*maxLoss*/ ) external view virtual returns (uint256) {
+    function maxWithdraw(address _owner, uint256 /*maxLoss*/) external view virtual returns (uint256) {
         return _maxWithdraw(_strategyStorage(), _owner);
     }
 
@@ -685,7 +656,7 @@ contract TokenizedStrategy {
      * @dev Accepts a `maxLoss` variable in order to match the multi
      * strategy vaults ABI.
      */
-    function maxRedeem(address _owner, uint256 /*maxLoss*/ ) external view virtual returns (uint256) {
+    function maxRedeem(address _owner, uint256 /*maxLoss*/) external view virtual returns (uint256) {
         return _maxRedeem(_strategyStorage(), _owner);
     }
 
@@ -753,12 +724,7 @@ contract TokenizedStrategy {
     }
 
     /// @dev Internal implementation of {maxWithdraw}.
-    function _maxWithdraw(StrategyData storage S, address _owner)
-        internal
-        view
-        virtual
-        returns (uint256 maxWithdraw_)
-    {
+    function _maxWithdraw(StrategyData storage S, address _owner) internal view virtual returns (uint256 maxWithdraw_) {
         // Get the max the owner could withdraw currently.
         maxWithdraw_ = IBaseStrategy(address(this)).availableWithdrawLimit(_owner);
 
@@ -897,7 +863,7 @@ contract TokenizedStrategy {
         _burn(S, _owner, shares);
 
         if (address(S.asset) == ETH) {
-            (bool success,) = receiver.call{value: assets}("");
+            (bool success, ) = receiver.call{ value: assets }("");
             if (!success) revert TokenizedStrategy__TransferFailed();
         } else {
             // Transfer the amount of underlying to the receiver.
@@ -922,7 +888,7 @@ contract TokenizedStrategy {
         uint256 _newTotalAssets = IBaseStrategy(address(this)).harvestAndReport();
 
         if (address(S.asset) == ETH) {
-            (bool success,) = S.dragonRouter.call{value: _newTotalAssets - _oldTotalAssets}("");
+            (bool success, ) = S.dragonRouter.call{ value: _newTotalAssets - _oldTotalAssets }("");
             if (!success) revert TokenizedStrategy__TransferFailed();
         } else {
             // Transfer the amount of underlying to the receiver.
