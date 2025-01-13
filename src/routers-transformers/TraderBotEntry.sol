@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.23;
 
-import {Trader} from "./Trader.sol";
-import {DragonRouter} from "../dragons/DragonRouter.sol";
+import { Trader } from "./Trader.sol";
+import { DragonRouter } from "../dragons/DragonRouter.sol";
 
 contract TraderBotEntry {
-    constructor () {}
+    constructor() {}
 
     function flash(address _router, address user, address strategy, address _trader) public {
         Trader trader = Trader(payable(_trader));

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.25;
 
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ReentrancyGuardUpgradeable} from "openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import {AccessControlUpgradeable} from "openzeppelin-upgradeable/access/AccessControlUpgradeable.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { ReentrancyGuardUpgradeable } from "openzeppelin-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import { AccessControlUpgradeable } from "openzeppelin-upgradeable/access/AccessControlUpgradeable.sol";
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {ITokenizedStrategy} from "src/interfaces/ITokenizedStrategy.sol";
-import {ITransformer} from "src/interfaces/ITransformer.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
+import { ITransformer } from "src/interfaces/ITransformer.sol";
 import "src/interfaces/ISplitChecker.sol";
 
 /**
@@ -281,7 +281,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      */
     function fundFromSource(address strategy, uint256 amount) external onlyRole(SPLIT_DISTRIBUTOR_ROLE) nonReentrant {
         StrategyData storage data = strategyData[strategy];
-        if(data.asset == address(0)) revert ZeroAddress();
+        if (data.asset == address(0)) revert ZeroAddress();
 
         ITokenizedStrategy(strategy).withdraw(amount, address(this), address(this), 0);
 
@@ -295,7 +295,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      * @dev Only callable by accounts with OWNER_ROLE
      */
     function setSplit(Split memory _split) external onlyRole(OWNER_ROLE) {
-        if(block.timestamp - lastSetSplitTime < COOL_DOWN_PERIOD) revert CooldownPeriodNotPassed();
+        if (block.timestamp - lastSetSplitTime < COOL_DOWN_PERIOD) revert CooldownPeriodNotPassed();
         splitChecker.checkSplit(_split, opexVault, metapool);
 
         for (uint256 i = 0; i < strategies.length; i++) {
@@ -366,8 +366,10 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      */
     function _claimableAssets(UserData memory _userData, address _strategy) internal view returns (uint256) {
         StrategyData memory _stratData = strategyData[_strategy];
-        return _userData.splitPerShare * _stratData.totalShares
-            * (_stratData.assetPerShare - _userData.userAssetPerShare) / SPLIT_PRECISION;
+        return
+            (_userData.splitPerShare *
+                _stratData.totalShares *
+                (_stratData.assetPerShare - _userData.userAssetPerShare)) / SPLIT_PRECISION;
     }
 
     /**
@@ -435,18 +437,18 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
         if (address(userTransformer.transformer) != address(0)) {
             IERC20(_asset).approve(address(userTransformer.transformer), _amount);
             uint256 _transformedAmount = _asset == NATIVE_TOKEN
-                ? userTransformer.transformer.transform{value: _amount}(_asset, userTransformer.targetToken, _amount)
+                ? userTransformer.transformer.transform{ value: _amount }(_asset, userTransformer.targetToken, _amount)
                 : userTransformer.transformer.transform(_asset, userTransformer.targetToken, _amount);
             if (userTransformer.targetToken == NATIVE_TOKEN) {
-                (bool success,) = _user.call{value: _transformedAmount}("");
-                if(!success) revert TransferFailed();
+                (bool success, ) = _user.call{ value: _transformedAmount }("");
+                if (!success) revert TransferFailed();
             } else {
                 IERC20(userTransformer.targetToken).safeTransfer(_user, _transformedAmount);
             }
         } else {
             if (_asset == NATIVE_TOKEN) {
-                (bool success,) = _user.call{value: _amount}("");
-                if(!success) revert TransferFailed();
+                (bool success, ) = _user.call{ value: _amount }("");
+                if (!success) revert TransferFailed();
             } else {
                 IERC20(_asset).safeTransfer(_user, _amount);
             }

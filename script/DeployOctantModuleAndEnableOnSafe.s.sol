@@ -32,8 +32,7 @@ contract DeployModuleAndEnableOnSafe is Script, BatchScript {
         octantVaultModule = moduleFactory.deployModule(
             safeModuleImplementation,
             abi.encodeWithSignature(
-                "setUp(bytes)",
-                abi.encode(safe_, abi.encode(keeper, treasury, dragonRouter, totalValidators, maxYield))
+                "setUp(bytes)", abi.encode(safe_, abi.encode(keeper, treasury, dragonRouter, totalValidators, maxYield))
             ),
             block.timestamp
         );

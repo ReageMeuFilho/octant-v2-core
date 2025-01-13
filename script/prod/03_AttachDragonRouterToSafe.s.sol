@@ -13,8 +13,7 @@ contract CreateSafeWithModule is Script, BatchScript {
         safe = vm.envAddress("SAFE_ADDRESS");
     }
 
-
-    function run() public isBatch(safe) {    
+    function run() public isBatch(safe) {
         // Enable DragonRouter module
         bytes memory txn1 = abi.encodeWithSignature("enableModule(address)", vm.envAddress("DRAGON_ROUTER"));
 

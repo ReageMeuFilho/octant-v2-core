@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.23;
 
-import { IOctantRouter } from "./IOctantRouter.sol";
+import {IOctantRouter} from "./IOctantRouter.sol";
 
 /**
  * @author  .

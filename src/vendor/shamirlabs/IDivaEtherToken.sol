@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.23;
 
-import { IErrors } from "./IErrors.sol";
-import { IERC20Permit } from "./IERC20Permit.sol";
+import {IErrors} from "./IErrors.sol";
+import {IERC20Permit} from "./IERC20Permit.sol";
 
 interface IDivaEtherTokenErrors {
     error ErrZeroDeposit();

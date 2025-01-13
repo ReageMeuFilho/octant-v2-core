@@ -6,6 +6,9 @@ import {MockStrategy} from "./mocks/MockStrategy.sol";
 import {MockYieldSource} from "./mocks/MockYieldSource.sol";
 import {DragonTokenizedStrategy} from "src/dragons/DragonTokenizedStrategy.sol";
 
+import {
+    Unauthorized, TokenizedStrategy__NotKeeperOrManagement, TokenizedStrategy__NotManagement, TokenizedStrategy__NotOwner
+} from "../src/errors.sol";
 import {ITokenizedStrategy} from "../src/interfaces/ITokenizedStrategy.sol";
 
 contract BaseStrategyTest is BaseTest {
@@ -65,7 +68,7 @@ contract BaseStrategyTest is BaseTest {
         vm.deal(temps.safe, amount);
 
         // only safe can call deposit function
-        vm.expectRevert("Unauthorized");
+        vm.expectRevert(TokenizedStrategy__NotOwner.selector);
         ITokenizedStrategy(address(module)).deposit(amount, temps.safe);
 
         vm.startPrank(temps.safe);
@@ -133,11 +136,10 @@ contract BaseStrategyTest is BaseTest {
 
     function testTendThis() public {
         // tend works only through keepers
-        vm.expectRevert("!keeper");
+        vm.expectRevert(TokenizedStrategy__NotKeeperOrManagement.selector);
         ITokenizedStrategy(address(module)).tend();
 
         vm.startPrank(keeper);
-
 
         uint256 idleFunds = 1 ether;
         vm.deal(address(module), idleFunds);
@@ -178,7 +180,7 @@ contract BaseStrategyTest is BaseTest {
 
         // reverts if not called by management.
         uint256 debtOutstanding = 0.5 ether;
-        vm.expectRevert("!management");
+        vm.expectRevert(TokenizedStrategy__NotManagement.selector);
         module.adjustPosition(debtOutstanding);
 
         vm.startPrank(management);
@@ -197,7 +199,7 @@ contract BaseStrategyTest is BaseTest {
 
         // reverts if not called by management.
         uint256 liquidationAmount = 0.5 ether;
-        vm.expectRevert("!management");
+        vm.expectRevert(TokenizedStrategy__NotManagement.selector);
         module.liquidatePosition(liquidationAmount);
 
         vm.startPrank(management);

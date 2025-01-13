@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {Initializable} from "solady/src/utils/Initializable.sol";
+import { Initializable } from "solady/src/utils/Initializable.sol";
 import "src/interfaces/ISplitChecker.sol";
 
 /// @title SplitChecker
 /// @notice Validates split configurations for revenue distribution
 /// @dev Ensures splits meet requirements for opex and metapool allocations
 contract SplitChecker is ISplitChecker, Initializable {
-
     // =============================================================
     //                            CONSTANTS
     // =============================================================
@@ -20,8 +19,10 @@ contract SplitChecker is ISplitChecker, Initializable {
     // =============================================================
 
     address public goverance;
-    uint256 public maxOpexSplit; /// @dev in precision of 1e18
-    uint256 public minMetapoolSplit; /// @dev in precision of 1e18
+    uint256 public maxOpexSplit;
+    /// @dev in precision of 1e18
+    uint256 public minMetapoolSplit;
+    /// @dev in precision of 1e18
 
     // =============================================================
     //                            ERRORS
@@ -70,11 +71,7 @@ contract SplitChecker is ISplitChecker, Initializable {
     /// @param _goverance Address of the governance controller
     /// @param _maxOpexSplit Maximum allowed split for operational expenses (scaled by 1e18)
     /// @param _minMetapoolSplit Minimum required split for metapool (scaled by 1e18)
-    function initialize(
-        address _goverance,
-        uint256 _maxOpexSplit,
-        uint256 _minMetapoolSplit
-    ) external initializer {
+    function initialize(address _goverance, uint256 _maxOpexSplit, uint256 _minMetapoolSplit) external initializer {
         goverance = _goverance;
         _setMaxOpexSplit(_maxOpexSplit);
         _setMinMetapoolSplit(_minMetapoolSplit);
@@ -113,10 +110,14 @@ contract SplitChecker is ISplitChecker, Initializable {
         uint256 calculatedTotalAllocation;
         for (uint256 i = 0; i < split.recipients.length; i++) {
             if (split.recipients[i] == opexVault) {
-                if (split.allocations[i] * SPLIT_PRECISION / split.totalAllocations > maxOpexSplit) revert ValueExceedsMaximum();
+                if ((split.allocations[i] * SPLIT_PRECISION) / split.totalAllocations > maxOpexSplit) {
+                    revert ValueExceedsMaximum();
+                }
             }
             if (split.recipients[i] == metapool) {
-                if (split.allocations[i] * SPLIT_PRECISION / split.totalAllocations <= minMetapoolSplit) revert ValueBelowMinimum();
+                if ((split.allocations[i] * SPLIT_PRECISION) / split.totalAllocations <= minMetapoolSplit) {
+                    revert ValueBelowMinimum();
+                }
                 flag = true;
             }
             calculatedTotalAllocation += split.allocations[i];

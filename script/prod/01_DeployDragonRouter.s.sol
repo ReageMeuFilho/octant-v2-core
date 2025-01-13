@@ -50,12 +50,12 @@ contract DeployDragonRouter is Script {
 
         // Deploy TransparentProxy for DragonRouter
         bytes memory initData = abi.encode(
-            address(this), // owner 
+            address(this), // owner
             abi.encode(
                 new address[](0), // initial strategies array
                 new address[](0), // initial assets array
                 vm.envAddress("GOVERNANCE"), // governance address
-                address(splitCheckerProxy), // split checker address  
+                address(splitCheckerProxy), // split checker address
                 vm.envAddress("OPEX_VAULT"), // opex vault address
                 vm.envAddress("METAPOOL") // metapool address
             )
@@ -76,10 +76,20 @@ contract DeployDragonRouter is Script {
         // Log the address of the newly deployed contracts
         console.log("Split Checker Implementation deployed at:", address(splitCheckerImplementation));
         console.log("Split Checker Proxy deployed at:", address(splitCheckerProxy));
-        console.log("Split Checker Proxy Admin deployed at:", address(splitCheckerProxyAdmin), "with owner:", vm.envAddress("PROXY_ADMIN_OWNER"));
+        console.log(
+            "Split Checker Proxy Admin deployed at:",
+            address(splitCheckerProxyAdmin),
+            "with owner:",
+            vm.envAddress("PROXY_ADMIN_OWNER")
+        );
 
         console.log("Dragon Router Implementation deployed at:", address(dragonRouterImplementation));
         console.log("Dragon Router deployed at:", address(proxy));
-        console.log("Dragon Router Proxy Admin deployed at:", address(proxyAdmin), "with owner:", vm.envAddress("PROXY_ADMIN_OWNER"));
+        console.log(
+            "Dragon Router Proxy Admin deployed at:",
+            address(proxyAdmin),
+            "with owner:",
+            vm.envAddress("PROXY_ADMIN_OWNER")
+        );
     }
 }

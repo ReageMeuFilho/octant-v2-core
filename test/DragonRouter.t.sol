@@ -21,7 +21,7 @@ contract DragonRouterTest is Test {
 
     function setUp() public {
         owner = makeAddr("owner");
-        governance = makeAddr("governance"); 
+        governance = makeAddr("governance");
         opexVault = makeAddr("opexVault");
         metapool = makeAddr("metapool");
 
@@ -30,56 +30,41 @@ contract DragonRouterTest is Test {
         splitChecker.initialize(governance, 0.5e18, 0.05e18); // 50% max opex, 5% min metapool
 
         // Setup mock strategies and assets
-        for(uint i = 0; i < 3; i++) {
+        for (uint256 i = 0; i < 3; i++) {
             strategies.push(makeAddr(string.concat("strategy", vm.toString(i))));
             assets.push(makeAddr(string.concat("asset", vm.toString(i))));
         }
 
         // Deploy DragonRouter
         router = new DragonRouter();
-        bytes memory initParams = abi.encode(
-            owner,
-            abi.encode(
-                strategies,
-                assets,
-                governance,
-                address(splitChecker),
-                opexVault,
-                metapool
-            )
-        );
+        bytes memory initParams =
+            abi.encode(owner, abi.encode(strategies, assets, governance, address(splitChecker), opexVault, metapool));
         router.setUp(initParams);
     }
 
-    function _setupStrategies(uint256 numStrategies) internal returns (address[] memory _strategies, address[] memory _assets) {
+    function _setupStrategies(uint256 numStrategies)
+        internal
+        returns (address[] memory _strategies, address[] memory _assets)
+    {
         // Initialize arrays
         _strategies = new address[](numStrategies);
         _assets = new address[](numStrategies);
 
         // Deploy mock strategies and assets
-        for(uint256 i = 0; i < numStrategies; i++) {
+        for (uint256 i = 0; i < numStrategies; i++) {
             // Create mock asset
             _assets[i] = makeAddr(string.concat("asset", vm.toString(i)));
-            
+
             // Deploy mock strategy
             MockStrategy strategy = new MockStrategy();
-            
+
             _strategies[i] = address(strategy);
         }
 
         // Deploy new router with mock strategies
         router = new DragonRouter();
-        bytes memory initParams = abi.encode(
-            owner,
-            abi.encode(
-                _strategies,
-                _assets,
-                governance,
-                address(splitChecker),
-                opexVault,
-                metapool
-            )
-        );
+        bytes memory initParams =
+            abi.encode(owner, abi.encode(_strategies, _assets, governance, address(splitChecker), opexVault, metapool));
         router.setUp(initParams);
 
         // Update state variables
@@ -90,17 +75,13 @@ contract DragonRouterTest is Test {
         address[] memory recipients = new address[](2);
         recipients[0] = opexVault;
         recipients[1] = metapool;
-        
+
         uint256[] memory allocations = new uint256[](2);
         allocations[0] = 40; // 40% to opex
         allocations[1] = 60; // 60% to metapool
-        
+
         vm.startPrank(governance);
-        router.setSplit(Split({
-            recipients: recipients,
-            allocations: allocations,
-            totalAllocations: 100
-        }));
+        router.setSplit(Split({recipients: recipients, allocations: allocations, totalAllocations: 100}));
         vm.stopPrank();
     }
 }

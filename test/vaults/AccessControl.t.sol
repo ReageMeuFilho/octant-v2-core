@@ -3,7 +3,19 @@ pragma solidity >=0.8.18;
 
 import "forge-std/console.sol";
 import {Setup} from "./Setup.sol";
-import {PerformanceFeeDisabled, MaxUnlockIsAlwaysZero, Unauthorized, InvalidLockupDuration, InvalidRageQuitCooldownPeriod} from "src/errors.sol";
+import {
+    DragonTokenizedStrategy__PerformanceFeeDisabled,
+    DragonTokenizedStrategy__MaxUnlockIsAlwaysZero,
+    Unauthorized,
+    DragonTokenizedStrategy__InvalidLockupDuration,
+    DragonTokenizedStrategy__InvalidRageQuitCooldownPeriod,
+    TokenizedStrategy__NotKeeperOrManagement,
+    TokenizedStrategy__NotManagement,
+    TokenizedStrategy__NotPendingManagement,
+    TokenizedStrategy__NotEmergencyAuthorized,
+    TokenizedStrategy__AlreadyInitialized,
+    BaseStrategy__NotSelf
+} from "src/errors.sol";
 
 contract AccessControlTest is Setup {
     function setUp() public override {
@@ -69,7 +81,7 @@ contract AccessControlTest is Setup {
         address _management = strategy.management();
 
         vm.prank(_address);
-        vm.expectRevert("!management");
+        vm.expectRevert(TokenizedStrategy__NotManagement.selector);
         strategy.setPendingManagement(address(69));
 
         assertEq(strategy.management(), _management);
@@ -81,7 +93,7 @@ contract AccessControlTest is Setup {
         assertEq(strategy.management(), _management);
         assertEq(strategy.pendingManagement(), _address);
 
-        vm.expectRevert("!pending");
+        vm.expectRevert(TokenizedStrategy__NotPendingManagement.selector);
         vm.prank(management);
         strategy.acceptManagement();
     }
@@ -92,7 +104,7 @@ contract AccessControlTest is Setup {
         address _keeper = strategy.keeper();
 
         vm.prank(_address);
-        vm.expectRevert("!management");
+        vm.expectRevert(TokenizedStrategy__NotManagement.selector);
         strategy.setKeeper(address(69));
 
         assertEq(strategy.keeper(), _keeper);
@@ -103,7 +115,7 @@ contract AccessControlTest is Setup {
         assertTrue(!strategy.isShutdown());
 
         vm.prank(_address);
-        vm.expectRevert("!emergency authorized");
+        vm.expectRevert(TokenizedStrategy__NotEmergencyAuthorized.selector);
         strategy.shutdownStrategy();
 
         assertTrue(!strategy.isShutdown());
@@ -118,7 +130,7 @@ contract AccessControlTest is Setup {
         assertTrue(strategy.isShutdown());
 
         vm.prank(_address);
-        vm.expectRevert("!emergency authorized");
+        vm.expectRevert(TokenizedStrategy__NotEmergencyAuthorized.selector);
         strategy.emergencyWithdraw(0);
     }
 
@@ -128,8 +140,10 @@ contract AccessControlTest is Setup {
         assertEq(tokenizedStrategy.management(), address(0));
         assertEq(tokenizedStrategy.keeper(), address(0));
 
-        vm.expectRevert("initialized");
-        tokenizedStrategy.initialize(address(asset), name_, _address, _address, _address, address(mockDragonRouter), regenGovernance);
+        vm.expectRevert(TokenizedStrategy__AlreadyInitialized.selector);
+        tokenizedStrategy.initialize(
+            address(asset), name_, _address, _address, _address, address(mockDragonRouter), regenGovernance
+        );
 
         assertEq(tokenizedStrategy.management(), address(0));
         assertEq(tokenizedStrategy.keeper(), address(0));
@@ -143,11 +157,11 @@ contract AccessControlTest is Setup {
 
         // doesn't work from random address
         vm.prank(_address);
-        vm.expectRevert("!self");
+        vm.expectRevert(BaseStrategy__NotSelf.selector);
         strategy.deployFunds(_amount);
 
         vm.prank(management);
-        vm.expectRevert("!self");
+        vm.expectRevert(BaseStrategy__NotSelf.selector);
         strategy.deployFunds(_amount);
 
         assertEq(asset.balanceOf(address(yieldSource)), 0);
@@ -172,13 +186,13 @@ contract AccessControlTest is Setup {
 
         // doesn't work from random address
         vm.prank(_address);
-        vm.expectRevert("!self");
+        vm.expectRevert(BaseStrategy__NotSelf.selector);
         strategy.freeFunds(_amount);
         (_amount);
 
         // doesn't work from management either
         vm.prank(management);
-        vm.expectRevert("!self");
+        vm.expectRevert(BaseStrategy__NotSelf.selector);
         strategy.freeFunds(_amount);
 
         assertEq(asset.balanceOf(address(strategy)), 0);
@@ -203,12 +217,12 @@ contract AccessControlTest is Setup {
 
         // doesn't work from random address
         vm.prank(_address);
-        vm.expectRevert("!self");
+        vm.expectRevert(BaseStrategy__NotSelf.selector);
         strategy.harvestAndReport();
 
         // doesn't work from management either
         vm.prank(management);
-        vm.expectRevert("!self");
+        vm.expectRevert(BaseStrategy__NotSelf.selector);
         strategy.harvestAndReport();
 
         vm.prank(address(strategy));
@@ -223,7 +237,7 @@ contract AccessControlTest is Setup {
 
         // doesn't work from random address
         vm.prank(_address);
-        vm.expectRevert("!self");
+        vm.expectRevert(BaseStrategy__NotSelf.selector);
         strategy.tendThis(_amount);
 
         vm.prank(address(strategy));
@@ -238,7 +252,7 @@ contract AccessControlTest is Setup {
 
         // doesn't work from random address
         vm.prank(_address);
-        vm.expectRevert("!keeper");
+        vm.expectRevert(TokenizedStrategy__NotKeeperOrManagement.selector);
         strategy.tend();
 
         vm.prank(keeper);
@@ -251,7 +265,7 @@ contract AccessControlTest is Setup {
         string memory newName = "New Strategy Name";
 
         vm.prank(_address);
-        vm.expectRevert("!management");
+        vm.expectRevert(TokenizedStrategy__NotManagement.selector);
         strategy.setName(newName);
 
         vm.prank(management);
@@ -262,10 +276,10 @@ contract AccessControlTest is Setup {
 
     function test_setLockupDuration() public {
         uint256 newDuration = 180 days;
-        
+
         vm.prank(regenGovernance);
         strategy.setLockupDuration(newDuration);
-        
+
         // Test successful change
         assertEq(strategy.minimumLockupDuration(), newDuration);
     }
@@ -273,31 +287,31 @@ contract AccessControlTest is Setup {
     function test_setLockupDuration_reverts(address _address) public {
         vm.assume(_address != regenGovernance);
         uint256 newDuration = 180 days;
-        
+
         // Test unauthorized access
         vm.startPrank(_address);
         vm.expectRevert(Unauthorized.selector);
         strategy.setLockupDuration(newDuration);
         vm.stopPrank();
-        
+
         // Test invalid duration below minimum
         vm.startPrank(regenGovernance);
-        vm.expectRevert(InvalidLockupDuration.selector);
-        strategy.setLockupDuration(29 days); // Below RANGE_MINIMUM_LOCKUP_DURATION
+        vm.expectRevert(DragonTokenizedStrategy__InvalidLockupDuration.selector);
+        strategy.setLockupDuration(29 days);
         vm.stopPrank();
         // Test invalid duration above maximum
         vm.startPrank(regenGovernance);
-        vm.expectRevert(InvalidLockupDuration.selector);
-        strategy.setLockupDuration(3651 days); // Above RANGE_MAXIMUM_LOCKUP_DURATION
+        vm.expectRevert(DragonTokenizedStrategy__InvalidLockupDuration.selector);
+        strategy.setLockupDuration(3651 days);
         vm.stopPrank();
     }
 
     function test_setRageQuitCooldownPeriod() public {
         uint256 newPeriod = 180 days;
-        
+
         vm.prank(regenGovernance);
         strategy.setRageQuitCooldownPeriod(newPeriod);
-        
+
         // Test successful change
         assertEq(strategy.rageQuitCooldownPeriod(), newPeriod);
     }
@@ -305,23 +319,23 @@ contract AccessControlTest is Setup {
     function test_setRageQuitCooldownPeriod_reverts(address _address) public {
         vm.assume(_address != regenGovernance);
         uint256 newPeriod = 180 days;
-        
+
         // Test unauthorized access
         vm.startPrank(_address);
         vm.expectRevert(Unauthorized.selector);
         strategy.setRageQuitCooldownPeriod(newPeriod);
         vm.stopPrank();
-        
+
         // Test invalid period below minimum
         vm.startPrank(regenGovernance);
-        vm.expectRevert(InvalidRageQuitCooldownPeriod.selector);
-        strategy.setRageQuitCooldownPeriod(29 days); // Below RANGE_MINIMUM_RAGE_QUIT_COOLDOWN_PERIOD
+        vm.expectRevert(DragonTokenizedStrategy__InvalidRageQuitCooldownPeriod.selector);
+        strategy.setRageQuitCooldownPeriod(29 days);
         vm.stopPrank();
-        
+
         // Test invalid period above maximum
         vm.startPrank(regenGovernance);
-        vm.expectRevert(InvalidRageQuitCooldownPeriod.selector);
-        strategy.setRageQuitCooldownPeriod(3651 days); // Above RANGE_MAXIMUM_RAGE_QUIT_COOLDOWN_PERIOD
+        vm.expectRevert(DragonTokenizedStrategy__InvalidRageQuitCooldownPeriod.selector);
+        strategy.setRageQuitCooldownPeriod(3651 days);
         vm.stopPrank();
     }
 }
