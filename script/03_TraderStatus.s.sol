@@ -45,7 +45,7 @@ contract TraderStatus is Script, Test {
         emit log_named_decimal_uint("Contract balance (WETH)", weth.balanceOf(traderAddress), 18);
 
         int256 spendable = int256(
-            (block.number - trader.spentResetBlock()) * (trader.spendADay() / trader.blocksADay())
+            (block.number - trader.spentResetBlock()) * (trader.spendADay() / trader.BLOCKS_PER_DAY())
         ) - int256(spent);
         emit log_named_decimal_int("Spendable (ETH)", spendable, 18);
 
