@@ -807,6 +807,7 @@ contract TokenizedStrategy {
      * If we are not able to withdraw the full amount needed, it will
      * be counted as a loss and passed on to the user.
      */
+    // solhint-disable-next-line code-complexity
     function _withdraw(
         StrategyData storage S,
         address receiver,
