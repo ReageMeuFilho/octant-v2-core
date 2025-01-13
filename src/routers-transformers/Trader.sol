@@ -31,7 +31,7 @@ contract Trader is ITransformer, Ownable, Pausable {
                           Constants
     //////////////////////////////////////////////////////////////*/
 
-    uint256 public constant blocksADay = 7200;
+    uint256 public constant BLOCKS_PER_DAY = 7200;
     /// @notice Address used to represent native ETH.
     address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     /// @notice Address of WETH wrapper
@@ -405,7 +405,7 @@ contract Trader is ITransformer, Ownable, Pausable {
     /// @return Average amount of token in wei to be sold in 24 hours.
     /// @dev This reads configuration parameters, not current state of swapping process, which may diverge because of randomness.
     function spendADay() external view returns (uint256) {
-        return (budget / (deadline - spentResetBlock)) * blocksADay;
+        return (budget / (deadline - spentResetBlock)) * BLOCKS_PER_DAY;
     }
 
     /// @notice Get random value for particular blockchain height.
