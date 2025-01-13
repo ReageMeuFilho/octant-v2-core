@@ -6,13 +6,13 @@ import "forge-std/console.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {ERC20Mock} from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 
-import {ExtendedTest} from "./ExtendedTest.sol";
-import {MockStrategy} from "../mocks/MockStrategy2.sol";
-import {MockYieldSource} from "../mocks/MockYieldSource.sol";
-import {MockDragonRouter} from "../mocks/MockDragonRouter.sol";
-import {ModuleProxyFactory} from "src/dragons/ModuleProxyFactory.sol";
-import {DragonTokenizedStrategy} from "src/dragons/DragonTokenizedStrategy.sol";
-import {TestERC20} from "src/test/TestERC20.sol";
+import { ExtendedTest } from "./ExtendedTest.sol";
+import { MockStrategy } from "../mocks/MockStrategy2.sol";
+import { MockYieldSource } from "../mocks/MockYieldSource.sol";
+import { MockDragonRouter } from "../mocks/MockDragonRouter.sol";
+import { ModuleProxyFactory } from "src/dragons/ModuleProxyFactory.sol";
+import { DragonTokenizedStrategy } from "src/dragons/vaults/DragonTokenizedStrategy.sol";
+import { TestERC20 } from "src/test/TestERC20.sol";
 
 import {IEvents} from "src/interfaces/IEvents.sol";
 import {IMockStrategy} from "../mocks/IMockStrategy.sol";

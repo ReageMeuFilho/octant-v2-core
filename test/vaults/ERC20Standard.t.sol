@@ -77,7 +77,8 @@ contract ERC20BaseTest is Setup {
         approval_ = bound(approval_, amount_, type(uint256).max - 1);
 
         ERC20User owner = ERC20User(user);
-
+        // Assume recipient starts with 0 balance
+        vm.assume(strategy.balanceOf(recipient_) == 0);
         mintAndDepositIntoStrategy(strategy, address(owner), amount_);
 
         vm.prank(address(owner));

@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.8.18;
 
-import {BaseStrategy, ERC20} from "../BaseStrategy.sol";
-import {Module} from "zodiac/core/Module.sol";
+import { DragonBaseStrategy, ERC20 } from "src/dragons/vaults/DragonBaseStrategy.sol";
+import { Module } from "zodiac/core/Module.sol";
 
-import {IStrategy} from "../../interfaces/IStrategy.sol";
+import { IStrategy } from "../../interfaces/IStrategy.sol";
 
-contract YearnPolygonUsdcStrategy is Module, BaseStrategy {
+contract YearnPolygonUsdcStrategy is Module, DragonBaseStrategy {
     /// @dev Yearn Polygon Aave V3 USDC Lender Vault
-    address public constant yieldSource = 0x52367C8E381EDFb068E9fBa1e7E9B2C847042897;
+    address public constant YIELD_SOURCE = 0x52367C8E381EDFb068E9fBa1e7E9B2C847042897;
 
     /// @dev Initialize function, will be triggered when a new proxy is deployed
     /// @dev owner of this module will the safe multisig that calls setUp function
@@ -43,8 +43,8 @@ contract YearnPolygonUsdcStrategy is Module, BaseStrategy {
             _regenGovernance
         );
 
-        ERC20(_asset).approve(yieldSource, type(uint256).max);
-        IStrategy(yieldSource).approve(_owner, type(uint256).max);
+        ERC20(_asset).approve(YIELD_SOURCE, type(uint256).max);
+        IStrategy(YIELD_SOURCE).approve(_owner, type(uint256).max);
 
         setAvatar(_owner);
         setTarget(_owner);
@@ -52,11 +52,11 @@ contract YearnPolygonUsdcStrategy is Module, BaseStrategy {
     }
 
     function _deployFunds(uint256 _amount) internal override {
-        IStrategy(yieldSource).deposit(_amount, address(this));
+        IStrategy(YIELD_SOURCE).deposit(_amount, address(this));
     }
 
     function _freeFunds(uint256 _amount) internal override {
-        IStrategy(yieldSource).withdraw(_amount, address(this), address(this));
+        IStrategy(YIELD_SOURCE).withdraw(_amount, address(this), address(this));
     }
 
     /* @dev As we are using yearn vault, the strategy accrues yield in the vault. so the value of strategy's shares
@@ -64,20 +64,20 @@ contract YearnPolygonUsdcStrategy is Module, BaseStrategy {
      * shares of dragon router are allocated.
      */
     function _harvestAndReport() internal override returns (uint256) {
-        uint256 _withdrawAmount = IStrategy(yieldSource).maxWithdraw(address(this));
-        IStrategy(yieldSource).withdraw(_withdrawAmount, address(this), address(this));
+        uint256 _withdrawAmount = IStrategy(YIELD_SOURCE).maxWithdraw(address(this));
+        IStrategy(YIELD_SOURCE).withdraw(_withdrawAmount, address(this), address(this));
         return ERC20(asset).balanceOf(address(this));
     }
 
-    function _tend(uint256 /*_idle*/ ) internal override {
+    function _tend(uint256 /*_idle*/) internal override {
         uint256 balance = ERC20(asset).balanceOf(address(this));
         if (balance > 0) {
-            IStrategy(yieldSource).deposit(balance, address(this));
+            IStrategy(YIELD_SOURCE).deposit(balance, address(this));
         }
     }
 
     function _emergencyWithdraw(uint256 _amount) internal override {
-        IStrategy(yieldSource).withdraw(_amount, address(this), address(this));
+        IStrategy(YIELD_SOURCE).withdraw(_amount, address(this), address(this));
     }
 
     function _tendTrigger() internal pure override returns (bool) {
