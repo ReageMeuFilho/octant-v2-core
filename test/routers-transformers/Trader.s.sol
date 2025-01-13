@@ -23,7 +23,7 @@ contract TestTraderRandomness is BaseTest {
     string constant deadlineFn = "./cache/test-artifacts/deadline.csv";
 
     function setUp() public {
-        _configure(false);
+        _configure(false, "eth");
 
         helperConfig = new HelperConfig(true);
         (, address wethToken,,,,,,,, address uniV3Swap) = helperConfig.activeNetworkConfig();

@@ -43,7 +43,7 @@ contract TestTraderIntegrationETH is BaseTest {
     uint32 defaultScaledOfferFactor = 99_00_00; // TODO: check if represents 1% MEV reward to searchers?
 
     function setUp() public {
-        _configure(true);
+        _configure(true, "eth");
         helperConfig = new HelperConfig(true);
         (address glmToken, address wethToken,,,,,,,, address uniV3Swap) = helperConfig.activeNetworkConfig();
 
