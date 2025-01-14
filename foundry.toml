@@ -7,7 +7,9 @@ optimizer = true
 optimizer_runs = 10_000_000
 solc = "0.8.25"
 verbosity = 3
-fs_permissions = [{ access = "read-write", path = "./cache/test-artifacts/" }]
+ast = true
+fs_permissions = [{ access = "read-write", path = "./cache/test-artifacts/" },{ access = "read", path = "./out/"}]
+build_info = true
 
 [profile.ci]
 fuzz = { runs = 5000 }
