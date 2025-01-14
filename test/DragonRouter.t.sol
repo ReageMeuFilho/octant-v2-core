@@ -6,6 +6,7 @@ import {DragonRouter} from "src/dragons/DragonRouter.sol";
 import "src/dragons/SplitChecker.sol";
 import {MockStrategy} from "./mocks/MockStrategy.sol";
 
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ITokenizedStrategy} from "src/interfaces/ITokenizedStrategy.sol";
 
@@ -105,7 +106,11 @@ contract DragonRouterTest is Test {
         uint256 newPeriod = 180 days;
 
         vm.startPrank(address(0));
-        vm.expectRevert(); // FIXME
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, address(0), keccak256("REGEN_GOVERNANCE_ROLE")
+            )
+        );
         router.setCooldownPeriod(newPeriod);
 
         vm.stopPrank();
