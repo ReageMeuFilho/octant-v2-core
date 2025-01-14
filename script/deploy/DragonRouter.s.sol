@@ -4,61 +4,69 @@ pragma solidity ^0.8.25;
 import {Script} from "forge-std/Script.sol";
 import {console2} from "forge-std/console2.sol";
 import {DragonRouter} from "src/dragons/DragonRouter.sol";
-import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
+import {DeploySplitChecker} from "./SplitChecker.s.sol";
+import {Upgrades} from "lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 
 /**
  * @title DeployDragonRouter
  * @notice Script to deploy the DragonRouter with transparent proxy pattern
  * @dev Uses OpenZeppelin Upgrades plugin to handle proxy deployment
  */
-contract DeployDragonRouter is Script {
+contract DeployDragonRouter is DeploySplitChecker {
     /// @notice The deployed DragonRouter implementation
-    DragonRouter public dragonRouterImplementation;
+    DragonRouter public dragonRouterSingleton;
     /// @notice The deployed DragonRouter proxy
     DragonRouter public dragonRouterProxy;
 
-    function run() public virtual {
+    function run() public virtual override {
+        // First deploy SplitChecker
+        DeploySplitChecker.run();
+
         vm.startBroadcast();
 
         // Deploy implementation
-        address implementation = Upgrades.deployImplementation(
-            DragonRouter,
-            "DragonRouter_v1"
-        );
-        dragonRouterImplementation = DragonRouter(implementation);
+        dragonRouterSingleton = new DragonRouter();
 
-        // Deploy proxy
-        bytes memory initData = abi.encodeWithSelector(
-            DragonRouter.initialize.selector,
-            _getConfiguredAddress("DRAGON_ROUTER_OWNER"),
-            _getConfiguredAddress("DRAGON_ROUTER_ADMIN")
-        );
+        // setup empty strategies and assets
+        address[] memory strategies = new address[](0);
+        address[] memory assets = new address[](0);
 
+        bytes memory initData = abi.encode(
+            msg.sender, // owner
+            abi.encode(
+                strategies, // initial strategies array   
+                assets, // initial assets array
+                msg.sender, // governance address
+                address(splitCheckerProxy), // split checker address
+                msg.sender, // opex vault address
+                msg.sender // metapool address
+            )
+        );
+        address _owner = msg.sender;
+        
         address proxy = Upgrades.deployTransparentProxy(
-            "DragonRouter_v1",
-            _getConfiguredAddress("DRAGON_ROUTER_ADMIN"),
-            initData
+            "DragonRouter.sol",
+            _getConfiguredAddress("PROXY_ADMIN"),
+            
+            abi.encodeCall( 
+                DragonRouter.setUp,
+                abi.encode(_owner, initData)
+            )
         );
-        dragonRouterProxy = DragonRouter(proxy);
-
+        
+        dragonRouterProxy = DragonRouter(payable(address(proxy)));
+    
         vm.stopBroadcast();
 
         // Log deployment info
-        console2.log("DragonRouter Implementation deployed at:", address(dragonRouterImplementation));
+        console2.log("DragonRouter Singleton deployed at:", address(dragonRouterSingleton));
         console2.log("DragonRouter Proxy deployed at:", address(dragonRouterProxy));
         console2.log("\nConfiguration:");
-        console2.log("- Owner:", _getConfiguredAddress("DRAGON_ROUTER_OWNER"));
-        console2.log("- Admin:", _getConfiguredAddress("DRAGON_ROUTER_ADMIN"));
+        console2.log("- Governance:", _getConfiguredAddress("GOVERNANCE"));
+        console2.log("- Split Checker:", address(splitCheckerProxy));
+        console2.log("- Opex Vault:", _getConfiguredAddress("OPEX_VAULT"));
+        console2.log("- Metapool:", _getConfiguredAddress("METAPOOL"));
     }
 
-    /**
-     * @dev Helper to get address from environment with fallback to msg.sender
-     */
-    function _getConfiguredAddress(string memory key) internal view returns (address) {
-        try vm.envAddress(key) returns (address value) {
-            return value;
-        } catch {
-            return msg.sender;
-        }
-    }
+   
 }

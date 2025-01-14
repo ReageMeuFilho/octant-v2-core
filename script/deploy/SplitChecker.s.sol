@@ -4,22 +4,74 @@ pragma solidity ^0.8.25;
 import {Script} from "forge-std/Script.sol";
 import {console2} from "forge-std/console2.sol";
 import {SplitChecker} from "src/dragons/SplitChecker.sol";
+import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 
 /**
  * @title DeploySplitChecker
  * @notice Script to deploy the base implementation of SplitChecker
- * @dev This deploys the implementation contract that will be used as the base for all split checkers
+ * @dev Uses OpenZeppelin Upgrades plugin for transparent proxy deployment
  */
 contract DeploySplitChecker is Script {
     /// @notice The deployed SplitChecker implementation
     SplitChecker public splitCheckerSingleton;
+    /// @notice The deployed SplitChecker proxy
+    SplitChecker public splitCheckerProxy;
+
+    /// @notice Default configuration values
+    uint256 constant DEFAULT_MAX_OPEX_SPLIT = 0.5e18;
+    uint256 constant DEFAULT_MIN_METAPOOL_SPLIT = 0.05e18;
 
     function run() public virtual {
         vm.startBroadcast();
+
         splitCheckerSingleton = new SplitChecker();
+
+        // Deploy proxy
+        bytes memory initData = abi.encodeWithSelector(
+            SplitChecker.initialize.selector,
+            _getConfiguredAddress("GOVERNANCE"),
+            _getConfiguredUint("MAX_OPEX_SPLIT", DEFAULT_MAX_OPEX_SPLIT),
+            _getConfiguredUint("MIN_METAPOOL_SPLIT", DEFAULT_MIN_METAPOOL_SPLIT)
+        );
+        
+        address proxy = Upgrades.deployTransparentProxy(
+            "SplitChecker.sol",
+            _getConfiguredAddress("PROXY_ADMIN"),
+            initData
+        );
+        console2.log("ALSMOST" );
+        splitCheckerProxy = SplitChecker(payable(address(proxy)));
+
         vm.stopBroadcast();
 
-        // Log deployment
+        // Log deployment info
         console2.log("SplitChecker Implementation deployed at:", address(splitCheckerSingleton));
+        console2.log("SplitChecker Proxy deployed at:", address(splitCheckerProxy));
+        console2.log("\nConfiguration:");
+        console2.log("- Governance:", _getConfiguredAddress("GOVERNANCE"));
+        console2.log("- Max Opex Split:", _getConfiguredUint("MAX_OPEX_SPLIT", DEFAULT_MAX_OPEX_SPLIT));
+        console2.log("- Min Metapool Split:", _getConfiguredUint("MIN_METAPOOL_SPLIT", DEFAULT_MIN_METAPOOL_SPLIT));
+    }
+
+    /**
+     * @dev Helper to get address from environment with fallback to msg.sender
+     */
+    function _getConfiguredAddress(string memory key) internal view returns (address) {
+        try vm.envAddress(key) returns (address value) {
+            return value;
+        } catch {
+            return msg.sender;
+        }
+    }
+
+    /**
+     * @dev Helper to get uint from environment with fallback to default value
+     */
+    function _getConfiguredUint(string memory key, uint256 defaultValue) internal view returns (uint256) {
+        try vm.envUint(key) returns (uint256 value) {
+            return value;
+        } catch {
+            return defaultValue;
+        }
     }
 }

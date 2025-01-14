@@ -29,7 +29,7 @@ contract DeploySafe is Script, BatchScript {
     
     // Safe contract addresses
     address public safeSingleton;
-    address public proxyFactory;
+    address public safeProxyFactoryAddress;
     
     // Deployed Safe instance
     Safe public deployedSafe;
@@ -43,18 +43,18 @@ contract DeploySafe is Script, BatchScript {
     /**
      * @notice Initialize the Safe setup with provided addresses and configuration
      * @param _safeSingleton Safe singleton contract address
-     * @param _proxyFactory Safe proxy factory address
+     * @param _safeProxyFactory Safe proxy factory address
      * @param _owners Array of owner addresses
      * @param _threshold Number of required signatures
      */
     function setUpSafeDeployParams(
         address _safeSingleton,
-        address _proxyFactory,
+        address _safeProxyFactory,
         address[] memory _owners,
         uint256 _threshold
     ) public virtual {
         // Validate inputs
-        if (_safeSingleton == address(0) || _proxyFactory == address(0)) {
+        if (_safeSingleton == address(0) || _safeProxyFactory == address(0)) {
             revert InvalidSafeSetup();
         }
         if (_threshold == 0 || _threshold > _owners.length) {
@@ -62,7 +62,7 @@ contract DeploySafe is Script, BatchScript {
         }
 
         safeSingleton = _safeSingleton;
-        proxyFactory = _proxyFactory;
+        safeProxyFactoryAddress = _safeProxyFactory;
         threshold = _threshold;
         totalOwners = _owners.length;
 
@@ -94,7 +94,7 @@ contract DeploySafe is Script, BatchScript {
     }
 
     function run() public virtual {
-        bool needsSetup = safeSingleton == address(0) || proxyFactory == address(0) || owners.length == 0;
+        bool needsSetup = safeSingleton == address(0) || safeProxyFactoryAddress == address(0) || owners.length == 0;
         if (needsSetup) {
             // Try to get threshold from environment, default to 5
             uint256 configuredThreshold;
@@ -134,7 +134,7 @@ contract DeploySafe is Script, BatchScript {
         bytes memory initializer = generateInitializerData();
 
         // Deploy new Safe via factory
-        SafeProxyFactory factory = SafeProxyFactory(proxyFactory);
+        SafeProxyFactory factory = SafeProxyFactory(safeProxyFactoryAddress);
         SafeProxy proxy = factory.createProxyWithNonce(
             safeSingleton,
             initializer,

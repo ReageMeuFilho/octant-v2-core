@@ -4,14 +4,16 @@ pragma solidity ^0.8.0;
 import "forge-std/Test.sol";
 import {TestPlus} from "lib/solady/test/utils/TestPlus.sol";
 import {ModuleProxyFactory} from "../src/dragons/ModuleProxyFactory.sol";
+import {DeployModuleProxyFactory} from "script/deploy/ModuleProxyFactory.s.sol";
 import {TestERC20} from "src/test/TestERC20.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
 import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
 import {DeploySafe} from "script/deploy/Safe.s.sol";
 import {DeployDragonTokenizedStrategy} from "script/deploy/DragonTokenizedStrategy.s.sol";
+import {DeployDragonRouter} from "script/deploy/DragonRouter.s.sol";
 import {DragonTokenizedStrategy} from "src/dragons/vaults/DragonTokenizedStrategy.sol";
 
-contract Setup is DeploySafe, DeployDragonTokenizedStrategy, Test, TestPlus {
+contract SetupIntegrationTest is DeploySafe, DeployDragonTokenizedStrategy, DeployDragonRouter, DeployModuleProxyFactory, Test, TestPlus {
 
     uint256 constant TEST_THRESHOLD = 3;
     uint256 constant TEST_TOTAL_OWNERS = 5;
@@ -25,7 +27,7 @@ contract Setup is DeploySafe, DeployDragonTokenizedStrategy, Test, TestPlus {
     /// uint256 public totalOwners;
     /// address[] public owners;
     /// address public safeSingleton;
-    /// address public proxyFactory;
+    /// address public safeProxyFactory;
     /// Safe public deployedSafe;
     /// ===================================================
 
@@ -34,14 +36,48 @@ contract Setup is DeploySafe, DeployDragonTokenizedStrategy, Test, TestPlus {
     /// DragonTokenizedStrategy public dragonTokenizedStrategySingleton;
     /// ===================================================  
 
-    function run() public override(DeploySafe, DeployDragonTokenizedStrategy) {
+    /// ============ DeploySplitChecker ==================
+    /// SplitChecker public splitCheckerSingleton;
+    /// SplitChecker public splitCheckerProxy;
+    /// ===================================================
+
+    /// ============ DeployDragonRouter ==================
+    /// DragonRouter public dragonRouterSingleton;
+    /// DragonRouter public dragonRouterProxy;
+    /// ===================================================
+
+    /// ============ DeployModuleProxyFactory ============
+    /// ModuleProxyFactory public moduleProxyFactory;
+    /// ===================================================
+
+    function addLabels() internal {
+        vm.label(SAFE_SINGLETON, "Safe Singleton");
+        vm.label(SAFE_PROXY_FACTORY, "Safe Proxy Factory");
+        vm.label(address(deployedSafe), "Safe Proxy");
+        vm.label(address(dragonTokenizedStrategySingleton), "DragonTokenizedStrategy Implementation");
+        vm.label(address(splitCheckerSingleton), "SplitChecker Implementation");
+        vm.label(address(splitCheckerProxy), "SplitChecker Proxy");
+        vm.label(address(dragonRouterSingleton), "DragonRouter Implementation");
+        vm.label(address(dragonRouterProxy), "DragonRouter Proxy");
+        vm.label(address(moduleProxyFactory), "ModuleProxyFactory");
+        //loop over owners
+        for (uint256 i = 0; i < TEST_TOTAL_OWNERS; i++) {
+            vm.label(owners[i], string.concat("Owner ", vm.toString(i + 1)));
+        }
+        vm.label(address(token), "Test Token");
+
+    }
+
+    function run() public override(DeploySafe, DeployDragonTokenizedStrategy, DeployDragonRouter, DeployModuleProxyFactory) {
         DeploySafe.run();
         DeployDragonTokenizedStrategy.run();
+        DeployDragonRouter.run();
+        DeployModuleProxyFactory.run();
     }
 
     function setUp() public virtual {
         // Fork mainnet
-        vm.createSelectFork(vm.envString("ETH_RPC_URL"));
+        vm.createSelectFork(vm.envString("TEST_RPC_URL"));
 
         // Create test owners and store their private keys
         address[] memory testOwners = _createTestOwners(TEST_TOTAL_OWNERS);
@@ -64,6 +100,12 @@ contract Setup is DeploySafe, DeployDragonTokenizedStrategy, Test, TestPlus {
         require(deployedSafe.getThreshold() == TEST_THRESHOLD, "Invalid threshold");
         require(deployedSafe.getOwners().length == TEST_TOTAL_OWNERS, "Invalid number of owners");
         require(address(dragonTokenizedStrategySingleton) != address(0), "Strategy not deployed");
+        require(address(splitCheckerSingleton) != address(0), "SplitChecker not deployed");
+        require(address(dragonRouterSingleton) != address(0), "DragonRouter implementation not deployed");
+        require(address(dragonRouterProxy) != address(0), "DragonRouter proxy not deployed");
+        require(address(moduleProxyFactory) != address(0), "ModuleProxyFactory not deployed");
+
+        addLabels();
     }
     
 
