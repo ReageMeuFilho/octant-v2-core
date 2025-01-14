@@ -14,6 +14,7 @@ import {ISwapperFactory} from "../../src/vendor/0xSplits/ISwapperFactory.sol";
 import {UniV3Swap} from "../../src/vendor/0xSplits/UniV3Swap.sol";
 import {ISwapRouter} from "../../src/vendor/uniswap/ISwapRouter.sol";
 import {WETH} from "solady/src/tokens/WETH.sol";
+import {FixedPointMathLib} from "solady/src/utils/FixedPointMathLib.sol";
 
 contract TestTraderIntegrationETH is BaseTest {
     HelperConfig helperConfig;
@@ -293,6 +294,15 @@ contract TestTraderIntegrationETH is BaseTest {
         vm.roll(block.number + 100);
         uint256 saleValue = trader.findSaleValue(15 ether);
         assert(saleValue > 0);
+
+        // mock value of quote to avoid problems with stale oracle on CI
+        uint256[] memory unscaledAmountsToBeneficiary = new uint256[](1);
+        unscaledAmountsToBeneficiary[0] = FixedPointMathLib.divWadUp(1, 4228914774285437607589);
+        vm.mockCall(
+            address(oracle),
+            abi.encodeWithSelector(IOracle.getQuoteAmounts.selector),
+            abi.encode(unscaledAmountsToBeneficiary)
+        );
 
         // do actual attempt to convert ERC20 to ETH
         uint256 amountToBeneficiary = trader.transform(glmAddress, ETH, saleValue);
