@@ -26,6 +26,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
     uint256 private constant SPLIT_PRECISION = 1e18;
     bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
     bytes32 public constant GOVERNANCE_ROLE = keccak256("OCTANT_GOVERNANCE_ROLE");
+    bytes32 public constant REGEN_GOVERNANCE_ROLE = keccak256("REGEN_GOVERNANCE_ROLE");
     bytes32 public constant SPLIT_DISTRIBUTOR_ROLE = keccak256("SPLIT_DISTRIBUTOR_ROLE");
     address public constant NATIVE_TOKEN = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
@@ -81,7 +82,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
     event StrategyRemoved(address indexed strategy);
     event MetapoolUpdated(address oldMetapool, address newMetapool);
     event OpexVaultUpdated(address oldOpexVault, address newOpexVault);
-    event CoolDownPeriodUpdated(uint256 oldPeriod, uint256 newPeriod);
+    event CooldownPeriodUpdated(uint256 oldPeriod, uint256 newPeriod);
     event SplitDelayUpdated(uint256 oldDelay, uint256 newDelay);
     event SplitCheckerUpdated(address oldChecker, address newChecker);
     event UserTransformerSet(address indexed user, address transformer, address targetToken);
@@ -114,10 +115,11 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
             address[] memory _strategy,
             address[] memory _asset,
             address _governance,
+            address _regen_governance,
             address _splitChecker,
             address _opexVault,
             address _metapool
-        ) = abi.decode(data, (address[], address[], address, address, address, address));
+        ) = abi.decode(data, (address[], address[], address, address, address, address, address));
 
         __AccessControl_init();
         __ReentrancyGuard_init();
@@ -139,6 +141,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
         strategies = _strategy;
         _grantRole(OWNER_ROLE, _owner);
         _grantRole(GOVERNANCE_ROLE, _governance);
+        _grantRole(REGEN_GOVERNANCE_ROLE, _regen_governance);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -255,12 +258,12 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
     }
 
     /**
-     * @notice Updates the cool down period
-     * @param _coolDownPeriod New cool down period in seconds
-     * @dev Only callable by accounts with OWNER_ROLE
+     * @notice Updates the cooldown period
+     * @param _cooldownPeriod New cooldown period in seconds
+     * @dev Only callable by accounts with REGEN_GOVERNANCE_ROLE
      */
-    function setCoolDownPeriod(uint256 _coolDownPeriod) external onlyRole(GOVERNANCE_ROLE) {
-        _setCoolDownPeriod(_coolDownPeriod);
+    function setCooldownPeriod(uint256 _cooldownPeriod) external onlyRole(REGEN_GOVERNANCE_ROLE) {
+        _setCooldownPeriod(_cooldownPeriod);
     }
 
     /**
@@ -373,12 +376,12 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
     }
 
     /**
-     * @notice Internal function to set the cool down period
-     * @param _coolDownPeriod New cool down period in seconds
+     * @notice Internal function to set the cooldown period
+     * @param _cooldownPeriod New cooldown period in seconds
      */
-    function _setCoolDownPeriod(uint256 _coolDownPeriod) internal {
-        emit CoolDownPeriodUpdated(DRAGON_SPLIT_COOLDOWN_PERIOD, _coolDownPeriod);
-        DRAGON_SPLIT_COOLDOWN_PERIOD = _coolDownPeriod;
+    function _setCooldownPeriod(uint256 _cooldownPeriod) internal {
+        emit CooldownPeriodUpdated(DRAGON_SPLIT_COOLDOWN_PERIOD, _cooldownPeriod);
+        DRAGON_SPLIT_COOLDOWN_PERIOD = _cooldownPeriod;
     }
 
     /**
