@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
-
-import {Script} from "forge-std/Script.sol";
+import "forge-std/Test.sol";
 import {console2} from "forge-std/console2.sol";
-import {DragonRouter} from "src/dragons/DragonRouter.sol";
-import {DeploySplitChecker} from "./SplitChecker.s.sol";
-import {Upgrades} from "lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
+import {DragonRouter} from "src/dragons/DragonRouter.sol";
+import {DeploySplitChecker} from "./DeploySplitChecker.sol";
 /**
  * @title DeployDragonRouter
  * @notice Script to deploy the DragonRouter with transparent proxy pattern
@@ -18,9 +18,9 @@ contract DeployDragonRouter is DeploySplitChecker {
     /// @notice The deployed DragonRouter proxy
     DragonRouter public dragonRouterProxy;
 
-    function run() public virtual override {
+    function deploy() public virtual override {
         // First deploy SplitChecker
-        DeploySplitChecker.run();
+        DeploySplitChecker.deploy();
 
         vm.startBroadcast();
 
@@ -44,13 +44,16 @@ contract DeployDragonRouter is DeploySplitChecker {
         );
         address _owner = msg.sender;
         
-        address proxy = Upgrades.deployTransparentProxy(
-            "DragonRouter.sol",
+           // Deploy ProxyAdmin for DragonRouter proxy
+        ProxyAdmin proxyAdmin = new ProxyAdmin(msg.sender);
+
+        // Deploy TransparentProxy for DragonRouter
+        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
+            address(dragonRouterSingleton),
             _getConfiguredAddress("PROXY_ADMIN"),
-            
             abi.encodeCall( 
                 DragonRouter.setUp,
-                abi.encode(_owner, initData)
+                initData
             )
         );
         

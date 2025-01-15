@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
-
-import "forge-std/Script.sol";
+import "forge-std/Test.sol";
 import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxy.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
-import {BatchScript} from "forge-safe/src/BatchScript.sol";
 import {LibString} from "solady/src/utils/LibString.sol";
 
 /**
@@ -13,7 +11,7 @@ import {LibString} from "solady/src/utils/LibString.sol";
  * @notice Script to deploy a configurable Safe multisig with transaction execution utilities
  * @dev Uses Safe singleton and proxy factory pattern for gas efficient deployments
  */
-contract DeploySafe is Script, BatchScript {
+contract DeploySafe is Test {
     using LibString for *;
 
     // Default configuration for 5/9 multisig
@@ -93,7 +91,7 @@ contract DeploySafe is Script, BatchScript {
         );
     }
 
-    function run() public virtual {
+    function deploy() public virtual {
         bool needsSetup = safeSingleton == address(0) || safeProxyFactoryAddress == address(0) || owners.length == 0;
         if (needsSetup) {
             // Try to get threshold from environment, default to 5

@@ -109,6 +109,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
     /// @dev owner of this module will the safe multisig that calls setUp function
     /// @param initializeParams Parameters of initialization encoded
     function setUp(bytes memory initializeParams) public initializer {
+        COOL_DOWN_PERIOD = 30 days;
         (address _owner, bytes memory data) = abi.decode(initializeParams, (address, bytes));
 
         (

@@ -9,11 +9,6 @@ import {AlreadyInitialized} from "src/errors.sol";
 /// @notice Validates split configurations for revenue distribution
 /// @dev Ensures splits meet requirements for opex and metapool allocations
 contract SplitChecker is ISplitChecker, Initializable {
-    /// @dev Constructor that sets governance to a non-zero address to prevent implementation initialization
-    constructor() {
-        goverance = address(1);
-    }
-
     // =============================================================
     //                            CONSTANTS
     // =============================================================
