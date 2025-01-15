@@ -64,3 +64,5 @@ $ forge --help
 $ anvil --help
 $ cast --help
 ```
+
+testing slither on CI
