@@ -5,7 +5,7 @@ import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import { BaseStrategy } from "./BaseStrategy.sol";
 // TokenizedStrategy interface used for internal view delegateCalls.
-import { ITokenizedStrategy } from "../../interfaces/ITokenizedStrategy.sol";
+import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
 
 /**
  * @title Dragon Base Strategy
