@@ -1,17 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {Script} from "forge-std/Script.sol";
+import "forge-std/Test.sol";
 import {console2} from "forge-std/console2.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+
 import {SplitChecker} from "src/dragons/SplitChecker.sol";
-import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 
 /**
  * @title DeploySplitChecker
  * @notice Script to deploy the base implementation of SplitChecker
  * @dev Uses OpenZeppelin Upgrades plugin for transparent proxy deployment
  */
-contract DeploySplitChecker is Script {
+contract DeploySplitChecker is Test {
     /// @notice The deployed SplitChecker implementation
     SplitChecker public splitCheckerSingleton;
     /// @notice The deployed SplitChecker proxy
@@ -21,25 +23,28 @@ contract DeploySplitChecker is Script {
     uint256 constant DEFAULT_MAX_OPEX_SPLIT = 0.5e18;
     uint256 constant DEFAULT_MIN_METAPOOL_SPLIT = 0.05e18;
 
-    function run() public virtual {
+    function deploy() public virtual {
         vm.startBroadcast();
 
         splitCheckerSingleton = new SplitChecker();
 
-        // Deploy proxy
-        bytes memory initData = abi.encodeWithSelector(
-            SplitChecker.initialize.selector,
-            _getConfiguredAddress("GOVERNANCE"),
-            _getConfiguredUint("MAX_OPEX_SPLIT", DEFAULT_MAX_OPEX_SPLIT),
-            _getConfiguredUint("MIN_METAPOOL_SPLIT", DEFAULT_MIN_METAPOOL_SPLIT)
+
+        // Deploy ProxyAdmin for DragonRouter proxy
+        ProxyAdmin proxyAdmin = new ProxyAdmin(msg.sender);
+
+        // Deploy TransparentProxy for DragonRouter
+        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
+            address(splitCheckerSingleton),
+            _getConfiguredAddress("PROXY_ADMIN"),
+            abi.encodeCall(
+                SplitChecker.initialize,
+                (_getConfiguredAddress("GOVERNANCE"),
+                _getConfiguredUint("MAX_OPEX_SPLIT", DEFAULT_MAX_OPEX_SPLIT),
+                _getConfiguredUint("MIN_METAPOOL_SPLIT", DEFAULT_MIN_METAPOOL_SPLIT)
+                )
+            )
         );
         
-        address proxy = Upgrades.deployTransparentProxy(
-            "SplitChecker.sol",
-            _getConfiguredAddress("PROXY_ADMIN"),
-            initData
-        );
-        console2.log("ALSMOST" );
         splitCheckerProxy = SplitChecker(payable(address(proxy)));
 
         vm.stopBroadcast();

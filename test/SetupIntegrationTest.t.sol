@@ -3,17 +3,16 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 import {TestPlus} from "lib/solady/test/utils/TestPlus.sol";
-import {ModuleProxyFactory} from "../src/dragons/ModuleProxyFactory.sol";
-import {DeployModuleProxyFactory} from "script/deploy/ModuleProxyFactory.s.sol";
-import {TestERC20} from "src/test/TestERC20.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
 import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
-import {DeploySafe} from "script/deploy/Safe.s.sol";
-import {DeployDragonTokenizedStrategy} from "script/deploy/DragonTokenizedStrategy.s.sol";
-import {DeployDragonRouter} from "script/deploy/DragonRouter.s.sol";
-import {DragonTokenizedStrategy} from "src/dragons/vaults/DragonTokenizedStrategy.sol";
 
-contract SetupIntegrationTest is DeploySafe, DeployDragonTokenizedStrategy, DeployDragonRouter, DeployModuleProxyFactory, Test, TestPlus {
+import {TestERC20} from "src/test/TestERC20.sol";
+import {DeploySafe} from "script/deploy/DeploySafe.sol";
+import {DeployDragonRouter} from "script/deploy/DeployDragonRouter.sol";
+import {DeployModuleProxyFactory} from "script/deploy/DeployModuleProxyFactory.sol";
+import {DeployDragonTokenizedStrategy} from "script/deploy/DeployDragonTokenizedStrategy.sol";
+
+contract SetupIntegrationTest is DeploySafe, DeployDragonTokenizedStrategy, DeployDragonRouter, DeployModuleProxyFactory, TestPlus {
 
     uint256 constant TEST_THRESHOLD = 3;
     uint256 constant TEST_TOTAL_OWNERS = 5;
@@ -31,7 +30,6 @@ contract SetupIntegrationTest is DeploySafe, DeployDragonTokenizedStrategy, Depl
     /// Safe public deployedSafe;
     /// ===================================================
 
-    
     /// ========== DeployDragonTokenizedStrategy ==========
     /// DragonTokenizedStrategy public dragonTokenizedStrategySingleton;
     /// ===================================================  
@@ -68,11 +66,11 @@ contract SetupIntegrationTest is DeploySafe, DeployDragonTokenizedStrategy, Depl
 
     }
 
-    function run() public override(DeploySafe, DeployDragonTokenizedStrategy, DeployDragonRouter, DeployModuleProxyFactory) {
-        DeploySafe.run();
-        DeployDragonTokenizedStrategy.run();
-        DeployDragonRouter.run();
-        DeployModuleProxyFactory.run();
+    function deploy() public override(DeploySafe, DeployDragonTokenizedStrategy, DeployDragonRouter, DeployModuleProxyFactory) {
+        DeploySafe.deploy();
+        DeployDragonTokenizedStrategy.deploy();
+        DeployDragonRouter.deploy();
+        DeployModuleProxyFactory.deploy();
     }
 
     function setUp() public virtual {
@@ -90,7 +88,7 @@ contract SetupIntegrationTest is DeploySafe, DeployDragonTokenizedStrategy, Depl
             TEST_THRESHOLD
         );
 
-        run();
+        deploy();
 
         // Deploy test token
         token = new TestERC20();
@@ -100,10 +98,10 @@ contract SetupIntegrationTest is DeploySafe, DeployDragonTokenizedStrategy, Depl
         require(deployedSafe.getThreshold() == TEST_THRESHOLD, "Invalid threshold");
         require(deployedSafe.getOwners().length == TEST_TOTAL_OWNERS, "Invalid number of owners");
         require(address(dragonTokenizedStrategySingleton) != address(0), "Strategy not deployed");
-        require(address(splitCheckerSingleton) != address(0), "SplitChecker not deployed");
+        require(address(moduleProxyFactory) != address(0), "ModuleProxyFactory not deployed");
         require(address(dragonRouterSingleton) != address(0), "DragonRouter implementation not deployed");
         require(address(dragonRouterProxy) != address(0), "DragonRouter proxy not deployed");
-        require(address(moduleProxyFactory) != address(0), "ModuleProxyFactory not deployed");
+        require(address(splitCheckerSingleton) != address(0), "SplitChecker not deployed");
 
         addLabels();
     }
