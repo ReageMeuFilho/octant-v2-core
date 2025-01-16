@@ -131,6 +131,12 @@ contract TokenizedStrategy {
         uint256 RANGE_MAXIMUM_LOCKUP_DURATION;
         uint256 RANGE_MINIMUM_RAGE_QUIT_COOLDOWN_PERIOD;
         uint256 RANGE_MAXIMUM_RAGE_QUIT_COOLDOWN_PERIOD;
+        // Hats protocol integration
+        address HATS;
+        uint256 KEEPER_HAT;
+        uint256 MANAGEMENT_HAT;
+        uint256 EMERGENCY_ADMIN_HAT;
+        uint256 REGEN_GOVERNANCE_HAT;
     }
 
     address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE; // using this address to represent native ETH
@@ -228,6 +234,7 @@ contract TokenizedStrategy {
         StrategyData storage S = _strategyStorage();
         if (_sender != S.emergencyAdmin && _sender != S.management) revert TokenizedStrategy__NotEmergencyAuthorized();
     }
+    
 
     /*//////////////////////////////////////////////////////////////
                                CONSTANTS
