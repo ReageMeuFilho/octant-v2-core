@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.23;
 
-import { Ownable } from "solady/src/auth/Ownable.sol";
-import { SafeCastLib } from "solady/src/utils/SafeCastLib.sol";
-import { FixedPointMathLib } from "solady/src/utils/FixedPointMathLib.sol";
+import { Ownable } from "solady/auth/Ownable.sol";
+import { SafeCastLib } from "solady/utils/SafeCastLib.sol";
+import { FixedPointMathLib } from "solady/utils/FixedPointMathLib.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Enum } from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";

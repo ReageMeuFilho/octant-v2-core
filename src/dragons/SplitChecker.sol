@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import { Initializable } from "solady/src/utils/Initializable.sol";
+import { Initializable } from "solady/utils/Initializable.sol";
 import "src/interfaces/ISplitChecker.sol";
 
 import {AlreadyInitialized} from "src/errors.sol";
