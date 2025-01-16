@@ -29,15 +29,7 @@ contract DragonHatter is AbstractHatsManager {
 
     error AlreadyInitialized();
 
-    constructor(
-        address hats,
-        uint256 _adminHat,
-        uint256 _branchHat
-    ) AbstractHatsManager(
-        hats,
-        _adminHat,
-        _branchHat
-    ) {}
+    constructor(address hats, uint256 _adminHat, uint256 _branchHat) AbstractHatsManager(hats, _adminHat, _branchHat) {}
 
     /**
      * @notice Initializes the role hats under this branch
@@ -46,7 +38,7 @@ contract DragonHatter is AbstractHatsManager {
     function initialize() external {
         // Check initialization
         if (initialized) revert AlreadyInitialized();
-        
+
         // Verify contract has its branch hat
         require(HATS.isWearerOfHat(address(this), branchHat), "Must wear branch hat");
 

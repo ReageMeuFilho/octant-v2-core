@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
+
 import "forge-std/Test.sol";
 import {console2} from "forge-std/console2.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
@@ -12,6 +13,7 @@ import {DeploySplitChecker} from "./DeploySplitChecker.sol";
  * @notice Script to deploy the DragonRouter with transparent proxy pattern
  * @dev Uses OpenZeppelin Upgrades plugin to handle proxy deployment
  */
+
 contract DeployDragonRouter is DeploySplitChecker {
     /// @notice The deployed DragonRouter implementation
     DragonRouter public dragonRouterSingleton;
@@ -34,7 +36,7 @@ contract DeployDragonRouter is DeploySplitChecker {
         bytes memory initData = abi.encode(
             msg.sender, // owner
             abi.encode(
-                strategies, // initial strategies array   
+                strategies, // initial strategies array
                 assets, // initial assets array
                 msg.sender, // governance address
                 address(splitCheckerProxy), // split checker address
@@ -43,22 +45,19 @@ contract DeployDragonRouter is DeploySplitChecker {
             )
         );
         address _owner = msg.sender;
-        
-           // Deploy ProxyAdmin for DragonRouter proxy
+
+        // Deploy ProxyAdmin for DragonRouter proxy
         ProxyAdmin proxyAdmin = new ProxyAdmin(msg.sender);
 
         // Deploy TransparentProxy for DragonRouter
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(dragonRouterSingleton),
             _getConfiguredAddress("PROXY_ADMIN"),
-            abi.encodeCall( 
-                DragonRouter.setUp,
-                initData
-            )
+            abi.encodeCall(DragonRouter.setUp, initData)
         );
-        
+
         dragonRouterProxy = DragonRouter(payable(address(proxy)));
-    
+
         vm.stopBroadcast();
 
         // Log deployment info
@@ -70,6 +69,4 @@ contract DeployDragonRouter is DeploySplitChecker {
         console2.log("- Opex Vault:", _getConfiguredAddress("OPEX_VAULT"));
         console2.log("- Metapool:", _getConfiguredAddress("METAPOOL"));
     }
-
-   
 }

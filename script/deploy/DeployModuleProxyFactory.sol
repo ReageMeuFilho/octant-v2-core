@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
+
 import "forge-std/Test.sol";
 import {console2} from "forge-std/console2.sol";
 import {ModuleProxyFactory} from "src/dragons/ModuleProxyFactory.sol";
@@ -14,12 +15,12 @@ contract DeployModuleProxyFactory is Test {
     /// @notice The deployed ModuleProxyFactory instance
     ModuleProxyFactory public moduleProxyFactory;
 
-    function deploy() public virtual{
+    function deploy() public virtual {
         vm.startBroadcast();
-        
+
         // Deploy the factory
         moduleProxyFactory = new ModuleProxyFactory();
-        
+
         vm.stopBroadcast();
 
         // Log deployment information

@@ -58,7 +58,7 @@ contract BaseTest is Test, TestPlus {
     /// @return t A struct containing the test environment addresses and keys
     ///         - owner: The Safe owner address
     ///         - ownerPrivateKey: The private key of the owner
-    ///         - safe: The deployed Safe proxy address 
+    ///         - safe: The deployed Safe proxy address
     ///         - module: The deployed module address
     function _testTemps(address moduleImplementation, bytes memory moduleData) internal returns (testTemps memory t) {
         (t.owner, t.ownerPrivateKey) = _randomSigner();

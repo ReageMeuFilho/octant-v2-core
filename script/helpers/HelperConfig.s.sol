@@ -19,6 +19,7 @@ contract HelperConfig is Script {
         address uniV3Swap;
     }
     // TODO: REMOVE HARDCODED KEYS
+
     uint256 public immutable DEFAULT_ANVIL_KEY = vm.envUint("PRIVATE_KEY");
     NetworkConfig public activeNetworkConfig;
 
