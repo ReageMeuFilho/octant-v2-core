@@ -11,8 +11,15 @@ import {DeploySafe} from "script/deploy/DeploySafe.sol";
 import {DeployDragonRouter} from "script/deploy/DeployDragonRouter.sol";
 import {DeployModuleProxyFactory} from "script/deploy/DeployModuleProxyFactory.sol";
 import {DeployDragonTokenizedStrategy} from "script/deploy/DeployDragonTokenizedStrategy.sol";
+import {DeployHatsProtocol} from "script/deploy/DeployHatsProtocol.sol";
 
-contract SetupIntegrationTest is DeploySafe, DeployDragonTokenizedStrategy, DeployDragonRouter, DeployModuleProxyFactory, TestPlus {
+contract SetupIntegrationTest is 
+    DeploySafe, 
+    DeployDragonTokenizedStrategy, 
+    DeployDragonRouter, 
+    DeployModuleProxyFactory,
+    DeployHatsProtocol,
+    TestPlus {
 
     uint256 constant TEST_THRESHOLD = 3;
     uint256 constant TEST_TOTAL_OWNERS = 5;
@@ -48,6 +55,15 @@ contract SetupIntegrationTest is DeploySafe, DeployDragonTokenizedStrategy, Depl
     /// ModuleProxyFactory public moduleProxyFactory;
     /// ===================================================
 
+    /// ============ DeployHatsProtocol ===================
+    /// Hats public hats;
+    /// DragonHatter public dragonHatter;
+    /// uint256 public topHatId;
+    /// uint256 public autonomousAdminHatId;
+    /// uint256 public dragonAdminHatId;
+    /// uint256 public branchHatId;
+    /// ===================================================
+
     function addLabels() internal {
         vm.label(SAFE_SINGLETON, "Safe Singleton");
         vm.label(SAFE_PROXY_FACTORY, "Safe Proxy Factory");
@@ -64,10 +80,25 @@ contract SetupIntegrationTest is DeploySafe, DeployDragonTokenizedStrategy, Depl
         }
         vm.label(address(token), "Test Token");
 
+        // Add Hats Protocol labels
+        vm.label(address(HATS), "Hats Protocol");
+        vm.label(address(dragonHatter), "Dragon Hatter");
     }
 
-    function deploy() public override(DeploySafe, DeployDragonTokenizedStrategy, DeployDragonRouter, DeployModuleProxyFactory) {
+    function deploy() public override(
+        DeploySafe, 
+        DeployDragonTokenizedStrategy, 
+        DeployDragonRouter, 
+        DeployModuleProxyFactory,
+        DeployHatsProtocol
+    ) {
+        // Deploy Safe first as it will be the admin
         DeploySafe.deploy();
+
+        // Deploy Hats Protocol and setup roles
+        DeployHatsProtocol.deploy();
+
+        // Deploy remaining components
         DeployDragonTokenizedStrategy.deploy();
         DeployDragonRouter.deploy();
         DeployModuleProxyFactory.deploy();
@@ -97,13 +128,51 @@ contract SetupIntegrationTest is DeploySafe, DeployDragonTokenizedStrategy, Depl
         require(address(deployedSafe) != address(0), "Safe not deployed");
         require(deployedSafe.getThreshold() == TEST_THRESHOLD, "Invalid threshold");
         require(deployedSafe.getOwners().length == TEST_TOTAL_OWNERS, "Invalid number of owners");
+
+        // Verify other components
         require(address(dragonTokenizedStrategySingleton) != address(0), "Strategy not deployed");
         require(address(moduleProxyFactory) != address(0), "ModuleProxyFactory not deployed");
         require(address(dragonRouterSingleton) != address(0), "DragonRouter implementation not deployed");
         require(address(dragonRouterProxy) != address(0), "DragonRouter proxy not deployed");
         require(address(splitCheckerSingleton) != address(0), "SplitChecker not deployed");
 
-        addLabels();
+        // Verify Hats Protocol deployment
+        require(address(HATS) != address(0), "Hats Protocol not deployed");
+        require(address(dragonHatter) != address(0), "DragonHatter not deployed");
+        require(HATS.isWearerOfHat(msg.sender, topHatId), "Safe not wearing top hat");
+        require(HATS.isWearerOfHat(address(msg.sender), dragonAdminHatId), "Safe not wearing branch hat");
+        require(HATS.isWearerOfHat(address(dragonHatter), branchHatId), "DragonHatter not wearing branch hat");
+               // Get role hat IDs
+               uint256 keeperHatId = dragonHatter.getRoleHat(dragonHatter.KEEPER_ROLE());
+               uint256 managementHatId = dragonHatter.getRoleHat(dragonHatter.MANAGEMENT_ROLE());
+               uint256 emergencyHatId = dragonHatter.getRoleHat(dragonHatter.EMERGENCY_ROLE());
+               uint256 regenGovernanceHatId = dragonHatter.getRoleHat(dragonHatter.REGEN_GOVERNANCE_ROLE());
+
+               // Log role hat IDs
+               console.log("Keeper Role Hat ID:", keeperHatId);
+               console.log("Management Role Hat ID:", managementHatId);
+               console.log("Emergency Role Hat ID:", emergencyHatId);
+               console.log("Regen Governance Role Hat ID:", regenGovernanceHatId);
+
+               // Verify deployer is wearing all role hats
+               require(HATS.isWearerOfHat(msg.sender, keeperHatId), "Deployer not wearing keeper hat");
+               require(HATS.isWearerOfHat(msg.sender, managementHatId), "Deployer not wearing management hat");
+               require(HATS.isWearerOfHat(msg.sender, emergencyHatId), "Deployer not wearing emergency hat");
+               require(HATS.isWearerOfHat(msg.sender, regenGovernanceHatId), "Deployer not wearing regen governance hat");
+
+
+        // Verify role hats were created properly
+        require(keeperHatId != 0, "Keeper role hat not created");
+        require(managementHatId != 0, "Management role hat not created");
+        require(emergencyHatId != 0, "Emergency role hat not created");
+        require(regenGovernanceHatId != 0, "Regen Governance role hat not created");
+
+        // Verify role hats are under branch hat
+        require(HATS.isValidHatId(branchHatId), "Keeper hat not under branch");
+        require(HATS.isValidHatId(managementHatId), "Management hat not under branch");
+        require(HATS.isValidHatId(emergencyHatId), "Emergency hat not under branch");
+        require(HATS.isValidHatId(regenGovernanceHatId), "Regen Governance hat not under branch");
+        // addLabels();
     }
     
 
