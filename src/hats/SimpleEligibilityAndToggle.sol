@@ -16,8 +16,8 @@ contract SimpleEligibilityAndToggle is IHatsEligibility, IHatsToggle {
      * @dev Used for testing and initial setup
      */
     function getWearerStatus(
-        address,  // wearer
-        uint256   // hatId
+        address, // wearer
+        uint256 // hatId
     ) external pure override returns (bool eligible, bool standing) {
         return (true, true);
     }
@@ -27,8 +27,8 @@ contract SimpleEligibilityAndToggle is IHatsEligibility, IHatsToggle {
      * @dev Used for testing and initial setup
      */
     function getHatStatus(
-        uint256  // hatId
+        uint256 // hatId
     ) external pure override returns (bool) {
         return true;
     }
-} 
+}

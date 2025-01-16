@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
+
 import "forge-std/Test.sol";
 import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxy.sol";
@@ -21,18 +22,16 @@ contract DeploySafe is Test {
     // Configurable parameters
     uint256 public threshold;
     uint256 public totalOwners;
-    
+
     // Dynamic owner array
     address[] public owners;
-    
+
     // Safe contract addresses
     address public safeSingleton;
     address public safeProxyFactoryAddress;
-    
+
     // Deployed Safe instance
     Safe public deployedSafe;
-
-
 
     error InvalidSafeSetup();
     error InvalidOwnerAddress();
@@ -119,10 +118,7 @@ contract DeploySafe is Test {
 
             // Set up deployment parameters
             setUpSafeDeployParams(
-                vm.envAddress("SAFE_SINGLETON"),
-                vm.envAddress("SAFE_PROXY_FACTORY"),
-                _owners,
-                configuredThreshold
+                vm.envAddress("SAFE_SINGLETON"), vm.envAddress("SAFE_PROXY_FACTORY"), _owners, configuredThreshold
             );
         }
 
@@ -148,15 +144,8 @@ contract DeploySafe is Test {
         console.log("Safe deployed at:", address(proxy));
         console.log("Threshold:", threshold);
         console.log("\nOwners:");
-        for(uint i = 0; i < owners.length; i++) {
-            console.log(
-                string.concat(
-                    "Owner ", 
-                    (i + 1).toString(), 
-                    ": ", 
-                    owners[i].toHexString()
-                )
-            );
+        for (uint256 i = 0; i < owners.length; i++) {
+            console.log(string.concat("Owner ", (i + 1).toString(), ": ", owners[i].toHexString()));
         }
     }
 }

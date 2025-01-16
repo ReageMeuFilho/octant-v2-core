@@ -4,10 +4,11 @@ pragma solidity ^0.8.25;
 import { Initializable } from "solady/utils/Initializable.sol";
 import "src/interfaces/ISplitChecker.sol";
 
-import {AlreadyInitialized} from "src/errors.sol";
+import { AlreadyInitialized } from "src/errors.sol";
 /// @title SplitChecker
 /// @notice Validates split configurations for revenue distribution
 /// @dev Ensures splits meet requirements for opex and metapool allocations
+
 contract SplitChecker is ISplitChecker, Initializable {
     // =============================================================
     //                            CONSTANTS

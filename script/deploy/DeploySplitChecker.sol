@@ -28,7 +28,6 @@ contract DeploySplitChecker is Test {
 
         splitCheckerSingleton = new SplitChecker();
 
-
         // Deploy ProxyAdmin for DragonRouter proxy
         ProxyAdmin proxyAdmin = new ProxyAdmin(msg.sender);
 
@@ -38,13 +37,14 @@ contract DeploySplitChecker is Test {
             _getConfiguredAddress("PROXY_ADMIN"),
             abi.encodeCall(
                 SplitChecker.initialize,
-                (_getConfiguredAddress("GOVERNANCE"),
-                _getConfiguredUint("MAX_OPEX_SPLIT", DEFAULT_MAX_OPEX_SPLIT),
-                _getConfiguredUint("MIN_METAPOOL_SPLIT", DEFAULT_MIN_METAPOOL_SPLIT)
+                (
+                    _getConfiguredAddress("GOVERNANCE"),
+                    _getConfiguredUint("MAX_OPEX_SPLIT", DEFAULT_MAX_OPEX_SPLIT),
+                    _getConfiguredUint("MIN_METAPOOL_SPLIT", DEFAULT_MIN_METAPOOL_SPLIT)
                 )
             )
         );
-        
+
         splitCheckerProxy = SplitChecker(payable(address(proxy)));
 
         vm.stopBroadcast();

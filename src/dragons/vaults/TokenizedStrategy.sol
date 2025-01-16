@@ -234,7 +234,6 @@ contract TokenizedStrategy {
         StrategyData storage S = _strategyStorage();
         if (_sender != S.emergencyAdmin && _sender != S.management) revert TokenizedStrategy__NotEmergencyAuthorized();
     }
-    
 
     /*//////////////////////////////////////////////////////////////
                                CONSTANTS

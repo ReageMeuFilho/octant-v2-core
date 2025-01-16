@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
+
 import "forge-std/Test.sol";
 import {console2} from "forge-std/console2.sol";
 import {DragonTokenizedStrategy} from "src/dragons/vaults/DragonTokenizedStrategy.sol";
@@ -13,7 +14,7 @@ contract DeployDragonTokenizedStrategy is Test {
     DragonTokenizedStrategy public dragonTokenizedStrategySingleton;
 
     function deploy() public virtual {
-           vm.startBroadcast();
+        vm.startBroadcast();
         dragonTokenizedStrategySingleton = new DragonTokenizedStrategy();
         vm.stopBroadcast();
     }

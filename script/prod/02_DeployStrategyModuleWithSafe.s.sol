@@ -73,7 +73,16 @@ contract DeployStrategyModuleWithSafe is Script {
             abi.encodeWithSignature(
                 "deployAndEnableModuleFromSafe(address,bytes,uint256)",
                 module,
-                abi.encode(tokenizedStrategyImplementation, address(token), address(yieldSource), management, keeper, dragonRouter, maxReportDelay, name),
+                abi.encode(
+                    tokenizedStrategyImplementation,
+                    address(token),
+                    address(yieldSource),
+                    management,
+                    keeper,
+                    dragonRouter,
+                    maxReportDelay,
+                    name
+                ),
                 block.timestamp
             ),
             address(0),

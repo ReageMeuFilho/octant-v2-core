@@ -17,7 +17,6 @@
 pragma solidity >=0.8.20;
 
 interface IHats {
-
     function createHat(
         uint256 _admin,
         string calldata _details,
@@ -32,7 +31,9 @@ interface IHats {
                               VIEW FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    function viewHat(uint256 _hatId)
+    function viewHat(
+        uint256 _hatId
+    )
         external
         view
         returns (
@@ -52,5 +53,4 @@ interface IHats {
     function isAdminOfHat(address _user, uint256 _hatId) external view returns (bool isAdmin);
 
     function isInGoodStanding(address _wearer, uint256 _hatId) external view returns (bool standing);
-
 }

@@ -33,7 +33,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
-    uint256 public COOL_DOWN_PERIOD ;
+    uint256 public COOL_DOWN_PERIOD;
     uint256 public SPLIT_DELAY;
     ISplitChecker public splitChecker;
     address public opexVault;
