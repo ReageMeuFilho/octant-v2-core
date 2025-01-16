@@ -4,8 +4,8 @@ pragma solidity ^0.8.23;
 import "forge-std/Script.sol";
 import "forge-std/Test.sol";
 
-import "solady/src/tokens/ERC20.sol";
-import "solady/src/tokens/WETH.sol";
+import "solady/tokens/ERC20.sol";
+import "solady/tokens/WETH.sol";
 
 import {HelperConfig} from "./helpers/HelperConfig.s.sol";
 import {Trader} from "../src/routers-transformers/Trader.sol";

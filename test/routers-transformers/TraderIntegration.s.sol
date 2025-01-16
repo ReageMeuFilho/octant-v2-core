@@ -13,8 +13,7 @@ import {ISwapperImpl} from "../../src/vendor/0xSplits/SwapperImpl.sol";
 import {ISwapperFactory} from "../../src/vendor/0xSplits/ISwapperFactory.sol";
 import {UniV3Swap} from "../../src/vendor/0xSplits/UniV3Swap.sol";
 import {ISwapRouter} from "../../src/vendor/uniswap/ISwapRouter.sol";
-import {WETH} from "solady/src/tokens/WETH.sol";
-import {FixedPointMathLib} from "solady/src/utils/FixedPointMathLib.sol";
+import {WETH} from "solady/tokens/WETH.sol";
 
 contract TestTraderIntegrationETH is BaseTest {
     HelperConfig helperConfig;
