@@ -9,15 +9,15 @@ import { Enum } from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 
-import { CreateOracleParams, IOracleFactory, IOracle, OracleParams } from "../../src/vendor/0xSplits/OracleParams.sol";
-import { QuotePair, QuoteParams } from "../../src/vendor/0xSplits/LibQuotes.sol";
+import { CreateOracleParams, IOracleFactory, IOracle, OracleParams } from "src/vendor/0xSplits/OracleParams.sol";
+import { QuotePair, QuoteParams } from "src/vendor/0xSplits/LibQuotes.sol";
 import { OracleParams } from "../vendor/0xSplits/OracleParams.sol";
-import { UniV3Swap } from "../../src/vendor/0xSplits/UniV3Swap.sol";
+import { UniV3Swap } from "src/vendor/0xSplits/UniV3Swap.sol";
 
 import { ITransformer } from "../interfaces/ITransformer.sol";
-import { IUniV3OracleImpl } from "../../src/vendor/0xSplits/IUniV3OracleImpl.sol";
-import { ISwapperImpl } from "../../src/vendor/0xSplits/SwapperImpl.sol";
-import { ISwapRouter } from "../../src/vendor/uniswap/ISwapRouter.sol";
+import { IUniV3OracleImpl } from "src/vendor/0xSplits/IUniV3OracleImpl.sol";
+import { ISwapperImpl } from "src/vendor/0xSplits/SwapperImpl.sol";
+import { ISwapRouter } from "src/vendor/uniswap/ISwapRouter.sol";
 
 /// @author .
 /// @title Octant Trader

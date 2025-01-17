@@ -3,7 +3,7 @@ pragma solidity ^0.8.13;
 
 import "../Base.t.sol";
 import {OctantRewardsSafe} from "src/dragons/modules/OctantRewardsSafe.sol";
-import {FailSafe} from "../mocks/MockFailSafe.sol";
+import {FailSafe} from "test/mocks/MockFailSafe.sol";
 
 contract OctantRewardsSafeModule is BaseTest {
     address keeper = makeAddr("keeper");

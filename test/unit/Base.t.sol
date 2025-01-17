@@ -3,11 +3,11 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 import {TestPlus} from "lib/solady/test/utils/TestPlus.sol";
-import {ModuleProxyFactory} from "../src/dragons/ModuleProxyFactory.sol";
-import {TestERC20} from "../src/test/TestERC20.sol";
+import {ModuleProxyFactory} from "src/dragons/ModuleProxyFactory.sol";
+import {MockERC20} from "test/mocks/MockERC20.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
 import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
-import {ISafe} from "../src/interfaces/Safe.sol";
+import {ISafe} from "src/interfaces/Safe.sol";
 
 contract BaseTest is Test, TestPlus {
     struct testTemps {
@@ -24,7 +24,7 @@ contract BaseTest is Test, TestPlus {
     uint256 threshold = 1;
     uint256 fork;
     ModuleProxyFactory public moduleFactory;
-    TestERC20 public token;
+    MockERC20 public token;
     address[] public owners;
 
     function _configure(bool _useFork, string memory _chain) internal {
@@ -48,7 +48,7 @@ contract BaseTest is Test, TestPlus {
         // deploy module proxy factory and test erc20 asset
         moduleFactory = new ModuleProxyFactory();
 
-        token = new TestERC20();
+        token = new MockERC20();
     }
 
     /// @notice Helper function to setup test environment with a Safe and Module

@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxy.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
-import {TestERC20} from "../src/test/TestERC20.sol";
+import {MockERC20} from "test/mocks/MockERC20.sol";
 import "forge-std/Script.sol";
 
 contract CreateSafeWithModule is Script {
@@ -14,7 +14,7 @@ contract CreateSafeWithModule is Script {
     address public proxyFactory;
     address public moduleFactory;
     address public module;
-    TestERC20 public token;
+    MockERC20 public token;
 
     function setUp() public {
         // Initialize owners and threshold
@@ -28,7 +28,7 @@ contract CreateSafeWithModule is Script {
         moduleFactory = vm.envAddress("MODULE_FACTORY");
         module = vm.envAddress("MODULE");
 
-        token = TestERC20(payable(vm.envAddress("TOKEN")));
+        token = MockERC20(payable(vm.envAddress("TOKEN")));
     }
 
     function run() public {
