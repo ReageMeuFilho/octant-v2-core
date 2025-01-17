@@ -9,6 +9,7 @@ import { IAvatar } from "zodiac/interfaces/IAvatar.sol";
 import { ZeroAddress, ZeroShares, ZeroAssets, ReentrancyGuard__ReentrantCall, TokenizedStrategy__NotOwner, TokenizedStrategy__NotManagement, TokenizedStrategy__NotKeeperOrManagement, TokenizedStrategy__NotEmergencyAuthorized, TokenizedStrategy__AlreadyInitialized, TokenizedStrategy__DepositMoreThanMax, TokenizedStrategy__MintMoreThanMax, TokenizedStrategy__InvalidMaxLoss, TokenizedStrategy__TransferFromZeroAddress, TokenizedStrategy__TransferToZeroAddress, TokenizedStrategy__TransferToStrategy, TokenizedStrategy__MintToZeroAddress, TokenizedStrategy__BurnFromZeroAddress, TokenizedStrategy__ApproveFromZeroAddress, TokenizedStrategy__ApproveToZeroAddress, TokenizedStrategy__InsufficientAllowance, TokenizedStrategy__PermitDeadlineExpired, TokenizedStrategy__InvalidSigner, TokenizedStrategy__NotSelf, TokenizedStrategy__WithdrawMoreThanMax, TokenizedStrategy__RedeemMoreThanMax, TokenizedStrategy__TransferFailed, TokenizedStrategy__NotPendingManagement, TokenizedStrategy__StrategyInShutdown, TokenizedStrategy__TooMuchLoss } from "../../errors.sol";
 
 import { IBaseStrategy } from "src/interfaces/IBaseStrategy.sol";
+import { IHats } from "src/interfaces/IHats.sol";
 
 contract TokenizedStrategy {
     using Math for uint256;
@@ -132,7 +133,7 @@ contract TokenizedStrategy {
         uint256 RANGE_MINIMUM_RAGE_QUIT_COOLDOWN_PERIOD;
         uint256 RANGE_MAXIMUM_RAGE_QUIT_COOLDOWN_PERIOD;
         // Hats protocol integration
-        address HATS;
+        IHats HATS;
         uint256 KEEPER_HAT;
         uint256 MANAGEMENT_HAT;
         uint256 EMERGENCY_ADMIN_HAT;
@@ -204,11 +205,14 @@ contract TokenizedStrategy {
      * @param _sender The original msg.sender.
      */
     function requireManagement(address _sender) public view {
-        if (_sender != _strategyStorage().management) revert TokenizedStrategy__NotManagement();
+        StrategyData storage S = _strategyStorage();
+        if (_sender != S.management && !HATS.isWearerOfHat(_sender, S.MANAGEMENT_HAT)) 
+            revert TokenizedStrategy__NotManagement();
     }
 
     /**
-     * @notice Require a caller is the `keeper` or `management`.
+     * @dev Require that the call is coming from either the strategies
+     * management or the keeper.
      * @dev Is left public so that it can be used by the Strategy.
      *
      * When the Strategy calls this the msg.sender would be the
@@ -218,11 +222,16 @@ contract TokenizedStrategy {
      */
     function requireKeeperOrManagement(address _sender) public view {
         StrategyData storage S = _strategyStorage();
-        if (_sender != S.keeper && _sender != S.management) revert TokenizedStrategy__NotKeeperOrManagement();
+        if (_sender != S.keeper && 
+            _sender != S.management && 
+            !HATS.isWearerOfHat(_sender, S.KEEPER_HAT) && 
+            !HATS.isWearerOfHat(_sender, S.MANAGEMENT_HAT)
+        ) revert TokenizedStrategy__NotKeeperOrManagement();
     }
 
     /**
-     * @notice Require a caller is the `management` or `emergencyAdmin`.
+     * @dev Require that the call is coming from either the strategies
+     * management or the emergencyAdmin.
      * @dev Is left public so that it can be used by the Strategy.
      *
      * When the Strategy calls this the msg.sender would be the
@@ -232,7 +241,11 @@ contract TokenizedStrategy {
      */
     function requireEmergencyAuthorized(address _sender) public view {
         StrategyData storage S = _strategyStorage();
-        if (_sender != S.emergencyAdmin && _sender != S.management) revert TokenizedStrategy__NotEmergencyAuthorized();
+        if (_sender != S.emergencyAdmin && 
+            _sender != S.management && 
+            !HATS.isWearerOfHat(_sender, S.EMERGENCY_ADMIN_HAT) && 
+            !HATS.isWearerOfHat(_sender, S.MANAGEMENT_HAT)
+        ) revert TokenizedStrategy__NotEmergencyAuthorized();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -279,7 +292,6 @@ contract TokenizedStrategy {
     /// @notice Address of the previously deployed Vault factory that the
     // protocol fee config is retrieved from.
     address public immutable FACTORY;
-
     /*//////////////////////////////////////////////////////////////
                             STORAGE GETTER
     //////////////////////////////////////////////////////////////*/
@@ -312,7 +324,12 @@ contract TokenizedStrategy {
         address _management,
         address _keeper,
         address _dragonRouter,
-        address _regenGovernance
+        address _regenGovernance,
+        address _hats,
+        uint256 _keeperHat,
+        uint256 _managementHat,
+        uint256 _emergencyAdminHat,
+        uint256 _regenGovernanceHat
     ) internal {
         // Cache storage pointer.
         StrategyData storage S = _strategyStorage();
@@ -346,6 +363,13 @@ contract TokenizedStrategy {
         S.RANGE_MAXIMUM_LOCKUP_DURATION = 3650 days;
         S.RANGE_MINIMUM_RAGE_QUIT_COOLDOWN_PERIOD = 30 days;
         S.RANGE_MAXIMUM_RAGE_QUIT_COOLDOWN_PERIOD = 3650 days;
+
+        // Initialize Hats Protocol integration
+        S.HATS = IHats(_hats);
+        S.KEEPER_HAT = _keeperHat;
+        S.MANAGEMENT_HAT = _managementHat;
+        S.EMERGENCY_ADMIN_HAT = _emergencyAdminHat;
+        S.REGEN_GOVERNANCE_HAT = _regenGovernanceHat;
 
         // Emit event to signal a new strategy has been initialized.
         emit NewTokenizedStrategy(address(this), _asset, API_VERSION);
