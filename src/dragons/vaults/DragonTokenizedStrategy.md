@@ -97,6 +97,33 @@ The contract uses a unique storage pattern with a custom storage slot to prevent
 - Withdrawal limits and loss parameters
 - Comprehensive event emission for transparency
 
+#### Major Feature 5: Hats Protocol Integration
+
+The strategy integrates with Hats Protocol for role-based access control, providing a flexible and decentralized way to manage permissions:
+
+- **Role Management Through Hats**
+  - Keeper role (operations)
+  - Management role (administrative)
+  - Emergency Admin role (crisis management)
+  - Regen Governance role (protocol parameters)
+
+- **Dual Permission System**
+  - Traditional address-based permissions remain functional
+  - Additional hat-based permissions can be enabled post-deployment
+  - Permissions are additive (either direct address OR hat ownership grants access)
+
+- **Initialization Flow**
+  - Hats integration is optional and can be set up after deployment
+  - Management can initialize Hats Protocol integration once
+  - Each role is associated with a specific hat ID
+  - Role checks automatically handle both pre and post Hats initialization states
+
+- **Security Considerations**
+  - One-time initialization prevents hat ID changes
+  - Early termination for hat checks if not initialized
+  - Maintains backward compatibility with address-based permissions
+  - Clear separation between core functionality and role management
+
 ### Contract Summary
 
 **Main Functions:**
@@ -228,3 +255,5 @@ The key innovation is the balance between commitment (through lockups) and flexi
   - Used for both voluntary lockups and rage quit duration
   - Chosen to ensure sufficient commitment while maintaining reasonable liquidity
   - Critical for preventing rapid capital flight
+
+
