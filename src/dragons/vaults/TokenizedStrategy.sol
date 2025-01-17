@@ -87,6 +87,17 @@ contract TokenizedStrategy {
         uint256 shares
     );
 
+    /**
+     * @notice Emitted when Hats Protocol integration is set up
+     */
+    event HatsProtocolSetup(
+        address indexed hats,
+        uint256 indexed keeperHat,
+        uint256 indexed managementHat,
+        uint256 emergencyAdminHat,
+        uint256 regenGovernanceHat
+    );
+
     /*//////////////////////////////////////////////////////////////
                         STORAGE STRUCT
     //////////////////////////////////////////////////////////////*/
@@ -138,6 +149,7 @@ contract TokenizedStrategy {
         uint256 MANAGEMENT_HAT;
         uint256 EMERGENCY_ADMIN_HAT;
         uint256 REGEN_GOVERNANCE_HAT;
+        bool hatsInitialized;  // Flag for Hats Protocol initialization
     }
 
     address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE; // using this address to represent native ETH
@@ -206,7 +218,7 @@ contract TokenizedStrategy {
      */
     function requireManagement(address _sender) public view {
         StrategyData storage S = _strategyStorage();
-        if (_sender != S.management && !HATS.isWearerOfHat(_sender, S.MANAGEMENT_HAT)) 
+        if (_sender != S.management && !_isHatsWearer(S, _sender, S.MANAGEMENT_HAT)) 
             revert TokenizedStrategy__NotManagement();
     }
 
@@ -224,8 +236,8 @@ contract TokenizedStrategy {
         StrategyData storage S = _strategyStorage();
         if (_sender != S.keeper && 
             _sender != S.management && 
-            !HATS.isWearerOfHat(_sender, S.KEEPER_HAT) && 
-            !HATS.isWearerOfHat(_sender, S.MANAGEMENT_HAT)
+            !_isHatsWearer(S, _sender, S.KEEPER_HAT) && 
+            !_isHatsWearer(S, _sender, S.MANAGEMENT_HAT)
         ) revert TokenizedStrategy__NotKeeperOrManagement();
     }
 
@@ -243,8 +255,8 @@ contract TokenizedStrategy {
         StrategyData storage S = _strategyStorage();
         if (_sender != S.emergencyAdmin && 
             _sender != S.management && 
-            !HATS.isWearerOfHat(_sender, S.EMERGENCY_ADMIN_HAT) && 
-            !HATS.isWearerOfHat(_sender, S.MANAGEMENT_HAT)
+            !_isHatsWearer(S, _sender, S.EMERGENCY_ADMIN_HAT) && 
+            !_isHatsWearer(S, _sender, S.MANAGEMENT_HAT)
         ) revert TokenizedStrategy__NotEmergencyAuthorized();
     }
 
@@ -324,12 +336,7 @@ contract TokenizedStrategy {
         address _management,
         address _keeper,
         address _dragonRouter,
-        address _regenGovernance,
-        address _hats,
-        uint256 _keeperHat,
-        uint256 _managementHat,
-        uint256 _emergencyAdminHat,
-        uint256 _regenGovernanceHat
+        address _regenGovernance
     ) internal {
         // Cache storage pointer.
         StrategyData storage S = _strategyStorage();
@@ -363,13 +370,6 @@ contract TokenizedStrategy {
         S.RANGE_MAXIMUM_LOCKUP_DURATION = 3650 days;
         S.RANGE_MINIMUM_RAGE_QUIT_COOLDOWN_PERIOD = 30 days;
         S.RANGE_MAXIMUM_RAGE_QUIT_COOLDOWN_PERIOD = 3650 days;
-
-        // Initialize Hats Protocol integration
-        S.HATS = IHats(_hats);
-        S.KEEPER_HAT = _keeperHat;
-        S.MANAGEMENT_HAT = _managementHat;
-        S.EMERGENCY_ADMIN_HAT = _emergencyAdminHat;
-        S.REGEN_GOVERNANCE_HAT = _regenGovernanceHat;
 
         // Emit event to signal a new strategy has been initialized.
         emit NewTokenizedStrategy(address(this), _asset, API_VERSION);
@@ -1530,5 +1530,51 @@ contract TokenizedStrategy {
 
     function _onlySelf() internal view {
         if (msg.sender != address(this)) revert TokenizedStrategy__NotSelf();
+    }
+
+    /**
+     * @notice Sets up Hats Protocol integration for role management
+     * @dev Can only be called by management
+     * @param _hats The Hats Protocol contract address
+     * @param _keeperHat The hat ID for keeper role
+     * @param _managementHat The hat ID for management role
+     * @param _emergencyAdminHat The hat ID for emergency admin role
+     * @param _regenGovernanceHat The hat ID for regen governance role
+     */
+    function setupHatsProtocol(
+        address _hats,
+        uint256 _keeperHat,
+        uint256 _managementHat,
+        uint256 _emergencyAdminHat,
+        uint256 _regenGovernanceHat
+    ) external onlyManagement {
+        StrategyData storage S = _strategyStorage();
+        require(!S.hatsInitialized, "Hats already initialized");
+        require(_hats != address(0), "Invalid Hats address");
+        
+        S.HATS = IHats(_hats);
+        S.KEEPER_HAT = _keeperHat;
+        S.MANAGEMENT_HAT = _managementHat;
+        S.EMERGENCY_ADMIN_HAT = _emergencyAdminHat;
+        S.REGEN_GOVERNANCE_HAT = _regenGovernanceHat;
+        S.hatsInitialized = true;
+
+        emit HatsProtocolSetup(_hats, _keeperHat, _managementHat, _emergencyAdminHat, _regenGovernanceHat);
+    }
+
+    /**
+     * @dev Base function to check if an address wears a specific hat
+     * @param S Storage pointer
+     * @param _wearer Address to check
+     * @param _hatId Hat ID to verify
+     * @return bool True if wearer has the hat, false otherwise
+     */
+    function _isHatsWearer(
+        StrategyData storage S,
+        address _wearer,
+        uint256 _hatId
+    ) internal view returns (bool) {
+        if (!S.hatsInitialized) return false;
+        return S.HATS.isWearerOfHat(_wearer, _hatId);
     }
 }

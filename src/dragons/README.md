@@ -60,6 +60,19 @@ Modify existing functions:
 - _deposit(): Ensure 1:1 minting of shares.
 - _withdraw(): Ensure 1:1 burning of shares.
 
+Additional Functions:
+
+- `setupHatsProtocol(address _hats, uint256 _keeperHat, uint256 _managementHat, uint256 _emergencyAdminHat, uint256 _regenGovernanceHat)`
+  - Initializes Hats Protocol integration
+  - Can only be called once by management
+  - Sets up hat IDs for each role
+
+Storage Updates:
+
+- Added to StrategyData:
+  - `hatsInitialized`: Flag for Hats Protocol state
+  - `HATS`: IHats interface reference
+  - Role-specific hat IDs (KEEPER_HAT, MANAGEMENT_HAT, etc.)
 
 Update tests:
 - Modify existing tests to reflect new behavior.
