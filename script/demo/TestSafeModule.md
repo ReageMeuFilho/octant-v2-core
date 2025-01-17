@@ -12,9 +12,9 @@
 ## Steps to test with new safe
 
 - Duplicate .env.template to .env and fill in the required fields
-- Run `script/CreateSafeWithDragonVaultModule.s.sol` to deploy a new safe with dragon vault module already linked.
+- Run `script/CreateSafeWithVaultModule.s.sol` to deploy a new safe with dragon vault module already linked.
   ```
-  forge script script/CreateSafeWithDragonVaultModule.s.sol --private-key $PRIVATE_KEY --rpc-url $RPC_URL --broadcast -vvvvv
+  forge script script/CreateSafeWithVaultModule.s.sol --private-key $PRIVATE_KEY --rpc-url $RPC_URL --broadcast -vvvvv
   ```
 - Add the newly deployed Safe address `SAFE_ADDRESS` and linked dragon vault module address `SAFE_DRAGON_VAULT_MODULE_ADDRESS` to `.env` and run `source .env`
 - `script/AddTransactionToSafe.s.sol` contains default transaction to approve Test Asset to the module and deposit in the Dragon Vault Module. modify it if u want to run different transaction.

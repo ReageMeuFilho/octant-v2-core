@@ -4,7 +4,7 @@ pragma solidity ^0.8.25;
 import "forge-std/Test.sol";
 import {DragonRouter} from "src/dragons/DragonRouter.sol";
 import "src/dragons/SplitChecker.sol";
-import {MockStrategy} from "./mocks/MockStrategy.sol";
+import {MockStrategy} from "test/mocks/MockStrategy.sol";
 
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";

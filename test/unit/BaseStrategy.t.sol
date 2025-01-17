@@ -2,17 +2,14 @@
 pragma solidity ^0.8.13;
 
 import "./Base.t.sol";
-import {MockStrategy} from "./mocks/MockStrategy.sol";
-import {MockYieldSource} from "./mocks/MockYieldSource.sol";
+import {MockStrategy} from "test/mocks/MockStrategy.sol";
+import {MockYieldSource} from "test/mocks/MockYieldSource.sol";
 import {DragonTokenizedStrategy} from "src/dragons/vaults/DragonTokenizedStrategy.sol";
 
 import {
-    Unauthorized,
-    TokenizedStrategy__NotKeeperOrManagement,
-    TokenizedStrategy__NotManagement,
-    TokenizedStrategy__NotOwner
-} from "../src/errors.sol";
-import {ITokenizedStrategy} from "../src/interfaces/ITokenizedStrategy.sol";
+    Unauthorized, TokenizedStrategy__NotKeeperOrManagement, TokenizedStrategy__NotManagement, TokenizedStrategy__NotOwner
+} from "src/errors.sol";
+import {ITokenizedStrategy} from "src/interfaces/ITokenizedStrategy.sol";
 
 contract BaseStrategyTest is BaseTest {
     address keeper = makeAddr("keeper");

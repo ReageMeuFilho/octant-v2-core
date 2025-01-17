@@ -6,7 +6,7 @@ import {TestPlus} from "lib/solady/test/utils/TestPlus.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
 import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
 
-import {TestERC20} from "src/test/TestERC20.sol";
+import {MockERC20} from "test/mocks/MockERC20.sol";
 import {DeploySafe} from "script/deploy/DeploySafe.sol";
 import {DeployDragonRouter} from "script/deploy/DeployDragonRouter.sol";
 import {DeployModuleProxyFactory} from "script/deploy/DeployModuleProxyFactory.sol";
@@ -25,8 +25,8 @@ contract SetupIntegrationTest is
     uint256 constant TEST_TOTAL_OWNERS = 5;
     address constant SAFE_SINGLETON = 0x41675C099F32341bf84BFc5382aF534df5C7461a;
     address constant SAFE_PROXY_FACTORY = 0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67;
-
-    TestERC20 public token;
+    
+    MockERC20 public token;
 
     /// ============ DeploySafe ===========================
     /// uint256 public threshold;
@@ -116,7 +116,7 @@ contract SetupIntegrationTest is
         deploy();
 
         // Deploy test token
-        token = new TestERC20();
+        token = new MockERC20();
 
         // Verify deployment
         require(address(deployedSafe) != address(0), "Safe not deployed");
