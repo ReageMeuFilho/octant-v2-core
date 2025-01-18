@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0
-pragma solidity 0.8.25;
+pragma solidity ^0.8.25;
 
 import { ITokenizedStrategy } from "./ITokenizedStrategy.sol";
 
@@ -42,4 +42,12 @@ interface IDragonTokenizedStrategy is ITokenizedStrategy {
     function rageQuitCooldownPeriod() external view returns (uint256);
 
     function regenGovernance() external view returns (address);
+
+    function setupHatsProtocol(
+        address _hats,
+        uint256 _keeperHat,
+        uint256 _managementHat,
+        uint256 _emergencyAdminHat,
+        uint256 _regenGovernanceHat
+    ) external;
 }

@@ -16,12 +16,9 @@ contract DeployModuleProxyFactory is Test {
     ModuleProxyFactory public moduleProxyFactory;
 
     function deploy() public virtual {
-        vm.startBroadcast();
 
         // Deploy the factory
         moduleProxyFactory = new ModuleProxyFactory();
-
-        vm.stopBroadcast();
 
         // Log deployment information
         console2.log("ModuleProxyFactory deployed at:", address(moduleProxyFactory));

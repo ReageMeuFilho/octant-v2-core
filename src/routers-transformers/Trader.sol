@@ -162,7 +162,7 @@ contract Trader is ITransformer, Ownable, Pausable {
         swapper = _swapper;
         uniV3Swap = _uniV3Swap;
         oracle = IOracle(_oracle);
-        splitsPair = QuotePair({base: splitsEthWrapper(base), quote: splitsEthWrapper(quote)});
+        splitsPair = QuotePair({ base: splitsEthWrapper(base), quote: splitsEthWrapper(quote) });
         uniPath = abi.encodePacked(uniEthWrapper(base), uint24(10_000), uniEthWrapper(quote));
         transferOwnership(_owner);
     }
@@ -201,12 +201,16 @@ contract Trader is ITransformer, Ownable, Pausable {
 
         delete quoteParams;
         quoteParams.push(
-            QuoteParams({quotePair: splitsPair, baseAmount: uint128(amount), data: abi.encode(exactInputParams)})
+            QuoteParams({ quotePair: splitsPair, baseAmount: uint128(amount), data: abi.encode(exactInputParams) })
         );
-        UniV3Swap.FlashCallbackData memory data =
-            UniV3Swap.FlashCallbackData({exactInputParams: exactInputParams, excessRecipient: address(beneficiary)});
-        UniV3Swap.InitFlashParams memory params =
-            UniV3Swap.InitFlashParams({quoteParams: quoteParams, flashCallbackData: data});
+        UniV3Swap.FlashCallbackData memory data = UniV3Swap.FlashCallbackData({
+            exactInputParams: exactInputParams,
+            excessRecipient: address(beneficiary)
+        });
+        UniV3Swap.InitFlashParams memory params = UniV3Swap.InitFlashParams({
+            quoteParams: quoteParams,
+            flashCallbackData: data
+        });
         UniV3Swap(payable(uniV3Swap)).initFlash(ISwapperImpl(swapper), params);
 
         return safeBalanceOf(quote, beneficiary) - oldQuoteBalance;
@@ -280,7 +284,7 @@ contract Trader is ITransformer, Ownable, Pausable {
         spent = spent + saleValue;
 
         if (base == ETH) {
-            (bool success,) = payable(swapper).call{value: saleValue}("");
+            (bool success, ) = payable(swapper).call{ value: saleValue }("");
             require(success);
         } else {
             IERC20(base).safeTransfer(swapper, saleValue);
