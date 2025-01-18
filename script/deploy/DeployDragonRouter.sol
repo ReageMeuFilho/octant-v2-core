@@ -39,6 +39,7 @@ contract DeployDragonRouter is DeploySplitChecker {
                 strategies, // initial strategies array
                 assets, // initial assets array
                 msg.sender, // governance address
+                msg.sender, // regen governance address
                 address(splitCheckerProxy), // split checker address
                 msg.sender, // opex vault address
                 msg.sender // metapool address
