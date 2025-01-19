@@ -71,7 +71,7 @@ contract ERC20BaseTest is Setup {
     }
 
     function testFuzz_transferFrom(address recipient_, uint256 approval_, uint256 amount_) public {
-        vm.assume(recipient_ != address(0) && recipient_ != address(strategy));
+        vm.assume(recipient_ != address(0) && recipient_ != address(strategy) && recipient_ != address(user));
 
         amount_ = bound(amount_, minFuzzAmount, maxFuzzAmount);
         approval_ = bound(approval_, amount_, type(uint256).max - 1);
@@ -96,7 +96,7 @@ contract ERC20BaseTest is Setup {
     }
 
     function testFuzz_transferFrom_infiniteApproval(address recipient_, uint256 amount_) public {
-        vm.assume(recipient_ != address(0) && recipient_ != address(strategy));
+        vm.assume(recipient_ != address(0) && recipient_ != address(strategy) && recipient_ != address(user));
         uint256 MAX_UINT256 = type(uint256).max;
 
         amount_ = bound(amount_, minFuzzAmount, maxFuzzAmount);
