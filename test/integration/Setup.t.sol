@@ -7,27 +7,32 @@ import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
 import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
 
 import {MockERC20} from "test/mocks/MockERC20.sol";
+import {MockYieldSource} from "test/mocks/MockYieldSource.sol";
+import {MockStrategy} from "test/mocks/MockStrategy.sol";
+import {IMockStrategy} from "test/mocks/IMockStrategy.sol";
 import {DeploySafe} from "script/deploy/DeploySafe.sol";
 import {DeployDragonRouter} from "script/deploy/DeployDragonRouter.sol";
 import {DeployModuleProxyFactory} from "script/deploy/DeployModuleProxyFactory.sol";
 import {DeployDragonTokenizedStrategy} from "script/deploy/DeployDragonTokenizedStrategy.sol";
 import {DeployHatsProtocol} from "script/deploy/DeployHatsProtocol.sol";
+import {DeployMockStrategy} from "script/deploy/DeployMockStrategy.sol";
+
+import {TokenizedStrategy__StrategyNotInShutdown, TokenizedStrategy__NotEmergencyAuthorized, TokenizedStrategy__HatsAlreadyInitialized, TokenizedStrategy__NotKeeperOrManagement, TokenizedStrategy__NotManagement} from "src/errors.sol";
 
 contract SetupIntegrationTest is
     DeploySafe,
     DeployDragonTokenizedStrategy,
     DeployDragonRouter,
-    DeployModuleProxyFactory,
     DeployHatsProtocol,
+    DeployMockStrategy,
     TestPlus
 {
     uint256 constant TEST_THRESHOLD = 3;
     uint256 constant TEST_TOTAL_OWNERS = 5;
     address constant SAFE_SINGLETON = 0x41675C099F32341bf84BFc5382aF534df5C7461a;
     address constant SAFE_PROXY_FACTORY = 0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67;
-    
-    MockERC20 public token;
-
+    mapping(uint256 => uint256) public testPrivateKeys;
+    address public deployer;
     /// ============ DeploySafe ===========================
     /// uint256 public threshold;
     /// uint256 public totalOwners;
@@ -91,6 +96,7 @@ contract SetupIntegrationTest is
             DeploySafe, DeployDragonTokenizedStrategy, DeployDragonRouter, DeployModuleProxyFactory, DeployHatsProtocol
         )
     {
+        deployer = msg.sender;  
         // Deploy Safe first as it will be the admin
         DeploySafe.deploy();
 
@@ -100,7 +106,9 @@ contract SetupIntegrationTest is
         // Deploy remaining components
         DeployDragonTokenizedStrategy.deploy();
         DeployDragonRouter.deploy();
-        DeployModuleProxyFactory.deploy();
+        vm.startPrank(address(deployedSafe));
+        DeployMockStrategy.deploy(address(deployedSafe), address(dragonTokenizedStrategySingleton), address(dragonRouterProxy));
+        vm.stopPrank();
     }
 
     function setUp() public virtual {
@@ -114,9 +122,6 @@ contract SetupIntegrationTest is
         setUpSafeDeployParams(SAFE_SINGLETON, SAFE_PROXY_FACTORY, testOwners, TEST_THRESHOLD);
 
         deploy();
-
-        // Deploy test token
-        token = new MockERC20();
 
         // Verify deployment
         require(address(deployedSafe) != address(0), "Safe not deployed");
@@ -142,12 +147,6 @@ contract SetupIntegrationTest is
         uint256 emergencyHatId = dragonHatter.getRoleHat(dragonHatter.EMERGENCY_ROLE());
         uint256 regenGovernanceHatId = dragonHatter.getRoleHat(dragonHatter.REGEN_GOVERNANCE_ROLE());
 
-        // Log role hat IDs
-        console.log("Keeper Role Hat ID:", keeperHatId);
-        console.log("Management Role Hat ID:", managementHatId);
-        console.log("Emergency Role Hat ID:", emergencyHatId);
-        console.log("Regen Governance Role Hat ID:", regenGovernanceHatId);
-
         // Verify deployer is wearing all role hats
         require(HATS.isWearerOfHat(msg.sender, keeperHatId), "Deployer not wearing keeper hat");
         require(HATS.isWearerOfHat(msg.sender, managementHatId), "Deployer not wearing management hat");
@@ -171,22 +170,47 @@ contract SetupIntegrationTest is
     /**
      * @notice Creates an array of test owner addresses and stores their private keys
      * @dev Uses _randomSigner() to generate deterministic addresses and private keys
+     *      and sorts them in ascending order
      * @return _owners Array of owner addresses for Safe setup
      */
     function _createTestOwners(uint256 _totalOwners) internal returns (address[] memory _owners) {
         _owners = new address[](_totalOwners);
+        uint256[] memory privateKeys = new uint256[](_totalOwners);
+        
+        // Generate all owners first
         for (uint256 i = 0; i < _totalOwners; i++) {
-            // Generate private key and address
             (address owner, uint256 privateKey) = _randomSigner();
-            vm.rememberKey(privateKey);
-            // Store owner and their private key
             _owners[i] = owner;
+            privateKeys[i] = privateKey;
+        }
+        
+        // Sort owners and private keys together (bubble sort)
+        for (uint256 i = 0; i < _totalOwners - 1; i++) {
+            for (uint256 j = 0; j < _totalOwners - i - 1; j++) {
+                if (uint160(_owners[j]) > uint160(_owners[j + 1])) {
+                    // Swap owners
+                    address tempAddr = _owners[j];
+                    _owners[j] = _owners[j + 1];
+                    _owners[j + 1] = tempAddr;
+                    
+                    // Swap corresponding private keys
+                    uint256 tempKey = privateKeys[j];
+                    privateKeys[j] = privateKeys[j + 1];
+                    privateKeys[j + 1] = tempKey;
+                }
+            }
+        }
+        
+        // Store sorted private keys
+        for (uint256 i = 0; i < _totalOwners; i++) {
+            testPrivateKeys[i] = privateKeys[i];
+            vm.rememberKey(privateKeys[i]);
         }
     }
 
     /**
      * @notice Execute a transaction through the Safe with direct signing
-     * @dev This uses vm.sign for testing purposes
+     * @dev Uses pre-sorted signer indices to generate signatures in ascending order
      */
     function execTransaction(address to, uint256 value, bytes memory data, uint256[] memory signerIndices) public {
         require(address(deployedSafe) != address(0), "Safe not deployed");
@@ -203,22 +227,23 @@ contract SetupIntegrationTest is
             0, // gasPrice
             address(0), // gasToken
             payable(address(0)), // refundReceiver
-            uint256(deployedSafe.nonce())
+            deployedSafe.nonce()
         );
 
-        // Collect signatures
+        // Collect signatures using pre-sorted indices
         bytes memory signatures = new bytes(signerIndices.length * 65);
         uint256 pos = 0;
+       // log all the owner public keys
+        for (uint256 i = 0; i < TEST_TOTAL_OWNERS; i++) {
+            // check they are all owners of the safe
+            require(deployedSafe.isOwner(owners[i]), "Owner not owner of safe");
+        }
+
 
         for (uint256 i = 0; i < signerIndices.length; i++) {
-            require(signerIndices[i] < TEST_TOTAL_OWNERS, "Invalid signer index");
-
-            // Get the owner's private key from the mapping
-            address owner = owners[signerIndices[i]];
-            vm.startPrank(owner);
-            // Sign with the owner's private key
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(owner, txHash);
-            vm.stopPrank();
+            uint256 ownerSk = testPrivateKeys[signerIndices[i]];
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerSk, txHash);
+            
             assembly {
                 mstore(add(signatures, add(pos, 32)), r)
                 mstore(add(signatures, add(pos, 64)), s)
@@ -226,7 +251,7 @@ contract SetupIntegrationTest is
             }
             pos += 65;
         }
-
+         vm.startBroadcast(testPrivateKeys[0]);
         // Execute transaction
         bool success = deployedSafe.execTransaction(
             to,
@@ -240,7 +265,10 @@ contract SetupIntegrationTest is
             payable(address(0)), // refundReceiver
             signatures
         );
-
+        vm.stopBroadcast();
         require(success, "Transaction execution failed");
     }
+
+    
 }
+
