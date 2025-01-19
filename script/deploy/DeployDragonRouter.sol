@@ -53,7 +53,7 @@ contract DeployDragonRouter is DeploySplitChecker {
         // Deploy TransparentProxy for DragonRouter
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(dragonRouterSingleton),
-            _getConfiguredAddress("PROXY_ADMIN"),
+            address(proxyAdmin),
             abi.encodeCall(DragonRouter.setUp, initData)
         );
 
@@ -62,12 +62,12 @@ contract DeployDragonRouter is DeploySplitChecker {
         vm.stopBroadcast();
 
         // Log deployment info
-        console2.log("DragonRouter Singleton deployed at:", address(dragonRouterSingleton));
-        console2.log("DragonRouter Proxy deployed at:", address(dragonRouterProxy));
-        console2.log("\nConfiguration:");
-        console2.log("- Governance:", _getConfiguredAddress("GOVERNANCE"));
-        console2.log("- Split Checker:", address(splitCheckerProxy));
-        console2.log("- Opex Vault:", _getConfiguredAddress("OPEX_VAULT"));
-        console2.log("- Metapool:", _getConfiguredAddress("METAPOOL"));
+        // console2.log("DragonRouter Singleton deployed at:", address(dragonRouterSingleton));
+        // console2.log("DragonRouter Proxy deployed at:", address(dragonRouterProxy));
+        // console2.log("\nConfiguration:");
+        // console2.log("- Governance:", _getConfiguredAddress("GOVERNANCE"));
+        // console2.log("- Split Checker:", address(splitCheckerProxy));
+        // console2.log("- Opex Vault:", _getConfiguredAddress("OPEX_VAULT"));
+        // console2.log("- Metapool:", _getConfiguredAddress("METAPOOL"));
     }
 }

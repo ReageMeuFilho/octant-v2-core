@@ -34,7 +34,7 @@ contract DeploySplitChecker is Test {
         // Deploy TransparentProxy for DragonRouter
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(splitCheckerSingleton),
-            _getConfiguredAddress("PROXY_ADMIN"),
+            address(proxyAdmin),
             abi.encodeCall(
                 SplitChecker.initialize,
                 (
@@ -50,12 +50,12 @@ contract DeploySplitChecker is Test {
         vm.stopBroadcast();
 
         // Log deployment info
-        console2.log("SplitChecker Implementation deployed at:", address(splitCheckerSingleton));
-        console2.log("SplitChecker Proxy deployed at:", address(splitCheckerProxy));
-        console2.log("\nConfiguration:");
-        console2.log("- Governance:", _getConfiguredAddress("GOVERNANCE"));
-        console2.log("- Max Opex Split:", _getConfiguredUint("MAX_OPEX_SPLIT", DEFAULT_MAX_OPEX_SPLIT));
-        console2.log("- Min Metapool Split:", _getConfiguredUint("MIN_METAPOOL_SPLIT", DEFAULT_MIN_METAPOOL_SPLIT));
+        // console2.log("SplitChecker Implementation deployed at:", address(splitCheckerSingleton));
+        // console2.log("SplitChecker Proxy deployed at:", address(splitCheckerProxy));
+        // console2.log("\nConfiguration:");
+        // console2.log("- Governance:", _getConfiguredAddress("GOVERNANCE"));
+        // console2.log("- Max Opex Split:", _getConfiguredUint("MAX_OPEX_SPLIT", DEFAULT_MAX_OPEX_SPLIT));
+        // console2.log("- Min Metapool Split:", _getConfiguredUint("MIN_METAPOOL_SPLIT", DEFAULT_MIN_METAPOOL_SPLIT));
     }
 
     /**

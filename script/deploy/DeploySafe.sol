@@ -141,11 +141,11 @@ contract DeploySafe is Test {
         vm.stopBroadcast();
 
         // Log deployment info
-        console.log("Safe deployed at:", address(proxy));
-        console.log("Threshold:", threshold);
-        console.log("\nOwners:");
-        for (uint256 i = 0; i < owners.length; i++) {
-            console.log(string.concat("Owner ", (i + 1).toString(), ": ", owners[i].toHexString()));
-        }
+        // console.log("Safe deployed at:", address(proxy));
+        // console.log("Threshold:", threshold);
+        // console.log("\nOwners:");
+        // for (uint256 i = 0; i < owners.length; i++) {
+        //     console.log(string.concat("Owner ", (i + 1).toString(), ": ", owners[i].toHexString()));
+        // }
     }
 }

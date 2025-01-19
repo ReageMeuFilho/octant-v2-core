@@ -121,17 +121,17 @@ contract DeployHatsProtocol is Test {
         vm.stopBroadcast();
 
         // Log deployed addresses and hat IDs
-        console.log("Hats Protocol deployed at:", address(HATS));
-        console.log("DragonHatter deployed at:", address(dragonHatter));
-        console.log("Top Hat ID:", topHatId);
-        console.log("Autonomous Admin Hat ID:", autonomousAdminHatId);
-        console.log("Dragon Admin Hat ID:", dragonAdminHatId);
-        console.log("Branch Hat ID:", branchHatId);
+        // console.log("Hats Protocol deployed at:", address(HATS));
+        // console.log("DragonHatter deployed at:", address(dragonHatter));
+        // console.log("Top Hat ID:", topHatId);
+        // console.log("Autonomous Admin Hat ID:", autonomousAdminHatId);
+        // console.log("Dragon Admin Hat ID:", dragonAdminHatId);
+        // console.log("Branch Hat ID:", branchHatId);
 
         // Log role hat IDs
-        console.log("Keeper Role Hat ID:", dragonHatter.getRoleHat(dragonHatter.KEEPER_ROLE()));
-        console.log("Management Role Hat ID:", dragonHatter.getRoleHat(dragonHatter.MANAGEMENT_ROLE()));
-        console.log("Emergency Role Hat ID:", dragonHatter.getRoleHat(dragonHatter.EMERGENCY_ROLE()));
-        console.log("Regen Governance Role Hat ID:", dragonHatter.getRoleHat(dragonHatter.REGEN_GOVERNANCE_ROLE()));
+        // console.log("Keeper Role Hat ID:", dragonHatter.getRoleHat(dragonHatter.KEEPER_ROLE()));
+        // console.log("Management Role Hat ID:", dragonHatter.getRoleHat(dragonHatter.MANAGEMENT_ROLE()));
+        // console.log("Emergency Role Hat ID:", dragonHatter.getRoleHat(dragonHatter.EMERGENCY_ROLE()));
+        // console.log("Regen Governance Role Hat ID:", dragonHatter.getRoleHat(dragonHatter.REGEN_GOVERNANCE_ROLE()));
     }
 }

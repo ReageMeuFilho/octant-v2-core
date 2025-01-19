@@ -46,16 +46,16 @@ contract DeployMockStrategy is DeployModuleProxyFactory {
         uint256 _maxReportDelay = 1 days;
         string memory _name = "Mock Dragon Strategy";
 
-        console2.log("Safe Address:", safeAddress);
-        console2.log("Dragon Tokenized Strategy Address:", dragonTokenizedStrategyAddress);
-        console2.log("Mock Token:", address(token));
-        console2.log("MockYieldSource:", address(mockYieldSource));
-        console2.log("Management:", safeAddress);
-        console2.log("Keeper:", safeAddress);
-        console2.log("Dragon Router Proxy Address:", dragonRouterProxyAddress);
-        console2.log("Max Report Delay:", _maxReportDelay);
-        console2.log("Name:", _name);
-        console2.log("MockStrategy Implementation:", address(mockStrategySingleton));
+        // console2.log("Safe Address:", safeAddress);
+        // console2.log("Dragon Tokenized Strategy Address:", dragonTokenizedStrategyAddress);
+        // console2.log("Mock Token:", address(token));
+        // console2.log("MockYieldSource:", address(mockYieldSource));
+        // console2.log("Management:", safeAddress);
+        // console2.log("Keeper:", safeAddress);
+        // console2.log("Dragon Router Proxy Address:", dragonRouterProxyAddress);
+        // console2.log("Max Report Delay:", _maxReportDelay);
+        // console2.log("Name:", _name);
+        // console2.log("MockStrategy Implementation:", address(mockStrategySingleton));
 
         // Prepare initialization data
         // First encode the strategy initialization parameters
@@ -88,11 +88,11 @@ contract DeployMockStrategy is DeployModuleProxyFactory {
         ISafe(safeAddress).enableModule(address(mockStrategyProxy));
 
         // Log deployments
-        console2.log("MockStrategy Implementation:", address(mockStrategySingleton));
-        console2.log("MockStrategy Proxy:", address(mockStrategyProxy));
-        console2.log("MockYieldSource:", address(mockYieldSource));
-        console2.log("Mock Token:", address(token));
-        console2.log("library address", address(mockStrategyProxy.tokenizedStrategyImplementation()));
-        console2.log("hats initialized", dragonTokenizedStrategyAddress);
+        // console2.log("MockStrategy Implementation:", address(mockStrategySingleton));
+        // console2.log("MockStrategy Proxy:", address(mockStrategyProxy));
+        // console2.log("MockYieldSource:", address(mockYieldSource));
+        // console2.log("Mock Token:", address(token));
+        // console2.log("library address", address(mockStrategyProxy.tokenizedStrategyImplementation()));
+        // console2.log("hats initialized", dragonTokenizedStrategyAddress);
     }
 }

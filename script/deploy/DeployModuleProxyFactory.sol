@@ -21,6 +21,6 @@ contract DeployModuleProxyFactory is Test {
         moduleProxyFactory = new ModuleProxyFactory();
 
         // Log deployment information
-        console2.log("ModuleProxyFactory deployed at:", address(moduleProxyFactory));
+        // console2.log("ModuleProxyFactory deployed at:", address(moduleProxyFactory));
     }
 }
