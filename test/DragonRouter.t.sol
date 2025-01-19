@@ -6,6 +6,7 @@ import {DragonRouter} from "src/dragons/DragonRouter.sol";
 import "src/dragons/SplitChecker.sol";
 import {MockStrategy} from "./mocks/MockStrategy.sol";
 
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ITokenizedStrategy} from "src/interfaces/ITokenizedStrategy.sol";
 
@@ -14,6 +15,7 @@ contract DragonRouterTest is Test {
     SplitChecker public splitChecker;
     address public owner;
     address public governance;
+    address public regenGovernance;
     address public opexVault;
     address public metapool;
     address[] public strategies;
@@ -22,6 +24,7 @@ contract DragonRouterTest is Test {
     function setUp() public {
         owner = makeAddr("owner");
         governance = makeAddr("governance");
+        regenGovernance = makeAddr("regenGovernance");
         opexVault = makeAddr("opexVault");
         metapool = makeAddr("metapool");
 
@@ -38,7 +41,7 @@ contract DragonRouterTest is Test {
         // Deploy DragonRouter
         router = new DragonRouter();
         bytes memory initParams =
-            abi.encode(owner, abi.encode(strategies, assets, governance, address(splitChecker), opexVault, metapool));
+            abi.encode(owner, abi.encode(strategies, assets, governance, regenGovernance, address(splitChecker), opexVault, metapool));
         router.setUp(initParams);
     }
 
@@ -71,6 +74,12 @@ contract DragonRouterTest is Test {
         strategies = _strategies;
         assets = _assets;
 
+        vm.startPrank(governance);
+        _setSplits();
+        vm.stopPrank();
+    }
+
+    function _setSplits() public {
         // Setup initial split configuration
         address[] memory recipients = new address[](2);
         recipients[0] = opexVault;
@@ -80,8 +89,30 @@ contract DragonRouterTest is Test {
         allocations[0] = 40; // 40% to opex
         allocations[1] = 60; // 60% to metapool
 
-        vm.startPrank(governance);
         router.setSplit(Split({recipients: recipients, allocations: allocations, totalAllocations: 100}));
+    }
+
+    function test_setCooldownPeriod() public {
+        uint256 newPeriod = 180 days;
+
+        vm.prank(regenGovernance);
+        router.setCooldownPeriod(newPeriod);
+
+        // Test successful change
+        assertEq(router.DRAGON_SPLIT_COOLDOWN_PERIOD(), newPeriod);
+    }
+
+    function test_setCooldownPeriod_reverts() public {
+        uint256 newPeriod = 180 days;
+
+        vm.startPrank(address(0));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, address(0), keccak256("REGEN_GOVERNANCE_ROLE")
+            )
+        );
+        router.setCooldownPeriod(newPeriod);
+
         vm.stopPrank();
     }
 }
