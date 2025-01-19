@@ -8,7 +8,7 @@ import "forge-std/Script.sol";
 
 import {MockStrategy} from "../../test/mocks/MockStrategy2.sol";
 import {DragonTokenizedStrategy} from "src/dragons/vaults/DragonTokenizedStrategy.sol";
-import {TestERC20} from "../../src/test/TestERC20.sol";
+import {MockERC20} from "test/mocks/MockERC20.sol";
 import {MockYieldSource} from "../../test/mocks/MockYieldSource.sol";
 
 contract DeployStrategyModuleWithSafe is Script {
@@ -24,7 +24,7 @@ contract DeployStrategyModuleWithSafe is Script {
     address treasury;
     address dragonRouter;
     address tokenizedStrategyImplementation;
-    TestERC20 token;
+    MockERC20 token;
     MockYieldSource yieldSource;
 
     /// @notice change this according to the strategy
@@ -58,7 +58,7 @@ contract DeployStrategyModuleWithSafe is Script {
         module = address(mockStrategy);
 
         // Deploy the token
-        token = new TestERC20();
+        token = new MockERC20();
 
         // Deploy Mock Yield Source
         yieldSource = new MockYieldSource(address(token));

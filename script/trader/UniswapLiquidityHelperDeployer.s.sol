@@ -2,8 +2,8 @@
 pragma solidity ^0.8.23;
 
 import "forge-std/Script.sol";
-import {HelperConfig} from "./helpers/HelperConfig.s.sol";
-import {UniswapLiquidityHelper} from "./helpers/UniswapLiquidityHelper.s.sol";
+import {HelperConfig} from "../helpers/HelperConfig.s.sol";
+import {UniswapLiquidityHelper} from "../helpers/UniswapLiquidityHelper.s.sol";
 
 contract UniswapLiquidityHelperDeployer is Script {
     function run() external {
