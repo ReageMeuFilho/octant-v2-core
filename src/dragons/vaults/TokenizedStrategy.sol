@@ -6,7 +6,7 @@ import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Enum } from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 import { IAvatar } from "zodiac/interfaces/IAvatar.sol";
-import { ZeroAddress, ZeroShares, ZeroAssets, ReentrancyGuard__ReentrantCall, TokenizedStrategy__NotOwner, TokenizedStrategy__NotManagement, TokenizedStrategy__NotKeeperOrManagement, TokenizedStrategy__NotEmergencyAuthorized, TokenizedStrategy__AlreadyInitialized, TokenizedStrategy__DepositMoreThanMax, TokenizedStrategy__MintMoreThanMax, TokenizedStrategy__InvalidMaxLoss, TokenizedStrategy__TransferFromZeroAddress, TokenizedStrategy__TransferToZeroAddress, TokenizedStrategy__TransferToStrategy, TokenizedStrategy__MintToZeroAddress, TokenizedStrategy__BurnFromZeroAddress, TokenizedStrategy__ApproveFromZeroAddress, TokenizedStrategy__ApproveToZeroAddress, TokenizedStrategy__InsufficientAllowance, TokenizedStrategy__PermitDeadlineExpired, TokenizedStrategy__InvalidSigner, TokenizedStrategy__NotSelf, TokenizedStrategy__WithdrawMoreThanMax, TokenizedStrategy__RedeemMoreThanMax, TokenizedStrategy__TransferFailed, TokenizedStrategy__NotPendingManagement, TokenizedStrategy__StrategyInShutdown, TokenizedStrategy__TooMuchLoss } from "../../errors.sol";
+import { ZeroAddress, ZeroShares, ZeroAssets, ReentrancyGuard__ReentrantCall, TokenizedStrategy__NotOwner, TokenizedStrategy__NotManagement, TokenizedStrategy__NotKeeperOrManagement, TokenizedStrategy__NotEmergencyAuthorized, TokenizedStrategy__AlreadyInitialized, TokenizedStrategy__DepositMoreThanMax, TokenizedStrategy__MintMoreThanMax, TokenizedStrategy__InvalidMaxLoss, TokenizedStrategy__TransferFromZeroAddress, TokenizedStrategy__TransferToZeroAddress, TokenizedStrategy__TransferToStrategy, TokenizedStrategy__MintToZeroAddress, TokenizedStrategy__BurnFromZeroAddress, TokenizedStrategy__ApproveFromZeroAddress, TokenizedStrategy__ApproveToZeroAddress, TokenizedStrategy__InsufficientAllowance, TokenizedStrategy__PermitDeadlineExpired, TokenizedStrategy__InvalidSigner, TokenizedStrategy__NotSelf, TokenizedStrategy__WithdrawMoreThanMax, TokenizedStrategy__RedeemMoreThanMax, TokenizedStrategy__TransferFailed, TokenizedStrategy__NotPendingManagement, TokenizedStrategy__StrategyNotInShutdown, TokenizedStrategy__TooMuchLoss, TokenizedStrategy__HatsAlreadyInitialized, TokenizedStrategy__InvalidHatsAddress } from "../../errors.sol";
 
 import { IBaseStrategy } from "src/interfaces/IBaseStrategy.sol";
 import { IHats } from "src/interfaces/IHats.sol";
@@ -149,7 +149,7 @@ contract TokenizedStrategy {
         uint256 MANAGEMENT_HAT;
         uint256 EMERGENCY_ADMIN_HAT;
         uint256 REGEN_GOVERNANCE_HAT;
-        bool hatsInitialized;  // Flag for Hats Protocol initialization
+        bool hatsInitialized; // Flag for Hats Protocol initialization
     }
 
     address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE; // using this address to represent native ETH
@@ -218,7 +218,7 @@ contract TokenizedStrategy {
      */
     function requireManagement(address _sender) public view {
         StrategyData storage S = _strategyStorage();
-        if (_sender != S.management && !_isHatsWearer(S, _sender, S.MANAGEMENT_HAT)) 
+        if (_sender != S.management && !_isHatsWearer(S, _sender, S.MANAGEMENT_HAT))
             revert TokenizedStrategy__NotManagement();
     }
 
@@ -234,9 +234,10 @@ contract TokenizedStrategy {
      */
     function requireKeeperOrManagement(address _sender) public view {
         StrategyData storage S = _strategyStorage();
-        if (_sender != S.keeper && 
-            _sender != S.management && 
-            !_isHatsWearer(S, _sender, S.KEEPER_HAT) && 
+        if (
+            _sender != S.keeper &&
+            _sender != S.management &&
+            !_isHatsWearer(S, _sender, S.KEEPER_HAT) &&
             !_isHatsWearer(S, _sender, S.MANAGEMENT_HAT)
         ) revert TokenizedStrategy__NotKeeperOrManagement();
     }
@@ -253,9 +254,10 @@ contract TokenizedStrategy {
      */
     function requireEmergencyAuthorized(address _sender) public view {
         StrategyData storage S = _strategyStorage();
-        if (_sender != S.emergencyAdmin && 
-            _sender != S.management && 
-            !_isHatsWearer(S, _sender, S.EMERGENCY_ADMIN_HAT) && 
+        if (
+            _sender != S.emergencyAdmin &&
+            _sender != S.management &&
+            !_isHatsWearer(S, _sender, S.EMERGENCY_ADMIN_HAT) &&
             !_isHatsWearer(S, _sender, S.MANAGEMENT_HAT)
         ) revert TokenizedStrategy__NotEmergencyAuthorized();
     }
@@ -328,7 +330,6 @@ contract TokenizedStrategy {
     /*//////////////////////////////////////////////////////////////
                           INITIALIZATION
     //////////////////////////////////////////////////////////////*/
-
     function __TokenizedStrategy_init(
         address _asset,
         string memory _name,
@@ -798,7 +799,6 @@ contract TokenizedStrategy {
         // Cache storage variables used more than once.
         ERC20 _asset = S.asset;
 
-        //TODO: need a cleaner solution here, execTransactionFromModule reverts not caught in foundry even after adding requires
         if (address(_asset) == ETH) {
             if (IAvatar(S.owner).execTransactionFromModule(address(this), assets, "", Enum.Operation.Call) == false) {
                 revert TokenizedStrategy__DepositMoreThanMax();
@@ -1003,7 +1003,7 @@ contract TokenizedStrategy {
      */
     function emergencyWithdraw(uint256 amount) external nonReentrant onlyEmergencyAuthorized {
         // Make sure the strategy has been shutdown.
-        if (!_strategyStorage().shutdown) revert TokenizedStrategy__StrategyInShutdown();
+        if (!_strategyStorage().shutdown) revert TokenizedStrategy__StrategyNotInShutdown();
 
         // Withdraw from the yield source.
         IBaseStrategy(address(this)).shutdownWithdraw(amount);
@@ -1549,9 +1549,9 @@ contract TokenizedStrategy {
         uint256 _regenGovernanceHat
     ) external onlyManagement {
         StrategyData storage S = _strategyStorage();
-        require(!S.hatsInitialized, "Hats already initialized");
-        require(_hats != address(0), "Invalid Hats address");
-        
+        if (S.hatsInitialized) revert TokenizedStrategy__HatsAlreadyInitialized();
+        if (_hats == address(0)) revert TokenizedStrategy__InvalidHatsAddress();
+
         S.HATS = IHats(_hats);
         S.KEEPER_HAT = _keeperHat;
         S.MANAGEMENT_HAT = _managementHat;
@@ -1569,12 +1569,12 @@ contract TokenizedStrategy {
      * @param _hatId Hat ID to verify
      * @return bool True if wearer has the hat, false otherwise
      */
-    function _isHatsWearer(
-        StrategyData storage S,
-        address _wearer,
-        uint256 _hatId
-    ) internal view returns (bool) {
+    function _isHatsWearer(StrategyData storage S, address _wearer, uint256 _hatId) internal view returns (bool) {
         if (!S.hatsInitialized) return false;
-        return S.HATS.isWearerOfHat(_wearer, _hatId);
+        try S.HATS.isWearerOfHat(_wearer, _hatId) returns (bool isWearer) {
+            return isWearer;
+        } catch {
+            return false;
+        }
     }
 }
