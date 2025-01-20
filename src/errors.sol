@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.25;
+pragma solidity ^0.8.25;
 
 // General errors
 error Unauthorized();
@@ -8,6 +8,7 @@ error ReentrancyGuard__ReentrantCall();
 error ZeroShares();
 error ZeroAssets();
 error ERC20InsufficientBalance();
+error AlreadyInitialized();
 
 // TokenizedStrategy specific errors
 error TokenizedStrategy__NotEmergencyAuthorized();
@@ -33,8 +34,10 @@ error TokenizedStrategy__NotSelf();
 error TokenizedStrategy__WithdrawMoreThanMax();
 error TokenizedStrategy__RedeemMoreThanMax();
 error TokenizedStrategy__NotPendingManagement();
-error TokenizedStrategy__StrategyInShutdown();
+error TokenizedStrategy__StrategyNotInShutdown();
 error TokenizedStrategy__TooMuchLoss();
+error TokenizedStrategy__HatsAlreadyInitialized();
+error TokenizedStrategy__InvalidHatsAddress();
 
 // DragonTokenizedStrategy specific errors
 error DragonTokenizedStrategy__VaultSharesNotTransferable();

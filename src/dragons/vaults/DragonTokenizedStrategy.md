@@ -97,6 +97,33 @@ The contract uses a unique storage pattern with a custom storage slot to prevent
 - Withdrawal limits and loss parameters
 - Comprehensive event emission for transparency
 
+#### Major Feature 5: Hats Protocol Integration
+
+The strategy integrates with Hats Protocol for role-based access control, providing a flexible and decentralized way to manage permissions:
+
+- **Role Management Through Hats**
+  - Keeper role (operations)
+  - Management role (administrative)
+  - Emergency Admin role (crisis management)
+  - Regen Governance role (protocol parameters)
+
+- **Dual Permission System**
+  - Traditional address-based permissions remain functional
+  - Additional hat-based permissions can be enabled post-deployment
+  - Permissions are additive (either direct address OR hat ownership grants access)
+
+- **Initialization Flow**
+  - Hats integration is optional and can be set up after deployment
+  - Management can initialize Hats Protocol integration once
+  - Each role is associated with a specific hat ID
+  - Role checks automatically handle both pre and post Hats initialization states
+
+- **Security Considerations**
+  - One-time initialization prevents hat ID changes
+  - Early termination for hat checks if not initialized
+  - Maintains backward compatibility with address-based permissions
+  - Clear separation between core functionality and role management
+
 ### Contract Summary
 
 **Main Functions:**
@@ -192,6 +219,7 @@ Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#uniniti
 - `SECONDS_PER_YEAR = 31_556_952`: Standard year in seconds
 - `ENTERED = 2`, `NOT_ENTERED = 1`: Reentrancy guard flags
 
+
 ---
 
 ## DragonTokenizedStrategy.sol
@@ -217,6 +245,17 @@ The key innovation is the balance between commitment (through lockups) and flexi
 - Converts full lockup to 3-month linear unlock
 - Proportional share release over time
 - Protection against immediate mass withdrawals
+
+##### Lockup Parameters
+
+The strategy enforces strict bounds on lockup durations:
+
+- Minimum lockup: 30 days
+- Maximum lockup: 3650 days (10 years)
+- Minimum rage quit cooldown: 30 days  
+- Maximum rage quit cooldown: 3650 days
+
+These bounds ensure both flexibility and security in the lockup mechanism while preventing extreme values that could harm the protocol.
 
 #### Major Feature 3: Deposit Variations
 
@@ -254,7 +293,7 @@ The key innovation is the balance between commitment (through lockups) and flexi
 
 - `report() external returns (uint256 profit, uint256 loss)`
 
-### Security Analysis
+### Security Analysis (ACK)
 
 INFO:Detectors:
 
@@ -312,3 +351,6 @@ Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#uniniti
   - Used for both voluntary lockups and rage quit duration
   - Chosen to ensure sufficient commitment while maintaining reasonable liquidity
   - Critical for preventing rapid capital flight
+
+
+

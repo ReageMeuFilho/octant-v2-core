@@ -15,7 +15,7 @@ import { BaseStrategy__NotSelf } from "src/errors.sol";
  *  seamlessly integrate with the `TokenizedStrategy` implementation contract
  *  allowing anyone to easily build a fully permissionless ERC-4626 compliant
  *  Vault by inheriting this contract and overriding three simple functions.
-
+ *
  *  It utilizes an immutable proxy pattern that allows the BaseStrategy
  *  to remain simple and small. All standard logic is held within the
  *  `TokenizedStrategy` and is reused over any n strategies all using the
@@ -353,7 +353,7 @@ abstract contract BaseStrategy {
      *
      * We name the function `tendThis` so that `tend` calls are forwarded to
      * the TokenizedStrategy.
-
+     *
      * @param _totalIdle The amount of current idle funds that can be
      * deployed during the tend
      */

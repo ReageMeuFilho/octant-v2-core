@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import { Initializable } from "solady/src/utils/Initializable.sol";
+import { Initializable } from "solady/utils/Initializable.sol";
 import "src/interfaces/ISplitChecker.sol";
 
+import { AlreadyInitialized } from "src/errors.sol";
 /// @title SplitChecker
 /// @notice Validates split configurations for revenue distribution
 /// @dev Ensures splits meet requirements for opex and metapool allocations
+
 contract SplitChecker is ISplitChecker, Initializable {
     // =============================================================
     //                            CONSTANTS
@@ -72,6 +74,7 @@ contract SplitChecker is ISplitChecker, Initializable {
     /// @param _maxOpexSplit Maximum allowed split for operational expenses (scaled by 1e18)
     /// @param _minMetapoolSplit Minimum required split for metapool (scaled by 1e18)
     function initialize(address _goverance, uint256 _maxOpexSplit, uint256 _minMetapoolSplit) external initializer {
+        if (goverance != address(0)) revert AlreadyInitialized();
         goverance = _goverance;
         _setMaxOpexSplit(_maxOpexSplit);
         _setMinMetapoolSplit(_minMetapoolSplit);

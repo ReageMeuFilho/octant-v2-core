@@ -21,6 +21,7 @@ contract ModuleProxyFactory {
     function createProxy(address target, bytes32 salt) internal returns (address result) {
         if (address(target) == address(0)) revert ZeroAddress(target);
         if (address(target).code.length == 0) revert TargetHasNoCode(target);
+        // NOTE: Magic number https://github.com/thebor1337/solidity_sandbox/blob/f8a678f4cbabd22831e646830e299c75e75dd76f/contracts/Proxy/ERC1167/Proxy.huff#L4
         bytes memory deployment = abi.encodePacked(
             hex"602d8060093d393df3363d3d373d3d3d363d73",
             target,

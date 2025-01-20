@@ -34,7 +34,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
-    uint256 public DRAGON_SPLIT_COOLDOWN_PERIOD = 30 days;
+    uint256 public DRAGON_SPLIT_COOLDOWN_PERIOD;
     uint256 public SPLIT_DELAY;
     ISplitChecker public splitChecker;
     address public opexVault;
@@ -109,6 +109,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
     /// @dev owner of this module will the safe multisig that calls setUp function
     /// @param initializeParams Parameters of initialization encoded
     function setUp(bytes memory initializeParams) public initializer {
+        DRAGON_SPLIT_COOLDOWN_PERIOD = 30 days;
         (address _owner, bytes memory data) = abi.decode(initializeParams, (address, bytes));
 
         (
@@ -298,7 +299,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      * @dev Only callable by accounts with OWNER_ROLE
      */
     function setSplit(Split memory _split) external onlyRole(OWNER_ROLE) {
-        if(block.timestamp - lastSetSplitTime < DRAGON_SPLIT_COOLDOWN_PERIOD) revert CooldownPeriodNotPassed();
+        if (block.timestamp - lastSetSplitTime < DRAGON_SPLIT_COOLDOWN_PERIOD) revert CooldownPeriodNotPassed();
         splitChecker.checkSplit(_split, opexVault, metapool);
 
         for (uint256 i = 0; i < strategies.length; i++) {

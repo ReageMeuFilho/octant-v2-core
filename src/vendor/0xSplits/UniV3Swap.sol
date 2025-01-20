@@ -2,12 +2,12 @@
 pragma solidity ^0.8.17;
 
 import "forge-std/Test.sol";
-import { ERC20 } from "solady/src/tokens/ERC20.sol";
+import { ERC20 } from "solady/tokens/ERC20.sol";
 import { IOracle } from "./IOracle.sol";
 import { ISwapRouter } from "../uniswap/ISwapRouter.sol";
-import { WETH } from "solady/src/tokens/WETH.sol";
+import { WETH } from "solady/tokens/WETH.sol";
 import { QuoteParams } from "./LibQuotes.sol";
-import { SafeTransferLib } from "solady/src/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { TokenUtils } from "./TokenUtils.sol";
 
 import { ISwapperFlashCallback } from "./ISwapperFlashCallback.sol";

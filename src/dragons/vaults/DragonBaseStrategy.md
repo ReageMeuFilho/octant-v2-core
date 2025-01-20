@@ -4,7 +4,7 @@
 
 DragonBaseStrategy is a foundational abstract contract for implementing yield-generating strategies in a tokenized format. It inherits from BaseStrategy and implements a proxy pattern using delegatecall to interact with a contract that implements the TokenizedStrategy interface. This architecture enables multiple strategies to share core logic while keeping strategy-specific implementations separate.
 
-This contract should be inherited by a specific strategy. It implements all of the required functionality toseamlessly integrate with the `TokenizedStrategy` implementation contract allowing anyone to easily build a fully permissionless ERC-4626 compliant Vault by inheriting this contract and overriding four simple functions.
+This contract should be inherited by a specific strategy. It implements all of the required functionality to seamlessly integrate with the `TokenizedStrategy` implementation contract allowing anyone to easily build a fully permissionless ERC-4626 compliant Vault by inheriting this contract and overriding four simple functions.
 
 It utilizes an immutable proxy pattern that allows the BaseStrategy to remain simple and small. All standard logic is held within the
 `TokenizedStrategy` and is reused over any n strategies all using the `fallback` function to delegatecall the implementation so that strategists can only be concerned with writing their strategy specific code.
