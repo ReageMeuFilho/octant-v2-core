@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.17;
 
-import "forge-std/Test.sol";
 import { ERC20 } from "solady/tokens/ERC20.sol";
 import { IOracle } from "./IOracle.sol";
 import { ISwapRouter } from "../uniswap/ISwapRouter.sol";
@@ -18,7 +17,7 @@ import { ISwapperFactory } from "./ISwapperFactory.sol";
 /// @author 0xSplits
 /// @notice Used by EOAs & simple bots to execute `Swapper#flash` with uniswap v3
 /// @dev This contract uses token = address(0) to refer to ETH.
-contract UniV3Swap is ISwapperFlashCallback, Test {
+contract UniV3Swap is ISwapperFlashCallback {
     using SafeTransferLib for address;
     using TokenUtils for address;
 
