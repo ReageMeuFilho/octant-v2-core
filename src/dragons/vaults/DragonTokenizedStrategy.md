@@ -219,6 +219,7 @@ Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#uniniti
 - `SECONDS_PER_YEAR = 31_556_952`: Standard year in seconds
 - `ENTERED = 2`, `NOT_ENTERED = 1`: Reentrancy guard flags
 
+
 ---
 
 ## DragonTokenizedStrategy.sol
@@ -244,6 +245,17 @@ The key innovation is the balance between commitment (through lockups) and flexi
 - Converts full lockup to 3-month linear unlock
 - Proportional share release over time
 - Protection against immediate mass withdrawals
+
+##### Lockup Parameters
+
+The strategy enforces strict bounds on lockup durations:
+
+- Minimum lockup: 30 days
+- Maximum lockup: 3650 days (10 years)
+- Minimum rage quit cooldown: 30 days  
+- Maximum rage quit cooldown: 3650 days
+
+These bounds ensure both flexibility and security in the lockup mechanism while preventing extreme values that could harm the protocol.
 
 #### Major Feature 3: Deposit Variations
 
@@ -281,7 +293,7 @@ The key innovation is the balance between commitment (through lockups) and flexi
 
 - `report() external returns (uint256 profit, uint256 loss)`
 
-### Security Analysis
+### Security Analysis (ACK)
 
 INFO:Detectors:
 
@@ -339,5 +351,6 @@ Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#uniniti
   - Used for both voluntary lockups and rage quit duration
   - Chosen to ensure sufficient commitment while maintaining reasonable liquidity
   - Critical for preventing rapid capital flight
+
 
 
