@@ -2,29 +2,32 @@
 pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
-import "../Base.t.sol";
+import {TestPlus} from "lib/solady/test/utils/TestPlus.sol";
 import "src/routers-transformers/Trader.sol";
-import { HelperConfig } from "script/helpers/HelperConfig.s.sol";
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import { CreateOracleParams, IOracleFactory, IOracle, OracleParams } from "src/vendor/0xSplits/OracleParams.sol";
-import { QuotePair, QuoteParams } from "src/vendor/0xSplits/LibQuotes.sol";
-import { IUniV3OracleImpl } from "src/vendor/0xSplits/IUniV3OracleImpl.sol";
-import { ISwapperImpl } from "src/vendor/0xSplits/SwapperImpl.sol";
-import { ISwapperFactory } from "src/vendor/0xSplits/ISwapperFactory.sol";
-import { UniV3Swap } from "src/vendor/0xSplits/UniV3Swap.sol";
-import { ISwapRouter } from "src/vendor/uniswap/ISwapRouter.sol";
-import { WETH } from "solady/tokens/WETH.sol";
+import {HelperConfig} from "script/helpers/HelperConfig.s.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {CreateOracleParams, IOracleFactory, IOracle, OracleParams} from "src/vendor/0xSplits/OracleParams.sol";
+import {QuotePair, QuoteParams} from "src/vendor/0xSplits/LibQuotes.sol";
+import {IUniV3OracleImpl} from "src/vendor/0xSplits/IUniV3OracleImpl.sol";
+import {ISwapperImpl} from "src/vendor/0xSplits/SwapperImpl.sol";
+import {ISwapperFactory} from "src/vendor/0xSplits/ISwapperFactory.sol";
+import {UniV3Swap} from "src/vendor/0xSplits/UniV3Swap.sol";
+import {ISwapRouter} from "src/vendor/uniswap/ISwapRouter.sol";
+import {WETH} from "solady/tokens/WETH.sol";
+import {MockERC20} from "test/mocks/MockERC20.sol";
 
-contract TestTraderIntegrationETH is BaseTest {
+contract TestTraderIntegrationETH is Test, TestPlus {
+    MockERC20 public token;
+    uint256 fork;
+    string TEST_RPC_URL;
+
     HelperConfig helperConfig;
 
     address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
-    testTemps temps;
-    Trader public moduleImplementation;
+    address public owner;
     Trader public trader;
     address public glmAddress;
-
     address public swapper;
 
     UniV3Swap public initializer;
@@ -44,14 +47,23 @@ contract TestTraderIntegrationETH is BaseTest {
     uint32 defaultScaledOfferFactor = 99_00_00; // TODO: check if represents 1% MEV reward to searchers?
 
     function setUp() public {
-        _configure(true, "eth");
+        owner = makeAddr("owner");
+        vm.label(owner, "owner");
+        beneficiary = makeAddr("beneficiary");
+        vm.label(beneficiary, "beneficiary");
+        token = new MockERC20();
+        token.mint(owner, 100 ether);
+
+        TEST_RPC_URL = vm.envString("TEST_RPC_URL");
+        fork = vm.createFork(TEST_RPC_URL);
+        vm.selectFork(fork);
+
         helperConfig = new HelperConfig(true);
         (address glmToken, address wethToken, , , , , , , , address uniV3Swap) = helperConfig.activeNetworkConfig();
 
         glmAddress = glmToken;
 
         wethAddress = wethToken;
-        beneficiary = address(this); // FIXME
         initializer = UniV3Swap(payable(uniV3Swap));
     }
 
@@ -60,35 +72,32 @@ contract TestTraderIntegrationETH is BaseTest {
         quoteAddress = _quote;
         swapper = deploySwapper();
 
-        moduleImplementation = new Trader();
-        temps = _testTemps(
-            address(moduleImplementation),
-            abi.encode(baseAddress, quoteAddress, wethAddress, beneficiary, swapper, address(initializer), oracle)
+        trader = new Trader(
+            abi.encode(
+                owner, baseAddress, quoteAddress, wethAddress, beneficiary, swapper, address(initializer), oracle
+            )
         );
-        trader = Trader(payable(temps.module));
     }
 
     function _initOracleParams() internal view returns (IUniV3OracleImpl.InitParams memory) {
-        return
-            IUniV3OracleImpl.InitParams({
-                owner: temps.safe,
-                paused: false,
-                defaultPeriod: 30 minutes,
-                pairDetails: oraclePairDetails
-            });
+        return IUniV3OracleImpl.InitParams({
+            owner: owner,
+            paused: false,
+            defaultPeriod: 30 minutes,
+            pairDetails: oraclePairDetails
+        });
     }
 
     function _createSwapperParams() internal view returns (ISwapperFactory.CreateSwapperParams memory) {
-        return
-            ISwapperFactory.CreateSwapperParams({
-                owner: temps.safe,
-                paused: false,
-                beneficiary: beneficiary,
-                tokenToBeneficiary: splitsEthWrapper(quoteAddress),
-                oracleParams: oracleParams,
-                defaultScaledOfferFactor: defaultScaledOfferFactor,
-                pairScaledOfferFactors: pairScaledOfferFactors
-            });
+        return ISwapperFactory.CreateSwapperParams({
+            owner: owner,
+            paused: false,
+            beneficiary: beneficiary,
+            tokenToBeneficiary: splitsEthWrapper(quoteAddress),
+            oracleParams: oracleParams,
+            defaultScaledOfferFactor: defaultScaledOfferFactor,
+            pairScaledOfferFactors: pairScaledOfferFactors
+        });
     }
 
     function deploySwapper() public returns (address) {
@@ -133,21 +142,21 @@ contract TestTraderIntegrationETH is BaseTest {
         return clone;
     }
 
-    function uniEthWrapper(address token) private view returns (address) {
-        if (token == ETH) return wethAddress;
-        else return token;
+    function uniEthWrapper(address _token) private view returns (address) {
+        if (_token == ETH) return wethAddress;
+        else return _token;
     }
 
-    function splitsEthWrapper(address token) private pure returns (address) {
-        if (token == ETH) return address(0x0);
-        else return token;
+    function splitsEthWrapper(address _token) private pure returns (address) {
+        if (_token == ETH) return address(0x0);
+        else return _token;
     }
 
     receive() external payable {}
 
-    function testCheckModuleInitialization() public {
+    function test_TraderInit() public {
         configureTrader(ETH, glmAddress);
-        assertTrue(trader.owner() == temps.safe);
+        assertTrue(trader.owner() == owner);
         assertTrue(trader.swapper() == swapper);
     }
 
@@ -158,7 +167,7 @@ contract TestTraderIntegrationETH is BaseTest {
         // effectively disable upper bound check and randomness check
         uint256 fakeBudget = 1 ether;
 
-        vm.startPrank(temps.safe);
+        vm.startPrank(owner);
         trader.configurePeriod(block.number, 101);
         trader.setSpending(0.5 ether, 1.5 ether, fakeBudget);
         vm.stopPrank();
@@ -190,7 +199,7 @@ contract TestTraderIntegrationETH is BaseTest {
         uint256 fakeBudget = 1 ether;
         vm.deal(address(trader), 2 ether);
 
-        vm.startPrank(temps.safe);
+        vm.startPrank(owner);
         trader.configurePeriod(block.number, 101);
         trader.setSpending(1 ether, 1 ether, fakeBudget);
         vm.stopPrank();
@@ -210,7 +219,7 @@ contract TestTraderIntegrationETH is BaseTest {
             abi.encode(unscaledAmountsToBeneficiary)
         );
 
-        uint256 oldGlmBalance = IERC20(quoteAddress).balanceOf(address(this));
+        uint256 oldGlmBalance = IERC20(quoteAddress).balanceOf(beneficiary);
 
         // now, do the actual swap
 
@@ -240,7 +249,7 @@ contract TestTraderIntegrationETH is BaseTest {
         initializer.initFlash(ISwapperImpl(swapper), params);
 
         // check if beneficiary received some quote token
-        uint256 newGlmBalance = IERC20(quoteAddress).balanceOf(address(this));
+        uint256 newGlmBalance = IERC20(quoteAddress).balanceOf(beneficiary);
         assertGt(newGlmBalance, oldGlmBalance);
 
         emit log_named_uint("oldGlmBalance", oldGlmBalance);
@@ -287,13 +296,13 @@ contract TestTraderIntegrationETH is BaseTest {
 
     function test_transform_glm_to_eth() external {
         configureTrader(glmAddress, ETH);
-        uint256 initialETHBalance = address(this).balance;
+        uint256 initialETHBalance = beneficiary.balance;
         // effectively disable upper bound check and randomness check
         uint256 fakeBudget = 50 ether;
         deal(glmAddress, address(this), fakeBudget, false);
         ERC20(glmAddress).approve(address(trader), fakeBudget);
 
-        vm.startPrank(temps.safe);
+        vm.startPrank(owner);
         trader.configurePeriod(block.number, 101);
         trader.setSpending(5 ether, 15 ether, fakeBudget);
         vm.stopPrank();
@@ -314,8 +323,8 @@ contract TestTraderIntegrationETH is BaseTest {
         // do actual attempt to convert ERC20 to ETH
         uint256 amountToBeneficiary = trader.transform(glmAddress, ETH, saleValue);
 
-        assert(address(this).balance > initialETHBalance);
-        assert(address(this).balance == initialETHBalance + amountToBeneficiary);
+        assert(beneficiary.balance > initialETHBalance);
+        assert(beneficiary.balance == initialETHBalance + amountToBeneficiary);
         emit log_named_uint("ETH (in GLM) price on Trader.transform(...)", saleValue / amountToBeneficiary);
     }
 }

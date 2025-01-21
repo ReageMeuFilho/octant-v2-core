@@ -140,12 +140,10 @@ contract Trader is ITransformer, Ownable, Pausable {
       INITIALIZER
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev Initialize function
-    /// @dev owner of this module will the safe multisig that calls setUp function
     /// @param initializeParams Parameters of initialization encoded
-    function setUp(bytes memory initializeParams) public {
-        (address _owner, bytes memory data) = abi.decode(initializeParams, (address, bytes));
+    constructor (bytes memory initializeParams) {
         (
+            address _owner,
             address _base,
             address _quote,
             address _wethAddress,
@@ -153,7 +151,7 @@ contract Trader is ITransformer, Ownable, Pausable {
             address _swapper,
             address _uniV3Swap,
             address _oracle
-        ) = abi.decode(data, (address, address, address, address, address, address, address));
+        ) = abi.decode(initializeParams, (address, address, address, address, address, address, address, address));
         _initializeOwner(msg.sender);
         base = _base;
         quote = _quote;
