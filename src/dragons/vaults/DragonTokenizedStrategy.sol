@@ -419,16 +419,14 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @param receiver The address to receive the `shares`.
      * @return assets The actual amount of asset deposited.
      */
-    function mint(uint256 shares, address receiver)
-        external
-        payable
-        override
-        nonReentrant
-        onlyOwner
-        returns (uint256 assets)
-    {
+    function mint(
+        uint256 shares,
+        address receiver
+    ) external payable override nonReentrant onlyOwner returns (uint256 assets) {
+        if(receiver != msg.sender) revert Unauthorized();
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
+        if (S.voluntaryLockups[msg.sender].isRageQuit) revert DragonTokenizedStrategy__RageQuitInProgress();
 
         // Check for shutdown first to enable better error msg.
         if (S.shutdown) revert DragonTokenizedStrategy__StrategyInShutdown();
