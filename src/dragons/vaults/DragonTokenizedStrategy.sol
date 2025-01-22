@@ -450,11 +450,12 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @param lockupDuration The duration of the lockup in seconds.
      * @return shares The amount of shares minted.
      */
-    function depositWithLockup(uint256 assets, address receiver, uint256 lockupDuration)
-        public
-        onlyOwner
-        returns (uint256 shares)
-    {
+    function depositWithLockup(
+        uint256 assets,
+        address receiver,
+        uint256 lockupDuration
+    ) public onlyOwner returns (uint256 shares) {
+        if(receiver != msg.sender) revert Unauthorized();
         if (lockupDuration == 0) revert DragonTokenizedStrategy__ZeroLockupDuration();
 
         // Get the storage slot for all following calls.
@@ -487,11 +488,12 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @param lockupDuration The duration of the lockup in seconds.
      * @return assets The actual amount of asset deposited.
      */
-    function mintWithLockup(uint256 shares, address receiver, uint256 lockupDuration)
-        public
-        onlyOwner
-        returns (uint256 assets)
-    {
+    function mintWithLockup(
+        uint256 shares,
+        address receiver,
+        uint256 lockupDuration
+    ) public onlyOwner returns (uint256 assets) {
+        if(receiver != msg.sender) revert Unauthorized();
         if (lockupDuration == 0) revert DragonTokenizedStrategy__ZeroLockupDuration();
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
