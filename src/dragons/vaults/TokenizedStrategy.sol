@@ -301,11 +301,6 @@ contract TokenizedStrategy {
 
     /// @notice Used for fee calculations.
     uint256 internal constant MAX_BPS = 10_000;
-    /// @notice Used for profit unlocking rate calculations.
-    uint256 internal constant MAX_BPS_EXTENDED = 1_000_000_000_000;
-
-    /// @notice Seconds per year for max profit unlocking time.
-    uint256 internal constant SECONDS_PER_YEAR = 31_556_952; // 365.2425 days
 
     /**
      * @dev Custom storage slot that will be used to store the
@@ -324,13 +319,6 @@ contract TokenizedStrategy {
      */
     bytes32 internal constant BASE_STRATEGY_STORAGE = bytes32(uint256(keccak256("octant.base.strategy.storage")) - 1);
 
-    /*//////////////////////////////////////////////////////////////
-                               IMMUTABLE
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Address of the previously deployed Vault factory that the
-    // protocol fee config is retrieved from.
-    address public immutable FACTORY;
     /*//////////////////////////////////////////////////////////////
                             STORAGE GETTER
     //////////////////////////////////////////////////////////////*/
@@ -419,23 +407,7 @@ contract TokenizedStrategy {
         nonReentrant
         onlyOwner
         returns (uint256 shares)
-    {
-        // Get the storage slot for all following calls.
-        StrategyData storage S = _strategyStorage();
-
-        // Deposit full balance if using max uint.
-        if (assets == type(uint256).max) {
-            assets = S.asset.balanceOf(msg.sender);
-        }
-
-        // Checking max deposit will also check if shutdown.
-        if (assets > _maxDeposit(S, receiver)) revert TokenizedStrategy__DepositMoreThanMax();
-        // Check for rounding error.
-        shares = _convertToShares(S, assets, Math.Rounding.Floor);
-        if (shares == 0) revert ZeroShares();
-
-        _deposit(S, receiver, assets, shares);
-    }
+    {}
 
     /**
      * @notice Mints exactly `shares` of strategy shares to
@@ -451,17 +423,7 @@ contract TokenizedStrategy {
         nonReentrant
         onlyOwner
         returns (uint256 assets)
-    {
-        // Get the storage slot for all following calls.
-        StrategyData storage S = _strategyStorage();
-
-        // Checking max mint will also check if shutdown.
-        if (shares > _maxMint(S, receiver)) revert TokenizedStrategy__MintMoreThanMax();
-        // Check for rounding error.
-        if ((assets = _convertToAssets(S, shares, Math.Rounding.Ceil)) == 0) revert ZeroAssets();
-
-        _deposit(S, receiver, assets, shares);
-    }
+    {}
 
     /**
      * @notice Withdraws exactly `assets` from `owners` shares and sends
@@ -491,20 +453,7 @@ contract TokenizedStrategy {
         virtual
         nonReentrant
         returns (uint256 shares)
-    {
-        if (maxLoss > MAX_BPS) revert TokenizedStrategy__InvalidMaxLoss();
-        if (receiver == address(0)) revert ZeroAddress();
-
-        // Get the storage slot for all following calls.
-        StrategyData storage S = _strategyStorage();
-        if (assets > _maxWithdraw(S, _owner)) revert TokenizedStrategy__WithdrawMoreThanMax();
-        // Check for rounding error or 0 value.
-        shares = _convertToShares(S, assets, Math.Rounding.Ceil);
-        if (shares == 0) revert ZeroShares();
-
-        // Withdraw and track the actual amount withdrawn for loss check.
-        _withdraw(S, receiver, _owner, assets, shares, maxLoss);
-    }
+    {}
 
     /**
      * @notice Redeems exactly `shares` from `owner` and
@@ -535,16 +484,7 @@ contract TokenizedStrategy {
         virtual
         nonReentrant
         returns (uint256)
-    {
-        // Get the storage slot for all following calls.
-        StrategyData storage S = _strategyStorage();
-        if (shares > _maxRedeem(S, _owner)) revert TokenizedStrategy__RedeemMoreThanMax();
-        uint256 assets = _convertToAssets(S, shares, Math.Rounding.Floor);
-        if (assets == 0) revert ZeroAssets();
-
-        // We need to return the actual amount withdrawn in case of a loss.
-        return _withdraw(S, receiver, _owner, assets, shares, maxLoss);
-    }
+    {}
 
     /*//////////////////////////////////////////////////////////////
                     EXTERNAL 4626 VIEW METHODS
@@ -686,18 +626,14 @@ contract TokenizedStrategy {
      * @param _owner The owner of the shares.
      * @return _maxWithdraw Max amount of `asset` that can be withdrawn.
      */
-    function maxWithdraw(address _owner) external view virtual returns (uint256) {
-        return _maxWithdraw(_strategyStorage(), _owner);
-    }
+    function maxWithdraw(address _owner) external view virtual returns (uint256) {}
 
     /**
      * @notice Variable `maxLoss` is ignored.
      * @dev Accepts a `maxLoss` variable in order to match the multi
      * strategy vaults ABI.
      */
-    function maxWithdraw(address _owner, uint256 /*maxLoss*/ ) external view virtual returns (uint256) {
-        return _maxWithdraw(_strategyStorage(), _owner);
-    }
+    function maxWithdraw(address _owner, uint256 /*maxLoss*/ ) external view virtual returns (uint256) {}
 
     /**
      * @notice Total number of strategy shares that can be
@@ -707,7 +643,7 @@ contract TokenizedStrategy {
      * @param _owner The owner of the shares.
      * @return _maxRedeem Max amount of shares that can be redeemed.
      */
-    function maxRedeem(address _owner) external view virtual returns (uint256) {
+    function maxRedeem(address _owner) external view returns (uint256) {
         return _maxRedeem(_strategyStorage(), _owner);
     }
 
@@ -716,7 +652,7 @@ contract TokenizedStrategy {
      * @dev Accepts a `maxLoss` variable in order to match the multi
      * strategy vaults ABI.
      */
-    function maxRedeem(address _owner, uint256 /*maxLoss*/ ) external view virtual returns (uint256) {
+    function maxRedeem(address _owner, uint256 /*maxLoss*/ ) external view returns (uint256) {
         return _maxRedeem(_strategyStorage(), _owner);
     }
 
@@ -803,21 +739,7 @@ contract TokenizedStrategy {
     }
 
     /// @dev Internal implementation of {maxRedeem}.
-    function _maxRedeem(StrategyData storage S, address _owner) internal view virtual returns (uint256 maxRedeem_) {
-        // Get the max the owner could withdraw currently.
-        maxRedeem_ = IBaseStrategy(address(this)).availableWithdrawLimit(_owner);
-
-        // Conversion would overflow and saves a min check if there is no withdrawal limit.
-        if (maxRedeem_ == type(uint256).max) {
-            maxRedeem_ = _balanceOf(S, _owner);
-        } else {
-            maxRedeem_ = Math.min(
-                // Can't redeem more than the balance.
-                _convertToShares(S, maxRedeem_, Math.Rounding.Floor),
-                _balanceOf(S, _owner)
-            );
-        }
-    }
+    function _maxRedeem(StrategyData storage S, address _owner) internal view virtual returns (uint256 maxRedeem_) {}
 
     /*//////////////////////////////////////////////////////////////
                     INTERNAL 4626 WRITE METHODS
@@ -945,34 +867,7 @@ contract TokenizedStrategy {
                         PROFIT REPORTING
     //////////////////////////////////////////////////////////////*/
 
-    function report() external virtual nonReentrant onlyKeepers returns (uint256 profit, uint256 loss) {
-        // Cache storage pointer since its used repeatedly.
-        StrategyData storage S = _strategyStorage();
-
-        uint256 _oldTotalAssets = S.totalAssets;
-        uint256 _newTotalAssets = IBaseStrategy(address(this)).harvestAndReport();
-
-        if (address(S.asset) == ETH) {
-            (bool success,) = S.dragonRouter.call{value: _newTotalAssets - _oldTotalAssets}("");
-            if (!success) revert TokenizedStrategy__TransferFailed();
-        } else {
-            // Transfer the amount of underlying to the receiver.
-            S.asset.safeTransfer(S.dragonRouter, _newTotalAssets - _oldTotalAssets);
-        }
-
-        S.totalAssets = _newTotalAssets;
-        S.lastReport = uint96(block.timestamp);
-
-        // Emit event with info
-        emit Reported(
-            _newTotalAssets - _oldTotalAssets,
-            0,
-            0, // Protocol fees
-            0 // Performance Fees
-        );
-
-        return (_newTotalAssets - _oldTotalAssets, 0);
-    }
+    function report() external virtual nonReentrant onlyKeepers returns (uint256 profit, uint256 loss) {}
 
     /*//////////////////////////////////////////////////////////////
                             TENDING
@@ -1259,10 +1154,7 @@ contract TokenizedStrategy {
      * @param amount The amount of shares to be transferred from sender.
      * @return . a boolean value indicating whether the operation succeeded.
      */
-    function transfer(address to, uint256 amount) external virtual returns (bool) {
-        _transfer(_strategyStorage(), msg.sender, to, amount);
-        return true;
-    }
+    function transfer(address to, uint256 amount) external virtual returns (bool) {}
 
     /**
      * @notice Returns the remaining number of tokens that `spender` will be
@@ -1339,41 +1231,7 @@ contract TokenizedStrategy {
      * @param amount the quantity of shares to move.
      * @return . a boolean value indicating whether the operation succeeded.
      */
-    function transferFrom(address from, address to, uint256 amount) external virtual returns (bool) {
-        StrategyData storage S = _strategyStorage();
-        _spendAllowance(S, from, msg.sender, amount);
-        _transfer(S, from, to, amount);
-        return true;
-    }
-
-    /**
-     * @dev Moves `amount` of tokens from `from` to `to`.
-     *
-     * This internal function is equivalent to {transfer}, and can be used to
-     * e.g. implement automatic token fees, slashing mechanisms, etc.
-     *
-     * Emits a {Transfer} event.
-     *
-     * Requirements:
-     *
-     * - `from` cannot be the zero address.
-     * - `to` cannot be the zero address.
-     * - `to` cannot be the strategies address
-     * - `from` must have a balance of at least `amount`.
-     *
-     */
-    function _transfer(StrategyData storage S, address from, address to, uint256 amount) internal {
-        if (from == address(0)) revert TokenizedStrategy__TransferFromZeroAddress();
-        if (to == address(0)) revert TokenizedStrategy__TransferToZeroAddress();
-        if (to == address(this)) revert TokenizedStrategy__TransferToStrategy();
-
-        S.balances[from] -= amount;
-        unchecked {
-            S.balances[to] += amount;
-        }
-
-        emit Transfer(from, to, amount);
-    }
+    function transferFrom(address from, address to, uint256 amount) external virtual returns (bool) {}
 
     /**
      * @dev Creates `amount` tokens and assigns them to `account`, increasing

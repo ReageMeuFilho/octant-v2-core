@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.25;
 
-import {TokenizedStrategy, IBaseStrategy, Math, ERC20} from "./TokenizedStrategy.sol";
+import {TokenizedStrategy, IBaseStrategy, Math} from "./TokenizedStrategy.sol";
 import {
     Unauthorized,
     DragonTokenizedStrategy__VaultSharesNotTransferable,
@@ -232,20 +232,6 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         maxWithdraw_ = Math.min(_convertToAssets(S, _userUnlockedShares(S, _owner), Math.Rounding.Floor), maxWithdraw_);
     }
 
-    /**
-     * @dev Override of _withdraw to enforce lockup period.
-     */
-    function _withdraw(
-        StrategyData storage S,
-        address receiver,
-        address _owner,
-        uint256 assets,
-        uint256 shares,
-        uint256 maxLoss
-    ) internal override returns (uint256) {
-        return super._withdraw(S, receiver, _owner, assets, shares, maxLoss);
-    }
-
     /// @dev Internal implementation of {maxRedeem}.
     function _maxRedeem(StrategyData storage S, address _owner) internal view override returns (uint256 maxRedeem_) {
         // Get the max the owner could withdraw currently.
@@ -315,27 +301,6 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     }
 
     /**
-     * @notice Total number of strategy shares that can be
-     * redeemed from the strategy by `owner`, where `owner`
-     * corresponds to the msg.sender of a {redeem} call.
-     *
-     * @param _owner The owner of the shares.
-     * @return _maxRedeem Max amount of shares that can be redeemed.
-     */
-    function maxRedeem(address _owner) external view override returns (uint256) {
-        return _maxRedeem(_strategyStorage(), _owner);
-    }
-
-    /**
-     * @notice Variable `maxLoss` is ignored.
-     * @dev Accepts a `maxLoss` variable in order to match the multi
-     * strategy vaults ABI.
-     */
-    function maxRedeem(address _owner, uint256 /*maxLoss*/ ) external view override returns (uint256) {
-        return _maxRedeem(_strategyStorage(), _owner);
-    }
-
-    /**
      * @notice Redeems exactly `shares` from `owner` and
      * sends `assets` of underlying tokens to `receiver`.
      * @dev This includes an added parameter to allow for losses.
@@ -390,6 +355,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         onlyOwner
         returns (uint256 shares)
     {
+        if (receiver != msg.sender) revert Unauthorized();
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
         if (S.voluntaryLockups[msg.sender].isRageQuit) revert DragonTokenizedStrategy__RageQuitInProgress();
@@ -419,11 +385,15 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @param receiver The address to receive the `shares`.
      * @return assets The actual amount of asset deposited.
      */
-    function mint(
-        uint256 shares,
-        address receiver
-    ) external payable override nonReentrant onlyOwner returns (uint256 assets) {
-        if(receiver != msg.sender) revert Unauthorized();
+    function mint(uint256 shares, address receiver)
+        external
+        payable
+        override
+        nonReentrant
+        onlyOwner
+        returns (uint256 assets)
+    {
+        if (receiver != msg.sender) revert Unauthorized();
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
         if (S.voluntaryLockups[msg.sender].isRageQuit) revert DragonTokenizedStrategy__RageQuitInProgress();
@@ -448,12 +418,13 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @param lockupDuration The duration of the lockup in seconds.
      * @return shares The amount of shares minted.
      */
-    function depositWithLockup(
-        uint256 assets,
-        address receiver,
-        uint256 lockupDuration
-    ) public onlyOwner returns (uint256 shares) {
-        if(receiver != msg.sender) revert Unauthorized();
+    function depositWithLockup(uint256 assets, address receiver, uint256 lockupDuration)
+        public
+        onlyOwner
+        nonReentrant
+        returns (uint256 shares)
+    {
+        if (receiver != msg.sender) revert Unauthorized();
         if (lockupDuration == 0) revert DragonTokenizedStrategy__ZeroLockupDuration();
 
         // Get the storage slot for all following calls.
@@ -486,12 +457,12 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @param lockupDuration The duration of the lockup in seconds.
      * @return assets The actual amount of asset deposited.
      */
-    function mintWithLockup(
-        uint256 shares,
-        address receiver,
-        uint256 lockupDuration
-    ) public onlyOwner returns (uint256 assets) {
-        if(receiver != msg.sender) revert Unauthorized();
+    function mintWithLockup(uint256 shares, address receiver, uint256 lockupDuration)
+        public
+        onlyOwner
+        returns (uint256 assets)
+    {
+        if (receiver != msg.sender) revert Unauthorized();
         if (lockupDuration == 0) revert DragonTokenizedStrategy__ZeroLockupDuration();
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
