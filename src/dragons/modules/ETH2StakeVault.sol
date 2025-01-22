@@ -78,5 +78,193 @@ contract ETH2StakeVault is ERC4626, ReentrancyGuard {
        uint256 timestamp
    );
 
-   
+   /**
+    * @notice Contract constructor
+    * @param _depositContract ETH2 deposit contract address
+    * @param _asset Asset contract address (WETH)
+    * @param _name Share token name
+    * @param _symbol Share token symbol
+    */
+   constructor(
+       address _depositContract,
+       address _asset,
+       string memory _name,
+       string memory _symbol
+   ) ERC4626(IERC20(_asset)) ERC20(_name, _symbol) {
+       require(_depositContract != address(0), "Invalid deposit contract");
+       DEPOSIT_CONTRACT = IDepositContract(_depositContract);
+   }
+
+   // --- ERC4626 Overrides ---
+
+   /**
+    * @notice Total ETH controlled by vault (explicitly tracked)
+    * @return Total assets in vault
+    */
+   function totalAssets() public view override returns (uint256) {
+       return totalAssets;
+   }
+
+   /**
+    * @notice Convert assets to shares (1:1 for ETH staking)
+    * @param assets Amount of ETH
+    * @return shares Equal amount of shares
+    */
+   function convertToShares(
+       uint256 assets
+   ) public pure override returns (uint256) {
+       return assets;
+   }
+
+   /**
+    * @notice Convert shares to assets (1:1 for ETH staking)
+    * @param shares Amount of shares
+    * @return assets Equal amount of ETH
+    */
+   function convertToAssets(
+       uint256 shares
+   ) public pure override returns (uint256) {
+       return shares;
+   }
+
+   /**
+    * @notice Maximum deposit allowed (32 ETH if no active validator)
+    * @param controller Address to check
+    * @return Maximum deposit amount
+    */
+   function maxDeposit(
+       address controller
+   ) public view override returns (uint256) {
+       if (validators[controller].isActive || pendingDeposits[controller] > 0) {
+           return 0;
+       }
+       return VALIDATOR_DEPOSIT;
+   }
+
+   /**
+    * @notice Maximum mint allowed (32 ETH if no active validator)
+    * @param controller Address to check
+    * @return Maximum mint amount
+    */
+   function maxMint(
+       address controller
+   ) public view override returns (uint256) {
+       return maxDeposit(controller);
+   }
+
+   /**
+    * @notice Maximum withdrawal allowed (full balance if validator exited)
+    * @param owner Address to check
+    * @return Maximum withdrawal amount
+    */
+   function maxWithdraw(
+       address owner
+   ) public view override returns (uint256) {
+       ValidatorInfo storage validator = validators[owner];
+       return validator.isExited ? balanceOf(owner) : 0;
+   }
+
+   /**
+    * @notice Maximum redemption allowed (full balance if validator exited)
+    * @param owner Address to check
+    * @return Maximum redemption amount
+    */
+   function maxRedeem(
+       address owner
+   ) public view override returns (uint256) {
+       return maxWithdraw(owner);
+   }
+
+   /**
+    * @notice Disabled - use requestDeposit for async deposits
+    */
+   function deposit(
+       uint256,
+       address
+   ) public pure override returns (uint256) {
+       revert("Use requestDeposit");
+   }
+
+   /**
+    * @notice Disabled - use requestDeposit for async deposits
+    */
+   function mint(
+       uint256,
+       address
+   ) public pure override returns (uint256) {
+       revert("Use requestDeposit");
+   }
+
+   /**
+    * @notice Disabled - use requestRedeem for async withdrawals
+    */
+   function withdraw(
+       uint256,
+       address,
+       address
+   ) public pure override returns (uint256) {
+       revert("Use requestRedeem");
+   }
+
+   /**
+    * @notice Disabled - use requestRedeem for async withdrawals
+    */
+   function redeem(
+       uint256,
+       address,
+       address
+   ) public pure override returns (uint256) {
+       revert("Use requestRedeem");
+   }
+
+   /**
+    * @notice Disabled for async vault
+    */
+   function previewDeposit(
+       uint256
+   ) public pure override returns (uint256) {
+       revert("Async deposits only");
+   }
+
+   /**
+    * @notice Disabled for async vault
+    */
+   function previewMint(
+       uint256
+   ) public pure override returns (uint256) {
+       revert("Async deposits only");
+   }
+
+   /**
+    * @notice Disabled for async vault
+    */
+   function previewWithdraw(
+       uint256
+   ) public pure override returns (uint256) {
+       revert("Async withdrawals only");
+   }
+
+   /**
+    * @notice Disabled for async vault
+    */
+   function previewRedeem(
+       uint256
+   ) public pure override returns (uint256) {
+       revert("Async withdrawals only");
+   }
+
+   /**
+    * @notice Only accept ETH from deposit contract
+    */
+   receive() external payable {
+       require(msg.sender == address(DEPOSIT_CONTRACT), "Direct deposits not allowed");
+   }
+
+   /**
+    * @notice Prevent accidental ETH transfers
+    */
+   fallback() external payable {
+       revert("Not supported");
+   }
+
 }
