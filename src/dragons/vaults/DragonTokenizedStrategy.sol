@@ -460,6 +460,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     function mintWithLockup(uint256 shares, address receiver, uint256 lockupDuration)
         public
         onlyOwner
+        nonReentrant
         returns (uint256 assets)
     {
         if (receiver != msg.sender) revert Unauthorized();
