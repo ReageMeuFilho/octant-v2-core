@@ -94,6 +94,117 @@ contract ETH2StakeVault is ERC4626, ReentrancyGuard {
        require(_depositContract != address(0), "Invalid deposit contract");
        DEPOSIT_CONTRACT = IDepositContract(_depositContract);
    }
+/**
+    * @notice Request deposit of ETH for validator creation
+    * @param assets Amount of ETH to deposit (must be 32)
+    * @param controller Address that controls the validator
+    * @param owner Address providing the ETH
+    * @param withdrawalCreds Withdrawal credentials for validator
+    * @return requestId Always returns 0 per ERC7540 spec
+    */
+   function requestDeposit(
+       uint256 assets,
+       address controller,
+       address owner,
+       bytes calldata withdrawalCreds
+   ) public payable nonReentrant returns (uint256) {
+       // Input validation
+       require(owner == msg.sender || isOperator[owner][msg.sender], "Not authorized");
+       require(assets == VALIDATOR_DEPOSIT && msg.value == VALIDATOR_DEPOSIT, "Must be 32 ETH");
+       require(withdrawalCreds.length == 32, "Invalid withdrawal credentials");
+       require(!validators[controller].isActive, "Validator exists");
+       require(depositRequests[controller].amount == 0, "Request exists");
+
+       // Track pending deposit
+       pendingDeposits[controller] = assets;
+       
+       // Store validator and request info
+       validators[controller].withdrawalCreds = withdrawalCreds;
+       depositRequests[controller] = RequestInfo({
+           amount: assets,
+           owner: owner,
+           isCancelled: false,
+           isProcessed: false
+       });
+
+       emit ValidatorRequested(controller, withdrawalCreds, block.timestamp);
+       emit DepositRequest(controller, owner, 0, msg.sender, assets);
+       return 0;
+   }
+
+   /**
+    * @notice Process validator deposit with signing credentials
+    * @param controller Controller address 
+    * @param pubkey Validator public key
+    * @param signature Proof of possession of signing key
+    * @param depositDataRoot Merkle root of deposit data
+    */
+   function processValidatorDeposit(
+       address controller,
+       bytes calldata pubkey,
+       bytes calldata signature,
+       bytes32 depositDataRoot
+   ) external nonReentrant {
+       // Load state
+       RequestInfo storage request = depositRequests[controller];
+       ValidatorInfo storage validator = validators[controller];
+       
+       // Validate state
+       require(pendingDeposits[controller] == VALIDATOR_DEPOSIT, "No pending deposit");
+       require(!request.isProcessed && !request.isCancelled, "Invalid request state");
+       require(!validator.isActive, "Validator already exists");
+       require(pubkey.length == 48 && signature.length == 96, "Invalid key lengths");
+
+       // Process deposit
+       DEPOSIT_CONTRACT.deposit{value: VALIDATOR_DEPOSIT}(
+           pubkey,
+           validator.withdrawalCreds,
+           signature,
+           depositDataRoot
+       );
+
+       // Update state
+       totalAssets += VALIDATOR_DEPOSIT;
+       pendingDeposits[controller] = 0;
+
+       validator.pubkey = pubkey;
+       validator.signature = signature;
+       validator.depositDataRoot = depositDataRoot;
+       validator.isActive = true;
+
+       _mint(request.owner, VALIDATOR_DEPOSIT);
+       request.isProcessed = true;
+
+       emit ValidatorActivated(controller, pubkey, block.timestamp);
+   }
+
+   /**
+    * @notice Get pending deposit amount for controller
+    * @param requestId Unused - returns 0 if no pending deposit
+    * @param controller Controller address to check
+    * @return Amount of ETH pending deposit
+    */
+   function pendingDepositRequest(
+       uint256 requestId,
+       address controller
+   ) external view returns (uint256) {
+       return pendingDeposits[controller];
+   }
+
+   /**
+    * @notice Get claimable deposit amount for controller
+    * @param requestId Unused - returns 0 if nothing claimable
+    * @param controller Controller address to check
+    * @return Amount of ETH ready to claim
+    */
+   function claimableDepositRequest(
+       uint256 requestId,
+       address controller
+   ) external view returns (uint256) {
+       RequestInfo storage request = depositRequests[controller];
+       return (request.isProcessed && !request.isCancelled) ? request.amount : 0;
+   }
+
 
    // --- ERC4626 Overrides ---
 
