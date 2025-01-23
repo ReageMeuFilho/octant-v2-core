@@ -205,7 +205,156 @@ contract ETH2StakeVault is ERC4626, ReentrancyGuard {
        return (request.isProcessed && !request.isCancelled) ? request.amount : 0;
    }
 
+     /**
+    * @notice Request redemption of staked ETH
+    * @param shares Amount of shares to redeem
+    * @param controller Controller claiming the redemption
+    * @param owner Owner of the shares
+    * @return requestId Always returns 0 per ERC7540 spec
+    */
+   function requestRedeem(
+       uint256 shares,
+       address controller,
+       address owner
+   ) public nonReentrant returns (uint256) {
+       require(balanceOf(owner) >= shares, "Insufficient shares");
+       require(redeemRequests[controller].amount == 0, "Request exists");
+       require(validators[controller].isActive, "No active validator");
+       require(!validators[controller].isExited, "Validator already exited");
 
+       // Handle operator approval
+       address sender = isOperator[owner][msg.sender] ? owner : msg.sender;
+       if (sender != owner) {
+           uint256 allowed = allowance(owner, sender);
+           if (allowed != type(uint256).max) {
+               _approve(owner, sender, allowed - shares);
+           }
+       }
+
+       // Store redemption request
+       redeemRequests[controller] = RequestInfo({
+           amount: shares,
+           owner: owner,
+           isCancelled: false,
+           isProcessed: false
+       });
+
+       // Transfer shares to vault
+       _transfer(owner, address(this), shares);
+
+       emit RedeemRequest(controller, owner, 0, msg.sender, shares);
+       return 0;
+   }
+
+   /**
+    * @notice Process redemption request after validator exit
+    * @param controller Controller address
+    * @param exitEpoch Epoch when validator exited
+    */
+   function processRedeem(
+       address controller,
+       uint256 exitEpoch
+   ) external nonReentrant {
+       RequestInfo storage request = redeemRequests[controller];
+       ValidatorInfo storage validator = validators[controller];
+       
+       require(request.amount > 0 && !request.isProcessed, "Invalid request");
+       require(validator.isActive, "No active validator");
+       require(!validator.isExited, "Already exited");
+
+       // Track pending withdrawal
+       pendingWithdrawals[controller] = request.amount;
+       totalAssets -= request.amount;
+
+       // Update validator state
+       validator.isExited = true;
+       validator.exitEpoch = exitEpoch;
+       request.isProcessed = true;
+
+       // Burn shares
+       _burn(address(this), request.amount);
+
+       emit ValidatorExited(controller, exitEpoch, block.timestamp);
+   }
+
+   /**
+    * @notice Get pending redeem amount for controller
+    * @param requestId Unused - returns 0 if no pending redeem
+    * @param controller Controller address to check
+    * @return Amount of shares pending redemption
+    */
+   function pendingRedeemRequest(
+       uint256 requestId,
+       address controller
+   ) external view returns (uint256) {
+       RequestInfo storage request = redeemRequests[controller];
+       return (!request.isProcessed && !request.isCancelled) ? request.amount : 0;
+   }
+
+   /**
+    * @notice Get claimable redeem amount for controller
+    * @param requestId Unused - returns 0 if nothing claimable
+    * @param controller Controller address to check
+    * @return Amount of shares ready to claim
+    */
+   function claimableRedeemRequest(
+       uint256 requestId,
+       address controller
+   ) external view returns (uint256) {
+       RequestInfo storage request = redeemRequests[controller];
+       ValidatorInfo storage validator = validators[controller];
+       return (request.isProcessed && !request.isCancelled && validator.isExited) ? pendingWithdrawals[controller] : 0;
+   }
+
+   /**
+    * @notice Cancel a pending redeem request
+    * @param requestId Unused - cancels controller's active request
+    * @param controller Controller address
+    */
+   function cancelRedeemRequest(
+       uint256 requestId,
+       address controller
+   ) external nonReentrant {
+       RequestInfo storage request = redeemRequests[controller];
+       require(controller == msg.sender || isOperator[controller][msg.sender], "Not authorized");
+       require(!request.isProcessed && !request.isCancelled, "Invalid request");
+       
+       uint256 shareAmount = request.amount;
+       address shareOwner = request.owner;
+
+       // Clear request
+       request.amount = 0;
+       request.isCancelled = true;
+
+       // Return shares to owner
+       _transfer(address(this), shareOwner, shareAmount);
+
+       emit CancelRedeemRequest(controller, 0, msg.sender);
+   }
+
+   /**
+    * @notice Claim redeemed ETH after validator exit
+    * @param controller Controller address
+    */
+   function claimRedeem(
+       address controller
+   ) external nonReentrant {
+       RequestInfo storage request = redeemRequests[controller];
+       ValidatorInfo storage validator = validators[controller];
+       
+       require(request.isProcessed && !request.isCancelled, "Not claimable");
+       require(validator.isExited, "Validator not exited");
+
+       uint256 withdrawAmount = pendingWithdrawals[controller];
+       require(withdrawAmount > 0, "Nothing to claim");
+
+       // Clear withdrawal
+       pendingWithdrawals[controller] = 0;
+
+       // Transfer ETH to owner
+       (bool success, ) = request.owner.call{value: withdrawAmount}("");
+       require(success, "ETH transfer failed");
+   }
    // --- ERC4626 Overrides ---
 
    /**
