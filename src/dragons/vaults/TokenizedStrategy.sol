@@ -755,7 +755,7 @@ contract TokenizedStrategy {
      * values to prevent view reentrancy issues from the token
      * transfers or the _deployFunds() calls.
      */
-    function _deposit(StrategyData storage S, address receiver, uint256 assets, uint256 shares) internal {
+    function _deposit(StrategyData storage S, address receiver, uint256 assets, uint256 shares) internal nonReentrant {
         // Cache storage variables used more than once.
         ERC20 _asset = S.asset;
 
