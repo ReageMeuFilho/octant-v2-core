@@ -134,7 +134,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
             uint256 unlockedPortion = (timeElapsed * balance) / (lockup.unlockTime - lockup.lockupTime);
             return Math.min(unlockedPortion, balance);
         } else {
-            return balance - lockup.lockedShares;
+            return 0;
         }
     }
 
