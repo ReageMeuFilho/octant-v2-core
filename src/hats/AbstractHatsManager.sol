@@ -50,11 +50,12 @@ abstract contract AbstractHatsManager is IHatsEligibility, IHatsToggle {
      * @param initialHolders Optional array of addresses to grant the role to immediately
      * @return hatId The ID of the newly created role hat
      */
-    function createRole(bytes32 roleId, string memory details, uint256 maxSupply, address[] memory initialHolders)
-        internal
-        virtual
-        returns (uint256 hatId)
-    {
+    function createRole(
+        bytes32 roleId,
+        string memory details,
+        uint256 maxSupply,
+        address[] memory initialHolders
+    ) internal virtual returns (uint256 hatId) {
         require(HATS.isAdminOfHat(msg.sender, adminHat), "Not admin");
         require(roleHats[roleId] == 0, "Role already exists");
         require(initialHolders.length <= maxSupply, "Too many initial holders");
@@ -128,12 +129,10 @@ abstract contract AbstractHatsManager is IHatsEligibility, IHatsToggle {
      * @notice Virtual function to check if an address is eligible for a role
      * @dev Must be implemented by inheriting contracts
      */
-    function getWearerStatus(address wearer, uint256 hatId)
-        external
-        view
-        virtual
-        override
-        returns (bool eligible, bool standing);
+    function getWearerStatus(
+        address wearer,
+        uint256 hatId
+    ) external view virtual override returns (bool eligible, bool standing);
 
     /**
      * @notice Checks if roles are currently enabled

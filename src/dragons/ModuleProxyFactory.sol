@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.8.0;
 
-import {ISafe} from "../interfaces/Safe.sol";
+import { ISafe } from "../interfaces/Safe.sol";
 
 contract ModuleProxyFactory {
     event ModuleProxyCreation(address indexed proxy, address indexed masterCopy);
@@ -22,8 +22,11 @@ contract ModuleProxyFactory {
         if (address(target) == address(0)) revert ZeroAddress(target);
         if (address(target).code.length == 0) revert TargetHasNoCode(target);
         // NOTE: Magic number https://github.com/thebor1337/solidity_sandbox/blob/f8a678f4cbabd22831e646830e299c75e75dd76f/contracts/Proxy/ERC1167/Proxy.huff#L4
-        bytes memory deployment =
-            abi.encodePacked(hex"602d8060093d393df3363d3d373d3d3d363d73", target, hex"5af43d82803e903d91602b57fd5bf3");
+        bytes memory deployment = abi.encodePacked(
+            hex"602d8060093d393df3363d3d373d3d3d363d73",
+            target,
+            hex"5af43d82803e903d91602b57fd5bf3"
+        );
         // solhint-disable-next-line no-inline-assembly
         assembly {
             result := create2(0, add(deployment, 0x20), mload(deployment), salt)
@@ -31,23 +34,27 @@ contract ModuleProxyFactory {
         if (result == address(0)) revert TakenAddress(result);
     }
 
-    function deployModule(address masterCopy, bytes memory initializer, uint256 saltNonce)
-        public
-        returns (address proxy)
-    {
+    function deployModule(
+        address masterCopy,
+        bytes memory initializer,
+        uint256 saltNonce
+    ) public returns (address proxy) {
         proxy = createProxy(masterCopy, keccak256(abi.encodePacked(keccak256(initializer), saltNonce)));
-        (bool success,) = proxy.call(initializer);
+        (bool success, ) = proxy.call(initializer);
         if (!success) revert FailedInitialization();
 
         emit ModuleProxyCreation(proxy, masterCopy);
     }
 
-    function deployAndEnableModuleFromSafe(address masterCopy, bytes memory data, uint256 saltNonce)
-        public
-        returns (address proxy)
-    {
+    function deployAndEnableModuleFromSafe(
+        address masterCopy,
+        bytes memory data,
+        uint256 saltNonce
+    ) public returns (address proxy) {
         proxy = deployModule(
-            masterCopy, abi.encodeWithSignature("setUp(bytes)", abi.encode(address(this), data)), saltNonce
+            masterCopy,
+            abi.encodeWithSignature("setUp(bytes)", abi.encode(address(this), data)),
+            saltNonce
         );
 
         ISafe(address(this)).enableModule(proxy);

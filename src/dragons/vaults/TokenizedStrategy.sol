@@ -1,47 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity >=0.8.18;
 
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Enum} from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
-import {IAvatar} from "zodiac/interfaces/IAvatar.sol";
-import {
-    ZeroAddress,
-    ZeroShares,
-    ZeroAssets,
-    ReentrancyGuard__ReentrantCall,
-    TokenizedStrategy__NotOwner,
-    TokenizedStrategy__NotManagement,
-    TokenizedStrategy__NotKeeperOrManagement,
-    TokenizedStrategy__NotEmergencyAuthorized,
-    TokenizedStrategy__AlreadyInitialized,
-    TokenizedStrategy__DepositMoreThanMax,
-    TokenizedStrategy__MintMoreThanMax,
-    TokenizedStrategy__InvalidMaxLoss,
-    TokenizedStrategy__TransferFromZeroAddress,
-    TokenizedStrategy__TransferToZeroAddress,
-    TokenizedStrategy__TransferToStrategy,
-    TokenizedStrategy__MintToZeroAddress,
-    TokenizedStrategy__BurnFromZeroAddress,
-    TokenizedStrategy__ApproveFromZeroAddress,
-    TokenizedStrategy__ApproveToZeroAddress,
-    TokenizedStrategy__InsufficientAllowance,
-    TokenizedStrategy__PermitDeadlineExpired,
-    TokenizedStrategy__InvalidSigner,
-    TokenizedStrategy__NotSelf,
-    TokenizedStrategy__WithdrawMoreThanMax,
-    TokenizedStrategy__RedeemMoreThanMax,
-    TokenizedStrategy__TransferFailed,
-    TokenizedStrategy__NotPendingManagement,
-    TokenizedStrategy__StrategyNotInShutdown,
-    TokenizedStrategy__TooMuchLoss,
-    TokenizedStrategy__HatsAlreadyInitialized,
-    TokenizedStrategy__InvalidHatsAddress
-} from "../../errors.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { Enum } from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
+import { IAvatar } from "zodiac/interfaces/IAvatar.sol";
+import { ZeroAddress, ZeroShares, ZeroAssets, ReentrancyGuard__ReentrantCall, TokenizedStrategy__NotOwner, TokenizedStrategy__NotManagement, TokenizedStrategy__NotKeeperOrManagement, TokenizedStrategy__NotEmergencyAuthorized, TokenizedStrategy__AlreadyInitialized, TokenizedStrategy__DepositMoreThanMax, TokenizedStrategy__MintMoreThanMax, TokenizedStrategy__InvalidMaxLoss, TokenizedStrategy__TransferFromZeroAddress, TokenizedStrategy__TransferToZeroAddress, TokenizedStrategy__TransferToStrategy, TokenizedStrategy__MintToZeroAddress, TokenizedStrategy__BurnFromZeroAddress, TokenizedStrategy__ApproveFromZeroAddress, TokenizedStrategy__ApproveToZeroAddress, TokenizedStrategy__InsufficientAllowance, TokenizedStrategy__PermitDeadlineExpired, TokenizedStrategy__InvalidSigner, TokenizedStrategy__NotSelf, TokenizedStrategy__WithdrawMoreThanMax, TokenizedStrategy__RedeemMoreThanMax, TokenizedStrategy__TransferFailed, TokenizedStrategy__NotPendingManagement, TokenizedStrategy__StrategyNotInShutdown, TokenizedStrategy__TooMuchLoss, TokenizedStrategy__HatsAlreadyInitialized, TokenizedStrategy__InvalidHatsAddress } from "../../errors.sol";
 
-import {IBaseStrategy} from "src/interfaces/IBaseStrategy.sol";
-import {IHats} from "src/interfaces/IHats.sol";
+import { IBaseStrategy } from "src/interfaces/IBaseStrategy.sol";
+import { IHats } from "src/interfaces/IHats.sol";
 
 contract TokenizedStrategy {
     using Math for uint256;
@@ -112,7 +80,11 @@ contract TokenizedStrategy {
      * and transferred those `assets` to `receiver`.
      */
     event Withdraw(
-        address indexed caller, address indexed receiver, address indexed owner, uint256 assets, uint256 shares
+        address indexed caller,
+        address indexed receiver,
+        address indexed owner,
+        uint256 assets,
+        uint256 shares
     );
 
     /**
@@ -264,8 +236,10 @@ contract TokenizedStrategy {
     function requireKeeperOrManagement(address _sender) public view {
         StrategyData storage S = _strategyStorage();
         if (
-            _sender != S.keeper && _sender != S.management && !_isHatsWearer(S, _sender, S.KEEPER_HAT)
-                && !_isHatsWearer(S, _sender, S.MANAGEMENT_HAT)
+            _sender != S.keeper &&
+            _sender != S.management &&
+            !_isHatsWearer(S, _sender, S.KEEPER_HAT) &&
+            !_isHatsWearer(S, _sender, S.MANAGEMENT_HAT)
         ) revert TokenizedStrategy__NotKeeperOrManagement();
     }
 
@@ -282,8 +256,10 @@ contract TokenizedStrategy {
     function requireEmergencyAuthorized(address _sender) public view {
         StrategyData storage S = _strategyStorage();
         if (
-            _sender != S.emergencyAdmin && _sender != S.management && !_isHatsWearer(S, _sender, S.EMERGENCY_ADMIN_HAT)
-                && !_isHatsWearer(S, _sender, S.MANAGEMENT_HAT)
+            _sender != S.emergencyAdmin &&
+            _sender != S.management &&
+            !_isHatsWearer(S, _sender, S.EMERGENCY_ADMIN_HAT) &&
+            !_isHatsWearer(S, _sender, S.MANAGEMENT_HAT)
         ) revert TokenizedStrategy__NotEmergencyAuthorized();
     }
 
@@ -412,14 +388,10 @@ contract TokenizedStrategy {
      * @param receiver The address to receive the `shares`.
      * @return shares The actual amount of shares issued.
      */
-    function deposit(uint256 assets, address receiver)
-        external
-        payable
-        virtual
-        nonReentrant
-        onlyOwner
-        returns (uint256 shares)
-    {
+    function deposit(
+        uint256 assets,
+        address receiver
+    ) external payable virtual nonReentrant onlyOwner returns (uint256 shares) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
 
@@ -444,14 +416,10 @@ contract TokenizedStrategy {
      * @param receiver The address to receive the `shares`.
      * @return assets The actual amount of asset deposited.
      */
-    function mint(uint256 shares, address receiver)
-        external
-        payable
-        virtual
-        nonReentrant
-        onlyOwner
-        returns (uint256 assets)
-    {
+    function mint(
+        uint256 shares,
+        address receiver
+    ) external payable virtual nonReentrant onlyOwner returns (uint256 assets) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
 
@@ -486,12 +454,12 @@ contract TokenizedStrategy {
      * @param maxLoss The amount of acceptable loss in Basis points.
      * @return shares The actual amount of shares burnt.
      */
-    function withdraw(uint256 assets, address receiver, address _owner, uint256 maxLoss)
-        public
-        virtual
-        nonReentrant
-        returns (uint256 shares)
-    {
+    function withdraw(
+        uint256 assets,
+        address receiver,
+        address _owner,
+        uint256 maxLoss
+    ) public virtual nonReentrant returns (uint256 shares) {
         if (maxLoss > MAX_BPS) revert TokenizedStrategy__InvalidMaxLoss();
         if (receiver == address(0)) revert ZeroAddress();
 
@@ -530,12 +498,12 @@ contract TokenizedStrategy {
      * @param maxLoss The amount of acceptable loss in Basis points.
      * @return . The actual amount of underlying withdrawn.
      */
-    function redeem(uint256 shares, address receiver, address _owner, uint256 maxLoss)
-        public
-        virtual
-        nonReentrant
-        returns (uint256)
-    {
+    function redeem(
+        uint256 shares,
+        address receiver,
+        address _owner,
+        uint256 maxLoss
+    ) public virtual nonReentrant returns (uint256) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
         if (shares > _maxRedeem(S, _owner)) revert TokenizedStrategy__RedeemMoreThanMax();
@@ -695,7 +663,7 @@ contract TokenizedStrategy {
      * @dev Accepts a `maxLoss` variable in order to match the multi
      * strategy vaults ABI.
      */
-    function maxWithdraw(address _owner, uint256 /*maxLoss*/ ) external view virtual returns (uint256) {
+    function maxWithdraw(address _owner, uint256 /*maxLoss*/) external view virtual returns (uint256) {
         return _maxWithdraw(_strategyStorage(), _owner);
     }
 
@@ -716,7 +684,7 @@ contract TokenizedStrategy {
      * @dev Accepts a `maxLoss` variable in order to match the multi
      * strategy vaults ABI.
      */
-    function maxRedeem(address _owner, uint256 /*maxLoss*/ ) external view virtual returns (uint256) {
+    function maxRedeem(address _owner, uint256 /*maxLoss*/) external view virtual returns (uint256) {
         return _maxRedeem(_strategyStorage(), _owner);
     }
 
@@ -735,11 +703,11 @@ contract TokenizedStrategy {
     }
 
     /// @dev Internal implementation of {convertToShares}.
-    function _convertToShares(StrategyData storage S, uint256 assets, Math.Rounding _rounding)
-        internal
-        view
-        returns (uint256)
-    {
+    function _convertToShares(
+        StrategyData storage S,
+        uint256 assets,
+        Math.Rounding _rounding
+    ) internal view returns (uint256) {
         // Saves an extra SLOAD if values are non-zero.
         uint256 totalSupply_ = _totalSupply(S);
         // If supply is 0, PPS = 1.
@@ -753,11 +721,11 @@ contract TokenizedStrategy {
     }
 
     /// @dev Internal implementation of {convertToAssets}.
-    function _convertToAssets(StrategyData storage S, uint256 shares, Math.Rounding _rounding)
-        internal
-        view
-        returns (uint256)
-    {
+    function _convertToAssets(
+        StrategyData storage S,
+        uint256 shares,
+        Math.Rounding _rounding
+    ) internal view returns (uint256) {
         // Saves an extra SLOAD if totalSupply() is non-zero.
         uint256 supply = _totalSupply(S);
 
@@ -784,12 +752,7 @@ contract TokenizedStrategy {
     }
 
     /// @dev Internal implementation of {maxWithdraw}.
-    function _maxWithdraw(StrategyData storage S, address _owner)
-        internal
-        view
-        virtual
-        returns (uint256 maxWithdraw_)
-    {
+    function _maxWithdraw(StrategyData storage S, address _owner) internal view virtual returns (uint256 maxWithdraw_) {
         // Get the max the owner could withdraw currently.
         maxWithdraw_ = IBaseStrategy(address(this)).availableWithdrawLimit(_owner);
 
@@ -928,7 +891,7 @@ contract TokenizedStrategy {
         _burn(S, _owner, shares);
 
         if (address(S.asset) == ETH) {
-            (bool success,) = receiver.call{value: assets}("");
+            (bool success, ) = receiver.call{ value: assets }("");
             if (!success) revert TokenizedStrategy__TransferFailed();
         } else {
             // Transfer the amount of underlying to the receiver.
@@ -953,7 +916,7 @@ contract TokenizedStrategy {
         uint256 _newTotalAssets = IBaseStrategy(address(this)).harvestAndReport();
 
         if (address(S.asset) == ETH) {
-            (bool success,) = S.dragonRouter.call{value: _newTotalAssets - _oldTotalAssets}("");
+            (bool success, ) = S.dragonRouter.call{ value: _newTotalAssets - _oldTotalAssets }("");
             if (!success) revert TokenizedStrategy__TransferFailed();
         } else {
             // Transfer the amount of underlying to the receiver.
@@ -1546,15 +1509,16 @@ contract TokenizedStrategy {
      * @return . The domain separator that will be used for any {permit} calls.
      */
     function DOMAIN_SEPARATOR() public view returns (bytes32) {
-        return keccak256(
-            abi.encode(
-                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                keccak256("Dragon Vault"),
-                keccak256(bytes(API_VERSION)),
-                block.chainid,
-                address(this)
-            )
-        );
+        return
+            keccak256(
+                abi.encode(
+                    keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                    keccak256("Dragon Vault"),
+                    keccak256(bytes(API_VERSION)),
+                    block.chainid,
+                    address(this)
+                )
+            );
     }
 
     /*//////////////////////////////////////////////////////////////
