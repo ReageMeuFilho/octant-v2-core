@@ -7,22 +7,28 @@ import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
 import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
 
 import {SetupIntegrationTest} from "../Setup.t.sol";
-import {TokenizedStrategy__StrategyNotInShutdown, TokenizedStrategy__NotEmergencyAuthorized, TokenizedStrategy__HatsAlreadyInitialized, TokenizedStrategy__NotKeeperOrManagement, TokenizedStrategy__NotManagement} from "src/errors.sol";
+import {
+    TokenizedStrategy__StrategyNotInShutdown,
+    TokenizedStrategy__NotEmergencyAuthorized,
+    TokenizedStrategy__HatsAlreadyInitialized,
+    TokenizedStrategy__NotKeeperOrManagement,
+    TokenizedStrategy__NotManagement
+} from "src/errors.sol";
 
 contract HatsIntegrationTest is SetupIntegrationTest {
-            // Setup test addresses
-     address public keeper = address(0x123);
-     address public manager = address(0x456);
-     address public emergency = address(0x789);
-     address public regenGov = address(0xabc);
-     address public unauthorized = address(0xdef);
+    // Setup test addresses
+    address public keeper = address(0x123);
+    address public manager = address(0x456);
+    address public emergency = address(0x789);
+    address public regenGov = address(0xabc);
+    address public unauthorized = address(0xdef);
+
     function setUp() public override {
         super.setUp();
 
-        
         // Create signature array for safe transaction
         uint256[] memory signerIndices = new uint256[](TEST_THRESHOLD);
-        for(uint256 i = 0; i < TEST_THRESHOLD; i++) {
+        for (uint256 i = 0; i < TEST_THRESHOLD; i++) {
             signerIndices[i] = i;
         }
 
@@ -41,13 +47,8 @@ contract HatsIntegrationTest is SetupIntegrationTest {
             emergencyHatId,
             regenGovernanceHatId
         );
-        
-        execTransaction(
-            address(mockStrategyProxy),
-            0,
-            setupHatsData,
-            signerIndices
-        );
+
+        execTransaction(address(mockStrategyProxy), 0, setupHatsData, signerIndices);
 
         // Grant roles using DragonHatter
         vm.startPrank(deployer);
@@ -65,62 +66,67 @@ contract HatsIntegrationTest is SetupIntegrationTest {
         token.mint(address(mockStrategyProxy), 1 ether);
         vm.stopPrank();
     }
+
     function testCannotSetupHatsProtocolTwice() public {
-            // Get role hat IDs from existing deployment
-            uint256 keeperHatId = 1;
-            uint256 managementHatId = 2;
-            uint256 emergencyHatId = 3;
-            uint256 regenGovernanceHatId = 4;
+        // Get role hat IDs from existing deployment
+        uint256 keeperHatId = 1;
+        uint256 managementHatId = 2;
+        uint256 emergencyHatId = 3;
+        uint256 regenGovernanceHatId = 4;
 
-            vm.startPrank(address(deployedSafe));
-            vm.expectRevert(TokenizedStrategy__HatsAlreadyInitialized.selector);
-            mockStrategyProxy.setupHatsProtocol(address(HATS), keeperHatId, managementHatId, emergencyHatId, regenGovernanceHatId);
-            vm.stopPrank();
-        }
-        function testKeeperFunctions() public {
-            // Test unauthorized access
-            vm.startPrank(unauthorized);
-            vm.expectRevert(TokenizedStrategy__NotKeeperOrManagement.selector);
-            mockStrategyProxy.tend();
-            vm.stopPrank();
+        vm.startPrank(address(deployedSafe));
+        vm.expectRevert(TokenizedStrategy__HatsAlreadyInitialized.selector);
+        mockStrategyProxy.setupHatsProtocol(
+            address(HATS), keeperHatId, managementHatId, emergencyHatId, regenGovernanceHatId
+        );
+        vm.stopPrank();
+    }
 
-            // Test authorized keeper access
-            vm.prank(keeper);
-            mockStrategyProxy.tend(); // Should succeed
-        }
+    function testKeeperFunctions() public {
+        // Test unauthorized access
+        vm.startPrank(unauthorized);
+        vm.expectRevert(TokenizedStrategy__NotKeeperOrManagement.selector);
+        mockStrategyProxy.tend();
+        vm.stopPrank();
 
-        function testManagementFunctions() public {
-            // Test unauthorized access
-            vm.startPrank(unauthorized);
-            vm.expectRevert(TokenizedStrategy__NotManagement.selector);
-            mockStrategyProxy.adjustPosition(100);
-            vm.stopPrank();
+        // Test authorized keeper access
+        vm.prank(keeper);
+        mockStrategyProxy.tend(); // Should succeed
+    }
 
-            // Test authorized management access
-            vm.prank(manager);
-            mockStrategyProxy.adjustPosition(100); // Should succeed
-        }
+    function testManagementFunctions() public {
+        // Test unauthorized access
+        vm.startPrank(unauthorized);
+        vm.expectRevert(TokenizedStrategy__NotManagement.selector);
+        mockStrategyProxy.adjustPosition(100);
+        vm.stopPrank();
 
-        function testEmergencyFunctions() public {
-            // Test unauthorized access
-            vm.startPrank(unauthorized);
-            vm.expectRevert(TokenizedStrategy__NotEmergencyAuthorized.selector);
-            mockStrategyProxy.emergencyWithdraw(100);
-            vm.stopPrank();
+        // Test authorized management access
+        vm.prank(manager);
+        mockStrategyProxy.adjustPosition(100); // Should succeed
+    }
 
-            // Test emergency withdraw fails when not shut down
-            vm.prank(emergency);
-            vm.expectRevert(TokenizedStrategy__StrategyNotInShutdown.selector);
-            mockStrategyProxy.emergencyWithdraw(100);
+    function testEmergencyFunctions() public {
+        // Test unauthorized access
+        vm.startPrank(unauthorized);
+        vm.expectRevert(TokenizedStrategy__NotEmergencyAuthorized.selector);
+        mockStrategyProxy.emergencyWithdraw(100);
+        vm.stopPrank();
 
-            // Test emergency withdraw succeeds after shutdown
-            vm.startPrank(emergency);
-            mockStrategyProxy.shutdownStrategy();
-            mockStrategyProxy.emergencyWithdraw(100);
-            vm.stopPrank();
-        }
-        function testRoleRevocation() public {
-         // Test role revocation
+        // Test emergency withdraw fails when not shut down
+        vm.prank(emergency);
+        vm.expectRevert(TokenizedStrategy__StrategyNotInShutdown.selector);
+        mockStrategyProxy.emergencyWithdraw(100);
+
+        // Test emergency withdraw succeeds after shutdown
+        vm.startPrank(emergency);
+        mockStrategyProxy.shutdownStrategy();
+        mockStrategyProxy.emergencyWithdraw(100);
+        vm.stopPrank();
+    }
+
+    function testRoleRevocation() public {
+        // Test role revocation
         vm.startPrank(address(deployer));
         dragonHatter.revokeRole(dragonHatter.KEEPER_ROLE(), keeper);
         vm.stopPrank();
@@ -131,17 +137,15 @@ contract HatsIntegrationTest is SetupIntegrationTest {
         mockStrategyProxy.tend();
         vm.stopPrank();
 
+        //revoke emergency role
+        vm.startPrank(address(deployer));
+        dragonHatter.revokeRole(dragonHatter.EMERGENCY_ROLE(), emergency);
+        vm.stopPrank();
 
-       //revoke emergency role
-       vm.startPrank(address(deployer));
-       dragonHatter.revokeRole(dragonHatter.EMERGENCY_ROLE(), emergency);
-       vm.stopPrank();
-
-       //make sure reverts
-       vm.startPrank(emergency);
-       vm.expectRevert(TokenizedStrategy__NotEmergencyAuthorized.selector);
-       mockStrategyProxy.emergencyWithdraw(100);
-       vm.stopPrank();
-
+        //make sure reverts
+        vm.startPrank(emergency);
+        vm.expectRevert(TokenizedStrategy__NotEmergencyAuthorized.selector);
+        mockStrategyProxy.emergencyWithdraw(100);
+        vm.stopPrank();
     }
 }

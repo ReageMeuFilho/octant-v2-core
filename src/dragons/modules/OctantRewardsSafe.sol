@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.0;
 
-import { Module } from "zodiac/core/Module.sol";
-import { Enum } from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
+import {Module} from "zodiac/core/Module.sol";
+import {Enum} from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 
 contract OctantRewardsSafe is Module {
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
@@ -69,8 +69,8 @@ contract OctantRewardsSafe is Module {
     function setUp(bytes memory initializeParams) public override initializer {
         (address _owner, bytes memory data) = abi.decode(initializeParams, (address, bytes));
 
-        (address _keeper, address _treasury, address _dragonRouter, uint256 _totalValidators, uint256 _maxYield) = abi
-            .decode(data, (address, address, address, uint256, uint256));
+        (address _keeper, address _treasury, address _dragonRouter, uint256 _totalValidators, uint256 _maxYield) =
+            abi.decode(data, (address, address, address, uint256, uint256));
 
         __Ownable_init(msg.sender);
 

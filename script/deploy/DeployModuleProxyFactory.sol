@@ -16,7 +16,6 @@ contract DeployModuleProxyFactory is Test {
     ModuleProxyFactory public moduleProxyFactory;
 
     function deploy() public virtual {
-
         // Deploy the factory
         moduleProxyFactory = new ModuleProxyFactory();
 

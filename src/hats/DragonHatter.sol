@@ -89,10 +89,12 @@ contract DragonHatter is AbstractHatsManager {
      * @return eligible Whether the address can wear the hat
      * @return standing Whether the address is in good standing
      */
-    function getWearerStatus(
-        address wearer,
-        uint256 hatId
-    ) external view override returns (bool eligible, bool standing) {
+    function getWearerStatus(address wearer, uint256 hatId)
+        external
+        view
+        override
+        returns (bool eligible, bool standing)
+    {
         bytes32 roleId = hatRoles[hatId];
         require(roleId != bytes32(0), "Invalid role hat");
 

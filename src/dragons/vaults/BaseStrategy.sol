@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity >=0.8.18;
 
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 // TokenizedStrategy interface used for internal view delegateCalls.
-import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
-import { BaseStrategy__NotSelf } from "src/errors.sol";
+import {ITokenizedStrategy} from "src/interfaces/ITokenizedStrategy.sol";
+import {BaseStrategy__NotSelf} from "src/errors.sol";
 
 /**
  * @title YearnV3 Base Strategy
@@ -243,7 +243,7 @@ abstract contract BaseStrategy {
      * @param . The address that is depositing into the strategy.
      * @return . The available amount the `_owner` can deposit in terms of `asset`
      */
-    function availableDepositLimit(address /*_owner*/) public view virtual returns (uint256) {
+    function availableDepositLimit(address /*_owner*/ ) public view virtual returns (uint256) {
         return type(uint256).max;
     }
 
@@ -265,7 +265,7 @@ abstract contract BaseStrategy {
      * @param . The address that is withdrawing from the strategy.
      * @return . The available amount that can be withdrawn in terms of `asset`
      */
-    function availableWithdrawLimit(address /*_owner*/) public view virtual returns (uint256) {
+    function availableWithdrawLimit(address /*_owner*/ ) public view virtual returns (uint256) {
         return type(uint256).max;
     }
 

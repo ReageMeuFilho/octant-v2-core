@@ -1,23 +1,23 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.23;
 
-import { Ownable } from "solady/auth/Ownable.sol";
-import { SafeCastLib } from "solady/utils/SafeCastLib.sol";
-import { FixedPointMathLib } from "solady/utils/FixedPointMathLib.sol";
-import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { Enum } from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
+import {Ownable} from "solady/auth/Ownable.sol";
+import {SafeCastLib} from "solady/utils/SafeCastLib.sol";
+import {FixedPointMathLib} from "solady/utils/FixedPointMathLib.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Enum} from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 
-import { CreateOracleParams, IOracleFactory, IOracle, OracleParams } from "src/vendor/0xSplits/OracleParams.sol";
-import { QuotePair, QuoteParams } from "src/vendor/0xSplits/LibQuotes.sol";
-import { OracleParams } from "../vendor/0xSplits/OracleParams.sol";
-import { UniV3Swap } from "src/vendor/0xSplits/UniV3Swap.sol";
+import {CreateOracleParams, IOracleFactory, IOracle, OracleParams} from "src/vendor/0xSplits/OracleParams.sol";
+import {QuotePair, QuoteParams} from "src/vendor/0xSplits/LibQuotes.sol";
+import {OracleParams} from "../vendor/0xSplits/OracleParams.sol";
+import {UniV3Swap} from "src/vendor/0xSplits/UniV3Swap.sol";
 
-import { ITransformer } from "../interfaces/ITransformer.sol";
-import { IUniV3OracleImpl } from "src/vendor/0xSplits/IUniV3OracleImpl.sol";
-import { ISwapperImpl } from "src/vendor/0xSplits/SwapperImpl.sol";
-import { ISwapRouter } from "src/vendor/uniswap/ISwapRouter.sol";
+import {ITransformer} from "../interfaces/ITransformer.sol";
+import {IUniV3OracleImpl} from "src/vendor/0xSplits/IUniV3OracleImpl.sol";
+import {ISwapperImpl} from "src/vendor/0xSplits/SwapperImpl.sol";
+import {ISwapRouter} from "src/vendor/uniswap/ISwapRouter.sol";
 
 /// @author .
 /// @title Octant Trader
@@ -162,7 +162,7 @@ contract Trader is ITransformer, Ownable, Pausable {
         swapper = _swapper;
         uniV3Swap = _uniV3Swap;
         oracle = IOracle(_oracle);
-        splitsPair = QuotePair({ base: splitsEthWrapper(base), quote: splitsEthWrapper(quote) });
+        splitsPair = QuotePair({base: splitsEthWrapper(base), quote: splitsEthWrapper(quote)});
         uniPath = abi.encodePacked(uniEthWrapper(base), uint24(10_000), uniEthWrapper(quote));
         transferOwnership(_owner);
     }
@@ -201,16 +201,12 @@ contract Trader is ITransformer, Ownable, Pausable {
 
         delete quoteParams;
         quoteParams.push(
-            QuoteParams({ quotePair: splitsPair, baseAmount: uint128(amount), data: abi.encode(exactInputParams) })
+            QuoteParams({quotePair: splitsPair, baseAmount: uint128(amount), data: abi.encode(exactInputParams)})
         );
-        UniV3Swap.FlashCallbackData memory data = UniV3Swap.FlashCallbackData({
-            exactInputParams: exactInputParams,
-            excessRecipient: address(beneficiary)
-        });
-        UniV3Swap.InitFlashParams memory params = UniV3Swap.InitFlashParams({
-            quoteParams: quoteParams,
-            flashCallbackData: data
-        });
+        UniV3Swap.FlashCallbackData memory data =
+            UniV3Swap.FlashCallbackData({exactInputParams: exactInputParams, excessRecipient: address(beneficiary)});
+        UniV3Swap.InitFlashParams memory params =
+            UniV3Swap.InitFlashParams({quoteParams: quoteParams, flashCallbackData: data});
         UniV3Swap(payable(uniV3Swap)).initFlash(ISwapperImpl(swapper), params);
 
         return safeBalanceOf(quote, beneficiary) - oldQuoteBalance;
@@ -284,7 +280,7 @@ contract Trader is ITransformer, Ownable, Pausable {
         spent = spent + saleValue;
 
         if (base == ETH) {
-            (bool success, ) = payable(swapper).call{ value: saleValue }("");
+            (bool success,) = payable(swapper).call{value: saleValue}("");
             require(success);
         } else {
             IERC20(base).safeTransfer(swapper, saleValue);

@@ -52,9 +52,7 @@ contract DeployDragonRouter is DeploySplitChecker {
 
         // Deploy TransparentProxy for DragonRouter
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
-            address(dragonRouterSingleton),
-            address(proxyAdmin),
-            abi.encodeCall(DragonRouter.setUp, initData)
+            address(dragonRouterSingleton), address(proxyAdmin), abi.encodeCall(DragonRouter.setUp, initData)
         );
 
         dragonRouterProxy = DragonRouter(payable(address(proxy)));

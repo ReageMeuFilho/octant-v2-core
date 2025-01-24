@@ -31,9 +31,7 @@ interface IHats {
                               VIEW FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    function viewHat(
-        uint256 _hatId
-    )
+    function viewHat(uint256 _hatId)
         external
         view
         returns (

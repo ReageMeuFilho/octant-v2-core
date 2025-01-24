@@ -2,17 +2,17 @@
 pragma solidity ^0.8.17;
 
 import "forge-std/Test.sol";
-import { ERC20 } from "solady/tokens/ERC20.sol";
-import { IOracle } from "./IOracle.sol";
-import { ISwapRouter } from "../uniswap/ISwapRouter.sol";
-import { WETH } from "solady/tokens/WETH.sol";
-import { QuoteParams } from "./LibQuotes.sol";
-import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
-import { TokenUtils } from "./TokenUtils.sol";
+import {ERC20} from "solady/tokens/ERC20.sol";
+import {IOracle} from "./IOracle.sol";
+import {ISwapRouter} from "../uniswap/ISwapRouter.sol";
+import {WETH} from "solady/tokens/WETH.sol";
+import {QuoteParams} from "./LibQuotes.sol";
+import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
+import {TokenUtils} from "./TokenUtils.sol";
 
-import { ISwapperFlashCallback } from "./ISwapperFlashCallback.sol";
-import { ISwapperImpl } from "./SwapperImpl.sol";
-import { ISwapperFactory } from "./ISwapperFactory.sol";
+import {ISwapperFlashCallback} from "./ISwapperFlashCallback.sol";
+import {ISwapperImpl} from "./SwapperImpl.sol";
+import {ISwapperFactory} from "./ISwapperFactory.sol";
 
 /// @title Uniswap V3 Swapper Integration
 /// @author 0xSplits
@@ -61,17 +61,15 @@ contract UniV3Swap is ISwapperFlashCallback, Test {
     /// @dev by end of function if `tokenToBeneficiary_` is ETH, must have sent `amountToBeneficiary_`
     /// to `Swapper#payback`. Otherwise, must approve Swapper to transfer `amountToBeneficiary_`
     /// DO NOT HOLD FUNDS IN THIS CONTRACT WITHOUT ADDING PROPER VERIFICATION OF MSG.SENDER
-    function swapperFlashCallback(
-        address tokenToBeneficiary_,
-        uint256 amountToBeneficiary_,
-        bytes calldata data_
-    ) external {
+    function swapperFlashCallback(address tokenToBeneficiary_, uint256 amountToBeneficiary_, bytes calldata data_)
+        external
+    {
         FlashCallbackData memory flashCallbackData = abi.decode(data_, (FlashCallbackData));
         ISwapRouter.ExactInputParams[] memory exactInputParams = flashCallbackData.exactInputParams;
 
         uint256 ethBalance = address(this).balance;
         if (ethBalance != 0) {
-            weth9.deposit{ value: ethBalance }();
+            weth9.deposit{value: ethBalance}();
         }
 
         uint256 totalOut = (tokenToBeneficiary_._isETH())
@@ -79,7 +77,7 @@ contract UniV3Swap is ISwapperFlashCallback, Test {
             : tokenToBeneficiary_.balanceOf(address(this));
 
         uint256 length = exactInputParams.length;
-        for (uint256 i; i < length; ) {
+        for (uint256 i; i < length;) {
             ISwapRouter.ExactInputParams memory eip = exactInputParams[i];
             address token = _getStartTokenFromPath(eip.path);
 
@@ -100,7 +98,7 @@ contract UniV3Swap is ISwapperFlashCallback, Test {
             weth9.withdraw(weth9Balance);
 
             // send req'd amt to swapper#payback
-            ISwapperImpl(msg.sender).payback{ value: amountToBeneficiary_ }();
+            ISwapperImpl(msg.sender).payback{value: amountToBeneficiary_}();
 
             // xfr excess out
             ethBalance = address(this).balance;

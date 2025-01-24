@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.17;
 
-import { IOracle } from "./IOracle.sol";
-import { QuotePair, QuoteParams } from "./LibQuotes.sol";
+import {IOracle} from "./IOracle.sol";
+import {QuotePair, QuoteParams} from "./LibQuotes.sol";
 
 interface ISwapperImpl {
     struct InitParams {

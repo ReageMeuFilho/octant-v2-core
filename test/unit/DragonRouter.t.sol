@@ -40,8 +40,10 @@ contract DragonRouterTest is Test {
 
         // Deploy DragonRouter
         router = new DragonRouter();
-        bytes memory initParams =
-            abi.encode(owner, abi.encode(strategies, assets, governance, regenGovernance, address(splitChecker), opexVault, metapool));
+        bytes memory initParams = abi.encode(
+            owner,
+            abi.encode(strategies, assets, governance, regenGovernance, address(splitChecker), opexVault, metapool)
+        );
         router.setUp(initParams);
     }
 

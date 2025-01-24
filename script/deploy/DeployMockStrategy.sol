@@ -21,11 +21,10 @@ contract DeployMockStrategy is DeployModuleProxyFactory {
     address public dragonTokenizedStrategyAddress;
     address public dragonRouterProxyAddress;
 
-    function deploy(
-        address _safeAddress,
-        address _dragonTokenizedStrategyAddress,
-        address _dragonRouterProxyAddress
-    ) public virtual {
+    function deploy(address _safeAddress, address _dragonTokenizedStrategyAddress, address _dragonRouterProxyAddress)
+        public
+        virtual
+    {
         // Store addresses in storage
         safeAddress = _safeAddress;
         dragonTokenizedStrategyAddress = _dragonTokenizedStrategyAddress;
@@ -33,10 +32,10 @@ contract DeployMockStrategy is DeployModuleProxyFactory {
 
         // Deploy module proxy factory first
         DeployModuleProxyFactory.deploy();
-        
+
         // Deploy test token
         token = new MockERC20();
-        
+
         // Deploy implementation
         mockStrategySingleton = new MockStrategy();
 
@@ -72,19 +71,12 @@ contract DeployMockStrategy is DeployModuleProxyFactory {
         );
 
         // Then encode the full initialization call with owner and params
-        bytes memory initData = abi.encodeWithSignature(
-            "setUp(bytes)", 
-            abi.encode(safeAddress, strategyParams)
-        );
+        bytes memory initData = abi.encodeWithSignature("setUp(bytes)", abi.encode(safeAddress, strategyParams));
 
         // Deploy and enable module on safe
-        address proxy = moduleProxyFactory.deployModule(
-            address(mockStrategySingleton),
-            initData,
-            block.timestamp
-        );
+        address proxy = moduleProxyFactory.deployModule(address(mockStrategySingleton), initData, block.timestamp);
         mockStrategyProxy = IMockStrategy(payable(address(proxy)));
-        
+
         ISafe(safeAddress).enableModule(address(mockStrategyProxy));
 
         // Log deployments
