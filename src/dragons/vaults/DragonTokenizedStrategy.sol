@@ -131,7 +131,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         } else if (lockup.isRageQuit) {
             // Calculate unlocked portion based on time elapsed
             uint256 timeElapsed = block.timestamp - lockup.lockupTime;
-            uint256 unlockedPortion = (timeElapsed * lockup.lockedShares) / (lockup.unlockTime - lockup.lockupTime);
+            uint256 unlockedPortion = (timeElapsed * balance) / (lockup.unlockTime - lockup.lockupTime);
             return Math.min(unlockedPortion, balance);
         } else {
             return balance - lockup.lockedShares;
