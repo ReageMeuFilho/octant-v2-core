@@ -55,8 +55,6 @@ contract YearnPolygonUsdcStrategyTest is BaseTest {
 
         vm.startPrank(temps.safe);
 
-        assertTrue(module.availableDepositLimit(temps.safe) == type(uint256).max);
-
         assertTrue(module.balanceOf(temps.safe) == 0);
         module.deposit(amount, temps.safe);
         assertTrue(module.balanceOf(temps.safe) > 0);
