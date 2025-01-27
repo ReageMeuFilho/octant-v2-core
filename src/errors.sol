@@ -15,6 +15,7 @@ error TokenizedStrategy__NotEmergencyAuthorized();
 error TokenizedStrategy__NotKeeperOrManagement();
 error TokenizedStrategy__NotOwner();
 error TokenizedStrategy__NotManagement();
+error TokenizedStrategy__NotRegenGovernance();
 error TokenizedStrategy__AlreadyInitialized();
 error TokenizedStrategy__DepositMoreThanMax();
 error TokenizedStrategy__MintMoreThanMax();

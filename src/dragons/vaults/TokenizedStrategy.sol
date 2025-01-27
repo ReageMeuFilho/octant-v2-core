@@ -1,17 +1,50 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity >=0.8.18;
 
-import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { Enum } from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
-import { IAvatar } from "zodiac/interfaces/IAvatar.sol";
-import { ZeroAddress, ZeroShares, ZeroAssets, ReentrancyGuard__ReentrantCall, TokenizedStrategy__NotOwner, TokenizedStrategy__NotManagement, TokenizedStrategy__NotKeeperOrManagement, TokenizedStrategy__NotEmergencyAuthorized, TokenizedStrategy__AlreadyInitialized, TokenizedStrategy__DepositMoreThanMax, TokenizedStrategy__MintMoreThanMax, TokenizedStrategy__InvalidMaxLoss, TokenizedStrategy__TransferFromZeroAddress, TokenizedStrategy__TransferToZeroAddress, TokenizedStrategy__TransferToStrategy, TokenizedStrategy__MintToZeroAddress, TokenizedStrategy__BurnFromZeroAddress, TokenizedStrategy__ApproveFromZeroAddress, TokenizedStrategy__ApproveToZeroAddress, TokenizedStrategy__InsufficientAllowance, TokenizedStrategy__PermitDeadlineExpired, TokenizedStrategy__InvalidSigner, TokenizedStrategy__NotSelf, TokenizedStrategy__WithdrawMoreThanMax, TokenizedStrategy__RedeemMoreThanMax, TokenizedStrategy__TransferFailed, TokenizedStrategy__NotPendingManagement, TokenizedStrategy__StrategyNotInShutdown, TokenizedStrategy__TooMuchLoss, TokenizedStrategy__HatsAlreadyInitialized, TokenizedStrategy__InvalidHatsAddress } from "../../errors.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Enum} from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
+import {IAvatar} from "zodiac/interfaces/IAvatar.sol";
+import {
+    ZeroAddress,
+    ZeroShares,
+    ZeroAssets,
+    ReentrancyGuard__ReentrantCall,
+    TokenizedStrategy__NotOwner,
+    TokenizedStrategy__NotManagement,
+    TokenizedStrategy__NotKeeperOrManagement,
+    TokenizedStrategy__NotRegenGovernance,
+    TokenizedStrategy__NotEmergencyAuthorized,
+    TokenizedStrategy__AlreadyInitialized,
+    TokenizedStrategy__DepositMoreThanMax,
+    TokenizedStrategy__MintMoreThanMax,
+    TokenizedStrategy__InvalidMaxLoss,
+    TokenizedStrategy__TransferFromZeroAddress,
+    TokenizedStrategy__TransferToZeroAddress,
+    TokenizedStrategy__TransferToStrategy,
+    TokenizedStrategy__MintToZeroAddress,
+    TokenizedStrategy__BurnFromZeroAddress,
+    TokenizedStrategy__ApproveFromZeroAddress,
+    TokenizedStrategy__ApproveToZeroAddress,
+    TokenizedStrategy__InsufficientAllowance,
+    TokenizedStrategy__PermitDeadlineExpired,
+    TokenizedStrategy__InvalidSigner,
+    TokenizedStrategy__NotSelf,
+    TokenizedStrategy__WithdrawMoreThanMax,
+    TokenizedStrategy__RedeemMoreThanMax,
+    TokenizedStrategy__TransferFailed,
+    TokenizedStrategy__NotPendingManagement,
+    TokenizedStrategy__StrategyNotInShutdown,
+    TokenizedStrategy__TooMuchLoss,
+    TokenizedStrategy__HatsAlreadyInitialized,
+    TokenizedStrategy__InvalidHatsAddress
+} from "../../errors.sol";
 
 import { IBaseStrategy } from "src/interfaces/IBaseStrategy.sol";
 import { IHats } from "src/interfaces/IHats.sol";
 
-contract TokenizedStrategy {
+abstract contract TokenizedStrategy {
     using Math for uint256;
     using SafeERC20 for ERC20;
 
@@ -185,6 +218,15 @@ contract TokenizedStrategy {
     }
 
     /**
+     * @dev Require that the call is coming from the regen governance.
+     */
+
+    modifier onlyRegenGovernance() {
+        requireRegenGovernance(msg.sender);
+        _;
+    }
+
+    /**
      * @dev Prevents a contract from calling itself, directly or indirectly.
      * Placed over all state changing functions for increased safety.
      */
@@ -256,6 +298,22 @@ contract TokenizedStrategy {
             !_isHatsWearer(S, _sender, S.EMERGENCY_ADMIN_HAT) &&
             !_isHatsWearer(S, _sender, S.MANAGEMENT_HAT)
         ) revert TokenizedStrategy__NotEmergencyAuthorized();
+    }
+
+    /**
+     * @notice Require a caller is `regenGovernance`.
+     * @dev Is left public so that it can be used by the Strategy.
+     *
+     * When the Strategy calls this the msg.sender would be the
+     * address of the strategy so we need to specify the sender.
+     *
+     * @param _sender The original msg.sender.
+     */
+    function requireRegenGovernance(address _sender) public view {
+        StrategyData storage S = _strategyStorage();
+        if (_sender != S.REGEN_GOVERNANCE && !_isHatsWearer(S, _sender, S.REGEN_GOVERNANCE_HAT)) {
+            revert TokenizedStrategy__NotRegenGovernance();
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
