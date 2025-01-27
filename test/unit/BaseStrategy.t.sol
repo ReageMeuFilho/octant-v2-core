@@ -113,10 +113,6 @@ contract BaseStrategyTest is BaseTest {
         // should return false if strategy has funds but report has been called recently
         assertTrue(!module.harvestTrigger());
 
-        // should return true if strategy has some idle funds
-        vm.deal(address(module), 1 ether);
-        assertTrue(module.harvestTrigger());
-
         // should return true if assets in strategy > 0 and report hasn't been called for time > maxReportDelay.
         vm.warp(block.timestamp + 100);
         assertTrue(module.harvestTrigger());

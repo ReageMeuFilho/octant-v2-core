@@ -118,8 +118,15 @@ abstract contract DragonBaseStrategy is BaseStrategy, Module {
         if (
             TokenizedStrategy.totalAssets() != 0 && (block.timestamp - TokenizedStrategy.lastReport()) >= maxReportDelay
         ) return true;
+    }
 
-        // Check for idle funds in the strategy and deposit in the farm.
+    /**
+     * @dev Optional trigger to override if tend() will be used by the strategy.
+     * This must be implemented if the strategy hopes to invoke _tend().
+     *
+     * @return . Should return true if tend() should be called by keeper or false if not.
+     */
+    function _tendTrigger() internal view override virtual returns (bool) {
         return (address(asset) == ETH ? address(this).balance : asset.balanceOf(address(this))) > 0;
     }
 

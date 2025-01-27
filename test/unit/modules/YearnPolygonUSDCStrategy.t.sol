@@ -91,12 +91,8 @@ contract YearnPolygonUsdcStrategyTest is BaseTest {
         // should return false if strategy has funds but report has been called recently
         assertTrue(!module.harvestTrigger());
 
-        // should return true if strategy has some idle funds
-        deal(address(asset), address(module), 1e13, true);
-        assertTrue(module.harvestTrigger());
-
         // should return true if assets in strategy > 0 and report hasn't been called for time > maxReportDelay.
-        vm.warp(block.timestamp + 100);
+        vm.warp(block.timestamp + 7 days);
         assertTrue(module.harvestTrigger());
     }
 
