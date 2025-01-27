@@ -13,6 +13,7 @@ import {
     TokenizedStrategy__NotManagement,
     TokenizedStrategy__NotPendingManagement,
     TokenizedStrategy__NotEmergencyAuthorized,
+    TokenizedStrategy__NotRegenGovernance,
     TokenizedStrategy__AlreadyInitialized,
     BaseStrategy__NotSelf
 } from "src/errors.sol";
@@ -290,7 +291,7 @@ contract AccessControlTest is Setup {
 
         // Test unauthorized access
         vm.startPrank(_address);
-        vm.expectRevert(Unauthorized.selector);
+        vm.expectRevert(TokenizedStrategy__NotRegenGovernance.selector);
         strategy.setLockupDuration(newDuration);
         vm.stopPrank();
 
@@ -322,7 +323,7 @@ contract AccessControlTest is Setup {
 
         // Test unauthorized access
         vm.startPrank(_address);
-        vm.expectRevert(Unauthorized.selector);
+        vm.expectRevert(TokenizedStrategy__NotRegenGovernance.selector);
         strategy.setRageQuitCooldownPeriod(newPeriod);
         vm.stopPrank();
 

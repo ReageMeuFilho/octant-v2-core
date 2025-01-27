@@ -14,6 +14,7 @@ import {
     TokenizedStrategy__NotOwner,
     TokenizedStrategy__NotManagement,
     TokenizedStrategy__NotKeeperOrManagement,
+    TokenizedStrategy__NotRegenGovernance,
     TokenizedStrategy__NotEmergencyAuthorized,
     TokenizedStrategy__AlreadyInitialized,
     TokenizedStrategy__DepositMoreThanMax,
@@ -43,7 +44,7 @@ import {
 import {IBaseStrategy} from "src/interfaces/IBaseStrategy.sol";
 import {IHats} from "src/interfaces/IHats.sol";
 
-contract TokenizedStrategy {
+abstract contract TokenizedStrategy {
     using Math for uint256;
     using SafeERC20 for ERC20;
 
@@ -218,6 +219,15 @@ contract TokenizedStrategy {
     }
 
     /**
+     * @dev Require that the call is coming from the regen governance.
+     */
+
+    modifier onlyRegenGovernance() {
+        requireRegenGovernance(msg.sender);
+        _;
+    }
+
+    /**
      * @dev Prevents a contract from calling itself, directly or indirectly.
      * Placed over all state changing functions for increased safety.
      */
@@ -285,6 +295,22 @@ contract TokenizedStrategy {
             _sender != S.emergencyAdmin && _sender != S.management && !_isHatsWearer(S, _sender, S.EMERGENCY_ADMIN_HAT)
                 && !_isHatsWearer(S, _sender, S.MANAGEMENT_HAT)
         ) revert TokenizedStrategy__NotEmergencyAuthorized();
+    }
+
+    /**
+     * @notice Require a caller is `regenGovernance`.
+     * @dev Is left public so that it can be used by the Strategy.
+     *
+     * When the Strategy calls this the msg.sender would be the
+     * address of the strategy so we need to specify the sender.
+     *
+     * @param _sender The original msg.sender.
+     */
+    function requireRegenGovernance(address _sender) public view {
+        StrategyData storage S = _strategyStorage();
+        if (_sender != S.REGEN_GOVERNANCE && !_isHatsWearer(S, _sender, S.REGEN_GOVERNANCE_HAT)) {
+            revert TokenizedStrategy__NotRegenGovernance();
+        }
     }
 
     /*//////////////////////////////////////////////////////////////

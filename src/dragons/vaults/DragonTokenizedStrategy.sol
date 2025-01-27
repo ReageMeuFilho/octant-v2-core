@@ -26,11 +26,6 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     event NewLockupSet(address indexed user, uint256 indexed unlockTime, uint256 indexed lockedShares);
     event RageQuitInitiated(address indexed user, uint256 indexed unlockTime);
 
-    modifier onlyRegenGovernance() {
-        if (msg.sender != _strategyStorage().REGEN_GOVERNANCE) revert Unauthorized();
-        _;
-    }
-
     function initialize(
         address _asset,
         string memory _name,
