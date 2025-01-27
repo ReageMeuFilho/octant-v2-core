@@ -11,10 +11,10 @@ contract DeployTraderHelper is Script {
 
         vm.startBroadcast(deployerKey);
 
-        Trader trader = new Trader();
+        /* Trader trader = new Trader(); */
 
         vm.stopBroadcast();
 
-        console.log("Trader deployed to: ", address(trader));
+        /* console.log("Trader deployed to: ", address(trader)); */
     }
 }

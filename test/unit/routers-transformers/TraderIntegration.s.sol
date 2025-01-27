@@ -59,7 +59,7 @@ contract TestTraderIntegrationETH is Test, TestPlus {
         vm.selectFork(fork);
 
         helperConfig = new HelperConfig(true);
-        (address glmToken, address wethToken,,,,,,,, address uniV3Swap) = helperConfig.activeNetworkConfig();
+        (address glmToken, address wethToken,,,,,,, address uniV3Swap,) = helperConfig.activeNetworkConfig();
 
         glmAddress = glmToken;
 
@@ -67,16 +67,16 @@ contract TestTraderIntegrationETH is Test, TestPlus {
         initializer = UniV3Swap(payable(uniV3Swap));
     }
 
-    function configureTrader(address _base, address _quote) public {
-        baseAddress = _base;
-        quoteAddress = _quote;
-        swapper = deploySwapper();
+    function configureTrader(string memory poolName) public {
+        (baseAddress, quoteAddress,) = helperConfig.poolByName(poolName);
+        swapper = deploySwapper(poolName);
 
         trader = new Trader(
             abi.encode(
                 owner, baseAddress, quoteAddress, wethAddress, beneficiary, swapper, address(initializer), oracle
             )
         );
+        vm.label(address(trader), "Trader");
     }
 
     function _initOracleParams() internal view returns (IUniV3OracleImpl.InitParams memory) {
@@ -100,21 +100,24 @@ contract TestTraderIntegrationETH is Test, TestPlus {
         });
     }
 
-    function deploySwapper() public returns (address) {
+    function deploySwapper(string memory poolName) public returns (address) {
         helperConfig = new HelperConfig(true);
-        (,,,,, address glmPool,, address swapperFactoryAddress, address oracleFactoryAddress,) =
+        (,,,,, , address swapperFactoryAddress, address oracleFactoryAddress,,) =
             helperConfig.activeNetworkConfig();
+        (address _base, address _quote, uint24 _fee) = helperConfig.poolByName(poolName);
+        address poolAddress = helperConfig.getPoolAddress(_base, _quote, _fee);
+
         IOracleFactory oracleFactory = IOracleFactory(oracleFactoryAddress);
         ISwapperFactory swapperFactory = ISwapperFactory(swapperFactoryAddress);
 
-        fromTo = QuotePair({base: splitsEthWrapper(baseAddress), quote: splitsEthWrapper(quoteAddress)});
+        fromTo = QuotePair({base: splitsEthWrapper(_base), quote: splitsEthWrapper(_quote)});
 
         delete oraclePairDetails;
         oraclePairDetails.push(
             IUniV3OracleImpl.SetPairDetailParams({
                 quotePair: fromTo,
                 pairDetail: IUniV3OracleImpl.PairDetail({
-                    pool: glmPool, //FIXME
+                    pool: poolAddress,
                     period: 0 // no override
                 })
             })
@@ -137,6 +140,7 @@ contract TestTraderIntegrationETH is Test, TestPlus {
 
         // setup LibCloneBase
         address clone = address(swapperFactory.createSwapper(_createSwapperParams()));
+        vm.label(clone, "Swapper");
         return clone;
     }
 
@@ -153,13 +157,13 @@ contract TestTraderIntegrationETH is Test, TestPlus {
     receive() external payable {}
 
     function test_TraderInit() public {
-        configureTrader(ETH, glmAddress);
+        configureTrader("ETHGLM");
         assertTrue(trader.owner() == owner);
         assertTrue(trader.swapper() == swapper);
     }
 
     function test_transform_eth_to_glm() external {
-        configureTrader(ETH, glmAddress);
+        configureTrader("ETHGLM");
         assert(address(trader).balance == 0);
         assert(IERC20(quoteAddress).balanceOf(trader.beneficiary()) == 0);
         // effectively disable upper bound check and randomness check
@@ -191,7 +195,7 @@ contract TestTraderIntegrationETH is Test, TestPlus {
     }
 
     function test_convert_eth_to_glm() external {
-        configureTrader(ETH, glmAddress);
+        configureTrader("ETHGLM");
 
         // effectively disable upper bound check and randomness check
         uint256 fakeBudget = 1 ether;
@@ -258,7 +262,7 @@ contract TestTraderIntegrationETH is Test, TestPlus {
     }
 
     function test_transform_wrong_base() external {
-        configureTrader(glmAddress, ETH);
+        configureTrader("GLMETH");
 
         // check if trader will reject unexpected ETH
         vm.expectRevert(Trader.Trader__ImpossibleConfiguration.selector);
@@ -266,7 +270,7 @@ contract TestTraderIntegrationETH is Test, TestPlus {
     }
 
     function test_transform_wrong_quote() external {
-        configureTrader(glmAddress, ETH);
+        configureTrader("GLMETH");
 
         // check if trader will reject unexpected ETH
         vm.expectRevert(Trader.Trader__ImpossibleConfiguration.selector);
@@ -274,14 +278,14 @@ contract TestTraderIntegrationETH is Test, TestPlus {
     }
 
     function test_transform_wrong_eth_value() external {
-        configureTrader(ETH, glmAddress);
+        configureTrader("ETHGLM");
         assert(address(trader).balance == 0);
         vm.expectRevert(Trader.Trader__ImpossibleConfiguration.selector);
         trader.transform{value: 1 ether}(ETH, glmAddress, 2 ether);
     }
 
     function test_transform_unexpected_value() external {
-        configureTrader(glmAddress, ETH);
+        configureTrader("GLMETH");
 
         // check if trader will reject unexpected ETH
         vm.expectRevert(Trader.Trader__UnexpectedETH.selector);
@@ -289,7 +293,7 @@ contract TestTraderIntegrationETH is Test, TestPlus {
     }
 
     function test_transform_glm_to_eth() external {
-        configureTrader(glmAddress, ETH);
+        configureTrader("GLMETH");
         uint256 initialETHBalance = beneficiary.balance;
         // effectively disable upper bound check and randomness check
         uint256 fakeBudget = 50 ether;
