@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.8.18;
 
-import { DragonBaseStrategy, ERC20 } from "src/dragons/vaults/DragonBaseStrategy.sol";
-import { Module } from "zodiac/core/Module.sol";
+import {DragonBaseStrategy, ERC20} from "src/dragons/vaults/DragonBaseStrategy.sol";
 
 import { IStrategy } from "../../interfaces/IStrategy.sol";
 
-contract YearnPolygonUsdcStrategy is Module, DragonBaseStrategy {
+contract YearnPolygonUsdcStrategy is DragonBaseStrategy {
     /// @dev Yearn Polygon Aave V3 USDC Lender Vault
     address public constant YIELD_SOURCE = 0x52367C8E381EDFb068E9fBa1e7E9B2C847042897;
 
