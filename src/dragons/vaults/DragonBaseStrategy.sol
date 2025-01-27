@@ -113,8 +113,8 @@ abstract contract DragonBaseStrategy is BaseStrategy, Module {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Provide a signal to the keeper that `harvest()` should be called.
-     * @return `true` if `harvest()` should be called, `false` otherwise.
+     * @notice Provide a signal to the keeper that `report()` should be called.
+     * @return `true` if `report()` should be called, `false` otherwise.
      */
     function harvestTrigger() external view virtual returns (bool) {
         // Should not trigger if strategy is not active (no assets) or harvest has been recently called.
