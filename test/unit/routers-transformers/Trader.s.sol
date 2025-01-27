@@ -27,7 +27,7 @@ contract TestTraderRandomness is Test, TestPlus {
         token = new MockERC20();
 
         helperConfig = new HelperConfig(true);
-        (, address wethToken, , , , , , , , address uniV3Swap) = helperConfig.activeNetworkConfig();
+        (, address wethToken,,,,,,, address uniV3Swap,) = helperConfig.activeNetworkConfig();
 
         trader = new Trader(abi.encode(owner, ETH, token, wethToken, beneficiary, swapper, uniV3Swap, oracle));
 
