@@ -119,7 +119,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @param user The user's address.
      * @return The amount of unlocked shares.
      */
-    function unlockedShares(address user) public view returns (uint256) {
+    function unlockedShares(address user) external view returns (uint256) {
         StrategyData storage S = _strategyStorage();
         return _userUnlockedShares(S, user);
     }
@@ -129,7 +129,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @param user The user's address.
      * @return The unlock timestamp.
      */
-    function getUnlockTime(address user) public view returns (uint256) {
+    function getUnlockTime(address user) external view returns (uint256) {
         return _strategyStorage().voluntaryLockups[user].unlockTime;
     }
 
@@ -138,7 +138,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @param user The address to check
      * @return remainingTime The time remaining in seconds until unlock (0 if already unlocked)
      */
-    function getRemainingCooldown(address user) public view returns (uint256 remainingTime) {
+    function getRemainingCooldown(address user) external view returns (uint256 remainingTime) {
         uint256 unlockTime = _strategyStorage().voluntaryLockups[user].unlockTime;
         if (unlockTime <= block.timestamp) {
             return 0;
