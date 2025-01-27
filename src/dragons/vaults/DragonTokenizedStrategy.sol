@@ -343,7 +343,6 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @return shares The actual amount of shares issued.
      */
     function deposit(uint256 assets, address receiver) external payable override onlyOwner returns (uint256 shares) {
-        if (receiver != msg.sender) revert Unauthorized();
         shares = _deposit(assets, receiver, 0);
     }
 
@@ -361,13 +360,13 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         onlyOwner
         returns (uint256 shares)
     {
-        if (receiver != msg.sender) revert Unauthorized();
         if (lockupDuration == 0) revert DragonTokenizedStrategy__ZeroLockupDuration();
         shares = _deposit(assets, receiver, lockupDuration);
     }
 
     function _deposit(uint256 assets, address receiver, uint256 lockupDuration) internal returns (uint256 shares) {
         StrategyData storage S = _strategyStorage();
+        if (receiver != msg.sender || receiver == S.dragonRouter) revert Unauthorized();
         if (S.voluntaryLockups[receiver].isRageQuit) {
             revert DragonTokenizedStrategy__RageQuitInProgress();
         }
