@@ -17,6 +17,7 @@
     in {
       devShells.default = pkgs.mkShell {
         buildInputs = [
+          pkgs.solc
           pkgs.foundry-bin
           pkgs.nodejs_22.pkgs.yarn
           pkgs.nodejs_22
