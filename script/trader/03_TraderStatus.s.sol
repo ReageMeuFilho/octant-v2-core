@@ -11,8 +11,11 @@ import {HelperConfig} from "../helpers/HelperConfig.s.sol";
 import {Trader} from "src/routers-transformers/Trader.sol";
 
 contract TraderStatus is Script, Test {
+    address ETH;
+
     function run() external {
-        (, address wethToken,,,, address traderAddress,,,,) = new HelperConfig(false).activeNetworkConfig();
+        (, address wethToken,,,,,,,,) = new HelperConfig(false).activeNetworkConfig();
+        address traderAddress = vm.envAddress("TRADER");
 
         console.log("ChainID:", block.chainid);
         console.log("Trader at", traderAddress);
@@ -20,6 +23,9 @@ contract TraderStatus is Script, Test {
         assert(traderAddress != address(0));
 
         Trader trader = Trader(payable(traderAddress));
+        ETH = trader.ETH();
+        console.log("Selling:", getTicker(trader.base()), trader.base());
+        console.log("Buying:", getTicker(trader.quote()), trader.quote());
         uint256 chance = trader.chance();
         if (chance == 0) {
             emit log("Trade every (blocks): never");
@@ -51,5 +57,13 @@ contract TraderStatus is Script, Test {
 
         emit log_named_decimal_uint("Min trade (ETH)", trader.saleValueLow(), 18);
         emit log_named_decimal_uint("Max trade (ETH)", trader.saleValueHigh(), 18);
+    }
+
+    function getTicker(address token) public view returns (string memory result) {
+        if (token == ETH) {
+            result = "ETH";
+        } else {
+            result = ERC20(token).symbol();
+        }
     }
 }

@@ -8,12 +8,12 @@ import {HelperConfig} from "../helpers/HelperConfig.s.sol";
 import {DeployTrader} from "../deploy/DeployTrader.sol";
 
 contract DeployTraderHelper is DeployTrader {
-
     HelperConfig config = new HelperConfig(false);
     string buff = "";
 
     function run() external {
-        (address glmToken, address wethToken,, uint256 deployerKey,,,,,address uniV3Swap,) = config.activeNetworkConfig();
+        (address glmToken, address wethToken,, uint256 deployerKey,,,,, address uniV3Swap,) =
+            config.activeNetworkConfig();
         wethAddress = wethToken;
         glmAddress = glmToken;
         address base;
@@ -24,14 +24,12 @@ contract DeployTraderHelper is DeployTrader {
         preprompt2("Chain id is: ", vm.toString(block.chainid));
         try vm.prompt(prompt("Input owner address")) returns (string memory res) {
             owner = vm.parseAddress(res);
-        }
-        catch (bytes memory) {
+        } catch (bytes memory) {
             revert("Deployment aborted");
         }
         try vm.prompt(prompt("Input beneficiary address")) returns (string memory res) {
             beneficiary = vm.parseAddress(res);
-        }
-        catch (bytes memory) {
+        } catch (bytes memory) {
             revert("Deployment aborted");
         }
         try vm.prompt(listPairsPrompt()) returns (string memory _poolName) {
@@ -44,7 +42,9 @@ contract DeployTraderHelper is DeployTrader {
         preprompt2("Base: ", vm.toString(base));
         preprompt2("Quote: ", vm.toString(quote));
         preprompt2("Fee: ", vm.toString(fee));
-        preprompt2("V3 pool address: ", vm.toString(config.getPoolAddress(uniEthWrapper(base), uniEthWrapper(quote), fee)));
+        preprompt2(
+            "V3 pool address: ", vm.toString(config.getPoolAddress(uniEthWrapper(base), uniEthWrapper(quote), fee))
+        );
         initializer = UniV3Swap(payable(uniV3Swap));
         preprompt2("uniV3Swap at: ", vm.toString(address(initializer)));
         preprompt2("Beneficiary is: ", vm.toString(beneficiary));
@@ -54,11 +54,10 @@ contract DeployTraderHelper is DeployTrader {
             if (keccak256(abi.encode(res)) == keccak256(abi.encode("yes"))) {
                 doDeploy = true;
             }
-        }
-        catch (bytes memory) {
+        } catch (bytes memory) {
             revert("Deployment aborted");
         }
-        if (!doDeploy) { revert("Deployment aborted"); }
+        if (!doDeploy) revert("Deployment aborted");
 
         vm.startBroadcast(deployerKey);
         configureTrader(config, poolName);
@@ -71,7 +70,7 @@ contract DeployTraderHelper is DeployTrader {
 
     function listPairsPrompt() public returns (string memory result) {
         preprompt1("Following pools are configured:");
-        for (uint i; i < config.poolCount(); i++) {
+        for (uint256 i; i < config.poolCount(); i++) {
             preprompt2("- ", config.pools(i));
         }
         return prompt("Please enter pool name which will be used to trade");
@@ -87,6 +86,7 @@ contract DeployTraderHelper is DeployTrader {
         buff = string.concat(buff, "\n");
         buff = string.concat(buff, _str);
     }
+
     function preprompt2(string memory _str1, string memory _str2) public {
         buff = string.concat(buff, "\n");
         buff = string.concat(buff, _str1);
