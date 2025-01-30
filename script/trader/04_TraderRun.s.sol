@@ -10,12 +10,12 @@ import "solady/tokens/WETH.sol";
 import {HelperConfig} from "../helpers/HelperConfig.s.sol";
 import {Trader} from "src/routers-transformers/Trader.sol";
 
-contract TraderRun is Script, Test {
+contract TraderRun is Script {
     Trader trader;
 
-    uint256 scanSince;
-    uint256 deployerKey;
     address ETH;
+    address base;
+    address quote;
 
     function max(uint256 a, uint256 b) public pure returns (uint256) {
         if (a > b) return a;
@@ -23,17 +23,18 @@ contract TraderRun is Script, Test {
     }
 
     function run() external {
-        (,,, uint256 _deployerKey,,,,,,) = new HelperConfig(false).activeNetworkConfig();
+        (,,, uint256 deployerKey,,,,,,) = new HelperConfig(false).activeNetworkConfig();
 
-        deployerKey = _deployerKey;
         trader = Trader(payable(vm.envAddress("TRADER")));
         ETH = trader.ETH();
+        base = trader.base();
+        quote = trader.quote();
 
         console.log("ChainID:", block.chainid);
         console.log("Trader at", address(trader));
         require(address(trader) != address(0), "Please provide trader address via TRADER env var");
 
-        if (safeBalanceOf(trader.base(), address(trader)) != 0) {
+        if (safeBalanceOf(base, address(trader)) != 0) {
             vm.startBroadcast(deployerKey);
             trade_loop();
             vm.stopBroadcast();
@@ -43,20 +44,20 @@ contract TraderRun is Script, Test {
     }
 
     function trade_loop() public {
-        scanSince = max(block.number - 255, trader.lastHeight()) + 1;
-        emit log_named_uint("Scanning since", scanSince);
+        uint256 scanSince = max(block.number - 255, trader.lastHeight()) + 1;
+        console.log("Scanning since", scanSince);
         for (uint256 height = scanSince; height < block.number - 1; height++) {
-            if (trader.canTrade(height)) {
-                if (!trader.hasOverspent(height)) {
-                    emit log_named_uint("Height YES, has budget YES", height);
-                    trader.convert(height);
-                    uint256 sellable = safeBalanceOf(trader.base(), trader.swapper());
-                    trader.callInitFlash(sellable);
-                } else {
-                    emit log_named_uint("Height YES, has budget no ", height);
+            if (safeBalanceOf(base, address(trader)) != 0) {
+                if (trader.canTrade(height)) {
+                    if (!trader.hasOverspent(height)) {
+                        console.log("Height YES, has budget YES", height);
+                        trader.convert(height);
+                        uint256 sellable = safeBalanceOf(base, trader.swapper());
+                        trader.callInitFlash(sellable);
+                    } else {
+                        console.log("Height YES, has budget no ", height);
+                    }
                 }
-            } else {
-                emit log_named_uint("Height no ", height);
             }
         }
     }

@@ -142,7 +142,7 @@ contract Trader is ITransformer, Ownable, Pausable {
     //////////////////////////////////////////////////////////////*/
 
     /// @param initializeParams Parameters of initialization encoded
-    constructor (bytes memory initializeParams) {
+    constructor(bytes memory initializeParams) {
         (
             address _owner,
             address _base,
