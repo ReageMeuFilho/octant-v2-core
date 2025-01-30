@@ -50,6 +50,8 @@ contract TraderRun is Script, Test {
                 if (!trader.hasOverspent(height)) {
                     emit log_named_uint("Height YES, has budget YES", height);
                     trader.convert(height);
+                    uint256 sellable = safeBalanceOf(trader.base(), trader.swapper());
+                    trader.callInitFlash(sellable);
                 } else {
                     emit log_named_uint("Height YES, has budget no ", height);
                 }

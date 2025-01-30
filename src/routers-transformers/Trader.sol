@@ -184,7 +184,7 @@ contract Trader is ITransformer, Ownable, Pausable {
         }
     }
 
-    function callInitFlash(uint256 amount) private returns (uint256) {
+    function callInitFlash(uint256 amount) public returns (uint256) {
         uint256 oldQuoteBalance = safeBalanceOf(quote, beneficiary);
 
         delete exactInputParams;
