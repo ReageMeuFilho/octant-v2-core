@@ -120,6 +120,10 @@ contract HelperConfig is Script {
         poolByName[_name] = pool;
     }
 
+    function poolCount() public view returns (uint) {
+        return pools.length;
+    }
+
     function getPoolAddress(address _base, address _quote, uint24 _fee) public returns (address) {
         IUniswapV3Factory factory = IUniswapV3Factory(activeNetworkConfig.uniswapV3Factory);
         return factory.getPool(_base, _quote, _fee);
