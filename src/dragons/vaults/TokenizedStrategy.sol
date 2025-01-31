@@ -213,8 +213,9 @@ contract TokenizedStrategy {
      */
     function requireManagement(address _sender) public view {
         StrategyData storage S = _strategyStorage();
-        if (_sender != S.management && !_isHatsWearer(S, _sender, S.MANAGEMENT_HAT))
+        if (_sender != S.management && !_isHatsWearer(S, _sender, S.MANAGEMENT_HAT)) {
             revert TokenizedStrategy__NotManagement();
+        }
     }
 
     /**
@@ -1320,7 +1321,7 @@ contract TokenizedStrategy {
         uint8 _v,
         bytes32 _r,
         bytes32 _s
-    ) external virtual{
+    ) external virtual {
         if (_deadline < block.timestamp) revert TokenizedStrategy__PermitDeadlineExpired();
 
         // Unchecked because the only math done is incrementing

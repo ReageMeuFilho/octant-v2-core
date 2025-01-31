@@ -26,10 +26,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     }
 
     function setLockupDuration(uint256 _lockupDuration) external onlyRegenGovernance {
-        if (
-            _lockupDuration < RANGE_MINIMUM_LOCKUP_DURATION ||
-            _lockupDuration > RANGE_MAXIMUM_LOCKUP_DURATION
-        ) {
+        if (_lockupDuration < RANGE_MINIMUM_LOCKUP_DURATION || _lockupDuration > RANGE_MAXIMUM_LOCKUP_DURATION) {
             revert DragonTokenizedStrategy__InvalidLockupDuration();
         }
         _strategyStorage().MINIMUM_LOCKUP_DURATION = _lockupDuration;
@@ -220,20 +217,6 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         maxWithdraw_ = Math.min(_convertToAssets(S, _userUnlockedShares(S, _owner), Math.Rounding.Floor), maxWithdraw_);
     }
 
-    /**
-     * @dev Override of _withdraw to enforce lockup period.
-     */
-    function _withdraw(
-        StrategyData storage S,
-        address receiver,
-        address _owner,
-        uint256 assets,
-        uint256 shares,
-        uint256 maxLoss
-    ) internal override returns (uint256) {
-        return super._withdraw(S, receiver, _owner, assets, shares, maxLoss);
-    }
-
     /// @dev Internal implementation of {maxRedeem}.
     function _maxRedeem(StrategyData storage S, address _owner) internal view override returns (uint256 maxRedeem_) {
         // Get the max the owner could withdraw currently.
@@ -300,27 +283,6 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         }
         // Withdraw and track the actual amount withdrawn for loss check.
         _withdraw(S, receiver, _owner, assets, shares, maxLoss);
-    }
-
-    /**
-     * @notice Total number of strategy shares that can be
-     * redeemed from the strategy by `owner`, where `owner`
-     * corresponds to the msg.sender of a {redeem} call.
-     *
-     * @param _owner The owner of the shares.
-     * @return _maxRedeem Max amount of shares that can be redeemed.
-     */
-    function maxRedeem(address _owner) external view override returns (uint256) {
-        return _maxRedeem(_strategyStorage(), _owner);
-    }
-
-    /**
-     * @notice Variable `maxLoss` is ignored.
-     * @dev Accepts a `maxLoss` variable in order to match the multi
-     * strategy vaults ABI.
-     */
-    function maxRedeem(address _owner, uint256 /*maxLoss*/) external view override returns (uint256) {
-        return _maxRedeem(_strategyStorage(), _owner);
     }
 
     /**
@@ -576,7 +538,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         uint8 _v,
         bytes32 _r,
         bytes32 _s
-    ) external override{
+    ) external override {
         revert DragonTokenizedStrategy__VaultSharesNotTransferable();
     }
 }

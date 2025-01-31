@@ -29,3 +29,6 @@ node_modules/
 
 # direnv files
 .direnv/
+
+# cursor files
+.specstory/
