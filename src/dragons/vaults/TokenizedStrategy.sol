@@ -271,11 +271,7 @@ contract TokenizedStrategy {
 
     /// @notice Used for fee calculations.
     uint256 internal constant MAX_BPS = 10_000;
-    /// @notice Used for profit unlocking rate calculations.
-    uint256 internal constant MAX_BPS_EXTENDED = 1_000_000_000_000;
 
-    /// @notice Seconds per year for max profit unlocking time.
-    uint256 internal constant SECONDS_PER_YEAR = 31_556_952; // 365.2425 days
     /// @notice Minimum and maximum durations for lockup and rage quit periods
     uint256 internal constant RANGE_MINIMUM_LOCKUP_DURATION = 30 days;
     uint256 internal constant RANGE_MAXIMUM_LOCKUP_DURATION = 3650 days;
@@ -299,13 +295,6 @@ contract TokenizedStrategy {
      */
     bytes32 internal constant BASE_STRATEGY_STORAGE = bytes32(uint256(keccak256("octant.base.strategy.storage")) - 1);
 
-    /*//////////////////////////////////////////////////////////////
-                               IMMUTABLE
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Address of the previously deployed Vault factory that the
-    // protocol fee config is retrieved from.
-    address public immutable FACTORY;
     /*//////////////////////////////////////////////////////////////
                             STORAGE GETTER
     //////////////////////////////////////////////////////////////*/
