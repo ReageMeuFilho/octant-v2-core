@@ -11,13 +11,13 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     function initialize(
         address _asset,
         string memory _name,
-        address _owner,
+        address _operator,
         address _management,
         address _keeper,
         address _dragonRouter,
         address _regenGovernance
     ) external {
-        __TokenizedStrategy_init(_asset, _name, _owner, _management, _keeper, _dragonRouter, _regenGovernance);
+        __TokenizedStrategy_init(_asset, _name, _operator, _management, _keeper, _dragonRouter, _regenGovernance);
     }
 
     function setLockupDuration(uint256 _lockupDuration) external onlyRegenGovernance {
@@ -327,7 +327,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @param receiver The address to receive the `shares`.
      * @return shares The actual amount of shares issued.
      */
-    function deposit(uint256 assets, address receiver) external payable override onlyOwner returns (uint256 shares) {
+    function deposit(uint256 assets, address receiver) external payable override onlyOperator returns (uint256 shares) {
         shares = _deposit(assets, receiver, 0);
     }
 
@@ -340,12 +340,11 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @param lockupDuration The duration of the lockup in seconds.
      * @return shares The amount of shares minted.
      */
-    function depositWithLockup(uint256 assets, address receiver, uint256 lockupDuration)
-        external
-        payable
-        onlyOwner
-        returns (uint256 shares)
-    {
+    function depositWithLockup(
+        uint256 assets,
+        address receiver,
+        uint256 lockupDuration
+    ) external payable onlyOperator returns (uint256 shares) {
         if (lockupDuration == 0) revert DragonTokenizedStrategy__ZeroLockupDuration();
         shares = _deposit(assets, receiver, lockupDuration);
     }
@@ -385,7 +384,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @param receiver The address to receive the `shares`.
      * @return assets The actual amount of asset deposited.
      */
-    function mint(uint256 shares, address receiver) external payable override onlyOwner returns (uint256 assets) {
+    function mint(uint256 shares, address receiver) external payable override onlyOperator returns (uint256 assets) {
         assets = _mint(shares, receiver, 0);
     }
 
@@ -393,7 +392,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         uint256 shares,
         address receiver,
         uint256 lockupDuration
-    ) external payable onlyOwner returns (uint256 assets) {
+    ) external payable onlyOperator returns (uint256 assets) {
         if (lockupDuration == 0) revert DragonTokenizedStrategy__ZeroLockupDuration();
         assets = _mint(shares, receiver, lockupDuration);
     }

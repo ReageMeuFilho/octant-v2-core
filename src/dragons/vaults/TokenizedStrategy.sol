@@ -1,45 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity >=0.8.18;
 
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Enum} from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
-import {IAvatar} from "zodiac/interfaces/IAvatar.sol";
-import {
-    ZeroAddress,
-    ZeroShares,
-    ZeroAssets,
-    ReentrancyGuard__ReentrantCall,
-    TokenizedStrategy__NotOwner,
-    TokenizedStrategy__NotManagement,
-    TokenizedStrategy__NotKeeperOrManagement,
-    TokenizedStrategy__NotRegenGovernance,
-    TokenizedStrategy__NotEmergencyAuthorized,
-    TokenizedStrategy__AlreadyInitialized,
-    TokenizedStrategy__DepositMoreThanMax,
-    TokenizedStrategy__MintMoreThanMax,
-    TokenizedStrategy__InvalidMaxLoss,
-    TokenizedStrategy__TransferFromZeroAddress,
-    TokenizedStrategy__TransferToZeroAddress,
-    TokenizedStrategy__TransferToStrategy,
-    TokenizedStrategy__MintToZeroAddress,
-    TokenizedStrategy__BurnFromZeroAddress,
-    TokenizedStrategy__ApproveFromZeroAddress,
-    TokenizedStrategy__ApproveToZeroAddress,
-    TokenizedStrategy__InsufficientAllowance,
-    TokenizedStrategy__PermitDeadlineExpired,
-    TokenizedStrategy__InvalidSigner,
-    TokenizedStrategy__NotSelf,
-    TokenizedStrategy__WithdrawMoreThanMax,
-    TokenizedStrategy__RedeemMoreThanMax,
-    TokenizedStrategy__TransferFailed,
-    TokenizedStrategy__NotPendingManagement,
-    TokenizedStrategy__StrategyNotInShutdown,
-    TokenizedStrategy__TooMuchLoss,
-    TokenizedStrategy__HatsAlreadyInitialized,
-    TokenizedStrategy__InvalidHatsAddress
-} from "../../errors.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { Enum } from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
+import { IAvatar } from "zodiac/interfaces/IAvatar.sol";
+import { ZeroAddress, ZeroShares, ZeroAssets, ReentrancyGuard__ReentrantCall, TokenizedStrategy__NotOperator, TokenizedStrategy__NotManagement, TokenizedStrategy__NotKeeperOrManagement, TokenizedStrategy__NotRegenGovernance, TokenizedStrategy__NotEmergencyAuthorized, TokenizedStrategy__AlreadyInitialized, TokenizedStrategy__DepositMoreThanMax, TokenizedStrategy__MintMoreThanMax, TokenizedStrategy__InvalidMaxLoss, TokenizedStrategy__TransferFromZeroAddress, TokenizedStrategy__TransferToZeroAddress, TokenizedStrategy__TransferToStrategy, TokenizedStrategy__MintToZeroAddress, TokenizedStrategy__BurnFromZeroAddress, TokenizedStrategy__ApproveFromZeroAddress, TokenizedStrategy__ApproveToZeroAddress, TokenizedStrategy__InsufficientAllowance, TokenizedStrategy__PermitDeadlineExpired, TokenizedStrategy__InvalidSigner, TokenizedStrategy__NotSelf, TokenizedStrategy__WithdrawMoreThanMax, TokenizedStrategy__RedeemMoreThanMax, TokenizedStrategy__TransferFailed, TokenizedStrategy__NotPendingManagement, TokenizedStrategy__StrategyNotInShutdown, TokenizedStrategy__TooMuchLoss, TokenizedStrategy__HatsAlreadyInitialized, TokenizedStrategy__InvalidHatsAddress } from "../../errors.sol";
 
 import { IBaseStrategy } from "src/interfaces/IBaseStrategy.sol";
 import { IHats } from "src/interfaces/IHats.sol";
@@ -146,7 +113,7 @@ abstract contract TokenizedStrategy {
         // The ERC20 compliant underlying asset that will be
         // used by the Strategy
         ERC20 asset;
-        address owner;
+        address operator;
         address dragonRouter;
         // These are the corresponding ERC20 variables needed for the
         // strategies token that is issued and burned on each deposit or withdraw.
@@ -186,8 +153,8 @@ abstract contract TokenizedStrategy {
                             MODIFIERS
     //////////////////////////////////////////////////////////////*/
 
-    modifier onlyOwner() {
-        if (msg.sender != _strategyStorage().owner) revert TokenizedStrategy__NotOwner();
+    modifier onlyOperator() {
+        if (msg.sender != _strategyStorage().operator) revert TokenizedStrategy__NotOperator();
         _;
     }
 
@@ -381,7 +348,7 @@ abstract contract TokenizedStrategy {
     function __TokenizedStrategy_init(
         address _asset,
         string memory _name,
-        address _owner,
+        address _operator,
         address _management,
         address _keeper,
         address _dragonRouter,
@@ -396,7 +363,7 @@ abstract contract TokenizedStrategy {
         // Set the strategy's underlying asset.
         S.asset = ERC20(_asset);
 
-        S.owner = _owner;
+        S.operator = _operator;
         S.dragonRouter = _dragonRouter;
 
         // Set the Strategy Tokens name.
@@ -434,7 +401,7 @@ abstract contract TokenizedStrategy {
     function deposit(
         uint256 assets,
         address receiver
-    ) external payable virtual nonReentrant onlyOwner returns (uint256 shares) {}
+    ) external payable virtual nonReentrant onlyOperator returns (uint256 shares) {}
 
     /**
      * @notice Mints exactly `shares` of strategy shares to
@@ -446,7 +413,7 @@ abstract contract TokenizedStrategy {
     function mint(
         uint256 shares,
         address receiver
-    ) external payable virtual nonReentrant onlyOwner returns (uint256 assets) {}
+    ) external payable virtual nonReentrant onlyOperator returns (uint256 assets) {}
 
     /**
      * @notice Withdraws exactly `assets` from `owners` shares and sends
@@ -776,14 +743,15 @@ abstract contract TokenizedStrategy {
     function _deposit(StrategyData storage S, address receiver, uint256 assets, uint256 shares) internal nonReentrant {
         // Cache storage variables used more than once.
         ERC20 _asset = S.asset;
-
+        address target = IBaseStrategy(address(this)).target();
+        if (target == address(0)) revert TokenizedStrategy__NotOperator();
         if (address(_asset) == ETH) {
-            if (IAvatar(S.owner).execTransactionFromModule(address(this), assets, "", Enum.Operation.Call) == false) {
+            if (IAvatar(target).execTransactionFromModule(address(this), assets, "", Enum.Operation.Call) == false) {
                 revert TokenizedStrategy__DepositMoreThanMax();
             }
         } else {
             if (
-                IAvatar(S.owner).execTransactionFromModule(
+                IAvatar(target).execTransactionFromModule(
                     address(_asset),
                     0,
                     abi.encodeWithSignature("transfer(address,uint256)", address(this), assets),
@@ -996,8 +964,8 @@ abstract contract TokenizedStrategy {
         return _strategyStorage().pendingManagement;
     }
 
-    function owner() public view returns (address) {
-        return _strategyStorage().owner;
+    function operator() external view returns (address) {
+        return _strategyStorage().operator;
     }
 
     function dragonRouter() external view returns (address) {

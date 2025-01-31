@@ -13,7 +13,7 @@ error AlreadyInitialized();
 // TokenizedStrategy specific errors
 error TokenizedStrategy__NotEmergencyAuthorized();
 error TokenizedStrategy__NotKeeperOrManagement();
-error TokenizedStrategy__NotOwner();
+error TokenizedStrategy__NotOperator();
 error TokenizedStrategy__NotManagement();
 error TokenizedStrategy__NotRegenGovernance();
 error TokenizedStrategy__AlreadyInitialized();

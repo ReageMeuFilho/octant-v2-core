@@ -83,7 +83,7 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
 
     function pricePerShare() external view returns (uint256);
 
-    function owner() external view returns (address);
+    function operator() external view returns (address);
 
     function dragonRouter() external view returns (address);
 

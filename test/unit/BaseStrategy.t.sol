@@ -7,7 +7,7 @@ import {MockYieldSource} from "test/mocks/MockYieldSource.sol";
 import {DragonTokenizedStrategy} from "src/dragons/vaults/DragonTokenizedStrategy.sol";
 
 import {
-    Unauthorized, TokenizedStrategy__NotKeeperOrManagement, TokenizedStrategy__NotManagement, TokenizedStrategy__NotOwner
+    Unauthorized, TokenizedStrategy__NotKeeperOrManagement, TokenizedStrategy__NotManagement, TokenizedStrategy__NotOperator
 } from "src/errors.sol";
 import {ITokenizedStrategy} from "src/interfaces/ITokenizedStrategy.sol";
 
@@ -58,7 +58,7 @@ contract BaseStrategyTest is BaseTest {
         assertTrue(module.maxReportDelay() == maxReportDelay);
         assertTrue(ITokenizedStrategy(address(module)).management() == management);
         assertTrue(ITokenizedStrategy(address(module)).keeper() == keeper);
-        assertTrue(ITokenizedStrategy(address(module)).owner() == temps.safe);
+        assertTrue(ITokenizedStrategy(address(module)).operator() == temps.safe);
         assertTrue(ITokenizedStrategy(address(module)).dragonRouter() == dragonRouter);
     }
 
@@ -68,7 +68,7 @@ contract BaseStrategyTest is BaseTest {
         vm.deal(temps.safe, amount);
 
         // only safe can call deposit function
-        vm.expectRevert(TokenizedStrategy__NotOwner.selector);
+        vm.expectRevert(TokenizedStrategy__NotOperator.selector);
         ITokenizedStrategy(address(module)).deposit(amount, temps.safe);
 
         vm.startPrank(temps.safe);
