@@ -19,7 +19,7 @@ jobs:
           - 16.x
 
     name: Octant V2 Core Build
-    runs-on: ubuntu-latest
+    runs-on: general
     steps:
       - uses: actions/checkout@v3
         with:
@@ -45,7 +45,7 @@ jobs:
       fail-fast: true
 
     name: Octant V2 Test
-    runs-on: ubuntu-latest
+    runs-on: general
     steps:
       - uses: actions/checkout@v3
         with:
@@ -72,7 +72,7 @@ jobs:
         run: forge test -v
 
   analyze:
-    runs-on: ubuntu-latest
+    runs-on: general
     steps:
       - name: Setup node
         uses: actions/setup-node@v3
