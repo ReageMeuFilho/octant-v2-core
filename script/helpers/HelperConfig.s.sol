@@ -18,9 +18,9 @@ contract HelperConfig is Script {
         address oracleFactory;
         address uniV3Swap;
     }
-    // TODO: REMOVE HARDCODED KEYS
 
-    uint256 public immutable DEFAULT_ANVIL_KEY = vm.envUint("PRIVATE_KEY");
+    // This is the private key for dev account available in anvil. It is not a secret!
+    uint256 public immutable DEFAULT_ANVIL_KEY = 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80;
     NetworkConfig public activeNetworkConfig;
 
     constructor(bool forking) {
@@ -38,8 +38,10 @@ contract HelperConfig is Script {
     function getSepoliaEthConfig(bool forking) public view returns (NetworkConfig memory) {
         uint256 deployerKey;
         if (forking) {
+            // throw-away environment; using ETH from test account
             deployerKey = DEFAULT_ANVIL_KEY;
         } else {
+            // some other environment, user needs to provide their own source of ETH for gas
             deployerKey = vm.envUint("PRIVATE_KEY");
         }
         return
