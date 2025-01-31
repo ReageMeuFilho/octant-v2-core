@@ -563,4 +563,20 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     function transferFrom(address, /*from*/ address, /*to*/ uint256 /*amount*/) external pure override returns (bool) {
         revert DragonTokenizedStrategy__VaultSharesNotTransferable();
     }
+
+    function approve(address spender, uint256 amount) external override returns (bool) {
+        revert DragonTokenizedStrategy__VaultSharesNotTransferable();
+    }
+
+    function permit(
+        address _owner,
+        address _spender,
+        uint256 _value,
+        uint256 _deadline,
+        uint8 _v,
+        bytes32 _r,
+        bytes32 _s
+    ) external override{
+        revert DragonTokenizedStrategy__VaultSharesNotTransferable();
+    }
 }

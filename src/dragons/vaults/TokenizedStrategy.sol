@@ -1169,7 +1169,7 @@ contract TokenizedStrategy {
      * @param amount the amount of shares to allow `spender` to move.
      * @return . a boolean value indicating whether the operation succeeded.
      */
-    function approve(address spender, uint256 amount) external returns (bool) {
+    function approve(address spender, uint256 amount) external virtual returns (bool) {
         _approve(_strategyStorage(), msg.sender, spender, amount);
         return true;
     }
@@ -1331,7 +1331,7 @@ contract TokenizedStrategy {
         uint8 _v,
         bytes32 _r,
         bytes32 _s
-    ) external {
+    ) external virtual{
         if (_deadline < block.timestamp) revert TokenizedStrategy__PermitDeadlineExpired();
 
         // Unchecked because the only math done is incrementing

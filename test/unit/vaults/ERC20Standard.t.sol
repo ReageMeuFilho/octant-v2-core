@@ -52,9 +52,10 @@ contract ERC20BaseTest is Setup {
     function testFuzz_approve(uint256 amount_) public {
         amount_ = bound(amount_, minFuzzAmount, maxFuzzAmount);
 
-        assertTrue(strategy.approve(user, amount_));
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__VaultSharesNotTransferable.selector));
+        strategy.approve(user, amount_);
 
-        assertEq(strategy.allowance(self, user), amount_);
+        assertEq(strategy.allowance(self, user), 0);
     }
 
     function testFuzz_transfer(uint256 amount_) public {
@@ -81,6 +82,7 @@ contract ERC20BaseTest is Setup {
         vm.assume(strategy.balanceOf(recipient_) == 0);
         mintAndDepositIntoStrategy(strategy, address(owner), amount_);
 
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__VaultSharesNotTransferable.selector));
         vm.prank(address(owner));
         strategy.approve(self, approval_);
 
@@ -89,7 +91,7 @@ contract ERC20BaseTest is Setup {
 
         assertEq(strategy.totalSupply(), amount_);
 
-        assertEq(strategy.allowance(address(owner), self), approval_);
+        assertEq(strategy.allowance(address(owner), self), 0);
 
         assertEq(strategy.balanceOf(address(owner)), amount_);
         assertEq(strategy.balanceOf(recipient_), 0);
@@ -106,17 +108,18 @@ contract ERC20BaseTest is Setup {
         mintAndDepositIntoStrategy(strategy, address(owner), amount_);
 
         vm.prank(address(owner));
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__VaultSharesNotTransferable.selector));
         strategy.approve(self, MAX_UINT256);
 
         assertEq(strategy.balanceOf(address(owner)), amount_);
         assertEq(strategy.totalSupply(), amount_);
-        assertEq(strategy.allowance(address(owner), self), MAX_UINT256);
+        assertEq(strategy.allowance(address(owner), self), 0);
 
         vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__VaultSharesNotTransferable.selector));
         strategy.transferFrom(address(owner), recipient_, amount_);
 
         assertEq(strategy.totalSupply(), amount_);
-        assertEq(strategy.allowance(address(owner), self), MAX_UINT256);
+        assertEq(strategy.allowance(address(owner), self), 0);
 
         assertEq(strategy.balanceOf(address(owner)), amount_);
         assertEq(strategy.balanceOf(recipient_), 0);
@@ -150,6 +153,7 @@ contract ERC20BaseTest is Setup {
         mintAndDepositIntoStrategy(strategy, address(owner), amount_);
 
         vm.prank(address(owner));
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__VaultSharesNotTransferable.selector));
         strategy.approve(self, amount_);
 
         vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__VaultSharesNotTransferable.selector));
@@ -213,15 +217,16 @@ contract ERC20PermitTest is Setup {
 
     function testFuzz_permit(uint256 amount_) public {
         uint256 startingNonce = strategy.nonces(_owner);
-        uint256 expectedNonce = startingNonce + 1;
+        uint256 expectedNonce = startingNonce;
 
         (uint8 v, bytes32 r, bytes32 s) =
             _getValidPermitSignature(address(strategy), _owner, _spender, amount_, startingNonce, _deadline, _skOwner);
 
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__VaultSharesNotTransferable.selector));
         _user.erc20_permit(address(strategy), _owner, _spender, amount_, _deadline, v, r, s);
 
         assertEq(strategy.nonces(_owner), expectedNonce);
-        assertEq(strategy.allowance(_owner, _spender), amount_);
+        assertEq(strategy.allowance(_owner, _spender), 0);
     }
 
     function testFuzz_permit_multiple(bytes32 seed_) public {
@@ -234,7 +239,7 @@ contract ERC20PermitTest is Setup {
         (uint8 v, bytes32 r, bytes32 s) =
             _getValidPermitSignature(address(strategy), _owner, _spender, 1000, 0, _deadline, _skOwner);
 
-        vm.expectRevert(TokenizedStrategy__InvalidSigner.selector);
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__VaultSharesNotTransferable.selector));
         _user.erc20_permit(address(strategy), address(0), _spender, 1000, _deadline, v, r, s);
     }
 
@@ -243,7 +248,7 @@ contract ERC20PermitTest is Setup {
             _getValidPermitSignature(address(strategy), _owner, address(1111), 1000, 0, _deadline, _skOwner);
 
         // Using permit with unintended spender should fail.
-        vm.expectRevert(TokenizedStrategy__InvalidSigner.selector);
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__VaultSharesNotTransferable.selector));
         _user.erc20_permit(address(strategy), _owner, _spender, 1000, _deadline, v, r, s);
     }
 
@@ -251,7 +256,7 @@ contract ERC20PermitTest is Setup {
         (uint8 v, bytes32 r, bytes32 s) =
             _getValidPermitSignature(address(strategy), _owner, _spender, 1000, 0, _deadline, _skSpender);
 
-        vm.expectRevert(TokenizedStrategy__InvalidSigner.selector);
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__VaultSharesNotTransferable.selector));
         _user.erc20_permit(address(strategy), _owner, _spender, 1000, _deadline, v, r, s);
     }
 
@@ -266,7 +271,7 @@ contract ERC20PermitTest is Setup {
         (uint8 v, bytes32 r, bytes32 s) =
             _getValidPermitSignature(address(strategy), _owner, _spender, 1000, 0, expiry, _skOwner);
 
-        vm.expectRevert(TokenizedStrategy__PermitDeadlineExpired.selector);
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__VaultSharesNotTransferable.selector));
         _user.erc20_permit(address(strategy), _owner, _spender, 1000, expiry, v, r, s);
 
         assertEq(strategy.allowance(_owner, _spender), 0);
@@ -279,10 +284,11 @@ contract ERC20PermitTest is Setup {
 
         (v, r, s) = _getValidPermitSignature(address(strategy), _owner, _spender, 1000, 0, expiry, _skOwner);
 
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__VaultSharesNotTransferable.selector));
         _user.erc20_permit(address(strategy), _owner, _spender, 1000, expiry, v, r, s);
 
-        assertEq(strategy.allowance(_owner, _spender), 1000);
-        assertEq(strategy.nonces(_owner), 1);
+        assertEq(strategy.allowance(_owner, _spender), 0);
+        assertEq(strategy.nonces(_owner), 0);
     }
 
     function test_permit_replay() public {
@@ -290,10 +296,11 @@ contract ERC20PermitTest is Setup {
             _getValidPermitSignature(address(strategy), _owner, _spender, 1000, 0, _deadline, _skOwner);
 
         // First time should succeed
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__VaultSharesNotTransferable.selector));
         _user.erc20_permit(address(strategy), _owner, _spender, 1000, _deadline, v, r, s);
 
         // Second time nonce has been consumed and should fail
-        vm.expectRevert(TokenizedStrategy__InvalidSigner.selector);
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__VaultSharesNotTransferable.selector));
         _user.erc20_permit(address(strategy), _owner, _spender, 1000, _deadline, v, r, s);
     }
 
@@ -302,7 +309,7 @@ contract ERC20PermitTest is Setup {
             _getValidPermitSignature(address(strategy), _owner, _spender, 1000, 1, _deadline, _skOwner);
 
         // Previous nonce of 0 has not been consumed yet, so nonce of 1 should fail.
-        vm.expectRevert(TokenizedStrategy__InvalidSigner.selector);
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__VaultSharesNotTransferable.selector));
         _user.erc20_permit(address(strategy), _owner, _spender, 1000, _deadline, v, r, s);
     }
 
@@ -313,7 +320,7 @@ contract ERC20PermitTest is Setup {
             _getValidPermitSignature(someToken, _owner, _spender, 1000, 0, _deadline, _skOwner);
 
         // Using permit with unintended verifier should fail.
-        vm.expectRevert(TokenizedStrategy__InvalidSigner.selector);
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__VaultSharesNotTransferable.selector));
         _user.erc20_permit(address(strategy), _owner, _spender, 1000, _deadline, v, r, s);
     }
 
@@ -323,7 +330,7 @@ contract ERC20PermitTest is Setup {
 
         // Send in an s that is above the upper bound.
         bytes32 badS = bytes32(S_VALUE_INCLUSIVE_UPPER_BOUND + 1);
-        vm.expectRevert(TokenizedStrategy__InvalidSigner.selector);
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__VaultSharesNotTransferable.selector));
         _user.erc20_permit(address(strategy), _owner, _spender, 1000, _deadline, v, r, badS);
     }
 
@@ -338,15 +345,8 @@ contract ERC20PermitTest is Setup {
         for (uint8 i; i <= type(uint8).max; i++) {
             if (i == type(uint8).max) {
                 break;
-            } else if (i != 27 && i != 28) {
-                vm.expectRevert(TokenizedStrategy__InvalidSigner.selector);
-            } else {
-                if (i == v) continue;
-
-                // Should get past the Malleable require check as 27 or 28 are valid values for s.
-                vm.expectRevert(TokenizedStrategy__InvalidSigner.selector);
             }
-
+            vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__VaultSharesNotTransferable.selector));
             _user.erc20_permit(address(strategy), _owner, _spender, 1000, _deadline, i, r, s);
         }
     }
