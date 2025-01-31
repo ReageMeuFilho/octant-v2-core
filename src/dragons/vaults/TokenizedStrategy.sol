@@ -138,11 +138,6 @@ contract TokenizedStrategy {
         uint256 MINIMUM_LOCKUP_DURATION;
         uint256 RAGE_QUIT_COOLDOWN_PERIOD;
         address REGEN_GOVERNANCE;
-        // contraints for regen governance to set the lockup duration and rage quit cooldown period
-        uint256 RANGE_MINIMUM_LOCKUP_DURATION;
-        uint256 RANGE_MAXIMUM_LOCKUP_DURATION;
-        uint256 RANGE_MINIMUM_RAGE_QUIT_COOLDOWN_PERIOD;
-        uint256 RANGE_MAXIMUM_RAGE_QUIT_COOLDOWN_PERIOD;
         // Hats protocol integration
         IHats HATS;
         uint256 KEEPER_HAT;
@@ -281,6 +276,11 @@ contract TokenizedStrategy {
 
     /// @notice Seconds per year for max profit unlocking time.
     uint256 internal constant SECONDS_PER_YEAR = 31_556_952; // 365.2425 days
+    /// @notice Minimum and maximum durations for lockup and rage quit periods
+    uint256 internal constant RANGE_MINIMUM_LOCKUP_DURATION = 30 days;
+    uint256 internal constant RANGE_MAXIMUM_LOCKUP_DURATION = 3650 days;
+    uint256 internal constant RANGE_MINIMUM_RAGE_QUIT_COOLDOWN_PERIOD = 30 days;
+    uint256 internal constant RANGE_MAXIMUM_RAGE_QUIT_COOLDOWN_PERIOD = 3650 days;
 
     /**
      * @dev Custom storage slot that will be used to store the
@@ -367,10 +367,6 @@ contract TokenizedStrategy {
         S.REGEN_GOVERNANCE = _regenGovernance;
         S.MINIMUM_LOCKUP_DURATION = 90 days;
         S.RAGE_QUIT_COOLDOWN_PERIOD = 90 days;
-        S.RANGE_MINIMUM_LOCKUP_DURATION = 30 days;
-        S.RANGE_MAXIMUM_LOCKUP_DURATION = 3650 days;
-        S.RANGE_MINIMUM_RAGE_QUIT_COOLDOWN_PERIOD = 30 days;
-        S.RANGE_MAXIMUM_RAGE_QUIT_COOLDOWN_PERIOD = 3650 days;
 
         // Emit event to signal a new strategy has been initialized.
         emit NewTokenizedStrategy(address(this), _asset, API_VERSION);

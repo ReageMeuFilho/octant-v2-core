@@ -27,8 +27,8 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
 
     function setLockupDuration(uint256 _lockupDuration) external onlyRegenGovernance {
         if (
-            _lockupDuration < _strategyStorage().RANGE_MINIMUM_LOCKUP_DURATION ||
-            _lockupDuration > _strategyStorage().RANGE_MAXIMUM_LOCKUP_DURATION
+            _lockupDuration < RANGE_MINIMUM_LOCKUP_DURATION ||
+            _lockupDuration > RANGE_MAXIMUM_LOCKUP_DURATION
         ) {
             revert DragonTokenizedStrategy__InvalidLockupDuration();
         }
@@ -37,8 +37,8 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
 
     function setRageQuitCooldownPeriod(uint256 _rageQuitCooldownPeriod) external onlyRegenGovernance {
         if (
-            _rageQuitCooldownPeriod < _strategyStorage().RANGE_MINIMUM_RAGE_QUIT_COOLDOWN_PERIOD ||
-            _rageQuitCooldownPeriod > _strategyStorage().RANGE_MAXIMUM_RAGE_QUIT_COOLDOWN_PERIOD
+            _rageQuitCooldownPeriod < RANGE_MINIMUM_RAGE_QUIT_COOLDOWN_PERIOD ||
+            _rageQuitCooldownPeriod > RANGE_MAXIMUM_RAGE_QUIT_COOLDOWN_PERIOD
         ) revert DragonTokenizedStrategy__InvalidRageQuitCooldownPeriod();
         _strategyStorage().RAGE_QUIT_COOLDOWN_PERIOD = _rageQuitCooldownPeriod;
     }
