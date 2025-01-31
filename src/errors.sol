@@ -39,6 +39,7 @@ error TokenizedStrategy__StrategyNotInShutdown();
 error TokenizedStrategy__TooMuchLoss();
 error TokenizedStrategy__HatsAlreadyInitialized();
 error TokenizedStrategy__InvalidHatsAddress();
+error DragonTokenizedStrategy__ReceiverHasExistingShares();
 
 // DragonTokenizedStrategy specific errors
 error DragonTokenizedStrategy__VaultSharesNotTransferable();

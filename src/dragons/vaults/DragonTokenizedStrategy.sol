@@ -2,7 +2,7 @@
 pragma solidity ^0.8.25;
 
 import { TokenizedStrategy, IBaseStrategy, Math } from "./TokenizedStrategy.sol";
-import { Unauthorized, DragonTokenizedStrategy__VaultSharesNotTransferable, DragonTokenizedStrategy__ZeroLockupDuration, DragonTokenizedStrategy__InsufficientLockupDuration, DragonTokenizedStrategy__SharesStillLocked, DragonTokenizedStrategy__InvalidLockupDuration, DragonTokenizedStrategy__InvalidRageQuitCooldownPeriod, DragonTokenizedStrategy__RageQuitInProgress, DragonTokenizedStrategy__StrategyInShutdown, DragonTokenizedStrategy__NoSharesToRageQuit, DragonTokenizedStrategy__SharesAlreadyUnlocked, DragonTokenizedStrategy__DepositMoreThanMax, DragonTokenizedStrategy__MintMoreThanMax, DragonTokenizedStrategy__WithdrawMoreThanMax, DragonTokenizedStrategy__RedeemMoreThanMax, ZeroShares, ZeroAssets } from "src/errors.sol";
+import { Unauthorized, DragonTokenizedStrategy__VaultSharesNotTransferable, DragonTokenizedStrategy__ZeroLockupDuration, DragonTokenizedStrategy__InsufficientLockupDuration, DragonTokenizedStrategy__SharesStillLocked, DragonTokenizedStrategy__InvalidLockupDuration, DragonTokenizedStrategy__InvalidRageQuitCooldownPeriod, DragonTokenizedStrategy__RageQuitInProgress, DragonTokenizedStrategy__StrategyInShutdown, DragonTokenizedStrategy__NoSharesToRageQuit, DragonTokenizedStrategy__SharesAlreadyUnlocked, DragonTokenizedStrategy__DepositMoreThanMax, DragonTokenizedStrategy__MintMoreThanMax, DragonTokenizedStrategy__WithdrawMoreThanMax, DragonTokenizedStrategy__RedeemMoreThanMax, ZeroShares, ZeroAssets, DragonTokenizedStrategy__ReceiverHasExistingShares } from "src/errors.sol";
 
 contract DragonTokenizedStrategy is TokenizedStrategy {
     event NewLockupSet(address indexed user, uint256 indexed unlockTime, uint256 indexed lockedShares);
@@ -333,7 +333,8 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
 
     /**
      * @dev Mints `shares` of strategy shares to `receiver` by depositing exactly `assets` of underlying tokens with a lock up
-     * @dev Please note that deposits are forbidden if rage quit was triggered.
+     * @dev The attached gnosis safe module may extend its own lockup duration
+     * @dev Deposits with lockup are forbidden if rage quit was triggered for receiver, or if the receiver has existing shares to avoid unauthorized locking of user funds
      * @param assets The amount of assets to deposit.
      * @param receiver The receiver of the shares.
      * @param lockupDuration The duration of the lockup in seconds.
@@ -351,9 +352,10 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
 
     function _deposit(uint256 assets, address receiver, uint256 lockupDuration) internal returns (uint256 shares) {
         StrategyData storage S = _strategyStorage();
-        if (receiver != msg.sender || receiver == S.dragonRouter) revert Unauthorized();
-        if (S.voluntaryLockups[receiver].isRageQuit) {
-            revert DragonTokenizedStrategy__RageQuitInProgress();
+        if (receiver == S.dragonRouter) revert Unauthorized();
+        if (S.voluntaryLockups[receiver].isRageQuit) revert DragonTokenizedStrategy__RageQuitInProgress();
+        if (_balanceOf(S, receiver) > 0 && IBaseStrategy(address(this)).target() != address(receiver)) {
+            revert DragonTokenizedStrategy__ReceiverHasExistingShares();
         }
 
         if (assets == type(uint256).max) {
@@ -398,10 +400,6 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
 
     function _mint(uint256 shares, address receiver, uint256 lockupDuration) internal returns (uint256 assets) {
         StrategyData storage S = _strategyStorage();
-        if (S.voluntaryLockups[receiver].isRageQuit) {
-            revert DragonTokenizedStrategy__RageQuitInProgress();
-        }
-
         if ((assets = _convertToAssets(S, shares, Math.Rounding.Ceil)) == 0) {
             revert ZeroAssets();
         }
