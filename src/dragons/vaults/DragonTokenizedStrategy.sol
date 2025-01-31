@@ -370,56 +370,9 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @param receiver The address to receive the `shares`.
      * @return shares The actual amount of shares issued.
      */
-    function deposit(
-        uint256 assets,
-        address receiver
-    ) external payable override nonReentrant onlyOwner returns (uint256 shares) {
-        // Get the storage slot for all following calls.
-        StrategyData storage S = _strategyStorage();
-        if (S.voluntaryLockups[msg.sender].isRageQuit) revert DragonTokenizedStrategy__RageQuitInProgress();
-
-        // Deposit full balance if using max uint.
-        if (assets == type(uint256).max) {
-            assets = S.asset.balanceOf(msg.sender);
-        }
-
-        // Check for shutdown first to enable better error msg.
-        if (S.shutdown) revert DragonTokenizedStrategy__StrategyInShutdown();
-        // Checking max deposit will also check if shutdown.
-        if (assets > _maxDeposit(S, receiver)) revert DragonTokenizedStrategy__DepositMoreThanMax();
-        // Check for rounding error.
-        if ((shares = _convertToShares(S, assets, Math.Rounding.Floor)) == 0) {
-            revert ZeroShares();
-        }
-
-        _deposit(S, receiver, assets, shares);
-        _setOrExtendLockup(S, receiver, 0, _balanceOf(S, receiver));
-    }
-
-    /**
-     * @notice Mints exactly `shares` of strategy shares to
-     * `receiver` by depositing `assets` of underlying tokens.
-     * @param shares The amount of strategy shares mint.
-     * @param receiver The address to receive the `shares`.
-     * @return assets The actual amount of asset deposited.
-     */
-    function mint(
-        uint256 shares,
-        address receiver
-    ) external payable override nonReentrant onlyOwner returns (uint256 assets) {
-        // Get the storage slot for all following calls.
-        StrategyData storage S = _strategyStorage();
-
-        // Check for shutdown first to enable better error msg.
-        if (S.shutdown) revert DragonTokenizedStrategy__StrategyInShutdown();
-        // Checking max mint will also check if shutdown.
-        if (shares > _maxMint(S, receiver)) revert DragonTokenizedStrategy__MintMoreThanMax();
-        // Check for rounding error.
-        assets = _convertToAssets(S, shares, Math.Rounding.Ceil);
-        if (assets == 0) revert ZeroAssets();
-
-        _deposit(S, receiver, assets, shares);
-        _setOrExtendLockup(S, receiver, 0, _balanceOf(S, receiver));
+    function deposit(uint256 assets, address receiver) external payable override onlyOwner returns (uint256 shares) {
+        if (receiver != msg.sender) revert Unauthorized();
+        shares = _deposit(assets, receiver, 0);
     }
 
     /**
@@ -434,61 +387,69 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         uint256 assets,
         address receiver,
         uint256 lockupDuration
-    ) public onlyOwner returns (uint256 shares) {
+    ) external payable onlyOwner returns (uint256 shares) {
+        if (receiver != msg.sender) revert Unauthorized();
         if (lockupDuration == 0) revert DragonTokenizedStrategy__ZeroLockupDuration();
+        shares = _deposit(assets, receiver, lockupDuration);
+    }
 
-        // Get the storage slot for all following calls.
+    function _deposit(uint256 assets, address receiver, uint256 lockupDuration) internal returns (uint256 shares) {
         StrategyData storage S = _strategyStorage();
-        if (S.voluntaryLockups[msg.sender].isRageQuit) revert DragonTokenizedStrategy__RageQuitInProgress();
+        if (S.voluntaryLockups[receiver].isRageQuit) {
+            revert DragonTokenizedStrategy__RageQuitInProgress();
+        }
 
-        // Deposit full balance if using max uint.
         if (assets == type(uint256).max) {
             assets = S.asset.balanceOf(msg.sender);
         }
 
-        // Check for shutdown first to enable better error msg.
+        if ((shares = _convertToShares(S, assets, Math.Rounding.Floor)) == 0) {
+            revert ZeroShares();
+        }
+
+        _processDeposit(S, assets, shares, receiver);
+        _setOrExtendLockup(S, receiver, lockupDuration, _balanceOf(S, receiver));
+    }
+
+    function _processDeposit(StrategyData storage S, uint256 assets, uint256 shares, address receiver) internal {
         if (S.shutdown) revert DragonTokenizedStrategy__StrategyInShutdown();
-        // Checking max deposit will also check if shutdown.
         if (assets > _maxDeposit(S, receiver)) revert DragonTokenizedStrategy__DepositMoreThanMax();
-        // Check for rounding error.
-        shares = _convertToShares(S, assets, Math.Rounding.Floor);
-        if (shares == 0) revert ZeroShares();
+        if (shares > _maxMint(S, receiver)) revert DragonTokenizedStrategy__MintMoreThanMax();
 
         _deposit(S, receiver, assets, shares);
-        _setOrExtendLockup(S, receiver, lockupDuration, _balanceOf(S, receiver));
-
-        return shares;
     }
 
     /**
-     * @dev Mints exactly `shares` of strategy shares to `receiver` by depositing `assets` of underlying tokens.with a lockup period.
+     * @notice Mints exactly `shares` of strategy shares to
+     * `receiver` by depositing `assets` of underlying tokens.
      * @param shares The amount of strategy shares mint.
      * @param receiver The address to receive the `shares`.
-     * @param lockupDuration The duration of the lockup in seconds.
      * @return assets The actual amount of asset deposited.
      */
+    function mint(uint256 shares, address receiver) external payable override onlyOwner returns (uint256 assets) {
+        assets = _mint(shares, receiver, 0);
+    }
+
     function mintWithLockup(
         uint256 shares,
         address receiver,
         uint256 lockupDuration
-    ) public onlyOwner returns (uint256 assets) {
+    ) external payable onlyOwner returns (uint256 assets) {
         if (lockupDuration == 0) revert DragonTokenizedStrategy__ZeroLockupDuration();
-        // Get the storage slot for all following calls.
+        assets = _mint(shares, receiver, lockupDuration);
+    }
+
+    function _mint(uint256 shares, address receiver, uint256 lockupDuration) internal returns (uint256 assets) {
         StrategyData storage S = _strategyStorage();
+        if (S.voluntaryLockups[receiver].isRageQuit) {
+            revert DragonTokenizedStrategy__RageQuitInProgress();
+        }
 
-        if (S.voluntaryLockups[msg.sender].isRageQuit) revert DragonTokenizedStrategy__RageQuitInProgress();
+        if ((assets = _convertToAssets(S, shares, Math.Rounding.Ceil)) == 0) {
+            revert ZeroAssets();
+        }
 
-        // Check for shutdown first to enable better error msg.
-        if (S.shutdown) revert DragonTokenizedStrategy__StrategyInShutdown();
-        // Checking max mint will also check if shutdown.
-        if (shares > _maxMint(S, receiver)) revert DragonTokenizedStrategy__MintMoreThanMax();
-        // Check for rounding error.
-        assets = _convertToAssets(S, shares, Math.Rounding.Ceil);
-        if (assets == 0) revert ZeroAssets();
-
-        _deposit(S, receiver, assets, shares);
-        _setOrExtendLockup(S, receiver, lockupDuration, _balanceOf(S, receiver));
-
+        _deposit(assets, receiver, lockupDuration);
         return assets;
     }
 
