@@ -109,6 +109,9 @@ contract Trader is ITransformer, Ownable, Pausable {
     /// @notice Raised if tx was already performed for this source of randomness (this height).
     error Trader__RandomnessAlreadyUsed();
 
+    /// @notice Raised if amount of base being converted is zero.
+    error Trader__ZeroValueConvert();
+
     /// @notice Unsafe randomness seed.
     error Trader__RandomnessUnsafeSeed();
 
@@ -278,6 +281,8 @@ contract Trader is ITransformer, Ownable, Pausable {
         }
 
         uint256 saleValue = getSaleValue(rand, 0);
+
+        if (saleValue == 0) revert Trader__ZeroValueConvert();
 
         spent = spent + saleValue;
 
