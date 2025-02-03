@@ -13,8 +13,9 @@ error AlreadyInitialized();
 // TokenizedStrategy specific errors
 error TokenizedStrategy__NotEmergencyAuthorized();
 error TokenizedStrategy__NotKeeperOrManagement();
-error TokenizedStrategy__NotOwner();
+error TokenizedStrategy__NotOperator();
 error TokenizedStrategy__NotManagement();
+error TokenizedStrategy__NotRegenGovernance();
 error TokenizedStrategy__AlreadyInitialized();
 error TokenizedStrategy__DepositMoreThanMax();
 error TokenizedStrategy__MintMoreThanMax();
@@ -38,6 +39,7 @@ error TokenizedStrategy__StrategyNotInShutdown();
 error TokenizedStrategy__TooMuchLoss();
 error TokenizedStrategy__HatsAlreadyInitialized();
 error TokenizedStrategy__InvalidHatsAddress();
+error DragonTokenizedStrategy__ReceiverHasExistingShares();
 
 // DragonTokenizedStrategy specific errors
 error DragonTokenizedStrategy__VaultSharesNotTransferable();

@@ -963,13 +963,14 @@ contract LockupsTest is Setup {
         strategy.mintWithLockup(0, user, 100 days);
 
         // Test mint requiring more assets than user has
-        uint256 largeAmount = INITIAL_DEPOSIT * 2;
+        uint256 largeAmount = asset.balanceOf(user) + 1;
         vm.expectRevert(abi.encodeWithSelector(TokenizedStrategy__TransferFailed.selector));
         strategy.mintWithLockup(largeAmount, user, 100 days);
         assertEq(strategy.balanceOf(user), 0, "Should not have minted any shares");
 
-        vm.expectRevert(abi.encodeWithSelector(TokenizedStrategy__TransferFailed.selector));
-        strategy.mintWithLockup(type(uint256).max, user, 100 days);
+        /// @dev if max mint of shares, the complete balance of the user is taken into account.
+        // vm.expectRevert(abi.encodeWithSelector(TokenizedStrategy__TransferFailed.selector));
+        // strategy.mintWithLockup(type(uint256).max, user, 100 days);
         vm.stopPrank();
     }
 

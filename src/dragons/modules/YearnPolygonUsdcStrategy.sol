@@ -2,11 +2,10 @@
 pragma solidity >=0.8.18;
 
 import { DragonBaseStrategy, ERC20 } from "src/dragons/vaults/DragonBaseStrategy.sol";
-import { Module } from "zodiac/core/Module.sol";
-
+import { Math } from "lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 import { IStrategy } from "../../interfaces/IStrategy.sol";
 
-contract YearnPolygonUsdcStrategy is Module, DragonBaseStrategy {
+contract YearnPolygonUsdcStrategy is DragonBaseStrategy {
     /// @dev Yearn Polygon Aave V3 USDC Lender Vault
     address public constant YIELD_SOURCE = 0x52367C8E381EDFb068E9fBa1e7E9B2C847042897;
 
@@ -52,7 +51,17 @@ contract YearnPolygonUsdcStrategy is Module, DragonBaseStrategy {
     }
 
     function _deployFunds(uint256 _amount) internal override {
-        IStrategy(YIELD_SOURCE).deposit(_amount, address(this));
+        uint256 limit = IStrategy(YIELD_SOURCE).availableDepositLimit(address(this));
+        _amount = Math.min(_amount, limit);
+        if (_amount > 0) {
+            IStrategy(YIELD_SOURCE).deposit(_amount, address(this));
+        }
+    }
+
+    function availableDepositLimit(address _user) public view override returns (uint256) {
+        uint256 actualLimit = super.availableDepositLimit(_user);
+        uint256 vaultLimit = IStrategy(YIELD_SOURCE).availableDepositLimit(address(this));
+        return Math.min(actualLimit, vaultLimit);
     }
 
     function _freeFunds(uint256 _amount) internal override {

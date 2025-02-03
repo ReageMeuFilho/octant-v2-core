@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity >=0.8.18;
 
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {Module} from "zodiac/core/Module.sol";
 
 import { BaseStrategy } from "./BaseStrategy.sol";
 // TokenizedStrategy interface used for internal view delegateCalls.
@@ -10,7 +11,7 @@ import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
 /**
  * @title Dragon Base Strategy
  */
-abstract contract DragonBaseStrategy is BaseStrategy {
+abstract contract DragonBaseStrategy is BaseStrategy, Module {
     /*//////////////////////////////////////////////////////////////
                             CONSTANTS
     //////////////////////////////////////////////////////////////*/
@@ -60,7 +61,7 @@ abstract contract DragonBaseStrategy is BaseStrategy {
         uint256 _maxReportDelay,
         string memory _name,
         address _regenGovernance
-    ) internal {
+    ) internal onlyInitializing {
         tokenizedStrategyImplementation = _tokenizedStrategyImplementation;
         asset = ERC20(_asset);
         maxReportDelay = _maxReportDelay;
@@ -109,16 +110,23 @@ abstract contract DragonBaseStrategy is BaseStrategy {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Provide a signal to the keeper that `harvest()` should be called.
-     * @return `true` if `harvest()` should be called, `false` otherwise.
+     * @notice Provide a signal to the keeper that `report()` should be called.
+     * @return `true` if `report()` should be called, `false` otherwise.
      */
     function harvestTrigger() external view virtual returns (bool) {
         // Should not trigger if strategy is not active (no assets) or harvest has been recently called.
         if (
             TokenizedStrategy.totalAssets() != 0 && (block.timestamp - TokenizedStrategy.lastReport()) >= maxReportDelay
         ) return true;
+    }
 
-        // Check for idle funds in the strategy and deposit in the farm.
+    /**
+     * @dev Optional trigger to override if tend() will be used by the strategy.
+     * This must be implemented if the strategy hopes to invoke _tend().
+     *
+     * @return . Should return true if tend() should be called by keeper or false if not.
+     */
+    function _tendTrigger() internal view override virtual returns (bool) {
         return (address(asset) == ETH ? address(this).balance : asset.balanceOf(address(this))) > 0;
     }
 

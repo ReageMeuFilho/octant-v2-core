@@ -7,7 +7,7 @@ import {YearnPolygonUsdcStrategy} from "src/dragons/modules/YearnPolygonUsdcStra
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IStrategy} from "src/interfaces/IStrategy.sol";
-import {TokenizedStrategy__NotOwner} from "src/errors.sol";
+import {TokenizedStrategy__NotOperator} from "src/errors.sol";
 
 contract YearnPolygonUsdcStrategyTest is BaseTest {
     address management = makeAddr("management");
@@ -50,12 +50,10 @@ contract YearnPolygonUsdcStrategyTest is BaseTest {
         deal(address(asset), temps.safe, amount, true);
 
         // only safe can call deposit function
-        vm.expectRevert(abi.encodeWithSelector(TokenizedStrategy__NotOwner.selector));
+        vm.expectRevert(abi.encodeWithSelector(TokenizedStrategy__NotOperator.selector));
         module.deposit(amount, temps.safe);
 
         vm.startPrank(temps.safe);
-
-        assertTrue(module.availableDepositLimit(temps.safe) == type(uint256).max);
 
         assertTrue(module.balanceOf(temps.safe) == 0);
         module.deposit(amount, temps.safe);
@@ -91,12 +89,8 @@ contract YearnPolygonUsdcStrategyTest is BaseTest {
         // should return false if strategy has funds but report has been called recently
         assertTrue(!module.harvestTrigger());
 
-        // should return true if strategy has some idle funds
-        deal(address(asset), address(module), 1e13, true);
-        assertTrue(module.harvestTrigger());
-
         // should return true if assets in strategy > 0 and report hasn't been called for time > maxReportDelay.
-        vm.warp(block.timestamp + 100);
+        vm.warp(block.timestamp + 7 days);
         assertTrue(module.harvestTrigger());
     }
 
