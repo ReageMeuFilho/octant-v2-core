@@ -2,20 +2,16 @@
 pragma solidity ^0.8.23;
 
 import { Ownable } from "solady/auth/Ownable.sol";
-import { SafeCastLib } from "solady/utils/SafeCastLib.sol";
 import { FixedPointMathLib } from "solady/utils/FixedPointMathLib.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { Enum } from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 
-import { CreateOracleParams, IOracleFactory, IOracle, OracleParams } from "src/vendor/0xSplits/OracleParams.sol";
+import { IOracle } from "src/vendor/0xSplits/OracleParams.sol";
 import { QuotePair, QuoteParams } from "src/vendor/0xSplits/LibQuotes.sol";
-import { OracleParams } from "../vendor/0xSplits/OracleParams.sol";
 import { UniV3Swap } from "src/vendor/0xSplits/UniV3Swap.sol";
 
 import { ITransformer } from "../interfaces/ITransformer.sol";
-import { IUniV3OracleImpl } from "src/vendor/0xSplits/IUniV3OracleImpl.sol";
 import { ISwapperImpl } from "src/vendor/0xSplits/SwapperImpl.sol";
 import { ISwapRouter } from "src/vendor/uniswap/ISwapRouter.sol";
 
@@ -118,6 +114,9 @@ contract Trader is ITransformer, Ownable, Pausable {
 
     /// @notice Unexpected ETH passed as value in function call.
     error Trader__UnexpectedETH();
+
+    /// @notice Transfer of ETH failed.
+    error Trader__ETHTransferFailed();
 
     /// @notice Configuration parameters are impossible: deadline is in the past.
     error Trader__ImpossibleConfigurationDeadlineInThePast();
@@ -284,7 +283,7 @@ contract Trader is ITransformer, Ownable, Pausable {
 
         if (base == ETH) {
             (bool success, ) = payable(swapper).call{ value: saleValue }("");
-            require(success);
+            if (!success) revert Trader__ETHTransferFailed();
         } else {
             IERC20(base).safeTransfer(swapper, saleValue);
         }
