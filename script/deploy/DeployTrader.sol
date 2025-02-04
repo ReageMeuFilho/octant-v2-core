@@ -47,7 +47,9 @@ contract DeployTrader is Script {
 
     function configureTrader(HelperConfig _config, string memory _poolName) public {
         (baseAddress, quoteAddress,) = _config.poolByName(_poolName);
-        swapper = deploySwapper(_config, _poolName);
+        if (swapper == address(0x0)) {
+            swapper = deploySwapper(_config, _poolName);
+        }
 
         trader = new Trader(
             abi.encode(

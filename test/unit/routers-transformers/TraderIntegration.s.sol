@@ -209,4 +209,28 @@ contract TestTraderIntegrationETH is Test, TestPlus, DeployTrader {
         assert(beneficiary.balance == initialETHBalance + amountToBeneficiary);
         emit log_named_uint("ETH (in GLM) price on Trader.transform(...)", saleValue / amountToBeneficiary);
     }
+
+    function test_reverts_if_swapper_is_misconfigured() external {
+        swapper = address(new ContractThatRejectsETH());
+        configureTrader(config, "ETHGLM");
+
+        // effectively disable upper bound check and randomness check
+        uint256 fakeBudget = 1 ether;
+        vm.deal(address(trader), 2 ether);
+
+        vm.startPrank(owner);
+        trader.configurePeriod(block.number, 101);
+        trader.setSpending(1 ether, 1 ether, fakeBudget);
+        vm.stopPrank();
+
+        vm.roll(block.number + 100);
+        vm.expectRevert(Trader.Trader__ETHTransferFailed.selector);
+        trader.convert(block.number - 2);
+    }
+}
+
+contract ContractThatRejectsETH {
+    receive() external payable {
+        require(false);
+    }
 }
