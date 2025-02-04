@@ -246,7 +246,7 @@ contract Trader is ITransformer, Ownable, Pausable {
                 break;
             }
         }
-        assert(saleValue == amount);
+        if (saleValue != amount) revert Trader__SoftwareError();
 
         return callInitFlash(amount);
     }
