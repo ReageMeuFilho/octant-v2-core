@@ -216,6 +216,7 @@ contract TestTraderIntegrationETH is Test, TestPlus, DeployTrader {
 
     function test_reverts_if_swapper_is_misconfigured() external {
         swapper = address(new ContractThatRejectsETH());
+        vm.label(swapper, "bad_swapper");
         configureTrader(config, "ETHGLM");
 
         // effectively disable upper bound check and randomness check
@@ -231,6 +232,24 @@ contract TestTraderIntegrationETH is Test, TestPlus, DeployTrader {
         vm.expectRevert(Trader.Trader__ETHTransferFailed.selector);
         trader.convert(block.number - 2);
     }
+
+    function test_findSaleValue_throws() external {
+        configureTrader(config, "ETHGLM");
+        assert(address(trader).balance == 0);
+        assert(IERC20(quoteAddress).balanceOf(trader.beneficiary()) == 0);
+        // effectively disable upper bound check and randomness check
+        uint256 fakeBudget = 1 ether;
+
+        vm.startPrank(owner);
+        trader.configurePeriod(block.number, 5000);
+        trader.setSpending(0.5 ether, 1.5 ether, fakeBudget);
+        vm.stopPrank();
+
+        vm.roll(block.number + 300);
+        vm.expectRevert(Trader.Trader__WrongHeight.selector);
+        trader.findSaleValue(1 ether);
+    }
+
 }
 
 contract ContractThatRejectsETH {

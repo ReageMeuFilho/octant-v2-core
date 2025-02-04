@@ -4,6 +4,7 @@ pragma solidity ^0.8.23;
 import "forge-std/Test.sol";
 import {TestPlus} from "lib/solady/test/utils/TestPlus.sol";
 import "src/routers-transformers/Trader.sol";
+import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 import {HelperConfig} from "script/helpers/HelperConfig.s.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 
@@ -147,9 +148,7 @@ contract TestTraderRandomness is Test, TestPlus {
     function test_emergecy_stop_stop_throws() external {
         vm.startPrank(owner);
         trader.emergencyStop(true);
-        vm.stopPrank();
 
-        vm.startPrank(owner);
         vm.expectRevert();
         trader.emergencyStop(true);
         vm.stopPrank();
@@ -157,17 +156,27 @@ contract TestTraderRandomness is Test, TestPlus {
 
     function test_emergecy_resume_resume_throws() external {
         vm.startPrank(owner);
+
+        vm.expectEmit(true, false, false, false, address(trader));
+        emit Pausable.Paused(owner);
+        trader.emergencyStop(true);
+
+        vm.expectEmit(true, false, false, false, address(trader));
+        emit Pausable.Unpaused(owner);
+        trader.emergencyStop(false);
+
         vm.expectRevert();
         trader.emergencyStop(false);
+
         vm.stopPrank();
     }
 
     function test_emergencyStop() external {
         uint256 blocks = 1_000;
-        vm.deal(address(trader), 100 ether);
+        vm.deal(address(trader), 105 ether);
         vm.startPrank(owner);
         trader.configurePeriod(block.number, blocks);
-        trader.setSpending(1 ether, 1 ether, 100 ether);
+        trader.setSpending(0.9 ether, 1.1 ether, 100 ether);
         vm.stopPrank();
         for (uint256 i = 0; i < blocks / 3; i++) {
             wrapBuy();
@@ -228,6 +237,17 @@ contract TestTraderRandomness is Test, TestPlus {
             }
             assert(!traded || canTrade); // traded => canTrade;
         }
+    }
+
+    function test_unsafe_seed() external {
+        uint256 blocks = 1000;
+        vm.startPrank(owner);
+        trader.configurePeriod(block.number, blocks);
+        trader.setSpending(1 ether, 1 ether, 100 ether);
+        vm.stopPrank();
+        vm.roll(500);
+        vm.expectRevert(Trader.Trader__RandomnessUnsafeSeed.selector);
+        trader.convert(block.number - 300);
     }
 
     function test_reconfigure() external {
