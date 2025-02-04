@@ -745,19 +745,34 @@ abstract contract TokenizedStrategy {
         ERC20 _asset = S.asset;
         address target = IBaseStrategy(address(this)).target();
         if (target == address(0)) revert TokenizedStrategy__NotOperator();
-        if (address(_asset) == ETH) {
-            if (IAvatar(target).execTransactionFromModule(address(this), assets, "", Enum.Operation.Call) == false) {
-                revert TokenizedStrategy__DepositMoreThanMax();
+
+        // This function can be called by a wallet or a contract.
+        // Depending on the caller type, we need to handle the transfer differently.
+        // If msg.sender.code.length > 0, it is a contract.
+        if (msg.sender.code.length > 0) {
+            if (address(_asset) == ETH) {
+                if (
+                    IAvatar(target).execTransactionFromModule(address(this), assets, "", Enum.Operation.Call) == false
+                ) {
+                    revert TokenizedStrategy__DepositMoreThanMax();
+                }
+            } else {
+                if (
+                    IAvatar(target).execTransactionFromModule(
+                        address(_asset),
+                        0,
+                        abi.encodeWithSignature("transfer(address,uint256)", address(this), assets),
+                        Enum.Operation.Call
+                    ) == false
+                ) revert TokenizedStrategy__TransferFailed();
             }
         } else {
-            if (
-                IAvatar(target).execTransactionFromModule(
-                    address(_asset),
-                    0,
-                    abi.encodeWithSignature("transfer(address,uint256)", address(this), assets),
-                    Enum.Operation.Call
-                ) == false
-            ) revert TokenizedStrategy__TransferFailed();
+            // If msg.sender.code.length == 0, it is a wallet (EOA). Unless it is a contract calling during construction.
+            if (address(_asset) == ETH) {
+                if (msg.value < assets) revert TokenizedStrategy__DepositMoreThanMax();
+            } else {
+                if (!_asset.transferFrom(msg.sender, address(this), assets)) revert TokenizedStrategy__TransferFailed();
+            }
         }
 
         // We can deploy the full loose balance currently held.
