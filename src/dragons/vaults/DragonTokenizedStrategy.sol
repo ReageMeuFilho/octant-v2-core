@@ -263,11 +263,11 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
         LockupInfo storage lockup = S.voluntaryLockups[_owner];
-        if (assets > _maxWithdraw(S, _owner)) revert DragonTokenizedStrategy__WithdrawMoreThanMax();
         if (block.timestamp < lockup.unlockTime && !lockup.isRageQuit) {
             revert DragonTokenizedStrategy__SharesStillLocked();
         }
-
+        if (assets > _maxWithdraw(S, _owner)) revert DragonTokenizedStrategy__WithdrawMoreThanMax();
+        
         // Check for rounding error or 0 value.
         if ((shares = _convertToShares(S, assets, Math.Rounding.Ceil)) == 0) {
             revert ZeroShares();
