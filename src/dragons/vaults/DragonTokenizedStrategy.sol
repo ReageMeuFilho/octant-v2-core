@@ -66,7 +66,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         if (lockup.unlockTime <= currentTime) {
             if (lockupDuration == 0) return 0;
             // NOTE: enforce minimum lockup duration for new lockups
-            if (lockupDuration <= _strategyStorage().MINIMUM_LOCKUP_DURATION) {
+            if (lockupDuration < _strategyStorage().MINIMUM_LOCKUP_DURATION) {
                 revert DragonTokenizedStrategy__InsufficientLockupDuration();
             }
             lockup.lockupTime = currentTime;
