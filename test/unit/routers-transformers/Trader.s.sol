@@ -17,8 +17,10 @@ contract TestTraderRandomness is Test, TestPlus {
     address owner = makeAddr("owner");
     address beneficiary = makeAddr("beneficiary");
     address swapper = makeAddr("swapper");
+    address integrator;
     address oracle = makeAddr("oracle");
     address alt_swapper = makeAddr("alt_swapper");
+    address alt_integrator = makeAddr("alt_integrator");
     bool log_spending = false;
     string constant deadlineFn = "./cache/test-artifacts/deadline.csv";
 
@@ -28,10 +30,11 @@ contract TestTraderRandomness is Test, TestPlus {
         token = new MockERC20();
 
         helperConfig = new HelperConfig(true);
-        (, address wethToken, , , , , , , address uniV3Swap, ) = helperConfig.activeNetworkConfig();
+        (, address wethToken, , , , , , , address integrator_, ) = helperConfig.activeNetworkConfig();
+        integrator = integrator_;
 
         trader = new Trader(
-            abi.encode(owner, ETH, uint24(10_000), token, wethToken, beneficiary, swapper, uniV3Swap, oracle)
+            abi.encode(owner, ETH, uint24(10_000), token, wethToken, beneficiary, swapper, integrator, oracle)
         );
         token.mint(address(owner), 100 ether);
     }
@@ -424,12 +427,15 @@ contract TestTraderRandomness is Test, TestPlus {
 
     function test_setSwapper() public {
         assert(trader.swapper() == swapper);
+        assert(trader.integrator() == integrator);
         vm.expectRevert();
-        trader.setSwapper(alt_swapper);
+        trader.setSwapper(alt_swapper, alt_integrator);
         assert(trader.swapper() == swapper);
+        assert(trader.integrator() == integrator);
         vm.startPrank(owner);
-        trader.setSwapper(alt_swapper);
+        trader.setSwapper(alt_swapper, alt_integrator);
         vm.stopPrank();
         assert(trader.swapper() == alt_swapper);
+        assert(trader.integrator() == alt_integrator);
     }
 }

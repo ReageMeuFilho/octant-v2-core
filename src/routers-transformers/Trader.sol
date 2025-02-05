@@ -9,7 +9,7 @@ import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 
 import { IOracle } from "src/vendor/0xSplits/OracleParams.sol";
 import { QuotePair, QuoteParams } from "src/vendor/0xSplits/LibQuotes.sol";
-import { UniV3Swap } from "src/vendor/0xSplits/UniV3Swap.sol";
+import { IUniV3Swap } from "src/vendor/0xSplits/IUniV3Swap.sol";
 
 import { ITransformer } from "../interfaces/ITransformer.sol";
 import { ISwapperImpl } from "src/vendor/0xSplits/SwapperImpl.sol";
@@ -17,7 +17,7 @@ import { ISwapRouter } from "src/vendor/uniswap/ISwapRouter.sol";
 
 /// @author .
 /// @title Octant Trader
-/// @notice Octant Trader is a contract that performs "DCA" in terms of sold token into another token. This contract performs trades in a random times, isolating the deployer from risks of insider trading. On very technical level, Trader deals with amounts and times, while Swapper and UniV3Swap are dealing with actual conversion of currencies.
+/// @notice Octant Trader is a contract that performs "DCA" in terms of sold token into another token. This contract performs trades in a random times, isolating the deployer from risks of insider trading. On very technical level, Trader deals with amounts and times, while Swapper and IUniV3Swap are dealing with actual conversion of currencies.
 /// @dev When dealing with ETH, conversion to and from WETH is dealt on the level of UniV3Swap contract.
 contract Trader is ITransformer, Ownable, Pausable {
     using SafeERC20 for IERC20;
@@ -57,10 +57,10 @@ contract Trader is ITransformer, Ownable, Pausable {
                           STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Swapper - instance of Splits' Swapper. Makes sure that Trader/beneficier gets fair price.
+    /// @notice Contract that temporary stores sold token and makes sure that Trader/beneficier gets fair price.
     address public swapper;
-    /// @notice Address of the contract that integrates Uniswap (or possibly some other exchange).
-    address public uniV3Swap;
+    /// @notice Address of the contract that integrates Uniswap (or possibly some other exchange). Implements IUniV3Swap interface.
+    address public integrator;
     /// @notice Beneficiary will receive quote token after the sale of base token.
     address public beneficiary;
     /// @notice `budget` needs to be spend before the end of the period (in blocks).
@@ -88,7 +88,7 @@ contract Trader is ITransformer, Ownable, Pausable {
     //////////////////////////////////////////////////////////////*/
 
     event Traded(uint256 sold, uint256 left);
-    event SwapperChanged(address oldSwapper, address newSwapper);
+    event SwapperChanged(address oldSwapper, address newSwapper, address oldIntegrator, address newIntegrator);
     event SpendingChanged(uint256 low, uint256 high, uint256 spent, uint256 budget);
     event PeriodsChanged(uint256 height, uint256 length, uint256 deadline);
 
@@ -147,7 +147,7 @@ contract Trader is ITransformer, Ownable, Pausable {
     ///      address _beneficiary - bought token will be sent to this address
     ///      address _swapper - address of the contact that makes sure beneficiery is not being shortchanged during swapping.
     ///              Must implement ISwapperImpl interface.
-    ///      address _uniV3Swap - address of the contract that does actual swapping. Must implement ISwapperFlashCallback interface.
+    ///      address _integrator - address of the contract that does actual swapping. Must implement ISwapperFlashCallback interface.
     ///      address _oracle - oracle used by Splits' Swapper to ensure that beneficiery gets fair price.
     /// @param initializeParams Parameters of initialization encoded
     constructor(bytes memory initializeParams) {
@@ -159,7 +159,7 @@ contract Trader is ITransformer, Ownable, Pausable {
             address _wethAddress,
             address _beneficiary,
             address _swapper,
-            address _uniV3Swap,
+            address _integrator,
             address _oracle
         ) = abi.decode(
                 initializeParams,
@@ -171,7 +171,7 @@ contract Trader is ITransformer, Ownable, Pausable {
         wethAddress = _wethAddress;
         beneficiary = _beneficiary;
         swapper = _swapper;
-        uniV3Swap = _uniV3Swap;
+        integrator = _integrator;
         oracle = IOracle(_oracle);
         splitsPair = QuotePair({ base: splitsEthWrapper(base), quote: splitsEthWrapper(quote) });
         uniPair = abi.encodePacked(uniEthWrapper(base), _fee, uniEthWrapper(quote));
@@ -211,7 +211,7 @@ contract Trader is ITransformer, Ownable, Pausable {
         exactInputParams.push(
             ISwapRouter.ExactInputParams({
                 path: uniPair,
-                recipient: address(uniV3Swap),
+                recipient: address(integrator),
                 deadline: block.timestamp + 60,
                 amountIn: amount,
                 amountOutMinimum: 0
@@ -222,15 +222,15 @@ contract Trader is ITransformer, Ownable, Pausable {
         quoteParams.push(
             QuoteParams({ quotePair: splitsPair, baseAmount: uint128(amount), data: abi.encode(exactInputParams) })
         );
-        UniV3Swap.FlashCallbackData memory data = UniV3Swap.FlashCallbackData({
+        IUniV3Swap.FlashCallbackData memory data = IUniV3Swap.FlashCallbackData({
             exactInputParams: exactInputParams,
             excessRecipient: address(beneficiary)
         });
-        UniV3Swap.InitFlashParams memory params = UniV3Swap.InitFlashParams({
+        IUniV3Swap.InitFlashParams memory params = IUniV3Swap.InitFlashParams({
             quoteParams: quoteParams,
             flashCallbackData: data
         });
-        UniV3Swap(payable(uniV3Swap)).initFlash(ISwapperImpl(swapper), params);
+        IUniV3Swap(payable(integrator)).initFlash(ISwapperImpl(swapper), params);
 
         return safeBalanceOf(quote, beneficiary) - oldQuoteBalance;
     }
@@ -411,12 +411,12 @@ contract Trader is ITransformer, Ownable, Pausable {
         }
     }
 
-    //FIXME: shoudn't we also be able to change the address of uniV3Swap?
     /// @notice Set address of the contract that will receive token (base) to be converted to target token (quote).
     /// @param swapper_ address of the contract handling the swapping.
-    function setSwapper(address swapper_) external onlyOwner {
+    function setSwapper(address swapper_, address integrator_) external onlyOwner {
+        emit SwapperChanged(swapper, swapper_, integrator, integrator_);
         swapper = payable(swapper_);
-        emit SwapperChanged(swapper, swapper_);
+        integrator = integrator_;
     }
 
     /// @notice Returns upper bound of number of blocks enough to sold remaining budget.
