@@ -8,7 +8,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     event NewLockupSet(address indexed user, uint256 indexed unlockTime, uint256 indexed lockedShares);
     event RageQuitInitiated(address indexed user, uint256 indexed unlockTime);
     event DragonModeToggled(bool enabled);
-    
+
     bool public isDragonOnly = true;
 
     function toggleDragonMode(bool enabled) external onlyOperator {
@@ -280,7 +280,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
             revert DragonTokenizedStrategy__SharesStillLocked();
         }
         if (assets > _maxWithdraw(S, _owner)) revert DragonTokenizedStrategy__WithdrawMoreThanMax();
-        
+
         // Check for rounding error or 0 value.
         if ((shares = _convertToShares(S, assets, Math.Rounding.Ceil)) == 0) {
             revert ZeroShares();
@@ -340,7 +340,10 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @param receiver The address to receive the `shares`.
      * @return shares The actual amount of shares issued.
      */
-    function deposit(uint256 assets, address receiver) external payable override onlyOperatorIfDragonMode returns (uint256 shares) {
+    function deposit(
+        uint256 assets,
+        address receiver
+    ) external payable override onlyOperatorIfDragonMode returns (uint256 shares) {
         shares = _deposit(assets, receiver, 0);
     }
 
@@ -397,7 +400,10 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
      * @param receiver The address to receive the `shares`.
      * @return assets The actual amount of asset deposited.
      */
-    function mint(uint256 shares, address receiver) external payable override onlyOperatorIfDragonMode returns (uint256 assets) {
+    function mint(
+        uint256 shares,
+        address receiver
+    ) external payable override onlyOperatorIfDragonMode returns (uint256 assets) {
         assets = _mint(shares, receiver, 0);
     }
 
