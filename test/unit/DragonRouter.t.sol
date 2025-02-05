@@ -115,4 +115,23 @@ contract DragonRouterTest is Test {
 
         vm.stopPrank();
     }
+
+    function test_setMetaPool() public {
+        address newMetaPool = makeAddr("newMetaPool");
+
+        vm.prank(governance);
+        router.setMetapool(newMetaPool);
+
+        assertEq(router.metapool(), newMetaPool);
+
+        vm.startPrank(address(0));
+        vm.expectRevert(
+        abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, address(0), keccak256("OCTANT_GOVERNANCE_ROLE")
+            )
+        );
+        router.setMetapool(newMetaPool);
+
+        vm.stopPrank();
+    }
 }
