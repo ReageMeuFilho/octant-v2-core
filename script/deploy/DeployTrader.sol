@@ -34,6 +34,7 @@ contract DeployTrader is Script {
     QuotePair fromTo;
     QuoteParams[] quoteParams;
     address baseAddress;
+    uint24 poolFee;
     address quoteAddress;
     address wethAddress;
     uint32 defaultScaledOfferFactor = 99_00_00; // TODO: check if represents 1% MEV reward to searchers?
@@ -46,14 +47,14 @@ contract DeployTrader is Script {
     }
 
     function configureTrader(HelperConfig _config, string memory _poolName) public {
-        (baseAddress, quoteAddress,) = _config.poolByName(_poolName);
+        (baseAddress, quoteAddress, poolFee) = _config.poolByName(_poolName);
         if (swapper == address(0x0)) {
             swapper = deploySwapper(_config, _poolName);
         }
 
         trader = new Trader(
             abi.encode(
-                owner, baseAddress, quoteAddress, wethAddress, beneficiary, swapper, address(initializer), oracle
+                owner, baseAddress, poolFee, quoteAddress, wethAddress, beneficiary, swapper, address(initializer), oracle
             )
         );
         vm.label(address(trader), "Trader");

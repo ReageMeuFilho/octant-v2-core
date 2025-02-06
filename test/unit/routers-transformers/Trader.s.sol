@@ -30,8 +30,9 @@ contract TestTraderRandomness is Test, TestPlus {
         helperConfig = new HelperConfig(true);
         (, address wethToken, , , , , , , address uniV3Swap, ) = helperConfig.activeNetworkConfig();
 
-        trader = new Trader(abi.encode(owner, ETH, token, wethToken, beneficiary, swapper, uniV3Swap, oracle));
-
+        trader = new Trader(
+            abi.encode(owner, ETH, uint24(10_000), token, wethToken, beneficiary, swapper, uniV3Swap, oracle)
+        );
         token.mint(address(owner), 100 ether);
     }
 

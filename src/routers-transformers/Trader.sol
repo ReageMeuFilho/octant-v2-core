@@ -154,13 +154,17 @@ contract Trader is ITransformer, Ownable, Pausable {
         (
             address _owner,
             address _base,
+            uint24 _fee,
             address _quote,
             address _wethAddress,
             address _beneficiary,
             address _swapper,
             address _uniV3Swap,
             address _oracle
-        ) = abi.decode(initializeParams, (address, address, address, address, address, address, address, address));
+        ) = abi.decode(
+                initializeParams,
+                (address, address, uint24, address, address, address, address, address, address)
+            );
         _initializeOwner(msg.sender);
         base = _base;
         quote = _quote;
@@ -170,8 +174,7 @@ contract Trader is ITransformer, Ownable, Pausable {
         uniV3Swap = _uniV3Swap;
         oracle = IOracle(_oracle);
         splitsPair = QuotePair({ base: splitsEthWrapper(base), quote: splitsEthWrapper(quote) });
-        // FIXME: pass fee as a parameter
-        uniPair = abi.encodePacked(uniEthWrapper(base), uint24(10_000), uniEthWrapper(quote));
+        uniPair = abi.encodePacked(uniEthWrapper(base), _fee, uniEthWrapper(quote));
         transferOwnership(_owner);
     }
 
@@ -403,7 +406,8 @@ contract Trader is ITransformer, Ownable, Pausable {
         _;
         if (budget != 0) {
             if (saleValueLow == 0) revert Trader__ImpossibleConfigurationSaleValueLowIsZero();
-            if (getSafetyBlocks() > (deadline - block.number)) revert Trader__ImpossibleConfigurationSaleValueLowIsTooLow();
+            if (getSafetyBlocks() > (deadline - block.number))
+                revert Trader__ImpossibleConfigurationSaleValueLowIsTooLow();
         }
     }
 

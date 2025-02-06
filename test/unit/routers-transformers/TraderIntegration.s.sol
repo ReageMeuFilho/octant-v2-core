@@ -9,8 +9,7 @@ import "../../../script/deploy/DeployTrader.sol";
 import { HelperConfig } from "../../../script/helpers/HelperConfig.s.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract TestTraderIntegrationETH is Test, TestPlus, DeployTrader {
-    MockERC20 public token;
+contract TestTraderIntegrationETH2GLM is Test, TestPlus, DeployTrader {
     HelperConfig config;
     uint256 fork;
     string TEST_RPC_URL;
@@ -20,8 +19,6 @@ contract TestTraderIntegrationETH is Test, TestPlus, DeployTrader {
         vm.label(owner, "owner");
         beneficiary = makeAddr("beneficiary");
         vm.label(beneficiary, "beneficiary");
-        token = new MockERC20();
-        token.mint(owner, 100 ether);
 
         TEST_RPC_URL = vm.envString("TEST_RPC_URL");
         fork = vm.createFork(TEST_RPC_URL);
@@ -35,51 +32,12 @@ contract TestTraderIntegrationETH is Test, TestPlus, DeployTrader {
 
         wethAddress = wethToken;
         initializer = UniV3Swap(payable(uniV3Swap));
+        configureTrader(config, "ETHGLM");
     }
 
     receive() external payable {}
 
-    function test_TraderInit() public {
-        configureTrader(config, "ETHGLM");
-        assertTrue(trader.owner() == owner);
-        assertTrue(trader.swapper() == swapper);
-    }
-
-    function test_transform_eth_to_glm() external {
-        configureTrader(config, "ETHGLM");
-        assert(address(trader).balance == 0);
-        assert(IERC20(quoteAddress).balanceOf(trader.beneficiary()) == 0);
-        // effectively disable upper bound check and randomness check
-        uint256 fakeBudget = 1 ether;
-
-        vm.startPrank(owner);
-        trader.configurePeriod(block.number, 101);
-        trader.setSpending(0.5 ether, 1.5 ether, fakeBudget);
-        vm.stopPrank();
-
-        vm.roll(block.number + 100);
-        uint256 saleValue = trader.findSaleValue(1.5 ether);
-        assert(saleValue > 0);
-
-        // mock value of quote to avoid problems with stale oracle on CI
-        uint256[] memory unscaledAmountsToBeneficiary = new uint256[](1);
-        unscaledAmountsToBeneficiary[0] = 4228914774285437607589;
-        vm.mockCall(
-            address(oracle),
-            abi.encodeWithSelector(IOracle.getQuoteAmounts.selector),
-            abi.encode(unscaledAmountsToBeneficiary)
-        );
-
-        uint256 amountToBeneficiary = trader.transform{ value: saleValue }(trader.base(), trader.quote(), saleValue);
-
-        assert(IERC20(quoteAddress).balanceOf(trader.beneficiary()) > 0);
-        assert(IERC20(quoteAddress).balanceOf(trader.beneficiary()) == amountToBeneficiary);
-        emit log_named_uint("GLM price on Trader.transform(...)", amountToBeneficiary / saleValue);
-    }
-
     function test_convert_eth_to_glm() external {
-        configureTrader(config, "ETHGLM");
-
         // effectively disable upper bound check and randomness check
         uint256 fakeBudget = 1 ether;
         vm.deal(address(trader), 2 ether);
@@ -142,45 +100,118 @@ contract TestTraderIntegrationETH is Test, TestPlus, DeployTrader {
         emit log_named_int("glm delta", int256(newGlmBalance) - int256(oldGlmBalance));
     }
 
+    function test_TraderInit() public view {
+        assertTrue(trader.owner() == owner);
+        assertTrue(trader.swapper() == swapper);
+    }
+
+    function test_transform_eth_to_glm() external {
+        // effectively disable upper bound check and randomness check
+        uint256 fakeBudget = 1 ether;
+
+        vm.startPrank(owner);
+        trader.configurePeriod(block.number, 101);
+        trader.setSpending(0.5 ether, 1.5 ether, fakeBudget);
+        vm.stopPrank();
+
+        vm.roll(block.number + 100);
+        uint256 saleValue = trader.findSaleValue(1.5 ether);
+        assert(saleValue > 0);
+
+        // mock value of quote to avoid problems with stale oracle on CI
+        uint256[] memory unscaledAmountsToBeneficiary = new uint256[](1);
+        unscaledAmountsToBeneficiary[0] = 4228914774285437607589;
+        vm.mockCall(
+            address(oracle),
+            abi.encodeWithSelector(IOracle.getQuoteAmounts.selector),
+            abi.encode(unscaledAmountsToBeneficiary)
+        );
+
+        uint256 amountToBeneficiary = trader.transform{ value: saleValue }(trader.base(), trader.quote(), saleValue);
+
+        assert(IERC20(quoteAddress).balanceOf(trader.beneficiary()) > 0);
+        assert(IERC20(quoteAddress).balanceOf(trader.beneficiary()) == amountToBeneficiary);
+        emit log_named_uint("GLM price on Trader.transform(...)", amountToBeneficiary / saleValue);
+    }
+
     function test_receivesEth() external {
         vm.deal(address(this), 10_000 ether);
         (bool sent, ) = payable(address(trader)).call{ value: 100 ether }("");
         require(sent, "Failed to send Ether");
     }
 
-    function test_transform_wrong_base() external {
-        configureTrader(config, "GLMETH");
-
-        // check if trader will reject unexpected ETH
-        vm.expectRevert(Trader.Trader__ImpossibleConfiguration.selector);
-        trader.transform(address(token), glmAddress, 10 ether);
-    }
-
-    function test_transform_wrong_quote() external {
-        configureTrader(config, "GLMETH");
-
-        // check if trader will reject unexpected ETH
-        vm.expectRevert(Trader.Trader__ImpossibleConfiguration.selector);
-        trader.transform(glmAddress, address(token), 10 ether);
-    }
-
     function test_transform_wrong_eth_value() external {
-        configureTrader(config, "ETHGLM");
-        assert(address(trader).balance == 0);
         vm.expectRevert(Trader.Trader__ImpossibleConfiguration.selector);
         trader.transform{ value: 1 ether }(ETH, glmAddress, 2 ether);
     }
 
-    function test_transform_unexpected_value() external {
-        configureTrader(config, "GLMETH");
+    function test_findSaleValue_throws() external {
+        // effectively disable upper bound check and randomness check
+        uint256 fakeBudget = 1 ether;
 
+        vm.startPrank(owner);
+        trader.configurePeriod(block.number, 5000);
+        trader.setSpending(0.5 ether, 1.5 ether, fakeBudget);
+        vm.stopPrank();
+
+        vm.roll(block.number + 300);
+        vm.expectRevert(Trader.Trader__WrongHeight.selector);
+        trader.findSaleValue(1 ether);
+    }
+}
+
+contract TestTraderIntegrationGLM2ETH is Test, TestPlus, DeployTrader {
+    HelperConfig config;
+    uint256 fork;
+    string TEST_RPC_URL;
+
+    function setUp() public {
+        owner = makeAddr("owner");
+        vm.label(owner, "owner");
+        beneficiary = makeAddr("beneficiary");
+        vm.label(beneficiary, "beneficiary");
+
+        TEST_RPC_URL = vm.envString("TEST_RPC_URL");
+        fork = vm.createFork(TEST_RPC_URL);
+        vm.selectFork(fork);
+
+        config = new HelperConfig(true);
+
+        (address glmToken, address wethToken, , , , , , , address uniV3Swap, ) = config.activeNetworkConfig();
+
+        glmAddress = glmToken;
+
+        wethAddress = wethToken;
+        initializer = UniV3Swap(payable(uniV3Swap));
+        configureTrader(config, "GLMETH");
+    }
+
+    receive() external payable {}
+
+    function test_transform_unexpected_value() external {
         // check if trader will reject unexpected ETH
         vm.expectRevert(Trader.Trader__UnexpectedETH.selector);
         trader.transform{ value: 1 ether }(glmAddress, ETH, 10 ether);
     }
 
+    function test_transform_wrong_base() external {
+        MockERC20 otherToken = new MockERC20();
+        otherToken.mint(address(trader), 100 ether);
+
+        // check if trader will reject base token different than configured
+        vm.expectRevert(Trader.Trader__ImpossibleConfiguration.selector);
+        trader.transform(address(otherToken), glmAddress, 10 ether);
+    }
+
+    function test_transform_wrong_quote() external {
+        MockERC20 otherToken = new MockERC20();
+
+        // check if trader will reject unexpected ETH
+        vm.expectRevert(Trader.Trader__ImpossibleConfiguration.selector);
+        trader.transform(glmAddress, address(otherToken), 10 ether);
+    }
+
     function test_transform_glm_to_eth() external {
-        configureTrader(config, "GLMETH");
         uint256 initialETHBalance = beneficiary.balance;
         // effectively disable upper bound check and randomness check
         uint256 fakeBudget = 50 ether;
@@ -212,6 +243,34 @@ contract TestTraderIntegrationETH is Test, TestPlus, DeployTrader {
         assert(beneficiary.balance == initialETHBalance + amountToBeneficiary);
         emit log_named_uint("ETH (in GLM) price on Trader.transform(...)", saleValue / amountToBeneficiary);
     }
+}
+
+contract MisconfiguredSwapperTest is Test, TestPlus, DeployTrader {
+    HelperConfig config;
+    uint256 fork;
+    string TEST_RPC_URL;
+
+    function setUp() public {
+        owner = makeAddr("owner");
+        vm.label(owner, "owner");
+        beneficiary = makeAddr("beneficiary");
+        vm.label(beneficiary, "beneficiary");
+
+        TEST_RPC_URL = vm.envString("TEST_RPC_URL");
+        fork = vm.createFork(TEST_RPC_URL);
+        vm.selectFork(fork);
+
+        config = new HelperConfig(true);
+
+        (address glmToken, address wethToken, , , , , , , address uniV3Swap, ) = config.activeNetworkConfig();
+
+        glmAddress = glmToken;
+
+        wethAddress = wethToken;
+        initializer = UniV3Swap(payable(uniV3Swap));
+    }
+
+    receive() external payable {}
 
     function test_reverts_if_swapper_is_misconfigured() external {
         swapper = address(new ContractThatRejectsETH());
@@ -231,23 +290,6 @@ contract TestTraderIntegrationETH is Test, TestPlus, DeployTrader {
         // revert without data
         vm.expectRevert();
         trader.convert(block.number - 2);
-    }
-
-    function test_findSaleValue_throws() external {
-        configureTrader(config, "ETHGLM");
-        assert(address(trader).balance == 0);
-        assert(IERC20(quoteAddress).balanceOf(trader.beneficiary()) == 0);
-        // effectively disable upper bound check and randomness check
-        uint256 fakeBudget = 1 ether;
-
-        vm.startPrank(owner);
-        trader.configurePeriod(block.number, 5000);
-        trader.setSpending(0.5 ether, 1.5 ether, fakeBudget);
-        vm.stopPrank();
-
-        vm.roll(block.number + 300);
-        vm.expectRevert(Trader.Trader__WrongHeight.selector);
-        trader.findSaleValue(1 ether);
     }
 }
 
