@@ -3,9 +3,10 @@ pragma solidity 0.8.26;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import {SafeTransferLib} from "./libraries/SafeTransferLib.sol";
 
-contract ETH2StakeVault is ERC4626, IERC7540Vault, ReentrancyGuard {
+contract ETH2StakeVault is ERC4626, IERC7540Vault, ReentrancyGuard, Ownable {
     using SafeTransferLib for IERC20;
 
     uint256 private constant VALIDATOR_DEPOSIT = 32 ether;
@@ -77,7 +78,7 @@ contract ETH2StakeVault is ERC4626, IERC7540Vault, ReentrancyGuard {
         address _asset,
         string memory _name,
         string memory _symbol
-    ) ERC4626(IERC20(_asset)) ERC20(_name, _symbol) {
+    ) ERC4626(IERC20(_asset)) ERC20(_name, _symbol) Ownable(msg.sender) {
         require(_depositContract != address(0), "Invalid deposit contract");
         DEPOSIT_CONTRACT = IDepositContract(_depositContract);
     }
@@ -118,13 +119,22 @@ contract ETH2StakeVault is ERC4626, IERC7540Vault, ReentrancyGuard {
         return requestId;
     }
 
+    /**
+     * @notice Process a validator deposit request by storing validator credentials
+     * @dev Only callable by contract owner
+     * @param requestId The ID of the deposit request
+     * @param pubkey The validator's public key
+     * @param signature The deposit signature
+     * @param depositDataRoot The deposit data root
+     * @param validatorIndex The validator index
+     */
     function processValidatorDeposit(
         uint256 requestId,
         bytes calldata pubkey,
         bytes calldata signature,
         bytes32 depositDataRoot,
         uint256 validatorIndex
-    ) external nonReentrant {
+    ) external nonReentrant onlyOwner {
         Request storage request = requests[requestId];
         ValidatorInfo storage validator = validators[requestId];
         
@@ -148,15 +158,21 @@ contract ETH2StakeVault is ERC4626, IERC7540Vault, ReentrancyGuard {
     }
 
     /**
-     * @notice Allows user to claim validator deposit data and execute deposit to the official deposit contract
+     * @notice Allows request owner/controller to claim validator deposit and execute deposit to the official deposit contract
+     * @dev Only callable by the request owner or controller
      * @param requestId The ID of the deposit request
      */
     function claimValidatorDeposit(uint256 requestId) external nonReentrant {
         Request storage request = requests[requestId];
         ValidatorInfo storage validator = validators[requestId];
         
+        // Check that caller is either the request owner or controller
+        require(
+            msg.sender == request.controller || 
+            isOperator[request.controller][msg.sender], 
+            "Not request owner or controller"
+        );
         require(request.state == RequestState.Claimable, "Not claimable");
-        require(request.controller == msg.sender || isOperator[request.controller][msg.sender], "Not authorized");
         require(validator.isActive, "Validator not processed");
 
         // Execute deposit to official deposit contract
