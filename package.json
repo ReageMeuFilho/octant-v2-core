@@ -6,7 +6,8 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "format": "prettier --config .prettierrc --write --plugin=prettier-plugin-solidity '{contracts,src}/**/*.sol'",
+    "format": "prettier --config .prettierrc --plugin=prettier-plugin-solidity '{contracts,src,test}/**/*.sol' -w",
+    "format:check": "prettier --config .prettierrc --plugin=prettier-plugin-solidity '{contracts,src,test}/**/*.sol' -c",
     "lint": "solhint './{src,scripts,test}/**/*.sol'",
     "precommit": "lint-staged",
     "build": "forge clean && forge compile",
