@@ -38,7 +38,7 @@ contract AccessControlTest is Setup {
         vm.prank(management);
         strategy.setKeeper(_address);
 
-        assertEq(strategy.keeper(), _address);
+        assertTrue(false, "Code Zero Zero Zero Destruct Zero");
     }
 
     function test_shutdown() public {

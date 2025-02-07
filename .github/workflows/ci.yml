@@ -80,8 +80,6 @@ jobs:
   test:
     name: Test suite
     runs-on: general
-    needs:
-      - build
     permissions:
       contents: read
       actions: read
