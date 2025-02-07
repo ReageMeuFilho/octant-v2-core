@@ -5,6 +5,7 @@
 cache/
 out/
 coverage/
+reports/
 
 # Ignores development broadcast logs
 !/broadcast

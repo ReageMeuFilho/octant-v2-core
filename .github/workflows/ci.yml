@@ -32,7 +32,7 @@ jobs:
         run: "yarn format:check"
 
   lint:
-    name: Check with linter
+    name: Run linter
     runs-on: general
 
     steps:
@@ -54,6 +54,9 @@ jobs:
   build:
     name: Build
     runs-on: general
+    needs:
+      - format
+      - lint
 
     steps:
       - uses: actions/checkout@v4
@@ -77,6 +80,12 @@ jobs:
   test:
     name: Test suite
     runs-on: general
+    needs:
+      - build
+    permissions:
+      contents: read
+      actions: read
+      checks: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -101,7 +110,23 @@ jobs:
           TEST_RPC_URL_POLYGON: "https://polygon-rpc.com"
           TEST_SAFE_SINGLETON_POLYGON: "0x41675C099F32341bf84BFc5382aF534df5C7461a"
           TEST_SAFE_PROXY_FACTORY_POLYGON: "0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67"
-        run: "yarn test -v"
+        run: "yarn test:ci"
+
+      - name: Upload test artifact
+        uses: actions/upload-artifact@v4  # upload test results
+        if: success() || failure()        # run this step even if previous step failed
+        with:
+          name: test-results
+          path: reports/junit.xml
+
+      - name: Prepare test report
+        uses: dorny/test-reporter@v1
+        if: success() || failure()        # run this step even if previous step failed
+        with:
+          artifact: test-results            # artifact name
+          name: Tests results                # Name of the check run which will be created
+          path: '*.xml'                     # Path to test results (inside artifact .zip)
+          reporter: java-junit              # Format of test results
 
 #  # Coverage fails on 'Yul exception:Variable expr is 1 too deep in the stack'
 #  coverage:
