@@ -2,8 +2,8 @@
 pragma solidity ^0.8.13;
 
 import "../Base.t.sol";
-import {OctantRewardsSafe} from "src/dragons/modules/OctantRewardsSafe.sol";
-import {FailSafe} from "test/mocks/MockFailSafe.sol";
+import { OctantRewardsSafe } from "src/dragons/modules/OctantRewardsSafe.sol";
+import { FailSafe } from "test/mocks/MockFailSafe.sol";
 
 contract OctantRewardsSafeModule is BaseTest {
     address keeper = makeAddr("keeper");
@@ -20,7 +20,8 @@ contract OctantRewardsSafeModule is BaseTest {
         _configure(true, "eth");
         moduleImplementation = new OctantRewardsSafe();
         temps = _testTemps(
-            address(moduleImplementation), abi.encode(keeper, treasury, dragonRouter, totalValidators, maxYield)
+            address(moduleImplementation),
+            abi.encode(keeper, treasury, dragonRouter, totalValidators, maxYield)
         );
         module = OctantRewardsSafe(payable(temps.module));
     }

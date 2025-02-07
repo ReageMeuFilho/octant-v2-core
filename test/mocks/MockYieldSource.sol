@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.8.18;
 
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract MockYieldSource {
     address public asset;
@@ -20,7 +20,7 @@ contract MockYieldSource {
         uint256 _balance = asset == ETH ? address(this).balance : ERC20(asset).balanceOf(address(this));
         _amount = _amount > _balance ? _balance : _amount;
         if (asset == ETH) {
-            (bool success,) = msg.sender.call{value: _amount}("");
+            (bool success, ) = msg.sender.call{ value: _amount }("");
             require(success, "Transfer Failed");
             return;
         }
@@ -33,7 +33,7 @@ contract MockYieldSource {
 
     function simulateHarvestRewards(uint256 _amount) public {
         if (asset == ETH) {
-            (bool success,) = msg.sender.call{value: _amount}("");
+            (bool success, ) = msg.sender.call{ value: _amount }("");
             require(success, "Transfer Failed");
             return;
         }

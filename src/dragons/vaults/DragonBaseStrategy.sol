@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity >=0.8.18;
 
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {Module} from "zodiac/core/Module.sol";
+import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { Module } from "zodiac/core/Module.sol";
 
 import { BaseStrategy } from "./BaseStrategy.sol";
 // TokenizedStrategy interface used for internal view delegateCalls.
@@ -126,7 +126,7 @@ abstract contract DragonBaseStrategy is BaseStrategy, Module {
      *
      * @return . Should return true if tend() should be called by keeper or false if not.
      */
-    function _tendTrigger() internal view override virtual returns (bool) {
+    function _tendTrigger() internal view virtual override returns (bool) {
         return (address(asset) == ETH ? address(this).balance : asset.balanceOf(address(this))) > 0;
     }
 

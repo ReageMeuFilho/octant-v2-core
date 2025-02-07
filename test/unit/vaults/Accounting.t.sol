@@ -2,8 +2,8 @@
 pragma solidity >=0.8.18;
 
 import "forge-std/console.sol";
-import {Setup, IMockStrategy} from "./Setup.sol";
-import {TokenizedStrategy__TooMuchLoss, ZeroShares, ZeroAssets} from "src/errors.sol";
+import { Setup, IMockStrategy } from "./Setup.sol";
+import { TokenizedStrategy__TooMuchLoss, ZeroShares, ZeroAssets } from "src/errors.sol";
 
 contract AccountingTest is Setup {
     function setUp() public override {
@@ -72,7 +72,7 @@ contract AccountingTest is Setup {
         // process a report to realize the gain from the airdrop
         uint256 profit;
         vm.prank(keeper);
-        (profit,) = strategy.report();
+        (profit, ) = strategy.report();
 
         assertEq(strategy.pricePerShare(), pricePerShare);
         assertEq(profit, toAirdrop);
@@ -172,7 +172,7 @@ contract AccountingTest is Setup {
         // process a report to realize the gain from the airdrop
         uint256 profit;
         vm.prank(keeper);
-        (profit,) = strategy.report();
+        (profit, ) = strategy.report();
 
         assertEq(strategy.pricePerShare(), pricePerShare);
         assertEq(profit, toAirdrop);
@@ -212,7 +212,7 @@ contract AccountingTest is Setup {
         checkStrategyTotals(strategy, toAirdrop, toAirdrop, 0, dragonRouterShares);
         // calling report again should assign profit to the dragon router
         vm.prank(keeper);
-        (profit,) = strategy.report();
+        (profit, ) = strategy.report();
         dragonRouterShares = strategy.balanceOf(address(mockDragonRouter));
         assertEq(dragonRouterShares, strategy.convertToShares(toAirdrop * 2));
 

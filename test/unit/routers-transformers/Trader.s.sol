@@ -4,7 +4,7 @@ pragma solidity ^0.8.23;
 import "forge-std/Test.sol";
 import "../Base.t.sol";
 import "src/routers-transformers/Trader.sol";
-import {HelperConfig} from "script/helpers/HelperConfig.s.sol";
+import { HelperConfig } from "script/helpers/HelperConfig.s.sol";
 
 contract TestTraderRandomness is BaseTest {
     HelperConfig helperConfig = new HelperConfig(true);
@@ -26,11 +26,12 @@ contract TestTraderRandomness is BaseTest {
         _configure(false, "eth");
 
         helperConfig = new HelperConfig(true);
-        (, address wethToken,,,,,,,, address uniV3Swap) = helperConfig.activeNetworkConfig();
+        (, address wethToken, , , , , , , , address uniV3Swap) = helperConfig.activeNetworkConfig();
 
         moduleImplementation = new Trader();
         temps = _testTemps(
-            address(moduleImplementation), abi.encode(ETH, token, wethToken, beneficiary, swapper, uniV3Swap, oracle)
+            address(moduleImplementation),
+            abi.encode(ETH, token, wethToken, beneficiary, swapper, uniV3Swap, oracle)
         );
         trader = Trader(payable(temps.module));
     }
@@ -88,7 +89,7 @@ contract TestTraderRandomness is BaseTest {
     }
 
     function test_receivesEth() external {
-        (bool sent,) = payable(address(trader)).call{value: 100000}("");
+        (bool sent, ) = payable(address(trader)).call{ value: 100000 }("");
         require(sent, "Failed to send Ether");
     }
 

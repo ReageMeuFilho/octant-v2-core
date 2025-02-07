@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity >=0.8.18;
 
-import {BaseTest} from "../Base.t.sol";
+import { BaseTest } from "../Base.t.sol";
 
 contract ExtendedTest is BaseTest {
     // solhint-disable-next-line
