@@ -14,6 +14,7 @@
     "precommit": "lint-staged",
     "build": "forge clean && forge compile",
     "test": "forge clean && forge test",
+    "test:junit": "forge clean && mkdir -p reports && forge test --junit > reports/junit.xml",
     "gas": "forge snapshot --isolate --gas-report --diff .gas-snapshot > gasreport.txt",
     "coverage": "forge coverage --ir-minimum --report lcov",
     "coverage:genhtml": "genhtml lcov.info --branch-coverage --output-dir coverage --ignore-errors inconsistent,corrupt,category",
