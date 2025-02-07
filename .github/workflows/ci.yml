@@ -11,6 +11,46 @@ env:
   FOUNDRY_PROFILE: ci
 
 jobs:
+  format:
+    name: Check formatting
+    runs-on: general
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: 'package.json'
+
+      - name: Install dependencies
+        run: "corepack enable && yarn install"
+
+      - name: Check formatting
+        run: "yarn format:check"
+
+  lint:
+    name: Check with linter
+    runs-on: general
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: 'package.json'
+
+      - name: Install dependencies
+        run: "corepack enable && yarn install"
+
+      - name: Linter
+        run: "yarn lint"
+
   build:
     name: Build
     runs-on: general
@@ -28,12 +68,6 @@ jobs:
       - name: Install Foundry
         uses: onbjerg/foundry-toolchain@v1
 
-      - run: "node -v"
-
-      - run: "corepack -v || true"
-
-      - run: "yarn -v || true"
-
       - name: Install dependencies
         run: "corepack enable && yarn install"
 
@@ -50,12 +84,14 @@ jobs:
 
       - name: Setup node
         uses: actions/setup-node@v4
+        with:
+          node-version-file: 'package.json'
 
       - name: Install Foundry
         uses: onbjerg/foundry-toolchain@v1
 
       - name: Install dependencies
-        run: "yarn install"
+        run: "corepack enable && yarn install"
 
       - name: Run tests
         env:
@@ -81,12 +117,14 @@ jobs:
 #
 #      - name: Setup node
 #        uses: actions/setup-node@v4
+#        with:
+#          node-version-file: 'package.json'
 #
 #      - name: Install Foundry
 #        uses: onbjerg/foundry-toolchain@v1
 #
 #      - name: Install dependencies
-#        run: "yarn install"
+#        run: "corepack enable && yarn install"
 #
 #      - name: Run Forge build
 #        run: "forge --version && yarn build --sizes"
@@ -130,12 +168,14 @@ jobs:
 #
 #      - name: Setup node
 #        uses: actions/setup-node@v4
+#        with:
+#          node-version-file: 'package.json'
 #
 #      - name: Install Foundry
 #        uses: onbjerg/foundry-toolchain@v1
 #
 #      - name: Install dependencies
-#        run: "yarn install"
+#        run: "corepack enable && yarn install"
 #
 #      - name: Run Slither
 #        run: "yarn slither:setup && yarn slither"
