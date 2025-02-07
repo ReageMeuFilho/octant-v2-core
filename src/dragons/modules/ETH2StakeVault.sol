@@ -133,40 +133,47 @@ contract ETH2StakeVault is ERC4626, IERC7540Vault, ReentrancyGuard {
         require(!validator.isActive, "Validator already exists");
         require(pubkey.length == 48 && signature.length == 96, "Invalid key lengths");
 
-        request.state = RequestState.Processing;
-        request.validatorIndex = validatorIndex;
-
-        DEPOSIT_CONTRACT.deposit{value: VALIDATOR_DEPOSIT}(
-            pubkey,
-            validator.withdrawalCreds,
-            signature,
-            depositDataRoot
-        );
-
         // Update validator info
         validator.pubkey = pubkey;
         validator.signature = signature;
         validator.depositDataRoot = depositDataRoot;
         validator.isActive = true;
 
-        // Update state
-        totalAssets += VALIDATOR_DEPOSIT;
-        pendingDeposits[requestId] = 0;
+        // Update request state
         request.state = RequestState.Claimable;
+        request.validatorIndex = validatorIndex;
 
         emit ValidatorCreated(requestId, request.controller, pubkey, validatorIndex);
         emit RequestStateUpdated(requestId, RequestState.Claimable);
     }
 
-    function claimDeposit(uint256 requestId) external nonReentrant {
+    /**
+     * @notice Allows user to claim validator deposit data and execute deposit to the official deposit contract
+     * @param requestId The ID of the deposit request
+     */
+    function claimValidatorDeposit(uint256 requestId) external nonReentrant {
         Request storage request = requests[requestId];
+        ValidatorInfo storage validator = validators[requestId];
+        
         require(request.state == RequestState.Claimable, "Not claimable");
         require(request.controller == msg.sender || isOperator[request.controller][msg.sender], "Not authorized");
+        require(validator.isActive, "Validator not processed");
 
+        // Execute deposit to official deposit contract
+        DEPOSIT_CONTRACT.deposit{value: VALIDATOR_DEPOSIT}(
+            validator.pubkey,
+            validator.withdrawalCreds,
+            validator.signature,
+            validator.depositDataRoot
+        );
+
+        // Update state after successful deposit
         request.state = RequestState.Claimed;
+        totalAssets += VALIDATOR_DEPOSIT;
+        pendingDeposits[requestId] = 0;
         _mint(request.owner, VALIDATOR_DEPOSIT);
 
-        emit Deposit(request.owner, request.controller, VALIDATOR_DEPOSIT, VALIDATOR_DEPOSIT);
+        emit RequestStateUpdated(requestId, RequestState.Claimed);
     }
 
     function requestRedeem(
