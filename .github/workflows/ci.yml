@@ -124,7 +124,7 @@ jobs:
           artifact: test-results            # artifact name
           name: Tests results                # Name of the check run which will be created
           path: '*.xml'                     # Path to test results (inside artifact .zip)
-          reporter: jest-junit              # Format of test results
+          reporter: java-junit              # Format of test results
 
 #  # Coverage fails on 'Yul exception:Variable expr is 1 too deep in the stack'
 #  coverage:
