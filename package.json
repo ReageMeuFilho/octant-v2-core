@@ -2,7 +2,9 @@
   "name": "octant-v2-core",
   "version": "0.0.1",
   "description": "",
+  "packageManager": "yarn@4.6.0",
   "engines": {
+    "npm": "please-use-yarn",
     "node": ">=22.0.0"
   },
   "scripts": {

@@ -23,14 +23,19 @@ jobs:
       - name: Setup node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
-          cache: yarn
+          node-version-file: 'package.json'
 
       - name: Install Foundry
         uses: onbjerg/foundry-toolchain@v1
 
+      - run: "node -v"
+
+      - run: "corepack -v || true"
+
+      - run: "yarn -v || true"
+
       - name: Install dependencies
-        run: "yarn install"
+        run: "corepack enable && yarn install"
 
       - name: Build
         run: "yarn build"
@@ -45,9 +50,6 @@ jobs:
 
       - name: Setup node
         uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: yarn
 
       - name: Install Foundry
         uses: onbjerg/foundry-toolchain@v1
@@ -79,9 +81,6 @@ jobs:
 #
 #      - name: Setup node
 #        uses: actions/setup-node@v4
-#        with:
-#          node-version: 22
-#          cache: yarn
 #
 #      - name: Install Foundry
 #        uses: onbjerg/foundry-toolchain@v1
@@ -131,8 +130,6 @@ jobs:
 #
 #      - name: Setup node
 #        uses: actions/setup-node@v4
-#        with:
-#          node-version: 22
 #
 #      - name: Install Foundry
 #        uses: onbjerg/foundry-toolchain@v1
