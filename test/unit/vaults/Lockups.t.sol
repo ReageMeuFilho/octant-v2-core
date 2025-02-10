@@ -2,26 +2,10 @@
 pragma solidity ^0.8.18;
 
 import "forge-std/console.sol";
-import {Setup} from "./Setup.sol";
-import {
-    DragonTokenizedStrategy__InsufficientLockupDuration,
-    DragonTokenizedStrategy__RageQuitInProgress,
-    DragonTokenizedStrategy__SharesStillLocked,
-    DragonTokenizedStrategy__StrategyInShutdown,
-    DragonTokenizedStrategy__SharesAlreadyUnlocked,
-    DragonTokenizedStrategy__NoSharesToRageQuit,
-    DragonTokenizedStrategy__ZeroLockupDuration,
-    DragonTokenizedStrategy__WithdrawMoreThanMax,
-    DragonTokenizedStrategy__RedeemMoreThanMax,
-    TokenizedStrategy__TransferFailed,
-    ZeroAssets,
-    ZeroShares,
-    DragonTokenizedStrategy__DepositMoreThanMax,
-    DragonTokenizedStrategy__MintMoreThanMax,
-    ERC20InsufficientBalance
-} from "src/errors.sol";
+import { Setup } from "./Setup.sol";
+import { DragonTokenizedStrategy__InsufficientLockupDuration, DragonTokenizedStrategy__RageQuitInProgress, DragonTokenizedStrategy__SharesStillLocked, DragonTokenizedStrategy__StrategyInShutdown, DragonTokenizedStrategy__SharesAlreadyUnlocked, DragonTokenizedStrategy__NoSharesToRageQuit, DragonTokenizedStrategy__ZeroLockupDuration, DragonTokenizedStrategy__WithdrawMoreThanMax, DragonTokenizedStrategy__RedeemMoreThanMax, TokenizedStrategy__TransferFailed, ZeroAssets, ZeroShares, DragonTokenizedStrategy__DepositMoreThanMax, DragonTokenizedStrategy__MintMoreThanMax, ERC20InsufficientBalance } from "src/errors.sol";
 
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract LockupsTest is Setup {
     // Events to track
@@ -59,8 +43,13 @@ contract LockupsTest is Setup {
         assertEq(sharesAfter - sharesBefore, depositAmount, "Incorrect shares minted");
 
         // Verify lockup details
-        (uint256 unlockTime, uint256 lockedShares, bool isRageQuit, uint256 totalShares, uint256 withdrawableShares) =
-            strategy.getUserLockupInfo(user);
+        (
+            uint256 unlockTime,
+            uint256 lockedShares,
+            bool isRageQuit,
+            uint256 totalShares,
+            uint256 withdrawableShares
+        ) = strategy.getUserLockupInfo(user);
 
         assertEq(unlockTime, block.timestamp + lockupDuration, "Incorrect unlock time");
         assertEq(lockedShares, depositAmount, "Incorrect locked shares");
@@ -89,7 +78,7 @@ contract LockupsTest is Setup {
         assertTrue(assetsUsed > 0, "No assets were used");
 
         // Verify lockup details
-        (uint256 unlockTime, uint256 lockedShares,,,) = strategy.getUserLockupInfo(user);
+        (uint256 unlockTime, uint256 lockedShares, , , ) = strategy.getUserLockupInfo(user);
         assertEq(unlockTime, block.timestamp + lockupDuration, "Incorrect unlock time");
         assertEq(lockedShares, sharesToMint, "Incorrect locked shares");
     }
@@ -113,14 +102,14 @@ contract LockupsTest is Setup {
         strategy.depositWithLockup(depositAmount, user, initialLockup);
 
         // Get initial unlock time
-        (uint256 initialUnlockTime,,,,) = strategy.getUserLockupInfo(user);
+        (uint256 initialUnlockTime, , , , ) = strategy.getUserLockupInfo(user);
 
         // Extend lockup
         uint256 extensionPeriod = 50 days;
         strategy.depositWithLockup(depositAmount, user, extensionPeriod);
 
         // Verify extended lockup
-        (uint256 newUnlockTime,,,,) = strategy.getUserLockupInfo(user);
+        (uint256 newUnlockTime, , , , ) = strategy.getUserLockupInfo(user);
         assertEq(newUnlockTime, initialUnlockTime + extensionPeriod, "Lockup not extended correctly");
         vm.stopPrank();
     }
@@ -140,8 +129,13 @@ contract LockupsTest is Setup {
         strategy.initiateRageQuit();
 
         // Verify rage quit state
-        (uint256 unlockTime, uint256 lockedShares, bool isRageQuit, uint256 totalShares, uint256 withdrawableShares) =
-            strategy.getUserLockupInfo(user);
+        (
+            uint256 unlockTime,
+            uint256 lockedShares,
+            bool isRageQuit,
+            uint256 totalShares,
+            uint256 withdrawableShares
+        ) = strategy.getUserLockupInfo(user);
 
         assertEq(unlockTime, block.timestamp + MINIMUM_LOCKUP_DURATION, "Incorrect rage quit unlock time");
         assertEq(lockedShares, depositAmount, "Incorrect locked shares");
@@ -151,7 +145,7 @@ contract LockupsTest is Setup {
         // Check partial unlocking after some time
         skip(45 days); // Half of MINIMUM_LOCKUP_DURATION
         uint256 expectedUnlocked = (depositAmount * 45 days) / MINIMUM_LOCKUP_DURATION;
-        (,,,, withdrawableShares) = strategy.getUserLockupInfo(user);
+        (, , , , withdrawableShares) = strategy.getUserLockupInfo(user);
         assertEq(withdrawableShares, expectedUnlocked, "Incorrect partial unlock amount");
 
         vm.stopPrank();
@@ -198,8 +192,8 @@ contract LockupsTest is Setup {
         vm.expectRevert(DragonTokenizedStrategy__RageQuitInProgress.selector);
         strategy.deposit(depositAmount, user);
 
-        (, uint256 lockedShares, bool isRageQuit, uint256 totalShares, uint256 withdrawableShares) =
-            strategy.getUserLockupInfo(user);
+        (, uint256 lockedShares, bool isRageQuit, uint256 totalShares, uint256 withdrawableShares) = strategy
+            .getUserLockupInfo(user);
 
         assertEq(lockedShares, depositAmount, "Incorrect locked shares");
         assertEq(withdrawableShares, depositAmount, "Incorrect unlocked shares");
@@ -350,7 +344,11 @@ contract LockupsTest is Setup {
         // New deposit should update unlock time
         uint256 newLockupDuration = 120 days;
         strategy.depositWithLockup(depositAmount, user, newLockupDuration);
-        assertEq(strategy.getUnlockTime(user), block.timestamp + newLockupDuration, "New unlock time not set correctly");
+        assertEq(
+            strategy.getUnlockTime(user),
+            block.timestamp + newLockupDuration,
+            "New unlock time not set correctly"
+        );
 
         vm.stopPrank();
     }
@@ -397,7 +395,9 @@ contract LockupsTest is Setup {
 
         // During lockup
         assertEq(
-            strategy.maxWithdraw(user, maxLoss), 0, "Should not be able to withdraw during lockup even with maxLoss"
+            strategy.maxWithdraw(user, maxLoss),
+            0,
+            "Should not be able to withdraw during lockup even with maxLoss"
         );
 
         // Skip past lockup
@@ -442,7 +442,9 @@ contract LockupsTest is Setup {
         // Skip to end of rage quit period
         skip(45 days);
         assertEq(
-            strategy.maxWithdraw(user), depositAmount, "Should be able to withdraw full amount after rage quit period"
+            strategy.maxWithdraw(user),
+            depositAmount,
+            "Should be able to withdraw full amount after rage quit period"
         );
 
         vm.stopPrank();
@@ -483,7 +485,10 @@ contract LockupsTest is Setup {
         skip(45 days);
         uint256 expectedRedeem = (newLockupAmount * 45 days) / MINIMUM_LOCKUP_DURATION;
         assertApproxEqRel(
-            strategy.maxRedeem(user), expectedRedeem, 0.01e18, "Incorrect redeemable shares during rage quit"
+            strategy.maxRedeem(user),
+            expectedRedeem,
+            0.01e18,
+            "Incorrect redeemable shares during rage quit"
         );
         strategy.withdraw(expectedRedeem, user, user);
 
@@ -533,7 +538,10 @@ contract LockupsTest is Setup {
         skip(45 days);
         uint256 expectedRedeem = (newLockupAmount * 45 days) / MINIMUM_LOCKUP_DURATION;
         assertApproxEqRel(
-            strategy.maxRedeem(user), expectedRedeem, 0.01e18, "Incorrect redeemable shares during rage quit"
+            strategy.maxRedeem(user),
+            expectedRedeem,
+            0.01e18,
+            "Incorrect redeemable shares during rage quit"
         );
         strategy.withdraw(expectedRedeem, user, user, 0);
 
@@ -773,7 +781,7 @@ contract LockupsTest is Setup {
         uint256 standardShares = sharesAfter - sharesBefore;
 
         // Verify standard deposit state
-        (uint256 unlockTime, uint256 lockedShares, bool isRageQuit,,) = strategy.getUserLockupInfo(user);
+        (uint256 unlockTime, uint256 lockedShares, bool isRageQuit, , ) = strategy.getUserLockupInfo(user);
         assertEq(unlockTime, 0, "No unlock time should be set");
         assertEq(lockedShares, 0, "No shares should be locked");
         assertFalse(isRageQuit, "Should not be in rage quit");
@@ -794,7 +802,7 @@ contract LockupsTest is Setup {
         strategy.mintWithLockup(sharesToMint, user, lockupDuration);
 
         // Verify locked mint state
-        (unlockTime, lockedShares, isRageQuit,,) = strategy.getUserLockupInfo(user);
+        (unlockTime, lockedShares, isRageQuit, , ) = strategy.getUserLockupInfo(user);
         assertEq(unlockTime, block.timestamp + lockupDuration, "Incorrect unlock time");
         assertEq(lockedShares, standardShares / 2 + sharesToMint, "Incorrect locked shares");
         assertFalse(isRageQuit, "Should not be in rage quit");
@@ -812,7 +820,7 @@ contract LockupsTest is Setup {
         strategy.initiateRageQuit();
 
         // Verify rage quit state
-        (unlockTime, lockedShares, isRageQuit,,) = strategy.getUserLockupInfo(user);
+        (unlockTime, lockedShares, isRageQuit, , ) = strategy.getUserLockupInfo(user);
         assertTrue(isRageQuit, "Should be in rage quit");
         assertEq(unlockTime, block.timestamp + 90 days, "Incorrect rage quit duration");
 
@@ -1085,8 +1093,8 @@ contract LockupsTest is Setup {
         strategy.redeem(redeemAmount, user, user, 0);
 
         // Verify balances and state after first redeem
-        (, uint256 remainingLockedShares,, uint256 newTotalShares, uint256 newWithdrawableShares) =
-            strategy.getUserLockupInfo(user);
+        (, uint256 remainingLockedShares, , uint256 newTotalShares, uint256 newWithdrawableShares) = strategy
+            .getUserLockupInfo(user);
 
         assertEq(remainingLockedShares, depositAmount - redeemAmount, "Remaining locked shares incorrect");
         assertEq(newTotalShares, shares - redeemAmount, "New total shares incorrect");

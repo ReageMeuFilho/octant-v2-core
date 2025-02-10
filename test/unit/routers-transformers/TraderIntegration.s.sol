@@ -4,16 +4,16 @@ pragma solidity ^0.8.23;
 import "forge-std/Test.sol";
 import "../Base.t.sol";
 import "src/routers-transformers/Trader.sol";
-import {HelperConfig} from "script/helpers/HelperConfig.s.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {CreateOracleParams, IOracleFactory, IOracle, OracleParams} from "src/vendor/0xSplits/OracleParams.sol";
-import {QuotePair, QuoteParams} from "src/vendor/0xSplits/LibQuotes.sol";
-import {IUniV3OracleImpl} from "src/vendor/0xSplits/IUniV3OracleImpl.sol";
-import {ISwapperImpl} from "src/vendor/0xSplits/SwapperImpl.sol";
-import {ISwapperFactory} from "src/vendor/0xSplits/ISwapperFactory.sol";
-import {UniV3Swap} from "src/vendor/0xSplits/UniV3Swap.sol";
-import {ISwapRouter} from "src/vendor/uniswap/ISwapRouter.sol";
-import {WETH} from "solady/tokens/WETH.sol";
+import { HelperConfig } from "script/helpers/HelperConfig.s.sol";
+import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { CreateOracleParams, IOracleFactory, IOracle, OracleParams } from "src/vendor/0xSplits/OracleParams.sol";
+import { QuotePair, QuoteParams } from "src/vendor/0xSplits/LibQuotes.sol";
+import { IUniV3OracleImpl } from "src/vendor/0xSplits/IUniV3OracleImpl.sol";
+import { ISwapperImpl } from "src/vendor/0xSplits/SwapperImpl.sol";
+import { ISwapperFactory } from "src/vendor/0xSplits/ISwapperFactory.sol";
+import { UniV3Swap } from "src/vendor/0xSplits/UniV3Swap.sol";
+import { ISwapRouter } from "src/vendor/uniswap/ISwapRouter.sol";
+import { WETH } from "solady/tokens/WETH.sol";
 
 contract TestTraderIntegrationETH is BaseTest {
     HelperConfig helperConfig;
@@ -46,7 +46,7 @@ contract TestTraderIntegrationETH is BaseTest {
     function setUp() public {
         _configure(true, "eth");
         helperConfig = new HelperConfig(true);
-        (address glmToken, address wethToken,,,,,,,, address uniV3Swap) = helperConfig.activeNetworkConfig();
+        (address glmToken, address wethToken, , , , , , , , address uniV3Swap) = helperConfig.activeNetworkConfig();
 
         glmAddress = glmToken;
 
@@ -69,34 +69,36 @@ contract TestTraderIntegrationETH is BaseTest {
     }
 
     function _initOracleParams() internal view returns (IUniV3OracleImpl.InitParams memory) {
-        return IUniV3OracleImpl.InitParams({
-            owner: temps.safe,
-            paused: false,
-            defaultPeriod: 30 minutes,
-            pairDetails: oraclePairDetails
-        });
+        return
+            IUniV3OracleImpl.InitParams({
+                owner: temps.safe,
+                paused: false,
+                defaultPeriod: 30 minutes,
+                pairDetails: oraclePairDetails
+            });
     }
 
     function _createSwapperParams() internal view returns (ISwapperFactory.CreateSwapperParams memory) {
-        return ISwapperFactory.CreateSwapperParams({
-            owner: temps.safe,
-            paused: false,
-            beneficiary: beneficiary,
-            tokenToBeneficiary: splitsEthWrapper(quoteAddress),
-            oracleParams: oracleParams,
-            defaultScaledOfferFactor: defaultScaledOfferFactor,
-            pairScaledOfferFactors: pairScaledOfferFactors
-        });
+        return
+            ISwapperFactory.CreateSwapperParams({
+                owner: temps.safe,
+                paused: false,
+                beneficiary: beneficiary,
+                tokenToBeneficiary: splitsEthWrapper(quoteAddress),
+                oracleParams: oracleParams,
+                defaultScaledOfferFactor: defaultScaledOfferFactor,
+                pairScaledOfferFactors: pairScaledOfferFactors
+            });
     }
 
     function deploySwapper() public returns (address) {
         helperConfig = new HelperConfig(true);
-        (,,,,, address glmPool,, address swapperFactoryAddress, address oracleFactoryAddress,) =
-            helperConfig.activeNetworkConfig();
+        (, , , , , address glmPool, , address swapperFactoryAddress, address oracleFactoryAddress, ) = helperConfig
+            .activeNetworkConfig();
         IOracleFactory oracleFactory = IOracleFactory(oracleFactoryAddress);
         ISwapperFactory swapperFactory = ISwapperFactory(swapperFactoryAddress);
 
-        fromTo = QuotePair({base: splitsEthWrapper(baseAddress), quote: splitsEthWrapper(quoteAddress)});
+        fromTo = QuotePair({ base: splitsEthWrapper(baseAddress), quote: splitsEthWrapper(quoteAddress) });
 
         delete oraclePairDetails;
         oraclePairDetails.push(
@@ -118,8 +120,10 @@ contract TestTraderIntegrationETH is BaseTest {
         );
 
         IUniV3OracleImpl.InitParams memory initOracleParams = _initOracleParams();
-        oracleParams.createOracleParams =
-            CreateOracleParams({factory: IOracleFactory(address(oracleFactory)), data: abi.encode(initOracleParams)});
+        oracleParams.createOracleParams = CreateOracleParams({
+            factory: IOracleFactory(address(oracleFactory)),
+            data: abi.encode(initOracleParams)
+        });
 
         oracle = oracleFactory.createUniV3Oracle(initOracleParams);
         oracleParams.oracle = oracle;
@@ -172,7 +176,7 @@ contract TestTraderIntegrationETH is BaseTest {
             abi.encode(unscaledAmountsToBeneficiary)
         );
 
-        uint256 amountToBeneficiary = trader.transform{value: saleValue}(trader.base(), trader.quote(), saleValue);
+        uint256 amountToBeneficiary = trader.transform{ value: saleValue }(trader.base(), trader.quote(), saleValue);
 
         assert(IERC20(quoteAddress).balanceOf(trader.beneficiary()) > 0);
         assert(IERC20(quoteAddress).balanceOf(trader.beneficiary()) == amountToBeneficiary);
@@ -223,12 +227,16 @@ contract TestTraderIntegrationETH is BaseTest {
 
         delete quoteParams;
         quoteParams.push(
-            QuoteParams({quotePair: fromTo, baseAmount: uint128(swapper.balance), data: abi.encode(exactInputParams)})
+            QuoteParams({ quotePair: fromTo, baseAmount: uint128(swapper.balance), data: abi.encode(exactInputParams) })
         );
-        UniV3Swap.FlashCallbackData memory data =
-            UniV3Swap.FlashCallbackData({exactInputParams: exactInputParams, excessRecipient: address(oracle)});
-        UniV3Swap.InitFlashParams memory params =
-            UniV3Swap.InitFlashParams({quoteParams: quoteParams, flashCallbackData: data});
+        UniV3Swap.FlashCallbackData memory data = UniV3Swap.FlashCallbackData({
+            exactInputParams: exactInputParams,
+            excessRecipient: address(oracle)
+        });
+        UniV3Swap.InitFlashParams memory params = UniV3Swap.InitFlashParams({
+            quoteParams: quoteParams,
+            flashCallbackData: data
+        });
         initializer.initFlash(ISwapperImpl(swapper), params);
 
         // check if beneficiary received some quote token
@@ -242,7 +250,7 @@ contract TestTraderIntegrationETH is BaseTest {
 
     function test_receivesEth() external {
         vm.deal(address(this), 10_000 ether);
-        (bool sent,) = payable(address(trader)).call{value: 100 ether}("");
+        (bool sent, ) = payable(address(trader)).call{ value: 100 ether }("");
         require(sent, "Failed to send Ether");
     }
 
@@ -266,7 +274,7 @@ contract TestTraderIntegrationETH is BaseTest {
         configureTrader(ETH, glmAddress);
         assert(address(trader).balance == 0);
         vm.expectRevert(Trader.Trader__ImpossibleConfiguration.selector);
-        trader.transform{value: 1 ether}(ETH, glmAddress, 2 ether);
+        trader.transform{ value: 1 ether }(ETH, glmAddress, 2 ether);
     }
 
     function test_transform_unexpected_value() external {
@@ -274,7 +282,7 @@ contract TestTraderIntegrationETH is BaseTest {
 
         // check if trader will reject unexpected ETH
         vm.expectRevert(Trader.Trader__UnexpectedETH.selector);
-        trader.transform{value: 1 ether}(glmAddress, ETH, 10 ether);
+        trader.transform{ value: 1 ether }(glmAddress, ETH, 10 ether);
     }
 
     function test_transform_glm_to_eth() external {

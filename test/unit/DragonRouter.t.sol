@@ -2,13 +2,13 @@
 pragma solidity ^0.8.25;
 
 import "forge-std/Test.sol";
-import {DragonRouter} from "src/dragons/DragonRouter.sol";
+import { DragonRouter } from "src/dragons/DragonRouter.sol";
 import "src/dragons/SplitChecker.sol";
-import {MockStrategy} from "test/mocks/MockStrategy.sol";
+import { MockStrategy } from "test/mocks/MockStrategy.sol";
 
-import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {ITokenizedStrategy} from "src/interfaces/ITokenizedStrategy.sol";
+import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
 
 contract DragonRouterTest is Test {
     DragonRouter public router;
@@ -40,15 +40,16 @@ contract DragonRouterTest is Test {
 
         // Deploy DragonRouter
         router = new DragonRouter();
-        bytes memory initParams =
-            abi.encode(owner, abi.encode(strategies, assets, governance, regenGovernance, address(splitChecker), opexVault, metapool));
+        bytes memory initParams = abi.encode(
+            owner,
+            abi.encode(strategies, assets, governance, regenGovernance, address(splitChecker), opexVault, metapool)
+        );
         router.setUp(initParams);
     }
 
-    function _setupStrategies(uint256 numStrategies)
-        internal
-        returns (address[] memory _strategies, address[] memory _assets)
-    {
+    function _setupStrategies(
+        uint256 numStrategies
+    ) internal returns (address[] memory _strategies, address[] memory _assets) {
         // Initialize arrays
         _strategies = new address[](numStrategies);
         _assets = new address[](numStrategies);
@@ -66,8 +67,10 @@ contract DragonRouterTest is Test {
 
         // Deploy new router with mock strategies
         router = new DragonRouter();
-        bytes memory initParams =
-            abi.encode(owner, abi.encode(_strategies, _assets, governance, address(splitChecker), opexVault, metapool));
+        bytes memory initParams = abi.encode(
+            owner,
+            abi.encode(_strategies, _assets, governance, address(splitChecker), opexVault, metapool)
+        );
         router.setUp(initParams);
 
         // Update state variables
@@ -89,7 +92,7 @@ contract DragonRouterTest is Test {
         allocations[0] = 40; // 40% to opex
         allocations[1] = 60; // 60% to metapool
 
-        router.setSplit(Split({recipients: recipients, allocations: allocations, totalAllocations: 100}));
+        router.setSplit(Split({ recipients: recipients, allocations: allocations, totalAllocations: 100 }));
     }
 
     function test_setCooldownPeriod() public {
@@ -108,7 +111,9 @@ contract DragonRouterTest is Test {
         vm.startPrank(address(0));
         vm.expectRevert(
             abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector, address(0), keccak256("REGEN_GOVERNANCE_ROLE")
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                address(0),
+                keccak256("REGEN_GOVERNANCE_ROLE")
             )
         );
         router.setCooldownPeriod(newPeriod);

@@ -1,65 +1,106 @@
-name: CI
-
+name: CI Pipeline
 on:
   workflow_dispatch:
   pull_request:
   push:
     branches:
       - main
+      - develop
 
 env:
   FOUNDRY_PROFILE: ci
 
 jobs:
-  build:
-    strategy:
-      fail-fast: true
-      matrix:
-        node-version:
-          - 16.x
-
-    name: Octant V2 Core Build
+  format:
+    name: Check formatting
     runs-on: general
+
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
+
       - name: Setup node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 16.x.x
+          node-version-file: 'package.json'
+
+      - name: Install dependencies
+        run: "corepack enable && yarn install"
+
+      - name: Check formatting
+        run: "yarn format:check"
+
+  lint:
+    name: Run linter
+    runs-on: general
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: 'package.json'
+
+      - name: Install dependencies
+        run: "corepack enable && yarn install"
+
+      - name: Linter
+        run: "yarn lint"
+
+  build:
+    name: Build
+    runs-on: general
+    needs:
+      - format
+      - lint
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: 'package.json'
 
       - name: Install Foundry
         uses: onbjerg/foundry-toolchain@v1
-        with:
-          version: nightly
 
-      - name: Run npm install
-        run: "npm i"
+      - name: Install dependencies
+        run: "corepack enable && yarn install"
 
-      - name: Run Forge build
-        run: "forge build"
+      - name: Build
+        run: "yarn build"
 
   test:
-    strategy:
-      fail-fast: true
-
-    name: Octant V2 Test
+    name: Test suite
     runs-on: general
+    needs:
+      - build
+    permissions:
+      contents: read
+      actions: read
+      checks: write
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
+
       - name: Setup node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 16.x.x
+          node-version-file: 'package.json'
 
       - name: Install Foundry
         uses: onbjerg/foundry-toolchain@v1
 
-      - name: Run npm install
-        run: "npm i"
+      - name: Install dependencies
+        run: "corepack enable && yarn install"
 
       - name: Run tests
         env:
@@ -69,26 +110,97 @@ jobs:
           TEST_RPC_URL_POLYGON: "https://polygon-rpc.com"
           TEST_SAFE_SINGLETON_POLYGON: "0x41675C099F32341bf84BFc5382aF534df5C7461a"
           TEST_SAFE_PROXY_FACTORY_POLYGON: "0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67"
-        run: forge test -v
+        run: "yarn test:ci"
 
-  analyze:
-    runs-on: general
-    steps:
-      - name: Setup node
-        uses: actions/setup-node@v3
+      - name: Upload test artifact
+        uses: actions/upload-artifact@v4  # upload test results
+        if: success() || failure()        # run this step even if previous step failed
         with:
-          node-version: 16.x.x
+          name: test-results
+          path: reports/junit.xml
 
-      - name: Install Foundry
-        uses: onbjerg/foundry-toolchain@v1
-
-      - name: Run npm install
-        run: "npm i"
-
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Run Slither
-        uses: crytic/slither-action@v0.4.0
+      - name: Prepare test report
+        uses: dorny/test-reporter@v1
+        if: success() || failure()        # run this step even if previous step failed
         with:
-          target: "src/"
+          artifact: test-results            # artifact name
+          name: Tests results                # Name of the check run which will be created
+          path: '*.xml'                     # Path to test results (inside artifact .zip)
+          reporter: java-junit              # Format of test results
+
+#  # Coverage fails on 'Yul exception:Variable expr is 1 too deep in the stack'
+#  coverage:
+#    runs-on: general
+#    permissions:
+#      contents: read
+#      pull-requests: write
+#
+#    steps:
+#      - uses: actions/checkout@v4
+#        with:
+#          submodules: recursive
+#
+#      - name: Setup node
+#        uses: actions/setup-node@v4
+#        with:
+#          node-version-file: 'package.json'
+#
+#      - name: Install Foundry
+#        uses: onbjerg/foundry-toolchain@v1
+#
+#      - name: Install dependencies
+#        run: "corepack enable && yarn install"
+#
+#      - name: Run Forge build
+#        run: "forge --version && yarn build --sizes"
+#
+#      - name: Run forge coverage
+#        id: coverage
+#        env:
+#          TEST_RPC_URL: "https://eth.llamarpc.com"
+#          TEST_SAFE_SINGLETON: "0x41675C099F32341bf84BFc5382aF534df5C7461a"
+#          TEST_SAFE_PROXY_FACTORY: "0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67"
+#        run: |
+#          {
+#          echo 'COVERAGE<<EOF'
+#          forge coverage --ir-minimum --summary | awk '/Test Summary:/{y=1;next}y'
+#          echo EOF
+#          } >> "$GITHUB_OUTPUT"
+#
+#      - name: Comment on PR
+#        id: comment
+#        uses: actions/github-script@v7
+#        with:
+#          github-token: ${{ secrets.TOKEN_GITHUB }}
+#          script: |
+#            const output = `${{ steps.coverage.outputs.COVERAGE }}`;
+#            const commentBody = `Forge code coverage:\n${output}\n`;
+#            github.rest.issues.createComment({
+#              issue_number: context.issue.number,
+#              owner: context.repo.owner,
+#              repo: context.repo.repo,
+#              body: commentBody
+#            });
+
+#  # Blocked by OSU-502
+#  analyze:
+#    name: Analyze with Slither
+#    runs-on: general
+#    steps:
+#      - uses: actions/checkout@v4
+#        with:
+#          submodules: recursive
+#
+#      - name: Setup node
+#        uses: actions/setup-node@v4
+#        with:
+#          node-version-file: 'package.json'
+#
+#      - name: Install Foundry
+#        uses: onbjerg/foundry-toolchain@v1
+#
+#      - name: Install dependencies
+#        run: "corepack enable && yarn install"
+#
+#      - name: Run Slither
+#        run: "yarn slither:setup && yarn slither"

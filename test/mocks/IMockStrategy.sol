@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.8.18;
 
-import {IStrategy} from "src/interfaces/IStrategy.sol";
+import { IStrategy } from "src/interfaces/IStrategy.sol";
 
 // Interface to use during testing that implements the 4626 standard
 // the implementation functions, the Strategies immutable functions

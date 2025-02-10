@@ -2,21 +2,8 @@
 pragma solidity >=0.8.18;
 
 import "forge-std/console.sol";
-import {Setup} from "./Setup.sol";
-import {
-    DragonTokenizedStrategy__PerformanceFeeDisabled,
-    DragonTokenizedStrategy__MaxUnlockIsAlwaysZero,
-    Unauthorized,
-    DragonTokenizedStrategy__InvalidLockupDuration,
-    DragonTokenizedStrategy__InvalidRageQuitCooldownPeriod,
-    TokenizedStrategy__NotKeeperOrManagement,
-    TokenizedStrategy__NotManagement,
-    TokenizedStrategy__NotPendingManagement,
-    TokenizedStrategy__NotEmergencyAuthorized,
-    TokenizedStrategy__NotRegenGovernance,
-    TokenizedStrategy__AlreadyInitialized,
-    BaseStrategy__NotSelf
-} from "src/errors.sol";
+import { Setup } from "./Setup.sol";
+import { DragonTokenizedStrategy__PerformanceFeeDisabled, DragonTokenizedStrategy__MaxUnlockIsAlwaysZero, Unauthorized, DragonTokenizedStrategy__InvalidLockupDuration, DragonTokenizedStrategy__InvalidRageQuitCooldownPeriod, TokenizedStrategy__NotKeeperOrManagement, TokenizedStrategy__NotManagement, TokenizedStrategy__NotPendingManagement, TokenizedStrategy__NotEmergencyAuthorized, TokenizedStrategy__NotRegenGovernance, TokenizedStrategy__AlreadyInitialized, BaseStrategy__NotSelf } from "src/errors.sol";
 
 contract AccessControlTest is Setup {
     function setUp() public override {
@@ -143,7 +130,13 @@ contract AccessControlTest is Setup {
 
         vm.expectRevert(TokenizedStrategy__AlreadyInitialized.selector);
         tokenizedStrategy.initialize(
-            address(asset), name_, _address, _address, _address, address(mockDragonRouter), regenGovernance
+            address(asset),
+            name_,
+            _address,
+            _address,
+            _address,
+            address(mockDragonRouter),
+            regenGovernance
         );
 
         assertEq(tokenizedStrategy.management(), address(0));

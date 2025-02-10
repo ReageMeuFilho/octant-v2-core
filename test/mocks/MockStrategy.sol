@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.8.18;
 
-import {MockYieldSource} from "./MockYieldSource.sol";
-import {DragonBaseStrategy, ERC20} from "../../src/dragons/vaults/DragonBaseStrategy.sol";
-import {Module} from "zodiac/core/Module.sol";
+import { MockYieldSource } from "./MockYieldSource.sol";
+import { DragonBaseStrategy, ERC20 } from "../../src/dragons/vaults/DragonBaseStrategy.sol";
+import { Module } from "zodiac/core/Module.sol";
 import "forge-std/Test.sol";
 
 contract MockStrategy is Module, DragonBaseStrategy {
@@ -53,7 +53,7 @@ contract MockStrategy is Module, DragonBaseStrategy {
     }
 
     function _deployFunds(uint256 _amount) internal override {
-        if (address(asset) == ETH) MockYieldSource(yieldSource).deposit{value: _amount}(_amount);
+        if (address(asset) == ETH) MockYieldSource(yieldSource).deposit{ value: _amount }(_amount);
         else MockYieldSource(yieldSource).deposit(_amount);
     }
 
@@ -68,11 +68,11 @@ contract MockStrategy is Module, DragonBaseStrategy {
         return MockYieldSource(yieldSource).balance() + balance;
     }
 
-    function _tend(uint256 /*_idle*/ ) internal override {
+    function _tend(uint256 /*_idle*/) internal override {
         uint256 balance = address(asset) == ETH ? address(this).balance : ERC20(asset).balanceOf(address(this));
         if (balance > 0) {
             if (address(asset) == ETH) {
-                MockYieldSource(yieldSource).deposit{value: balance}(balance);
+                MockYieldSource(yieldSource).deposit{ value: balance }(balance);
                 return;
             }
             MockYieldSource(yieldSource).deposit(balance);
@@ -95,12 +95,9 @@ contract MockStrategy is Module, DragonBaseStrategy {
         MockYieldSource(yieldSource).withdraw(_debtOutstanding);
     }
 
-    function liquidatePosition(uint256 _amountNeeded)
-        external
-        override
-        onlyManagement
-        returns (uint256 _liquidatedAmount, uint256 _loss)
-    {
+    function liquidatePosition(
+        uint256 _amountNeeded
+    ) external override onlyManagement returns (uint256 _liquidatedAmount, uint256 _loss) {
         MockYieldSource(yieldSource).withdraw(_amountNeeded);
         return (_amountNeeded, 0);
     }

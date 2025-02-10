@@ -5,6 +5,7 @@
 cache/
 out/
 coverage/
+reports/
 
 # Ignores development broadcast logs
 !/broadcast
@@ -14,10 +15,8 @@ coverage/
 # Docs
 docs/
 
-# Dotenv file
+# Dotenv/direnv files
 .env
-
-# Direnv file
 .envrc
 
 # Github CI secrets for local CI runner (https://github.com/nektos/act)
@@ -32,3 +31,12 @@ node_modules/
 
 # cursor files
 .specstory/
+
+# Yarn files
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions

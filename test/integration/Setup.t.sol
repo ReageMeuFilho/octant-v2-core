@@ -2,22 +2,22 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import {TestPlus} from "lib/solady/test/utils/TestPlus.sol";
+import { TestPlus } from "lib/solady/test/utils/TestPlus.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
 import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
 
-import {MockERC20} from "test/mocks/MockERC20.sol";
-import {MockYieldSource} from "test/mocks/MockYieldSource.sol";
-import {MockStrategy} from "test/mocks/MockStrategy.sol";
-import {IMockStrategy} from "test/mocks/IMockStrategy.sol";
-import {DeploySafe} from "script/deploy/DeploySafe.sol";
-import {DeployDragonRouter} from "script/deploy/DeployDragonRouter.sol";
-import {DeployModuleProxyFactory} from "script/deploy/DeployModuleProxyFactory.sol";
-import {DeployDragonTokenizedStrategy} from "script/deploy/DeployDragonTokenizedStrategy.sol";
-import {DeployHatsProtocol} from "script/deploy/DeployHatsProtocol.sol";
-import {DeployMockStrategy} from "script/deploy/DeployMockStrategy.sol";
+import { MockERC20 } from "test/mocks/MockERC20.sol";
+import { MockYieldSource } from "test/mocks/MockYieldSource.sol";
+import { MockStrategy } from "test/mocks/MockStrategy.sol";
+import { IMockStrategy } from "test/mocks/IMockStrategy.sol";
+import { DeploySafe } from "script/deploy/DeploySafe.sol";
+import { DeployDragonRouter } from "script/deploy/DeployDragonRouter.sol";
+import { DeployModuleProxyFactory } from "script/deploy/DeployModuleProxyFactory.sol";
+import { DeployDragonTokenizedStrategy } from "script/deploy/DeployDragonTokenizedStrategy.sol";
+import { DeployHatsProtocol } from "script/deploy/DeployHatsProtocol.sol";
+import { DeployMockStrategy } from "script/deploy/DeployMockStrategy.sol";
 
-import {TokenizedStrategy__StrategyNotInShutdown, TokenizedStrategy__NotEmergencyAuthorized, TokenizedStrategy__HatsAlreadyInitialized, TokenizedStrategy__NotKeeperOrManagement, TokenizedStrategy__NotManagement} from "src/errors.sol";
+import { TokenizedStrategy__StrategyNotInShutdown, TokenizedStrategy__NotEmergencyAuthorized, TokenizedStrategy__HatsAlreadyInitialized, TokenizedStrategy__NotKeeperOrManagement, TokenizedStrategy__NotManagement } from "src/errors.sol";
 
 contract SetupIntegrationTest is
     DeploySafe,
@@ -93,10 +93,14 @@ contract SetupIntegrationTest is
     function deploy()
         public
         override(
-            DeploySafe, DeployDragonTokenizedStrategy, DeployDragonRouter, DeployModuleProxyFactory, DeployHatsProtocol
+            DeploySafe,
+            DeployDragonTokenizedStrategy,
+            DeployDragonRouter,
+            DeployModuleProxyFactory,
+            DeployHatsProtocol
         )
     {
-        deployer = msg.sender;  
+        deployer = msg.sender;
         // Deploy Safe first as it will be the admin
         DeploySafe.deploy();
 
@@ -107,7 +111,11 @@ contract SetupIntegrationTest is
         DeployDragonTokenizedStrategy.deploy();
         DeployDragonRouter.deploy();
         vm.startPrank(address(deployedSafe));
-        DeployMockStrategy.deploy(address(deployedSafe), address(dragonTokenizedStrategySingleton), address(dragonRouterProxy));
+        DeployMockStrategy.deploy(
+            address(deployedSafe),
+            address(dragonTokenizedStrategySingleton),
+            address(dragonRouterProxy)
+        );
         vm.stopPrank();
     }
 
@@ -176,14 +184,14 @@ contract SetupIntegrationTest is
     function _createTestOwners(uint256 _totalOwners) internal returns (address[] memory _owners) {
         _owners = new address[](_totalOwners);
         uint256[] memory privateKeys = new uint256[](_totalOwners);
-        
+
         // Generate all owners first
         for (uint256 i = 0; i < _totalOwners; i++) {
             (address owner, uint256 privateKey) = _randomSigner();
             _owners[i] = owner;
             privateKeys[i] = privateKey;
         }
-        
+
         // Sort owners and private keys together (bubble sort)
         for (uint256 i = 0; i < _totalOwners - 1; i++) {
             for (uint256 j = 0; j < _totalOwners - i - 1; j++) {
@@ -192,7 +200,7 @@ contract SetupIntegrationTest is
                     address tempAddr = _owners[j];
                     _owners[j] = _owners[j + 1];
                     _owners[j + 1] = tempAddr;
-                    
+
                     // Swap corresponding private keys
                     uint256 tempKey = privateKeys[j];
                     privateKeys[j] = privateKeys[j + 1];
@@ -200,7 +208,7 @@ contract SetupIntegrationTest is
                 }
             }
         }
-        
+
         // Store sorted private keys
         for (uint256 i = 0; i < _totalOwners; i++) {
             testPrivateKeys[i] = privateKeys[i];
@@ -233,17 +241,16 @@ contract SetupIntegrationTest is
         // Collect signatures using pre-sorted indices
         bytes memory signatures = new bytes(signerIndices.length * 65);
         uint256 pos = 0;
-       // log all the owner public keys
+        // log all the owner public keys
         for (uint256 i = 0; i < TEST_TOTAL_OWNERS; i++) {
             // check they are all owners of the safe
             require(deployedSafe.isOwner(owners[i]), "Owner not owner of safe");
         }
 
-
         for (uint256 i = 0; i < signerIndices.length; i++) {
             uint256 ownerSk = testPrivateKeys[signerIndices[i]];
             (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerSk, txHash);
-            
+
             assembly {
                 mstore(add(signatures, add(pos, 32)), r)
                 mstore(add(signatures, add(pos, 64)), s)
@@ -251,7 +258,7 @@ contract SetupIntegrationTest is
             }
             pos += 65;
         }
-         vm.startBroadcast(testPrivateKeys[0]);
+        vm.startBroadcast(testPrivateKeys[0]);
         // Execute transaction
         bool success = deployedSafe.execTransaction(
             to,
@@ -268,7 +275,4 @@ contract SetupIntegrationTest is
         vm.stopBroadcast();
         require(success, "Transaction execution failed");
     }
-
-    
 }
-
