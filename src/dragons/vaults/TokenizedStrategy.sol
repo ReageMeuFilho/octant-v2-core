@@ -746,10 +746,8 @@ abstract contract TokenizedStrategy {
         address target = IBaseStrategy(address(this)).target();
         if (target == address(0)) revert TokenizedStrategy__NotOperator();
 
-        // This function can be called by a wallet or a contract.
-        // Depending on the caller type, we need to handle the transfer differently.
-        // If msg.sender.code.length > 0, it is a contract.
-        if (msg.sender.code.length > 0) {
+        if (msg.sender == target || msg.sender == S.operator) {
+
             if (address(_asset) == ETH) {
                 if (
                     IAvatar(target).execTransactionFromModule(address(this), assets, "", Enum.Operation.Call) == false
@@ -767,7 +765,7 @@ abstract contract TokenizedStrategy {
                 ) revert TokenizedStrategy__TransferFailed();
             }
         } else {
-            // If msg.sender.code.length == 0, it is a wallet (EOA). Unless it is a contract calling during construction.
+
             if (address(_asset) == ETH) {
                 if (msg.value < assets) revert TokenizedStrategy__DepositMoreThanMax();
             } else {
