@@ -310,7 +310,7 @@ contract LockupsTest is Setup {
 
         // Second deposit without lockup
         strategy.deposit(additionalDeposit, user);
-  
+
         // Should not be able to withdraw locked shares
         vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__SharesStillLocked.selector));
         strategy.withdraw(depositAmount, user, user);
@@ -320,7 +320,7 @@ contract LockupsTest is Setup {
 
         // Try to withdraw more than unlocked shares
         vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__WithdrawMoreThanMax.selector));
-        strategy.withdraw(depositAmount + additionalDeposit +1, user, user);
+        strategy.withdraw(depositAmount + additionalDeposit + 1, user, user);
 
         strategy.withdraw(additionalDeposit, user, user, 0);
         vm.stopPrank();

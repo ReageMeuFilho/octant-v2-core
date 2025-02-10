@@ -104,7 +104,12 @@ contract DragonTokenizedStrategyTest is BaseTest {
     }
 
     /// @dev Demonstrates that a non-dragon user can deposit when dragon mode is off.
-    function testFuzz_nonDragonCanDepositWhenDragonModeOff(uint depositAmount, string memory alice, string memory bob, string memory charlie) public {
+    function testFuzz_nonDragonCanDepositWhenDragonModeOff(
+        uint depositAmount,
+        string memory alice,
+        string memory bob,
+        string memory charlie
+    ) public {
         depositAmount = bound(depositAmount, 1 ether, 100 ether);
 
         vm.assume(bytes(alice).length != bytes(bob).length);
@@ -122,7 +127,6 @@ contract DragonTokenizedStrategyTest is BaseTest {
         module.deposit{ value: depositAmount }(depositAmount, makeAddr(alice)); // Regular deposit to self
         module.deposit{ value: depositAmount }(depositAmount, makeAddr(bob)); // Regular deposit to others
 
-
         uint256 lockupDuration = MINIMUM_LOCKUP_DURATION;
         vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__InvalidReceiver.selector));
         module.depositWithLockup{ value: depositAmount }(depositAmount, makeAddr(charlie), lockupDuration);
@@ -130,7 +134,6 @@ contract DragonTokenizedStrategyTest is BaseTest {
 
         vm.prank(makeAddr(charlie));
         module.depositWithLockup{ value: depositAmount }(depositAmount, makeAddr(charlie), lockupDuration);
-        
 
         // Verify balances
         assertEq(module.balanceOf(makeAddr(bob)), depositAmount, "Deposit from Alice to Bob failed.");
@@ -296,7 +299,7 @@ contract DragonTokenizedStrategyTest is BaseTest {
         // Setup
         uint256 lockupDuration = MINIMUM_LOCKUP_DURATION;
         depositAmount = bound(depositAmount, 1 ether, 100 ether);
-        
+
         // Test depositWithLockup to others while dragon mode is on.
         vm.prank(operator);
         vm.expectRevert();
@@ -339,7 +342,7 @@ contract DragonTokenizedStrategyTest is BaseTest {
     function testFuzz_nonDragonCanWithdrawAfterDragonModeTurnsOn(uint256 initialDeposit) public {
         // Setup
         initialDeposit = bound(initialDeposit, 1 wei, 100 ether);
-        
+
         // 1. Enable non-dragon deposits first
         vm.prank(operator);
         module.toggleDragonMode(false);
@@ -347,7 +350,7 @@ contract DragonTokenizedStrategyTest is BaseTest {
         // 2. Degen deposits funds
         vm.prank(randomUser);
         vm.deal(randomUser, initialDeposit);
-        module.deposit{value: initialDeposit}(initialDeposit, randomUser);
+        module.deposit{ value: initialDeposit }(initialDeposit, randomUser);
         uint256 initialShares = ITokenizedStrategy(address(module)).balanceOf(randomUser);
         assert(initialShares > 0);
         assertEq(module.balanceOf(randomUser), initialDeposit, "Deposit amount mismatch");
@@ -363,5 +366,4 @@ contract DragonTokenizedStrategyTest is BaseTest {
         assertEq(finalShares, 0, "User should have no shares after full withdrawal");
         assertEq(address(randomUser).balance, initialDeposit, "Funds not received");
     }
-
 }
