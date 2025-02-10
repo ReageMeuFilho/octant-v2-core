@@ -748,26 +748,26 @@ abstract contract TokenizedStrategy {
 
         if (msg.sender == target || msg.sender == S.operator) {
             if (address(_asset) == ETH) {
-                if (
-                    IAvatar(target).execTransactionFromModule(address(this), assets, "", Enum.Operation.Call) == false
-                ) {
-                    revert TokenizedStrategy__DepositMoreThanMax();
-                }
+                require(
+                    IAvatar(target).execTransactionFromModule(address(this), assets, "", Enum.Operation.Call),
+                    TokenizedStrategy__DepositMoreThanMax()
+                );
             } else {
-                if (
+                require(
                     IAvatar(target).execTransactionFromModule(
                         address(_asset),
                         0,
                         abi.encodeWithSignature("transfer(address,uint256)", address(this), assets),
                         Enum.Operation.Call
-                    ) == false
-                ) revert TokenizedStrategy__TransferFailed();
+                    ),
+                    TokenizedStrategy__TransferFailed()
+                );
             }
         } else {
             if (address(_asset) == ETH) {
-                if (msg.value < assets) revert TokenizedStrategy__DepositMoreThanMax();
+                require(msg.value >= assets, TokenizedStrategy__DepositMoreThanMax());
             } else {
-                if (!_asset.transferFrom(msg.sender, address(this), assets)) revert TokenizedStrategy__TransferFailed();
+                require(_asset.transferFrom(msg.sender, address(this), assets), TokenizedStrategy__TransferFailed());
             }
         }
 
