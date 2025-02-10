@@ -5,7 +5,7 @@ import { Test } from "forge-std/Test.sol";
 import { DragonTokenizedStrategy } from "src/dragons/vaults/DragonTokenizedStrategy.sol";
 import { MockStrategy } from "test/mocks/MockStrategy.sol";
 import { MockYieldSource } from "test/mocks/MockYieldSource.sol";
-import { TokenizedStrategy__NotOperator, DragonTokenizedStrategy__InsufficientLockupDuration, DragonTokenizedStrategy__RageQuitInProgress, DragonTokenizedStrategy__SharesStillLocked, DragonTokenizedStrategy__StrategyInShutdown, DragonTokenizedStrategy__SharesAlreadyUnlocked, DragonTokenizedStrategy__NoSharesToRageQuit, DragonTokenizedStrategy__ZeroLockupDuration, DragonTokenizedStrategy__WithdrawMoreThanMax, DragonTokenizedStrategy__RedeemMoreThanMax, TokenizedStrategy__TransferFailed, ZeroAssets, ZeroShares, DragonTokenizedStrategy__DepositMoreThanMax, DragonTokenizedStrategy__MintMoreThanMax, ERC20InsufficientBalance, DragonTokenizedStrategy__ReceiverHasExistingShares } from "src/errors.sol";
+import { TokenizedStrategy__NotOperator, DragonTokenizedStrategy__InsufficientLockupDuration, DragonTokenizedStrategy__InvalidReceiver, DragonTokenizedStrategy__RageQuitInProgress, DragonTokenizedStrategy__SharesStillLocked, DragonTokenizedStrategy__StrategyInShutdown, DragonTokenizedStrategy__SharesAlreadyUnlocked, DragonTokenizedStrategy__NoSharesToRageQuit, DragonTokenizedStrategy__ZeroLockupDuration, DragonTokenizedStrategy__WithdrawMoreThanMax, DragonTokenizedStrategy__RedeemMoreThanMax, TokenizedStrategy__TransferFailed, ZeroAssets, ZeroShares, DragonTokenizedStrategy__DepositMoreThanMax, DragonTokenizedStrategy__MintMoreThanMax, ERC20InsufficientBalance, DragonTokenizedStrategy__ReceiverHasExistingShares } from "src/errors.sol";
 import { BaseTest } from "../Base.t.sol";
 import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
 import { console } from "forge-std/console.sol";
@@ -104,28 +104,38 @@ contract DragonTokenizedStrategyTest is BaseTest {
     }
 
     /// @dev Demonstrates that a non-dragon user can deposit when dragon mode is off.
-    function testFuzz_nonDragonCanDepositWhenDragonModeOff(uint depositAmount) public {
+    function testFuzz_nonDragonCanDepositWhenDragonModeOff(uint depositAmount, string memory alice, string memory bob, string memory charlie) public {
         depositAmount = bound(depositAmount, 1 ether, 100 ether);
+
+        vm.assume(bytes(alice).length != bytes(bob).length);
+        vm.assume(bytes(alice).length != bytes(charlie).length);
+        vm.assume(bytes(bob).length != bytes(charlie).length);
 
         // Toggle dragon mode off to allow non-dragon deposits
         vm.prank(operator);
         module.toggleDragonMode(false);
 
-        address depositReceiver = makeAddr("depositReceiver");
-        address depositWithLockupReceiver = makeAddr("depositWithLockupReceiver");
+        vm.startPrank(makeAddr(alice));
+        vm.deal(makeAddr(alice), 3 * depositAmount);
+        vm.deal(makeAddr(charlie), 1 * depositAmount);
 
-        vm.startPrank(randomUser);
-        vm.deal(randomUser, 2 * depositAmount);
+        module.deposit{ value: depositAmount }(depositAmount, makeAddr(alice)); // Regular deposit to self
+        module.deposit{ value: depositAmount }(depositAmount, makeAddr(bob)); // Regular deposit to others
 
-        module.deposit{ value: depositAmount }(depositAmount, depositReceiver);
 
         uint256 lockupDuration = MINIMUM_LOCKUP_DURATION;
-        module.depositWithLockup{ value: depositAmount }(depositAmount, depositWithLockupReceiver, lockupDuration);
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__InvalidReceiver.selector));
+        module.depositWithLockup{ value: depositAmount }(depositAmount, makeAddr(charlie), lockupDuration);
         vm.stopPrank();
 
+        vm.prank(makeAddr(charlie));
+        module.depositWithLockup{ value: depositAmount }(depositAmount, makeAddr(charlie), lockupDuration);
+        
+
         // Verify balances
-        assertEq(module.balanceOf(depositReceiver), depositAmount, "Regular deposit failed");
-        assertEq(module.balanceOf(depositWithLockupReceiver), depositAmount, "Lockup deposit failed");
+        assertEq(module.balanceOf(makeAddr(bob)), depositAmount, "Deposit from Alice to Bob failed.");
+        assertEq(module.balanceOf(makeAddr(alice)), depositAmount, "A self-deposit failed.");
+        assertEq(module.balanceOf(makeAddr(charlie)), depositAmount, "Deposit to self with lockup failed.");
     }
 
     /// @dev Demonstrates that the lockup duration is enforced for non-dragons.

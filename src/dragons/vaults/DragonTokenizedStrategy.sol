@@ -2,7 +2,7 @@
 pragma solidity ^0.8.25;
 
 import { TokenizedStrategy, IBaseStrategy, Math } from "./TokenizedStrategy.sol";
-import { Unauthorized, TokenizedStrategy__NotOperator, DragonTokenizedStrategy__NoOperation, DragonTokenizedStrategy__VaultSharesNotTransferable, DragonTokenizedStrategy__ZeroLockupDuration, DragonTokenizedStrategy__InsufficientLockupDuration, DragonTokenizedStrategy__SharesStillLocked, DragonTokenizedStrategy__InvalidLockupDuration, DragonTokenizedStrategy__InvalidRageQuitCooldownPeriod, DragonTokenizedStrategy__RageQuitInProgress, DragonTokenizedStrategy__StrategyInShutdown, DragonTokenizedStrategy__NoSharesToRageQuit, DragonTokenizedStrategy__SharesAlreadyUnlocked, DragonTokenizedStrategy__DepositMoreThanMax, DragonTokenizedStrategy__MintMoreThanMax, DragonTokenizedStrategy__WithdrawMoreThanMax, DragonTokenizedStrategy__RedeemMoreThanMax, ZeroShares, ZeroAssets, DragonTokenizedStrategy__ReceiverHasExistingShares } from "src/errors.sol";
+import { Unauthorized, TokenizedStrategy__NotOperator, DragonTokenizedStrategy__NoOperation, DragonTokenizedStrategy__InvalidReceiver, DragonTokenizedStrategy__VaultSharesNotTransferable, DragonTokenizedStrategy__ZeroLockupDuration, DragonTokenizedStrategy__InsufficientLockupDuration, DragonTokenizedStrategy__SharesStillLocked, DragonTokenizedStrategy__InvalidLockupDuration, DragonTokenizedStrategy__InvalidRageQuitCooldownPeriod, DragonTokenizedStrategy__RageQuitInProgress, DragonTokenizedStrategy__StrategyInShutdown, DragonTokenizedStrategy__NoSharesToRageQuit, DragonTokenizedStrategy__SharesAlreadyUnlocked, DragonTokenizedStrategy__DepositMoreThanMax, DragonTokenizedStrategy__MintMoreThanMax, DragonTokenizedStrategy__WithdrawMoreThanMax, DragonTokenizedStrategy__RedeemMoreThanMax, ZeroShares, ZeroAssets, DragonTokenizedStrategy__ReceiverHasExistingShares } from "src/errors.sol";
 
 contract DragonTokenizedStrategy is TokenizedStrategy {
     event NewLockupSet(address indexed user, uint256 indexed unlockTime, uint256 indexed lockedShares);
@@ -19,6 +19,12 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
 
     modifier onlyOperatorIfDragonMode() {
         if (isDragonOnly && msg.sender != _strategyStorage().operator) revert TokenizedStrategy__NotOperator();
+        _;
+    }
+
+    modifier validateArgsForLockupFunctions(address receiver, uint256 lockupDuration) {
+        if (lockupDuration == 0) revert DragonTokenizedStrategy__ZeroLockupDuration();
+        if (!isDragonOnly && receiver != msg.sender) revert DragonTokenizedStrategy__InvalidReceiver();
         _;
     }
 
@@ -361,8 +367,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         uint256 assets,
         address receiver,
         uint256 lockupDuration
-    ) external payable onlyOperatorIfDragonMode returns (uint256 shares) {
-        if (lockupDuration == 0) revert DragonTokenizedStrategy__ZeroLockupDuration();
+    ) external payable onlyOperatorIfDragonMode validateArgsForLockupFunctions(receiver, lockupDuration) returns (uint256 shares) {
         shares = _deposit(assets, receiver, lockupDuration);
     }
 
@@ -412,8 +417,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         uint256 shares,
         address receiver,
         uint256 lockupDuration
-    ) external payable onlyOperatorIfDragonMode returns (uint256 assets) {
-        if (lockupDuration == 0) revert DragonTokenizedStrategy__ZeroLockupDuration();
+    ) external payable onlyOperatorIfDragonMode validateArgsForLockupFunctions(receiver, lockupDuration) returns (uint256 assets) {
         assets = _mint(shares, receiver, lockupDuration);
     }
 
