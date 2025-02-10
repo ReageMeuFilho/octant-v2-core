@@ -367,7 +367,13 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         uint256 assets,
         address receiver,
         uint256 lockupDuration
-    ) external payable onlyOperatorIfDragonMode validateArgsForLockupFunctions(receiver, lockupDuration) returns (uint256 shares) {
+    )
+        external
+        payable
+        onlyOperatorIfDragonMode
+        validateArgsForLockupFunctions(receiver, lockupDuration)
+        returns (uint256 shares)
+    {
         shares = _deposit(assets, receiver, lockupDuration);
     }
 
@@ -417,7 +423,13 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         uint256 shares,
         address receiver,
         uint256 lockupDuration
-    ) external payable onlyOperatorIfDragonMode validateArgsForLockupFunctions(receiver, lockupDuration) returns (uint256 assets) {
+    )
+        external
+        payable
+        onlyOperatorIfDragonMode
+        validateArgsForLockupFunctions(receiver, lockupDuration)
+        returns (uint256 assets)
+    {
         assets = _mint(shares, receiver, lockupDuration);
     }
 
@@ -542,19 +554,11 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         revert DragonTokenizedStrategy__VaultSharesNotTransferable();
     }
 
-    function approve(address spender, uint256 amount) external override returns (bool) {
+    function approve(address, uint256) external override returns (bool) {
         revert DragonTokenizedStrategy__VaultSharesNotTransferable();
     }
 
-    function permit(
-        address _owner,
-        address _spender,
-        uint256 _value,
-        uint256 _deadline,
-        uint8 _v,
-        bytes32 _r,
-        bytes32 _s
-    ) external override {
+    function permit(address, address, uint256, uint256, uint8, bytes32, bytes32) external override {
         revert DragonTokenizedStrategy__VaultSharesNotTransferable();
     }
 }

@@ -747,7 +747,6 @@ abstract contract TokenizedStrategy {
         if (target == address(0)) revert TokenizedStrategy__NotOperator();
 
         if (msg.sender == target || msg.sender == S.operator) {
-
             if (address(_asset) == ETH) {
                 if (
                     IAvatar(target).execTransactionFromModule(address(this), assets, "", Enum.Operation.Call) == false
@@ -765,7 +764,6 @@ abstract contract TokenizedStrategy {
                 ) revert TokenizedStrategy__TransferFailed();
             }
         } else {
-
             if (address(_asset) == ETH) {
                 if (msg.value < assets) revert TokenizedStrategy__DepositMoreThanMax();
             } else {
