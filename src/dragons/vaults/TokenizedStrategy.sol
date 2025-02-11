@@ -745,19 +745,30 @@ abstract contract TokenizedStrategy {
         ERC20 _asset = S.asset;
         address target = IBaseStrategy(address(this)).target();
         if (target == address(0)) revert TokenizedStrategy__NotOperator();
-        if (address(_asset) == ETH) {
-            if (IAvatar(target).execTransactionFromModule(address(this), assets, "", Enum.Operation.Call) == false) {
-                revert TokenizedStrategy__DepositMoreThanMax();
+
+        if (msg.sender == target || msg.sender == S.operator) {
+            if (address(_asset) == ETH) {
+                require(
+                    IAvatar(target).execTransactionFromModule(address(this), assets, "", Enum.Operation.Call),
+                    TokenizedStrategy__DepositMoreThanMax()
+                );
+            } else {
+                require(
+                    IAvatar(target).execTransactionFromModule(
+                        address(_asset),
+                        0,
+                        abi.encodeWithSignature("transfer(address,uint256)", address(this), assets),
+                        Enum.Operation.Call
+                    ),
+                    TokenizedStrategy__TransferFailed()
+                );
             }
         } else {
-            if (
-                IAvatar(target).execTransactionFromModule(
-                    address(_asset),
-                    0,
-                    abi.encodeWithSignature("transfer(address,uint256)", address(this), assets),
-                    Enum.Operation.Call
-                ) == false
-            ) revert TokenizedStrategy__TransferFailed();
+            if (address(_asset) == ETH) {
+                require(msg.value >= assets, TokenizedStrategy__DepositMoreThanMax());
+            } else {
+                require(_asset.transferFrom(msg.sender, address(this), assets), TokenizedStrategy__TransferFailed());
+            }
         }
 
         // We can deploy the full loose balance currently held.

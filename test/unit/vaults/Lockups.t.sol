@@ -267,7 +267,7 @@ contract LockupsTest is Setup {
         strategy.depositWithLockup(depositAmount, user, lockupDuration);
 
         // Try to withdraw during lockup
-        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__WithdrawMoreThanMax.selector));
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__SharesStillLocked.selector));
         strategy.withdraw(depositAmount, user, user);
 
         // Skip past lockup
@@ -311,12 +311,16 @@ contract LockupsTest is Setup {
         // Second deposit without lockup
         strategy.deposit(additionalDeposit, user);
 
+        // Should not be able to withdraw locked shares
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__SharesStillLocked.selector));
+        strategy.withdraw(depositAmount, user, user);
+
+        // Skip past lockup
+        skip(lockupDuration + 1);
+
         // Try to withdraw more than unlocked shares
         vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__WithdrawMoreThanMax.selector));
-        strategy.withdraw(depositAmount + 1, user, user);
-
-        // Should not be able to withdraw locked shares
-        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__WithdrawMoreThanMax.selector));
+        strategy.withdraw(depositAmount + additionalDeposit + 1, user, user);
 
         strategy.withdraw(additionalDeposit, user, user, 0);
         vm.stopPrank();
@@ -845,7 +849,7 @@ contract LockupsTest is Setup {
         strategy.depositWithLockup(depositAmount, user, lockupDuration);
 
         // Test withdraw before unlock time
-        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__WithdrawMoreThanMax.selector));
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__SharesStillLocked.selector));
         strategy.withdraw(depositAmount, user, user, 0);
 
         // Test withdraw more than max

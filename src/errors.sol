@@ -60,6 +60,7 @@ error DragonTokenizedStrategy__NoSharesToRageQuit();
 error DragonTokenizedStrategy__SharesAlreadyUnlocked();
 error DragonTokenizedStrategy__LockupDurationTooShort();
 error DragonTokenizedStrategy__MaxUnlockIsAlwaysZero();
-
+error DragonTokenizedStrategy__NoOperation();
+error DragonTokenizedStrategy__InvalidReceiver();
 // BaseStrategy specific errors
 error BaseStrategy__NotSelf();
