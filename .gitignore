@@ -1,5 +1,6 @@
+.DS_Store
 # IDE
-.idea
+.idea/
 
 # Compiler files
 cache/
