@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.18;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
@@ -134,8 +134,12 @@ contract NonfungibleDepositManager is ERC721, Ownable, ReentrancyGuard {
     function claimValidator(uint256 tokenId, bytes32 depositDataRoot) external {
         DepositInfo storage info = deposits[tokenId];
         require(info.state == DepositState.Assigned, "Deposit not in Assigned state");
-        require(msg.sender == info.withdrawalAddress, "Only the withdrawal address can claim");
-        // Compute the deposit data root off-chain style and compare.
+        // Allow claim if caller is either the designated withdrawal address or the NFT owner.
+        require(
+            msg.sender == info.withdrawalAddress || msg.sender == ownerOf(tokenId),
+            "Not authorized to claim"
+        );
+        // Compute the deposit data root and verify it matches the provided value.
         bytes32 computedRoot = _computeDepositDataRoot(info.pubkey, info.withdrawalCredentials, info.signature);
         require(computedRoot == depositDataRoot, "Deposit data root mismatch");
 
@@ -144,6 +148,8 @@ contract NonfungibleDepositManager is ERC721, Ownable, ReentrancyGuard {
         info.confirmedTimestamp = block.timestamp; // Record confirmation time for cooldown.
         emit ValidatorConfirmed(tokenId, msg.sender, depositDataRoot);
     }
+
+
 
     // --- Step 4: Issue Validator ---
     /**
