@@ -1,530 +1,282 @@
-// SPDX-License-Identifier: AGPL-3.0-only
-pragma solidity 0.8.26;
+Identifier: MIT
+pragma solidity ^0.8.18;
 
-import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import {SafeTransferLib} from "./libraries/SafeTransferLib.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-contract ETH2StakeVault is ERC4626, IERC7540Vault, ReentrancyGuard, Ownable {
-    using SafeTransferLib for IERC20;
+/**
+ * @title NonfungibleDepositManager
+ * @notice Manages 32 ETH validator deposits via a 4‐step process, representing each deposit as an ERC-721 NFT.
+ * 
+ * The deposit lifecycle is:
+ *   1. requestDeposit – User sends 32 ETH; NFT is minted and withdrawal credentials (their address in proper format) are stored.
+ *   2. assignValidator – An approved operator commits the validator’s 48-byte public key and 96-byte signature.
+ *   3. claimValidator – The withdrawal address confirms the deposit by passing in the deposit data root.
+ *   4. issueValidator – An approved operator calls the official Deposit Contract on L1 with the stored deposit info.
+ *
+ * Additionally, a user may cancel (in Requested/Assigned states) to get their 32 ETH refunded.
+ */
+contract NonfungibleDepositManager is ERC721, Ownable, ReentrancyGuard {
+    // Address of the official ETH2 Deposit Contract on mainnet.
+    address public constant DEPOSIT_CONTRACT_ADDRESS = 0x00000000219ab540356cBB839Cbe05303d7705Fa;
 
-    uint256 private constant VALIDATOR_DEPOSIT = 32 ether;
-    
-    enum RequestState { None, Pending, Processing, Claimable, Cancelled, Claimed }
-    
-    struct ValidatorInfo {
-        bytes withdrawalCreds;     
-        bytes pubkey;              
-        bytes signature;           
-        bytes32 depositDataRoot;   
-        bool isActive;            
-        uint256 slashedAmount;    
-        bool isExited;            
-        uint256 exitEpoch;
-        uint256 requestId;        // Request that created this validator
+    /// @dev Interface for the official deposit contract.
+    interface IDepositContract {
+        function deposit(
+            bytes calldata pubkey,
+            bytes calldata withdrawal_credentials,
+            bytes calldata signature,
+            bytes32 deposit_data_root
+        ) external payable;
     }
 
-    struct Request {
-        uint256 amount;          
-        address owner;           // Original ETH/share provider
-        address controller;      // Request controller
-        RequestState state;      // Current state
-        RequestType requestType; // Deposit or Redeem
-        uint256 validatorIndex;  // Index if validator created
+    // The deposit process states.
+    enum DepositState { None, Requested, Assigned, Confirmed, Finalized, Cancelled }
+
+    // DepositInfo stores all information for a deposit.
+    struct DepositInfo {
+        DepositState state;
+        address withdrawalAddress;       // The address set at requestDeposit.
+        bytes32 withdrawalCredentials;   // 32-byte: 0x01 + 11 zeros + user's address.
+        bytes pubkey;                    // 48-byte BLS pubkey (immutable once assigned).
+        bytes signature;                 // 96-byte BLS signature (immutable once assigned).
+        bytes32 depositDataRoot;         // User-confirmed deposit data root.
+        address assignedOperator;        // Approved operator who called assignValidator.
     }
 
-    enum RequestType { Deposit, Redeem }
+    // tokenId => DepositInfo
+    mapping(uint256 => DepositInfo) private deposits;
 
-    // Core contract
-    IDepositContract public immutable DEPOSIT_CONTRACT;
+    // Next tokenId for minting NFT deposit receipts.
+    uint256 private nextTokenId = 1;
 
-    // Request management
-    uint256 public nextRequestId;
-    mapping(uint256 => Request) public requests;
-    mapping(uint256 => ValidatorInfo) public validators;
-    
-    // Amount tracking
-    uint256 public override totalAssets;
-    mapping(uint256 => uint256) public pendingDeposits;    // requestId -> amount
-    mapping(uint256 => uint256) public pendingWithdrawals;  // requestId -> amount
-    
-    // Request lookup
-    mapping(address => uint256[]) public controllerRequests;  // controller -> requestIds
-    mapping(address => mapping(address => bool)) public isOperator;
+    // Approved operator addresses.
+    mapping(address => bool) public operators;
 
-    event RequestCreated(
-        uint256 indexed requestId,
-        address indexed controller,
-        address owner,
-        RequestType requestType,
-        uint256 amount
-    );
+    // Total ETH (in wei) held as pending deposits.
+    uint256 public totalDeposits;
 
-    event RequestStateUpdated(
-        uint256 indexed requestId,
-        RequestState state
-    );
+    // Events for each stage.
+    event DepositRequested(uint256 indexed tokenId, address indexed user);
+    event ValidatorAssigned(uint256 indexed tokenId, address indexed operator, bytes pubkey);
+    event ValidatorConfirmed(uint256 indexed tokenId, address indexed user, bytes32 depositDataRoot);
+    event ValidatorIssued(uint256 indexed tokenId, address indexed operator);
+    event DepositCancelled(uint256 indexed tokenId, address indexed user);
 
-    event ValidatorCreated(
-        uint256 indexed requestId,
-        address indexed controller,
-        bytes pubkey,
-        uint256 validatorIndex
-    );
+    constructor() ERC721("ValidatorDeposit", "VDEP") {}
 
-    constructor(
-        address _depositContract,
-        address _asset,
-        string memory _name,
-        string memory _symbol
-    ) ERC4626(IERC20(_asset)) ERC20(_name, _symbol) Ownable(msg.sender) {
-        require(_depositContract != address(0), "Invalid deposit contract");
-        DEPOSIT_CONTRACT = IDepositContract(_depositContract);
-    }
-
-    function requestDeposit(
-        uint256 assets,
-        address controller,
-        address owner,
-        bytes calldata withdrawalCreds
-    ) public payable nonReentrant returns (uint256 requestId) {
-        require(owner == msg.sender || isOperator[owner][msg.sender], "Not authorized");
-        require(assets == VALIDATOR_DEPOSIT && msg.value == VALIDATOR_DEPOSIT, "Must be 32 ETH");
-        require(withdrawalCreds.length == 32, "Invalid withdrawal credentials");
-        
-        // Create new request
-        requestId = nextRequestId++;
-        
-        Request storage request = requests[requestId];
-        request.amount = assets;
-        request.owner = owner;
-        request.controller = controller;
-        request.state = RequestState.Pending;
-        request.requestType = RequestType.Deposit;
-        
-        // Track pending deposit
-        pendingDeposits[requestId] = assets;
-        
-        // Store validator withdrawal credentials
-        validators[requestId].withdrawalCreds = withdrawalCreds;
-        validators[requestId].requestId = requestId;
-        
-        // Track controller request
-        controllerRequests[controller].push(requestId);
-        
-        emit RequestCreated(requestId, controller, owner, RequestType.Deposit, assets);
-        emit DepositRequest(controller, owner, requestId, msg.sender, assets);
-        
-        return requestId;
-    }
-
+    // --- Operator Management ---
     /**
-     * @notice Process a validator deposit request by storing validator credentials
-     * @dev Only callable by contract owner
-     * @param requestId The ID of the deposit request
-     * @param pubkey The validator's public key
-     * @param signature The deposit signature
-     * @param depositDataRoot The deposit data root
-     * @param validatorIndex The validator index
+     * @notice Approve or revoke an operator.
      */
-    function processValidatorDeposit(
-        uint256 requestId,
-        bytes calldata pubkey,
-        bytes calldata signature,
-        bytes32 depositDataRoot,
-        uint256 validatorIndex
-    ) external nonReentrant onlyOwner {
-        Request storage request = requests[requestId];
-        ValidatorInfo storage validator = validators[requestId];
-        
-        require(request.state == RequestState.Pending, "Invalid request state");
-        require(request.requestType == RequestType.Deposit, "Not a deposit request");
-        require(!validator.isActive, "Validator already exists");
-        require(pubkey.length == 48 && signature.length == 96, "Invalid key lengths");
-
-        // Update validator info
-        validator.pubkey = pubkey;
-        validator.signature = signature;
-        validator.depositDataRoot = depositDataRoot;
-        validator.isActive = true;
-
-        // Update request state
-        request.state = RequestState.Claimable;
-        request.validatorIndex = validatorIndex;
-
-        emit ValidatorCreated(requestId, request.controller, pubkey, validatorIndex);
-        emit RequestStateUpdated(requestId, RequestState.Claimable);
+    function setOperator(address operator, bool approved) external onlyOwner {
+        operators[operator] = approved;
     }
 
+    // --- Step 1: Request Deposit ---
     /**
-     * @notice Allows request owner/controller to claim validator deposit and execute deposit to the official deposit contract
-     * @dev Only callable by the request owner or controller
-     * @param requestId The ID of the deposit request
+     * @notice User requests a deposit by sending exactly 32 ETH.
+     * The withdrawal credentials are set to the caller's address.
      */
-    function claimValidatorDeposit(uint256 requestId) external nonReentrant {
-        Request storage request = requests[requestId];
-        ValidatorInfo storage validator = validators[requestId];
-        
-        // Check that caller is either the request owner or controller
-        require(
-            msg.sender == request.controller || 
-            isOperator[request.controller][msg.sender], 
-            "Not request owner or controller"
-        );
-        require(request.state == RequestState.Claimable, "Not claimable");
-        require(validator.isActive, "Validator not processed");
+    function requestDeposit() external payable nonReentrant returns (uint256 tokenId) {
+        require(msg.value == 32 ether, "Must send exactly 32 ETH");
+        tokenId = nextTokenId++;
+        totalDeposits += msg.value;
 
-        // Execute deposit to official deposit contract
-        DEPOSIT_CONTRACT.deposit{value: VALIDATOR_DEPOSIT}(
-            validator.pubkey,
-            validator.withdrawalCreds,
-            validator.signature,
-            validator.depositDataRoot
+        // Format withdrawal credentials: 0x01 + 11 zero bytes + 20-byte address.
+        bytes32 cred = _formatWithdrawalCredentials(msg.sender);
+
+        deposits[tokenId] = DepositInfo({
+            state: DepositState.Requested,
+            withdrawalAddress: msg.sender,
+            withdrawalCredentials: cred,
+            pubkey: "",
+            signature: "",
+            depositDataRoot: 0,
+            assignedOperator: address(0)
+        });
+
+        _safeMint(msg.sender, tokenId);
+        emit DepositRequested(tokenId, msg.sender);
+    }
+
+    // --- Step 2: Assign Validator ---
+    /**
+     * @notice Approved operator assigns validator credentials.
+     * Can only be called when the deposit is in Requested state.
+     */
+    function assignValidator(uint256 tokenId, bytes calldata pubkey, bytes calldata signature) external {
+        require(operators[msg.sender], "Not an approved operator");
+        DepositInfo storage info = deposits[tokenId];
+        require(info.state == DepositState.Requested, "Deposit not in Requested state");
+        require(pubkey.length == 48, "Invalid pubkey length");
+        require(signature.length == 96, "Invalid signature length");
+
+        info.assignedOperator = msg.sender;
+        info.pubkey = pubkey;
+        info.signature = signature;
+        info.state = DepositState.Assigned;
+        emit ValidatorAssigned(tokenId, msg.sender, pubkey);
+    }
+
+    // --- Step 3: Claim Validator ---
+    /**
+     * @notice Withdrawal address confirms the validator assignment by providing the deposit data root.
+     * The data root is computed (via SSZ tree hash) from the pubkey, withdrawal credentials,
+     * 32 ETH (in gwei) and signature. This confirms that the operator’s data is correct.
+     * Only the original withdrawal address may call this.
+     */
+    function claimValidator(uint256 tokenId, bytes32 depositDataRoot) external {
+        DepositInfo storage info = deposits[tokenId];
+        require(info.state == DepositState.Assigned, "Deposit not in Assigned state");
+        require(msg.sender == info.withdrawalAddress, "Only the withdrawal address can claim");
+        // Compute the deposit data root off-chain style and compare.
+        bytes32 computedRoot = _computeDepositDataRoot(info.pubkey, info.withdrawalCredentials, info.signature);
+        require(computedRoot == depositDataRoot, "Deposit data root mismatch");
+
+        info.depositDataRoot = depositDataRoot;
+        info.state = DepositState.Confirmed;
+        emit ValidatorConfirmed(tokenId, msg.sender, depositDataRoot);
+    }
+
+    // --- Step 4: Issue Validator ---
+    /**
+     * @notice Approved operator issues the validator deposit on L1.
+     * This sends exactly 32 ETH and the stored deposit info to the official Deposit Contract.
+     * Can only be called when the deposit is in Confirmed state.
+     */
+    function issueValidator(uint256 tokenId) external nonReentrant {
+        require(operators[msg.sender], "Not an approved operator");
+        DepositInfo storage info = deposits[tokenId];
+        require(info.state == DepositState.Confirmed, "Deposit not in Confirmed state");
+
+        // Update state before external call.
+        info.state = DepositState.Finalized;
+        totalDeposits -= 32 ether;
+
+        // Call the official deposit contract.
+        IDepositContract(DEPOSIT_CONTRACT_ADDRESS).deposit{ value: 32 ether }(
+            info.pubkey,
+            abi.encodePacked(info.withdrawalCredentials),
+            info.signature,
+            info.depositDataRoot
         );
 
-        // Update state after successful deposit
-        request.state = RequestState.Claimed;
-        totalAssets += VALIDATOR_DEPOSIT;
-        pendingDeposits[requestId] = 0;
-        _mint(request.owner, VALIDATOR_DEPOSIT);
-
-        emit RequestStateUpdated(requestId, RequestState.Claimed);
+        emit ValidatorIssued(tokenId, msg.sender);
     }
 
-    function requestRedeem(
-       uint256 shares,
-       address controller,
-       address owner
-   ) public nonReentrant returns (uint256 requestId) {
-       require(balanceOf(owner) >= shares, "Insufficient shares");
-       
-       // Create new request
-       requestId = nextRequestId++;
-       
-       Request storage request = requests[requestId];
-       request.amount = shares;
-       request.owner = owner;
-       request.controller = controller;
-       request.state = RequestState.Pending;
-       request.requestType = RequestType.Redeem;
-
-       // Handle operator transfers
-       address sender = isOperator[owner][msg.sender] ? owner : msg.sender;
-       if (sender != owner) {
-           uint256 allowed = allowance(owner, sender);
-           if (allowed != type(uint256).max) {
-               _approve(owner, sender, allowed - shares);
-           }
-       }
-
-       // Track pending redemption
-       pendingWithdrawals[requestId] = shares;
-       
-       // Track controller request
-       controllerRequests[controller].push(requestId);
-
-       // Transfer shares to vault
-       _transfer(owner, address(this), shares);
-
-       emit RequestCreated(requestId, controller, owner, RequestType.Redeem, shares);
-       emit RedeemRequest(controller, owner, requestId, msg.sender, shares);
-       
-       return requestId;
-   }
-
-   function processRedeem(
-       uint256 requestId,
-       uint256 exitEpoch
-   ) external nonReentrant {
-       Request storage request = requests[requestId];
-       ValidatorInfo storage validator = validators[request.validatorIndex];
-       
-       require(request.state == RequestState.Pending, "Invalid request state");
-       require(request.requestType == RequestType.Redeem, "Not a redeem request");
-       require(validator.isActive, "No active validator");
-       require(!validator.isExited, "Already exited");
-
-       uint256 amount = request.amount;
-
-       // Update validator state
-       validator.isExited = true;
-       validator.exitEpoch = exitEpoch;
-
-       // Update request state
-       request.state = RequestState.Claimable;
-       totalAssets -= amount;
-       pendingWithdrawals[requestId] = amount;
-
-       // Burn shares
-       _burn(address(this), amount);
-
-       emit RequestStateUpdated(requestId, RequestState.Claimable);
-       emit ValidatorExited(request.validatorIndex, exitEpoch);
-   }
-
-   function claimRedeem(uint256 requestId) external nonReentrant {
-       Request storage request = requests[requestId];
-       
-       require(request.state == RequestState.Claimable, "Not claimable");
-       require(request.controller == msg.sender || isOperator[request.controller][msg.sender], "Not authorized");
-       
-       uint256 withdrawAmount = pendingWithdrawals[requestId];
-       require(withdrawAmount > 0, "Nothing to claim");
-
-       // Update state
-       request.state = RequestState.Claimed;
-       pendingWithdrawals[requestId] = 0;
-
-       // Transfer ETH to owner
-       (bool success, ) = request.owner.call{value: withdrawAmount}("");
-       require(success, "ETH transfer failed");
-
-       emit Withdraw(msg.sender, request.owner, request.controller, withdrawAmount, withdrawAmount);
-   }
-
-   function getRequestIds(
-       address controller
-   ) external view returns (uint256[] memory) {
-       return controllerRequests[controller];
-   }
-
-   function getRequestState(
-       uint256 requestId
-   ) external view returns (
-       RequestState state,
-       RequestType requestType,
-       uint256 amount,
-       address owner,
-       address controller
-   ) {
-       Request storage request = requests[requestId];
-       return (
-           request.state,
-           request.requestType,
-           request.amount,
-           request.owner,
-           request.controller
-       );
-   }
-
-   function cancelDepositRequest(
-       uint256 requestId,
-       address controller
-   ) external nonReentrant {
-       Request storage request = requests[requestId];
-       
-       require(request.controller == controller, "Invalid controller");
-       require(controller == msg.sender || isOperator[controller][msg.sender], "Not authorized");
-       require(request.state == RequestState.Pending, "Not pending");
-       require(request.requestType == RequestType.Deposit, "Not a deposit request");
-
-       uint256 refundAmount = pendingDeposits[requestId];
-       address refundAddress = request.owner;
-
-       // Update state
-       request.state = RequestState.Cancelled;
-       pendingDeposits[requestId] = 0;
-
-       // Return ETH to owner
-       (bool success, ) = refundAddress.call{value: refundAmount}("");
-       require(success, "ETH transfer failed");
-
-       emit RequestStateUpdated(requestId, RequestState.Cancelled);
-       emit CancelDepositRequest(controller, requestId, msg.sender);
-   }
-
-   function cancelRedeemRequest(
-       uint256 requestId,
-       address controller
-   ) external nonReentrant {
-       Request storage request = requests[requestId];
-       
-       require(request.controller == controller, "Invalid controller");
-       require(controller == msg.sender || isOperator[controller][msg.sender], "Not authorized");
-       require(request.state == RequestState.Pending, "Not pending");
-       require(request.requestType == RequestType.Redeem, "Not a redeem request");
-
-       uint256 shareAmount = request.amount;
-       address shareOwner = request.owner;
-
-       // Update state
-       request.state = RequestState.Cancelled;
-       pendingWithdrawals[requestId] = 0;
-
-       // Return shares to owner
-       _transfer(address(this), shareOwner, shareAmount);
-
-       emit RequestStateUpdated(requestId, RequestState.Cancelled);
-       emit CancelRedeemRequest(controller, requestId, msg.sender);
-   }
-
-   /**
-    * @notice Check if request can be cancelled
-    * @param requestId Request identifier
-    * @return canCancel Whether request is in cancellable state
-    */
-   function canCancelRequest(
-       uint256 requestId
-   ) external view returns (bool canCancel) {
-       Request storage request = requests[requestId];
-       return request.state == RequestState.Pending;
-   }
-
-   /**
-    * @notice Get cancellable amount for request
-    * @param requestId Request identifier
-    * @return amount Amount that would be returned on cancel
-    */
-   function getCancellableAmount(
-       uint256 requestId
-   ) external view returns (uint256 amount) {
-       Request storage request = requests[requestId];
-       if (request.state != RequestState.Pending) {
-           return 0;
-       }
-       
-       if (request.requestType == RequestType.Deposit) {
-           return pendingDeposits[requestId];
-       } else {
-           return pendingWithdrawals[requestId];
-       }
-   }
-    // --- ERC4626 Overrides ---
-
+    // --- Cancellation ---
     /**
-     * @notice Total ETH controlled by vault (explicitly tracked)
-     * @return Total assets in vault
+     * @notice Allows the withdrawal address to cancel a deposit (if still in Requested or Assigned state).
+     * Burns the NFT and refunds 32 ETH.
      */
-    function totalAssets() public view override returns (uint256) {
-        return totalAssets;
+    function cancelDeposit(uint256 tokenId) external nonReentrant {
+        DepositInfo storage info = deposits[tokenId];
+        require(info.state == DepositState.Requested || info.state == DepositState.Assigned, "Cannot cancel now");
+        require(msg.sender == info.withdrawalAddress, "Only the withdrawal address can cancel");
+
+        info.state = DepositState.Cancelled;
+        emit DepositCancelled(tokenId, msg.sender);
+        _burn(tokenId);
+        totalDeposits -= 32 ether;
+        (bool success, ) = msg.sender.call{ value: 32 ether }("");
+        require(success, "Refund failed");
+        delete deposits[tokenId];
+    }
+
+    // --- Helper Functions ---
+    /**
+     * @dev Formats withdrawal credentials: 0x01 (prefix) followed by 11 zero bytes and then the 20-byte address.
+     */
+    function _formatWithdrawalCredentials(address _addr) internal pure returns (bytes32) {
+        // Convert address to bytes20.
+        bytes20 addrBytes = bytes20(_addr);
+        return bytes32(abi.encodePacked(bytes1(0x01), bytes11(0), addrBytes));
     }
 
     /**
-     * @notice Convert assets to shares (1:1 for ETH staking)
-     * @param assets Amount of ETH
-     * @return shares Equal amount of shares
+     * @dev Computes the deposit data root according to the official deposit contract’s SSZ tree hash.
+     *
+     * The official algorithm is:
+     *   pubkey_root = sha256(abi.encodePacked(pubkey, bytes16(0)));
+     *   signature_root = sha256(abi.encodePacked(sha256(signature[0:64]), sha256(abi.encodePacked(signature[64:96], bytes32(0)))));
+     *   amount_bytes = to_little_endian_64(amount)   // here, amount in gwei (32 ETH = 32000000000)
+     *   amount_root = sha256(amount_bytes);
+     *   left = sha256(abi.encodePacked(pubkey_root, withdrawal_credentials));
+     *   right = sha256(abi.encodePacked(amount_root, signature_root));
+     *   deposit_data_root = sha256(abi.encodePacked(left, right));
      */
-    function convertToShares(uint256 assets) public pure override returns (uint256) {
-        return assets;
+    function _computeDepositDataRoot(
+        bytes memory pubkey,
+        bytes32 withdrawalCred,
+        bytes memory signature
+    ) internal pure returns (bytes32) {
+        require(pubkey.length == 48, "Bad pubkey length");
+        require(signature.length == 96, "Bad signature length");
+
+        bytes32 pubkeyRoot = sha256(abi.encodePacked(pubkey, bytes16(0)));
+        // For signature, slice into first 64 and last 32 bytes.
+        bytes memory sigPart1 = _slice(signature, 0, 64);
+        bytes memory sigPart2 = _slice(signature, 64, 32);
+        bytes32 sigRootFirst = sha256(sigPart1);
+        bytes32 sigRootSecond = sha256(abi.encodePacked(sigPart2, bytes32(0)));
+        bytes32 signatureRoot = sha256(abi.encodePacked(sigRootFirst, sigRootSecond));
+
+        // 32 ETH in gwei: 32 ETH = 32 * 1e9 = 32000000000.
+        uint64 depositAmountGwei = 32000000000;
+        bytes memory amountLE = _toLittleEndian64(depositAmountGwei);
+        bytes32 amountRoot = sha256(amountLE);
+
+        bytes32 left = sha256(abi.encodePacked(pubkeyRoot, withdrawalCred));
+        bytes32 right = sha256(abi.encodePacked(amountRoot, signatureRoot));
+        return sha256(abi.encodePacked(left, right));
     }
 
     /**
-     * @notice Convert shares to assets (1:1 for ETH staking)
-     * @param shares Amount of shares
-     * @return assets Equal amount of ETH
+     * @dev Helper: convert a uint64 to its 8-byte little-endian representation.
      */
-    function convertToAssets(uint256 shares) public pure override returns (uint256) {
-        return shares;
+    function _toLittleEndian64(uint64 value) internal pure returns (bytes memory) {
+        bytes8 b = bytes8(value);
+        bytes memory out = new bytes(8);
+        out[0] = b[7];
+        out[1] = b[6];
+        out[2] = b[5];
+        out[3] = b[4];
+        out[4] = b[3];
+        out[5] = b[2];
+        out[6] = b[1];
+        out[7] = b[0];
+        return out;
     }
 
     /**
-     * @notice Maximum deposit allowed (32 ETH if no active validator)
-     * @param controller Address to check
-     * @return Maximum deposit amount
+     * @dev Helper: slices a bytes array.
+     * @param data The original bytes array.
+     * @param start The starting index.
+     * @param len The length to slice.
+     * @return result A new bytes array containing the requested slice.
      */
-    function maxDeposit(address controller) public view override returns (uint256) {
-        if (validators[controller].isActive || pendingDeposits[controller] > 0) {
-            return 0;
+    function _slice(bytes memory data, uint256 start, uint256 len) internal pure returns (bytes memory result) {
+        require(data.length >= (start + len), "Slice out of range");
+        result = new bytes(len);
+        for (uint256 i = 0; i < len; i++) {
+            result[i] = data[i + start];
         }
-        return VALIDATOR_DEPOSIT;
     }
 
     /**
-     * @notice Maximum mint allowed (32 ETH if no active validator)
-     * @param controller Address to check
-     * @return Maximum mint amount
+     * @dev Prevents transfer of active deposit NFTs.
+     * NFTs can only be transferred if the deposit is Finalized or Cancelled.
      */
-    function maxMint(address controller) public view override returns (uint256) {
-        return maxDeposit(controller);
-    }
-
-    /**
-     * @notice Maximum withdrawal allowed (full balance if validator exited)
-     * @param owner Address to check
-     * @return Maximum withdrawal amount
-     */
-    function maxWithdraw(address owner) public view override returns (uint256) {
-        ValidatorInfo storage validator = validators[owner];
-        return validator.isExited ? balanceOf(owner) : 0;
-    }
-
-    /**
-     * @notice Maximum redemption allowed (full balance if validator exited)
-     * @param owner Address to check
-     * @return Maximum redemption amount
-     */
-    function maxRedeem(address owner) public view override returns (uint256) {
-        return maxWithdraw(owner);
-    }
-
-    /**
-     * @notice Disabled - use requestDeposit for async deposits
-     */
-    function deposit(uint256, address) public pure override returns (uint256) {
-        revert("Use requestDeposit");
-    }
-
-    /**
-     * @notice Disabled - use requestDeposit for async deposits
-     */
-    function mint(uint256, address) public pure override returns (uint256) {
-        revert("Use requestDeposit");
-    }
-
-    /**
-     * @notice Disabled - use requestRedeem for async withdrawals
-     */
-    function withdraw(uint256, address, address) public pure override returns (uint256) {
-        revert("Use requestRedeem");
-    }
-
-    /**
-     * @notice Disabled - use requestRedeem for async withdrawals
-     */
-    function redeem(uint256, address, address) public pure override returns (uint256) {
-        revert("Use requestRedeem");
-    }
-
-    /**
-     * @notice Disabled for async vault
-     */
-    function previewDeposit(uint256) public pure override returns (uint256) {
-        revert("Async deposits only");
-    }
-
-    /**
-     * @notice Disabled for async vault
-     */
-    function previewMint(uint256) public pure override returns (uint256) {
-        revert("Async deposits only");
-    }
-
-    /**
-     * @notice Disabled for async vault
-     */
-    function previewWithdraw(uint256) public pure override returns (uint256) {
-        revert("Async withdrawals only");
-    }
-
-    /**
-     * @notice Disabled for async vault
-     */
-    function previewRedeem(uint256) public pure override returns (uint256) {
-        revert("Async withdrawals only");
-    }
-
-    /**
-     * @notice Only accept ETH from deposit contract
-     */
-    receive() external payable {
-        require(msg.sender == address(DEPOSIT_CONTRACT), "Direct deposits not allowed");
-    }
-
-    /**
-     * @notice Prevent accidental ETH transfers
-     */
-    fallback() external payable {
-        revert("Not supported");
+    function _beforeTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize)
+        internal
+        override
+    {
+        super._beforeTokenTransfer(from, to, tokenId, batchSize);
+        if (from != address(0) && to != address(0)) { // not minting or burning
+            DepositState st = deposits[tokenId].state;
+            require(st == DepositState.Finalized || st == DepositState.Cancelled, "Active deposit NFTs are non-transferable");
+        }
     }
 }
