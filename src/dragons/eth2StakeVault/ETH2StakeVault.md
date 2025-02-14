@@ -73,8 +73,10 @@ After the deposit is successfully submitted via issueValidator, the beacon chain
 ### Dynamic NFT Metadata:
 The contract supports dynamic NFT metadata that reflects the current state of the deposit:
 
-    Requested: The metadata may display “Deposit Request #tokenId” with an image indicating pending status.
+    Requested: The metadata may display "Deposit Request #tokenId" with an image indicating pending status.
     Assigned/Confirmed: The metadata can update to reflect that the validator credentials have been set, and after confirmation, show details such as the validator public key.
     Finalized/Claimed: The metadata indicates that the deposit has been submitted to the beacon chain and is now active.
 
-Additionally we generate a base64 encoded URI response that includes a dynamically generated NFT that displays the current status
+Additionally we generate a base64 encoded URI response that includes a dynamically generated NFT that displays the current status.
+
+![Eth2StakerNFT](./assets/Eth2StakerNFT.jpg)

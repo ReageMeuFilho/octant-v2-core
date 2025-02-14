@@ -26,7 +26,10 @@ contract Eth2StakeVaultHarness is Eth2StakeVault {
     }
 
     /**
-     * @notice Override ERC721.tokenURI to generate dynamic metadata including an on-chain SVG image.
+     * @notice Generates dynamic NFT metadata including an on-chain SVG image for a given token ID
+     * @dev Overrides ERC721.tokenURI to provide rich token metadata
+     * @param tokenId The ID of the token to generate metadata for
+     * @return string The base64 encoded JSON metadata string containing SVG image and token details
      */
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
         require(_exists(tokenId), "Token does not exist");
@@ -66,7 +69,10 @@ contract Eth2StakeVaultHarness is Eth2StakeVault {
     }
 
     /**
-     * @notice Constructs the token URI (base64 JSON metadata) including an on-chain SVG image.
+     * @notice Builds the complete token URI with metadata and SVG visualization
+     * @dev Generates a base64 encoded JSON string containing token metadata and SVG image
+     * @param params Struct containing all necessary parameters for URI construction
+     * @return string The base64 encoded JSON metadata string
      */
     function constructTokenURI(ConstructTokenURIParams memory params) public pure returns (string memory) {
         // Build progress circles: 4 circles. For each index 0 to 3, fill green if index < progress; else grey.
@@ -175,21 +181,29 @@ contract Eth2StakeVaultHarness is Eth2StakeVault {
     // --- Utility Functions for Hex Conversions ---
 
     /**
-     * @dev Converts an address to its checksummed hex string.
+     * @notice Converts an Ethereum address to its checksummed hex string representation
+     * @dev Utilizes OpenZeppelin's Strings library for hex conversion
+     * @param account The address to convert
+     * @return string The hex string representation of the address
      */
     function toHexString(address account) internal pure returns (string memory) {
         return Strings.toHexString(uint160(account), 20);
     }
 
     /**
-     * @dev Converts bytes32 to hex string.
+     * @notice Converts a bytes32 value to its hex string representation
+     * @param data The bytes32 value to convert
+     * @return string The hex string representation of the bytes32 value
      */
     function toHexString(bytes32 data) internal pure returns (string memory) {
         return Strings.toHexString(uint256(data), 32);
     }
 
     /**
-     * @dev Converts arbitrary bytes to hex string.
+     * @notice Converts arbitrary bytes to a hex string representation
+     * @dev Decodes bytes to uint256 before conversion
+     * @param data The bytes array to convert
+     * @return string The hex string representation of the bytes
      */
     function toHexString(bytes memory data) internal pure returns (string memory) {
         uint256 length = data.length;
@@ -197,7 +211,10 @@ contract Eth2StakeVaultHarness is Eth2StakeVault {
     }
 
     /**
-     * @dev Shortens a hex string by showing the first 6 and last 4 characters, separated by "..."
+     * @notice Creates a shortened version of a hex string for display purposes
+     * @dev Shows first 6 and last 4 characters with "..." in between
+     * @param hexStr The hex string to shorten
+     * @return string The shortened hex string or original if length <= 10
      */
     function shortenHex(string memory hexStr) internal pure returns (string memory) {
         bytes memory b = bytes(hexStr);
@@ -216,7 +233,10 @@ contract Eth2StakeVaultHarness is Eth2StakeVault {
     }
 
     /**
-     * @dev Converts a DepositState enum to a string.
+     * @notice Converts a DepositState enum value to its string representation
+     * @dev Maps each enum value to a human-readable string
+     * @param state The DepositState enum value to convert
+     * @return string The string representation of the deposit state
      */
     function _stateToString(DepositState state) internal pure returns (string memory) {
         if (state == DepositState.Requested) return "Requested";
