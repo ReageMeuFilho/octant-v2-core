@@ -25,3 +25,6 @@
 [submodule "lib/hats-protocol"]
 	path = lib/hats-protocol
 	url = https://github.com/hats-protocol/hats-protocol
+[submodule "lib/kontrol-cheatcodes"]
+	path = lib/kontrol-cheatcodes
+	url = https://github.com/runtimeverification/kontrol-cheatcodes
