@@ -35,23 +35,21 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         uint256 balanceReceiver = freshUInt256Bounded("balanceOfReceiver");
         _storeMappingUInt256(address(strategy), BALANCES_SLOT, uint256(uint160(receiver)), 0, balanceReceiver);
 
-        uint256 lockupTimeReceiver = freshUInt256Bounded("lockupTimeReceiver");
-        _storeMappingUInt256(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(receiver)), 1, lockupTimeReceiver);
+        uint256 unlockTimeReceiver = freshUInt256Bounded("unlockTimeReceiver");
+        _storeMappingUInt256(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(receiver)), 1, unlockTimeReceiver);
 
-        if(receiver != safeOwner) {
-            vm.assume(balanceReceiver == 0);
-        }
+        vm.assume(balanceReceiver == 0 || receiver == safeOwner);
 
         if(lockupDuration > 0) {
             uint256 minimumLockupDuration = _loadUInt256(address(strategy), MINIMUM_LOCKUP_DURATION_SLOT);
-            if(lockupTimeReceiver <= block.timestamp) {
+            if(unlockTimeReceiver <= block.timestamp) {
                 vm.assume(lockupDuration > minimumLockupDuration);
                 // Overflow assumption
                 vm.assume(block.timestamp <= type(uint256).max - lockupDuration);
             }
             else{
-                vm.assume(lockupTimeReceiver <= type(uint256).max - lockupDuration);
-                vm.assume(lockupTimeReceiver + lockupDuration >= block.timestamp + minimumLockupDuration);
+                vm.assume(unlockTimeReceiver <= type(uint256).max - lockupDuration);
+                vm.assume(unlockTimeReceiver + lockupDuration >= block.timestamp + minimumLockupDuration);
             }
         }
     }
@@ -82,23 +80,33 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         // Assume non-reentrant
         _storeData(address(strategy), ENTERED_SLOT, ENTERED_OFFSET, ENTERED_WIDTH, 0);
 
-        // Assume that receiver has not rage quit
-        uint256 receiverHasRageQuit = 0;
-        _storeMappingData(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(receiver)), 3, 0, 1, receiverHasRageQuit);
+        // Assume that _owner has not rage quit
+        bool ownerHasRageQuit = kevm.freshBool("ownerHasRageQuit");
+        _storeMappingData(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(_owner)), 3, 0, 1, ownerHasRageQuit ? 1 : 0);
 
-        //uint256 balanceReceiver = freshUInt256Bounded("balanceOfReceiver");
-        //_storeMappingUInt256(address(strategy), BALANCES_SLOT, uint256(uint160(receiver)), 0, balanceReceiver);
+        uint256 ownerBalance = freshUInt256Bounded("ownerBalance");
+        _storeMappingUInt256(address(strategy), BALANCES_SLOT, uint256(uint160(_owner)), 0, ownerBalance);
 
         uint256 ownerLockupTime = freshUInt256Bounded("ownerLockupTime");
-        _storeMappingUInt256(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(receiver)), 1, ownerLockupTime);
+        _storeMappingUInt256(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(_owner)), 0, ownerLockupTime);
+
+        uint256 ownerUnlockTime = freshUInt256Bounded("ownerUnlockTime");
+        _storeMappingUInt256(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(_owner)), 1, ownerUnlockTime);
+        vm.assume(ownerUnlockTime <= block.timestamp || ownerHasRageQuit);
 
         uint256 ownerLockupShares = freshUInt256Bounded("ownerLockupShares");
         _storeMappingUInt256(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(_owner)), 2, ownerLockupShares);
-        vm.assume(assets <= ownerLockupShares);
+
+        if(ownerHasRageQuit) {
+            vm.assume(assets <= ownerLockupShares);
+        }
 
         vm.assume(0 < assets);
         vm.assume(assets <= ETH_UPPER_BOUND);
-        vm.assume(assets < strategy.maxWithdraw(_owner));
+        if (ownerUnlockTime <= block.timestamp) {
+            vm.assume(assets <= ownerBalance);
+        }
+        //vm.assume(assets < strategy.maxWithdraw(_owner));
 
         vm.assume(receiver != address(0));
         vm.assume(maxLoss <= 10_000); // MAX_BPS = 10_000
@@ -140,6 +148,19 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         _establish(mode, totalSupply == totalAssets);
     }
 
+    function lockupDurationInvariant(Mode mode, address user) internal view {
+        uint256 minimumLockupDuration = _loadUInt256(address(strategy), MINIMUM_LOCKUP_DURATION_SLOT);
+        uint256 ownerLockupTime = _loadMappingUInt256(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(user)), 0);
+        uint256 ownerUnlockTime = _loadMappingUInt256(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(user)), 1);
+        _establish(mode, ownerLockupTime <= block.timestamp);
+        _establish(mode, ownerLockupTime <= ownerUnlockTime);
+        _establish(mode, ownerUnlockTime - ownerLockupTime >= minimumLockupDuration);
+    }
+
+    function userBalancesTotalSupplyConsistency(Mode mode, address user) internal view {
+        _establish(mode, strategy.balanceOf(user) <= strategy.totalSupply());
+    }
+
     /*//////////////////////////////////////////////////////////////
                             ONLY OWNER TESTS
     //////////////////////////////////////////////////////////////*/
@@ -151,12 +172,16 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         _snapshop(preState, receiver);
 
         principalPreservationInvariant(Mode.Assume);
+        lockupDurationInvariant(Mode.Assume, receiver);
+        userBalancesTotalSupplyConsistency(Mode.Assume, receiver);
 
         vm.startPrank(safeOwner);
         strategy.deposit(assets, receiver);
         vm.stopPrank();
 
         principalPreservationInvariant(Mode.Assert);
+        lockupDurationInvariant(Mode.Assert, receiver);
+        userBalancesTotalSupplyConsistency(Mode.Assert, receiver);
 
         _snapshop(posState, receiver);
         assertDepositStateChanges(depositedAmount);
@@ -170,12 +195,16 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         _snapshop(preState, receiver);
 
         principalPreservationInvariant(Mode.Assume);
+        lockupDurationInvariant(Mode.Assume, receiver);
+        userBalancesTotalSupplyConsistency(Mode.Assume, receiver);
 
         vm.startPrank(safeOwner);
         strategy.depositWithLockup(assets, receiver, lockupDuration);
         vm.stopPrank();
 
         principalPreservationInvariant(Mode.Assert);
+        lockupDurationInvariant(Mode.Assert, receiver);
+        userBalancesTotalSupplyConsistency(Mode.Assert, receiver);
 
         _snapshop(posState, receiver);
         //TODO: assertions about the lockuptime and lockupshares
@@ -191,12 +220,16 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         _snapshop(preState, receiver);
 
         principalPreservationInvariant(Mode.Assume);
+        lockupDurationInvariant(Mode.Assume, receiver);
+        userBalancesTotalSupplyConsistency(Mode.Assume, receiver);
 
         vm.startPrank(safeOwner);
         strategy.mint(shares, receiver);
         vm.stopPrank();
 
         principalPreservationInvariant(Mode.Assert);
+        lockupDurationInvariant(Mode.Assert, receiver);
+        userBalancesTotalSupplyConsistency(Mode.Assert, receiver);
 
         _snapshop(posState, receiver);
         assertDepositStateChanges(shares);
@@ -211,12 +244,16 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         _snapshop(preState, receiver);
 
         principalPreservationInvariant(Mode.Assume);
+        lockupDurationInvariant(Mode.Assume, receiver);
+        userBalancesTotalSupplyConsistency(Mode.Assume, receiver);
 
         vm.startPrank(safeOwner);
         strategy.mintWithLockup(shares, receiver, lockupDuration);
         vm.stopPrank();
 
         principalPreservationInvariant(Mode.Assert);
+        lockupDurationInvariant(Mode.Assert, receiver);
+        userBalancesTotalSupplyConsistency(Mode.Assert, receiver);
 
         _snapshop(posState, receiver);
         //TODO: assertions about the lockuptime and lockupshares
@@ -233,12 +270,16 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         withdrawAssumptions(sender, assets, receiver, _owner, maxLoss);
 
         principalPreservationInvariant(Mode.Assume);
+        lockupDurationInvariant(Mode.Assume, _owner);
+        userBalancesTotalSupplyConsistency(Mode.Assume, _owner);
 
         vm.startPrank(sender);
         strategy.withdraw(assets, receiver, _owner, maxLoss);
         vm.stopPrank();
 
         principalPreservationInvariant(Mode.Assert);
+        lockupDurationInvariant(Mode.Assert, _owner);
+        userBalancesTotalSupplyConsistency(Mode.Assert, _owner);
     }
 
     function testRedeem(address sender, uint256 shares, address receiver, address _owner, uint256 maxLoss) public {

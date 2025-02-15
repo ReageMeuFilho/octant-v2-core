@@ -44,6 +44,7 @@ match-test                 = [
         "YearnPolygonUsdcStrategyTest.testDepositWithLockup(uint256,address,uint256)",
         "YearnPolygonUsdcStrategyTest.testMint(uint256,address)",
         "YearnPolygonUsdcStrategyTest.testMintWithLockup(uint256,address,uint256)",
+        "YearnPolygonUsdcStrategyTest.testWithdraw(address,uint256,address,address,uint256)",
     ]
 
 [show.default]
