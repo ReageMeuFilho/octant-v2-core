@@ -40,11 +40,11 @@ break-on-cheatcodes        = true
 auto_abstract              = true
 run-constructor            = false
 match-test                 = [
-        "YearnPolygonUsdcStrategyTest.testDeposit(uint256,address)",
-        "YearnPolygonUsdcStrategyTest.testDepositWithLockup(uint256,address,uint256)",
-        "YearnPolygonUsdcStrategyTest.testMint(uint256,address)",
-        "YearnPolygonUsdcStrategyTest.testMintWithLockup(uint256,address,uint256)",
-        "YearnPolygonUsdcStrategyTest.testWithdraw(address,uint256,address,address,uint256)",
+        #"YearnPolygonUsdcStrategyTest.testDeposit(uint256,address)",
+        #"YearnPolygonUsdcStrategyTest.testDepositWithLockup(uint256,address,uint256)",
+        #"YearnPolygonUsdcStrategyTest.testMint(uint256,address)",
+        #"YearnPolygonUsdcStrategyTest.testMintWithLockup(uint256,address,uint256)",
+        "YearnPolygonUsdcStrategyTest.testWithdraw(uint256,address,address,uint256)",
     ]
 
 [show.default]

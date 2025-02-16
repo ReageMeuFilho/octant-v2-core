@@ -161,7 +161,7 @@ contract Setup is BaseTest, KontrolTest  {
         vm.etch(YIELD_SOURCE, address(mockYieldferenceImplementation).code);
 
         // TODO: Make storage symbolic
-        MockYieldSource(payable(YIELD_SOURCE)).setUp(abi.encode(makeAddr("YIELD_STRATEGY_OWNER"), _asset));
+        MockYieldSource(YIELD_SOURCE).setUp(_asset);
     }
 
     function symbolicSetup() private {
@@ -205,6 +205,13 @@ contract Setup is BaseTest, KontrolTest  {
 
         strategySetup();
         symbolicSetup();
+
+        uint256 assetStrategyBalance = freshUInt256Bounded("assetStrategyBalance");
+        uint256 yieldSourceStrategyBalance = freshUInt256Bounded("yieldSourceStrategyBalance");
+        TestERC20(_asset).mint(address(strategy), assetStrategyBalance);
+        TestERC20(_asset).mint(address(this), yieldSourceStrategyBalance);
+        TestERC20(_asset).approve(address(YIELD_SOURCE), yieldSourceStrategyBalance);
+        MockYieldSource(YIELD_SOURCE).mint(yieldSourceStrategyBalance, address(strategy));
 
         currentTimestamp = freshUInt256Bounded("currentTimestamp");
         vm.assume(deploymentTimestamp < currentTimestamp);

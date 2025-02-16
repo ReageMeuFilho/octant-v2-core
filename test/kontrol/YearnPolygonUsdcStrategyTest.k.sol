@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IStrategy} from "src/interfaces/IStrategy.sol";
 
 import {TestERC20} from "test/kontrol/TestERC20.k.sol";
 import {Setup} from "test/kontrol/Setup.k.sol";
+import {MockYieldSource} from "test/kontrol/MockYieldSource.k.sol";
 import "test/kontrol/StrategyStateSlots.k.sol";
 import "test/kontrol/Constants.k.sol";
 
@@ -74,7 +76,7 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         }
     }
 
-    function withdrawAssumptions(address sender, uint256 assets, address receiver, address _owner, uint256 maxLoss) internal {
+    function withdrawAssumptions(address sender, uint256 assets, address receiver, address _owner, uint256 maxLoss) internal returns (uint256) {
         vm.assume(sender != address(0));
         
         // Assume non-reentrant
@@ -92,25 +94,35 @@ contract YearnPolygonUsdcStrategyTest is Setup {
 
         uint256 ownerUnlockTime = freshUInt256Bounded("ownerUnlockTime");
         _storeMappingUInt256(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(_owner)), 1, ownerUnlockTime);
+        // Avoid error DragonTokenizedStrategy__SharesStillLocked()
         vm.assume(ownerUnlockTime <= block.timestamp || ownerHasRageQuit);
 
         uint256 ownerLockupShares = freshUInt256Bounded("ownerLockupShares");
         _storeMappingUInt256(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(_owner)), 2, ownerLockupShares);
 
-        if(ownerHasRageQuit) {
-            vm.assume(assets <= ownerLockupShares);
-        }
-
-        vm.assume(0 < assets);
-        vm.assume(assets <= ETH_UPPER_BOUND);
-        if (ownerUnlockTime <= block.timestamp) {
-            vm.assume(assets <= ownerBalance);
-        }
-        //vm.assume(assets < strategy.maxWithdraw(_owner));
-
         vm.assume(receiver != address(0));
         vm.assume(maxLoss <= 10_000); // MAX_BPS = 10_000
 
+        vm.assume(0 < assets);
+        //vm.assume(assets <= ETH_UPPER_BOUND);
+        if (ownerUnlockTime <= block.timestamp) {
+            vm.assume(assets <= ownerBalance);
+            if(ownerHasRageQuit) {
+                vm.assume(assets <= ownerLockupShares);
+            }
+            return ownerBalance;
+        } else {
+            // Since we assume that ownerUnlockTime <= block.timestamp || ownerHasRageQuit 
+            // at this point we know that ownerHasRageQuit is true
+            vm.assume(ownerLockupTime <= block.timestamp);
+            vm.assume(ownerLockupTime < ownerUnlockTime);
+            uint256 timeElapsed = block.timestamp - ownerLockupTime;
+            uint256 unlockedPortion = (timeElapsed * ownerBalance) / (ownerUnlockTime - ownerLockupTime);
+            uint256 withdrawable = Math.min(unlockedPortion, ownerBalance);
+            vm.assume(assets <= withdrawable);
+            vm.assume(assets <= ownerLockupShares);
+            return withdrawable;
+        }
     }
 
     function _snapshop(ProofState storage state, address receiver) internal {
@@ -264,10 +276,13 @@ contract YearnPolygonUsdcStrategyTest is Setup {
                             ANY USER TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function testWithdraw(address sender, uint256 assets, address receiver, address _owner, uint256 maxLoss) public {
+    function testWithdraw(uint256 assets, address receiver, address _owner, uint256 maxLoss) public {
+        // Sender has to be concrete, otherwise it will branch a lot when setting prank 
+        address sender = makeAddr("SENDER");
         // TODO Remove this assumption
         vm.assume(sender == _owner);
-        withdrawAssumptions(sender, assets, receiver, _owner, maxLoss);
+        uint256 withdrawable = withdrawAssumptions(sender, assets, receiver, _owner, maxLoss);
+        vm.assume(withdrawable <= IStrategy(YIELD_SOURCE).balanceOf(address(strategy)));
 
         principalPreservationInvariant(Mode.Assume);
         lockupDurationInvariant(Mode.Assume, _owner);
@@ -280,6 +295,8 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         principalPreservationInvariant(Mode.Assert);
         lockupDurationInvariant(Mode.Assert, _owner);
         userBalancesTotalSupplyConsistency(Mode.Assert, _owner);
+
+        //TODO: assert expected state changes
     }
 
     function testRedeem(address sender, uint256 shares, address receiver, address _owner, uint256 maxLoss) public {
