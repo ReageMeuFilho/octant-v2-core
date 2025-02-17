@@ -376,26 +376,22 @@ contract Trader is ITransformer, Ownable, Pausable {
     /// @param low_ is a lower bound of sold token (in wei) for a single trade
     /// @param high_ is a higher bound of sold token (in wei) for a single trade
     /// @param budget_ sets amount of token (in wei) to be sold before deadline block height
-    function setSpending(uint256 low_, uint256 high_, uint256 budget_) public onlyOwner {
+    function setSpending(uint256 low_, uint256 high_, uint256 budget_) public onlyOwner validateSpendingArgs {
         lastHeight = block.number;
         saleValueLow = low_;
         saleValueHigh = high_;
         budget = budget_;
         if (spent > budget) spent = budget;
-        _sanityCheck();
         emit SpendingChanged(low_, high_, spent, budget);
     }
 
     /// @notice Configures spending periods. Budget will be fully spend before the end of each period.
     /// @param length_ is length of a period in blocks.
     /// @param height_ is a block height remarking the beginning of a period.
-    function configurePeriod(uint256 height_, uint256 length_) public onlyOwner {
+    function configurePeriod(uint256 height_, uint256 length_) public onlyOwner validateSpendingArgs {
         periodZero = height_;
         periodLength = length_;
         deadline = nextDeadline();
-        if (budget > 0) {
-            _sanityCheck();
-        }
         emit PeriodsChanged(height_, length_, deadline);
     }
 
@@ -406,10 +402,13 @@ contract Trader is ITransformer, Ownable, Pausable {
         else _unpause();
     }
 
-    /// @dev Whenever spending parameters are re-configured, this function is used to check if requested spending is realistic.
-    function _sanityCheck() private view {
-        if (saleValueLow == 0) revert Trader__ImpossibleConfigurationSaleValueLowIsZero();
-        if (getSafetyBlocks() > (deadline - block.number)) revert Trader__ImpossibleConfigurationSaleValueLowIsTooLow();
+    /// @dev Whenever spending parameters are re-configured, this modifier is used to check if requested spending is realistic.
+    modifier validateSpendingArgs() {
+        _;
+        if (budget != 0) {
+            if (saleValueLow == 0) revert Trader__ImpossibleConfigurationSaleValueLowIsZero();
+            if (getSafetyBlocks() > (deadline - block.number)) revert Trader__ImpossibleConfigurationSaleValueLowIsTooLow();
+        }
     }
 
     //FIXME: shoudn't we also be able to change the address of uniV3Swap?
