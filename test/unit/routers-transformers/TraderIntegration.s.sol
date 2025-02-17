@@ -2,13 +2,12 @@
 pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
-import {FixedPointMathLib} from "solady/utils/FixedPointMathLib.sol";
-import {TestPlus} from "lib/solady/test/utils/TestPlus.sol";
-import {MockERC20} from "test/mocks/MockERC20.sol";
+import { FixedPointMathLib } from "solady/utils/FixedPointMathLib.sol";
+import { TestPlus } from "lib/solady/test/utils/TestPlus.sol";
+import { MockERC20 } from "test/mocks/MockERC20.sol";
 import "../../../script/deploy/DeployTrader.sol";
-import {HelperConfig} from "../../../script/helpers/HelperConfig.s.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
+import { HelperConfig } from "../../../script/helpers/HelperConfig.s.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract TestTraderIntegrationETH is Test, TestPlus, DeployTrader {
     MockERC20 public token;
@@ -30,7 +29,7 @@ contract TestTraderIntegrationETH is Test, TestPlus, DeployTrader {
 
         config = new HelperConfig(true);
 
-        (address glmToken, address wethToken,,,,,,, address uniV3Swap,) = config.activeNetworkConfig();
+        (address glmToken, address wethToken, , , , , , , address uniV3Swap, ) = config.activeNetworkConfig();
 
         glmAddress = glmToken;
 
@@ -249,7 +248,6 @@ contract TestTraderIntegrationETH is Test, TestPlus, DeployTrader {
         vm.expectRevert(Trader.Trader__WrongHeight.selector);
         trader.findSaleValue(1 ether);
     }
-
 }
 
 contract ContractThatRejectsETH {

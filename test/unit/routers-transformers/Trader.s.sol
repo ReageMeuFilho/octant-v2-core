@@ -2,11 +2,11 @@
 pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
-import {TestPlus} from "lib/solady/test/utils/TestPlus.sol";
+import { TestPlus } from "lib/solady/test/utils/TestPlus.sol";
 import "src/routers-transformers/Trader.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
-import {HelperConfig} from "script/helpers/HelperConfig.s.sol";
-import {MockERC20} from "test/mocks/MockERC20.sol";
+import { HelperConfig } from "script/helpers/HelperConfig.s.sol";
+import { MockERC20 } from "test/mocks/MockERC20.sol";
 
 contract TestTraderRandomness is Test, TestPlus {
     MockERC20 public token;
@@ -28,7 +28,7 @@ contract TestTraderRandomness is Test, TestPlus {
         token = new MockERC20();
 
         helperConfig = new HelperConfig(true);
-        (, address wethToken,,,,,,, address uniV3Swap,) = helperConfig.activeNetworkConfig();
+        (, address wethToken, , , , , , , address uniV3Swap, ) = helperConfig.activeNetworkConfig();
 
         trader = new Trader(abi.encode(owner, ETH, token, wethToken, beneficiary, swapper, uniV3Swap, oracle));
 
