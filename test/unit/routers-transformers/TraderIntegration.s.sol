@@ -228,7 +228,8 @@ contract TestTraderIntegrationETH is Test, TestPlus, DeployTrader {
         vm.stopPrank();
 
         vm.roll(block.number + 100);
-        vm.expectRevert(Trader.Trader__ETHTransferFailed.selector);
+        // revert without data
+        vm.expectRevert();
         trader.convert(block.number - 2);
     }
 

@@ -117,9 +117,6 @@ contract Trader is ITransformer, Ownable, Pausable {
     /// @notice Unexpected ETH passed as value in function call.
     error Trader__UnexpectedETH();
 
-    /// @notice Transfer of ETH failed.
-    error Trader__ETHTransferFailed();
-
     /// @notice Configuration parameters are impossible: deadline is in the past.
     error Trader__ImpossibleConfigurationDeadlineInThePast();
 
@@ -308,8 +305,7 @@ contract Trader is ITransformer, Ownable, Pausable {
         spent = spent + saleValue;
 
         if (base == ETH) {
-            (bool success, ) = payable(swapper).call{ value: saleValue }("");
-            if (!success) revert Trader__ETHTransferFailed();
+            payable(swapper).transfer(saleValue);
         } else {
             IERC20(base).safeTransfer(swapper, saleValue);
         }
