@@ -24,8 +24,8 @@ import {KontrolTest} from "test/kontrol/KontrolTest.k.sol";
 
 contract Setup is BaseTest, KontrolTest  {
     DragonTokenizedStrategy public dragonTokenizedStrategySingleton;
-    /// @notice The deployed DragonRouter proxy
-    DragonRouter public dragonRouterProxy;
+    /// @notice The deployed DragonRouter
+    DragonRouter public dragonRouter;
 
     YearnPolygonUsdcStrategy public polygonStrategy;
 
@@ -50,49 +50,28 @@ contract Setup is BaseTest, KontrolTest  {
 
     function deploySplitChecker() private returns (SplitChecker) {
         /// The deployed SplitChecker implementation
-        SplitChecker splitCheckerSingleton;
-        /// The deployed SplitChecker proxy
-        SplitChecker splitCheckerProxy;
+        SplitChecker splitChecker;
 
         /// Default configuration values
         uint256 DEFAULT_MAX_OPEX_SPLIT = 0.5e18;
         uint256 DEFAULT_MIN_METAPOOL_SPLIT = 0.05e18;
 
-        splitCheckerSingleton = new SplitChecker();
+        splitChecker = new SplitChecker();
+        splitChecker.initialize(makeAddr("GOVERNANCE"), DEFAULT_MAX_OPEX_SPLIT, DEFAULT_MIN_METAPOOL_SPLIT);
 
-        // Deploy ProxyAdmin for DragonRouter proxy
-        ProxyAdmin proxyAdmin = new ProxyAdmin(msg.sender);
-
-        // Deploy TransparentProxy for DragonRouter
-        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
-            address(splitCheckerSingleton),
-            address(proxyAdmin),
-            // TODO Try to make these values symbolic later
-            abi.encodeCall(
-                SplitChecker.initialize,
-                (
-                    makeAddr("GOVERNANCE"),
-                    DEFAULT_MAX_OPEX_SPLIT,
-                    DEFAULT_MIN_METAPOOL_SPLIT
-                )
-            )
-        );
-
-        splitCheckerProxy = SplitChecker(payable(address(proxy)));
-
-        return splitCheckerProxy;
+        return splitChecker;
     }
 
     function deployDragonRouter() private {
         // The deployed DragonRouter implementation
-        DragonRouter dragonRouterSingleton = new DragonRouter();
+        dragonRouter = new DragonRouter();
 
         // setup empty strategies and assets
         address[] memory strategies = new address[](0);
         address[] memory assets = new address[](0);
 
         // Deploy Spli Checker
-        SplitChecker splitCheckerProxy = deploySplitChecker();
+        SplitChecker splitChecker = deploySplitChecker();
 
         bytes memory initData = abi.encode(
             msg.sender, // owner
@@ -101,23 +80,13 @@ contract Setup is BaseTest, KontrolTest  {
                 assets, // initial assets array
                 msg.sender, // governance address
                 msg.sender, // regen governance address
-                address(splitCheckerProxy), // split checker address
+                address(splitChecker), // split checker address
                 msg.sender, // opex vault address
                 msg.sender // metapool address
             )
         );
 
-        // Deploy ProxyAdmin for DragonRouter proxy
-        ProxyAdmin proxyAdmin = new ProxyAdmin(msg.sender);
-
-        // Deploy TransparentProxy for DragonRouter
-        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
-            address(dragonRouterSingleton),
-            address(proxyAdmin),
-            abi.encodeCall(DragonRouter.setUp, initData)
-        );
-
-        dragonRouterProxy = DragonRouter(payable(address(proxy)));
+        dragonRouter.setUp(initData);
     }
 
     function strategySetup() private {
@@ -131,7 +100,7 @@ contract Setup is BaseTest, KontrolTest  {
             address(dragonTokenizedStrategySingleton),
             _management,
             _keeper,
-            address(dragonRouterProxy),
+            address(dragonRouter),
             maxReportDelay,
             _regenGovernance
         );

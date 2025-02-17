@@ -31,7 +31,7 @@ contract KontrolTest is Test, KontrolCheats {
         } else if (mode == Mode.Try) {
             return condition;
         } else {
-            assert(condition);
+            vm.assertEq(condition, true);
             return true;
         }
     }

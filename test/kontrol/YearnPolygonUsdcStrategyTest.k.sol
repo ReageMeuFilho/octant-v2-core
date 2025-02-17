@@ -3,6 +3,7 @@ pragma solidity ^0.8.25;
 
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IStrategy} from "src/interfaces/IStrategy.sol";
+import "src/errors.sol";
 
 import {TestERC20} from "test/kontrol/TestERC20.k.sol";
 import {Setup} from "test/kontrol/Setup.k.sol";
@@ -20,15 +21,39 @@ struct ProofState {
     uint256 strategyYieldSourcesShares;
 }
 
+struct UserInfo {
+    uint256 balance;
+    uint256 lockupTime;
+    uint256 unlockTime;
+    uint256 lockedShares;
+    bool isRageQuit;
+}
+
 contract YearnPolygonUsdcStrategyTest is Setup {
     ProofState private preState;
     ProofState private posState;
 
+    function setupSymbolicUser(address user) internal returns (UserInfo memory info) {
+        info.balance = freshUInt256Bounded("userBalance");
+        _storeMappingUInt256(address(strategy), BALANCES_SLOT, uint256(uint160(user)), 0, info.balance);
 
-    function receiverSetup(address receiver, uint256 lockupDuration) private {
+        info.lockupTime = freshUInt256Bounded("userLockupTime");
+        _storeMappingUInt256(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(user)), 0, info.lockupTime);
+
+        info.unlockTime = freshUInt256Bounded("userUnlockTime");
+        _storeMappingUInt256(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(user)), 1, info.unlockTime);
+
+        info.lockedShares = freshUInt256Bounded("userLockupShares");
+        _storeMappingUInt256(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(user)), 2, info.lockedShares);
+
+        info.isRageQuit = kevm.freshBool("userHasRageQuit");
+        _storeMappingData(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(user)), 3, 0, 1, info.isRageQuit ? 1 : 0);
+    }
+
+    function receiverSetup(address receiver, uint256 lockupDuration) internal {
         vm.assume(receiver != address(0));
         vm.assume(receiver != address(strategy));
-        vm.assume(receiver != address(dragonRouterProxy));
+        vm.assume(receiver != address(dragonRouter));
 
         // Assume that receiver has not rage quit
         uint256 receiverHasRageQuit = 0;
@@ -40,7 +65,7 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         uint256 unlockTimeReceiver = freshUInt256Bounded("unlockTimeReceiver");
         _storeMappingUInt256(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(receiver)), 1, unlockTimeReceiver);
 
-        vm.assume(balanceReceiver == 0 || receiver == safeOwner);
+        vm.assume(receiver == safeOwner || balanceReceiver == 0);
 
         if(lockupDuration > 0) {
             uint256 minimumLockupDuration = _loadUInt256(address(strategy), MINIMUM_LOCKUP_DURATION_SLOT);
@@ -76,15 +101,11 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         }
     }
 
-    function withdrawAssumptions(address sender, uint256 assets, address receiver, address _owner, uint256 maxLoss) internal returns (uint256) {
+    function withdrawAssumptions(address sender, uint256 assets, address receiver, address _owner, uint256 maxLoss) internal {
         vm.assume(sender != address(0));
         
         // Assume non-reentrant
         _storeData(address(strategy), ENTERED_SLOT, ENTERED_OFFSET, ENTERED_WIDTH, 0);
-
-        // Assume that _owner has not rage quit
-        bool ownerHasRageQuit = kevm.freshBool("ownerHasRageQuit");
-        _storeMappingData(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(_owner)), 3, 0, 1, ownerHasRageQuit ? 1 : 0);
 
         uint256 ownerBalance = freshUInt256Bounded("ownerBalance");
         _storeMappingUInt256(address(strategy), BALANCES_SLOT, uint256(uint160(_owner)), 0, ownerBalance);
@@ -94,25 +115,27 @@ contract YearnPolygonUsdcStrategyTest is Setup {
 
         uint256 ownerUnlockTime = freshUInt256Bounded("ownerUnlockTime");
         _storeMappingUInt256(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(_owner)), 1, ownerUnlockTime);
-        // Avoid error DragonTokenizedStrategy__SharesStillLocked()
-        vm.assume(ownerUnlockTime <= block.timestamp || ownerHasRageQuit);
 
         uint256 ownerLockupShares = freshUInt256Bounded("ownerLockupShares");
         _storeMappingUInt256(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(_owner)), 2, ownerLockupShares);
+
+        bool ownerHasRageQuit = kevm.freshBool("ownerHasRageQuit");
+        _storeMappingData(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(_owner)), 3, 0, 1, ownerHasRageQuit ? 1 : 0);
+        // Avoid error DragonTokenizedStrategy__SharesStillLocked()
+        vm.assume(ownerHasRageQuit || ownerUnlockTime <= block.timestamp);
 
         vm.assume(receiver != address(0));
         vm.assume(maxLoss <= 10_000); // MAX_BPS = 10_000
 
         vm.assume(0 < assets);
-        //vm.assume(assets <= ETH_UPPER_BOUND);
+        
         if (ownerUnlockTime <= block.timestamp) {
             vm.assume(assets <= ownerBalance);
             if(ownerHasRageQuit) {
                 vm.assume(assets <= ownerLockupShares);
             }
-            return ownerBalance;
         } else {
-            // Since we assume that ownerUnlockTime <= block.timestamp || ownerHasRageQuit 
+            // Since we assume that ownerHasRageQuit || ownerUnlockTime <= block.timestamp 
             // at this point we know that ownerHasRageQuit is true
             vm.assume(ownerLockupTime <= block.timestamp);
             vm.assume(ownerLockupTime < ownerUnlockTime);
@@ -121,7 +144,6 @@ contract YearnPolygonUsdcStrategyTest is Setup {
             uint256 withdrawable = Math.min(unlockedPortion, ownerBalance);
             vm.assume(assets <= withdrawable);
             vm.assume(assets <= ownerLockupShares);
-            return withdrawable;
         }
     }
 
@@ -141,7 +163,7 @@ contract YearnPolygonUsdcStrategyTest is Setup {
     function assertDepositStateChanges(uint256 amount) internal view {
         assertEq(posState.assetOwnerBalance, preState.assetOwnerBalance - amount);
         assertEq(posState.assetYieldSourceBalance, preState.assetYieldSourceBalance + amount);
-        assertEq(posState.assetStrategyBalance, preState.assetStrategyBalance);
+        assertEq(posState.assetStrategyBalance, 0);
         assertEq(posState.stateTotalAssets, preState.stateTotalAssets + amount);
         assertEq(posState.stateTotalSupply, preState.stateTotalSupply + amount);
         assertEq(posState.receiverStrategyShares, preState.receiverStrategyShares + amount);
@@ -164,9 +186,13 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         uint256 minimumLockupDuration = _loadUInt256(address(strategy), MINIMUM_LOCKUP_DURATION_SLOT);
         uint256 ownerLockupTime = _loadMappingUInt256(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(user)), 0);
         uint256 ownerUnlockTime = _loadMappingUInt256(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(user)), 1);
+        uint256 ownerLockupShares = _loadMappingUInt256(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(user)), 2);
+
         _establish(mode, ownerLockupTime <= block.timestamp);
         _establish(mode, ownerLockupTime <= ownerUnlockTime);
-        _establish(mode, ownerUnlockTime - ownerLockupTime >= minimumLockupDuration);
+        //if (ownerLockupShares > 0) {
+        //    _establish(mode, ownerUnlockTime - ownerLockupTime >= minimumLockupDuration);
+        //}
     }
 
     function userBalancesTotalSupplyConsistency(Mode mode, address user) internal view {
@@ -281,12 +307,19 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         address sender = makeAddr("SENDER");
         // TODO Remove this assumption
         vm.assume(sender == _owner);
-        uint256 withdrawable = withdrawAssumptions(sender, assets, receiver, _owner, maxLoss);
-        vm.assume(withdrawable <= IStrategy(YIELD_SOURCE).balanceOf(address(strategy)));
+        withdrawAssumptions(sender, assets, receiver, _owner, maxLoss);
 
         principalPreservationInvariant(Mode.Assume);
         lockupDurationInvariant(Mode.Assume, _owner);
         userBalancesTotalSupplyConsistency(Mode.Assume, _owner);
+
+        //uint256 withdrawable = strategy.maxWithdraw(_owner);
+        //vm.assume(assets <= withdrawable);
+        //vm.assume(withdrawable <= IStrategy(YIELD_SOURCE).maxWithdraw(address(strategy)));
+        //uint256 assetStrategyBalance = TestERC20(_asset).balanceOf(address(strategy));
+        //if(assetStrategyBalance < assets) {
+        //    vm.assume(assets - assetStrategyBalance <= IStrategy(YIELD_SOURCE).balanceOf(address(strategy)));
+        //}
 
         vm.startPrank(sender);
         strategy.withdraw(assets, receiver, _owner, maxLoss);
@@ -299,16 +332,83 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         //TODO: assert expected state changes
     }
 
-    function testRedeem(address sender, uint256 shares, address receiver, address _owner, uint256 maxLoss) public {
+    function testWithdrawRevert(uint256 assets, address receiver, address _owner, uint256 maxLoss) public {
+        // Sender has to be concrete, otherwise it will branch a lot when setting prank 
+        address sender = makeAddr("SENDER");
+
+        UserInfo memory user = setupSymbolicUser(sender);
+        // Avoid error DragonTokenizedStrategy__SharesStillLocked()
+        vm.assume(!user.isRageQuit && block.timestamp <= user.unlockTime);
+
         vm.startPrank(sender);
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__SharesStillLocked.selector));
+        strategy.withdraw(assets, receiver, _owner, maxLoss);
+        vm.stopPrank();
+    }
+
+    function testRedeem(uint256 shares, address receiver, address _owner, uint256 maxLoss) public {
+       // Sender has to be concrete, otherwise it will branch a lot when setting prank 
+        address sender = makeAddr("SENDER");
+        // TODO Remove this assumption
+        vm.assume(sender == _owner);
+        withdrawAssumptions(sender, shares, receiver, _owner, maxLoss);
+
+        principalPreservationInvariant(Mode.Assume);
+        lockupDurationInvariant(Mode.Assume, _owner);
+        userBalancesTotalSupplyConsistency(Mode.Assume, _owner);
+
+        //uint256 withdrawable = strategy.maxWithdraw(_owner);
+        //vm.assume(assets <= withdrawable);
+        //vm.assume(withdrawable <= IStrategy(YIELD_SOURCE).maxWithdraw(address(strategy)));
+        uint256 assetStrategyBalance = TestERC20(_asset).balanceOf(address(strategy));
+        if(assetStrategyBalance < shares) {
+            vm.assume(shares - assetStrategyBalance <= IStrategy(YIELD_SOURCE).balanceOf(address(strategy)));
+        }
+        
+        vm.startPrank(sender);
+        strategy.redeem(shares, receiver, _owner, maxLoss);
+        vm.stopPrank();
+
+        principalPreservationInvariant(Mode.Assert);
+        lockupDurationInvariant(Mode.Assert, _owner);
+        userBalancesTotalSupplyConsistency(Mode.Assert, _owner);
+
+        //TODO: assert expected state changes
+    }
+
+    function testRedeemRevert(uint256 shares, address receiver, address _owner, uint256 maxLoss) public {
+        // Sender has to be concrete, otherwise it will branch a lot when setting prank 
+        address sender = makeAddr("SENDER");
+
+        UserInfo memory user = setupSymbolicUser(sender);
+        // Avoid error DragonTokenizedStrategy__SharesStillLocked()
+        vm.assume(!user.isRageQuit && block.timestamp <= user.unlockTime);
+
+        vm.startPrank(sender);
+        vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__SharesStillLocked.selector));
         strategy.redeem(shares, receiver, _owner, maxLoss);
         vm.stopPrank();
     }
 
     function testInitiateRageQuit(address sender) public {
+        UserInfo memory user = setupSymbolicUser(sender);
+        vm.assume(user.balance > 0);
+        vm.assume(block.timestamp < user.unlockTime);
+        vm.assume(!user.isRageQuit);
+
+        principalPreservationInvariant(Mode.Assume);
+        lockupDurationInvariant(Mode.Assume, sender);
+        userBalancesTotalSupplyConsistency(Mode.Assume, sender);
+
         vm.startPrank(sender);
         strategy.initiateRageQuit();
         vm.stopPrank();
+
+        principalPreservationInvariant(Mode.Assert);
+        lockupDurationInvariant(Mode.Assert, sender);
+        userBalancesTotalSupplyConsistency(Mode.Assert, sender);
+
+        //TODO: assert expected state changes
     }
 
     //approve

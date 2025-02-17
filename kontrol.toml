@@ -36,15 +36,19 @@ break-on-jumpi             = false
 break-on-calls             = false
 break-on-storage           = false
 break-on-basic-blocks      = false
-break-on-cheatcodes        = true
+break-on-cheatcodes        = false
 auto_abstract              = true
 run-constructor            = false
 match-test                 = [
-        #"YearnPolygonUsdcStrategyTest.testDeposit(uint256,address)",
-        #"YearnPolygonUsdcStrategyTest.testDepositWithLockup(uint256,address,uint256)",
-        #"YearnPolygonUsdcStrategyTest.testMint(uint256,address)",
-        #"YearnPolygonUsdcStrategyTest.testMintWithLockup(uint256,address,uint256)",
+        "YearnPolygonUsdcStrategyTest.testDeposit(uint256,address)",
+        "YearnPolygonUsdcStrategyTest.testDepositWithLockup(uint256,address,uint256)",
+        "YearnPolygonUsdcStrategyTest.testMint(uint256,address)",
+        "YearnPolygonUsdcStrategyTest.testMintWithLockup(uint256,address,uint256)",
         "YearnPolygonUsdcStrategyTest.testWithdraw(uint256,address,address,uint256)",
+        "YearnPolygonUsdcStrategyTest.testWithdrawRevert(uint256,address,address,uint256)",
+        "YearnPolygonUsdcStrategyTest.testRedeem(uint256,address,address,uint256)",
+        "YearnPolygonUsdcStrategyTest.testRedeemRevert(uint256,address,address,uint256)",
+        "YearnPolygonUsdcStrategyTest.testInitiateRageQuit(address)",
     ]
 
 [show.default]
