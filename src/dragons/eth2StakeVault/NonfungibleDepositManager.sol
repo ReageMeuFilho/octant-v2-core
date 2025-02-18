@@ -49,7 +49,7 @@ contract NonfungibleDepositManager is ERC721, Ownable, ReentrancyGuard {
     }
 
     // tokenId => DepositInfo
-    mapping(uint256 => DepositInfo) private deposits;
+    mapping(uint256 => DepositInfo) public deposits;
 
     // Next tokenId for minting NFT deposit receipts.
     uint256 private nextTokenId = 1;
@@ -67,7 +67,11 @@ contract NonfungibleDepositManager is ERC721, Ownable, ReentrancyGuard {
     event ValidatorIssued(uint256 indexed tokenId, address indexed operator);
     event DepositCancelled(uint256 indexed tokenId, address indexed cancelledBy);
 
-    constructor() ERC721("ValidatorDeposit", "VDEP") {}
+    /**
+     * @notice Initializes the NonfungibleDepositManager contract
+     * @dev Sets up the ERC721 token with name "ValidatorDeposit" and symbol "VDEP"
+     */
+    constructor() ERC721("TrustMinimizedEth2Staking", "stOCT") Ownable(msg.sender) ReentrancyGuard() {}
 
     /**
      * @notice Approve or revoke an operator's ability to assign validator credentials
@@ -266,42 +270,44 @@ contract NonfungibleDepositManager is ERC721, Ownable, ReentrancyGuard {
     ) internal pure returns (bytes32) {
         require(pubkey.length == 48, "Bad pubkey length");
         require(signature.length == 96, "Bad signature length");
+        
+        uint deposit_amount = 32 ether / 1 gwei;
+        bytes memory amount = to_little_endian_64(uint64(deposit_amount));
 
-        bytes32 pubkeyRoot = sha256(abi.encodePacked(pubkey, bytes16(0)));
-        // For signature, slice into first 64 and last 32 bytes.
-        bytes memory sigPart1 = _slice(signature, 0, 64);
-        bytes memory sigPart2 = _slice(signature, 64, 32);
-        bytes32 sigRootFirst = sha256(sigPart1);
-        bytes32 sigRootSecond = sha256(abi.encodePacked(sigPart2, bytes32(0)));
-        bytes32 signatureRoot = sha256(abi.encodePacked(sigRootFirst, sigRootSecond));
+        // Compute deposit data root (`DepositData` hash tree root)
+        bytes32 pubkey_root = sha256(abi.encodePacked(pubkey, bytes16(0)));
+        
+        // Split signature into two parts and hash them separately
+        bytes32 signature_root = sha256(abi.encodePacked(
+            sha256(abi.encodePacked(_slice(signature, 0, 64))),
+            sha256(abi.encodePacked(_slice(signature, 64, 32), bytes32(0)))
+        ));
 
-        // 32 ETH in gwei: 32 ETH = 32 * 1e9 = 32000000000.
-        uint64 depositAmountGwei = 32000000000;
-        bytes memory amountLE = _toLittleEndian64(depositAmountGwei);
-        bytes32 amountRoot = sha256(amountLE);
+        bytes32 node = sha256(abi.encodePacked(
+            sha256(abi.encodePacked(pubkey_root, withdrawalCred)),
+            sha256(abi.encodePacked(amount, bytes24(0), signature_root))
+        ));
 
-        bytes32 left = sha256(abi.encodePacked(pubkeyRoot, withdrawalCred));
-        bytes32 right = sha256(abi.encodePacked(amountRoot, signatureRoot));
-        return sha256(abi.encodePacked(left, right));
+        return node;
     }
     /**
      * @notice Converts a uint64 value to its 8-byte little-endian representation
      * @dev Used for deposit data root computation to match ETH2 deposit contract spec
      * @param value The uint64 value to convert
-     * @return bytes The 8-byte little-endian representation of the input value
+     * @return ret The 8-byte little-endian representation of the input value
      */
-    function _toLittleEndian64(uint64 value) internal pure returns (bytes memory) {
-        bytes8 b = bytes8(value);
-        bytes memory out = new bytes(8);
-        out[0] = b[7];
-        out[1] = b[6];
-        out[2] = b[5];
-        out[3] = b[4];
-        out[4] = b[3];
-        out[5] = b[2];
-        out[6] = b[1];
-        out[7] = b[0];
-        return out;
+    function to_little_endian_64(uint64 value) internal pure returns (bytes memory ret) {
+        ret = new bytes(8);
+        bytes8 bytesValue = bytes8(value);
+        // Byteswapping during copying to bytes.
+        ret[0] = bytesValue[7];
+        ret[1] = bytesValue[6];
+        ret[2] = bytesValue[5];
+        ret[3] = bytesValue[4];
+        ret[4] = bytesValue[3];
+        ret[5] = bytesValue[2];
+        ret[6] = bytesValue[1];
+        ret[7] = bytesValue[0];
     }
 
     /**
@@ -328,13 +334,10 @@ contract NonfungibleDepositManager is ERC721, Ownable, ReentrancyGuard {
      * @param from The address transferring the token
      * @param to The address receiving the token
      * @param tokenId The ID of the token being transferred
-     * @param batchSize The number of tokens being transferred (unused but required by ERC721)
      */
-    function _beforeTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize)
+    function _beforeTokenTransfer(address from, address to, uint256 tokenId)
         internal
-        override
     {
-        super._beforeTokenTransfer(from, to, tokenId, batchSize);
         if (from != address(0) && to != address(0)) { // not minting or burning
             DepositState st = deposits[tokenId].state;
             require(st == DepositState.Finalized, "Active deposit NFTs are non-transferable");

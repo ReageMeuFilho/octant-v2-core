@@ -79,4 +79,4 @@ The contract supports dynamic NFT metadata that reflects the current state of th
 
 Additionally we generate a base64 encoded URI response that includes a dynamically generated NFT that displays the current status.
 
-![Eth2StakerNFT](./assets/Eth2StakerNFT.jpg)
+![Eth2StakerNFT](/assets/Eth2StakerNFT.jpg)

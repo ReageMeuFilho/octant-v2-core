@@ -6,16 +6,17 @@ import { TestPlus } from "lib/solady/test/utils/TestPlus.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
 import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
 
-import { MockERC20 } from "test/mocks/MockERC20.sol";
-import { MockYieldSource } from "test/mocks/MockYieldSource.sol";
-import { MockStrategy } from "test/mocks/MockStrategy.sol";
-import { IMockStrategy } from "test/mocks/IMockStrategy.sol";
-import { DeploySafe } from "script/deploy/DeploySafe.sol";
-import { DeployDragonRouter } from "script/deploy/DeployDragonRouter.sol";
-import { DeployModuleProxyFactory } from "script/deploy/DeployModuleProxyFactory.sol";
-import { DeployDragonTokenizedStrategy } from "script/deploy/DeployDragonTokenizedStrategy.sol";
-import { DeployHatsProtocol } from "script/deploy/DeployHatsProtocol.sol";
-import { DeployMockStrategy } from "script/deploy/DeployMockStrategy.sol";
+import {MockERC20} from "test/mocks/MockERC20.sol";
+import {MockYieldSource} from "test/mocks/MockYieldSource.sol";
+import {MockStrategy} from "test/mocks/MockStrategy.sol";
+import {IMockStrategy} from "test/mocks/IMockStrategy.sol";
+import {DeploySafe} from "script/deploy/DeploySafe.sol";
+import {DeployDragonRouter} from "script/deploy/DeployDragonRouter.sol";
+import {DeployModuleProxyFactory} from "script/deploy/DeployModuleProxyFactory.sol";
+import {DeployDragonTokenizedStrategy} from "script/deploy/DeployDragonTokenizedStrategy.sol";
+import {DeployHatsProtocol} from "script/deploy/DeployHatsProtocol.sol";
+import {DeployMockStrategy} from "script/deploy/DeployMockStrategy.sol";
+import {DeployNonfungibleDepositManager} from "script/deploy/DeployNonfungibleDepositManager.sol";
 
 import { TokenizedStrategy__StrategyNotInShutdown, TokenizedStrategy__NotEmergencyAuthorized, TokenizedStrategy__HatsAlreadyInitialized, TokenizedStrategy__NotKeeperOrManagement, TokenizedStrategy__NotManagement } from "src/errors.sol";
 
@@ -25,6 +26,7 @@ contract SetupIntegrationTest is
     DeployDragonRouter,
     DeployHatsProtocol,
     DeployMockStrategy,
+    DeployNonfungibleDepositManager,
     TestPlus
 {
     uint256 constant TEST_THRESHOLD = 3;
@@ -69,6 +71,10 @@ contract SetupIntegrationTest is
     /// uint256 public branchHatId;
     /// ===================================================
 
+    /// ============ DeployNonfungibleDepositManager ===================
+    /// NonfungibleDepositManager public nonfungibleDepositManager;
+    /// ===================================================
+
     function addLabels() internal {
         vm.label(SAFE_SINGLETON, "Safe Singleton");
         vm.label(SAFE_PROXY_FACTORY, "Safe Proxy Factory");
@@ -88,6 +94,9 @@ contract SetupIntegrationTest is
         // Add Hats Protocol labels
         vm.label(address(HATS), "Hats Protocol");
         vm.label(address(dragonHatter), "Dragon Hatter");
+
+        // Add ETH2StakeVault label
+        vm.label(address(nonfungibleDepositManager), "NonfungibleDepositManager");
     }
 
     function deploy()
@@ -97,7 +106,8 @@ contract SetupIntegrationTest is
             DeployDragonTokenizedStrategy,
             DeployDragonRouter,
             DeployModuleProxyFactory,
-            DeployHatsProtocol
+            DeployHatsProtocol,
+            DeployNonfungibleDepositManager
         )
     {
         deployer = msg.sender;
@@ -110,6 +120,8 @@ contract SetupIntegrationTest is
         // Deploy remaining components
         DeployDragonTokenizedStrategy.deploy();
         DeployDragonRouter.deploy();
+        DeployNonfungibleDepositManager.deploy();
+        
         vm.startPrank(address(deployedSafe));
         DeployMockStrategy.deploy(
             address(deployedSafe),
@@ -172,6 +184,10 @@ contract SetupIntegrationTest is
         require(HATS.isValidHatId(managementHatId), "Management hat not under branch");
         require(HATS.isValidHatId(emergencyHatId), "Emergency hat not under branch");
         require(HATS.isValidHatId(regenGovernanceHatId), "Regen Governance hat not under branch");
+
+        // Add ETH2StakeVault verification
+        require(address(nonfungibleDepositManager) != address(0), "NonfungibleDepositManager not deployed");
+
         // addLabels();
     }
 
