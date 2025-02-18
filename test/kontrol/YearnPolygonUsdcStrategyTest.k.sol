@@ -26,7 +26,7 @@ struct UserInfo {
     uint256 lockupTime;
     uint256 unlockTime;
     uint256 lockedShares;
-    bool isRageQuit;
+    uint8 isRageQuit;
 }
 
 contract YearnPolygonUsdcStrategyTest is Setup {
@@ -46,48 +46,39 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         info.lockedShares = freshUInt256Bounded("userLockupShares");
         _storeMappingUInt256(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(user)), 2, info.lockedShares);
 
-        info.isRageQuit = kevm.freshBool("userHasRageQuit");
-        _storeMappingData(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(user)), 3, 0, 1, info.isRageQuit ? 1 : 0);
+        info.isRageQuit = freshUInt8("userHasRageQuit");
+        _storeMappingData(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(user)), 3, 0, 1, info.isRageQuit);
     }
 
-    function receiverSetup(address receiver, uint256 lockupDuration) internal {
+    function depositAssumptions(uint256 amount, address receiver, UserInfo memory receiverInfo, uint256 lockupDuration) internal returns (uint256) {
         vm.assume(receiver != address(0));
         vm.assume(receiver != address(strategy));
         vm.assume(receiver != address(dragonRouter));
 
-        // Assume that receiver has not rage quit
-        uint256 receiverHasRageQuit = 0;
-        _storeMappingData(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(receiver)), 3, 0, 1, receiverHasRageQuit);
-
-        uint256 balanceReceiver = freshUInt256Bounded("balanceOfReceiver");
-        _storeMappingUInt256(address(strategy), BALANCES_SLOT, uint256(uint160(receiver)), 0, balanceReceiver);
-
-        uint256 unlockTimeReceiver = freshUInt256Bounded("unlockTimeReceiver");
-        _storeMappingUInt256(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(receiver)), 1, unlockTimeReceiver);
-
-        vm.assume(receiver == safeOwner || balanceReceiver == 0);
-
-        if(lockupDuration > 0) {
-            uint256 minimumLockupDuration = _loadUInt256(address(strategy), MINIMUM_LOCKUP_DURATION_SLOT);
-            if(unlockTimeReceiver <= block.timestamp) {
-                vm.assume(lockupDuration > minimumLockupDuration);
-                // Overflow assumption
-                vm.assume(block.timestamp <= type(uint256).max - lockupDuration);
-            }
-            else{
-                vm.assume(unlockTimeReceiver <= type(uint256).max - lockupDuration);
-                vm.assume(unlockTimeReceiver + lockupDuration >= block.timestamp + minimumLockupDuration);
-            }
-        }
-    }
-
-    function depositAssumptions(uint256 amount) internal returns (uint256) {
         // Assume strategy is not shutdown
         _storeData(address(strategy), SHUTDOWN_SLOT, SHUTDOWN_OFFSET, SHUTDOWN_WIDTH, 0);
         // Assume non-reentrant
         _storeData(address(strategy), ENTERED_SLOT, ENTERED_OFFSET, ENTERED_WIDTH, 0);
 
+        vm.assume(receiverInfo.isRageQuit == 0);
+
+        vm.assume(receiver == safeOwner || receiverInfo.balance == 0);
+
+        if(lockupDuration > 0) {
+            uint256 minimumLockupDuration = _loadUInt256(address(strategy), MINIMUM_LOCKUP_DURATION_SLOT);
+            if(receiverInfo.unlockTime <= block.timestamp) {
+                vm.assume(lockupDuration > minimumLockupDuration);
+                // Overflow assumption
+                vm.assume(block.timestamp <= type(uint256).max - lockupDuration);
+            }
+            else{
+                vm.assume(receiverInfo.unlockTime <= type(uint256).max - lockupDuration);
+                vm.assume(receiverInfo.unlockTime + lockupDuration >= block.timestamp + minimumLockupDuration);
+            }
+        }
+
         vm.assume(amount > 0);
+        
         if (amount == type(uint256).max) {
             uint256 balance = freshUInt256Bounded("ownerBalance");
             vm.assume(0 < balance);
@@ -107,43 +98,30 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         // Assume non-reentrant
         _storeData(address(strategy), ENTERED_SLOT, ENTERED_OFFSET, ENTERED_WIDTH, 0);
 
-        uint256 ownerBalance = freshUInt256Bounded("ownerBalance");
-        _storeMappingUInt256(address(strategy), BALANCES_SLOT, uint256(uint160(_owner)), 0, ownerBalance);
+        UserInfo memory owner = setupSymbolicUser(_owner);
 
-        uint256 ownerLockupTime = freshUInt256Bounded("ownerLockupTime");
-        _storeMappingUInt256(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(_owner)), 0, ownerLockupTime);
-
-        uint256 ownerUnlockTime = freshUInt256Bounded("ownerUnlockTime");
-        _storeMappingUInt256(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(_owner)), 1, ownerUnlockTime);
-
-        uint256 ownerLockupShares = freshUInt256Bounded("ownerLockupShares");
-        _storeMappingUInt256(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(_owner)), 2, ownerLockupShares);
-
-        bool ownerHasRageQuit = kevm.freshBool("ownerHasRageQuit");
-        _storeMappingData(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(_owner)), 3, 0, 1, ownerHasRageQuit ? 1 : 0);
-        // Avoid error DragonTokenizedStrategy__SharesStillLocked()
-        vm.assume(ownerHasRageQuit || ownerUnlockTime <= block.timestamp);
+        vm.assume(owner.isRageQuit != 0 || owner.unlockTime <= block.timestamp);
 
         vm.assume(receiver != address(0));
         vm.assume(maxLoss <= 10_000); // MAX_BPS = 10_000
 
         vm.assume(0 < assets);
         
-        if (ownerUnlockTime <= block.timestamp) {
-            vm.assume(assets <= ownerBalance);
-            if(ownerHasRageQuit) {
-                vm.assume(assets <= ownerLockupShares);
+        if (owner.unlockTime <= block.timestamp) {
+            vm.assume(assets <= owner.balance);
+            if(owner.isRageQuit != 0) {
+                vm.assume(assets <= owner.lockedShares);
             }
         } else {
             // Since we assume that ownerHasRageQuit || ownerUnlockTime <= block.timestamp 
             // at this point we know that ownerHasRageQuit is true
-            vm.assume(ownerLockupTime <= block.timestamp);
-            vm.assume(ownerLockupTime < ownerUnlockTime);
-            uint256 timeElapsed = block.timestamp - ownerLockupTime;
-            uint256 unlockedPortion = (timeElapsed * ownerBalance) / (ownerUnlockTime - ownerLockupTime);
-            uint256 withdrawable = Math.min(unlockedPortion, ownerBalance);
+            vm.assume(owner.lockupTime <= block.timestamp);
+            vm.assume(owner.lockupTime < owner.unlockTime);
+            uint256 timeElapsed = block.timestamp - owner.lockupTime;
+            uint256 unlockedPortion = (timeElapsed * owner.balance) / (owner.unlockTime - owner.lockupTime);
+            uint256 withdrawable = Math.min(unlockedPortion, owner.balance);
             vm.assume(assets <= withdrawable);
-            vm.assume(assets <= ownerLockupShares);
+            vm.assume(assets <= owner.lockedShares);
         }
     }
 
@@ -162,12 +140,12 @@ contract YearnPolygonUsdcStrategyTest is Setup {
     //////////////////////////////////////////////////////////////*/
     function assertDepositStateChanges(uint256 amount) internal view {
         assertEq(posState.assetOwnerBalance, preState.assetOwnerBalance - amount);
-        assertEq(posState.assetYieldSourceBalance, preState.assetYieldSourceBalance + amount);
+        assertEq(posState.assetYieldSourceBalance, preState.assetYieldSourceBalance + amount + preState.assetStrategyBalance);
         assertEq(posState.assetStrategyBalance, 0);
         assertEq(posState.stateTotalAssets, preState.stateTotalAssets + amount);
         assertEq(posState.stateTotalSupply, preState.stateTotalSupply + amount);
         assertEq(posState.receiverStrategyShares, preState.receiverStrategyShares + amount);
-        assertEq(posState.strategyYieldSourcesShares, preState.strategyYieldSourcesShares + amount);
+        assertEq(posState.strategyYieldSourcesShares, preState.strategyYieldSourcesShares + amount + preState.assetStrategyBalance);
     } 
 
     /*//////////////////////////////////////////////////////////////
@@ -183,16 +161,11 @@ contract YearnPolygonUsdcStrategyTest is Setup {
     }
 
     function lockupDurationInvariant(Mode mode, address user) internal view {
-        uint256 minimumLockupDuration = _loadUInt256(address(strategy), MINIMUM_LOCKUP_DURATION_SLOT);
         uint256 ownerLockupTime = _loadMappingUInt256(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(user)), 0);
         uint256 ownerUnlockTime = _loadMappingUInt256(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(user)), 1);
-        uint256 ownerLockupShares = _loadMappingUInt256(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(user)), 2);
 
         _establish(mode, ownerLockupTime <= block.timestamp);
         _establish(mode, ownerLockupTime <= ownerUnlockTime);
-        //if (ownerLockupShares > 0) {
-        //    _establish(mode, ownerUnlockTime - ownerLockupTime >= minimumLockupDuration);
-        //}
     }
 
     function userBalancesTotalSupplyConsistency(Mode mode, address user) internal view {
@@ -204,8 +177,8 @@ contract YearnPolygonUsdcStrategyTest is Setup {
     //////////////////////////////////////////////////////////////*/
     
     function testDeposit(uint256 assets, address receiver) public {
-        receiverSetup(receiver, 0);
-        uint256 depositedAmount = depositAssumptions(assets);
+        UserInfo memory receiverInfo = setupSymbolicUser(receiver);
+        uint256 depositedAmount = depositAssumptions(assets, receiver, receiverInfo, 0);
 
         _snapshop(preState, receiver);
 
@@ -227,8 +200,8 @@ contract YearnPolygonUsdcStrategyTest is Setup {
 
     function testDepositWithLockup(uint256 assets, address receiver, uint256 lockupDuration) public {
         vm.assume(lockupDuration > 0);
-        receiverSetup(receiver, lockupDuration);
-        uint256 depositedAmount = depositAssumptions(assets);
+        UserInfo memory receiverInfo = setupSymbolicUser(receiver);
+        uint256 depositedAmount = depositAssumptions(assets, receiver, receiverInfo, lockupDuration);
 
         _snapshop(preState, receiver);
 
@@ -252,8 +225,8 @@ contract YearnPolygonUsdcStrategyTest is Setup {
 
     function testMint(uint256 shares, address receiver) public {
         vm.assume(shares != type(uint256).max);
-        receiverSetup(receiver, 0);
-        shares = depositAssumptions(shares);
+        UserInfo memory receiverInfo = setupSymbolicUser(receiver);
+        shares = depositAssumptions(shares, receiver, receiverInfo, 0);
 
         _snapshop(preState, receiver);
 
@@ -276,8 +249,8 @@ contract YearnPolygonUsdcStrategyTest is Setup {
     function testMintWithLockup(uint256 shares, address receiver, uint256 lockupDuration) public {
         vm.assume(lockupDuration > 0);
         vm.assume(shares != type(uint256).max);
-        receiverSetup(receiver, lockupDuration);
-        shares = depositAssumptions(shares);
+        UserInfo memory receiverInfo = setupSymbolicUser(receiver);
+        shares = depositAssumptions(shares, receiver, receiverInfo, lockupDuration);
 
         _snapshop(preState, receiver);
 
@@ -336,9 +309,9 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         // Sender has to be concrete, otherwise it will branch a lot when setting prank 
         address sender = makeAddr("SENDER");
 
-        UserInfo memory user = setupSymbolicUser(sender);
+        UserInfo memory user = setupSymbolicUser(_owner);
         // Avoid error DragonTokenizedStrategy__SharesStillLocked()
-        vm.assume(!user.isRageQuit && block.timestamp <= user.unlockTime);
+        vm.assume(user.isRageQuit == 0 && block.timestamp < user.unlockTime);
 
         vm.startPrank(sender);
         vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__SharesStillLocked.selector));
@@ -360,10 +333,10 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         //uint256 withdrawable = strategy.maxWithdraw(_owner);
         //vm.assume(assets <= withdrawable);
         //vm.assume(withdrawable <= IStrategy(YIELD_SOURCE).maxWithdraw(address(strategy)));
-        uint256 assetStrategyBalance = TestERC20(_asset).balanceOf(address(strategy));
-        if(assetStrategyBalance < shares) {
-            vm.assume(shares - assetStrategyBalance <= IStrategy(YIELD_SOURCE).balanceOf(address(strategy)));
-        }
+        //uint256 assetStrategyBalance = TestERC20(_asset).balanceOf(address(strategy));
+        //if(assetStrategyBalance < shares) {
+        //    vm.assume(shares - assetStrategyBalance <= IStrategy(YIELD_SOURCE).balanceOf(address(strategy)));
+        //}
         
         vm.startPrank(sender);
         strategy.redeem(shares, receiver, _owner, maxLoss);
@@ -380,9 +353,9 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         // Sender has to be concrete, otherwise it will branch a lot when setting prank 
         address sender = makeAddr("SENDER");
 
-        UserInfo memory user = setupSymbolicUser(sender);
+        UserInfo memory user = setupSymbolicUser(_owner);
         // Avoid error DragonTokenizedStrategy__SharesStillLocked()
-        vm.assume(!user.isRageQuit && block.timestamp <= user.unlockTime);
+        vm.assume(user.isRageQuit == 0 && block.timestamp < user.unlockTime);
 
         vm.startPrank(sender);
         vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__SharesStillLocked.selector));
@@ -390,11 +363,13 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         vm.stopPrank();
     }
 
-    function testInitiateRageQuit(address sender) public {
+    function testInitiateRageQuit() public {
+        address sender = makeAddr("SENDER");
+
         UserInfo memory user = setupSymbolicUser(sender);
         vm.assume(user.balance > 0);
         vm.assume(block.timestamp < user.unlockTime);
-        vm.assume(!user.isRageQuit);
+        vm.assume(user.isRageQuit == 0);
 
         principalPreservationInvariant(Mode.Assume);
         lockupDurationInvariant(Mode.Assume, sender);

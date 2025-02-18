@@ -13,12 +13,12 @@ contract MockYieldSource is ERC4626Upgradeable {
         __ERC4626_init(IERC20(_asset));
     }
 
-    function withdraw(uint256 assets, address receiver, address owner) public override returns (uint256) { 
-        uint256 withdrawable = Math.min(assets, maxWithdraw(owner));
-
-        _withdraw(_msgSender(), receiver, owner, withdrawable, withdrawable);
-        return withdrawable;
-    }
+    //function withdraw(uint256 assets, address receiver, address owner) public override returns (uint256) { 
+    //    uint256 withdrawable = Math.min(assets, maxWithdraw(owner));
+//
+    //    _withdraw(_msgSender(), receiver, owner, withdrawable, withdrawable);
+    //    return withdrawable;
+    //}
 
     function availableDepositLimit(
         address /*_owner*/
