@@ -37,7 +37,7 @@ contract DeployTrader is Script {
     uint24 poolFee;
     address quoteAddress;
     address wethAddress;
-    uint32 defaultScaledOfferFactor = 99_00_00; // TODO: check if represents 1% MEV reward to searchers?
+    uint32 defaultScaledOfferFactor = 100_00_00; // no discount or premium for oracle
 
     function run(address _owner, address _beneficiary) external {
         owner = _owner;
@@ -108,7 +108,7 @@ contract DeployTrader is Script {
         pairScaledOfferFactors.push(
             ISwapperImpl.SetPairScaledOfferFactorParams({
                 quotePair: fromTo,
-                scaledOfferFactor: 98_00_00 // TODO: What this "no discount" refers to exactly? What value should be here?
+                scaledOfferFactor: 100_00_00 // no discount or premium for the oracle
             })
         );
 
