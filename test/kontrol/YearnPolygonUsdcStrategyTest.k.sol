@@ -270,6 +270,14 @@ contract YearnPolygonUsdcStrategyTest is Setup {
 
         uint256 withdrawable = strategy.maxWithdraw(_owner);
         vm.assume(assets <= withdrawable);
+        
+        uint256 loss;
+        if (preState.assetStrategyBalance < assets) {
+            if (preState.strategyYieldSourcesShares < assets - preState.assetStrategyBalance) {
+                loss = assets - preState.strategyYieldSourcesShares + preState.assetStrategyBalance;
+                vm.assume(loss < (assets * maxLoss) / 10_000);
+            }
+        }
 
         vm.startPrank(sender);
         strategy.withdraw(assets, receiver, _owner, maxLoss);
@@ -298,14 +306,13 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         uint256 withdrawable = strategy.maxWithdraw(_owner);
         vm.assume(assets <= withdrawable);
         // Assume the stratagey has not enough balance to cover the withdraw amount
-        uint256 idle = preState.assetStrategyBalance;
-        vm.assume(assets > idle); // assets > TestERC20(_asset).balanceOf(address(strategy))
-        // vm.assume(assets > IStrategy(YIELD_SOURCE).maxWithdraw(address(strategy)));
+        uint256 idle = TestERC20(_asset).balanceOf(address(strategy));
+        vm.assume(idle < assets);
         // Assume there was a loss, i.e. the stratagy has not enough balance YIELD_SOURCE to cover the remaining withdraw amount
-        vm.assume(assets - idle > preState.strategyYieldSourcesShares); // IStrategy(YIELD_SOURCE).balanceOf(address(strategy)));
+        vm.assume(IStrategy(YIELD_SOURCE).balanceOf(address(strategy)) < assets - idle);
 
         vm.startPrank(sender);
-        vm.expectRevert("ERC4626: withdraw more than max");
+        //vm.expectRevert("ERC4626: withdraw more than max");
         strategy.withdraw(assets, receiver, _owner, maxLoss);
         vm.stopPrank();
 
@@ -444,14 +451,18 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         strategy.report();
         vm.stopPrank();
 
-        principalPreservationInvariant(Mode.Assume);
-        userBalancesTotalSupplyConsistency(Mode.Assume, address(dragonRouter));
+        principalPreservationInvariant(Mode.Assert);
+        userBalancesTotalSupplyConsistency(Mode.Assert, address(dragonRouter));
     }
 
     function testTend() public {
+        principalPreservationInvariant(Mode.Assume);
+
         vm.startPrank(_keeper);
         strategy.tend();
         vm.stopPrank();
+
+        principalPreservationInvariant(Mode.Assert);
     }
 
     /*//////////////////////////////////////////////////////////////

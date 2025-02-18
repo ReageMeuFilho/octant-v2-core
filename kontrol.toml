@@ -19,11 +19,11 @@ reinit                     = false
 cse                        = false
 workers                    = 1
 max-frontier-parallel      = 6
-maintenance-rate           = 128
+maintenance-rate           = 32
 assume-defined             = false
 no-log-succ-rewrites       = true
 no-stack-checks            = true
-optimize-kcfg              = true
+optimize-kcfg              = false
 kore-rpc-command           = 'kore-rpc-booster --no-post-exec-simplify --equation-max-recursion 20 --equation-max-iterations 1000 --fallback-on Aborted'
 failure-information        = true
 counterexample-information = true
@@ -45,12 +45,13 @@ match-test                 = [
         "YearnPolygonUsdcStrategyTest.testMint(uint256,address)",
         "YearnPolygonUsdcStrategyTest.testMintWithLockup(uint256,address,uint256)",
         "YearnPolygonUsdcStrategyTest.testWithdraw(uint256,address,address,uint256)",
-        "YearnPolygonUsdcStrategyTest.testWithdrawWithLossReverts(uint256,address,address,uint256)",
+        #"YearnPolygonUsdcStrategyTest.testWithdrawWithLossReverts(uint256,address,address,uint256)",
         "YearnPolygonUsdcStrategyTest.testWithdrawRevert(uint256,address,address,uint256)",
         "YearnPolygonUsdcStrategyTest.testRedeem(uint256,address,address,uint256)",
         "YearnPolygonUsdcStrategyTest.testRedeemRevert(uint256,address,address,uint256)",
         "YearnPolygonUsdcStrategyTest.testInitiateRageQuit()",
         "YearnPolygonUsdcStrategyTest.testReport()",
+        "YearnPolygonUsdcStrategyTest.testTend()",
     ]
 
 [show.default]

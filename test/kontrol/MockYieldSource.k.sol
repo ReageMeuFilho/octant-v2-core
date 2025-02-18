@@ -44,18 +44,23 @@ contract MockYieldSource is ERC4626Upgradeable {
             "ERC4626: withdraw more than max"
         );
         // Check for rounding error or 0 value.
-        require((shares = previewWithdraw(assets)) != 0, "ZERO_SHARES");
+        //require((shares = previewWithdraw(assets)) != 0, "ZERO_SHARES");
+        // Simplification, otherwise we get a smt-solver crash
+        // TODO: Fix this later
+        shares = assets;
 
         // Withdraw and track the actual amount withdrawn for loss check.
         // For simplicity I call the internal _withdraw from ERC4626Upgradeable instead of:
         // https://polygonscan.com/address/0xdfc8cd9f2f2d306b7c0d109f005df661e14f4ff2#code#L2185
         //_withdraw(receiver, owner, assets, shares, maxLoss);
         _withdraw(_msgSender(), receiver, owner, assets, shares);
+
     }
 
     function availableDepositLimit(
         address /*_owner*/
     ) public view virtual returns (uint256) {
         return type(uint256).max;
-    }                                                               
+    }                                                                       
+
 }
