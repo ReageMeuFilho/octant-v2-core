@@ -7,12 +7,13 @@ import {Trader} from "src/routers-transformers/Trader.sol";
 
 contract DeployTraderHelper is Script {
     function run() external {
-        (,,, uint256 deployerKey,,, address traderAddress,,,) = new HelperConfig(false).activeNetworkConfig();
+        (,,, uint256 deployerKey,,,,,,) = new HelperConfig(false).activeNetworkConfig();
 
-        console.log("Trader at ", traderAddress);
-        assert(traderAddress != address(0));
-
+        address traderAddress = vm.envAddress("TRADER");
         Trader trader = Trader(payable(traderAddress));
+        console.log("ChainID:", block.chainid);
+        require(address(trader) != address(0), "Please provide trader address via TRADER env var");
+        console.log("Trader at", address(trader));
 
         vm.startBroadcast(deployerKey);
 

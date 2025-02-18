@@ -5,21 +5,27 @@ import "forge-std/Script.sol";
 import "forge-std/Test.sol";
 
 import "solady/tokens/ERC20.sol";
-import "solady/tokens/WETH.sol";
 
 import {HelperConfig} from "../helpers/HelperConfig.s.sol";
 import {Trader} from "src/routers-transformers/Trader.sol";
 
 contract TraderStatus is Script, Test {
-    function run() external {
-        (, address wethToken,,,,, address traderAddress,,,) = new HelperConfig(false).activeNetworkConfig();
+    address ETH;
 
-        console.log("ChainID:", block.chainid);
-        console.log("Trader at", traderAddress);
-        console.log("Height:", block.number);
-        assert(traderAddress != address(0));
+    function run() external {
+        address traderAddress = vm.envAddress("TRADER");
+
+        emit log_named_uint("ChainID", block.chainid);
+        require(traderAddress != address(0), "Please provide trader address via TRADER env var");
+        emit log_named_address("Trader at", traderAddress);
+        emit log_named_uint("Height", block.number);
 
         Trader trader = Trader(payable(traderAddress));
+        address base = trader.base();
+        address quote = trader.quote();
+        ETH = trader.ETH();
+        console.log("Selling (base):", getTicker(base), base);
+        console.log("Buying (quote):", getTicker(quote), quote);
         uint256 chance = trader.chance();
         if (chance == 0) {
             emit log("Trade every (blocks): never");
@@ -34,22 +40,35 @@ contract TraderStatus is Script, Test {
         }
 
         uint256 spent = trader.spent();
-        emit log_named_decimal_uint("Spent (ETH)", spent, 18);
+        emit log_named_decimal_uint("Spent (base)", spent, 18);
 
         uint256 height = block.number - trader.spentResetBlock();
         emit log_named_uint("Configured for (blocks)", height);
 
-        WETH weth = WETH(payable(wethToken));
-
-        emit log_named_decimal_uint("Contract balance (ETH)", traderAddress.balance, 18);
-        emit log_named_decimal_uint("Contract balance (WETH)", weth.balanceOf(traderAddress), 18);
+        emit log_named_decimal_uint("Contract balance (base)", safeBalanceOf(base, traderAddress), 18);
 
         int256 spendable = int256(
             (block.number - trader.spentResetBlock()) * (trader.spendADay() / trader.BLOCKS_PER_DAY())
         ) - int256(spent);
-        emit log_named_decimal_int("Spendable (ETH)", spendable, 18);
+        emit log_named_decimal_int("Spendable (base)", spendable, 18);
 
-        emit log_named_decimal_uint("Min trade (ETH)", trader.saleValueLow(), 18);
-        emit log_named_decimal_uint("Max trade (ETH)", trader.saleValueHigh(), 18);
+        emit log_named_decimal_uint("Min trade (base)", trader.saleValueLow(), 18);
+        emit log_named_decimal_uint("Max trade (base)", trader.saleValueHigh(), 18);
+    }
+
+    function getTicker(address token) public view returns (string memory result) {
+        if (token == ETH) {
+            result = "ETH";
+        } else {
+            result = ERC20(token).symbol();
+        }
+    }
+
+    function safeBalanceOf(address token, address owner) private view returns (uint256) {
+        if ((token == ETH) || (token == address(0x0))) {
+            return owner.balance;
+        } else {
+            return ERC20(token).balanceOf(owner);
+        }
     }
 }

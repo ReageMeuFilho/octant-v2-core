@@ -2,27 +2,23 @@
 pragma solidity ^0.8.23;
 
 import { Ownable } from "solady/auth/Ownable.sol";
-import { SafeCastLib } from "solady/utils/SafeCastLib.sol";
 import { FixedPointMathLib } from "solady/utils/FixedPointMathLib.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { Enum } from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 
-import { CreateOracleParams, IOracleFactory, IOracle, OracleParams } from "src/vendor/0xSplits/OracleParams.sol";
+import { IOracle } from "src/vendor/0xSplits/OracleParams.sol";
 import { QuotePair, QuoteParams } from "src/vendor/0xSplits/LibQuotes.sol";
-import { OracleParams } from "../vendor/0xSplits/OracleParams.sol";
-import { UniV3Swap } from "src/vendor/0xSplits/UniV3Swap.sol";
+import { IUniV3Swap } from "src/vendor/0xSplits/IUniV3Swap.sol";
 
 import { ITransformer } from "../interfaces/ITransformer.sol";
-import { IUniV3OracleImpl } from "src/vendor/0xSplits/IUniV3OracleImpl.sol";
 import { ISwapperImpl } from "src/vendor/0xSplits/SwapperImpl.sol";
 import { ISwapRouter } from "src/vendor/uniswap/ISwapRouter.sol";
 
 /// @author .
 /// @title Octant Trader
-/// @notice Octant Trader is a contract that performs "DCA" in terms of sold token into another token.
-/// @dev this contract performs trades in a random times, isolating the deployer from risks of insider trading.
+/// @notice Octant Trader is a contract that performs "DCA" in terms of sold token into another token. This contract performs trades in a random times, isolating the deployer from risks of insider trading. On very technical level, Trader deals with amounts and times, while Swapper and IUniV3Swap are dealing with actual conversion of currencies.
+/// @dev When dealing with ETH, conversion to and from WETH is dealt on the level of UniV3Swap contract.
 contract Trader is ITransformer, Ownable, Pausable {
     using SafeERC20 for IERC20;
     using FixedPointMathLib for uint256;
@@ -46,8 +42,8 @@ contract Trader is ITransformer, Ownable, Pausable {
                           PRIVATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev Uniswap path between base and quote tokens, includes pool provision.
-    bytes private uniPath;
+    /// @dev Uniswap path representing base and quote token pair pool; includes pool provision.
+    bytes private uniPair;
     /// @dev Base-to-quote pair encoded for price oracle used by splits.
     QuotePair private splitsPair;
     /// @dev Price oracle used by splits to make sure that Trader gets fair price.
@@ -61,15 +57,15 @@ contract Trader is ITransformer, Ownable, Pausable {
                           STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Swapper is the address which will handle actual selling.
+    /// @notice Contract that temporary stores sold token and makes sure that Trader/beneficier gets fair price.
     address public swapper;
-    /// @notice Account that initializes the swapping.
-    address public uniV3Swap;
+    /// @notice Address of the contract that integrates Uniswap (or possibly some other exchange). Implements IUniV3Swap interface.
+    address public integrator;
     /// @notice Beneficiary will receive quote token after the sale of base token.
     address public beneficiary;
     /// @notice `budget` needs to be spend before the end of the period (in blocks).
     uint256 public periodLength;
-    /// @notice Total token to be spent before deadline.
+    /// @notice Total token to be spent before deadline. Please note that balance of quote token may differ from value of budget.
     uint256 public budget;
     /// @notice Spent token since spentResetBlock.
     uint256 public spent;
@@ -92,7 +88,7 @@ contract Trader is ITransformer, Ownable, Pausable {
     //////////////////////////////////////////////////////////////*/
 
     event Traded(uint256 sold, uint256 left);
-    event SwapperChanged(address oldSwapper, address newSwapper);
+    event SwapperChanged(address oldSwapper, address newSwapper, address oldIntegrator, address newIntegrator);
     event SpendingChanged(uint256 low, uint256 high, uint256 spent, uint256 budget);
     event PeriodsChanged(uint256 height, uint256 length, uint256 deadline);
 
@@ -112,6 +108,9 @@ contract Trader is ITransformer, Ownable, Pausable {
     /// @notice Raised if tx was already performed for this source of randomness (this height).
     error Trader__RandomnessAlreadyUsed();
 
+    /// @notice Raised if amount of base being converted is zero.
+    error Trader__ZeroValueConvert();
+
     /// @notice Unsafe randomness seed.
     error Trader__RandomnessUnsafeSeed();
 
@@ -124,7 +123,7 @@ contract Trader is ITransformer, Ownable, Pausable {
     /// @notice Configuration parameters are impossible: saleValueLow can't be zero.
     error Trader__ImpossibleConfigurationSaleValueLowIsZero();
 
-    /// @notice Configuration parameters are impossible: saleValueLow is too low to allow to sale budget before deadline.
+    /// @notice Configuration parameters are impossible: saleValueLow is too low to allow to spend remaining budget before deadline.
     error Trader__ImpossibleConfigurationSaleValueLowIsTooLow();
 
     /// @notice All of budget is already spent.
@@ -140,43 +139,59 @@ contract Trader is ITransformer, Ownable, Pausable {
       INITIALIZER
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev Initialize function
-    /// @dev owner of this module will the safe multisig that calls setUp function
+    /// @dev Constructor accepts following list of parameters in encoded form.
+    ///      address _owner - address that can configure Trader
+    ///      address _base - sold token. If it is ETH, use whatever address that ETH() function returns.
+    ///      address _quote - bought token. If it is ETH, use whatever address that ETH() function returns.
+    ///      address _wethAddress - address of WETH.
+    ///      address _beneficiary - bought token will be sent to this address
+    ///      address _swapper - address of the contact that makes sure beneficiery is not being shortchanged during swapping.
+    ///              Must implement ISwapperImpl interface.
+    ///      address _integrator - address of the contract that does actual swapping. Must implement ISwapperFlashCallback interface.
+    ///      address _oracle - oracle used by Splits' Swapper to ensure that beneficiery gets fair price.
     /// @param initializeParams Parameters of initialization encoded
-    function setUp(bytes memory initializeParams) public {
-        (address _owner, bytes memory data) = abi.decode(initializeParams, (address, bytes));
+    constructor(bytes memory initializeParams) {
         (
+            address _owner,
             address _base,
+            uint24 _fee,
             address _quote,
             address _wethAddress,
             address _beneficiary,
             address _swapper,
-            address _uniV3Swap,
+            address _integrator,
             address _oracle
-        ) = abi.decode(data, (address, address, address, address, address, address, address));
+        ) = abi.decode(
+                initializeParams,
+                (address, address, uint24, address, address, address, address, address, address)
+            );
         _initializeOwner(msg.sender);
         base = _base;
         quote = _quote;
         wethAddress = _wethAddress;
         beneficiary = _beneficiary;
         swapper = _swapper;
-        uniV3Swap = _uniV3Swap;
+        integrator = _integrator;
         oracle = IOracle(_oracle);
         splitsPair = QuotePair({ base: splitsEthWrapper(base), quote: splitsEthWrapper(quote) });
-        uniPath = abi.encodePacked(uniEthWrapper(base), uint24(10_000), uniEthWrapper(quote));
+        uniPair = abi.encodePacked(uniEthWrapper(base), _fee, uniEthWrapper(quote));
         transferOwnership(_owner);
     }
 
+    /// @dev This contract deals with native ETH, while Uniswap with WETH. This helper function does address conversion.
     function uniEthWrapper(address token) private view returns (address) {
         if (token == ETH) return wethAddress;
         else return token;
     }
 
+    /// @dev This contract and Splits' Swapper use different addresses to represent ETH. This function does the conversion.
     function splitsEthWrapper(address token) private pure returns (address) {
         if (token == ETH) return address(0x0);
         else return token;
     }
 
+    /// @dev Simplifies checking of balance for ETH and ERC20 tokens. ETH is represented by a particular address.
+    /// @return Balance of `token` currency associated with specified `owner`
     function safeBalanceOf(address token, address owner) private view returns (uint256) {
         if ((token == ETH) || (token == address(0x0))) {
             return owner.balance;
@@ -185,14 +200,18 @@ contract Trader is ITransformer, Ownable, Pausable {
         }
     }
 
-    function callInitFlash(uint256 amount) private returns (uint256) {
+    /// @notice This is a helper function, that can be used to trigger swapper's initFlash.
+    /// @param amount Amount of `base` token that will be traded for `quote` token.
+    /// @return Amount of `quote` token that beneficiery has received.
+    /// @dev If `transform` interface is not used, `convert` and `callInitFlash` provide an alternative integration path.
+    function callInitFlash(uint256 amount) public returns (uint256) {
         uint256 oldQuoteBalance = safeBalanceOf(quote, beneficiary);
 
         delete exactInputParams;
         exactInputParams.push(
             ISwapRouter.ExactInputParams({
-                path: uniPath,
-                recipient: address(uniV3Swap),
+                path: uniPair,
+                recipient: address(integrator),
                 deadline: block.timestamp + 60,
                 amountIn: amount,
                 amountOutMinimum: 0
@@ -203,19 +222,22 @@ contract Trader is ITransformer, Ownable, Pausable {
         quoteParams.push(
             QuoteParams({ quotePair: splitsPair, baseAmount: uint128(amount), data: abi.encode(exactInputParams) })
         );
-        UniV3Swap.FlashCallbackData memory data = UniV3Swap.FlashCallbackData({
+        IUniV3Swap.FlashCallbackData memory data = IUniV3Swap.FlashCallbackData({
             exactInputParams: exactInputParams,
             excessRecipient: address(beneficiary)
         });
-        UniV3Swap.InitFlashParams memory params = UniV3Swap.InitFlashParams({
+        IUniV3Swap.InitFlashParams memory params = IUniV3Swap.InitFlashParams({
             quoteParams: quoteParams,
             flashCallbackData: data
         });
-        UniV3Swap(payable(uniV3Swap)).initFlash(ISwapperImpl(swapper), params);
+        IUniV3Swap(payable(integrator)).initFlash(ISwapperImpl(swapper), params);
 
         return safeBalanceOf(quote, beneficiary) - oldQuoteBalance;
     }
 
+    /// @dev Max function. Returns bigger of two unsigned integers.
+    /// @param a first compared value
+    /// @param b second compared value
     function max(uint256 a, uint256 b) private pure returns (uint256) {
         if (a > b) return a;
         else return b;
@@ -245,7 +267,7 @@ contract Trader is ITransformer, Ownable, Pausable {
                 break;
             }
         }
-        assert(saleValue == amount);
+        if (saleValue != amount) revert Trader__SoftwareError();
 
         return callInitFlash(amount);
     }
@@ -281,11 +303,12 @@ contract Trader is ITransformer, Ownable, Pausable {
 
         uint256 saleValue = getSaleValue(rand, 0);
 
+        if (saleValue == 0) revert Trader__ZeroValueConvert();
+
         spent = spent + saleValue;
 
         if (base == ETH) {
-            (bool success, ) = payable(swapper).call{ value: saleValue }("");
-            require(success);
+            payable(swapper).transfer(saleValue);
         } else {
             IERC20(base).safeTransfer(swapper, saleValue);
         }
@@ -352,44 +375,48 @@ contract Trader is ITransformer, Ownable, Pausable {
     /// @param low_ is a lower bound of sold token (in wei) for a single trade
     /// @param high_ is a higher bound of sold token (in wei) for a single trade
     /// @param budget_ sets amount of token (in wei) to be sold before deadline block height
-    function setSpending(uint256 low_, uint256 high_, uint256 budget_) public onlyOwner {
+    function setSpending(uint256 low_, uint256 high_, uint256 budget_) public onlyOwner validateSpendingArgs {
         lastHeight = block.number;
         saleValueLow = low_;
         saleValueHigh = high_;
         budget = budget_;
         if (spent > budget) spent = budget;
-        _sanityCheck();
         emit SpendingChanged(low_, high_, spent, budget);
     }
 
-    /// @notice Configures spending periods. Budget needs to be fully spend before the end of each period.
+    /// @notice Configures spending periods. Budget will be fully spend before the end of each period.
     /// @param length_ is length of a period in blocks.
     /// @param height_ is a block height remarking the beginning of a period.
-    function configurePeriod(uint256 height_, uint256 length_) public onlyOwner {
+    function configurePeriod(uint256 height_, uint256 length_) public onlyOwner validateSpendingArgs {
         periodZero = height_;
         periodLength = length_;
         deadline = nextDeadline();
-        if (budget > 0) {
-            _sanityCheck();
-        }
         emit PeriodsChanged(height_, length_, deadline);
     }
 
+    /// @notice Prevent this contract from spending base token.
+    /// @param enable Set to true to stop spending. Set to false to continue spending.
     function emergencyStop(bool enable) external onlyOwner {
         if (enable) _pause();
         else _unpause();
     }
 
-    function _sanityCheck() private view {
-        if (saleValueLow == 0) revert Trader__ImpossibleConfigurationSaleValueLowIsZero();
-        if (getSafetyBlocks() > (deadline - block.number)) revert Trader__ImpossibleConfigurationSaleValueLowIsTooLow();
+    /// @dev Whenever spending parameters are re-configured, this modifier is used to check if requested spending is realistic.
+    modifier validateSpendingArgs() {
+        _;
+        if (budget != 0) {
+            if (saleValueLow == 0) revert Trader__ImpossibleConfigurationSaleValueLowIsZero();
+            if (getSafetyBlocks() > (deadline - block.number))
+                revert Trader__ImpossibleConfigurationSaleValueLowIsTooLow();
+        }
     }
 
     /// @notice Set address of the contract that will receive token (base) to be converted to target token (quote).
     /// @param swapper_ address of the contract handling the swapping.
-    function setSwapper(address swapper_) external onlyOwner {
+    function setSwapper(address swapper_, address integrator_) external onlyOwner {
+        emit SwapperChanged(swapper, swapper_, integrator, integrator_);
         swapper = payable(swapper_);
-        emit SwapperChanged(swapper, swapper_);
+        integrator = integrator_;
     }
 
     /// @notice Returns upper bound of number of blocks enough to sold remaining budget.
@@ -418,8 +445,8 @@ contract Trader is ITransformer, Ownable, Pausable {
         return deadline - block.number - safety_blocks;
     }
 
-    /// @return Average amount of token in wei to be sold in 24 hours.
     /// @dev This reads configuration parameters, not current state of swapping process, which may diverge because of randomness.
+    /// @return Average amount of token in wei to be sold in 24 hours.
     function spendADay() external view returns (uint256) {
         return (budget / (deadline - spentResetBlock)) * BLOCKS_PER_DAY;
     }
@@ -449,5 +476,6 @@ contract Trader is ITransformer, Ownable, Pausable {
         return low + (((high - low) * (apply_domain(seed) >> 200)) / 2 ** (256 - 200));
     }
 
+    /// @dev receive if integration doesn't use `transform` function
     receive() external payable {}
 }
