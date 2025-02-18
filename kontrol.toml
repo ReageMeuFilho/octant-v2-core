@@ -52,6 +52,12 @@ match-test                 = [
         "YearnPolygonUsdcStrategyTest.testInitiateRageQuit()",
         "YearnPolygonUsdcStrategyTest.testReport()",
         "YearnPolygonUsdcStrategyTest.testTend()",
+        "YearnPolygonUsdcStrategyTest.testSetManagement(address)",
+        "YearnPolygonUsdcStrategyTest.testSetManagementRevert(address,address)",
+        "YearnPolygonUsdcStrategyTest.testSetKeeper(address)",
+        "YearnPolygonUsdcStrategyTest.testSetKeeperRevert(address,address)",
+        "YearnPolygonUsdcStrategyTest.testSettestSetEmergencyAdmin(address)",
+        "YearnPolygonUsdcStrategyTest.testSettestSetEmergencyAdminRevert(address,address)",
     ]
 
 [show.default]

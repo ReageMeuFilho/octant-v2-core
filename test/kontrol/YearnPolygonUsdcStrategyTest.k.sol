@@ -406,9 +406,30 @@ contract YearnPolygonUsdcStrategyTest is Setup {
                             ONLY MANAGER TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function testSetPendingManagement(address management) public {
+    function testSetManagement(address newManagement) public {
+        vm.assume(newManagement != address(0));
+
         vm.startPrank(_management);
-        strategy.setPendingManagement(management);
+        strategy.setPendingManagement(newManagement);
+        vm.stopPrank();
+
+        assertEq(newManagement, _loadAddress(address(strategy), PENDING_MANAGEMENT_SLOT));
+
+        vm.startPrank(newManagement);
+        strategy.acceptManagement();
+        vm.stopPrank();
+
+        assertEq(address(0), _loadAddress(address(strategy), PENDING_MANAGEMENT_SLOT));
+        assertEq(newManagement, _loadAddress(address(strategy), MANAGEMENT_SLOT));        
+    }
+
+    function testSetManagementRevert(address sender, address newManagement) public {
+        vm.assume(sender != _management);
+        vm.assume(newManagement != address(0));
+
+        vm.startPrank(sender);
+        vm.expectRevert(abi.encodeWithSelector(TokenizedStrategy__NotManagement.selector));
+        strategy.setPendingManagement(newManagement);
         vm.stopPrank();
     }
 
@@ -416,10 +437,32 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         vm.startPrank(_management);
         strategy.setKeeper(keeper);
         vm.stopPrank();
+
+        assertEq(keeper, _loadAddress(address(strategy), KEEPER_SLOT));
+    }
+
+    function testSetKeeperRevert(address sender, address keeper) public {
+        vm.assume(sender != _management);
+
+        vm.startPrank(sender);
+        vm.expectRevert(abi.encodeWithSelector(TokenizedStrategy__NotManagement.selector));
+        strategy.setKeeper(keeper);
+        vm.stopPrank();
     }
 
     function testSetEmergencyAdmin(address _emergencyAdmin) public {
         vm.startPrank(_management);
+        strategy.setEmergencyAdmin(_emergencyAdmin);
+        vm.stopPrank();
+
+        assertEq(_emergencyAdmin, _loadAddress(address(strategy), EMERGENCY_ADMIN_SLOT));
+    }
+
+    function testSetEmergencyAdminRevert(address sender, address _emergencyAdmin) public {
+        vm.assume(sender != _management);
+
+        vm.startPrank(sender);
+        vm.expectRevert(abi.encodeWithSelector(TokenizedStrategy__NotManagement.selector));
         strategy.setEmergencyAdmin(_emergencyAdmin);
         vm.stopPrank();
     }
