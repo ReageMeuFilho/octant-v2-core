@@ -20,10 +20,42 @@ contract MockYieldSource is ERC4626Upgradeable {
     //    return withdrawable;
     //}
 
+    // This is the implementation of withdraw deployed in `tokenizedStrategyAddress` of the YIELD_SOURCE address:
+    // https://polygonscan.com/address/0x52367C8E381EDFb068E9fBa1e7E9B2C847042897#code#L1127
+
+    // https://polygonscan.com/address/0xdfc8cd9f2f2d306b7c0d109f005df661e14f4ff2#code#L1833
+    function withdraw(
+        uint256 assets,
+        address receiver,
+        address owner
+    ) public override returns (uint256 shares) {
+        return withdraw(assets, receiver, owner, 0);
+    }
+
+    // https://polygonscan.com/address/0xdfc8cd9f2f2d306b7c0d109f005df661e14f4ff2#code#L1846
+    function withdraw(
+        uint256 assets,
+        address receiver,
+        address owner,
+        uint256 maxLoss
+    ) public returns (uint256 shares) {
+        require(
+            assets <= maxWithdraw(owner),
+            "ERC4626: withdraw more than max"
+        );
+        // Check for rounding error or 0 value.
+        require((shares = previewWithdraw(assets)) != 0, "ZERO_SHARES");
+
+        // Withdraw and track the actual amount withdrawn for loss check.
+        // For simplicity I call the internal _withdraw from ERC4626Upgradeable instead of:
+        // https://polygonscan.com/address/0xdfc8cd9f2f2d306b7c0d109f005df661e14f4ff2#code#L2185
+        //_withdraw(receiver, owner, assets, shares, maxLoss);
+        _withdraw(_msgSender(), receiver, owner, assets, shares);
+    }
+
     function availableDepositLimit(
         address /*_owner*/
     ) public view virtual returns (uint256) {
         return type(uint256).max;
-    }                                                                       
-
+    }                                                               
 }
