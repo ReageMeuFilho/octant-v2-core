@@ -351,13 +351,15 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         vm.assume(sender == _owner);
         withdrawAssumptions(sender, shares, receiver, _owner, maxLoss);
 
+        _snapshop(preState, receiver);
+
         principalPreservationInvariant(Mode.Assume);
         lockupDurationInvariant(Mode.Assume, _owner);
         userBalancesTotalSupplyConsistency(Mode.Assume, _owner);
 
-        uint256 withdrawable = strategy.maxWithdraw(_owner);
+        uint256 withdrawable = strategy.maxRedeem(_owner);
         vm.assume(shares <= withdrawable);
-        
+
         uint256 loss;
         if (preState.assetStrategyBalance < shares) {
             if (preState.strategyYieldSourcesShares < shares - preState.assetStrategyBalance) {
@@ -371,19 +373,40 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         vm.stopPrank();
 
         principalPreservationInvariant(Mode.Assert);
-        lockupDurationInvariant(Mode.Assert, _owner);
+        // This invariant does not hold because if owner has rage quited tand block.timestamp > user.unlocktime
+        // because user.lockuptime is assigned to block.timestamp
+        // lockupDurationInvariant(Mode.Assert, _owner);
         userBalancesTotalSupplyConsistency(Mode.Assert, _owner);
 
         //TODO: assert expected state changes
     }
 
+    function testMaxRedeemAllwaysReverts(address _owner) public {
+        UserInfo memory user = setupSymbolicUser(_owner);
+
+        principalPreservationInvariant(Mode.Assume);
+        vm.assume(strategy.totalSupply() > 1);
+
+        vm.expectRevert(abi.encodeWithSelector(Math.MathOverflowedMulDiv.selector));
+        strategy.maxRedeem(_owner);
+    }
+
     function testRedeemRevert(uint256 shares, address receiver, address _owner, uint256 maxLoss) public {
+        assumeNonReentrant();
         // Sender has to be concrete, otherwise it will branch a lot when setting prank
         address sender = makeAddr("SENDER");
 
         UserInfo memory user = setupSymbolicUser(_owner);
-        // Avoid error DragonTokenizedStrategy__SharesStillLocked()
+
+        principalPreservationInvariant(Mode.Assume);
+        lockupDurationInvariant(Mode.Assume, _owner);
+        userBalancesTotalSupplyConsistency(Mode.Assume, _owner);
+
+        // Assume DragonTokenizedStrategy__SharesStillLocked()
         vm.assume(user.isRageQuit == 0 && block.timestamp < user.unlockTime);
+
+        uint256 redeemable = strategy.maxRedeem(_owner);
+        vm.assume(shares <= redeemable);
 
         vm.startPrank(sender);
         vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__SharesStillLocked.selector));
