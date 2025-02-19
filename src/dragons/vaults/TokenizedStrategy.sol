@@ -753,6 +753,7 @@ abstract contract TokenizedStrategy {
                     TokenizedStrategy__DepositMoreThanMax()
                 );
             } else {
+                uint256 previousBalance = _asset.balanceOf(address(this));
                 require(
                     IAvatar(target).execTransactionFromModule(
                         address(_asset),
@@ -762,6 +763,7 @@ abstract contract TokenizedStrategy {
                     ),
                     TokenizedStrategy__TransferFailed()
                 );
+                require(_asset.balanceOf(address(this)) == previousBalance + assets);
             }
         } else {
             if (address(_asset) == ETH) {
