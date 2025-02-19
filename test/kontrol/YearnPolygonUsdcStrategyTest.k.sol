@@ -331,11 +331,14 @@ contract YearnPolygonUsdcStrategyTest is Setup {
     }
 
     function testWithdrawRevert(uint256 assets, address receiver, address _owner, uint256 maxLoss) public {
+        assumeNonReentrant();
+
         // Sender has to be concrete, otherwise it will branch a lot when setting prank
         address sender = makeAddr("SENDER");
 
         UserInfo memory user = setupSymbolicUser(_owner);
-        // Avoid error DragonTokenizedStrategy__SharesStillLocked()
+
+        // Assume DragonTokenizedStrategy__SharesStillLocked()
         vm.assume(user.isRageQuit == 0 && block.timestamp < user.unlockTime);
 
         vm.startPrank(sender);
