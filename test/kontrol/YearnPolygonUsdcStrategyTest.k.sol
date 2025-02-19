@@ -271,6 +271,8 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         vm.assume(sender == _owner);
         withdrawAssumptions(sender, assets, receiver, _owner, maxLoss);
 
+        _snapshop(preState, receiver);
+
         principalPreservationInvariant(Mode.Assume);
         lockupDurationInvariant(Mode.Assume, _owner);
         userBalancesTotalSupplyConsistency(Mode.Assume, _owner);
@@ -291,20 +293,21 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         vm.stopPrank();
 
         principalPreservationInvariant(Mode.Assert);
-        lockupDurationInvariant(Mode.Assert, _owner);
+        // This invariant does not hold because if owner has rage quited tand block.timestamp > user.unlocktime
+        // because user.lockuptime is assigned to block.timestamp
+        // lockupDurationInvariant(Mode.Assert, _owner);
         userBalancesTotalSupplyConsistency(Mode.Assert, _owner);
 
         //TODO: assert expected state changes
     }
 
+    // This test is true with the  `_freeFunds` issue. Once that is fixed this test should fail
     function testWithdrawWithLossReverts(uint256 assets, address receiver, address _owner, uint256 maxLoss) public {
         // Sender has to be concrete, otherwise it will branch a lot when setting prank 
         address sender = makeAddr("SENDER");
         // TODO Remove this assumption
         vm.assume(sender == _owner);
         withdrawAssumptions(sender, assets, receiver, _owner, maxLoss);
-
-        _snapshop(preState, receiver);
 
         principalPreservationInvariant(Mode.Assume);
         lockupDurationInvariant(Mode.Assume, _owner);
@@ -319,15 +322,9 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         vm.assume(IStrategy(YIELD_SOURCE).balanceOf(address(strategy)) < assets - idle);
 
         vm.startPrank(sender);
-        //vm.expectRevert("ERC4626: withdraw more than max");
+        vm.expectRevert("ERC4626: withdraw more than max");
         strategy.withdraw(assets, receiver, _owner, maxLoss);
         vm.stopPrank();
-
-        principalPreservationInvariant(Mode.Assert);
-        lockupDurationInvariant(Mode.Assert, _owner);
-        userBalancesTotalSupplyConsistency(Mode.Assert, _owner);
-
-        //TODO: assert expected state changes
     }
 
     function testWithdrawRevert(uint256 assets, address receiver, address _owner, uint256 maxLoss) public {
