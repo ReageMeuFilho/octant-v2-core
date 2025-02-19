@@ -495,15 +495,23 @@ contract YearnPolygonUsdcStrategyTest is Setup {
     //////////////////////////////////////////////////////////////*/
 
     function testReport() public {
-        // Assume non-reentrant
-        _storeData(address(strategy), ENTERED_SLOT, ENTERED_OFFSET, ENTERED_WIDTH, 0);
+        assumeNonReentrant();
 
         // Mint dragonrouter symbolic amount
         uint256 dragonRouterStrategyBalance = freshUInt256Bounded("dragonRouterStrategyBalance");
         _storeMappingUInt256(address(strategy), BALANCES_SLOT, uint256(uint160(address(dragonRouter))), 0, dragonRouterStrategyBalance);
 
+        _snapshop(preState, address(dragonRouter));
+
         principalPreservationInvariant(Mode.Assume);
         userBalancesTotalSupplyConsistency(Mode.Assume, address(dragonRouter));
+
+        uint256 loss;
+        if (preState.assetStrategyBalance + preState.strategyYieldSourcesShares <= preState.stateTotalAssets) {
+            loss = preState.stateTotalAssets - (preState.assetStrategyBalance + preState.strategyYieldSourcesShares);
+            // DragonRouter shares is enough to cover the loss
+            vm.assume(dragonRouterStrategyBalance >= loss);
+        }
 
         vm.startPrank(_keeper);
         strategy.report();
