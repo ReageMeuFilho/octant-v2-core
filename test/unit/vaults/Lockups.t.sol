@@ -1103,5 +1103,14 @@ contract LockupsTest is Setup {
         assertEq(remainingLockedShares, depositAmount - redeemAmount, "Remaining locked shares incorrect");
         assertEq(newTotalShares, shares - redeemAmount, "New total shares incorrect");
         assertEq(newWithdrawableShares, 0, "New withdrawable shares incorrect");
+
+        // Skip another 25% through rage quit (so 50% in total)
+        skip(MINIMUM_LOCKUP_DURATION / 4);
+
+        // Calculate expected unlocked amount (50% should be unlocked, including amount already redeemed)
+        uint256 expectedUnlocked2 = (depositAmount * (MINIMUM_LOCKUP_DURATION / 2)) / MINIMUM_LOCKUP_DURATION;
+        uint256 actualUnlocked2 = redeemAmount + strategy.maxRedeem(user, 0);
+        // TODO: Fix unlocked shares calculation so this assertion will pass
+        assertApproxEqRel(actualUnlocked2, expectedUnlocked2, 0.01e18, "Incorrect unlock amount at 50%");
     }
 }
