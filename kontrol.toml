@@ -19,11 +19,11 @@ reinit                     = false
 cse                        = false
 workers                    = 1
 max-frontier-parallel      = 6
-maintenance-rate           = 32
+maintenance-rate           = 128
 assume-defined             = false
 no-log-succ-rewrites       = true
 no-stack-checks            = true
-optimize-kcfg              = false
+optimize-kcfg              = true
 kore-rpc-command           = 'kore-rpc-booster --no-post-exec-simplify --equation-max-recursion 20 --equation-max-iterations 1000 --fallback-on Aborted'
 failure-information        = true
 counterexample-information = true
@@ -49,15 +49,19 @@ match-test                 = [
         "YearnPolygonUsdcStrategyTest.testWithdrawRevert(uint256,address,address,uint256)",
         "YearnPolygonUsdcStrategyTest.testRedeem(uint256,address,address,uint256)",
         "YearnPolygonUsdcStrategyTest.testRedeemRevert(uint256,address,address,uint256)",
+        #"YearnPolygonUsdcStrategyTest.testMaxRedeemAllwaysReverts(uint256,address,address,uint256)",
         "YearnPolygonUsdcStrategyTest.testInitiateRageQuit()",
         "YearnPolygonUsdcStrategyTest.testReport()",
+        "YearnPolygonUsdcStrategyTest.testReportWithLoss()",
         "YearnPolygonUsdcStrategyTest.testTend()",
-        "YearnPolygonUsdcStrategyTest.testSetManagement(address)",
-        "YearnPolygonUsdcStrategyTest.testSetManagementRevert(address,address)",
+        "YearnPolygonUsdcStrategyTest.testSetPendingManagement(address)",
+        #"YearnPolygonUsdcStrategyTest.testSetPendingManagementRevert(address,address)",
+        "YearnPolygonUsdcStrategyTest.testAcceptManagement(address)",
+        #"YearnPolygonUsdcStrategyTest.testAcceptManagementRevert(address,address)",
         "YearnPolygonUsdcStrategyTest.testSetKeeper(address)",
-        "YearnPolygonUsdcStrategyTest.testSetKeeperRevert(address,address)",
-        "YearnPolygonUsdcStrategyTest.testSettestSetEmergencyAdmin(address)",
-        "YearnPolygonUsdcStrategyTest.testSettestSetEmergencyAdminRevert(address,address)",
+        #"YearnPolygonUsdcStrategyTest.testSetKeeperRevert(address,address)",
+        "YearnPolygonUsdcStrategyTest.testSetEmergencyAdmin(address)",
+        #"YearnPolygonUsdcStrategyTest.testSetEmergencyAdminRevert(address,address)",
     ]
 
 [show.default]

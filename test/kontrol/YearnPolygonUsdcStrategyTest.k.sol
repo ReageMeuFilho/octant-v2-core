@@ -444,7 +444,7 @@ contract YearnPolygonUsdcStrategyTest is Setup {
                             ONLY MANAGER TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function testSetManagement(address newManagement) public {
+    function testSetPendingManagement(address newManagement) public {
         vm.assume(newManagement != address(0));
 
         vm.startPrank(_management);
@@ -452,6 +452,19 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         vm.stopPrank();
 
         assertEq(newManagement, _loadAddress(address(strategy), PENDING_MANAGEMENT_SLOT));
+    }
+
+    function testSetPendingManagementRevert(address sender, address newManagement) public {
+        vm.assume(sender != _management);
+        vm.assume(newManagement != address(0));
+
+        vm.assume(msg.sender == sender);
+        vm.expectRevert(abi.encodeWithSelector(TokenizedStrategy__NotManagement.selector));
+        strategy.setPendingManagement(newManagement);
+    }
+
+    function testAcceptManagement(address newManagement) public {
+        _storeAddress(address(strategy), PENDING_MANAGEMENT_SLOT, newManagement);
 
         vm.startPrank(newManagement);
         strategy.acceptManagement();
@@ -461,14 +474,14 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         assertEq(newManagement, _loadAddress(address(strategy), MANAGEMENT_SLOT));        
     }
 
-    function testSetManagementRevert(address sender, address newManagement) public {
-        vm.assume(sender != _management);
-        vm.assume(newManagement != address(0));
+    function testAcceptManagementRevert(address sender, address newManagement) public {
+        _storeAddress(address(strategy), PENDING_MANAGEMENT_SLOT, newManagement);
+        vm.assume(sender != newManagement);
 
         vm.startPrank(sender);
-        vm.expectRevert(abi.encodeWithSelector(TokenizedStrategy__NotManagement.selector));
-        strategy.setPendingManagement(newManagement);
-        vm.stopPrank();
+        vm.expectRevert(abi.encodeWithSelector(TokenizedStrategy__NotPendingManagement.selector));
+        strategy.acceptManagement();
+        vm.stopPrank();       
     }
 
     function testSetKeeper(address keeper) public {
