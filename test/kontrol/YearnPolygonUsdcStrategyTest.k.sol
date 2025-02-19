@@ -50,15 +50,23 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         _storeMappingData(address(strategy), VOLUNTARY_LOCKUPS_SLOT, uint256(uint160(user)), 3, 0, 1, info.isRageQuit);
     }
 
+    function assumeNotShutdown() internal {
+        // Assign shutdown slot to 0
+        _storeData(address(strategy), SHUTDOWN_SLOT, SHUTDOWN_OFFSET, SHUTDOWN_WIDTH, 0);
+    }
+
+    function assumeNonReentrant() internal {
+        // Assign entered slot to 0
+        _storeData(address(strategy), ENTERED_SLOT, ENTERED_OFFSET, ENTERED_WIDTH, 0);
+    }
+
     function depositAssumptions(uint256 amount, address receiver, UserInfo memory receiverInfo, uint256 lockupDuration) internal {
         vm.assume(receiver != address(0));
         vm.assume(receiver != address(strategy));
         vm.assume(receiver != address(dragonRouter));
 
-        // Assume strategy is not shutdown
-        _storeData(address(strategy), SHUTDOWN_SLOT, SHUTDOWN_OFFSET, SHUTDOWN_WIDTH, 0);
-        // Assume non-reentrant
-        _storeData(address(strategy), ENTERED_SLOT, ENTERED_OFFSET, ENTERED_WIDTH, 0);
+        assumeNotShutdown();
+        assumeNonReentrant();
 
         vm.assume(receiverInfo.isRageQuit == 0);
 
@@ -89,8 +97,7 @@ contract YearnPolygonUsdcStrategyTest is Setup {
     function withdrawAssumptions(address sender, uint256 assets, address receiver, address _owner, uint256 maxLoss) internal {
         vm.assume(sender != address(0));
         
-        // Assume non-reentrant
-        _storeData(address(strategy), ENTERED_SLOT, ENTERED_OFFSET, ENTERED_WIDTH, 0);
+        assumeNonReentrant();
 
         UserInfo memory owner = setupSymbolicUser(_owner);
 
