@@ -547,6 +547,8 @@ contract YearnPolygonUsdcStrategyTest is Setup {
     }
 
     function testTend() public {
+        assumeNonReentrant();
+
         principalPreservationInvariant(Mode.Assume);
 
         vm.startPrank(_keeper);
