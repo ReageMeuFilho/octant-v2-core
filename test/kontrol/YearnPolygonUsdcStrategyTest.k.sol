@@ -351,6 +351,14 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         uint256 withdrawable = strategy.maxWithdraw(_owner);
         vm.assume(shares <= withdrawable);
         
+        uint256 loss;
+        if (preState.assetStrategyBalance < shares) {
+            if (preState.strategyYieldSourcesShares < shares - preState.assetStrategyBalance) {
+                loss = shares - preState.strategyYieldSourcesShares + preState.assetStrategyBalance;
+                vm.assume(loss < (shares * maxLoss) / 10_000);
+            }
+        }
+        
         vm.startPrank(sender);
         strategy.redeem(shares, receiver, _owner, maxLoss);
         vm.stopPrank();
