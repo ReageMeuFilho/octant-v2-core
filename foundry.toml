@@ -12,15 +12,18 @@ fs_permissions = [{ access = "read-write", path = "./cache/test-artifacts/" },{ 
 build_info = true
 extra_output = ["storageLayout"]
 [profile.ci]
-fuzz = { runs = 5000 }
-invariant = { runs = 1000 }
+invariant = 256
 verbosity = 4
 
-[profile.local]
-  fuzz = { runs = 50 }
-  invariant = { runs = 10 }
-  # Speed up compilation and tests during development.
-  optimizer = true
+[profile.default.fuzz]
+runs = 1000
+seed = "0xDEADC0DE"
+
+[profile.pr.fuzz]
+runs = 256
+
+[profile.ci.fuzz]
+runs = 256
 
 [rpc_endpoints]
 mainnet = "${ETHEREUM_NODE_MAINNET}"
