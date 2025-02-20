@@ -4,9 +4,9 @@ import "forge-std/Test.sol";
 import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxy.sol";
-import {LinearAllowance} from "src/dragons/modules/LinearAllowance.sol";
+import { LinearAllowance } from "src/dragons/modules/LinearAllowance.sol";
 import "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
-import {AllowanceExecutor} from "../../src/dragons/AllowanceExecutor.sol";
+import { AllowanceExecutor } from "../../src/dragons/AllowanceExecutor.sol";
 
 contract TestLinearAllowanceIntegration is Test {
     address delegateContractOwner = makeAddr("delegateContractOwner");
@@ -25,13 +25,9 @@ contract TestLinearAllowanceIntegration is Test {
         // Deploy Safe infrastructure
         safeProxyFactory = new SafeProxyFactory();
         singleton = new Safe();
-        
+
         // Create proxy Safe
-        SafeProxy proxy = safeProxyFactory.createProxyWithNonce(
-            address(singleton),
-            "",
-            0
-        );
+        SafeProxy proxy = safeProxyFactory.createProxyWithNonce(address(singleton), "", 0);
         safeImpl = Safe(payable(address(proxy)));
 
         // Fund Safe with ETH
@@ -40,27 +36,15 @@ contract TestLinearAllowanceIntegration is Test {
         // Initialize Safe
         address[] memory owners = new address[](1);
         owners[0] = vm.addr(1);
-        safeImpl.setup(
-            owners,
-            1,
-            address(0),
-            bytes(""),
-            address(0),
-            address(0),
-            0,
-            payable(address(0))
-        );
+        safeImpl.setup(owners, 1, address(0), bytes(""), address(0), address(0), 0, payable(address(0)));
 
         // Enable SimpleAllowance module on Safe
-        bytes memory enableData = abi.encodeWithSignature(
-            "enableModule(address)", 
-            address(allowanceModule)
-        );
+        bytes memory enableData = abi.encodeWithSignature("enableModule(address)", address(allowanceModule));
         bool ok = safeExecTransaction(
-            address(safeImpl),  // Target: Safe itself
-            0,                  // Value
-            enableData,         // Enable module call
-            1                   // Owner private key
+            address(safeImpl), // Target: Safe itself
+            0, // Value
+            enableData, // Enable module call
+            1 // Owner private key
         );
         require(ok, "Module enable failed");
 
@@ -83,18 +67,15 @@ contract TestLinearAllowanceIntegration is Test {
         allowanceModule.setAllowance(
             allowanceExecutorAddress,
             token,
-            1000 ether   // Drip rate per day
+            1000 ether // Drip rate per day
         );
 
         // Advance time by 1 day
-        vm.warp(block.timestamp + 1 days); 
+        vm.warp(block.timestamp + 1 days);
 
         // Execute transfer (no amount parameter needed, spends all available allowance)
         vm.prank(delegateContractOwner);
-        allowanceExecutor.executeTransferLinear( 
-            safeAddress,
-            token
-        );
+        allowanceExecutor.executeTransferLinear(safeAddress, token);
 
         // Verify balances (1000 ether drip rate * 1 day)
         assertEq(address(allowanceExecutor).balance, 1000 ether, "Delegate should receive daily drip");
@@ -133,7 +114,7 @@ contract TestLinearAllowanceIntegration is Test {
             data,
             Enum.Operation.Call,
             safeTxGas,
-            0,  // baseGas parameter removed from variable since it was always 0
+            0, // baseGas parameter removed from variable since it was always 0
             gasPrice,
             address(0),
             payable(address(0)),

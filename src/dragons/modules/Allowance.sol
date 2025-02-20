@@ -25,7 +25,11 @@ contract SignatureDecoder {
     /// @param messageHash operation ethereum signed message hash
     /// @param messageSignature message `txHash` signature
     /// @param pos which signature to read
-    function recoverKey(bytes32 messageHash, bytes memory messageSignature, uint256 pos) internal pure returns (address) {
+    function recoverKey(
+        bytes32 messageHash,
+        bytes memory messageSignature,
+        uint256 pos
+    ) internal pure returns (address) {
         uint8 v;
         bytes32 r;
         bytes32 s;
@@ -37,7 +41,10 @@ contract SignatureDecoder {
     /// @notice Make sure to peform a bounds check for @param pos, to avoid out of bounds access on @param signatures
     /// @param pos which signature to read. A prior bounds check of this parameter should be performed, to avoid out of bounds access
     /// @param signatures concatenated rsv signatures
-    function signatureSplit(bytes memory signatures, uint256 pos) internal pure returns (uint8 v, bytes32 r, bytes32 s) {
+    function signatureSplit(
+        bytes memory signatures,
+        uint256 pos
+    ) internal pure returns (uint8 v, bytes32 r, bytes32 s) {
         // The signature format is a compact form of:
         //   {bytes32 r}{bytes32 s}{uint8 v}
         // Compact means, uint8 is not padded to 32 bytes.
@@ -74,12 +81,14 @@ contract AllowanceModule is SignatureDecoder {
     string public constant NAME = "Allowance Module";
     string public constant VERSION = "0.1.1";
 
-    bytes32 public constant DOMAIN_SEPARATOR_TYPEHASH = 0x47e79534a245952e8b16893a336b85a3d9ea9fa8c573f3d803afb92a79469218;
+    bytes32 public constant DOMAIN_SEPARATOR_TYPEHASH =
+        0x47e79534a245952e8b16893a336b85a3d9ea9fa8c573f3d803afb92a79469218;
     // keccak256(
     //     "EIP712Domain(uint256 chainId,address verifyingContract)"
     // );
 
-    bytes32 public constant ALLOWANCE_TRANSFER_TYPEHASH = 0x97c7ed08d51f4a077f71428543a8a2454799e5f6df78c03ef278be094511eda4;
+    bytes32 public constant ALLOWANCE_TRANSFER_TYPEHASH =
+        0x97c7ed08d51f4a077f71428543a8a2454799e5f6df78c03ef278be094511eda4;
     // keccak256(
     //     "AllowanceTransfer(address safe,address token,address to,uint96 amount,address paymentToken,uint96 payment,uint16 nonce)"
     // );
@@ -112,8 +121,21 @@ contract AllowanceModule is SignatureDecoder {
 
     event AddDelegate(address indexed safe, address delegate);
     event RemoveDelegate(address indexed safe, address delegate);
-    event ExecuteAllowanceTransfer(address indexed safe, address delegate, address token, address to, uint96 value, uint16 nonce);
-    event PayAllowanceTransfer(address indexed safe, address delegate, address paymentToken, address paymentReceiver, uint96 payment);
+    event ExecuteAllowanceTransfer(
+        address indexed safe,
+        address delegate,
+        address token,
+        address to,
+        uint96 value,
+        uint16 nonce
+    );
+    event PayAllowanceTransfer(
+        address indexed safe,
+        address delegate,
+        address paymentToken,
+        address paymentReceiver,
+        uint96 payment
+    );
     event SetAllowance(address indexed safe, address delegate, address token, uint96 allowanceAmount, uint16 resetTime);
     event ResetAllowance(address indexed safe, address delegate, address token);
     event DeleteAllowance(address indexed safe, address delegate, address token);
@@ -124,7 +146,13 @@ contract AllowanceModule is SignatureDecoder {
     /// @param allowanceAmount allowance in smallest token unit.
     /// @param resetTimeMin Time after which the allowance should reset
     /// @param resetBaseMin Time based on which the reset time should be increased
-    function setAllowance(address delegate, address token, uint96 allowanceAmount, uint16 resetTimeMin, uint32 resetBaseMin) public {
+    function setAllowance(
+        address delegate,
+        address token,
+        uint96 allowanceAmount,
+        uint16 resetTimeMin,
+        uint32 resetBaseMin
+    ) public {
         require(delegate != address(0), "delegate != address(0)");
         require(
             delegates[msg.sender][uint48(uint160(delegate))].delegate == delegate,
@@ -152,7 +180,11 @@ contract AllowanceModule is SignatureDecoder {
         emit SetAllowance(msg.sender, delegate, token, allowanceAmount, resetTimeMin);
     }
 
-    function getAllowance(address safe, address delegate, address token) private view returns (Allowance memory allowance) {
+    function getAllowance(
+        address safe,
+        address delegate,
+        address token
+    ) private view returns (Allowance memory allowance) {
         allowance = allowances[safe][delegate][token];
         // solium-disable-next-line security/no-block-members
         uint32 currentMin = uint32(block.timestamp / 60);
@@ -213,17 +245,30 @@ contract AllowanceModule is SignatureDecoder {
     ) public {
         // Get current state
         Allowance memory allowance = getAllowance(address(safe), delegate, token);
-        bytes memory transferHashData = generateTransferHashData(address(safe), token, to, amount, paymentToken, payment, allowance.nonce);
+        bytes memory transferHashData = generateTransferHashData(
+            address(safe),
+            token,
+            to,
+            amount,
+            paymentToken,
+            payment,
+            allowance.nonce
+        );
 
         // Update state
         allowance.nonce = allowance.nonce + 1;
         uint96 newSpent = allowance.spent + amount;
         // Check new spent amount and overflow
-        require(newSpent > allowance.spent && newSpent <= allowance.amount, "newSpent > allowance.spent && newSpent <= allowance.amount");
+        require(
+            newSpent > allowance.spent && newSpent <= allowance.amount,
+            "newSpent > allowance.spent && newSpent <= allowance.amount"
+        );
         allowance.spent = newSpent;
         if (payment > 0) {
             // Use updated allowance if token and paymentToken are the same
-            Allowance memory paymentAllowance = paymentToken == token ? allowance : getAllowance(address(safe), delegate, paymentToken);
+            Allowance memory paymentAllowance = paymentToken == token
+                ? allowance
+                : getAllowance(address(safe), delegate, paymentToken);
             newSpent = paymentAllowance.spent + payment;
             // Check new spent amount and overflow
             require(
@@ -274,7 +319,9 @@ contract AllowanceModule is SignatureDecoder {
     ) private view returns (bytes memory) {
         uint256 chainId = getChainId();
         bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_SEPARATOR_TYPEHASH, chainId, this));
-        bytes32 transferHash = keccak256(abi.encode(ALLOWANCE_TRANSFER_TYPEHASH, safe, token, to, amount, paymentToken, payment, nonce));
+        bytes32 transferHash = keccak256(
+            abi.encode(ALLOWANCE_TRANSFER_TYPEHASH, safe, token, to, amount, paymentToken, payment, nonce)
+        );
         return abi.encodePacked(bytes1(0x19), bytes1(0x01), domainSeparator, transferHash);
     }
 
@@ -291,7 +338,12 @@ contract AllowanceModule is SignatureDecoder {
         return keccak256(generateTransferHashData(safe, token, to, amount, paymentToken, payment, nonce));
     }
 
-    function checkSignature(address expectedDelegate, bytes memory signature, bytes memory transferHashData, ISafe safe) private view {
+    function checkSignature(
+        address expectedDelegate,
+        bytes memory signature,
+        bytes memory transferHashData,
+        ISafe safe
+    ) private view {
         address signer = recoverSignature(signature, transferHashData);
         require(
             expectedDelegate == signer && delegates[address(safe)][uint48(uint160(signer))].delegate == signer,
@@ -300,7 +352,10 @@ contract AllowanceModule is SignatureDecoder {
     }
 
     // We use the same format as used for the Safe contract, except that we only support exactly 1 signature and no contract signatures.
-    function recoverSignature(bytes memory signature, bytes memory transferHashData) private view returns (address owner) {
+    function recoverSignature(
+        bytes memory signature,
+        bytes memory transferHashData
+    ) private view returns (address owner) {
         // If there is no signature data msg.sender should be used
         if (signature.length == 0) return msg.sender;
         // Check that the provided signature data is as long as 1 encoded ecsda signature
@@ -317,7 +372,12 @@ contract AllowanceModule is SignatureDecoder {
             owner = msg.sender;
         } else if (v > 30) {
             // To support eth_sign and similar we adjust v and hash the transferHashData with the Ethereum message prefix before applying ecrecover
-            owner = ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", keccak256(transferHashData))), v - 4, r, s);
+            owner = ecrecover(
+                keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", keccak256(transferHashData))),
+                v - 4,
+                r,
+                s
+            );
         } else {
             // Use ecrecover with the messageHash for EOA signatures
             owner = ecrecover(keccak256(transferHashData), v, r, s);
@@ -329,10 +389,16 @@ contract AllowanceModule is SignatureDecoder {
     function transfer(ISafe safe, address token, address payable to, uint96 amount) private {
         if (token == address(0)) {
             // solium-disable-next-line security/no-send
-            require(safe.execTransactionFromModule(to, amount, "", Enum.Operation.Call), "Could not execute ether transfer");
+            require(
+                safe.execTransactionFromModule(to, amount, "", Enum.Operation.Call),
+                "Could not execute ether transfer"
+            );
         } else {
             bytes memory data = abi.encodeWithSignature("transfer(address,uint256)", to, amount);
-            require(safe.execTransactionFromModule(token, 0, data, Enum.Operation.Call), "Could not execute token transfer");
+            require(
+                safe.execTransactionFromModule(token, 0, data, Enum.Operation.Call),
+                "Could not execute token transfer"
+            );
         }
     }
 
@@ -346,13 +412,7 @@ contract AllowanceModule is SignatureDecoder {
         uint256 lastReset = uint256(allowance.lastResetMin) * 60;
         uint256 nextReset = lastReset + resetTime;
         uint256 canSpendUntil = nextReset > block.timestamp ? nextReset : type(uint256).max;
-        return [
-            allowance.amount,
-            allowance.spent,
-            resetTime,
-            lastReset,
-            canSpendUntil
-        ];
+        return [allowance.amount, allowance.spent, resetTime, lastReset, canSpendUntil];
     }
 
     /// @dev Allows to add a delegate.
@@ -407,7 +467,11 @@ contract AllowanceModule is SignatureDecoder {
         emit RemoveDelegate(msg.sender, delegate);
     }
 
-    function getDelegates(address safe, uint48 start, uint8 pageSize) public view returns (address[] memory results, uint48 next) {
+    function getDelegates(
+        address safe,
+        uint48 start,
+        uint8 pageSize
+    ) public view returns (address[] memory results, uint48 next) {
         results = new address[](pageSize);
         uint8 i = 0;
         uint48 initialIndex = (start != 0) ? start : delegatesStart[safe];
@@ -425,10 +489,7 @@ contract AllowanceModule is SignatureDecoder {
         }
     }
 
-    function isDelegate(
-        address safe,
-        address delegate
-    ) public view returns (bool) {
+    function isDelegate(address safe, address delegate) public view returns (bool) {
         return delegates[safe][uint48(uint160(delegate))].delegate == delegate;
     }
 }

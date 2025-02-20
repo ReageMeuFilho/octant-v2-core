@@ -19,11 +19,7 @@ contract AllowanceExecutor {
 
     /// @dev Linear allowance transfer - in house allowance module
     function executeTransferLinear(address safe, address token) external {
-        LinearAllowance(address(allowanceModule)).executeAllowanceTransfer(
-            safe,
-            token,
-            payable(address(this))
-        );
+        LinearAllowance(address(allowanceModule)).executeAllowanceTransfer(safe, token, payable(address(this)));
     }
 
     /// @dev Allowance transfer using AllowanceModule by Gnosis Safe
@@ -46,7 +42,7 @@ contract AllowanceExecutor {
     }
 
     /// @dev EIP-1271 compatible signature validation
-    function isValidSignature(bytes32 _hash, bytes memory) external view returns (bytes4) {
+    function isValidSignature(bytes32, bytes memory) external view returns (bytes4) {
         // Authorize any hash for testing
         return MAGIC_VALUE;
     }

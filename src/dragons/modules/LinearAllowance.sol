@@ -21,7 +21,7 @@ contract LinearAllowance {
 
     function setAllowance(address delegate, address token, uint256 dripRatePerDay) external {
         Allowance storage a = allowances[msg.sender][delegate][token];
-        
+
         // Calculate spendable tokens since last bookkeeping
         if (a.lastBookedAt != 0) {
             uint256 timeElapsed = block.timestamp - a.lastBookedAt;
@@ -56,12 +56,7 @@ contract LinearAllowance {
         } else {
             // Execute ERC20 transfer through Safe
             bytes memory data = abi.encodeWithSignature("transfer(address,uint256)", to, toTransfer);
-            bool tokenSuccess = Safe(payable(safe)).execTransactionFromModule(
-                token,
-                0,
-                data,
-                Enum.Operation.Call
-            );
+            bool tokenSuccess = Safe(payable(safe)).execTransactionFromModule(token, 0, data, Enum.Operation.Call);
             require(tokenSuccess, "Token transfer failed");
         }
     }

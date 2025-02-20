@@ -67,7 +67,7 @@ contract SimpleAllowance {
             bytes memory data = abi.encodeWithSignature("transfer(address,uint256)", to, amount);
             bool tokenSuccess = Safe(payable(safe)).execTransactionFromModule(
                 token, // Token contract address
-                0,     // No value needed for ERC20
+                0, // No value needed for ERC20
                 data,
                 Enum.Operation.Call
             );
