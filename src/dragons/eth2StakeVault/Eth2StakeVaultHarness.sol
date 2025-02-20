@@ -40,7 +40,9 @@ contract Eth2StakeVaultHarness is NonfungibleDepositManager {
         string memory withdrawalCred = toHexString(info.withdrawalCredentials);
         string memory pubkeyStr = info.pubkey.length > 0 ? shortenHex(toHexString(info.pubkey)) : "";
         string memory signatureStr = info.signature.length > 0 ? shortenHex(toHexString(info.signature)) : "";
-        string memory depositDataRootStr = info.depositDataRoot != 0 ? shortenHex(toHexString(info.depositDataRoot)) : "";
+        string memory depositDataRootStr = info.depositDataRoot != 0
+            ? shortenHex(toHexString(info.depositDataRoot))
+            : "";
         string memory status = _stateToString(info.state);
 
         // Determine progress level: Requested=1, Assigned=2, Confirmed=3, Finalized=4, Cancelled=0.
@@ -78,7 +80,7 @@ contract Eth2StakeVaultHarness is NonfungibleDepositManager {
         string memory circles = _generateProgressCircles(params.progress);
         string memory checkmarksSVG = _generateCheckmarks(params);
         string memory svg = _generateSVG(params, circles, checkmarksSVG);
-        
+
         return _wrapInBase64JSON(params.tokenId, params.status, svg);
     }
 
@@ -92,10 +94,18 @@ contract Eth2StakeVaultHarness is NonfungibleDepositManager {
             if (i == progress - 1 && progress > 0) {
                 r = "6";
             }
-            circles = string(abi.encodePacked(
-                circles,
-                '<circle cx="', uint256(i * 16).toString(), '" cy="14" r="', r, '" fill="', fillColor, '"/>'
-            ));
+            circles = string(
+                abi.encodePacked(
+                    circles,
+                    '<circle cx="',
+                    uint256(i * 16).toString(),
+                    '" cy="14" r="',
+                    r,
+                    '" fill="',
+                    fillColor,
+                    '"/>'
+                )
+            );
         }
         return string(abi.encodePacked('<g transform="translate(320,50)">', circles, "</g>"));
     }
@@ -117,12 +127,19 @@ contract Eth2StakeVaultHarness is NonfungibleDepositManager {
         if (bytes(params.status).length > 0) {
             checkmarks[5] = '<path d="M360 388 l4 4 l8 -8" stroke="#48BB78" stroke-width="2" fill="none"/>';
         }
-        return string(abi.encodePacked(
-            "<g fill=\"#48BB78\">",
-            checkmarks[0], checkmarks[1], checkmarks[2],
-            checkmarks[3], checkmarks[4], checkmarks[5],
-            "</g>"
-        ));
+        return
+            string(
+                abi.encodePacked(
+                    '<g fill="#48BB78">',
+                    checkmarks[0],
+                    checkmarks[1],
+                    checkmarks[2],
+                    checkmarks[3],
+                    checkmarks[4],
+                    checkmarks[5],
+                    "</g>"
+                )
+            );
     }
 
     /// @notice Generates the main SVG content
@@ -131,14 +148,17 @@ contract Eth2StakeVaultHarness is NonfungibleDepositManager {
         string memory circles,
         string memory checkmarksSVG
     ) internal pure returns (string memory) {
-        return string(abi.encodePacked(
-            _generateSVGHeader(),
-            _generateSVGBackground(),
-            _generateTextElements(params),
-            circles,
-            checkmarksSVG,
-            '</svg>'
-        ));
+        return
+            string(
+                abi.encodePacked(
+                    _generateSVGHeader(),
+                    _generateSVGBackground(),
+                    _generateTextElements(params),
+                    circles,
+                    checkmarksSVG,
+                    "</svg>"
+                )
+            );
     }
 
     /// @notice Generates the SVG header and container
@@ -148,49 +168,57 @@ contract Eth2StakeVaultHarness is NonfungibleDepositManager {
 
     /// @notice Generates the SVG background elements
     function _generateSVGBackground() internal pure returns (string memory) {
-        return string(abi.encodePacked(
-            '<rect width="400" height="460" rx="12" fill="#2E2E2E" stroke="#F6E05E" stroke-width="2"/>',
-            '<path d="M12 2 h376 a10,10 0 0 1 10,10 v87 h-396 v-87 a10,10 0 0 1 10,-10" fill="#1A1A1A"/>',
-            '<path d="M100 160l-30-15 30-50 30 50-30 15zm0 10l-30-15 30 15 30-15-30 15z" fill="#4A5568" fill-opacity="0.2"/>',
-            '<path d="M300 400l-20 10v-20l20-30 20 30v20l-20-10z" fill="#4A5568" fill-opacity="0.2"/>'
-        ));
+        return
+            string(
+                abi.encodePacked(
+                    '<rect width="400" height="460" rx="12" fill="#2E2E2E" stroke="#F6E05E" stroke-width="2"/>',
+                    '<path d="M12 2 h376 a10,10 0 0 1 10,10 v87 h-396 v-87 a10,10 0 0 1 10,-10" fill="#1A1A1A"/>',
+                    '<path d="M100 160l-30-15 30-50 30 50-30 15zm0 10l-30-15 30 15 30-15-30 15z" fill="#4A5568" fill-opacity="0.2"/>',
+                    '<path d="M300 400l-20 10v-20l20-30 20 30v20l-20-10z" fill="#4A5568" fill-opacity="0.2"/>'
+                )
+            );
     }
 
     /// @notice Generates the text elements for the SVG
     function _generateTextElements(ConstructTokenURIParams memory params) internal pure returns (string memory) {
-        return string(abi.encodePacked(
-            _generateLabels(),
-            _generateValues(params)
-        ));
+        return string(abi.encodePacked(_generateLabels(), _generateValues(params)));
     }
 
     /// @notice Generates the label text elements
     function _generateLabels() internal pure returns (string memory) {
-        return string(abi.encodePacked(
-            '<text x="24" y="44" font-family="system-ui, sans-serif" font-size="22" font-weight="700" fill="white" letter-spacing="0.5">Validator Deposit</text>',
-            '<text x="24" y="70" font-family="system-ui, sans-serif" font-size="16" fill="#A0AEC0">ETH 2.0 Staking</text>',
-            '<text x="24" y="130" font-family="monospace" font-size="12" fill="#718096">Withdrawal Address</text>',
-            '<text x="24" y="180" font-family="monospace" font-size="12" fill="#718096">Withdrawal Credentials</text>',
-            '<text x="24" y="230" font-family="monospace" font-size="12" fill="#718096">Public Key</text>',
-            '<text x="24" y="280" font-family="monospace" font-size="12" fill="#718096">Signature</text>',
-            '<text x="24" y="330" font-family="monospace" font-size="12" fill="#718096">Deposit Data Root</text>',
-            '<text x="24" y="380" font-family="monospace" font-size="12" fill="#718096">Status</text>'
-        ));
+        return
+            string(
+                abi.encodePacked(
+                    '<text x="24" y="44" font-family="system-ui, sans-serif" font-size="22" font-weight="700" fill="white" letter-spacing="0.5">Validator Deposit</text>',
+                    '<text x="24" y="70" font-family="system-ui, sans-serif" font-size="16" fill="#A0AEC0">ETH 2.0 Staking</text>',
+                    '<text x="24" y="130" font-family="monospace" font-size="12" fill="#718096">Withdrawal Address</text>',
+                    '<text x="24" y="180" font-family="monospace" font-size="12" fill="#718096">Withdrawal Credentials</text>',
+                    '<text x="24" y="230" font-family="monospace" font-size="12" fill="#718096">Public Key</text>',
+                    '<text x="24" y="280" font-family="monospace" font-size="12" fill="#718096">Signature</text>',
+                    '<text x="24" y="330" font-family="monospace" font-size="12" fill="#718096">Deposit Data Root</text>',
+                    '<text x="24" y="380" font-family="monospace" font-size="12" fill="#718096">Status</text>'
+                )
+            );
     }
 
     /// @notice Generates the value text elements
     function _generateValues(ConstructTokenURIParams memory params) internal pure returns (string memory) {
         // Get display values with fallbacks
         string memory withdrawalAddrText = bytes(params.withdrawalAddress).length > 0 ? params.withdrawalAddress : "-";
-        string memory withdrawalCredText = bytes(params.withdrawalCredentials).length > 0 ? params.withdrawalCredentials : "-";
+        string memory withdrawalCredText = bytes(params.withdrawalCredentials).length > 0
+            ? params.withdrawalCredentials
+            : "-";
         string memory pubkeyText = bytes(params.pubkey).length > 0 ? params.pubkey : "-";
         string memory signatureText = bytes(params.signature).length > 0 ? params.signature : "-";
         string memory depositDataRootText = bytes(params.depositDataRoot).length > 0 ? params.depositDataRoot : "-";
 
-        return string(abi.encodePacked(
-            _generateValuesPart1(withdrawalAddrText, withdrawalCredText, pubkeyText),
-            _generateValuesPart2(signatureText, depositDataRootText, params.status)
-        ));
+        return
+            string(
+                abi.encodePacked(
+                    _generateValuesPart1(withdrawalAddrText, withdrawalCredText, pubkeyText),
+                    _generateValuesPart2(signatureText, depositDataRootText, params.status)
+                )
+            );
     }
 
     /// @notice Generates the first part of value text elements
@@ -199,11 +227,20 @@ contract Eth2StakeVaultHarness is NonfungibleDepositManager {
         string memory withdrawalCredText,
         string memory pubkeyText
     ) internal pure returns (string memory) {
-        return string(abi.encodePacked(
-            '<text x="24" y="150" font-family="monospace" font-size="14" fill="#E2E8F0">', withdrawalAddrText, '</text>',
-            '<text x="24" y="200" font-family="monospace" font-size="14" fill="#E2E8F0">', withdrawalCredText, '</text>',
-            '<text x="24" y="250" font-family="monospace" font-size="14" fill="#E2E8F0">', pubkeyText, '</text>'
-        ));
+        return
+            string(
+                abi.encodePacked(
+                    '<text x="24" y="150" font-family="monospace" font-size="14" fill="#E2E8F0">',
+                    withdrawalAddrText,
+                    "</text>",
+                    '<text x="24" y="200" font-family="monospace" font-size="14" fill="#E2E8F0">',
+                    withdrawalCredText,
+                    "</text>",
+                    '<text x="24" y="250" font-family="monospace" font-size="14" fill="#E2E8F0">',
+                    pubkeyText,
+                    "</text>"
+                )
+            );
     }
 
     /// @notice Generates the second part of value text elements
@@ -212,11 +249,20 @@ contract Eth2StakeVaultHarness is NonfungibleDepositManager {
         string memory depositDataRootText,
         string memory status
     ) internal pure returns (string memory) {
-        return string(abi.encodePacked(
-            '<text x="24" y="300" font-family="monospace" font-size="14" fill="#E2E8F0">', signatureText, '</text>',
-            '<text x="24" y="350" font-family="monospace" font-size="14" fill="#E2E8F0">', depositDataRootText, '</text>',
-            '<text x="24" y="400" font-family="monospace" font-size="14" fill="#E2E8F0">', status, '</text>'
-        ));
+        return
+            string(
+                abi.encodePacked(
+                    '<text x="24" y="300" font-family="monospace" font-size="14" fill="#E2E8F0">',
+                    signatureText,
+                    "</text>",
+                    '<text x="24" y="350" font-family="monospace" font-size="14" fill="#E2E8F0">',
+                    depositDataRootText,
+                    "</text>",
+                    '<text x="24" y="400" font-family="monospace" font-size="14" fill="#E2E8F0">',
+                    status,
+                    "</text>"
+                )
+            );
     }
 
     /// @notice Wraps the SVG in base64 encoded JSON
@@ -227,9 +273,12 @@ contract Eth2StakeVaultHarness is NonfungibleDepositManager {
     ) internal pure returns (string memory) {
         string memory json = string(
             abi.encodePacked(
-                '{"name": "Validator Deposit #', tokenId.toString(),
-                '", "description": "A Validator Deposit NFT representing a 32 ETH deposit. Current state: ', status,
-                '", "image": "data:image/svg+xml;base64,', Base64.encode(bytes(svg)),
+                '{"name": "Validator Deposit #',
+                tokenId.toString(),
+                '", "description": "A Validator Deposit NFT representing a 32 ETH deposit. Current state: ',
+                status,
+                '", "image": "data:image/svg+xml;base64,',
+                Base64.encode(bytes(svg)),
                 '"}'
             )
         );

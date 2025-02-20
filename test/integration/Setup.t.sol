@@ -6,17 +6,17 @@ import { TestPlus } from "lib/solady/test/utils/TestPlus.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
 import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
 
-import {MockERC20} from "test/mocks/MockERC20.sol";
-import {MockYieldSource} from "test/mocks/MockYieldSource.sol";
-import {MockStrategy} from "test/mocks/MockStrategy.sol";
-import {IMockStrategy} from "test/mocks/IMockStrategy.sol";
-import {DeploySafe} from "script/deploy/DeploySafe.sol";
-import {DeployDragonRouter} from "script/deploy/DeployDragonRouter.sol";
-import {DeployModuleProxyFactory} from "script/deploy/DeployModuleProxyFactory.sol";
-import {DeployDragonTokenizedStrategy} from "script/deploy/DeployDragonTokenizedStrategy.sol";
-import {DeployHatsProtocol} from "script/deploy/DeployHatsProtocol.sol";
-import {DeployMockStrategy} from "script/deploy/DeployMockStrategy.sol";
-import {DeployNonfungibleDepositManager} from "script/deploy/DeployNonfungibleDepositManager.sol";
+import { MockERC20 } from "test/mocks/MockERC20.sol";
+import { MockYieldSource } from "test/mocks/MockYieldSource.sol";
+import { MockStrategy } from "test/mocks/MockStrategy.sol";
+import { IMockStrategy } from "test/mocks/IMockStrategy.sol";
+import { DeploySafe } from "script/deploy/DeploySafe.sol";
+import { DeployDragonRouter } from "script/deploy/DeployDragonRouter.sol";
+import { DeployModuleProxyFactory } from "script/deploy/DeployModuleProxyFactory.sol";
+import { DeployDragonTokenizedStrategy } from "script/deploy/DeployDragonTokenizedStrategy.sol";
+import { DeployHatsProtocol } from "script/deploy/DeployHatsProtocol.sol";
+import { DeployMockStrategy } from "script/deploy/DeployMockStrategy.sol";
+import { DeployNonfungibleDepositManager } from "script/deploy/DeployNonfungibleDepositManager.sol";
 
 import { TokenizedStrategy__StrategyNotInShutdown, TokenizedStrategy__NotEmergencyAuthorized, TokenizedStrategy__HatsAlreadyInitialized, TokenizedStrategy__NotKeeperOrManagement, TokenizedStrategy__NotManagement } from "src/errors.sol";
 
@@ -121,7 +121,7 @@ contract SetupIntegrationTest is
         DeployDragonTokenizedStrategy.deploy();
         DeployDragonRouter.deploy();
         DeployNonfungibleDepositManager.deploy();
-        
+
         vm.startPrank(address(deployedSafe));
         DeployMockStrategy.deploy(
             address(deployedSafe),

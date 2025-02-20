@@ -18,7 +18,7 @@ interface IDepositContract {
 /**
  * @title NonfungibleDepositManager
  * @notice Manages 32 ETH validator deposits via a 4‐step process, representing each deposit as an ERC-721 NFT.
- * 
+ *
  * The deposit lifecycle is:
  *   1. requestDeposit – Deposit manager calls this with exactly 32 ETH and an explicit withdrawal address (cold wallet). NFT is minted to the deposit manager.
  *   2. assignValidator – An approved operator assigns the validator’s 48-byte public key and 96-byte signature.
@@ -34,18 +34,25 @@ contract NonfungibleDepositManager is ERC721, Ownable, ReentrancyGuard {
     address public constant DEPOSIT_CONTRACT_ADDRESS = 0x00000000219ab540356cBB839Cbe05303d7705Fa;
 
     // The deposit process states.
-    enum DepositState { None, Requested, Assigned, Confirmed, Finalized, Cancelled }
+    enum DepositState {
+        None,
+        Requested,
+        Assigned,
+        Confirmed,
+        Finalized,
+        Cancelled
+    }
 
     // DepositInfo stores all information for a deposit.
     struct DepositInfo {
         DepositState state;
-        address withdrawalAddress;       // The withdrawal (cold) address provided in requestDeposit.
-        bytes32 withdrawalCredentials;   // 32-byte: 0x01 + 11 zeros + user's address.
-        bytes pubkey;                    // 48-byte BLS pubkey (immutable once assigned).
-        bytes signature;                 // 96-byte BLS signature (immutable once assigned).
-        bytes32 depositDataRoot;         // User-confirmed deposit data root.
-        address assignedOperator;        // Approved operator who called assignValidator.
-        uint256 confirmedTimestamp;      // Timestamp when deposit entered the Confirmed state.
+        address withdrawalAddress; // The withdrawal (cold) address provided in requestDeposit.
+        bytes32 withdrawalCredentials; // 32-byte: 0x01 + 11 zeros + user's address.
+        bytes pubkey; // 48-byte BLS pubkey (immutable once assigned).
+        bytes signature; // 96-byte BLS signature (immutable once assigned).
+        bytes32 depositDataRoot; // User-confirmed deposit data root.
+        address assignedOperator; // Approved operator who called assignValidator.
+        uint256 confirmedTimestamp; // Timestamp when deposit entered the Confirmed state.
     }
 
     // tokenId => DepositInfo
@@ -142,7 +149,7 @@ contract NonfungibleDepositManager is ERC721, Ownable, ReentrancyGuard {
      * @notice Confirms the validator assignment by verifying the deposit data root
      * @dev The deposit data root is computed via SSZ tree hash from:
      *      - validator public key (pubkey)
-     *      - withdrawal credentials 
+     *      - withdrawal credentials
      *      - deposit amount (32 ETH in gwei)
      *      - validator signature
      * @param tokenId The ID of the deposit NFT to confirm
@@ -154,10 +161,7 @@ contract NonfungibleDepositManager is ERC721, Ownable, ReentrancyGuard {
         DepositInfo storage info = deposits[tokenId];
         require(info.state == DepositState.Assigned, "Deposit not in Assigned state");
         // Allow claim if caller is either the designated withdrawal address or the NFT owner.
-        require(
-            msg.sender == info.withdrawalAddress || msg.sender == ownerOf(tokenId),
-            "Not authorized to claim"
-        );
+        require(msg.sender == info.withdrawalAddress || msg.sender == ownerOf(tokenId), "Not authorized to claim");
         // Compute the deposit data root and verify it matches the provided value.
         bytes32 computedRoot = _computeDepositDataRoot(info.pubkey, info.withdrawalCredentials, info.signature);
         require(computedRoot == depositDataRoot, "Deposit data root mismatch");
@@ -167,7 +171,6 @@ contract NonfungibleDepositManager is ERC721, Ownable, ReentrancyGuard {
         info.confirmedTimestamp = block.timestamp; // Record confirmation time for cooldown.
         emit ValidatorConfirmed(tokenId, msg.sender, depositDataRoot);
     }
-
 
     /**
      * @notice Issues a validator deposit only callable by approved operators. Requires deposit to be confirmed.
@@ -198,7 +201,6 @@ contract NonfungibleDepositManager is ERC721, Ownable, ReentrancyGuard {
         emit ValidatorIssued(tokenId, msg.sender);
     }
 
-
     /**
      * @notice Cancels a validator deposit, refunds the 32 ETH, burn the NFT
      * @dev This function allows cancellation of deposits in different states with specific rules:
@@ -213,15 +215,12 @@ contract NonfungibleDepositManager is ERC721, Ownable, ReentrancyGuard {
         // Allowed states: Requested, Assigned, or Confirmed (if cooldown period passed).
         require(
             info.state == DepositState.Requested ||
-            info.state == DepositState.Assigned ||
-            (info.state == DepositState.Confirmed && block.timestamp >= info.confirmedTimestamp + 7 days),
+                info.state == DepositState.Assigned ||
+                (info.state == DepositState.Confirmed && block.timestamp >= info.confirmedTimestamp + 7 days),
             "Cannot cancel now"
         );
         // Allow cancellation if caller is the withdrawal address or holds the NFT (deposit manager).
-        require(
-            msg.sender == info.withdrawalAddress || msg.sender == ownerOf(tokenId),
-            "Not authorized to cancel"
-        );
+        require(msg.sender == info.withdrawalAddress || msg.sender == ownerOf(tokenId), "Not authorized to cancel");
 
         info.state = DepositState.Cancelled;
         emit DepositCancelled(tokenId, msg.sender);
@@ -270,23 +269,27 @@ contract NonfungibleDepositManager is ERC721, Ownable, ReentrancyGuard {
     ) internal pure returns (bytes32) {
         require(pubkey.length == 48, "Bad pubkey length");
         require(signature.length == 96, "Bad signature length");
-        
+
         uint deposit_amount = 32 ether / 1 gwei;
         bytes memory amount = to_little_endian_64(uint64(deposit_amount));
 
         // Compute deposit data root (`DepositData` hash tree root)
         bytes32 pubkey_root = sha256(abi.encodePacked(pubkey, bytes16(0)));
-        
-        // Split signature into two parts and hash them separately
-        bytes32 signature_root = sha256(abi.encodePacked(
-            sha256(abi.encodePacked(_slice(signature, 0, 64))),
-            sha256(abi.encodePacked(_slice(signature, 64, 32), bytes32(0)))
-        ));
 
-        bytes32 node = sha256(abi.encodePacked(
-            sha256(abi.encodePacked(pubkey_root, withdrawalCred)),
-            sha256(abi.encodePacked(amount, bytes24(0), signature_root))
-        ));
+        // Split signature into two parts and hash them separately
+        bytes32 signature_root = sha256(
+            abi.encodePacked(
+                sha256(abi.encodePacked(_slice(signature, 0, 64))),
+                sha256(abi.encodePacked(_slice(signature, 64, 32), bytes32(0)))
+            )
+        );
+
+        bytes32 node = sha256(
+            abi.encodePacked(
+                sha256(abi.encodePacked(pubkey_root, withdrawalCred)),
+                sha256(abi.encodePacked(amount, bytes24(0), signature_root))
+            )
+        );
 
         return node;
     }
@@ -335,10 +338,9 @@ contract NonfungibleDepositManager is ERC721, Ownable, ReentrancyGuard {
      * @param to The address receiving the token
      * @param tokenId The ID of the token being transferred
      */
-    function _beforeTokenTransfer(address from, address to, uint256 tokenId)
-        internal
-    {
-        if (from != address(0) && to != address(0)) { // not minting or burning
+    function _beforeTokenTransfer(address from, address to, uint256 tokenId) internal {
+        if (from != address(0) && to != address(0)) {
+            // not minting or burning
             DepositState st = deposits[tokenId].state;
             require(st == DepositState.Finalized, "Active deposit NFTs are non-transferable");
         }
