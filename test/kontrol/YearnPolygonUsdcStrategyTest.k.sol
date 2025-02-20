@@ -384,8 +384,7 @@ contract YearnPolygonUsdcStrategyTest is Setup {
     function testMaxRedeemAllwaysReverts(address _owner) public {
         UserInfo memory user = setupSymbolicUser(_owner);
 
-        principalPreservationInvariant(Mode.Assume);
-        vm.assume(strategy.totalSupply() > 1);
+        vm.assume(strategy.totalSupply() > strategy.totalAssets());
 
         vm.expectRevert(abi.encodeWithSelector(Math.MathOverflowedMulDiv.selector));
         strategy.maxRedeem(_owner);
@@ -455,12 +454,14 @@ contract YearnPolygonUsdcStrategyTest is Setup {
     }
 
     function testSetPendingManagementRevert(address sender, address newManagement) public {
-        vm.assume(sender != _management);
-        vm.assume(newManagement != address(0));
+        //vm.assume(sender != _management);
+        _storeData(address(strategy), HATS_INITIALIZED_SLOT, 0, 1, 0);
 
-        vm.assume(msg.sender == sender);
+        // Sender is this contract to avoid branching on prank
+        //vm.startPrank(sender);
         vm.expectRevert(abi.encodeWithSelector(TokenizedStrategy__NotManagement.selector));
         strategy.setPendingManagement(newManagement);
+        //vm.stopPrank();
     }
 
     function testAcceptManagement(address newManagement) public {
@@ -471,7 +472,7 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         vm.stopPrank();
 
         assertEq(address(0), _loadAddress(address(strategy), PENDING_MANAGEMENT_SLOT));
-        assertEq(newManagement, _loadAddress(address(strategy), MANAGEMENT_SLOT));        
+        assertEq(newManagement, _loadAddress(address(strategy), MANAGEMENT_SLOT));
     }
 
     function testAcceptManagementRevert(address sender, address newManagement) public {

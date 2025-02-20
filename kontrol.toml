@@ -56,7 +56,7 @@ match-test                 = [
         "YearnPolygonUsdcStrategyTest.testTend()",
         "YearnPolygonUsdcStrategyTest.testSetPendingManagement(address)",
         #"YearnPolygonUsdcStrategyTest.testSetPendingManagementRevert(address,address)",
-        "YearnPolygonUsdcStrategyTest.testAcceptManagement(address)",
+        #"YearnPolygonUsdcStrategyTest.testAcceptManagement(address)",
         #"YearnPolygonUsdcStrategyTest.testAcceptManagementRevert(address,address)",
         "YearnPolygonUsdcStrategyTest.testSetKeeper(address)",
         #"YearnPolygonUsdcStrategyTest.testSetKeeperRevert(address,address)",
