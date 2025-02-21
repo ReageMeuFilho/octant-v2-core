@@ -581,7 +581,7 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         vm.stopPrank();
 
         // The invariant breaks
-        assertNotEq(strategy.totalSupply(), strategy.totalAssets());
+        assertGt(strategy.totalSupply(), strategy.totalAssets());
     }
 
     function testTend() public {
