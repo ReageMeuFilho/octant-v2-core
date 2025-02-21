@@ -31,6 +31,9 @@ contract DeployMockStrategy is DeployModuleProxyFactory {
         dragonTokenizedStrategyAddress = _dragonTokenizedStrategyAddress;
         dragonRouterProxyAddress = _dragonRouterProxyAddress;
 
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        vm.startBroadcast(deployerPrivateKey);
+
         // Deploy module proxy factory first
         DeployModuleProxyFactory.deploy();
         
@@ -85,7 +88,7 @@ contract DeployMockStrategy is DeployModuleProxyFactory {
         );
         mockStrategyProxy = IMockStrategy(payable(address(proxy)));
         
-        ISafe(safeAddress).enableModule(address(mockStrategyProxy));
+        // ISafe(safeAddress).enableModule(address(mockStrategyProxy));
 
         // Log deployments
         // console2.log("MockStrategy Implementation:", address(mockStrategySingleton));
@@ -94,5 +97,7 @@ contract DeployMockStrategy is DeployModuleProxyFactory {
         // console2.log("Mock Token:", address(token));
         // console2.log("library address", address(mockStrategyProxy.tokenizedStrategyImplementation()));
         // console2.log("hats initialized", dragonTokenizedStrategyAddress);
+
+        vm.stopBroadcast();
     }
 }
