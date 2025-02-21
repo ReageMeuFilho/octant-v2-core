@@ -127,8 +127,10 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         } else if (lockup.isRageQuit) {
             // Calculate unlocked portion based on time elapsed
             uint256 timeElapsed = block.timestamp - lockup.lockupTime;
-            uint256 unlockedPortion = (timeElapsed * balance) / (lockup.unlockTime - lockup.lockupTime);
-            return Math.min(unlockedPortion, balance);
+            uint256 unlockedPortion = (timeElapsed * lockup.lockedShares) / (lockup.unlockTime - lockup.lockupTime);
+            uint256 sharesPreviouslyWithdrawn = lockup.lockedShares - balance;
+            uint256 maxWithdrawalAmount = unlockedPortion - sharesPreviouslyWithdrawn;
+            return Math.min(maxWithdrawalAmount, balance);
         } else {
             return 0;
         }
@@ -323,10 +325,6 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         if (shares > _maxRedeem(S, _owner)) revert DragonTokenizedStrategy__RedeemMoreThanMax();
         if (block.timestamp < lockup.unlockTime && !lockup.isRageQuit) {
             revert DragonTokenizedStrategy__SharesStillLocked();
-        }
-        if (lockup.isRageQuit) {
-            lockup.lockedShares -= shares;
-            lockup.lockupTime = block.timestamp;
         }
 
         uint256 assets;
