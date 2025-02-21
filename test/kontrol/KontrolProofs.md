@@ -75,9 +75,8 @@ To reproduce the results of this verification locally, follow the steps below:
 bash <(curl https://kframework.org/install)
 kup install kontrol
 ```
-2. Run the proofs
+2. Run the Proofs
 ```bash
-Run the Tests: 
 export FOUNDRY_PROFILE=kprove
 kontrol build
 kontrol prove
