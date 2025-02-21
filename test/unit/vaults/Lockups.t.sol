@@ -1110,6 +1110,6 @@ contract LockupsTest is Setup {
         // Calculate expected unlocked amount (50% should be unlocked, including amount already redeemed)
         uint256 expectedUnlocked2 = (depositAmount * (MINIMUM_LOCKUP_DURATION / 2)) / MINIMUM_LOCKUP_DURATION;
         uint256 actualUnlocked2 = redeemAmount + strategy.maxRedeem(user, 0);
-        assertApproxEqRel(actualUnlocked2, expectedUnlocked2, 0.01e18, "Incorrect unlock amount at 50%");
+        assertEq(actualUnlocked2, expectedUnlocked2, "Incorrect unlock amount at 50%");
     }
 }
