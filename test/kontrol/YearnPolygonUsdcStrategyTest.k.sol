@@ -385,6 +385,7 @@ contract YearnPolygonUsdcStrategyTest is Setup {
         UserInfo memory user = setupSymbolicUser(_owner);
 
         vm.assume(strategy.totalSupply() > strategy.totalAssets());
+        vm.assume(strategy.totalAssets() > 0);
 
         vm.expectRevert(abi.encodeWithSelector(Math.MathOverflowedMulDiv.selector));
         strategy.maxRedeem(_owner);

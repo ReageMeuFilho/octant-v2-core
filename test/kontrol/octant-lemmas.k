@@ -70,6 +70,14 @@ module OCTANT-LEMMAS
       requires #rangeUInt(256, X) andBool #rangeUInt(256, Y)
       [simplification, concrete(Y), comm]
 
+    rule ( chop ( X:Int ) -Int bool2Word (Y) ) ==Int 0 => chop ( X:Int ) ==Int 0
+      requires notBool Y
+      [simplification]
+
+    rule ( chop ( X:Int ) -Int bool2Word (Y) ) ==Int 0 => chop ( X:Int ) ==Int 1
+      requires Y
+      [simplification]
+
     rule [keccak-slots-disjoint-l]:
       keccak ( A ) ==Int keccak ( B ) +Int C => false
       requires notBool 0 ==Int C
