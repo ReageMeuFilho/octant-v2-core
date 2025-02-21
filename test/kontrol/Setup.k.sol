@@ -17,7 +17,6 @@ import {TestERC20} from "test/kontrol/TestERC20.k.sol";
 import {BaseTest} from "test/kontrol/Base.k.sol";
 import {MockYieldSource} from "test/kontrol/MockYieldSource.k.sol";
 import "test/kontrol/StrategyStateSlots.k.sol";
-import "test/kontrol/Constants.k.sol";
 
 import {KontrolTest} from "test/kontrol/KontrolTest.k.sol";
 

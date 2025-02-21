@@ -9,7 +9,6 @@ import {TestERC20} from "test/kontrol/TestERC20.k.sol";
 import {Setup} from "test/kontrol/Setup.k.sol";
 import {MockYieldSource} from "test/kontrol/MockYieldSource.k.sol";
 import "test/kontrol/StrategyStateSlots.k.sol";
-import "test/kontrol/Constants.k.sol";
 
 struct ProofState {
     uint256 assetOwnerBalance;

@@ -3,12 +3,11 @@ pragma solidity ^0.8.25;
 import "forge-std/Vm.sol";
 import "forge-std/Test.sol";
 import "kontrol-cheatcodes/KontrolCheats.sol";
-import "./Constants.k.sol";
 
 contract KontrolTest is Test, KontrolCheats {
     // Note: there are lemmas dependent on `ethUpperBound`
     uint256 constant ethMaxWidth = 96;
-    uint256 constant ethUpperBound = 2 ** ethMaxWidth;
+    uint256 constant ETH_UPPER_BOUND = 2 ** ethMaxWidth;
     // Note: 2 ** 35 takes us to year 3058
     uint256 constant timeUpperBound = 2 ** 35;
 
