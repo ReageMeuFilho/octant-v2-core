@@ -294,10 +294,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         if ((shares = _convertToShares(S, assets, Math.Rounding.Ceil)) == 0) {
             revert ZeroShares();
         }
-        if (lockup.isRageQuit) {
-            lockup.lockedShares -= shares;
-            lockup.lockupTime = block.timestamp;
-        }
+
         // Withdraw and track the actual amount withdrawn for loss check.
         _withdraw(S, receiver, _owner, assets, shares, maxLoss);
     }
