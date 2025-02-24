@@ -27,6 +27,20 @@ corepack enable
 yarn install
 ```
 
+3. Configure environment:
+
+```bash
+# Copy the environment template
+cp .env.template .env
+
+# Edit .env with your configuration
+# Required fields:
+# - RPC_URL: Your RPC endpoint
+# - PRIVATE_KEY: Your wallet private key
+# - ETHERSCAN_API_KEY: For contract verification
+# - Other fields as needed for your use case
+```
+
 ## Documentation
 
 https://book.getfoundry.sh/
