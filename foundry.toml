@@ -11,19 +11,11 @@ ast = true
 fs_permissions = [{ access = "read-write", path = "./cache/test-artifacts/" },{ access = "read", path = "./out/"}]
 build_info = true
 extra_output = ["storageLayout"]
-[profile.ci]
-invariant = 256
-verbosity = 4
-
-[profile.default.fuzz]
-runs = 1000
 seed = "0xDEADC0DE"
+fuzz = {runs = 2560, max_test_rejects=655360}
 
-[profile.pr.fuzz]
-runs = 256
-
-[profile.ci.fuzz]
-runs = 256
+[profile.ci]
+verbosity = 4
 
 [rpc_endpoints]
 mainnet = "${ETHEREUM_NODE_MAINNET}"
