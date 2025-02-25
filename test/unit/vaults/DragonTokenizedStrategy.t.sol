@@ -30,8 +30,6 @@ contract DragonTokenizedStrategyTest is BaseTest {
     string public name = "Test Mock Strategy";
     uint256 public maxReportDelay = 9;
 
-    uint256 public constant MINIMUM_LOCKUP_DURATION = 90 days; // Specified in TokenizedStrategy.sol, but not accessible publicly
-
     function setUp() public {
         _configure(true, "eth");
 
@@ -127,7 +125,7 @@ contract DragonTokenizedStrategyTest is BaseTest {
         module.deposit{ value: depositAmount }(depositAmount, makeAddr(alice)); // Regular deposit to self
         module.deposit{ value: depositAmount }(depositAmount, makeAddr(bob)); // Regular deposit to others
 
-        uint256 lockupDuration = MINIMUM_LOCKUP_DURATION;
+        uint256 lockupDuration = module.minimumLockupDuration();
         vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__InvalidReceiver.selector));
         module.depositWithLockup{ value: depositAmount }(depositAmount, makeAddr(charlie), lockupDuration);
         vm.stopPrank();
@@ -157,7 +155,7 @@ contract DragonTokenizedStrategyTest is BaseTest {
         vm.deal(randomUser, depositAmount);
         vm.startPrank(randomUser);
 
-        if (lockupDuration <= MINIMUM_LOCKUP_DURATION) {
+        if (lockupDuration <= module.minimumLockupDuration()) {
             // Should revert for durations under minimum
             vm.expectRevert(DragonTokenizedStrategy__InsufficientLockupDuration.selector);
             module.depositWithLockup{ value: depositAmount }(depositAmount, randomUser, lockupDuration);
@@ -207,7 +205,7 @@ contract DragonTokenizedStrategyTest is BaseTest {
     function testFuzz_lockedNonDragonCanRageQuit(uint depositAmount) public {
         depositAmount = bound(depositAmount, 1 ether, 100 ether);
         // Define deposit parameters.
-        uint256 lockupDuration = MINIMUM_LOCKUP_DURATION;
+        uint256 lockupDuration = module.minimumLockupDuration();
 
         // Toggle off dragon mode so that non-safe (non-operator) users may deposit
         vm.prank(operator);
@@ -261,7 +259,7 @@ contract DragonTokenizedStrategyTest is BaseTest {
     /// @dev Demonstrates that non-dragons can't deposit/mint after initial lockup.
     function testFuzz_nonDragonCannotDepositOrMintAfterLockup(uint initialDeposit) public {
         initialDeposit = bound(initialDeposit, 1 ether, 100 ether);
-        uint256 lockupDuration = MINIMUM_LOCKUP_DURATION;
+        uint256 lockupDuration = module.minimumLockupDuration();
 
         // Enable non-operator deposits
         vm.prank(operator);
@@ -297,7 +295,7 @@ contract DragonTokenizedStrategyTest is BaseTest {
     /// @dev Demonstrates that one can't lockup for others when dragon mode is off.
     function testFuzz_cannotLockupForOthersWhenDragonModeOff(uint depositAmount, string memory receiver) public {
         // Setup
-        uint256 lockupDuration = MINIMUM_LOCKUP_DURATION;
+        uint256 lockupDuration = module.minimumLockupDuration();
         depositAmount = bound(depositAmount, 1 ether, 100 ether);
 
         // Test depositWithLockup to others while dragon mode is on.
