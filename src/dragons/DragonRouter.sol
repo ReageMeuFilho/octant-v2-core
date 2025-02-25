@@ -356,7 +356,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      * @param _amount The amount of split to update
      */
     function _updateUserSplit(address _user, address _strategy, uint256 _amount) internal {
-        UserData storage _userData = userData[msg.sender][_strategy];
+        UserData storage _userData = userData[_user][_strategy];
         _userData.assets = balanceOf(_user, _strategy) - _amount;
         _userData.userAssetPerShare = strategyData[_strategy].assetPerShare;
     }
