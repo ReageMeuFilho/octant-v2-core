@@ -217,7 +217,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         // Use the minimum of current unlock time and rage quit period
         uint256 rageQuitUnlockTime = block.timestamp + _strategyStorage().RAGE_QUIT_COOLDOWN_PERIOD;
         lockup.unlockTime = lockup.unlockTime < rageQuitUnlockTime ? lockup.unlockTime : rageQuitUnlockTime;
-        lockup.lockupTime = block.timestamp;  // Set the starting point for gradual unlocking
+        lockup.lockupTime = block.timestamp; // Set the starting point for gradual unlocking
         lockup.isRageQuit = true;
 
         emit RageQuitInitiated(msg.sender, lockup.unlockTime);

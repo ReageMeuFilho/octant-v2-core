@@ -372,55 +372,58 @@ contract DragonTokenizedStrategyTest is BaseTest {
         // Setup: Toggle dragon mode off to allow non-operator deposits
         vm.prank(operator);
         module.toggleDragonMode(false);
-        
+
         // Define test parameters
         uint256 lockupDuration = module.minimumLockupDuration(); // Use minimum valid lockup
-        
+
         // User deposits with lockup
         vm.deal(randomUser, depositAmount);
         vm.prank(randomUser);
-        module.depositWithLockup{value: depositAmount}(depositAmount, randomUser, lockupDuration);
-        
+        module.depositWithLockup{ value: depositAmount }(depositAmount, randomUser, lockupDuration);
+
         // Fast forward to near the end of lockup period (e.g., 1 week remaining)
         uint256 timeToWarp = lockupDuration - timeRemaining;
         vm.warp(block.timestamp + timeToWarp);
-        
+
         // Capture the original unlock time before rage quit
         uint256 originalUnlockTime = module.getUnlockTime(randomUser);
         uint256 remainingLockupTime = originalUnlockTime - block.timestamp;
         assertEq(remainingLockupTime, timeRemaining, "Should have 7 days remaining before rage quit");
-        
+
         // User initiates rage quit
         vm.prank(randomUser);
         module.initiateRageQuit();
-        
+
         // Verify the unlock time wasn't extended
         uint256 newUnlockTime = module.getUnlockTime(randomUser);
         assertEq(newUnlockTime, originalUnlockTime, "Rage quit should not extend unlock time");
-        
+
         // Verify rage quit state
         (uint256 unlockTime, , bool isRageQuit, , ) = module.getUserLockupInfo(randomUser);
         assertTrue(isRageQuit, "Should be in rage quit state");
         assertEq(unlockTime, originalUnlockTime, "Unlock time should match original");
-        
+
         // Test gradual unlocking works correctly
         uint256 halfwayPoint = block.timestamp + (remainingLockupTime / 2);
         vm.warp(halfwayPoint);
-        
+
         // Calculate exact expected unlocked amount
         uint256 timeElapsed = block.timestamp - (originalUnlockTime - remainingLockupTime);
         uint256 totalDuration = remainingLockupTime;
         uint256 expectedWithdrawable = (timeElapsed * depositAmount) / totalDuration;
         uint256 actualWithdrawable = module.maxWithdraw(randomUser);
-        
+
         // Use exact assertion
         assertEq(actualWithdrawable, expectedWithdrawable, "Unlocked amount should match exact calculation");
-        
+
         // Fast forward to just after unlock time
         vm.warp(originalUnlockTime);
-        
+
         // Should be able to withdraw everything
-        assertEq(module.maxWithdraw(randomUser), module.balanceOf(randomUser), 
-                 "Should be able to withdraw all after unlock");
+        assertEq(
+            module.maxWithdraw(randomUser),
+            module.balanceOf(randomUser),
+            "Should be able to withdraw all after unlock"
+        );
     }
 }
