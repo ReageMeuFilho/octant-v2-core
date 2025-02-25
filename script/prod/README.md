@@ -1,6 +1,6 @@
 # Dragon Protocol Deployment Guide
 
-This guide explains how to deploy the Dragon Protocol core components in a Development environment.
+This guide explains how to deploy the Dragon Protocol core components in a Development environment or in your own Tenderly Sepolia Testnet (look at the end).
 
 ## Overview
 
@@ -60,3 +60,27 @@ After successful deployment:
 1. Configure multisig owners
 2. Set up etra permissions on hats protocol
 4. Deposit into strategy and mint undelying asset token
+
+
+
+## How to create your own Sepolia Virtual TestNet in Tenderly and deploy V2 contracts there:
+
+1. Create your own Virtual TestNet in Tenderly (Sepolia, sync on) (https://docs.tenderly.co/virtual-testnets/quickstart)
+2. Create Tenderly Personal accessToken (https://docs.tenderly.co/account/projects/how-to-generate-api-access-token#personal-account-access-tokens)
+3. Send some SepoliaETH (your own Sepolia TestNet RPC) to your deployer address (ex. MetaMask account) (https://docs.tenderly.co/virtual-testnets/unlimited-faucet)
+4. Set required ENVs
+
+```
+SENDER=(deployer address ex. MetaMask account)PRIVATE_KEY=(deployer private key ex. MetaMask account)
+THRESHOLD=1 # Safe threshold (default is 5)
+TENDERLY_VIRTUAL_TESTNET_RPC_URL=(your own Sepolia TestNet RPC)
+TENDERLY_VERIFIER_URL=$TENDERLY_VIRTUAL_TESTNET_RPC_URL/verify/etherscan
+TENDERLY_ACCESS_TOKEN= (your Personal Tenderly accessToken)
+MAX_OPEX_SPLIT=5 # to confirm
+MIN_METAPOOL_SPLIT=0 # to confirm
+GOVERNANCE=$SENDER # to confirm
+```
+
+3. Run script in terminal (repo root)
+    1. `source .env`
+    2. ```forge script script/prod/DeployProtocol.s.sol --slow --verify --verifier-url $TENDERLY_VERIFIER_URL --sender $SENDER --rpc-url $TENDERLY_VIRTUAL_TESTNET_RPC_URL --private-key $PRIVATE_KEY --etherscan-api-key $TENDERLY_ACCESS_TOKEN -vvvv -—broadcast```
