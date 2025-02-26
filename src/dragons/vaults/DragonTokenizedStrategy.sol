@@ -380,7 +380,11 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         StrategyData storage S = _strategyStorage();
         if (receiver == S.dragonRouter) revert Unauthorized();
         if (S.voluntaryLockups[receiver].isRageQuit) revert DragonTokenizedStrategy__RageQuitInProgress();
-        if (_balanceOf(S, receiver) > 0 && IBaseStrategy(address(this)).target() != address(receiver)) {
+        if (
+            _balanceOf(S, receiver) > 0 &&
+            IBaseStrategy(address(this)).target() != address(receiver) &&
+            lockupDuration > 0
+        ) {
             revert DragonTokenizedStrategy__ReceiverHasExistingShares();
         }
 
