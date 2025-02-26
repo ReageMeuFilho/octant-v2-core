@@ -95,6 +95,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
     error StrategyNotDefined();
     error InvalidAmount();
     error ZeroAddress();
+    error ZeroAssetAddress();
     error NoShares();
     error CooldownPeriodNotPassed();
     error TransferFailed();
@@ -154,16 +155,23 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      * @dev Only callable by accounts with DEFAULT_ADMIN_ROLE
      * @dev Strategy must not already be added
      */
-    // todo: why arent we adding the asset to the strategyData?
+
     function addStrategy(address _strategy) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        StrategyData storage _stratData = strategyData[_strategy];
+        StrategyData memory _stratData = strategyData[_strategy];
         if (_stratData.asset != address(0)) revert AlreadyAdded();
+
+        address asset = ITokenizedStrategy(_strategy).asset();
+
+        // check if asset is different from address(0)
+        if (asset == address(0)) revert ZeroAssetAddress();
 
         for (uint256 i = 0; i < split.recipients.length; i++) {
             userData[split.recipients[i]][_strategy].splitPerShare = split.allocations[i];
         }
 
         _stratData.totalShares = split.totalAllocations;
+        _stratData.asset = asset;
+
         strategies.push(_strategy);
 
         emit StrategyAdded(_strategy);

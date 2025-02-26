@@ -249,6 +249,10 @@ contract DragonRouterTest is Test {
 
     function test_addStrategy() public {
         vm.prank(owner);
+
+        // Mock the asset() call on the newStrategy
+        vm.mockCall(newStrategy, abi.encodeWithSelector(IERC4626.asset.selector), abi.encode(makeAddr("mockedAsset")));
+
         vm.expectEmit(true, true, true, true);
         emit StrategyAdded(newStrategy);
         routerTesting.addStrategy(newStrategy);
@@ -333,6 +337,9 @@ contract DragonRouterTest is Test {
         // Verify it was removed
         (storedAsset, , , ) = routerTesting.strategyData(newStrategy);
         assertEq(storedAsset, address(0), "Strategy asset should be zeroed after removal");
+
+        // Mock the asset() call for adding it back
+        vm.mockCall(newStrategy, abi.encodeWithSelector(IERC4626.asset.selector), abi.encode(testAsset));
 
         // Add it again to verify it works (would fail with AlreadyAdded if not properly removed)
         routerTesting.addStrategy(newStrategy);
