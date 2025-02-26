@@ -21,6 +21,7 @@ import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.so
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC4626 } from "lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
+import { DragonRouter } from "src/dragons/DragonRouter.sol";
 
 import { ITransformer } from "src/interfaces/ITransformer.sol";
 import { MockDragonRouterTesting } from "test/mocks/MockDragonRouterTesting.sol";
@@ -533,7 +534,9 @@ contract DragonRouterTest is Test {
 
         // No need to mock - using routerTesting which has real implementation
         vm.startPrank(owner);
-        routerTesting.setSplit(ISplitChecker.Split({ recipients: recipients, allocations: allocations, totalAllocations: 100 }));
+        routerTesting.setSplit(
+            ISplitChecker.Split({ recipients: recipients, allocations: allocations, totalAllocations: 100 })
+        );
         vm.stopPrank();
 
         // Verify the timestamp changed
@@ -551,7 +554,9 @@ contract DragonRouterTest is Test {
 
         vm.prank(owner);
         vm.expectRevert(IDragonRouter.CooldownPeriodNotPassed.selector);
-        routerTesting.setSplit(ISplitChecker.Split({ recipients: recipients, allocations: allocations, totalAllocations: 100 }));
+        routerTesting.setSplit(
+            ISplitChecker.Split({ recipients: recipients, allocations: allocations, totalAllocations: 100 })
+        );
     }
 
     function test_claimSplit() public {

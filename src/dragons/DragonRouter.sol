@@ -152,13 +152,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
     }
 
     /**
-<<<<<<< HEAD
-     * @notice Updates the metapool address
-     * @param _metapool New metapool address
-     * @dev Only callable by accounts with GOVERNANCE_ROLE
-=======
      * @inheritdoc IDragonRouter
->>>>>>> bc20433 (refactor: update IDragonRouter & DragonRouter)
      */
     function setMetapool(address _metapool) external onlyRole(GOVERNANCE_ROLE) {
         _setMetapool(_metapool);
