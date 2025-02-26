@@ -22,9 +22,11 @@ contract DeployDragonRouter is DeploySplitChecker {
 
     function deploy() public virtual override {
         // First deploy SplitChecker
+
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         DeploySplitChecker.deploy();
 
-        vm.startBroadcast();
+        vm.startBroadcast(deployerPrivateKey);
 
         // Deploy implementation
         dragonRouterSingleton = new DragonRouter();

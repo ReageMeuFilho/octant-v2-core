@@ -122,7 +122,8 @@ contract DeploySafe is Test {
             );
         }
 
-        vm.startBroadcast();
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        vm.startBroadcast(deployerPrivateKey);
 
         // Get initialization data
         bytes memory initializer = generateInitializerData();
