@@ -2,12 +2,12 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import {TestPlus} from "lib/solady/test/utils/TestPlus.sol";
-import {ModuleProxyFactory} from "src/dragons/ModuleProxyFactory.sol";
-import {MockERC20} from "test/mocks/MockERC20.sol";
+import { TestPlus } from "lib/solady/test/utils/TestPlus.sol";
+import { ModuleProxyFactory } from "src/dragons/ModuleProxyFactory.sol";
+import { MockERC20 } from "test/mocks/MockERC20.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
 import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
-import {ISafe} from "src/interfaces/Safe.sol";
+import { ISafe } from "src/interfaces/Safe.sol";
 
 contract BaseTest is Test, TestPlus {
     struct testTemps {
@@ -22,7 +22,6 @@ contract BaseTest is Test, TestPlus {
     address[] public owners;
 
     function _configure() internal {
-
         safe = new Safe();
         // So we don't need to setup a proxy for Safe
         vm.store(address(safe), bytes32(uint256(4)), bytes32(0));
@@ -37,16 +36,8 @@ contract BaseTest is Test, TestPlus {
         owners = [owner];
         // Deploy a new Safe Multisig using the Proxy Factory
         //SafeProxyFactory factory = SafeProxyFactory(proxyFactory);
-        safe.setup(
-            owners,
-            1,
-            address(0),
-            "0x00",
-            address(0),
-            address(0),
-            0,
-            payable(address(0)));
-        
+        safe.setup(owners, 1, address(0), "0x00", address(0), address(0), 0, payable(address(0)));
+
         vm.prank(address(safe));
         safe.enableModule(moduleImplementation);
 

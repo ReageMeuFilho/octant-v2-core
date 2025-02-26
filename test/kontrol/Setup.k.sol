@@ -1,27 +1,26 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import { ProxyAdmin } from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {DragonRouter} from "src/dragons/DragonRouter.sol";
-import {SplitChecker} from "src/dragons/SplitChecker.sol";
-import {DragonTokenizedStrategy} from "src/dragons/vaults/DragonTokenizedStrategy.sol";
+import { DragonRouter } from "src/dragons/DragonRouter.sol";
+import { SplitChecker } from "src/dragons/SplitChecker.sol";
+import { DragonTokenizedStrategy } from "src/dragons/vaults/DragonTokenizedStrategy.sol";
 
 import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
 
-import {YearnPolygonUsdcStrategy} from "src/dragons/modules/YearnPolygonUsdcStrategy.sol";
-import {IStrategy} from "src/interfaces/IStrategy.sol";
+import { YearnPolygonUsdcStrategy } from "src/dragons/modules/YearnPolygonUsdcStrategy.sol";
+import { IStrategy } from "src/interfaces/IStrategy.sol";
 
-import {TestERC20} from "test/kontrol/TestERC20.k.sol";
-import {BaseTest} from "test/kontrol/Base.k.sol";
-import {MockYieldSource} from "test/kontrol/MockYieldSource.k.sol";
+import { TestERC20 } from "test/kontrol/TestERC20.k.sol";
+import { BaseTest } from "test/kontrol/Base.k.sol";
+import { MockYieldSource } from "test/kontrol/MockYieldSource.k.sol";
 import "test/kontrol/StrategyStateSlots.k.sol";
 
-import {KontrolTest} from "test/kontrol/KontrolTest.k.sol";
+import { KontrolTest } from "test/kontrol/KontrolTest.k.sol";
 
-
-contract Setup is BaseTest, KontrolTest  {
+contract Setup is BaseTest, KontrolTest {
     DragonTokenizedStrategy public dragonTokenizedStrategySingleton;
     /// @notice The deployed DragonRouter
     DragonRouter public dragonRouter;
@@ -91,7 +90,7 @@ contract Setup is BaseTest, KontrolTest  {
     function strategySetup() private {
         // Prepare initialization data
         // First encode the strategy initialization parameters
-        
+
         // TODO: make it symbolic later
         maxReportDelay = 7 days;
 
@@ -164,7 +163,7 @@ contract Setup is BaseTest, KontrolTest  {
         deployDragonRouter();
 
         _configure();
-        
+
         etchPolygonAddresses();
 
         // Deploy and set up strategy

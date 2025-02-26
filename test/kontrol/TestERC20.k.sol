@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import { ERC20 } from "openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 
-import {KontrolTest} from "./KontrolTest.k.sol";
+import { KontrolTest } from "./KontrolTest.k.sol";
 
 /**
  * @title DummyERCWithMetadata Contract
@@ -11,10 +11,9 @@ import {KontrolTest} from "./KontrolTest.k.sol";
  * @notice Dummy contract which provides ERC20 with Metadata for RA & PA
  */
 contract TestERC20 is ERC20, KontrolTest {
-
-    uint256 constant private _balancesSlot = 0;
-    uint256 constant private _allowancesSlot = 1;
-    uint256 constant private _totalSupplySlot = 2;
+    uint256 private constant _balancesSlot = 0;
+    uint256 private constant _allowancesSlot = 1;
+    uint256 private constant _totalSupplySlot = 2;
 
     constructor() ERC20("Dragon Test Token", "DTT") {}
 
@@ -37,7 +36,7 @@ contract TestERC20 is ERC20, KontrolTest {
         vm.store(address(this), allowanceAccountSlot, bytes32(allowance));
     }
 
-     /**
+    /**
      * @notice mints `amount` number of tokens to `to` address
      * @param to address of receiver
      * @param amount number of tokens to be minted

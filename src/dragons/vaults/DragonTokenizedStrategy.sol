@@ -240,8 +240,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         maxRedeem_ = IBaseStrategy(address(this)).availableWithdrawLimit(_owner);
         if (maxRedeem_ == type(uint256).max) {
             maxRedeem_ = _userUnlockedShares(S, _owner);
-        }
-        else {
+        } else {
             maxRedeem_ = Math.min(
                 // Can't redeem more than the balance.
                 _convertToShares(S, maxRedeem_, Math.Rounding.Floor),
