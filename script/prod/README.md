@@ -60,9 +60,6 @@ After successful deployment:
 1. Configure multisig owners
 2. Set up etra permissions on hats protocol
 4. Deposit into strategy and mint undelying asset token
-
-
-
 ## How to create your own Sepolia Virtual TestNet in Tenderly and deploy V2 contracts there:
 
 1. Create your own Virtual TestNet in Tenderly (Sepolia, sync on) (https://docs.tenderly.co/virtual-testnets/quickstart)
