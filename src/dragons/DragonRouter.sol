@@ -154,7 +154,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      * @dev Only callable by accounts with DEFAULT_ADMIN_ROLE
      * @dev Strategy must not already be added
      */
-     // todo: why arent we adding the asset to the strategyData?
+    // todo: why arent we adding the asset to the strategyData?
     function addStrategy(address _strategy) external onlyRole(DEFAULT_ADMIN_ROLE) {
         StrategyData storage _stratData = strategyData[_strategy];
         if (_stratData.asset != address(0)) revert AlreadyAdded();
@@ -285,7 +285,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
      */
     function fundFromSource(address strategy, uint256 amount) external onlyRole(SPLIT_DISTRIBUTOR_ROLE) nonReentrant {
         StrategyData storage data = strategyData[strategy];
-        
+
         if (data.asset == address(0)) revert ZeroAddress();
 
         ITokenizedStrategy(strategy).withdraw(amount, address(this), address(this), 0);
