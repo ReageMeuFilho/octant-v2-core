@@ -102,7 +102,6 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
     /**
      * @inheritdoc IDragonRouter
      */
-
     function addStrategy(address _strategy) external onlyRole(DEFAULT_ADMIN_ROLE) {
         StrategyData memory _stratData = strategyData[_strategy];
         if (_stratData.asset != address(0)) revert AlreadyAdded();
@@ -224,7 +223,6 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
      */
     function fundFromSource(address strategy, uint256 amount) external onlyRole(SPLIT_DISTRIBUTOR_ROLE) nonReentrant {
         StrategyData storage data = strategyData[strategy];
-
         if (data.asset == address(0)) revert ZeroAddress();
 
         ITokenizedStrategy(strategy).withdraw(amount, address(this), address(this), 0);

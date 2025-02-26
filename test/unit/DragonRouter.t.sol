@@ -11,6 +11,9 @@ import { MockNativeTransformer } from "test/mocks/MockNativeTransformer.sol";
 import { ISplitChecker } from "src/interfaces/ISplitChecker.sol";
 import { ITransformer } from "src/interfaces/ITransformer.sol";
 import { IDragonRouter } from "src/interfaces/IDragonRouter.sol";
+import { MockDragonRouterTesting } from "test/mocks/MockDragonRouterTesting.sol";
+import { ISplitChecker } from "src/interfaces/ISplitChecker.sol";
+import { ITransformer } from "src/interfaces/ITransformer.sol";
 
 import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -240,7 +243,6 @@ contract DragonRouterTest is Test {
         routerTesting.addStrategy(newStrategy);
         vm.stopPrank();
     }
-
     function test_removeStrategy_reverts_notDefined() public {
         vm.prank(owner);
         vm.expectRevert(IDragonRouter.StrategyNotDefined.selector);
@@ -433,7 +435,6 @@ contract DragonRouterTest is Test {
         uint256 expectedTotal = expectedDirect + expectedClaimable;
         assertEq(balance, expectedTotal, "Balance does not match expected total");
     }
-
     function test_fundFromSource() public {
         // Create asset and deploy mock strategy
         address asset = makeAddr("asset");
@@ -485,7 +486,6 @@ contract DragonRouterTest is Test {
             abi.encodeWithSelector(ITokenizedStrategy.withdraw.selector),
             abi.encode(1000)
         );
-
         // Mock the asset transfer call that would happen from the strategy
         vm.mockCall(
             asset,
@@ -516,7 +516,6 @@ contract DragonRouterTest is Test {
         vm.expectRevert(IDragonRouter.ZeroAddress.selector);
         routerTesting.fundFromSource(makeAddr("nonExistentStrategy"), 1000);
     }
-
     function test_setSplit() public {
         // Set up a mock split
         address[] memory recipients = new address[](2);
@@ -588,13 +587,11 @@ contract DragonRouterTest is Test {
             abi.encodeWithSelector(IERC20.transfer.selector, userWithBalance, claimAmount),
             abi.encode(true)
         );
-
         // Test claiming by the user
         vm.prank(userWithBalance);
         vm.expectEmit(true, true, true, true);
         emit SplitClaimed(userWithBalance, strategies[0], claimAmount);
         routerTesting.claimSplit(userWithBalance, strategies[0], claimAmount);
-
         // Set user data for the second claim (reduced balance after first claim)
         routerTesting.setUserDataForTest(
             userWithBalance,
@@ -613,7 +610,6 @@ contract DragonRouterTest is Test {
             abi.encodeWithSelector(IERC20.transfer.selector, userWithBalance, secondClaimAmount),
             abi.encode(true)
         );
-
         // Test claiming by another address (bot)
         address bot = makeAddr("bot");
         vm.prank(bot);
@@ -621,7 +617,6 @@ contract DragonRouterTest is Test {
         emit SplitClaimed(userWithBalance, strategies[0], secondClaimAmount);
         routerTesting.claimSplit(userWithBalance, strategies[0], secondClaimAmount);
     }
-
     function test_claimSplit_reverts_zeroAmount() public {
         vm.prank(user);
         vm.expectRevert(IDragonRouter.InvalidAmount.selector);
@@ -648,7 +643,6 @@ contract DragonRouterTest is Test {
         vm.expectRevert(IDragonRouter.NotAllowed.selector);
         routerTesting.claimSplit(userWithBalance, strategies[0], 100);
     }
-
     function test_claimSplit_reverts_insufficientBalance() public {
         // Set up strategy data first to make sure asset is set
         address testAsset = makeAddr("testAsset");
@@ -681,7 +675,6 @@ contract DragonRouterTest is Test {
         vm.expectRevert(IDragonRouter.InvalidAmount.selector);
         routerTesting.claimSplit(user, strategies[0], 100);
     }
-
     function test_updateUserSplit() public {
         address userToUpdate = makeAddr("userToUpdate");
         uint256 balance = 1000;
@@ -689,7 +682,6 @@ contract DragonRouterTest is Test {
         uint256 assetPerShare = 2e18; // Using a higher asset per share to test claimable calculation
         uint256 userAssetPerShare = 1e18; // Initial user asset per share
         address asset = makeAddr("asset");
-
         // Setup data directly with setStrategyDataForTest and setUserDataForTest
         routerTesting.setStrategyDataForTest(
             strategies[0],
@@ -738,7 +730,6 @@ contract DragonRouterTest is Test {
         // userData.assets should contain all assets (original + claimable - claimed)
         assertEq(actualAssets, expectedRemainingTotal, "Assets were not updated correctly");
     }
-
     function test_transferSplit() public {
         address recipient = makeAddr("recipient");
         address asset = makeAddr("asset");
@@ -873,7 +864,6 @@ contract DragonRouterTest is Test {
         for (uint256 i = 0; i < 3; i++) {
             testAssets[i] = makeAddr(string.concat("testAsset", vm.toString(i)));
         }
-
         bytes memory initParams = abi.encode(
             owner,
             abi.encode(
@@ -893,7 +883,6 @@ contract DragonRouterTest is Test {
         assertEq(testRouter.strategies(0), testStrategies[0]);
         assertEq(testRouter.strategies(1), testStrategies[1]);
         assertEq(testRouter.strategies(2), testStrategies[2]);
-
         // Set strategy data directly to be able to remove the strategy
         testRouter.setStrategyDataForTest(
             testStrategies[1], // Middle strategy
@@ -902,7 +891,6 @@ contract DragonRouterTest is Test {
             1000,
             1e18
         );
-
         // Remove the middle strategy
         vm.expectEmit(true, true, true, true);
         emit StrategyRemoved(testStrategies[1]);

@@ -14,14 +14,12 @@ contract MockDragonRouterTesting is DragonRouter {
     function exposed_updateUserSplit(address _user, address _strategy, uint256 _amount) external {
         _updateUserSplit(_user, _strategy, _amount);
     }
-
     /**
      * @dev Exposes the internal _transferSplit function for testing
      */
     function exposed_transferSplit(address _user, address _strategy, uint256 _amount) external {
         _transferSplit(_user, _strategy, _amount);
     }
-
     /**
      * @dev Exposes the internal _claimableAssets function for testing
      */
@@ -56,7 +54,6 @@ contract MockDragonRouterTesting is DragonRouter {
         data.transformer = _transformer;
         data.allowBotClaim = _allowBotClaim;
     }
-
     /**
      * @dev Allows direct manipulation of strategyData storage for testing purposes
      * @param _strategy The strategy address
