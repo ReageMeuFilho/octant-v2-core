@@ -116,7 +116,7 @@ contract BaseStrategyTest is BaseTest {
         assertTrue(module.harvestTrigger());
     }
 
-    function testharvestAndReport() public {
+    function testHarvestAndReport() public {
         /// Setup
         uint256 amount = 1 ether;
         _deposit(amount);
