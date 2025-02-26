@@ -257,8 +257,8 @@ contract DragonTokenizedStrategyTest is BaseTest {
     }
 
     /// @dev Demonstrates that non-dragons can't deposit/mint after initial lockup.
-    function testFuzz_nonDragonCannotDepositOrMintAfterLockup(uint initialDeposit) public {
-        initialDeposit = bound(initialDeposit, 1 wei, type(uint232).max);
+    function testFuzz_nonDragonCannotDepositOrMintWithLockupAfterLockup(uint initialDeposit) public {
+        initialDeposit = bound(initialDeposit, 1 ether, 100 ether);
         uint256 lockupDuration = module.minimumLockupDuration();
 
         // Enable non-operator deposits
@@ -274,24 +274,73 @@ contract DragonTokenizedStrategyTest is BaseTest {
         // Attempt additional deposit before lockup expiration
         vm.startPrank(randomUser);
         vm.expectRevert(DragonTokenizedStrategy__ReceiverHasExistingShares.selector);
-        module.deposit(initialDeposit, randomUser);
+        module.depositWithLockup{ value: initialDeposit }(initialDeposit, randomUser, lockupDuration);
 
         vm.expectRevert(DragonTokenizedStrategy__ReceiverHasExistingShares.selector);
-        module.mint(initialDeposit, randomUser);
+        module.mintWithLockup(initialDeposit, randomUser, lockupDuration);
         vm.stopPrank();
 
         // Fast-forward past lockup period
         skip(lockupDuration);
 
-        // Attempt deposit after lockup expiration (should still fail)
+        // Attempt deposit after lockup expiration (should still fail for lockup deposits)
         vm.startPrank(randomUser);
         vm.expectRevert(DragonTokenizedStrategy__ReceiverHasExistingShares.selector);
-        module.deposit(initialDeposit, randomUser);
+        module.depositWithLockup{ value: initialDeposit }(initialDeposit, randomUser, lockupDuration);
 
         vm.expectRevert(DragonTokenizedStrategy__ReceiverHasExistingShares.selector);
-        module.mint(initialDeposit, randomUser);
+        module.mintWithLockup(initialDeposit, randomUser, lockupDuration);
         vm.stopPrank();
     }
+
+    /// @dev Demonstrates that non-dragons CAN deposit/mint without lockup after initial deposit.
+    function testFuzz_nonDragonCanDepositWithoutLockupAfterInitialDeposit(
+        uint initialDeposit,
+        uint additionalDeposit
+    ) public {
+        initialDeposit = bound(initialDeposit, 1 ether, 100 ether);
+        additionalDeposit = bound(additionalDeposit, 1 ether, 100 ether);
+        uint256 lockupDuration = module.minimumLockupDuration();
+
+        // Enable non-operator deposits
+        vm.prank(operator);
+        module.toggleDragonMode(false);
+
+        // Initial deposit with lockup
+        vm.deal(randomUser, initialDeposit + additionalDeposit);
+        vm.startPrank(randomUser);
+        module.depositWithLockup{ value: initialDeposit }(initialDeposit, randomUser, lockupDuration);
+        uint256 initialShares = module.balanceOf(randomUser);
+        assertEq(initialShares, initialDeposit, "Initial shares should match initial deposit");
+
+        // Now test that additional deposit WITHOUT lockup succeeds
+        module.deposit{ value: additionalDeposit }(additionalDeposit, randomUser);
+
+        // Verify the shares were added correctly
+        uint256 finalShares = module.balanceOf(randomUser);
+        assertEq(finalShares, initialShares + additionalDeposit, "Shares should increase by additional deposit amount");
+
+        vm.stopPrank();
+
+        // Reset for testing mint
+        address mintUser = makeAddr("mintUser");
+        vm.deal(mintUser, initialDeposit + additionalDeposit);
+
+        // Initial mint with lockup
+        vm.startPrank(mintUser);
+        module.mintWithLockup{ value: initialDeposit }(initialDeposit, mintUser, lockupDuration);
+        initialShares = module.balanceOf(mintUser);
+
+        // Test that additional mint WITHOUT lockup succeeds
+        module.mint{ value: additionalDeposit }(additionalDeposit, mintUser);
+
+        // Verify the shares were added correctly
+        finalShares = module.balanceOf(mintUser);
+        assertEq(finalShares, initialShares + additionalDeposit, "Shares should increase by additional mint amount");
+
+        vm.stopPrank();
+    }
+
     /// @dev Demonstrates that one can't lockup for others when dragon mode is off.
     function testFuzz_cannotLockupForOthersWhenDragonModeOff(uint depositAmount, string memory receiver) public {
         // Setup
