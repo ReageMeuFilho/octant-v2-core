@@ -6,6 +6,7 @@ import { DragonRouter } from "src/dragons/DragonRouter.sol";
 import "src/dragons/SplitChecker.sol";
 import { MockStrategy } from "test/mocks/MockStrategy.sol";
 import { MockDragonRouterTesting } from "test/mocks/MockDragonRouterTesting.sol";
+import { MockNativeTransformer } from "test/mocks/MockNativeTransformer.sol";
 import { Split } from "src/interfaces/ISplitChecker.sol";
 import { ITransformer } from "src/interfaces/ITransformer.sol";
 
@@ -13,22 +14,6 @@ import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.so
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
 import { IERC4626 } from "lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
-import { console2 as console } from "forge-std/console2.sol";
-
-// Add a mock native transformer contract
-contract MockNativeTransformer {
-    // This function will handle native ETH (msg.value)
-    function transform(address, address, uint256) external payable returns (uint256) {
-        // Return a slightly lower amount to simulate slippage
-        uint256 transformedAmount = (msg.value * 9) / 10;
-
-        // Simply return the transformed amount
-        return transformedAmount;
-    }
-
-    // Add a fallback function to handle receiving ETH
-    receive() external payable {}
-}
 
 contract DragonRouterTest is Test {
     DragonRouter public router;
@@ -140,87 +125,6 @@ contract DragonRouterTest is Test {
         }
     }
 
-    function _setupStrategies(
-        uint256 numStrategies
-    ) internal returns (address[] memory _strategies, address[] memory _assets) {
-        // Initialize arrays
-        _strategies = new address[](numStrategies);
-        _assets = new address[](numStrategies);
-
-        // Deploy mock strategies and assets
-        for (uint256 i = 0; i < numStrategies; i++) {
-            // Create mock asset
-            _assets[i] = makeAddr(string.concat("asset", vm.toString(i)));
-
-            // Deploy mock strategy
-            MockStrategy strategy = new MockStrategy();
-
-            _strategies[i] = address(strategy);
-        }
-
-        // Deploy new router with mock strategies
-        MockDragonRouterTesting newRouterTesting = new MockDragonRouterTesting();
-        bytes memory initParams = abi.encode(
-            owner, // Use same owner as setUp
-            abi.encode(_strategies, _assets, governance, regenGovernance, address(splitChecker), opexVault, metapool)
-        );
-
-        // Use same prank approach - whoever calls setUp gets DEFAULT_ADMIN_ROLE
-        vm.startPrank(owner);
-        newRouterTesting.setUp(initParams);
-
-        // Setup storage data for each strategy
-        for (uint256 i = 0; i < _strategies.length; i++) {
-            // Setup strategy data
-            newRouterTesting.setStrategyDataForTest(
-                _strategies[i],
-                _assets[i], // asset
-                1e18, // assetPerShare
-                1000, // totalAssets
-                1e18 // totalShares (SPLIT_PRECISION)
-            );
-
-            // Setup user data
-            newRouterTesting.setUserDataForTest(
-                user,
-                _strategies[i],
-                1 ether, // assets
-                0, // userAssetPerShare
-                1e18, // splitPerShare
-                DragonRouter.Transformer(ITransformer(address(0)), address(0)), // no transformer
-                false // allowBotClaim
-            );
-        }
-
-        vm.stopPrank();
-
-        // Update state variables
-        routerTesting = newRouterTesting;
-        strategies = _strategies;
-        assets = _assets;
-
-        vm.startPrank(governance);
-        _setSplits();
-        vm.stopPrank();
-    }
-
-    function _setSplits() public {
-        // Setup initial split configuration
-        address[] memory recipients = new address[](2);
-        recipients[0] = opexVault;
-        recipients[1] = metapool;
-
-        uint256[] memory allocations = new uint256[](2);
-        allocations[0] = 40; // 40% to opex
-        allocations[1] = 60; // 60% to metapool
-
-        // We need to advance time to bypass the cooldown period check
-        vm.warp(block.timestamp + routerTesting.DRAGON_SPLIT_COOLDOWN_PERIOD() + 1);
-
-        // Set the split on routerTesting
-        routerTesting.setSplit(Split({ recipients: recipients, allocations: allocations, totalAllocations: 100 }));
-    }
-
     function test_setCooldownPeriod() public {
         uint256 newPeriod = 180 days;
 
@@ -285,25 +189,6 @@ contract DragonRouterTest is Test {
             0, // totalAssets
             1e18 // totalShares (SPLIT_PRECISION)
         );
-
-        // Verify the strategy was added
-        bool found = false;
-        for (uint256 i = 0; i < 10; i++) {
-            // Check up to 10 strategies to be safe
-            try routerTesting.strategies(i) returns (address strat) {
-                if (strat == distinctStrategy) {
-                    found = true;
-                    break;
-                }
-            } catch {
-                break; // End of array
-            }
-        }
-
-        // If not found in the strategies array, add it manually to the array
-        if (!found) {
-            strategies.push(distinctStrategy);
-        }
 
         // Try to add it again - this should revert with AlreadyAdded because asset is set
         vm.expectRevert(DragonRouter.AlreadyAdded.selector);
@@ -891,12 +776,14 @@ contract DragonRouterTest is Test {
         // Mock transformer interactions
         vm.mockCall(asset, abi.encodeWithSelector(IERC20.approve.selector, transformerAddr, amount), abi.encode(true));
 
+        // Mock transformer.transform
         vm.mockCall(
             transformerAddr,
             abi.encodeWithSelector(ITransformer.transform.selector, asset, targetToken, amount),
             abi.encode(transformedAmount)
         );
 
+        // Mock target token transfer
         vm.mockCall(
             targetToken,
             abi.encodeWithSelector(IERC20.transfer.selector, recipient, transformedAmount),
@@ -919,8 +806,6 @@ contract DragonRouterTest is Test {
         // Calculate using the formula from DragonRouter._claimableAssets
         uint256 expectedClaimable = (userSplitPerShare * stratTotalShares * (stratAssetPerShare - userAssetPerShare)) /
             1e18;
-
-        // Set up data directly in storage instead of mocking
 
         // Set up strategy data
         routerTesting.setStrategyDataForTest(
@@ -945,12 +830,8 @@ contract DragonRouterTest is Test {
         // Call the exposed internal function
         uint256 claimable = routerTesting.exposed_claimableAssets(userAddress, strategies[0]);
 
-        // Verify result by checking range instead of exact match to account for rounding errors
-        uint256 tolerance = 1; // Allow small rounding errors
-        assertTrue(
-            claimable >= expectedClaimable - tolerance && claimable <= expectedClaimable + tolerance,
-            "Claimable amount outside of expected range"
-        );
+        // Use exact equality check
+        assertEq(claimable, expectedClaimable, "Claimable amount does not match expected value");
     }
 
     // Test removing a strategy from the middle of the array to hit the branch in
