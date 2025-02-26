@@ -72,7 +72,7 @@ SENDER=(deployer address ex. MetaMask account)PRIVATE_KEY=(deployer private key 
 THRESHOLD=1 # Safe threshold (default is 5)
 TENDERLY_VIRTUAL_TESTNET_RPC_URL=(your own Sepolia TestNet RPC)
 TENDERLY_VERIFIER_URL=$TENDERLY_VIRTUAL_TESTNET_RPC_URL/verify/etherscan
-TENDERLY_ACCESS_TOKEN= (your Personal Tenderly accessToken)
+TENDERLY_ACCESS_TOKEN=(your Personal Tenderly accessToken)
 MAX_OPEX_SPLIT=5 # to confirm
 MIN_METAPOOL_SPLIT=0 # to confirm
 GOVERNANCE=$SENDER # to confirm
