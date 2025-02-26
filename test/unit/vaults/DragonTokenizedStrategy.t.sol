@@ -30,8 +30,6 @@ contract DragonTokenizedStrategyTest is BaseTest {
     string public name = "Test Mock Strategy";
     uint256 public maxReportDelay = 9;
 
-    uint256 public constant MINIMUM_LOCKUP_DURATION = 90 days; // Specified in TokenizedStrategy.sol, but not accessible publicly
-
     function setUp() public {
         _configure(true, "eth");
 
@@ -70,7 +68,7 @@ contract DragonTokenizedStrategyTest is BaseTest {
 
     /// @dev Demonstrates that a dragon is able to toggle the feature switch to enable deposits by others.
     function testFuzz_dragonCanToggleDragonMode(uint depositAmount) public {
-        depositAmount = bound(depositAmount, 1 ether, 100 ether);
+        depositAmount = bound(depositAmount, 1 wei, type(uint232).max);
 
         // Non-dragon can't toggle
         vm.prank(randomUser);
@@ -110,7 +108,7 @@ contract DragonTokenizedStrategyTest is BaseTest {
         string memory bob,
         string memory charlie
     ) public {
-        depositAmount = bound(depositAmount, 1 ether, 100 ether);
+        depositAmount = bound(depositAmount, 1 wei, type(uint232).max);
 
         vm.assume(bytes(alice).length != bytes(bob).length);
         vm.assume(bytes(alice).length != bytes(charlie).length);
@@ -127,7 +125,7 @@ contract DragonTokenizedStrategyTest is BaseTest {
         module.deposit{ value: depositAmount }(depositAmount, makeAddr(alice)); // Regular deposit to self
         module.deposit{ value: depositAmount }(depositAmount, makeAddr(bob)); // Regular deposit to others
 
-        uint256 lockupDuration = MINIMUM_LOCKUP_DURATION;
+        uint256 lockupDuration = module.minimumLockupDuration();
         vm.expectRevert(abi.encodeWithSelector(DragonTokenizedStrategy__InvalidReceiver.selector));
         module.depositWithLockup{ value: depositAmount }(depositAmount, makeAddr(charlie), lockupDuration);
         vm.stopPrank();
@@ -149,7 +147,7 @@ contract DragonTokenizedStrategyTest is BaseTest {
         uint256 depositAmount
     ) public {
         lockupDuration = bound(lockupDuration, 1 days, 10000 days);
-        depositAmount = bound(depositAmount, 1 ether, 100 ether);
+        depositAmount = bound(depositAmount, 1 wei, type(uint232).max);
 
         vm.prank(operator);
         module.toggleDragonMode(false);
@@ -157,7 +155,7 @@ contract DragonTokenizedStrategyTest is BaseTest {
         vm.deal(randomUser, depositAmount);
         vm.startPrank(randomUser);
 
-        if (lockupDuration <= MINIMUM_LOCKUP_DURATION) {
+        if (lockupDuration <= module.minimumLockupDuration()) {
             // Should revert for durations under minimum
             vm.expectRevert(DragonTokenizedStrategy__InsufficientLockupDuration.selector);
             module.depositWithLockup{ value: depositAmount }(depositAmount, randomUser, lockupDuration);
@@ -205,9 +203,9 @@ contract DragonTokenizedStrategyTest is BaseTest {
 
     /// @dev Demonstrates that a locked-up non-dragon is able to rage quit.
     function testFuzz_lockedNonDragonCanRageQuit(uint depositAmount) public {
-        depositAmount = bound(depositAmount, 1 ether, 100 ether);
+        depositAmount = bound(depositAmount, 1 wei, type(uint232).max);
         // Define deposit parameters.
-        uint256 lockupDuration = MINIMUM_LOCKUP_DURATION;
+        uint256 lockupDuration = module.minimumLockupDuration();
 
         // Toggle off dragon mode so that non-safe (non-operator) users may deposit
         vm.prank(operator);
@@ -260,8 +258,8 @@ contract DragonTokenizedStrategyTest is BaseTest {
 
     /// @dev Demonstrates that non-dragons can't deposit/mint after initial lockup.
     function testFuzz_nonDragonCannotDepositOrMintAfterLockup(uint initialDeposit) public {
-        initialDeposit = bound(initialDeposit, 1 ether, 100 ether);
-        uint256 lockupDuration = MINIMUM_LOCKUP_DURATION;
+        initialDeposit = bound(initialDeposit, 1 wei, type(uint232).max);
+        uint256 lockupDuration = module.minimumLockupDuration();
 
         // Enable non-operator deposits
         vm.prank(operator);
@@ -297,8 +295,8 @@ contract DragonTokenizedStrategyTest is BaseTest {
     /// @dev Demonstrates that one can't lockup for others when dragon mode is off.
     function testFuzz_cannotLockupForOthersWhenDragonModeOff(uint depositAmount, string memory receiver) public {
         // Setup
-        uint256 lockupDuration = MINIMUM_LOCKUP_DURATION;
-        depositAmount = bound(depositAmount, 1 ether, 100 ether);
+        uint256 lockupDuration = module.minimumLockupDuration();
+        depositAmount = bound(depositAmount, 1 wei, type(uint232).max);
 
         // Test depositWithLockup to others while dragon mode is on.
         vm.prank(operator);
@@ -341,7 +339,7 @@ contract DragonTokenizedStrategyTest is BaseTest {
     /// after the contract is switched into dragon-only mode.
     function testFuzz_nonDragonCanWithdrawAfterDragonModeTurnsOn(uint256 initialDeposit) public {
         // Setup
-        initialDeposit = bound(initialDeposit, 1 wei, 100 ether);
+        initialDeposit = bound(initialDeposit, 1 wei, type(uint232).max);
 
         // 1. Enable non-dragon deposits first
         vm.prank(operator);
@@ -365,5 +363,67 @@ contract DragonTokenizedStrategyTest is BaseTest {
         uint256 finalShares = ITokenizedStrategy(address(module)).balanceOf(randomUser);
         assertEq(finalShares, 0, "User should have no shares after full withdrawal");
         assertEq(address(randomUser).balance, initialDeposit, "Funds not received");
+    }
+
+    /// @dev Demonstrates that rage quit doesn't extend a user's lockup time
+    function testRageQuitDoesntExtendLockupTime(uint256 depositAmount, uint256 timeRemaining) public {
+        depositAmount = bound(depositAmount, 1 wei, type(uint232).max);
+        timeRemaining = bound(timeRemaining, 1 minutes, module.rageQuitCooldownPeriod());
+        // Setup: Toggle dragon mode off to allow non-operator deposits
+        vm.prank(operator);
+        module.toggleDragonMode(false);
+
+        // Define test parameters
+        uint256 lockupDuration = module.minimumLockupDuration(); // Use minimum valid lockup
+
+        // User deposits with lockup
+        vm.deal(randomUser, depositAmount);
+        vm.prank(randomUser);
+        module.depositWithLockup{ value: depositAmount }(depositAmount, randomUser, lockupDuration);
+
+        // Fast forward to near the end of lockup period (e.g., 1 week remaining)
+        uint256 timeToWarp = lockupDuration - timeRemaining;
+        vm.warp(block.timestamp + timeToWarp);
+
+        // Capture the original unlock time before rage quit
+        uint256 originalUnlockTime = module.getUnlockTime(randomUser);
+        uint256 remainingLockupTime = originalUnlockTime - block.timestamp;
+        assertEq(remainingLockupTime, timeRemaining, "Should have 7 days remaining before rage quit");
+
+        // User initiates rage quit
+        vm.prank(randomUser);
+        module.initiateRageQuit();
+
+        // Verify the unlock time wasn't extended
+        uint256 newUnlockTime = module.getUnlockTime(randomUser);
+        assertEq(newUnlockTime, originalUnlockTime, "Rage quit should not extend unlock time");
+
+        // Verify rage quit state
+        (uint256 unlockTime, , bool isRageQuit, , ) = module.getUserLockupInfo(randomUser);
+        assertTrue(isRageQuit, "Should be in rage quit state");
+        assertEq(unlockTime, originalUnlockTime, "Unlock time should match original");
+
+        // Test gradual unlocking works correctly
+        uint256 halfwayPoint = block.timestamp + (remainingLockupTime / 2);
+        vm.warp(halfwayPoint);
+
+        // Calculate exact expected unlocked amount
+        uint256 timeElapsed = block.timestamp - (originalUnlockTime - remainingLockupTime);
+        uint256 totalDuration = remainingLockupTime;
+        uint256 expectedWithdrawable = (timeElapsed * depositAmount) / totalDuration;
+        uint256 actualWithdrawable = module.maxWithdraw(randomUser);
+
+        // Use exact assertion
+        assertEq(actualWithdrawable, expectedWithdrawable, "Unlocked amount should match exact calculation");
+
+        // Fast forward to just after unlock time
+        vm.warp(originalUnlockTime);
+
+        // Should be able to withdraw everything
+        assertEq(
+            module.maxWithdraw(randomUser),
+            module.balanceOf(randomUser),
+            "Should be able to withdraw all after unlock"
+        );
     }
 }

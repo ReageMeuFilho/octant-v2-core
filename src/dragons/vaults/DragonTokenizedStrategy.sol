@@ -214,10 +214,10 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         if (block.timestamp >= lockup.unlockTime) revert DragonTokenizedStrategy__SharesAlreadyUnlocked();
         if (lockup.isRageQuit) revert DragonTokenizedStrategy__RageQuitInProgress();
 
-        // Set 3-month lockup
-        lockup.lockupTime = block.timestamp;
-        lockup.unlockTime = block.timestamp + _strategyStorage().RAGE_QUIT_COOLDOWN_PERIOD;
-        lockup.lockedShares = _balanceOf(S, msg.sender);
+        // Use the minimum of current unlock time and rage quit period
+        uint256 rageQuitUnlockTime = block.timestamp + _strategyStorage().RAGE_QUIT_COOLDOWN_PERIOD;
+        lockup.unlockTime = lockup.unlockTime < rageQuitUnlockTime ? lockup.unlockTime : rageQuitUnlockTime;
+        lockup.lockupTime = block.timestamp; // Set the starting point for gradual unlocking
         lockup.isRageQuit = true;
 
         emit RageQuitInitiated(msg.sender, lockup.unlockTime);
