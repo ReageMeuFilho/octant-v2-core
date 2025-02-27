@@ -9,6 +9,7 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 /**
  * @dev Interface of the ERC4626 "Tokenized Vault Standard", as defined in
  * https://eips.ethereum.org/EIPS/eip-4626[ERC-4626] with payable deposit and mint functions.
+ * @dev differs from standard ERC4626 by making deposit and mint payable.
  */
 interface IERC4626Payable is IERC20, IERC20Metadata {
     event Deposit(address indexed sender, address indexed owner, uint256 assets, uint256 shares);
