@@ -747,13 +747,16 @@ abstract contract TokenizedStrategy {
         if (target == address(0)) revert TokenizedStrategy__NotOperator();
 
         if (msg.sender == target || msg.sender == S.operator) {
+            uint256 previousBalance;
             if (address(_asset) == ETH) {
+                previousBalance = address(this).balance;
                 require(
                     IAvatar(target).execTransactionFromModule(address(this), assets, "", Enum.Operation.Call),
                     TokenizedStrategy__DepositMoreThanMax()
                 );
+                assert(address(this).balance == previousBalance + assets);
             } else {
-                uint256 previousBalance = _asset.balanceOf(address(this));
+                previousBalance = _asset.balanceOf(address(this));
                 require(
                     IAvatar(target).execTransactionFromModule(
                         address(_asset),
@@ -763,10 +766,7 @@ abstract contract TokenizedStrategy {
                     ),
                     TokenizedStrategy__TransferFailed()
                 );
-                require(
-                    _asset.balanceOf(address(this)) == previousBalance + assets,
-                    TokenizedStrategy__TransferFailed()
-                );
+                assert(_asset.balanceOf(address(this)) == previousBalance + assets);
             }
         } else {
             if (address(_asset) == ETH) {
