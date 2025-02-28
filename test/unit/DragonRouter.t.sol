@@ -26,7 +26,7 @@ import { ITransformer } from "src/interfaces/ITransformer.sol";
 import { MockDragonRouterTesting } from "test/mocks/MockDragonRouterTesting.sol";
 import { MockNativeTransformer } from "test/mocks/MockNativeTransformer.sol";
 import { MockStrategy } from "test/mocks/MockStrategy.sol";
-import { Split } from "src/interfaces/ISplitChecker.sol";
+import { ISplitChecker } from "src/interfaces/ISplitChecker.sol";
 import { AccessControl } from "../../lib/openzeppelin-contracts/contracts/access/AccessControl.sol";
 
 contract DragonRouterTest is Test {
@@ -137,7 +137,6 @@ contract DragonRouterTest is Test {
                 false // allowBotClaim
             );
         }
-
     }
 
     function test_setCooldownPeriod() public {
