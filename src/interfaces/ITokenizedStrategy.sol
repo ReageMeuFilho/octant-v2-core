@@ -7,7 +7,7 @@ import { IERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import { IHats } from "./IHats.sol";
 
 // Interface that implements the 4626 Payable and Permit standard and the implementation functions
-interface ITokenizedStrategy is  IERC4626Payable, IERC20Permit {
+interface ITokenizedStrategy is IERC4626Payable, IERC20Permit {
     /*//////////////////////////////////////////////////////////////
                                  STRUCTS
     //////////////////////////////////////////////////////////////*/

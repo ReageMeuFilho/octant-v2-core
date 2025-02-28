@@ -10,8 +10,6 @@ import { IERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
 
 contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy {
-
-
     bool public override isDragonOnly = true;
 
     // /**
@@ -267,7 +265,10 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
     /**
      * @inheritdoc ITokenizedStrategy
      */
-    function maxWithdraw(address _owner, uint256 /*maxLoss*/) external view override(TokenizedStrategy, ITokenizedStrategy) returns (uint256) {
+    function maxWithdraw(
+        address _owner,
+        uint256 /*maxLoss*/
+    ) external view override(TokenizedStrategy, ITokenizedStrategy) returns (uint256) {
         return _maxWithdraw(_strategyStorage(), _owner);
     }
 
@@ -440,7 +441,13 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
     /**
      * @inheritdoc ITokenizedStrategy
      */
-    function report() external override(TokenizedStrategy, ITokenizedStrategy) nonReentrant onlyKeepers returns (uint256 profit, uint256 loss) {
+    function report()
+        external
+        override(TokenizedStrategy, ITokenizedStrategy)
+        nonReentrant
+        onlyKeepers
+        returns (uint256 profit, uint256 loss)
+    {
         // Cache storage pointer since its used repeatedly.
         StrategyData storage S = _strategyStorage();
 
@@ -479,14 +486,21 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
     /**
      * @inheritdoc IERC20
      */
-    function transfer(address, /*to*/ uint256 /*amount*/) external pure override(TokenizedStrategy, IERC20) returns (bool) {
+    function transfer(
+        address,
+        /*to*/ uint256 /*amount*/
+    ) external pure override(TokenizedStrategy, IERC20) returns (bool) {
         revert DragonTokenizedStrategy__VaultSharesNotTransferable();
     }
 
     /**
      * @inheritdoc IERC20
      */
-    function transferFrom(address, /*from*/ address, /*to*/ uint256 /*amount*/) external pure override(TokenizedStrategy, IERC20) returns (bool) {
+    function transferFrom(
+        address,
+        /*from*/ address,
+        /*to*/ uint256 /*amount*/
+    ) external pure override(TokenizedStrategy, IERC20) returns (bool) {
         revert DragonTokenizedStrategy__VaultSharesNotTransferable();
     }
 
@@ -500,8 +514,15 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
     /**
      * @inheritdoc TokenizedStrategy
      */
-    function permit(address, address, uint256, uint256, uint8, bytes32, bytes32) external override(TokenizedStrategy, IERC20Permit) {
+    function permit(
+        address,
+        address,
+        uint256,
+        uint256,
+        uint8,
+        bytes32,
+        bytes32
+    ) external override(TokenizedStrategy, IERC20Permit) {
         revert DragonTokenizedStrategy__VaultSharesNotTransferable();
     }
-
 }

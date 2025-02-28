@@ -29,5 +29,4 @@ interface IMockStrategy is IDragonTokenizedStrategy, IBaseStrategy {
     function setDontTend(bool _dontTend) external;
 
     function unlockedShares() external view returns (uint256);
-
 }

@@ -132,11 +132,7 @@ contract DragonRouterTest is Test {
                 false // allowBotClaim
             );
         }
-        // uint256[] memory allocations = new uint256[](2);
-        // allocations[0] = 40; // 40% to opex
-        // allocations[1] = 60; // 60% to metapool
 
-        // routerTesting.setSplit(ISplitChecker.Split({ recipients: recipients, allocations: allocations, totalAllocations: 100 }));
     }
 
     function test_setCooldownPeriod() public {

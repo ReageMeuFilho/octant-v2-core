@@ -8,7 +8,6 @@ import { IStrategy } from "../../interfaces/IStrategy.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC4626Payable } from "src/interfaces/IERC4626Payable.sol";
 
-
 contract YearnPolygonUsdcStrategy is DragonBaseStrategy {
     /// @dev Yearn Polygon Aave V3 USDC Lender Vault
     address public constant YIELD_SOURCE = 0x52367C8E381EDFb068E9fBa1e7E9B2C847042897;

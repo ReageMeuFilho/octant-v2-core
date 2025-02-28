@@ -160,7 +160,7 @@ abstract contract TokenizedStrategy is ITokenizedStrategy {
         // Initialize the strategy
         __TokenizedStrategy_init(_asset, _name, _owner, _management, _keeper, _dragonRouter, _regenGovernance);
     }
-    
+
     /**
      * @dev Internal initialization function
      */
@@ -205,7 +205,6 @@ abstract contract TokenizedStrategy is ITokenizedStrategy {
         // Emit event to signal a new strategy has been initialized.
         emit NewTokenizedStrategy(address(this), _asset, API_VERSION);
     }
-
 
     /*//////////////////////////////////////////////////////////////
                       ERC4626 WRITE METHODS
@@ -703,7 +702,6 @@ abstract contract TokenizedStrategy is ITokenizedStrategy {
     function isShutdown() external view returns (bool) {
         return _strategyStorage().shutdown;
     }
-
 
     /*//////////////////////////////////////////////////////////////
                         MODIFIER HELPERS

@@ -11,14 +11,14 @@ interface IDragonTokenizedStrategy is ITokenizedStrategy {
      * @param lockedShares The amount of shares locked
      */
     event NewLockupSet(address indexed user, uint256 indexed unlockTime, uint256 indexed lockedShares);
-    
+
     /**
      * @notice Emitted when a user initiates rage quit
      * @param user The user who initiated rage quit
      * @param unlockTime The new unlock time after rage quit
      */
     event RageQuitInitiated(address indexed user, uint256 indexed unlockTime);
-    
+
     /**
      * @notice Emitted when Dragon-only mode is toggled
      * @param enabled Whether Dragon-only mode is enabled or disabled
@@ -99,7 +99,11 @@ interface IDragonTokenizedStrategy is ITokenizedStrategy {
      * @param lockupDuration The duration of the lockup in seconds
      * @return assets The amount of assets used
      */
-    function mintWithLockup(uint256 shares, address receiver, uint256 lockupDuration) external payable returns (uint256 assets);
+    function mintWithLockup(
+        uint256 shares,
+        address receiver,
+        uint256 lockupDuration
+    ) external payable returns (uint256 assets);
 
     /**
      * @notice Returns the remaining cooldown time in seconds for a user's lock
@@ -137,6 +141,4 @@ interface IDragonTokenizedStrategy is ITokenizedStrategy {
      * @return The address of the regen governance
      */
     function regenGovernance() external view returns (address);
-
-
 }

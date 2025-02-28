@@ -51,7 +51,6 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
     mapping(address strategy => StrategyData data) public strategyData;
     mapping(address user => mapping(address strategy => UserData data)) public userData;
 
-
     /*//////////////////////////////////////////////////////////////
                             INITIALIZER
     //////////////////////////////////////////////////////////////*/
