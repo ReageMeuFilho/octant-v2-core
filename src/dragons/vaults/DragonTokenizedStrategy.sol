@@ -369,7 +369,6 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
 
         assets = type(uint256).max == assets ? S.asset.balanceOf(msg.sender) : assets;
         require((shares = _convertToShares(S, assets, Math.Rounding.Floor)) != 0, ZeroShares());
-        require(!S.shutdown, DragonTokenizedStrategy__StrategyInShutdown());
         require(assets < _maxDeposit(S, receiver), DragonTokenizedStrategy__DepositMoreThanMax());
         require(shares < _maxMint(S, receiver), DragonTokenizedStrategy__MintMoreThanMax());
 
@@ -383,8 +382,8 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
     function mint(
         uint256 shares,
         address receiver
-    ) external payable override(TokenizedStrategy, IERC4626Payable) onlyOperatorIfDragonMode returns (uint256 assets) {
-        assets = _mint(shares, receiver, 0);
+    ) external payable override onlyOperatorIfDragonMode returns (uint256 assets) {
+        assets = _mintWithLockup(shares, receiver, 0);
     }
 
     /**
@@ -402,10 +401,10 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
         validateArgsForLockupFunctions(receiver, lockupDuration)
         returns (uint256 assets)
     {
-        assets = _mint(shares, receiver, lockupDuration);
+        assets = _mintWithLockup(shares, receiver, lockupDuration);
     }
 
-    function _mint(uint256 shares, address receiver, uint256 lockupDuration) internal returns (uint256 assets) {
+    function _mintWithLockup(uint256 shares, address receiver, uint256 lockupDuration) internal returns (uint256 assets) {
         StrategyData storage S = _strategyStorage();
         if ((assets = _convertToAssets(S, shares, Math.Rounding.Ceil)) == 0) {
             revert ZeroAssets();
