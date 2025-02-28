@@ -332,8 +332,8 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
     function deposit(
         uint256 assets,
         address receiver
-    ) external payable override(TokenizedStrategy, IERC4626Payable) onlyOperatorIfDragonMode returns (uint256 shares) {
-        shares = _deposit(assets, receiver, 0);
+    ) external payable override onlyOperatorIfDragonMode returns (uint256 shares) {
+        shares = _depositWithLockup(assets, receiver, 0);
     }
 
     /**
@@ -351,10 +351,10 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
         validateArgsForLockupFunctions(receiver, lockupDuration)
         returns (uint256 shares)
     {
-        shares = _deposit(assets, receiver, lockupDuration);
+        shares = _depositWithLockup(assets, receiver, lockupDuration);
     }
 
-    function _deposit(uint256 assets, address receiver, uint256 lockupDuration) internal returns (uint256 shares) {
+    function _depositWithLockup(uint256 assets, address receiver, uint256 lockupDuration) internal returns (uint256 shares) {
         StrategyData storage S = _strategyStorage();
         require(!S.shutdown, DragonTokenizedStrategy__StrategyInShutdown());
 
@@ -410,7 +410,7 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
             revert ZeroAssets();
         }
 
-        _deposit(assets, receiver, lockupDuration);
+        _depositWithLockup(assets, receiver, lockupDuration);
         return assets;
     }
 
