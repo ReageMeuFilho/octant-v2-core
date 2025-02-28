@@ -7,6 +7,6 @@ interface ISplitChecker {
         uint256[] allocations;
         uint256 totalAllocations;
     }
-    
+
     function checkSplit(Split memory split, address opexVault, address metapool) external view;
 }
