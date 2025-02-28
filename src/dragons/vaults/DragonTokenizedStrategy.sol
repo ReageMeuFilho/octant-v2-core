@@ -2,16 +2,22 @@
 pragma solidity ^0.8.25;
 
 import { TokenizedStrategy, IBaseStrategy, Math } from "./TokenizedStrategy.sol";
+import { IDragonTokenizedStrategy } from "src/interfaces/IDragonTokenizedStrategy.sol";
 import { Unauthorized, TokenizedStrategy__NotOperator, DragonTokenizedStrategy__NoOperation, DragonTokenizedStrategy__InvalidReceiver, DragonTokenizedStrategy__VaultSharesNotTransferable, DragonTokenizedStrategy__ZeroLockupDuration, DragonTokenizedStrategy__InsufficientLockupDuration, DragonTokenizedStrategy__SharesStillLocked, DragonTokenizedStrategy__InvalidLockupDuration, DragonTokenizedStrategy__InvalidRageQuitCooldownPeriod, DragonTokenizedStrategy__RageQuitInProgress, DragonTokenizedStrategy__StrategyInShutdown, DragonTokenizedStrategy__NoSharesToRageQuit, DragonTokenizedStrategy__SharesAlreadyUnlocked, DragonTokenizedStrategy__DepositMoreThanMax, DragonTokenizedStrategy__MintMoreThanMax, DragonTokenizedStrategy__WithdrawMoreThanMax, DragonTokenizedStrategy__RedeemMoreThanMax, ZeroShares, ZeroAssets, DragonTokenizedStrategy__ReceiverHasExistingShares } from "src/errors.sol";
+import { IERC4626Payable } from "src/interfaces/IERC4626Payable.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
+import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
 
-contract DragonTokenizedStrategy is TokenizedStrategy {
-    event NewLockupSet(address indexed user, uint256 indexed unlockTime, uint256 indexed lockedShares);
-    event RageQuitInitiated(address indexed user, uint256 indexed unlockTime);
-    event DragonModeToggled(bool enabled);
+contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy {
 
-    bool public isDragonOnly = true;
 
-    function toggleDragonMode(bool enabled) external onlyOperator {
+    bool public override isDragonOnly = true;
+
+    // /**
+    //  * @inheritdoc IDragonTokenizedStrategy
+    //  */
+    function toggleDragonMode(bool enabled) external override onlyOperator {
         if (enabled == isDragonOnly) revert DragonTokenizedStrategy__NoOperation();
         isDragonOnly = enabled;
         emit DragonModeToggled(enabled);
@@ -36,18 +42,24 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         address _keeper,
         address _dragonRouter,
         address _regenGovernance
-    ) external {
+    ) external override(TokenizedStrategy, ITokenizedStrategy) {
         __TokenizedStrategy_init(_asset, _name, _operator, _management, _keeper, _dragonRouter, _regenGovernance);
     }
 
-    function setLockupDuration(uint256 _lockupDuration) external onlyRegenGovernance {
+    /**
+     * @inheritdoc IDragonTokenizedStrategy
+     */
+    function setLockupDuration(uint256 _lockupDuration) external override onlyRegenGovernance {
         if (_lockupDuration < RANGE_MINIMUM_LOCKUP_DURATION || _lockupDuration > RANGE_MAXIMUM_LOCKUP_DURATION) {
             revert DragonTokenizedStrategy__InvalidLockupDuration();
         }
         _strategyStorage().MINIMUM_LOCKUP_DURATION = _lockupDuration;
     }
 
-    function setRageQuitCooldownPeriod(uint256 _rageQuitCooldownPeriod) external onlyRegenGovernance {
+    /**
+     * @inheritdoc IDragonTokenizedStrategy
+     */
+    function setRageQuitCooldownPeriod(uint256 _rageQuitCooldownPeriod) external override onlyRegenGovernance {
         if (
             _rageQuitCooldownPeriod < RANGE_MINIMUM_RAGE_QUIT_COOLDOWN_PERIOD ||
             _rageQuitCooldownPeriod > RANGE_MAXIMUM_RAGE_QUIT_COOLDOWN_PERIOD
@@ -55,15 +67,24 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         _strategyStorage().RAGE_QUIT_COOLDOWN_PERIOD = _rageQuitCooldownPeriod;
     }
 
-    function minimumLockupDuration() external view returns (uint256) {
+    /**
+     * @inheritdoc IDragonTokenizedStrategy
+     */
+    function minimumLockupDuration() external view override returns (uint256) {
         return _strategyStorage().MINIMUM_LOCKUP_DURATION;
     }
 
-    function rageQuitCooldownPeriod() external view returns (uint256) {
+    /**
+     * @inheritdoc IDragonTokenizedStrategy
+     */
+    function rageQuitCooldownPeriod() external view override returns (uint256) {
         return _strategyStorage().RAGE_QUIT_COOLDOWN_PERIOD;
     }
 
-    function regenGovernance() external view returns (address) {
+    /**
+     * @inheritdoc IDragonTokenizedStrategy
+     */
+    function regenGovernance() external view override returns (address) {
         return _strategyStorage().REGEN_GOVERNANCE;
     }
 
@@ -136,30 +157,24 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     }
 
     /**
-     * @dev Returns the amount of unlocked shares for a user.
-     * @param user The user's address.
-     * @return The amount of unlocked shares.
+     * @inheritdoc IDragonTokenizedStrategy
      */
-    function unlockedShares(address user) external view returns (uint256) {
+    function unlockedShares(address user) external view override returns (uint256) {
         StrategyData storage S = _strategyStorage();
         return _userUnlockedShares(S, user);
     }
 
     /**
-     * @dev Returns the unlock time for a user's locked shares.
-     * @param user The user's address.
-     * @return The unlock timestamp.
+     * @inheritdoc IDragonTokenizedStrategy
      */
-    function getUnlockTime(address user) external view returns (uint256) {
+    function getUnlockTime(address user) external view override returns (uint256) {
         return _strategyStorage().voluntaryLockups[user].unlockTime;
     }
 
     /**
-     * @notice Returns the remaining cooldown time in seconds for a user's lock
-     * @param user The address to check
-     * @return remainingTime The time remaining in seconds until unlock (0 if already unlocked)
+     * @inheritdoc IDragonTokenizedStrategy
      */
-    function getRemainingCooldown(address user) external view returns (uint256 remainingTime) {
+    function getRemainingCooldown(address user) external view override returns (uint256 remainingTime) {
         uint256 unlockTime = _strategyStorage().voluntaryLockups[user].unlockTime;
         if (unlockTime <= block.timestamp) {
             return 0;
@@ -168,19 +183,14 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     }
 
     /**
-     * @notice Returns detailed information about a user's lockup status
-     * @param user The address to check
-     * @return unlockTime The timestamp when shares unlock
-     * @return lockedShares The amount of shares that are locked
-     * @return isRageQuit Whether the user is in rage quit mode
-     * @return totalShares Total shares owned by user
-     * @return withdrawableShares Amount of shares that can be withdrawn now
+     * @inheritdoc IDragonTokenizedStrategy
      */
     function getUserLockupInfo(
         address user
     )
         external
         view
+        override
         returns (
             uint256 unlockTime,
             uint256 lockedShares,
@@ -202,10 +212,9 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     }
 
     /**
-     * @notice Initiates a rage quit, allowing gradual withdrawal over 3 months
-     * @dev Sets a 3-month lockup and enables proportional withdrawals
+     * @inheritdoc IDragonTokenizedStrategy
      */
-    function initiateRageQuit() external {
+    function initiateRageQuit() external override {
         StrategyData storage S = _strategyStorage();
         LockupInfo storage lockup = S.voluntaryLockups[msg.sender];
 
@@ -249,42 +258,28 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     }
 
     /**
-     * @notice Total number of underlying assets that can be
-     * withdrawn from the strategy by `owner`, where `owner`
-     * corresponds to the msg.sender of a {redeem} call.
-     *
-     * @param _owner The owner of the shares.
-     * @return _maxWithdraw Max amount of `asset` that can be withdrawn.
+     * @inheritdoc IERC4626Payable
      */
-    function maxWithdraw(address _owner) external view override returns (uint256) {
+    function maxWithdraw(address _owner) external view override(TokenizedStrategy, IERC4626Payable) returns (uint256) {
         return _maxWithdraw(_strategyStorage(), _owner);
     }
 
     /**
-     * @notice Variable `maxLoss` is ignored.
-     * @dev Accepts a `maxLoss` variable in order to match the multi
-     * strategy vaults ABI.
+     * @inheritdoc ITokenizedStrategy
      */
-    function maxWithdraw(address _owner, uint256 /*maxLoss*/) external view override returns (uint256) {
+    function maxWithdraw(address _owner, uint256 /*maxLoss*/) external view override(TokenizedStrategy, ITokenizedStrategy) returns (uint256) {
         return _maxWithdraw(_strategyStorage(), _owner);
     }
 
     /**
-     * @notice Withdraws `assets` from `owners` shares and sends
-     * the underlying tokens to `receiver`.
-     * @dev This includes an added parameter to allow for losses.
-     * @param assets The amount of underlying to withdraw.
-     * @param receiver The address to receive `assets`.
-     * @param _owner The address whose shares are burnt.
-     * @param maxLoss The amount of acceptable loss in Basis points.
-     * @return shares The actual amount of shares burnt.
+     * @inheritdoc ITokenizedStrategy
      */
     function withdraw(
         uint256 assets,
         address receiver,
         address _owner,
         uint256 maxLoss
-    ) public override nonReentrant returns (uint256 shares) {
+    ) public override(TokenizedStrategy, ITokenizedStrategy) nonReentrant returns (uint256 shares) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
         LockupInfo storage lockup = S.voluntaryLockups[_owner];
@@ -303,21 +298,14 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     }
 
     /**
-     * @notice Redeems exactly `shares` from `owner` and
-     * sends `assets` of underlying tokens to `receiver`.
-     * @dev This includes an added parameter to allow for losses.
-     * @param shares The amount of shares burnt.
-     * @param receiver The address to receive `assets`.
-     * @param _owner The address whose shares are burnt.
-     * @param maxLoss The amount of acceptable loss in Basis points.
-     * @return . The actual amount of underlying withdrawn.
+     * @inheritdoc ITokenizedStrategy
      */
     function redeem(
         uint256 shares,
         address receiver,
         address _owner,
         uint256 maxLoss
-    ) public override nonReentrant returns (uint256) {
+    ) public override(TokenizedStrategy, ITokenizedStrategy) nonReentrant returns (uint256) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
         LockupInfo storage lockup = S.voluntaryLockups[_owner];
@@ -338,28 +326,17 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     }
 
     /**
-     * @notice Mints `shares` of strategy shares to `receiver` by
-     * depositing exactly `assets` of underlying tokens.
-     * @dev Please note that deposits are forbidden if rage quit was triggered.
-     * @param assets The amount of underlying to deposit in.
-     * @param receiver The address to receive the `shares`.
-     * @return shares The actual amount of shares issued.
+     * @inheritdoc IERC4626Payable
      */
     function deposit(
         uint256 assets,
         address receiver
-    ) external payable override onlyOperatorIfDragonMode returns (uint256 shares) {
+    ) external payable override(TokenizedStrategy, IERC4626Payable) onlyOperatorIfDragonMode returns (uint256 shares) {
         shares = _deposit(assets, receiver, 0);
     }
 
     /**
-     * @dev Mints `shares` of strategy shares to `receiver` by depositing exactly `assets` of underlying tokens with a lock up
-     * @dev The attached gnosis safe module may extend its own lockup duration
-     * @dev Deposits with lockup are forbidden if rage quit was triggered for receiver, or if the receiver has existing shares to avoid unauthorized locking of user funds
-     * @param assets The amount of assets to deposit.
-     * @param receiver The receiver of the shares.
-     * @param lockupDuration The duration of the lockup in seconds.
-     * @return shares The amount of shares minted.
+     * @inheritdoc IDragonTokenizedStrategy
      */
     function depositWithLockup(
         uint256 assets,
@@ -368,6 +345,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     )
         external
         payable
+        override
         onlyOperatorIfDragonMode
         validateArgsForLockupFunctions(receiver, lockupDuration)
         returns (uint256 shares)
@@ -408,19 +386,18 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     }
 
     /**
-     * @notice Mints exactly `shares` of strategy shares to
-     * `receiver` by depositing `assets` of underlying tokens.
-     * @param shares The amount of strategy shares mint.
-     * @param receiver The address to receive the `shares`.
-     * @return assets The actual amount of asset deposited.
+     * @inheritdoc IERC4626Payable
      */
     function mint(
         uint256 shares,
         address receiver
-    ) external payable override onlyOperatorIfDragonMode returns (uint256 assets) {
+    ) external payable override(TokenizedStrategy, IERC4626Payable) onlyOperatorIfDragonMode returns (uint256 assets) {
         assets = _mint(shares, receiver, 0);
     }
 
+    /**
+     * @inheritdoc IDragonTokenizedStrategy
+     */
     function mintWithLockup(
         uint256 shares,
         address receiver,
@@ -428,6 +405,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     )
         external
         payable
+        override
         onlyOperatorIfDragonMode
         validateArgsForLockupFunctions(receiver, lockupDuration)
         returns (uint256 assets)
@@ -460,24 +438,9 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     }
 
     /**
-     * @notice Function for keepers to call to harvest and record all
-     * profits accrued.
-     *
-     * @dev This will account for any gains/losses since the last report
-     * and charge fees accordingly.
-     *
-     * Any profit over the fees charged will be immediately distributed to the dragon router     *
-     * In case of a loss it will first attempt to offset the loss
-     * with any remaining dragon router shares
-     * order to protect dragon principal first and foremost.
-     *
-     * @return profit The notional amount of gain if any since the last
-     * report in terms of `asset`.
-     * @return loss The notional amount of loss if any since the last
-     * report in terms of `asset`.
+     * @inheritdoc ITokenizedStrategy
      */
-    // solhint-disable-next-line code-complexity
-    function report() external override nonReentrant onlyKeepers returns (uint256 profit, uint256 loss) {
+    function report() external override(TokenizedStrategy, ITokenizedStrategy) nonReentrant onlyKeepers returns (uint256 profit, uint256 loss) {
         // Cache storage pointer since its used repeatedly.
         StrategyData storage S = _strategyStorage();
 
@@ -514,53 +477,31 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     }
 
     /**
-     * @notice Transfer '_amount` of shares from `msg.sender` to `to`.
-     * @dev Dragon vault shares are not transferable
-     * Requirements:
-     *
-     * - `to` cannot be the zero address.
-     * - `to` cannot be the address of the strategy.
-     * - the caller must have a balance of at least `_amount`.
-     *
-     * @return . a boolean value indicating whether the operation succeeded.
+     * @inheritdoc IERC20
      */
-    function transfer(address, /*to*/ uint256 /*amount*/) external pure override returns (bool) {
+    function transfer(address, /*to*/ uint256 /*amount*/) external pure override(TokenizedStrategy, IERC20) returns (bool) {
         revert DragonTokenizedStrategy__VaultSharesNotTransferable();
     }
 
     /**
-     * @notice `amount` tokens from `from` to `to` using the
-     * allowance mechanism. `amount` is then deducted from the caller's
-     * allowance.
-     *
-     * @dev
-     * Emits an {Approval} event indicating the updated allowance. This is not
-     * required by the EIP.
-     *
-     * NOTE: Does not update the allowance if the current allowance
-     * is the maximum `uint256`.
-     *
-     * Requirements:
-     *
-     * - `from` and `to` cannot be the zero address.
-     * - `to` cannot be the address of the strategy.
-     * - `from` must have a balance of at least `amount`.
-     * - the caller must have allowance for ``from``'s tokens of at least
-     * `amount`.
-     *
-     * Emits a {Transfer} event.
-     *
-     * @return . a boolean value indicating whether the operation succeeded.
+     * @inheritdoc IERC20
      */
-    function transferFrom(address, /*from*/ address, /*to*/ uint256 /*amount*/) external pure override returns (bool) {
+    function transferFrom(address, /*from*/ address, /*to*/ uint256 /*amount*/) external pure override(TokenizedStrategy, IERC20) returns (bool) {
         revert DragonTokenizedStrategy__VaultSharesNotTransferable();
     }
 
-    function approve(address, uint256) external override returns (bool) {
+    /**
+     * @inheritdoc IERC20
+     */
+    function approve(address, uint256) external override(TokenizedStrategy, IERC20) returns (bool) {
         revert DragonTokenizedStrategy__VaultSharesNotTransferable();
     }
 
-    function permit(address, address, uint256, uint256, uint8, bytes32, bytes32) external override {
+    /**
+     * @inheritdoc TokenizedStrategy
+     */
+    function permit(address, address, uint256, uint256, uint8, bytes32, bytes32) external override(TokenizedStrategy, IERC20Permit) {
         revert DragonTokenizedStrategy__VaultSharesNotTransferable();
     }
+
 }

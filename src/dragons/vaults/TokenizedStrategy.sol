@@ -340,7 +340,7 @@ abstract contract TokenizedStrategy is ITokenizedStrategy {
     /**
      * @inheritdoc ITokenizedStrategy
      */
-    function maxWithdraw(address owner, uint256 /*maxLoss*/) external view virtual returns (uint256) {}
+    function maxWithdraw(address owner, uint256 /*maxLoss*/) external view virtual override returns (uint256) {}
 
     /**
      * @inheritdoc IERC4626Payable
