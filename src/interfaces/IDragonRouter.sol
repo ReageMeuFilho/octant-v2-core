@@ -145,6 +145,12 @@ interface IDragonRouter {
     function setSplit(ISplitChecker.Split memory _split) external;
 
     /**
+     * @notice Initializer function, triggered when a new proxy is deployed
+     * @param initializeParams Parameters of initialization encoded
+     */
+    function setUp(bytes memory initializeParams) external;
+
+    /**
      * @dev Allows a user to claim their available split, optionally transforming it.
      * @param _user The address of the user to claim for
      * @param _strategy The address of the strategy to claim from
