@@ -8,6 +8,7 @@ import { AccessControlUpgradeable } from "openzeppelin-upgradeable/access/Access
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
 import { ITransformer } from "src/interfaces/ITransformer.sol";
+import { IDragonRouter } from "src/interfaces/IDragonRouter.sol";
 import { LinearAllowanceExecutor } from "src/dragons/LinearAllowanceExecutor.sol";
 import "src/interfaces/ISplitChecker.sol";
 
@@ -17,7 +18,7 @@ import "src/interfaces/ISplitChecker.sol";
  * with the ability to transform the split token into another token upon withdrawal,
  * and allows authorized pushers to directly distribute splits.
  */
-contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, LinearAllowanceExecutor {
+contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, LinearAllowanceExecutor, IDragonRouter {
     using SafeERC20 for IERC20;
 
     /*//////////////////////////////////////////////////////////////
@@ -39,33 +40,9 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
     ISplitChecker public splitChecker;
     address public opexVault;
     address public metapool;
-    Split public split;
+    ISplitChecker.Split public split;
     uint256 public lastSetSplitTime;
     address[] public strategies;
-
-    /*//////////////////////////////////////////////////////////////
-                            STRUCTS
-    //////////////////////////////////////////////////////////////*/
-
-    struct StrategyData {
-        address asset;
-        uint256 assetPerShare;
-        uint256 totalAssets;
-        uint256 totalShares;
-    }
-
-    struct UserData {
-        uint256 assets;
-        uint256 userAssetPerShare;
-        uint256 splitPerShare;
-        Transformer transformer;
-        bool allowBotClaim;
-    }
-
-    struct Transformer {
-        ITransformer transformer;
-        address targetToken;
-    }
 
     /*//////////////////////////////////////////////////////////////
                             MAPPINGS
@@ -74,33 +51,6 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
     mapping(address strategy => StrategyData data) public strategyData;
     mapping(address user => mapping(address strategy => UserData data)) public userData;
 
-    /*//////////////////////////////////////////////////////////////
-                            EVENTS
-    //////////////////////////////////////////////////////////////*/
-
-    event StrategyAdded(address indexed strategy);
-    event StrategyRemoved(address indexed strategy);
-    event MetapoolUpdated(address oldMetapool, address newMetapool);
-    event OpexVaultUpdated(address oldOpexVault, address newOpexVault);
-    event CooldownPeriodUpdated(uint256 oldPeriod, uint256 newPeriod);
-    event SplitDelayUpdated(uint256 oldDelay, uint256 newDelay);
-    event SplitCheckerUpdated(address oldChecker, address newChecker);
-    event UserTransformerSet(address indexed user, address transformer, address targetToken);
-    event SplitClaimed(address indexed user, address indexed strategy, uint256 amount);
-
-    /*//////////////////////////////////////////////////////////////
-                            CUSTOM ERRORS
-    //////////////////////////////////////////////////////////////*/
-
-    error AlreadyAdded();
-    error StrategyNotDefined();
-    error InvalidAmount();
-    error ZeroAddress();
-    error ZeroAssetAddress();
-    error NoShares();
-    error CooldownPeriodNotPassed();
-    error TransferFailed();
-    error NotAllowed();
 
     /*//////////////////////////////////////////////////////////////
                             INITIALIZER
@@ -151,10 +101,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Adds a new strategy to the router
-     * @param _strategy Address of the strategy to add
-     * @dev Only callable by accounts with DEFAULT_ADMIN_ROLE
-     * @dev Strategy must not already be added
+     * @inheritdoc IDragonRouter
      */
 
     function addStrategy(address _strategy) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -179,10 +126,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
     }
 
     /**
-     * @notice Removes a strategy from the router
-     * @param _strategy Address of the strategy to remove
-     * @dev Only callable by accounts with DEFAULT_ADMIN_ROLE
-     * @dev Strategy must exist in the router
+     * @inheritdoc IDragonRouter
      */
     function removeStrategy(address _strategy) external onlyRole(DEFAULT_ADMIN_ROLE) {
         StrategyData storage _stratData = strategyData[_strategy];
@@ -210,46 +154,41 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
     }
 
     /**
+<<<<<<< HEAD
      * @notice Updates the metapool address
      * @param _metapool New metapool address
      * @dev Only callable by accounts with GOVERNANCE_ROLE
+=======
+     * @inheritdoc IDragonRouter
+>>>>>>> bc20433 (refactor: update IDragonRouter & DragonRouter)
      */
     function setMetapool(address _metapool) external onlyRole(GOVERNANCE_ROLE) {
         _setMetapool(_metapool);
     }
 
     /**
-     * @notice Updates the opex vault address
-     * @param _opexVault New opex vault address
-     * @dev Only callable by accounts with DEFAULT_ADMIN_ROLE
+     * @inheritdoc IDragonRouter
      */
     function setOpexVault(address _opexVault) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _setOpexVault(_opexVault);
     }
 
     /**
-     * @notice Updates the split delay
-     * @param _splitDelay New split delay in seconds
-     * @dev Only callable by accounts with DEFAULT_ADMIN_ROLE
+     * @inheritdoc IDragonRouter
      */
     function setSplitDelay(uint256 _splitDelay) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _setSplitDelay(_splitDelay);
     }
 
     /**
-     * @notice Updates the split checker contract address
-     * @param _splitChecker New split checker contract address
-     * @dev Only callable by accounts with DEFAULT_ADMIN_ROLE
+     * @inheritdoc IDragonRouter
      */
     function setSplitChecker(address _splitChecker) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _setSplitChecker(_splitChecker);
     }
 
     /**
-     * @dev Allows a user to set their transformer for split withdrawals.
-     * @param strategy The address of the strategy to set the transformer for.
-     * @param transformer The address of the transformer contract.
-     * @param targetToken The address of the token to transform into.
+     * @inheritdoc IDragonRouter
      */
     function setTransformer(address strategy, address transformer, address targetToken) external {
         if (balanceOf(msg.sender, strategy) == 0) revert NoShares();
@@ -259,28 +198,21 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
     }
 
     /**
-     * @dev Allows a user to decide if claim function can be called on their behalf for a particular strategy.
-     * @param strategy The address of the strategy to set the transformer for.
-     * @param enable If false, only user will be able to call claim. If true, anyone will be able to do it.
+     * @inheritdoc IDragonRouter
      */
     function setClaimAutomation(address strategy, bool enable) external {
         userData[msg.sender][strategy].allowBotClaim = enable;
     }
 
     /**
-     * @notice Updates the cooldown period
-     * @param _cooldownPeriod New cooldown period in seconds
-     * @dev Only callable by accounts with REGEN_GOVERNANCE_ROLE
+     * @inheritdoc IDragonRouter
      */
     function setCooldownPeriod(uint256 _cooldownPeriod) external onlyRole(REGEN_GOVERNANCE_ROLE) {
         _setCooldownPeriod(_cooldownPeriod);
     }
 
     /**
-     * @notice Returns the balance of a user for a given strategy
-     * @param _user The address of the user
-     * @param _strategy The address of the strategy
-     * @return The balance of the user for the strategy
+     * @inheritdoc IDragonRouter
      */
     function balanceOf(address _user, address _strategy) public view returns (uint256) {
         UserData memory _userData = userData[_user][_strategy];
@@ -289,8 +221,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
     }
 
     /**
-     * @dev Distributes new splits to all shareholders.
-     * @param amount The amount of tokens to distribute.
+     * @inheritdoc IDragonRouter
      */
     function fundFromSource(address strategy, uint256 amount) external onlyRole(SPLIT_DISTRIBUTOR_ROLE) nonReentrant {
         StrategyData storage data = strategyData[strategy];
@@ -304,11 +235,9 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
     }
 
     /**
-     * @notice Sets the split for the router
-     * @param _split The split to set
-     * @dev Only callable by accounts with DEFAULT_ADMIN_ROLE
+     * @inheritdoc IDragonRouter
      */
-    function setSplit(Split memory _split) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setSplit(ISplitChecker.Split memory _split) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (block.timestamp - lastSetSplitTime < DRAGON_SPLIT_COOLDOWN_PERIOD) revert CooldownPeriodNotPassed();
         splitChecker.checkSplit(_split, opexVault, metapool);
 
@@ -339,9 +268,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
     }
 
     /**
-     * @dev Allows a user to claim their available split, optionally transforming it.
-     * @param _strategy The address of the strategy to claim from
-     * @param _amount The amount of split to claim
+     * @inheritdoc IDragonRouter
      */
     function claimSplit(address _user, address _strategy, uint256 _amount) external nonReentrant {
         if (_amount == 0 || balanceOf(_user, _strategy) < _amount) revert InvalidAmount();
