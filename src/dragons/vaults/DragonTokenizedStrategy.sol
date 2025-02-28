@@ -270,7 +270,10 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
         // Get the max the owner could withdraw currently.
 
         maxWithdraw_ = IBaseStrategy(address(this)).availableWithdrawLimit(_owner);
-        maxWithdraw_ = Math.min(super._convertToAssets(S, _userUnlockedShares(S, _owner), Math.Rounding.Floor), maxWithdraw_);
+        maxWithdraw_ = Math.min(
+            super._convertToAssets(S, _userUnlockedShares(S, _owner), Math.Rounding.Floor),
+            maxWithdraw_
+        );
     }
 
     /// @dev Internal implementation of {maxRedeem}.
@@ -384,7 +387,11 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
         shares = _depositWithLockup(assets, receiver, lockupDuration);
     }
 
-    function _depositWithLockup(uint256 assets, address receiver, uint256 lockupDuration) internal returns (uint256 shares) {
+    function _depositWithLockup(
+        uint256 assets,
+        address receiver,
+        uint256 lockupDuration
+    ) internal returns (uint256 shares) {
         StrategyData storage S = super._strategyStorage();
         require(!S.shutdown, DragonTokenizedStrategy__StrategyInShutdown());
 
@@ -434,7 +441,11 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
         assets = _mintWithLockup(shares, receiver, lockupDuration);
     }
 
-    function _mintWithLockup(uint256 shares, address receiver, uint256 lockupDuration) internal returns (uint256 assets) {
+    function _mintWithLockup(
+        uint256 shares,
+        address receiver,
+        uint256 lockupDuration
+    ) internal returns (uint256 assets) {
         StrategyData storage S = super._strategyStorage();
         if ((assets = super._convertToAssets(S, shares, Math.Rounding.Ceil)) == 0) {
             revert ZeroAssets();
