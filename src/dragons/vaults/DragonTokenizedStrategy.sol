@@ -356,34 +356,24 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
 
     function _deposit(uint256 assets, address receiver, uint256 lockupDuration) internal returns (uint256 shares) {
         StrategyData storage S = _strategyStorage();
-        if (receiver == S.dragonRouter) revert Unauthorized();
-        if (S.voluntaryLockups[receiver].isRageQuit) revert DragonTokenizedStrategy__RageQuitInProgress();
-        if (
-            _balanceOf(S, receiver) > 0 &&
-            IBaseStrategy(address(this)).target() != address(receiver) &&
-            lockupDuration > 0
-        ) {
-            revert DragonTokenizedStrategy__ReceiverHasExistingShares();
-        }
 
-        if (assets == type(uint256).max) {
-            assets = S.asset.balanceOf(msg.sender);
-        }
+        require(receiver != S.dragonRouter, Unauthorized());
+        require(!S.voluntaryLockups[receiver].isRageQuit, DragonTokenizedStrategy__RageQuitInProgress());
+        require(
+            _balanceOf(S, receiver) == 0 ||
+                IBaseStrategy(address(this)).target() == address(receiver) ||
+                lockupDuration == 0,
+            DragonTokenizedStrategy__ReceiverHasExistingShares()
+        );
 
-        if ((shares = _convertToShares(S, assets, Math.Rounding.Floor)) == 0) {
-            revert ZeroShares();
-        }
-
-        _processDeposit(S, assets, shares, receiver);
-        _setOrExtendLockup(S, receiver, lockupDuration, _balanceOf(S, receiver));
-    }
-
-    function _processDeposit(StrategyData storage S, uint256 assets, uint256 shares, address receiver) internal {
-        if (S.shutdown) revert DragonTokenizedStrategy__StrategyInShutdown();
-        if (assets > _maxDeposit(S, receiver)) revert DragonTokenizedStrategy__DepositMoreThanMax();
-        if (shares > _maxMint(S, receiver)) revert DragonTokenizedStrategy__MintMoreThanMax();
+        assets = type(uint256).max == assets ? S.asset.balanceOf(msg.sender) : assets;
+        require((shares = _convertToShares(S, assets, Math.Rounding.Floor)) != 0, ZeroShares());
+        require(!S.shutdown, DragonTokenizedStrategy__StrategyInShutdown());
+        require(assets < _maxDeposit(S, receiver), DragonTokenizedStrategy__DepositMoreThanMax());
+        require(shares < _maxMint(S, receiver), DragonTokenizedStrategy__MintMoreThanMax());
 
         _deposit(S, receiver, assets, shares);
+        _setOrExtendLockup(S, receiver, lockupDuration, _balanceOf(S, receiver));
     }
 
     /**
