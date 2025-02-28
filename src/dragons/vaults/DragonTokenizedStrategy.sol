@@ -356,6 +356,7 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
 
     function _deposit(uint256 assets, address receiver, uint256 lockupDuration) internal returns (uint256 shares) {
         StrategyData storage S = _strategyStorage();
+        require(!S.shutdown, DragonTokenizedStrategy__StrategyInShutdown());
 
         require(receiver != S.dragonRouter, Unauthorized());
         require(!S.voluntaryLockups[receiver].isRageQuit, DragonTokenizedStrategy__RageQuitInProgress());
