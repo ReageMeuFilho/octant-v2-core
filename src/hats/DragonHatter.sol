@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "./AbstractHatsManager.sol";
+import { AbstractHatsManager } from "./AbstractHatsManager.sol";
 
 /**
  * @title DragonHatter

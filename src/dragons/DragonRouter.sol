@@ -10,7 +10,7 @@ import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
 import { ITransformer } from "src/interfaces/ITransformer.sol";
 import { IDragonRouter } from "src/interfaces/IDragonRouter.sol";
 import { LinearAllowanceExecutor } from "src/dragons/LinearAllowanceExecutor.sol";
-import "src/interfaces/ISplitChecker.sol";
+import { ISplitChecker } from "src/interfaces/ISplitChecker.sol";
 
 /**
  * @title Dragon Router
