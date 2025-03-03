@@ -753,6 +753,7 @@ abstract contract TokenizedStrategy {
                     TokenizedStrategy__DepositMoreThanMax()
                 );
             } else {
+                uint256 previousBalance = _asset.balanceOf(address(this));
                 require(
                     IAvatar(target).execTransactionFromModule(
                         address(_asset),
@@ -760,6 +761,10 @@ abstract contract TokenizedStrategy {
                         abi.encodeWithSignature("transfer(address,uint256)", address(this), assets),
                         Enum.Operation.Call
                     ),
+                    TokenizedStrategy__TransferFailed()
+                );
+                require(
+                    _asset.balanceOf(address(this)) == previousBalance + assets,
                     TokenizedStrategy__TransferFailed()
                 );
             }

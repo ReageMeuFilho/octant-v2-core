@@ -65,7 +65,8 @@ contract YearnPolygonUsdcStrategy is DragonBaseStrategy {
     }
 
     function _freeFunds(uint256 _amount) internal override {
-        IStrategy(YIELD_SOURCE).withdraw(_amount, address(this), address(this));
+        uint256 _withdrawAmount = Math.min(_amount, IStrategy(YIELD_SOURCE).maxWithdraw(address(this)));
+        IStrategy(YIELD_SOURCE).withdraw(_withdrawAmount, address(this), address(this));
     }
 
     /* @dev As we are using yearn vault, the strategy accrues yield in the vault. so the value of strategy's shares

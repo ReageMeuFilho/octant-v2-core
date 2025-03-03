@@ -8,6 +8,7 @@ import { AccessControlUpgradeable } from "openzeppelin-upgradeable/access/Access
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
 import { ITransformer } from "src/interfaces/ITransformer.sol";
+import { LinearAllowanceExecutor } from "src/dragons/LinearAllowanceExecutor.sol";
 import "src/interfaces/ISplitChecker.sol";
 
 /**
@@ -16,7 +17,7 @@ import "src/interfaces/ISplitChecker.sol";
  * with the ability to transform the split token into another token upon withdrawal,
  * and allows authorized pushers to directly distribute splits.
  */
-contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
+contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, LinearAllowanceExecutor {
     using SafeERC20 for IERC20;
 
     /*//////////////////////////////////////////////////////////////
@@ -353,7 +354,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable {
         emit SplitClaimed(_user, _strategy, _amount);
     }
 
-    receive() external payable {}
+    receive() external payable override {}
 
     /*//////////////////////////////////////////////////////////////
                             INTERNAL FUNCTIONS

@@ -127,8 +127,10 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         } else if (lockup.isRageQuit) {
             // Calculate unlocked portion based on time elapsed
             uint256 timeElapsed = block.timestamp - lockup.lockupTime;
-            uint256 unlockedPortion = (timeElapsed * balance) / (lockup.unlockTime - lockup.lockupTime);
-            return Math.min(unlockedPortion, balance);
+            uint256 unlockedPortion = (timeElapsed * lockup.lockedShares) / (lockup.unlockTime - lockup.lockupTime);
+            uint256 sharesPreviouslyWithdrawn = lockup.lockedShares - balance;
+            uint256 maxWithdrawalAmount = unlockedPortion - sharesPreviouslyWithdrawn;
+            return Math.min(maxWithdrawalAmount, balance);
         } else {
             return 0;
         }
@@ -212,10 +214,10 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         if (block.timestamp >= lockup.unlockTime) revert DragonTokenizedStrategy__SharesAlreadyUnlocked();
         if (lockup.isRageQuit) revert DragonTokenizedStrategy__RageQuitInProgress();
 
-        // Set 3-month lockup
-        lockup.lockupTime = block.timestamp;
-        lockup.unlockTime = block.timestamp + _strategyStorage().RAGE_QUIT_COOLDOWN_PERIOD;
-        lockup.lockedShares = _balanceOf(S, msg.sender);
+        // Use the minimum of current unlock time and rage quit period
+        uint256 rageQuitUnlockTime = block.timestamp + _strategyStorage().RAGE_QUIT_COOLDOWN_PERIOD;
+        lockup.unlockTime = lockup.unlockTime < rageQuitUnlockTime ? lockup.unlockTime : rageQuitUnlockTime;
+        lockup.lockupTime = block.timestamp; // Set the starting point for gradual unlocking
         lockup.isRageQuit = true;
 
         emit RageQuitInitiated(msg.sender, lockup.unlockTime);
@@ -236,11 +238,15 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
     function _maxRedeem(StrategyData storage S, address _owner) internal view override returns (uint256 maxRedeem_) {
         // Get the max the owner could withdraw currently.
         maxRedeem_ = IBaseStrategy(address(this)).availableWithdrawLimit(_owner);
-        maxRedeem_ = Math.min(
-            // Can't redeem more than the balance.
-            _convertToShares(S, maxRedeem_, Math.Rounding.Floor),
-            _userUnlockedShares(S, _owner)
-        );
+        if (maxRedeem_ == type(uint256).max) {
+            maxRedeem_ = _userUnlockedShares(S, _owner);
+        } else {
+            maxRedeem_ = Math.min(
+                // Can't redeem more than the balance.
+                _convertToShares(S, maxRedeem_, Math.Rounding.Floor),
+                _userUnlockedShares(S, _owner)
+            );
+        }
     }
 
     /**
@@ -292,10 +298,7 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         if ((shares = _convertToShares(S, assets, Math.Rounding.Ceil)) == 0) {
             revert ZeroShares();
         }
-        if (lockup.isRageQuit) {
-            lockup.lockedShares -= shares;
-            lockup.lockupTime = block.timestamp;
-        }
+
         // Withdraw and track the actual amount withdrawn for loss check.
         _withdraw(S, receiver, _owner, assets, shares, maxLoss);
     }
@@ -323,10 +326,6 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         if (shares > _maxRedeem(S, _owner)) revert DragonTokenizedStrategy__RedeemMoreThanMax();
         if (block.timestamp < lockup.unlockTime && !lockup.isRageQuit) {
             revert DragonTokenizedStrategy__SharesStillLocked();
-        }
-        if (lockup.isRageQuit) {
-            lockup.lockedShares -= shares;
-            lockup.lockupTime = block.timestamp;
         }
 
         uint256 assets;
@@ -381,7 +380,11 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         StrategyData storage S = _strategyStorage();
         if (receiver == S.dragonRouter) revert Unauthorized();
         if (S.voluntaryLockups[receiver].isRageQuit) revert DragonTokenizedStrategy__RageQuitInProgress();
-        if (_balanceOf(S, receiver) > 0 && IBaseStrategy(address(this)).target() != address(receiver)) {
+        if (
+            _balanceOf(S, receiver) > 0 &&
+            IBaseStrategy(address(this)).target() != address(receiver) &&
+            lockupDuration > 0
+        ) {
             revert DragonTokenizedStrategy__ReceiverHasExistingShares();
         }
 

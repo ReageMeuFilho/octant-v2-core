@@ -37,13 +37,16 @@ contract DeployHatsProtocol is Test {
 
     function deploy() public virtual {
         // Start broadcasting transactions
-        vm.startBroadcast();
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        vm.startBroadcast(deployerPrivateKey);
         address deployer = msg.sender;
         // 1. Deploy Hats protocol
         HATS = new Hats(PROTOCOL_NAME, BASE_IMAGE_URI);
           // Deploy DragonHatter with branch hat ID
 
-
+        console2.log("HATS deployed");
+        console2.log("HATS address:", address(HATS));
+        console2.log("Deployer address:", deployer);
         // 2. Create TopHat (1) and mint to deployer
         topHatId = HATS.mintTopHat(
             deployer,

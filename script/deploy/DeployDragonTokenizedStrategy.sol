@@ -14,7 +14,8 @@ contract DeployDragonTokenizedStrategy is Test {
     DragonTokenizedStrategy public dragonTokenizedStrategySingleton;
 
     function deploy() public virtual {
-        vm.startBroadcast();
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        vm.startBroadcast(deployerPrivateKey);
         dragonTokenizedStrategySingleton = new DragonTokenizedStrategy();
         vm.stopBroadcast();
     }
