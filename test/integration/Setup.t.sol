@@ -423,9 +423,9 @@ contract SetupIntegrationTest is Test, TestPlus {
         // Fork mainnet
         vm.createSelectFork(vm.envString("TEST_RPC_URL"));
 
-        // Get deployer address from private key
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        deployer = vm.addr(deployerPrivateKey);
+        // Generate a new private key using Anvil's createKey cheatcode
+        (address _deployer, uint256 deployerPrivateKey) = makeAddrAndKey("deployer");
+        deployer = _deployer;
 
         // Remember the key so we can use it in prank mode
         vm.rememberKey(deployerPrivateKey);
