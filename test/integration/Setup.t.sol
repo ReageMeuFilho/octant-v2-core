@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { Test, Vm } from "forge-std/Test.sol";
-import { console2 } from "forge-std/console2.sol";
+import "forge-std/Test.sol";
 import { TestPlus } from "lib/solady/test/utils/TestPlus.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MockYieldSource } from "test/mocks/MockYieldSource.sol";
