@@ -763,7 +763,10 @@ abstract contract TokenizedStrategy {
                     ),
                     TokenizedStrategy__TransferFailed()
                 );
-                require(_asset.balanceOf(address(this)) == previousBalance + assets, TokenizedStrategy__TransferFailed());
+                require(
+                    _asset.balanceOf(address(this)) == previousBalance + assets,
+                    TokenizedStrategy__TransferFailed()
+                );
             }
         } else {
             if (address(_asset) == ETH) {

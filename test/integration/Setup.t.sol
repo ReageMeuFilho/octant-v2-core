@@ -19,18 +19,11 @@ import { DragonRouter } from "src/dragons/DragonRouter.sol";
 import { SplitChecker } from "src/dragons/SplitChecker.sol";
 import { DragonTokenizedStrategy } from "src/dragons/vaults/DragonTokenizedStrategy.sol";
 import { ModuleProxyFactory } from "src/dragons/ModuleProxyFactory.sol";
-import {LibString} from "solady/utils/LibString.sol";
+import { LibString } from "solady/utils/LibString.sol";
 
-import { 
-    TokenizedStrategy__StrategyNotInShutdown,
-    TokenizedStrategy__NotEmergencyAuthorized, 
-    TokenizedStrategy__HatsAlreadyInitialized, 
-    TokenizedStrategy__NotKeeperOrManagement, 
-    TokenizedStrategy__NotManagement 
-} from "src/errors.sol";
+import { TokenizedStrategy__StrategyNotInShutdown, TokenizedStrategy__NotEmergencyAuthorized, TokenizedStrategy__HatsAlreadyInitialized, TokenizedStrategy__NotKeeperOrManagement, TokenizedStrategy__NotManagement } from "src/errors.sol";
 
-contract SetupIntegrationTest is Test, TestPlus
-{
+contract SetupIntegrationTest is Test, TestPlus {
     uint256 constant TEST_THRESHOLD = 3;
     uint256 constant TEST_TOTAL_OWNERS = 5;
     address constant SAFE_SINGLETON = 0x41675C099F32341bf84BFc5382aF534df5C7461a;
@@ -73,7 +66,7 @@ contract SetupIntegrationTest is Test, TestPlus
     uint256 public dragonAdminHatId;
     uint256 public branchHatId;
     /// ===================================================
-    
+
     /// ============ DeployMockStrategy ===================
     MockStrategy public mockStrategySingleton;
     IMockStrategy public mockStrategyProxy;
@@ -104,7 +97,7 @@ contract SetupIntegrationTest is Test, TestPlus
         vm.label(address(HATS), "Hats Protocol");
         vm.label(address(dragonHatter), "Dragon Hatter");
         vm.label(address(simpleEligibilityAndToggle), "SimpleEligibilityAndToggle");
-        
+
         // Add Mock Strategy labels
         vm.label(address(mockStrategySingleton), "MockStrategy Implementation");
         vm.label(address(mockStrategyProxy), "MockStrategy Proxy");
@@ -117,13 +110,13 @@ contract SetupIntegrationTest is Test, TestPlus
     uint32 public constant DEFAULT_MAX_SUPPLY = 5;
     uint256 public constant DEFAULT_THRESHOLD = 5;
     uint256 public constant DEFAULT_TOTAL_OWNERS = 9;
-    
+
     using LibString for uint256;
     using LibString for address;
-    
+
     function deploy() public {
         // Deploy everything as the current msg.sender (should be the deployer from setUp)
-        
+
         // Deploy Safe first as it will be the admin
         _deploySafe();
 
@@ -133,23 +126,19 @@ contract SetupIntegrationTest is Test, TestPlus
         // Deploy remaining components
         _deployDragonTokenizedStrategy();
         _deployDragonRouter();
-        
-        // Deploy mock strategy 
-        _deployMockStrategy(
-            safeAddress,
-            dragonTokenizedStrategyAddress,
-            dragonRouterProxyAddress
-        );
+
+        // Deploy mock strategy
+        _deployMockStrategy(safeAddress, dragonTokenizedStrategyAddress, dragonRouterProxyAddress);
     }
-    
+
     // Modified implementation that skips broadcasting
     function _deploySafe() internal {
         // The caller should have already started a prank as the deployer
-    
+
         // Use setup from test parameters
         uint256 configuredThreshold = TEST_THRESHOLD;
         uint256 configuredTotalOwners = TEST_TOTAL_OWNERS;
-        
+
         // Check if owners are already set up
         if (owners.length == 0) {
             // Generate owner addresses from environment or use test owners
@@ -160,7 +149,7 @@ contract SetupIntegrationTest is Test, TestPlus
             safeProxyFactory = SAFE_PROXY_FACTORY;
             threshold = configuredThreshold;
             totalOwners = configuredTotalOwners;
-            
+
             // Clear and set owners
             delete owners;
             for (uint256 i = 0; i < _owners.length; i++) {
@@ -191,22 +180,18 @@ contract SetupIntegrationTest is Test, TestPlus
 
         // Store deployed Safe
         deployedSafe = Safe(payable(address(proxy)));
-        
+
         // Make sure we save the address for the mock strategy deployment
         safeAddress = address(deployedSafe);
     }
-    
+
     // Modified implementation that skips broadcasting
     function _deployHatsProtocol() internal {
         // 1. Deploy Hats protocol
         HATS = new Hats(PROTOCOL_NAME, BASE_IMAGE_URI);
-        
+
         // 2. Create TopHat (1) and mint to deployer
-        topHatId = HATS.mintTopHat(
-            deployer,
-            "Dragon Protocol Top Hat",
-            string.concat(BASE_IMAGE_URI, "tophat")
-        );
+        topHatId = HATS.mintTopHat(deployer, "Dragon Protocol Top Hat", string.concat(BASE_IMAGE_URI, "tophat"));
 
         // Deploy simple eligibility and toggle module
         simpleEligibilityAndToggle = new SimpleEligibilityAndToggle();
@@ -221,7 +206,7 @@ contract SetupIntegrationTest is Test, TestPlus
             true,
             string.concat(BASE_IMAGE_URI, "autonomous")
         );
-        
+
         // 4. Create Dragon Admin Hat (1.1.1)
         dragonAdminHatId = HATS.createHat(
             autonomousAdminHatId,
@@ -232,7 +217,7 @@ contract SetupIntegrationTest is Test, TestPlus
             true,
             string.concat(BASE_IMAGE_URI, "dragon-admin")
         );
-        
+
         // Mint Dragon Admin hat to deployer
         HATS.mintHat(dragonAdminHatId, deployer);
 
@@ -243,16 +228,12 @@ contract SetupIntegrationTest is Test, TestPlus
             DEFAULT_MAX_SUPPLY,
             address(simpleEligibilityAndToggle),
             address(simpleEligibilityAndToggle),
-            true,          
-            ""            
+            true,
+            ""
         );
 
         // Deploy DragonHatter with branch hat ID
-        dragonHatter = new DragonHatter(
-            address(HATS),
-            dragonAdminHatId,
-            branchHatId
-        );
+        dragonHatter = new DragonHatter(address(HATS), dragonAdminHatId, branchHatId);
 
         // Mint branch hat to DragonHatter
         HATS.mintHat(branchHatId, address(dragonHatter));
@@ -265,42 +246,42 @@ contract SetupIntegrationTest is Test, TestPlus
         dragonHatter.grantRole(dragonHatter.MANAGEMENT_ROLE(), deployer);
         dragonHatter.grantRole(dragonHatter.EMERGENCY_ROLE(), deployer);
         dragonHatter.grantRole(dragonHatter.REGEN_GOVERNANCE_ROLE(), deployer);
-        
+
         vm.label(address(dragonHatter), "DragonHatter");
-        vm.label(address(simpleEligibilityAndToggle), "SimpleEligibilityAndToggle");    
+        vm.label(address(simpleEligibilityAndToggle), "SimpleEligibilityAndToggle");
         vm.label(deployer, "Deployer");
     }
-    
+
     // Modified implementation that skips broadcasting
     function _deployDragonTokenizedStrategy() internal {
         // The caller should start prank with the right deployer account
-        
+
         // Deploy DragonTokenizedStrategy implementation
         dragonTokenizedStrategySingleton = new DragonTokenizedStrategy();
-        
+
         // Make sure we save the address for the mock strategy deployment
         dragonTokenizedStrategyAddress = address(dragonTokenizedStrategySingleton);
     }
-    
+
     // Modified implementation that skips broadcasting
     function _deployDragonRouter() internal {
         // Deploy module proxy factory if not already deployed
         if (address(moduleProxyFactory) == address(0)) {
             _deployModuleProxyFactory();
         }
-        
+
         // Deploy DragonRouter implementation
         dragonRouterSingleton = new DragonRouter();
-        
+
         // Deploy SplitChecker implementation
         splitCheckerSingleton = new SplitChecker();
-        
+
         // Initialize SplitChecker first
         bytes memory initSplitCheckerData = abi.encodeWithSignature(
             "initialize(address,uint256,uint256)",
-            deployer,      // governance
-            0.2e18,       // maxOpexSplit (20%)
-            0.5e18        // minMetapoolSplit (50%)
+            deployer, // governance
+            0.2e18, // maxOpexSplit (20%)
+            0.5e18 // minMetapoolSplit (50%)
         );
 
         address splitCheckerProxyAddr = moduleProxyFactory.deployModule(
@@ -308,46 +289,46 @@ contract SetupIntegrationTest is Test, TestPlus
             initSplitCheckerData,
             block.timestamp
         );
-        
+
         splitCheckerProxy = SplitChecker(payable(splitCheckerProxyAddr));
-        
+
         // Prepare initialization parameters for router
         address[] memory _strategies = new address[](0); // Empty array for initial setup
         address[] memory _assets = new address[](0); // Empty array for initial setup
-        
+
         bytes memory routerParams = abi.encode(
-            _strategies,           // strategy array
-            _assets,              // asset array
-            deployer,             // governance
-            deployer,             // regen_governance
+            _strategies, // strategy array
+            _assets, // asset array
+            deployer, // governance
+            deployer, // regen_governance
             address(splitCheckerProxy), // splitChecker
-            address(deployedSafe),  // opexVault
-            address(deployedSafe)   // metapool (using safe address temporarily)
+            address(deployedSafe), // opexVault
+            address(deployedSafe) // metapool (using safe address temporarily)
         );
-        
+
         // Deploy router proxy
         bytes memory initRouterData = abi.encodeWithSignature(
             "setUp(bytes)",
             abi.encode(address(deployedSafe), routerParams)
         );
-        
+
         address routerProxy = moduleProxyFactory.deployModule(
             address(dragonRouterSingleton),
             initRouterData,
             block.timestamp
         );
-        
+
         dragonRouterProxy = DragonRouter(payable(routerProxy));
-        
+
         // Make sure we save the address for the mock strategy deployment
         dragonRouterProxyAddress = address(dragonRouterProxy);
     }
-    
+
     // Modified implementation that skips broadcasting
     function _deployModuleProxyFactory() internal {
         moduleProxyFactory = new ModuleProxyFactory();
     }
-    
+
     // Modified implementation that skips broadcasting
     function _deployMockStrategy(
         address _safeAddress,
@@ -358,10 +339,10 @@ contract SetupIntegrationTest is Test, TestPlus
         safeAddress = _safeAddress;
         dragonTokenizedStrategyAddress = _dragonTokenizedStrategyAddress;
         dragonRouterProxyAddress = _dragonRouterProxyAddress;
-        
+
         // Deploy test token
         token = new MockERC20();
-        
+
         // Deploy implementation
         mockStrategySingleton = new MockStrategy();
 
@@ -370,7 +351,6 @@ contract SetupIntegrationTest is Test, TestPlus
 
         uint256 _maxReportDelay = 1 days;
         string memory _name = "Mock Dragon Strategy";
-
 
         // Prepare initialization data
         bytes memory strategyParams = abi.encode(
@@ -385,41 +365,30 @@ contract SetupIntegrationTest is Test, TestPlus
             safeAddress // regenGovernance
         );
 
-        bytes memory initData = abi.encodeWithSignature(
-            "setUp(bytes)", 
-            abi.encode(safeAddress, strategyParams)
-        );
+        bytes memory initData = abi.encodeWithSignature("setUp(bytes)", abi.encode(safeAddress, strategyParams));
 
-        
         // Deploy and enable module on safe
-        address proxy = moduleProxyFactory.deployModule(
-            address(mockStrategySingleton),
-            initData,
-            block.timestamp
-        );
+        address proxy = moduleProxyFactory.deployModule(address(mockStrategySingleton), initData, block.timestamp);
 
         console2.log("MockStrategy Proxy Address:", address(proxy));
         mockStrategyProxy = IMockStrategy(payable(address(proxy)));
 
         // Enable the module on the Safe
-        bytes memory enableModuleData = abi.encodeWithSignature(
-            "enableModule(address)",
-            address(mockStrategyProxy)
-        );
-        
+        bytes memory enableModuleData = abi.encodeWithSignature("enableModule(address)", address(mockStrategyProxy));
+
         // Execute the enableModule transaction through the Safe
         // First sign with required number of owners
         address[] memory owners = deployedSafe.getOwners();
         bytes32 txHash = deployedSafe.getTransactionHash(
-            safeAddress,  // to
-            0,           // value
+            safeAddress, // to
+            0, // value
             enableModuleData, // data
             Enum.Operation.Call, // operation
-            0,           // safeTxGas
-            0,           // baseGas
-            0,           // gasPrice
-            address(0),  // gasToken
-            address(0),  // refundReceiver
+            0, // safeTxGas
+            0, // baseGas
+            0, // gasPrice
+            address(0), // gasToken
+            address(0), // refundReceiver
             deployedSafe.nonce() // nonce
         );
 
@@ -432,20 +401,20 @@ contract SetupIntegrationTest is Test, TestPlus
 
         // Execute transaction
         bool success = deployedSafe.execTransaction(
-            safeAddress,  // to
-            0,           // value
+            safeAddress, // to
+            0, // value
             enableModuleData, // data
             Enum.Operation.Call, // operation
-            0,           // safeTxGas
-            0,           // baseGas
-            0,           // gasPrice
-            address(0),  // gasToken
-            payable(address(0)),  // refundReceiver
-            signatures  // signatures
+            0, // safeTxGas
+            0, // baseGas
+            0, // gasPrice
+            address(0), // gasToken
+            payable(address(0)), // refundReceiver
+            signatures // signatures
         );
-        
+
         require(success, "Failed to enable module");
-        
+
         // Verify the module was enabled
         require(deployedSafe.isModuleEnabled(address(mockStrategyProxy)), "Module not enabled");
     }
@@ -453,21 +422,21 @@ contract SetupIntegrationTest is Test, TestPlus
     function setUp() public virtual {
         // Fork mainnet
         vm.createSelectFork(vm.envString("TEST_RPC_URL"));
-        
+
         // Get deployer address from private key
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         deployer = vm.addr(deployerPrivateKey);
-        
+
         // Remember the key so we can use it in prank mode
         vm.rememberKey(deployerPrivateKey);
-        
+
         // Set ourselves as the deployer and run deployment
         vm.startPrank(deployer);
         deploy();
-        
+
         // Add labels
         addLabels();
-        
+
         // Verify deployment
         require(address(deployedSafe) != address(0), "Safe not deployed");
         require(deployedSafe.getThreshold() == TEST_THRESHOLD, "Invalid threshold");
@@ -479,7 +448,7 @@ contract SetupIntegrationTest is Test, TestPlus
         require(address(splitCheckerSingleton) != address(0), "SplitChecker not deployed");
         require(address(HATS) != address(0), "Hats Protocol not deployed");
         require(address(dragonHatter) != address(0), "DragonHatter not deployed");
-        
+
         // End the prank
         vm.stopPrank();
     }
@@ -500,11 +469,11 @@ contract SetupIntegrationTest is Test, TestPlus
             // Use a different seed for each owner to ensure uniqueness
             bytes32 seed = keccak256(abi.encodePacked("owner", i, block.timestamp));
             uint256 privateKey = uint256(seed);
-            
+
             // Make sure the private key is valid (less than curve order)
             privateKey = privateKey % 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141;
             if (privateKey == 0) privateKey = 1;
-            
+
             address owner = vm.addr(privateKey);
             _owners[i] = owner;
             privateKeys[i] = privateKey;
