@@ -78,13 +78,13 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         address user,
         uint256 lockupDuration,
         uint256 totalSharesLocked
-    ) internal returns (uint256) {
+    ) internal {
         LockupInfo storage lockup = S.voluntaryLockups[user];
         uint256 currentTime = block.timestamp;
 
         // NOTE: if there is no lockup, and the lockup duration not 0 then set a new lockup
         if (lockup.unlockTime <= currentTime) {
-            if (lockupDuration == 0) return 0;
+            if (lockupDuration == 0) return;
             // NOTE: enforce minimum lockup duration for new lockups
             if (lockupDuration < _strategyStorage().MINIMUM_LOCKUP_DURATION) {
                 revert DragonTokenizedStrategy__InsufficientLockupDuration();
@@ -110,7 +110,6 @@ contract DragonTokenizedStrategy is TokenizedStrategy {
         }
 
         emit NewLockupSet(user, lockup.unlockTime, lockup.lockedShares);
-        return lockup.lockedShares;
     }
 
     /**
