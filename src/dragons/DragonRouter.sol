@@ -212,9 +212,9 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
     /**
      * @notice Updates the metapool address
      * @param _metapool New metapool address
-     * @dev Only callable by accounts with DEFAULT_ADMIN_ROLE
+     * @dev Only callable by accounts with GOVERNANCE_ROLE
      */
-    function setMetapool(address _metapool) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setMetapool(address _metapool) external onlyRole(GOVERNANCE_ROLE) {
         _setMetapool(_metapool);
     }
 
