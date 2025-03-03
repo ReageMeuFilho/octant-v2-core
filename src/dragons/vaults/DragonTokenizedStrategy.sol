@@ -65,27 +65,6 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
         super._strategyStorage().RAGE_QUIT_COOLDOWN_PERIOD = _rageQuitCooldownPeriod;
     }
 
-<<<<<<< HEAD
-    /**
-     * @inheritdoc IDragonTokenizedStrategy
-     */
-    function minimumLockupDuration() external view override returns (uint256) {
-        return _strategyStorage().MINIMUM_LOCKUP_DURATION;
-    }
-
-    /**
-     * @inheritdoc IDragonTokenizedStrategy
-     */
-    function rageQuitCooldownPeriod() external view override returns (uint256) {
-        return _strategyStorage().RAGE_QUIT_COOLDOWN_PERIOD;
-    }
-
-    /**
-     * @inheritdoc IDragonTokenizedStrategy
-     */
-    function regenGovernance() external view override returns (address) {
-        return _strategyStorage().REGEN_GOVERNANCE;
-=======
     function minimumLockupDuration() external view returns (uint256) {
         return super._strategyStorage().MINIMUM_LOCKUP_DURATION;
     }
@@ -96,7 +75,6 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
 
     function regenGovernance() external view returns (address) {
         return super._strategyStorage().REGEN_GOVERNANCE;
->>>>>>> 5cfe4bc (refactor(DragonTokenizedStrategy): eliminate non-explicit calls to superclass)
     }
 
     /**
@@ -170,38 +148,23 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
     /**
      * @inheritdoc IDragonTokenizedStrategy
      */
-<<<<<<< HEAD
-    function unlockedShares(address user) external view override returns (uint256) {
-        StrategyData storage S = _strategyStorage();
-=======
     function unlockedShares(address user) external view returns (uint256) {
         StrategyData storage S = super._strategyStorage();
->>>>>>> 5cfe4bc (refactor(DragonTokenizedStrategy): eliminate non-explicit calls to superclass)
         return _userUnlockedShares(S, user);
     }
 
     /**
      * @inheritdoc IDragonTokenizedStrategy
      */
-<<<<<<< HEAD
-    function getUnlockTime(address user) external view override returns (uint256) {
-        return _strategyStorage().voluntaryLockups[user].unlockTime;
-=======
     function getUnlockTime(address user) external view returns (uint256) {
         return super._strategyStorage().voluntaryLockups[user].unlockTime;
->>>>>>> 5cfe4bc (refactor(DragonTokenizedStrategy): eliminate non-explicit calls to superclass)
     }
 
     /**
      * @inheritdoc IDragonTokenizedStrategy
      */
-<<<<<<< HEAD
-    function getRemainingCooldown(address user) external view override returns (uint256 remainingTime) {
-        uint256 unlockTime = _strategyStorage().voluntaryLockups[user].unlockTime;
-=======
     function getRemainingCooldown(address user) external view returns (uint256 remainingTime) {
         uint256 unlockTime = super._strategyStorage().voluntaryLockups[user].unlockTime;
->>>>>>> 5cfe4bc (refactor(DragonTokenizedStrategy): eliminate non-explicit calls to superclass)
         if (unlockTime <= block.timestamp) {
             return 0;
         }
@@ -240,13 +203,8 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
     /**
      * @inheritdoc IDragonTokenizedStrategy
      */
-<<<<<<< HEAD
-    function initiateRageQuit() external override {
-        StrategyData storage S = _strategyStorage();
-=======
     function initiateRageQuit() external {
         StrategyData storage S = super._strategyStorage();
->>>>>>> 5cfe4bc (refactor(DragonTokenizedStrategy): eliminate non-explicit calls to superclass)
         LockupInfo storage lockup = S.voluntaryLockups[msg.sender];
 
         if (super._balanceOf(S, msg.sender) == 0) revert DragonTokenizedStrategy__NoSharesToRageQuit();
@@ -294,14 +252,17 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
     /**
      * @inheritdoc IERC4626Payable
      */
-    function maxWithdraw(address _owner) external view override returns (uint256) {
+    function maxWithdraw(address _owner) external view override(TokenizedStrategy, IERC4626Payable) returns (uint256) {
         return _maxWithdraw(super._strategyStorage(), _owner);
     }
 
     /**
      * @inheritdoc ITokenizedStrategy
      */
-    function maxWithdraw(address _owner, uint256 /*maxLoss*/) external view override returns (uint256) {
+    function maxWithdraw(
+        address _owner,
+        uint256 /*maxLoss*/
+    ) external view override(TokenizedStrategy, ITokenizedStrategy) returns (uint256) {
         return _maxWithdraw(super._strategyStorage(), _owner);
     }
 
@@ -365,7 +326,7 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
     function deposit(
         uint256 assets,
         address receiver
-    ) external payable override onlyOperatorIfDragonMode returns (uint256 shares) {
+    ) external payable override(TokenizedStrategy, IERC4626Payable) onlyOperatorIfDragonMode returns (uint256 shares) {
         shares = _depositWithLockup(assets, receiver, 0);
     }
 
@@ -419,7 +380,7 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
     function mint(
         uint256 shares,
         address receiver
-    ) external payable override onlyOperatorIfDragonMode returns (uint256 assets) {
+    ) external payable override(TokenizedStrategy, IERC4626Payable) onlyOperatorIfDragonMode returns (uint256 assets) {
         assets = _mintWithLockup(shares, receiver, 0);
     }
 
@@ -447,10 +408,7 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
         uint256 lockupDuration
     ) internal returns (uint256 assets) {
         StrategyData storage S = super._strategyStorage();
-        if ((assets = super._convertToAssets(S, shares, Math.Rounding.Ceil)) == 0) {
-            revert ZeroAssets();
-        }
-
+        require((assets = super._convertToAssets(S, shares, Math.Rounding.Ceil)) != 0, ZeroAssets());
         _depositWithLockup(assets, receiver, lockupDuration);
         return assets;
     }
