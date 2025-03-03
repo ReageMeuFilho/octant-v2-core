@@ -25,7 +25,6 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
     //////////////////////////////////////////////////////////////*/
 
     uint256 private constant SPLIT_PRECISION = 1e18;
-    bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
     bytes32 public constant GOVERNANCE_ROLE = keccak256("OCTANT_GOVERNANCE_ROLE");
     bytes32 public constant REGEN_GOVERNANCE_ROLE = keccak256("REGEN_GOVERNANCE_ROLE");
     bytes32 public constant SPLIT_DISTRIBUTOR_ROLE = keccak256("SPLIT_DISTRIBUTOR_ROLE");
@@ -97,6 +96,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
     error StrategyNotDefined();
     error InvalidAmount();
     error ZeroAddress();
+    error ZeroAssetAddress();
     error NoShares();
     error CooldownPeriodNotPassed();
     error TransferFailed();
@@ -141,7 +141,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
         split.totalAllocations = SPLIT_PRECISION;
 
         strategies = _strategy;
-        _grantRole(OWNER_ROLE, _owner);
+        _grantRole(DEFAULT_ADMIN_ROLE, _owner);
         _grantRole(GOVERNANCE_ROLE, _governance);
         _grantRole(REGEN_GOVERNANCE_ROLE, _regen_governance);
     }
@@ -153,18 +153,26 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
     /**
      * @notice Adds a new strategy to the router
      * @param _strategy Address of the strategy to add
-     * @dev Only callable by accounts with OWNER_ROLE
+     * @dev Only callable by accounts with DEFAULT_ADMIN_ROLE
      * @dev Strategy must not already be added
      */
-    function addStrategy(address _strategy) external onlyRole(OWNER_ROLE) {
-        StrategyData storage _stratData = strategyData[_strategy];
+
+    function addStrategy(address _strategy) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        StrategyData memory _stratData = strategyData[_strategy];
         if (_stratData.asset != address(0)) revert AlreadyAdded();
+
+        address asset = ITokenizedStrategy(_strategy).asset();
+
+        // check if asset is different from address(0)
+        if (asset == address(0)) revert ZeroAssetAddress();
 
         for (uint256 i = 0; i < split.recipients.length; i++) {
             userData[split.recipients[i]][_strategy].splitPerShare = split.allocations[i];
         }
 
         _stratData.totalShares = split.totalAllocations;
+        _stratData.asset = asset;
+
         strategies.push(_strategy);
 
         emit StrategyAdded(_strategy);
@@ -173,10 +181,10 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
     /**
      * @notice Removes a strategy from the router
      * @param _strategy Address of the strategy to remove
-     * @dev Only callable by accounts with OWNER_ROLE
+     * @dev Only callable by accounts with DEFAULT_ADMIN_ROLE
      * @dev Strategy must exist in the router
      */
-    function removeStrategy(address _strategy) external onlyRole(OWNER_ROLE) {
+    function removeStrategy(address _strategy) external onlyRole(DEFAULT_ADMIN_ROLE) {
         StrategyData storage _stratData = strategyData[_strategy];
         if (_stratData.asset == address(0)) revert StrategyNotDefined();
 
@@ -204,36 +212,36 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
     /**
      * @notice Updates the metapool address
      * @param _metapool New metapool address
-     * @dev Only callable by accounts with OWNER_ROLE
+     * @dev Only callable by accounts with DEFAULT_ADMIN_ROLE
      */
-    function setMetapool(address _metapool) external onlyRole(OWNER_ROLE) {
+    function setMetapool(address _metapool) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _setMetapool(_metapool);
     }
 
     /**
      * @notice Updates the opex vault address
      * @param _opexVault New opex vault address
-     * @dev Only callable by accounts with OWNER_ROLE
+     * @dev Only callable by accounts with DEFAULT_ADMIN_ROLE
      */
-    function setOpexVault(address _opexVault) external onlyRole(OWNER_ROLE) {
+    function setOpexVault(address _opexVault) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _setOpexVault(_opexVault);
     }
 
     /**
      * @notice Updates the split delay
      * @param _splitDelay New split delay in seconds
-     * @dev Only callable by accounts with OWNER_ROLE
+     * @dev Only callable by accounts with DEFAULT_ADMIN_ROLE
      */
-    function setSplitDelay(uint256 _splitDelay) external onlyRole(OWNER_ROLE) {
+    function setSplitDelay(uint256 _splitDelay) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _setSplitDelay(_splitDelay);
     }
 
     /**
      * @notice Updates the split checker contract address
      * @param _splitChecker New split checker contract address
-     * @dev Only callable by accounts with OWNER_ROLE
+     * @dev Only callable by accounts with DEFAULT_ADMIN_ROLE
      */
-    function setSplitChecker(address _splitChecker) external onlyRole(GOVERNANCE_ROLE) {
+    function setSplitChecker(address _splitChecker) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _setSplitChecker(_splitChecker);
     }
 
@@ -286,6 +294,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
      */
     function fundFromSource(address strategy, uint256 amount) external onlyRole(SPLIT_DISTRIBUTOR_ROLE) nonReentrant {
         StrategyData storage data = strategyData[strategy];
+
         if (data.asset == address(0)) revert ZeroAddress();
 
         ITokenizedStrategy(strategy).withdraw(amount, address(this), address(this), 0);
@@ -297,9 +306,9 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
     /**
      * @notice Sets the split for the router
      * @param _split The split to set
-     * @dev Only callable by accounts with OWNER_ROLE
+     * @dev Only callable by accounts with DEFAULT_ADMIN_ROLE
      */
-    function setSplit(Split memory _split) external onlyRole(OWNER_ROLE) {
+    function setSplit(Split memory _split) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (block.timestamp - lastSetSplitTime < DRAGON_SPLIT_COOLDOWN_PERIOD) revert CooldownPeriodNotPassed();
         splitChecker.checkSplit(_split, opexVault, metapool);
 
@@ -358,7 +367,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
      * @param _amount The amount of split to update
      */
     function _updateUserSplit(address _user, address _strategy, uint256 _amount) internal {
-        UserData storage _userData = userData[msg.sender][_strategy];
+        UserData storage _userData = userData[_user][_strategy];
         _userData.assets = balanceOf(_user, _strategy) - _amount;
         _userData.userAssetPerShare = strategyData[_strategy].assetPerShare;
     }
