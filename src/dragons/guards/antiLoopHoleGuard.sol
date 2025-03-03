@@ -5,6 +5,8 @@ import { BaseGuard } from "zodiac/guard/BaseGuard.sol";
 import { Enum } from "zodiac/interfaces/IAvatar.sol";
 import { FactoryFriendly } from "zodiac/factory/FactoryFriendly.sol";
 
+error AntiLoopholeGuard__LockPeriodNotEnded();
+
 contract AntiLoopholeGuard is FactoryFriendly, BaseGuard {
     uint256 public lockEndTime;
     uint256 public constant LOCK_DURATION = 25 days;
@@ -65,7 +67,7 @@ contract AntiLoopholeGuard is FactoryFriendly, BaseGuard {
     }
 
     function disableGuard() external onlyOwner {
-        require(block.timestamp >= lockEndTime, "Lock period not ended");
+        require(block.timestamp >= lockEndTime, AntiLoopholeGuard__LockPeriodNotEnded());
         if (isDisabled) revert GuardAlreadyDisabled();
         isDisabled = true;
     }

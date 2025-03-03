@@ -6,6 +6,7 @@
   "rules": {
     "imports-on-top": "error",
     "no-global-import": "error",
+    "gas-custom-errors": "error",
     "no-unused-vars": "error",
     "code-complexity": [
       "error",

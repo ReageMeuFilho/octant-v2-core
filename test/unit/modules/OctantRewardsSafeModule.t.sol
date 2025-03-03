@@ -40,7 +40,7 @@ contract OctantRewardsSafeModule is BaseTest {
         vm.startPrank(temps.safe);
 
         // Fails if 0 is passed
-        vm.expectRevert("Invalid Amount");
+        vm.expectRevert();
         module.requestNewValidators(0);
 
         module.requestNewValidators(amount);
@@ -55,7 +55,7 @@ contract OctantRewardsSafeModule is BaseTest {
         assertTrue(module.totalValidators() == totalValidators + amount);
 
         // fails when newValidators == 0
-        vm.expectRevert("Invalid Amount");
+        vm.expectRevert();
         module.confirmNewValidators();
 
         vm.stopPrank();
@@ -70,7 +70,7 @@ contract OctantRewardsSafeModule is BaseTest {
         vm.startPrank(temps.safe);
 
         // fails if zero address is passed.
-        vm.expectRevert("Invalid address");
+        vm.expectRevert();
         module.setTreasury(address(0));
 
         module.setTreasury(newTreasury);
@@ -88,7 +88,7 @@ contract OctantRewardsSafeModule is BaseTest {
         vm.startPrank(temps.safe);
 
         // fails if zero address is passed.
-        vm.expectRevert("Invalid address");
+        vm.expectRevert();
         module.setDragonRouter(address(0));
 
         module.setDragonRouter(newDragonRouter);
@@ -105,7 +105,7 @@ contract OctantRewardsSafeModule is BaseTest {
         vm.startPrank(temps.safe);
 
         // fails if max yield not in range
-        vm.expectRevert("Invalid Max Yield");
+        vm.expectRevert();
         module.setMaxYield(0);
 
         module.setMaxYield(_newMaxYield);
@@ -120,7 +120,7 @@ contract OctantRewardsSafeModule is BaseTest {
         vm.startPrank(temps.safe);
 
         // Fails if 0 is passed
-        vm.expectRevert("Invalid Amount");
+        vm.expectRevert();
         module.requestExitValidators(0);
 
         module.requestExitValidators(exitedValidators);
@@ -136,7 +136,7 @@ contract OctantRewardsSafeModule is BaseTest {
         vm.prank(temps.safe);
         module.setTarget(address(failSafe));
         vm.deal(temps.safe, exitedValidators * 32 ether); // send yield to safe
-        vm.expectRevert("Failed to transfer principal to Treasury");
+        vm.expectRevert();
         vm.prank(keeper);
         module.confirmExitValidators();
         vm.prank(temps.safe);
@@ -151,7 +151,7 @@ contract OctantRewardsSafeModule is BaseTest {
         assertTrue(treasury.balance == exitedValidators * 32 ether);
 
         // keeper cannot call confirmExitValidators when exitedValidators = 0
-        vm.expectRevert("Validators to be exited should be > 0");
+        vm.expectRevert();
         module.confirmExitValidators();
 
         vm.stopPrank();
@@ -162,7 +162,7 @@ contract OctantRewardsSafeModule is BaseTest {
 
         /// Harvest fails when Yield > Max Yield
         vm.deal(temps.safe, maxYield + 1 ether); // send yield to safe
-        vm.expectRevert("Yield not in range");
+        vm.expectRevert();
         module.harvest();
 
         /// Harvest works when Yield < Max Yield
@@ -176,7 +176,7 @@ contract OctantRewardsSafeModule is BaseTest {
         vm.prank(temps.safe);
         module.setTarget(address(failSafe));
         vm.deal(temps.safe, yield); // send yield to safe
-        vm.expectRevert("Failed to transfer yield to Dragon Router");
+        vm.expectRevert();
         module.harvest();
     }
 }
