@@ -475,4 +475,79 @@ contract DragonTokenizedStrategyTest is BaseTest {
             "Should be able to withdraw all after unlock"
         );
     }
+
+    /// @dev Demonstrates that maxRedeem doesn't revert when totalSupply > totalAssets (underwater scenario)
+    function testMaxRedeemAfterCatastrophicLoss(uint depositAmount, uint lossAmount) public {
+        depositAmount = bound(depositAmount, 2, type(uint128).max);
+        lossAmount = bound(lossAmount, depositAmount / 2, depositAmount - 1);
+
+        // Toggle off dragon-only mode to allow non-dragon deposits
+        vm.prank(operator);
+        module.toggleDragonMode(false);
+
+        // Use an arbitrary receiver address
+        address testReceiver = makeAddr("testReceiver");
+
+        // Deposit to testReceiver
+        vm.deal(testReceiver, depositAmount);
+        vm.prank(testReceiver);
+        module.deposit{ value: depositAmount }(depositAmount, testReceiver);
+
+        // Fast forward past lockup period to allow withdrawals
+        vm.warp(block.timestamp + module.minimumLockupDuration());
+
+        // First, get current totalAssets
+        uint256 currentTotalAssets = module.totalAssets();
+
+        // Mock the report function to return the desired profit and loss values
+        vm.mockCall(
+            address(module),
+            abi.encodeWithSelector(DragonTokenizedStrategy.report.selector),
+            abi.encode(0, lossAmount) // 0 profit, lossAmount loss
+        );
+
+        // After the report, we need to modify the internal accounting
+        vm.mockCall(
+            address(module),
+            abi.encodeWithSelector(module.totalAssets.selector),
+            abi.encode(currentTotalAssets - lossAmount)
+        );
+
+        // Trigger a report to recognize the loss
+        vm.prank(keeper);
+        (uint256 profit, uint256 loss) = module.report();
+
+        // Verify loss was recognized
+        assertEq(loss, lossAmount, "Loss should match simulated amount");
+        assertEq(profit, 0, "Should have no profit");
+
+        // Verify protocol state: totalSupply > totalAssets
+        uint256 totalAssets = module.totalAssets();
+        uint256 totalSupply = module.totalSupply();
+        assertTrue(totalSupply > totalAssets, "Protocol should be in underwater state");
+
+        // Call the actual maxRedeem function (no mocking)
+        uint256 maxRedeemAmount = module.maxRedeem(testReceiver);
+
+        // Verify maxRedeem returns the correct value
+        assertEq(maxRedeemAmount, module.balanceOf(testReceiver), "maxRedeem should return correct share amount");
+
+        // Get the initial balance before redeeming
+        uint256 initialBalance = address(testReceiver).balance;
+
+        // Verify user can actually redeem shares
+        vm.prank(testReceiver);
+        uint256 assetsReceived = module.redeem(maxRedeemAmount, testReceiver, testReceiver);
+
+        // Verify the assets received matches the balance change
+        uint256 finalBalance = address(testReceiver).balance;
+        assertEq(finalBalance - initialBalance, assetsReceived, "Balance change should match reported assets received");
+
+        // Verify shares were burned
+        assertEq(module.balanceOf(testReceiver), 0, "All user shares should be burned after redemption");
+
+        // Get the shares of dragon router
+        uint256 dragonRouterShares = module.balanceOf(module.dragonRouter());
+        assertEq(dragonRouterShares, 0, "Dragon router should have no shares");
+    }
 }
