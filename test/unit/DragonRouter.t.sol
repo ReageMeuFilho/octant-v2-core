@@ -5,16 +5,29 @@ import "../../lib/openzeppelin-contracts/contracts/utils/Strings.sol";
 import "forge-std/Test.sol";
 import "src/dragons/SplitChecker.sol";
 import { DragonRouter } from "src/dragons/DragonRouter.sol";
+import { MockStrategy } from "test/mocks/MockStrategy.sol";
+import { MockDragonRouterTesting } from "test/mocks/MockDragonRouterTesting.sol";
+import { MockNativeTransformer } from "test/mocks/MockNativeTransformer.sol";
+import { ISplitChecker } from "src/interfaces/ISplitChecker.sol";
+import { ITransformer } from "src/interfaces/ITransformer.sol";
+import { IDragonRouter } from "src/interfaces/IDragonRouter.sol";
+import { MockDragonRouterTesting } from "test/mocks/MockDragonRouterTesting.sol";
+import { MockNativeTransformer } from "test/mocks/MockNativeTransformer.sol";
+import { ISplitChecker } from "src/interfaces/ISplitChecker.sol";
+import { ITransformer } from "src/interfaces/ITransformer.sol";
+import { IDragonRouter } from "src/interfaces/IDragonRouter.sol";
+
 import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC4626 } from "lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
+import { DragonRouter } from "src/dragons/DragonRouter.sol";
 
 import { ITransformer } from "src/interfaces/ITransformer.sol";
 import { MockDragonRouterTesting } from "test/mocks/MockDragonRouterTesting.sol";
 import { MockNativeTransformer } from "test/mocks/MockNativeTransformer.sol";
 import { MockStrategy } from "test/mocks/MockStrategy.sol";
-import { Split } from "src/interfaces/ISplitChecker.sol";
+import { ISplitChecker } from "src/interfaces/ISplitChecker.sol";
 import { AccessControl } from "../../lib/openzeppelin-contracts/contracts/access/AccessControl.sol";
 
 contract DragonRouterTest is Test {
@@ -121,7 +134,7 @@ contract DragonRouterTest is Test {
                 1 ether, // assets (1 ETH balance)
                 0, // userAssetPerShare
                 1e18, // splitPerShare (100%)
-                DragonRouter.Transformer(ITransformer(address(0)), address(0)), // no transformer
+                IDragonRouter.Transformer(ITransformer(address(0)), address(0)), // no transformer
                 false // allowBotClaim
             );
         }
@@ -193,7 +206,7 @@ contract DragonRouterTest is Test {
         );
 
         // Try to add it again - this should revert with AlreadyAdded because asset is set
-        vm.expectRevert(DragonRouter.AlreadyAdded.selector);
+        vm.expectRevert(IDragonRouter.AlreadyAdded.selector);
         routerTesting.addStrategy(distinctStrategy);
         vm.stopPrank();
     }
@@ -232,10 +245,9 @@ contract DragonRouterTest is Test {
         routerTesting.addStrategy(newStrategy);
         vm.stopPrank();
     }
-
     function test_removeStrategy_reverts_notDefined() public {
         vm.prank(owner);
-        vm.expectRevert(DragonRouter.StrategyNotDefined.selector);
+        vm.expectRevert(IDragonRouter.StrategyNotDefined.selector);
         routerTesting.removeStrategy(makeAddr("nonExistentStrategy"));
     }
 
@@ -318,7 +330,7 @@ contract DragonRouterTest is Test {
             1000, // assets - non-zero balance to pass NoShares check
             1e18, // userAssetPerShare
             1e18, // splitPerShare
-            DragonRouter.Transformer(ITransformer(address(0)), address(0)), // no transformer initially
+            IDragonRouter.Transformer(ITransformer(address(0)), address(0)), // no transformer initially
             false // allowBotClaim
         );
 
@@ -336,7 +348,7 @@ contract DragonRouterTest is Test {
         routerTesting.setTransformerForTest(strategies[0], transformer, targetToken);
 
         // Verify that the transformer was set correctly
-        (, , , DragonRouter.Transformer memory userTransformer, ) = routerTesting.userData(
+        (, , , IDragonRouter.Transformer memory userTransformer, ) = routerTesting.userData(
             userWithBalance,
             strategies[0]
         );
@@ -356,7 +368,7 @@ contract DragonRouterTest is Test {
             0, // assets (zero balance)
             0, // userAssetPerShare
             1e18, // splitPerShare
-            DragonRouter.Transformer(ITransformer(address(0)), address(0)), // no transformer
+            IDragonRouter.Transformer(ITransformer(address(0)), address(0)), // no transformer
             false // allowBotClaim
         );
 
@@ -371,7 +383,7 @@ contract DragonRouterTest is Test {
 
         // Try to set transformer - should revert with NoShares
         vm.prank(zeroBalanceUser);
-        vm.expectRevert(DragonRouter.NoShares.selector);
+        vm.expectRevert(IDragonRouter.NoShares.selector);
         routerTesting.setTransformerForTest(strategies[0], transformer, targetToken);
     }
 
@@ -401,7 +413,7 @@ contract DragonRouterTest is Test {
             100, // assets (direct balance)
             1e18, // userAssetPerShare
             1e18, // splitPerShare (100%)
-            DragonRouter.Transformer(ITransformer(address(0)), address(0)), // no transformer
+            IDragonRouter.Transformer(ITransformer(address(0)), address(0)), // no transformer
             false // allowBotClaim
         );
 
@@ -425,7 +437,6 @@ contract DragonRouterTest is Test {
         uint256 expectedTotal = expectedDirect + expectedClaimable;
         assertEq(balance, expectedTotal, "Balance does not match expected total");
     }
-
     function test_fundFromSource() public {
         // Create asset and deploy mock strategy
         address asset = makeAddr("asset");
@@ -477,7 +488,6 @@ contract DragonRouterTest is Test {
             abi.encodeWithSelector(ITokenizedStrategy.withdraw.selector),
             abi.encode(1000)
         );
-
         // Mock the asset transfer call that would happen from the strategy
         vm.mockCall(
             asset,
@@ -505,10 +515,9 @@ contract DragonRouterTest is Test {
 
     function test_fundFromSource_reverts_zeroAddress() public {
         vm.prank(distributor);
-        vm.expectRevert(DragonRouter.ZeroAddress.selector);
+        vm.expectRevert(IDragonRouter.ZeroAddress.selector);
         routerTesting.fundFromSource(makeAddr("nonExistentStrategy"), 1000);
     }
-
     function test_setSplit() public {
         // Set up a mock split
         address[] memory recipients = new address[](2);
@@ -525,7 +534,9 @@ contract DragonRouterTest is Test {
 
         // No need to mock - using routerTesting which has real implementation
         vm.startPrank(owner);
-        routerTesting.setSplit(Split({ recipients: recipients, allocations: allocations, totalAllocations: 100 }));
+        routerTesting.setSplit(
+            ISplitChecker.Split({ recipients: recipients, allocations: allocations, totalAllocations: 100 })
+        );
         vm.stopPrank();
 
         // Verify the timestamp changed
@@ -542,8 +553,10 @@ contract DragonRouterTest is Test {
         allocations[1] = 70;
 
         vm.prank(owner);
-        vm.expectRevert(DragonRouter.CooldownPeriodNotPassed.selector);
-        routerTesting.setSplit(Split({ recipients: recipients, allocations: allocations, totalAllocations: 100 }));
+        vm.expectRevert(IDragonRouter.CooldownPeriodNotPassed.selector);
+        routerTesting.setSplit(
+            ISplitChecker.Split({ recipients: recipients, allocations: allocations, totalAllocations: 100 })
+        );
     }
 
     function test_claimSplit() public {
@@ -570,7 +583,7 @@ contract DragonRouterTest is Test {
             balance, // assets
             0, // userAssetPerShare
             1e18, // splitPerShare (100%)
-            DragonRouter.Transformer(ITransformer(address(0)), address(0)), // no transformer
+            IDragonRouter.Transformer(ITransformer(address(0)), address(0)), // no transformer
             true // allowBotClaim enabled
         );
 
@@ -580,13 +593,11 @@ contract DragonRouterTest is Test {
             abi.encodeWithSelector(IERC20.transfer.selector, userWithBalance, claimAmount),
             abi.encode(true)
         );
-
         // Test claiming by the user
         vm.prank(userWithBalance);
         vm.expectEmit(true, true, true, true);
         emit SplitClaimed(userWithBalance, strategies[0], claimAmount);
         routerTesting.claimSplit(userWithBalance, strategies[0], claimAmount);
-
         // Set user data for the second claim (reduced balance after first claim)
         routerTesting.setUserDataForTest(
             userWithBalance,
@@ -594,7 +605,7 @@ contract DragonRouterTest is Test {
             balance - claimAmount, // assets reduced by first claim
             0, // userAssetPerShare
             1e18, // splitPerShare (100%)
-            DragonRouter.Transformer(ITransformer(address(0)), address(0)), // no transformer
+            IDragonRouter.Transformer(ITransformer(address(0)), address(0)), // no transformer
             true // allowBotClaim enabled
         );
 
@@ -605,7 +616,6 @@ contract DragonRouterTest is Test {
             abi.encodeWithSelector(IERC20.transfer.selector, userWithBalance, secondClaimAmount),
             abi.encode(true)
         );
-
         // Test claiming by another address (bot)
         address bot = makeAddr("bot");
         vm.prank(bot);
@@ -613,10 +623,9 @@ contract DragonRouterTest is Test {
         emit SplitClaimed(userWithBalance, strategies[0], secondClaimAmount);
         routerTesting.claimSplit(userWithBalance, strategies[0], secondClaimAmount);
     }
-
     function test_claimSplit_reverts_zeroAmount() public {
         vm.prank(user);
-        vm.expectRevert(DragonRouter.InvalidAmount.selector);
+        vm.expectRevert(IDragonRouter.InvalidAmount.selector);
         routerTesting.claimSplit(user, strategies[0], 0);
     }
 
@@ -631,16 +640,15 @@ contract DragonRouterTest is Test {
             1000, // assets
             1e18, // userAssetPerShare
             1e18, // splitPerShare
-            DragonRouter.Transformer(ITransformer(address(0)), address(0)), // no transformer
+            IDragonRouter.Transformer(ITransformer(address(0)), address(0)), // no transformer
             false // allowBotClaim explicitly disabled
         );
 
         // Try claiming from another address (bot)
         vm.prank(bot);
-        vm.expectRevert(DragonRouter.NotAllowed.selector);
+        vm.expectRevert(IDragonRouter.NotAllowed.selector);
         routerTesting.claimSplit(userWithBalance, strategies[0], 100);
     }
-
     function test_claimSplit_reverts_insufficientBalance() public {
         // Set up strategy data first to make sure asset is set
         address testAsset = makeAddr("testAsset");
@@ -661,7 +669,7 @@ contract DragonRouterTest is Test {
             50, // direct assets = 50
             1e18, // userAssetPerShare = 1e18 (same as strategy assetPerShare)
             1e18, // splitPerShare
-            DragonRouter.Transformer(ITransformer(address(0)), address(0)), // no transformer
+            IDragonRouter.Transformer(ITransformer(address(0)), address(0)), // no transformer
             false // allowBotClaim
         );
 
@@ -670,10 +678,9 @@ contract DragonRouterTest is Test {
 
         // Try to claim more than available (balance = 50 + 0 claimable = 50)
         vm.prank(user);
-        vm.expectRevert(DragonRouter.InvalidAmount.selector);
+        vm.expectRevert(IDragonRouter.InvalidAmount.selector);
         routerTesting.claimSplit(user, strategies[0], 100);
     }
-
     function test_updateUserSplit() public {
         address userToUpdate = makeAddr("userToUpdate");
         uint256 balance = 1000;
@@ -681,7 +688,6 @@ contract DragonRouterTest is Test {
         uint256 assetPerShare = 2e18; // Using a higher asset per share to test claimable calculation
         uint256 userAssetPerShare = 1e18; // Initial user asset per share
         address asset = makeAddr("asset");
-
         // Setup data directly with setStrategyDataForTest and setUserDataForTest
         routerTesting.setStrategyDataForTest(
             strategies[0],
@@ -697,7 +703,7 @@ contract DragonRouterTest is Test {
             balance, // assets
             userAssetPerShare, // userAssetPerShare
             1e18, // splitPerShare
-            DragonRouter.Transformer(ITransformer(address(0)), address(0)), // no transformer
+            IDragonRouter.Transformer(ITransformer(address(0)), address(0)), // no transformer
             false // allowBotClaim
         );
 
@@ -730,7 +736,6 @@ contract DragonRouterTest is Test {
         // userData.assets should contain all assets (original + claimable - claimed)
         assertEq(actualAssets, expectedRemainingTotal, "Assets were not updated correctly");
     }
-
     function test_transferSplit() public {
         address recipient = makeAddr("recipient");
         address asset = makeAddr("asset");
@@ -778,7 +783,7 @@ contract DragonRouterTest is Test {
             1000, // assets
             0, // userAssetPerShare
             1e18, // splitPerShare
-            DragonRouter.Transformer(ITransformer(address(0)), address(0)), // No transformer yet
+            IDragonRouter.Transformer(ITransformer(address(0)), address(0)), // No transformer yet
             false // allowBotClaim not used
         );
 
@@ -836,7 +841,7 @@ contract DragonRouterTest is Test {
             0, // assets not used in calculation
             userAssetPerShare, // userAssetPerShare
             userSplitPerShare, // splitPerShare
-            DragonRouter.Transformer(ITransformer(address(0)), address(0)), // no transformer
+            IDragonRouter.Transformer(ITransformer(address(0)), address(0)), // no transformer
             false // allowBotClaim not used in calculation
         );
 
@@ -865,7 +870,6 @@ contract DragonRouterTest is Test {
         for (uint256 i = 0; i < 3; i++) {
             testAssets[i] = makeAddr(string.concat("testAsset", vm.toString(i)));
         }
-
         bytes memory initParams = abi.encode(
             owner,
             abi.encode(
@@ -885,7 +889,6 @@ contract DragonRouterTest is Test {
         assertEq(testRouter.strategies(0), testStrategies[0]);
         assertEq(testRouter.strategies(1), testStrategies[1]);
         assertEq(testRouter.strategies(2), testStrategies[2]);
-
         // Set strategy data directly to be able to remove the strategy
         testRouter.setStrategyDataForTest(
             testStrategies[1], // Middle strategy
@@ -894,7 +897,6 @@ contract DragonRouterTest is Test {
             1000,
             1e18
         );
-
         // Remove the middle strategy
         vm.expectEmit(true, true, true, true);
         emit StrategyRemoved(testStrategies[1]);
@@ -925,7 +927,7 @@ contract DragonRouterTest is Test {
             1000, // assets - non-zero balance
             0, // userAssetPerShare
             1e18, // splitPerShare
-            DragonRouter.Transformer(ITransformer(address(0)), address(0)), // no transformer initially
+            IDragonRouter.Transformer(ITransformer(address(0)), address(0)), // no transformer initially
             false // allowBotClaim
         );
 
@@ -936,7 +938,7 @@ contract DragonRouterTest is Test {
         routerTesting.setTransformerForTest(strategies[0], transformerImpl, targetToken);
 
         // Verify the transformer was set correctly
-        (, , , DragonRouter.Transformer memory userTransformer, ) = routerTesting.userData(
+        (, , , IDragonRouter.Transformer memory userTransformer, ) = routerTesting.userData(
             userWithBalance,
             strategies[0]
         );
@@ -998,7 +1000,7 @@ contract DragonRouterTest is Test {
             0, // No direct assets needed
             0, // No userAssetPerShare needed
             1e18, // Full split share
-            DragonRouter.Transformer(ITransformer(address(nativeTransformer)), nativeToken), // Use native token as target
+            IDragonRouter.Transformer(ITransformer(address(nativeTransformer)), nativeToken), // Use native token as target
             false
         );
 

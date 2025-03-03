@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.8.18;
 
-import { IStrategy } from "src/interfaces/IStrategy.sol";
-
+import { IDragonTokenizedStrategy } from "src/interfaces/IDragonTokenizedStrategy.sol";
+import { IBaseStrategy } from "src/interfaces/IBaseStrategy.sol";
+import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
 // Interface to use during testing that implements the 4626 standard
 // the implementation functions, the Strategies immutable functions
 // as well as the added functions for the Mock Strategy.
-interface IMockStrategy is IStrategy {
+interface IMockStrategy is IDragonTokenizedStrategy, IBaseStrategy {
     function setTrigger(bool _trigger) external;
 
     function onlyLetManagers() external;
@@ -26,4 +27,6 @@ interface IMockStrategy is IStrategy {
     function dontTend() external view returns (bool);
 
     function setDontTend(bool _dontTend) external;
+
+    function unlockedShares() external view returns (uint256);
 }

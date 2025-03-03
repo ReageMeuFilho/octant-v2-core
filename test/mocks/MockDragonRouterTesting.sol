@@ -2,6 +2,8 @@
 pragma solidity ^0.8.25;
 
 import "src/dragons/DragonRouter.sol";
+import { IDragonRouter } from "src/interfaces/IDragonRouter.sol";
+import { ITransformer } from "src/interfaces/ITransformer.sol";
 
 /**
  * @title DragonRouterTesting
@@ -14,14 +16,12 @@ contract MockDragonRouterTesting is DragonRouter {
     function exposed_updateUserSplit(address _user, address _strategy, uint256 _amount) external {
         _updateUserSplit(_user, _strategy, _amount);
     }
-
     /**
      * @dev Exposes the internal _transferSplit function for testing
      */
     function exposed_transferSplit(address _user, address _strategy, uint256 _amount) external {
         _transferSplit(_user, _strategy, _amount);
     }
-
     /**
      * @dev Exposes the internal _claimableAssets function for testing
      */
@@ -46,7 +46,7 @@ contract MockDragonRouterTesting is DragonRouter {
         uint256 _assets,
         uint256 _userAssetPerShare,
         uint256 _splitPerShare,
-        Transformer memory _transformer,
+        IDragonRouter.Transformer memory _transformer,
         bool _allowBotClaim
     ) external {
         UserData storage data = userData[_user][_strategy];
@@ -56,7 +56,6 @@ contract MockDragonRouterTesting is DragonRouter {
         data.transformer = _transformer;
         data.allowBotClaim = _allowBotClaim;
     }
-
     /**
      * @dev Allows direct manipulation of strategyData storage for testing purposes
      * @param _strategy The strategy address
@@ -85,7 +84,7 @@ contract MockDragonRouterTesting is DragonRouter {
      */
     function setTransformerForTest(address strategy, address transformer, address targetToken) external {
         if (balanceOf(msg.sender, strategy) == 0) revert NoShares();
-        userData[msg.sender][strategy].transformer = Transformer(ITransformer(transformer), targetToken);
+        userData[msg.sender][strategy].transformer = IDragonRouter.Transformer(ITransformer(transformer), targetToken);
 
         emit UserTransformerSet(msg.sender, transformer, targetToken);
     }
