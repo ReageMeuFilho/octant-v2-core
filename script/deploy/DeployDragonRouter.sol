@@ -47,7 +47,6 @@ contract DeployDragonRouter is DeploySplitChecker {
                 msg.sender // metapool address
             )
         );
-        address _owner = msg.sender;
 
         // Deploy ProxyAdmin for DragonRouter proxy
         ProxyAdmin proxyAdmin = new ProxyAdmin(msg.sender);
