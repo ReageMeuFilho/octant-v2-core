@@ -750,23 +750,20 @@ abstract contract TokenizedStrategy {
             uint256 previousBalance;
             if (address(_asset) == ETH) {
                 previousBalance = address(this).balance;
-                require(
-                    IAvatar(target).execTransactionFromModule(address(this), assets, "", Enum.Operation.Call),
-                    TokenizedStrategy__DepositMoreThanMax()
-                );
-                assert(address(this).balance == previousBalance + assets);
+                IAvatar(target).execTransactionFromModule(address(this), assets, "", Enum.Operation.Call);
+                require(address(this).balance == previousBalance + assets, TokenizedStrategy__DepositMoreThanMax());
             } else {
                 previousBalance = _asset.balanceOf(address(this));
+                IAvatar(target).execTransactionFromModule(
+                    address(_asset),
+                    0,
+                    abi.encodeWithSignature("transfer(address,uint256)", address(this), assets),
+                    Enum.Operation.Call
+                );
                 require(
-                    IAvatar(target).execTransactionFromModule(
-                        address(_asset),
-                        0,
-                        abi.encodeWithSignature("transfer(address,uint256)", address(this), assets),
-                        Enum.Operation.Call
-                    ),
+                    _asset.balanceOf(address(this)) == previousBalance + assets,
                     TokenizedStrategy__TransferFailed()
                 );
-                assert(_asset.balanceOf(address(this)) == previousBalance + assets);
             }
         } else {
             if (address(_asset) == ETH) {
