@@ -1,19 +1,21 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.25;
 
+import "../../lib/openzeppelin-contracts/contracts/utils/Strings.sol";
 import "forge-std/Test.sol";
-import { DragonRouter } from "src/dragons/DragonRouter.sol";
 import "src/dragons/SplitChecker.sol";
-import { MockStrategy } from "test/mocks/MockStrategy.sol";
-import { MockDragonRouterTesting } from "test/mocks/MockDragonRouterTesting.sol";
-import { MockNativeTransformer } from "test/mocks/MockNativeTransformer.sol";
-import { Split } from "src/interfaces/ISplitChecker.sol";
-import { ITransformer } from "src/interfaces/ITransformer.sol";
-
+import { DragonRouter } from "src/dragons/DragonRouter.sol";
 import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
 import { IERC4626 } from "lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
+import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
+
+import { ITransformer } from "src/interfaces/ITransformer.sol";
+import { MockDragonRouterTesting } from "test/mocks/MockDragonRouterTesting.sol";
+import { MockNativeTransformer } from "test/mocks/MockNativeTransformer.sol";
+import { MockStrategy } from "test/mocks/MockStrategy.sol";
+import { Split } from "src/interfaces/ISplitChecker.sol";
+import { AccessControl } from "../../lib/openzeppelin-contracts/contracts/access/AccessControl.sol";
 
 contract DragonRouterTest is Test {
     DragonRouter public router;
@@ -240,12 +242,23 @@ contract DragonRouterTest is Test {
     function test_setMetapool() public {
         address newMetapool = makeAddr("newMetapool");
 
-        vm.prank(owner);
+        vm.prank(governance);
         vm.expectEmit(true, true, true, true);
         emit MetapoolUpdated(metapool, newMetapool);
         routerTesting.setMetapool(newMetapool);
 
         assertEq(routerTesting.metapool(), newMetapool);
+    }
+
+    function test_setMetapool_reverts_invalidRole() public {
+        address newMetapool = makeAddr("newMetapool");
+
+        vm.prank(owner); // user with DEFAULT_ADMIN_ROLE, not GOVERNANCE_ROLE
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, owner, GOVERNANCE_ROLE)
+        );
+
+        routerTesting.setMetapool(newMetapool);
     }
 
     function test_setOpexVault() public {
