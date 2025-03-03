@@ -747,21 +747,18 @@ abstract contract TokenizedStrategy {
         if (target == address(0)) revert TokenizedStrategy__NotOperator();
 
         if (msg.sender == target || msg.sender == S.operator) {
+            uint256 previousBalance;
             if (address(_asset) == ETH) {
-                require(
-                    IAvatar(target).execTransactionFromModule(address(this), assets, "", Enum.Operation.Call),
-                    TokenizedStrategy__DepositMoreThanMax()
-                );
+                previousBalance = address(this).balance;
+                IAvatar(target).execTransactionFromModule(address(this), assets, "", Enum.Operation.Call);
+                require(address(this).balance == previousBalance + assets, TokenizedStrategy__DepositMoreThanMax());
             } else {
-                uint256 previousBalance = _asset.balanceOf(address(this));
-                require(
-                    IAvatar(target).execTransactionFromModule(
-                        address(_asset),
-                        0,
-                        abi.encodeWithSignature("transfer(address,uint256)", address(this), assets),
-                        Enum.Operation.Call
-                    ),
-                    TokenizedStrategy__TransferFailed()
+                previousBalance = _asset.balanceOf(address(this));
+                IAvatar(target).execTransactionFromModule(
+                    address(_asset),
+                    0,
+                    abi.encodeWithSignature("transfer(address,uint256)", address(this), assets),
+                    Enum.Operation.Call
                 );
                 require(
                     _asset.balanceOf(address(this)) == previousBalance + assets,
