@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 
 import { AbstractHatsManager } from "./AbstractHatsManager.sol";
-import { Hats__InvalidAddressFor, Hats__InvalidHat, Hats__DoesNotHaveThisHat, Hats__HatAlreadyExists, Hats__HatDoesNotExist, Hats__TooManyInitialHolders, Hats__NotAdminOfHat } from "./HatsErrors.sol";
+import { Hats__InvalidHat, Hats__DoesNotHaveThisHat, Hats__NotAdminOfHat } from "./HatsErrors.sol";
 
 /**
  * @title DragonHatter

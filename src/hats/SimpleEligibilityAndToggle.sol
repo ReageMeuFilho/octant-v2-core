@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import { IHats } from "lib/hats-protocol/src/Interfaces/IHats.sol";
 import { IHatsEligibility } from "src/interfaces/IHatsEligibility.sol";
 import { IHatsToggle } from "src/interfaces/IHatsToggle.sol";
 
