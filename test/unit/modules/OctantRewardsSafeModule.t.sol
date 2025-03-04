@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import "../Base.t.sol";
-import { OctantRewardsSafe } from "src/dragons/modules/OctantRewardsSafe.sol";
+import { OctantRewardsSafe, OctantRewardsSafe__InvalidNumberOfValidators, OctantRewardsSafe__InvalidAddress, OctantRewardsSafe__InvalidMaxYield, OctantRewardsSafe__TransferFailed, OctantRewardsSafe__YieldNotInRange } from "src/dragons/modules/OctantRewardsSafe.sol";
 import { FailSafe } from "test/mocks/MockFailSafe.sol";
 
 contract OctantRewardsSafeModule is BaseTest {
@@ -40,7 +40,7 @@ contract OctantRewardsSafeModule is BaseTest {
         vm.startPrank(temps.safe);
 
         // Fails if 0 is passed
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(OctantRewardsSafe__InvalidNumberOfValidators.selector, 0));
         module.requestNewValidators(0);
 
         module.requestNewValidators(amount);
@@ -55,7 +55,7 @@ contract OctantRewardsSafeModule is BaseTest {
         assertTrue(module.totalValidators() == totalValidators + amount);
 
         // fails when newValidators == 0
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(OctantRewardsSafe__InvalidNumberOfValidators.selector, 0));
         module.confirmNewValidators();
 
         vm.stopPrank();
@@ -70,7 +70,7 @@ contract OctantRewardsSafeModule is BaseTest {
         vm.startPrank(temps.safe);
 
         // fails if zero address is passed.
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(OctantRewardsSafe__InvalidAddress.selector, address(0)));
         module.setTreasury(address(0));
 
         module.setTreasury(newTreasury);
@@ -88,7 +88,7 @@ contract OctantRewardsSafeModule is BaseTest {
         vm.startPrank(temps.safe);
 
         // fails if zero address is passed.
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(OctantRewardsSafe__InvalidAddress.selector, address(0)));
         module.setDragonRouter(address(0));
 
         module.setDragonRouter(newDragonRouter);
@@ -105,7 +105,7 @@ contract OctantRewardsSafeModule is BaseTest {
         vm.startPrank(temps.safe);
 
         // fails if max yield not in range
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(OctantRewardsSafe__InvalidMaxYield.selector, 0));
         module.setMaxYield(0);
 
         module.setMaxYield(_newMaxYield);
@@ -120,7 +120,7 @@ contract OctantRewardsSafeModule is BaseTest {
         vm.startPrank(temps.safe);
 
         // Fails if 0 is passed
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(OctantRewardsSafe__InvalidNumberOfValidators.selector, 0));
         module.requestExitValidators(0);
 
         module.requestExitValidators(exitedValidators);
@@ -136,7 +136,9 @@ contract OctantRewardsSafeModule is BaseTest {
         vm.prank(temps.safe);
         module.setTarget(address(failSafe));
         vm.deal(temps.safe, exitedValidators * 32 ether); // send yield to safe
-        vm.expectRevert();
+        vm.expectRevert(
+            abi.encodeWithSelector(OctantRewardsSafe__TransferFailed.selector, exitedValidators * 32 ether)
+        );
         vm.prank(keeper);
         module.confirmExitValidators();
         vm.prank(temps.safe);
@@ -151,7 +153,7 @@ contract OctantRewardsSafeModule is BaseTest {
         assertTrue(treasury.balance == exitedValidators * 32 ether);
 
         // keeper cannot call confirmExitValidators when exitedValidators = 0
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(OctantRewardsSafe__InvalidNumberOfValidators.selector, 0));
         module.confirmExitValidators();
 
         vm.stopPrank();
@@ -162,7 +164,9 @@ contract OctantRewardsSafeModule is BaseTest {
 
         /// Harvest fails when Yield > Max Yield
         vm.deal(temps.safe, maxYield + 1 ether); // send yield to safe
-        vm.expectRevert();
+        vm.expectRevert(
+            abi.encodeWithSelector(OctantRewardsSafe__YieldNotInRange.selector, maxYield + 1 ether, maxYield)
+        );
         module.harvest();
 
         /// Harvest works when Yield < Max Yield
@@ -176,7 +180,7 @@ contract OctantRewardsSafeModule is BaseTest {
         vm.prank(temps.safe);
         module.setTarget(address(failSafe));
         vm.deal(temps.safe, yield); // send yield to safe
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(OctantRewardsSafe__TransferFailed.selector, yield));
         module.harvest();
     }
 }
