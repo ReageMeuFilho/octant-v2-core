@@ -18,6 +18,7 @@
       "^0.8.0"
     ],
     "const-name-snakecase": "error",
+    "immutable-vars-naming": "off",
     "event-name-camelcase": "error",
     "constructor-syntax": "error",
     "func-name-mixedcase": "off",
