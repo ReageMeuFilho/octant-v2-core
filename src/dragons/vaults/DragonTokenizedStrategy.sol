@@ -12,9 +12,9 @@ import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
 contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy {
     bool public override isDragonOnly = true;
 
-    // /**
-    //  * @inheritdoc IDragonTokenizedStrategy
-    //  */
+    /**
+     * @inheritdoc IDragonTokenizedStrategy
+     */
     function toggleDragonMode(bool enabled) external override onlyOperator {
         if (enabled == isDragonOnly) revert DragonTokenizedStrategy__NoOperation();
         isDragonOnly = enabled;
