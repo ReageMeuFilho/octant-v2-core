@@ -496,7 +496,7 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
     /**
      * @inheritdoc IERC20
      */
-    function approve(address, uint256) external override(TokenizedStrategy, IERC20) returns (bool) {
+    function approve(address, uint256) external pure override(TokenizedStrategy, IERC20) returns (bool) {
         revert DragonTokenizedStrategy__VaultSharesNotTransferable();
     }
 
@@ -511,7 +511,7 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
         uint8,
         bytes32,
         bytes32
-    ) external override(TokenizedStrategy, IERC20Permit) {
+    ) external pure override(TokenizedStrategy, IERC20Permit) {
         revert DragonTokenizedStrategy__VaultSharesNotTransferable();
     }
 }

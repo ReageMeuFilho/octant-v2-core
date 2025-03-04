@@ -377,7 +377,7 @@ contract SetupIntegrationTest is Test, TestPlus {
 
         // Execute the enableModule transaction through the Safe
         // First sign with required number of owners
-        address[] memory owners = deployedSafe.getOwners();
+        owners = deployedSafe.getOwners();
         bytes32 txHash = deployedSafe.getTransactionHash(
             safeAddress, // to
             0, // value

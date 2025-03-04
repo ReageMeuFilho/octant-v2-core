@@ -111,9 +111,9 @@ abstract contract DragonBaseStrategy is BaseStrategy, Module {
 
     /**
      * @notice Provide a signal to the keeper that `report()` should be called.
-     * @return `true` if `report()` should be called, `false` otherwise.
+     * @return timeToReport `true` if `report()` should be called, `false` otherwise.
      */
-    function harvestTrigger() external view virtual returns (bool) {
+    function harvestTrigger() external view virtual returns (bool timeToReport) {
         // Should not trigger if strategy is not active (no assets) or harvest has been recently called.
         if (
             TokenizedStrategy.totalAssets() != 0 && (block.timestamp - TokenizedStrategy.lastReport()) >= maxReportDelay
