@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "lib/hats-protocol/src/Interfaces/IHats.sol";
-import "src/interfaces/IHatsEligibility.sol";
-import "src/interfaces/IHatsToggle.sol";
+import { IHats } from "lib/hats-protocol/src/Interfaces/IHats.sol";
+import { IHatsEligibility } from "src/interfaces/IHatsEligibility.sol";
+import { IHatsToggle } from "src/interfaces/IHatsToggle.sol";
+
+import { Hats__InvalidAddressFor, Hats__InvalidHat, Hats__DoesNotHaveThisHat, Hats__HatAlreadyExists, Hats__HatDoesNotExist, Hats__TooManyInitialHolders, Hats__NotAdminOfHat } from "./HatsErrors.sol";
 
 /**
  * @title AbstractHatsManager
@@ -34,10 +36,10 @@ abstract contract AbstractHatsManager is IHatsEligibility, IHatsToggle {
      * @param _branchHat The branch hat ID
      */
     constructor(address hats, uint256 _adminHat, uint256 _branchHat) {
-        require(hats != address(0), "Invalid Hats address");
+        require(hats != address(0), Hats__InvalidAddressFor("Hats", hats));
         HATS = IHats(hats);
 
-        require(HATS.isWearerOfHat(msg.sender, _adminHat), "Deployer must wear admin hat");
+        require(HATS.isWearerOfHat(msg.sender, _adminHat), Hats__DoesNotHaveThisHat(msg.sender, _adminHat));
         adminHat = _adminHat;
         branchHat = _branchHat;
     }
@@ -56,9 +58,9 @@ abstract contract AbstractHatsManager is IHatsEligibility, IHatsToggle {
         uint256 maxSupply,
         address[] memory initialHolders
     ) internal virtual returns (uint256 hatId) {
-        require(HATS.isAdminOfHat(msg.sender, adminHat), "Not admin");
-        require(roleHats[roleId] == 0, "Role already exists");
-        require(initialHolders.length <= maxSupply, "Too many initial holders");
+        require(HATS.isAdminOfHat(msg.sender, adminHat), Hats__NotAdminOfHat(msg.sender, adminHat));
+        require(roleHats[roleId] == 0, Hats__HatAlreadyExists(roleId));
+        require(initialHolders.length <= maxSupply, Hats__TooManyInitialHolders(initialHolders.length, maxSupply));
 
         // Create role hat under branch
         hatId = HATS.createHat(
@@ -77,7 +79,7 @@ abstract contract AbstractHatsManager is IHatsEligibility, IHatsToggle {
         // Mint hats to initial holders
         for (uint256 i = 0; i < initialHolders.length; i++) {
             address holder = initialHolders[i];
-            require(holder != address(0), "Invalid address");
+            require(holder != address(0), Hats__InvalidAddressFor("initial holder", holder));
 
             // mintHat(
             //    uint256 hatId,    // Hat ID to mint
@@ -97,11 +99,11 @@ abstract contract AbstractHatsManager is IHatsEligibility, IHatsToggle {
      * @param account The address to receive the role
      */
     function grantRole(bytes32 roleId, address account) public virtual {
-        require(HATS.isWearerOfHat(msg.sender, adminHat), "Not admin");
-        require(account != address(0), "Invalid address");
+        require(HATS.isWearerOfHat(msg.sender, adminHat), Hats__DoesNotHaveThisHat(msg.sender, adminHat));
+        require(account != address(0), Hats__InvalidAddressFor("account", account));
 
         uint256 hatId = roleHats[roleId];
-        require(hatId != 0, "Role does not exist");
+        require(hatId != 0, Hats__HatDoesNotExist(roleId));
 
         // Mint role hat
         HATS.mintHat(hatId, account);
@@ -114,11 +116,11 @@ abstract contract AbstractHatsManager is IHatsEligibility, IHatsToggle {
      * @param account The address to revoke the role from
      */
     function revokeRole(bytes32 roleId, address account) public virtual {
-        require(HATS.isWearerOfHat(msg.sender, adminHat), "Not admin");
+        require(HATS.isWearerOfHat(msg.sender, adminHat), Hats__DoesNotHaveThisHat(msg.sender, adminHat));
 
         uint256 hatId = roleHats[roleId];
-        require(hatId != 0, "Role does not exist");
-        require(HATS.isWearerOfHat(account, hatId), "Address does not have role");
+        require(hatId != 0, Hats__HatDoesNotExist(roleId));
+        require(HATS.isWearerOfHat(account, hatId), Hats__DoesNotHaveThisHat(account, hatId));
 
         // Burn role hat
         HATS.setHatWearerStatus(hatId, account, false, false);
@@ -140,7 +142,7 @@ abstract contract AbstractHatsManager is IHatsEligibility, IHatsToggle {
      * @return bool Whether the hat is active
      */
     function getHatStatus(uint256 hatId) external view override returns (bool) {
-        require(hatId == branchHat || hatRoles[hatId] != 0, "Invalid hat");
+        require(hatId == branchHat || hatRoles[hatId] != 0, Hats__InvalidHat(hatId));
         return isActive;
     }
 
@@ -148,7 +150,7 @@ abstract contract AbstractHatsManager is IHatsEligibility, IHatsToggle {
      * @notice Allows admin to toggle role availability
      */
     function toggleBranch() external virtual {
-        require(HATS.isWearerOfHat(msg.sender, adminHat), "Not admin");
+        require(HATS.isWearerOfHat(msg.sender, adminHat), Hats__DoesNotHaveThisHat(msg.sender, adminHat));
         isActive = !isActive;
     }
 }

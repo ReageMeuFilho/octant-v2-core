@@ -74,6 +74,7 @@ contract SetupIntegrationTest is Test, TestPlus {
     address public safeAddress;
     address public dragonTokenizedStrategyAddress;
     address public dragonRouterProxyAddress;
+
     /// ===================================================
 
     function addLabels() internal {

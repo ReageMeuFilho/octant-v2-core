@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "./AbstractHatsManager.sol";
+import { AbstractHatsManager } from "./AbstractHatsManager.sol";
+import { Hats__InvalidHat, Hats__DoesNotHaveThisHat, Hats__NotAdminOfHat } from "./HatsErrors.sol";
 
 /**
  * @title DragonHatter
@@ -40,7 +41,7 @@ contract DragonHatter is AbstractHatsManager {
         if (initialized) revert AlreadyInitialized();
 
         // Verify contract has its branch hat
-        require(HATS.isWearerOfHat(address(this), branchHat), "Must wear branch hat");
+        require(HATS.isWearerOfHat(address(this), branchHat), Hats__DoesNotHaveThisHat(address(this), branchHat));
 
         // Create keeper role hat (1.1.1.1.1)
         uint256 keeperHat = createRole(
@@ -94,10 +95,10 @@ contract DragonHatter is AbstractHatsManager {
         uint256 hatId
     ) external view override returns (bool eligible, bool standing) {
         bytes32 roleId = hatRoles[hatId];
-        require(roleId != bytes32(0), "Invalid role hat");
+        require(roleId != bytes32(0), Hats__InvalidHat(hatId));
 
         // Check if hat is under our branch
-        require(HATS.isAdminOfHat(address(this), hatId), "Not branch hat");
+        require(HATS.isAdminOfHat(address(this), hatId), Hats__NotAdminOfHat(address(this), hatId));
 
         // Default to true standing - can be extended with role-specific checks
         standing = true;

@@ -3,6 +3,13 @@ pragma solidity ^0.8.0;
 
 import { Module } from "zodiac/core/Module.sol";
 import { Enum } from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
+import { Unauthorized } from "src/errors.sol";
+
+error OctantRewardsSafe__YieldNotInRange(uint256 yield, uint256 maxYield);
+error OctantRewardsSafe__TransferFailed(uint256 yield);
+error OctantRewardsSafe__InvalidNumberOfValidators(uint256 amount);
+error OctantRewardsSafe__InvalidAddress(address a);
+error OctantRewardsSafe__InvalidMaxYield(uint256 maxYield);
 
 contract OctantRewardsSafe is Module {
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
@@ -59,7 +66,7 @@ contract OctantRewardsSafe is Module {
      * @dev Throws if called by any account other than the keeper.
      */
     modifier onlyKeeper() {
-        require(msg.sender == keeper, "Unauthorized");
+        require(msg.sender == keeper, Unauthorized());
         _;
     }
 
@@ -91,13 +98,13 @@ contract OctantRewardsSafe is Module {
     /// @dev transfers the yield to the dragon router from safe and principal to treasury.
     function harvest() external {
         uint256 yield = owner().balance;
-        require(yield != 0 && yield < maxYield, "Yield not in range");
+        require(yield != 0 && yield < maxYield, OctantRewardsSafe__YieldNotInRange(yield, maxYield));
 
         uint256 lastHarvestTime = lastHarvested;
         lastHarvested = block.timestamp;
         totalYield += yield;
         bool success = exec(dragonRouter, yield, "", Enum.Operation.Call);
-        require(success, "Failed to transfer yield to Dragon Router");
+        require(success, OctantRewardsSafe__TransferFailed(yield));
         emit Transfer(owner(), dragonRouter, yield);
         emit Report(yield, totalValidators * 32 ether, block.timestamp - lastHarvestTime);
     }
@@ -110,7 +117,7 @@ contract OctantRewardsSafe is Module {
     ///      Can be only called by the owner of the module.
     /// @param amount Amount of validators to be added.
     function requestNewValidators(uint256 amount) external onlyOwner {
-        require(amount != 0, "Invalid Amount");
+        require(amount != 0, OctantRewardsSafe__InvalidNumberOfValidators(amount));
         newValidators += amount;
         emit RequestNewValidators(amount, newValidators);
     }
@@ -119,7 +126,7 @@ contract OctantRewardsSafe is Module {
     ///      Can be only called by the owner of the module.
     /// @param amount Amount of validators to be exited.
     function requestExitValidators(uint256 amount) external onlyOwner {
-        require(amount != 0, "Invalid Amount");
+        require(amount != 0, OctantRewardsSafe__InvalidNumberOfValidators(amount));
         exitedValidators += amount;
         emit RequestExitValidators(amount, exitedValidators);
     }
@@ -127,7 +134,7 @@ contract OctantRewardsSafe is Module {
     /// @dev sets treasury address. Can be only called by the owner of the module.
     /// @param _treasury address of the new treasury to set.
     function setTreasury(address _treasury) external onlyOwner {
-        require(_treasury != address(0), "Invalid address");
+        require(_treasury != address(0), OctantRewardsSafe__InvalidAddress(_treasury));
         emit TreasuryUpdated(treasury, _treasury);
         treasury = _treasury;
     }
@@ -135,7 +142,7 @@ contract OctantRewardsSafe is Module {
     /// @dev sets dragon router address. Can be only called by the owner of the module.
     /// @param _dragonRouter address of the new dragon router to set.
     function setDragonRouter(address _dragonRouter) external onlyOwner {
-        require(_dragonRouter != address(0), "Invalid address");
+        require(_dragonRouter != address(0), OctantRewardsSafe__InvalidAddress(_dragonRouter));
         emit DragonRouterUpdated(dragonRouter, _dragonRouter);
         dragonRouter = _dragonRouter;
     }
@@ -143,7 +150,7 @@ contract OctantRewardsSafe is Module {
     /// @dev sets max yield that can be harvested.
     /// @param _maxYield maximum yield that can be harvested
     function setMaxYield(uint256 _maxYield) external onlyOwner {
-        require(_maxYield > 0 && _maxYield < 32 ether, "Invalid Max Yield");
+        require(_maxYield > 0 && _maxYield < 32 ether, OctantRewardsSafe__InvalidMaxYield(_maxYield));
         emit MaxYieldUpdated(maxYield, _maxYield);
         maxYield = _maxYield;
     }
@@ -155,7 +162,7 @@ contract OctantRewardsSafe is Module {
     /// @dev Increases the number of total validators.
     ///      Can be only called by the keeper.
     function confirmNewValidators() external onlyKeeper {
-        require(newValidators != 0, "Invalid Amount");
+        require(newValidators != 0, OctantRewardsSafe__InvalidNumberOfValidators(newValidators));
         totalValidators += newValidators;
         emit NewValidatorsConfirmed(newValidators, totalValidators);
         newValidators = 0;
@@ -165,12 +172,12 @@ contract OctantRewardsSafe is Module {
     ///      Can be only called by the owner of the module.
     function confirmExitValidators() external onlyKeeper {
         uint256 validtorsExited = exitedValidators;
-        require(validtorsExited != 0, "Validators to be exited should be > 0");
+        require(validtorsExited != 0, OctantRewardsSafe__InvalidNumberOfValidators(validtorsExited));
 
         totalValidators -= validtorsExited;
         exitedValidators = 0;
         bool success = exec(treasury, validtorsExited * 32 ether, "", Enum.Operation.Call);
-        require(success, "Failed to transfer principal to Treasury");
+        require(success, OctantRewardsSafe__TransferFailed(validtorsExited * 32 ether));
         emit Transfer(owner(), treasury, validtorsExited * 32 ether);
         emit ExitValidatorsConfirmed(validtorsExited, totalValidators);
     }
