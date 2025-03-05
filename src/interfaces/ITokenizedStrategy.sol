@@ -225,6 +225,12 @@ interface ITokenizedStrategy is IERC4626Payable, IERC20Permit {
     function management() external view returns (address);
 
     /**
+     * @notice Returns the receiver address
+     * @return The receiver address
+     */
+    function getReceiver() external view returns (address);
+
+    /**
      * @notice Returns the name of the strategy
      * @return The name of the strategy
      */
