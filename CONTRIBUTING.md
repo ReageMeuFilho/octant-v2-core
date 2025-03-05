@@ -58,8 +58,7 @@ Main time cost of developing smart-contract is audits, not development itself. B
 - Focus on the code, not the person
 - Stay in the scope of the PR during your review
 - Be specific, leave no room for confusion
-- Try to to approve ASAP when concerns are addressed
-
+- Try to approve ASAP when concerns are addressed
 ## 🛠️ Development Workflow
 - We use [Gitflow](https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow) as Git branching model.
 - We use a precommit hook to automatically format, lint and test, ensuring no surprises on continuous integration run.
