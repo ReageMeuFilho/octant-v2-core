@@ -21,6 +21,7 @@ abstract contract TokenizedStrategy is ITokenizedStrategy {
     using SafeERC20 for ERC20;
 
     address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE; // using this address to represent native ETH
+    address internal _receiver;
 
     /*//////////////////////////////////////////////////////////////
                             MODIFIERS
@@ -529,10 +530,12 @@ abstract contract TokenizedStrategy is ITokenizedStrategy {
         uint256 loss;
         // Check if we need to withdraw funds.
         if (idle < assets) {
+            _receiver = receiver;
             // Tell Strategy to free what we need.
             unchecked {
                 IBaseStrategy(address(this)).freeFunds(assets - idle);
             }
+            _receiver = address(0);
 
             // Return the actual amount withdrawn. Adjust for potential under withdraws.
             idle = address(_asset) == ETH ? address(this).balance : _asset.balanceOf(address(this));
@@ -958,6 +961,13 @@ abstract contract TokenizedStrategy is ITokenizedStrategy {
      */
     function nonces(address _owner) external view returns (uint256) {
         return _strategyStorage().nonces[_owner];
+    }
+
+    /**
+     * @inheritdoc ITokenizedStrategy
+     */
+    function getReceiver() external view returns (address) {
+        return _receiver;
     }
 
     /**
