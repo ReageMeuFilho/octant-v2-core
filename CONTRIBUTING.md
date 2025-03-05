@@ -1,36 +1,81 @@
-# Contributing to Octant V2 Core
+# Contribution Guide for Octant V2 Core
 
-Thank you for considering contributing to Octant V2 Core! This document outlines the process and guidelines for contributing.
+## 🌟 Our Development Philosophy
 
-## Branch Naming Convention
+At Golem Foundation, we believe in creating maintainable, high-quality code through thoughtful collaboration. This guide outlines our expectations and best practices for contributing to the project.
 
-When creating a new branch, use one of these prefixes:
+## 📋 Pull Request Guidelines
 
-- `feature/*` - For new features
-- `hotfix/*` - For urgent fixes
-- `release/*` - For release branches
-- `support/*` - For support branches
+### Atomic Commits
+- Each commit should represent a single logical change
+- Use clear, descriptive commit messages that explain *why* the change was made
+- Follow the [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/) format: `type(scope): message` (e.g., `fix(rewards): correct calculation for staking rewards`)
+- Avoid mixing unrelated changes in a single commit
 
-Example: `feature/add-new-validator`
+### PR Management
+As PRs get bigger, time to review them scales super-linearly. And long-standing PRs create lots of merge conflict and duplicate work. It's much cheaper for the team to make small and prompt changes to codebase than big and belated changes.
 
-## Commit Signing
 
-All commits must be signed. For information about commit signing:
+- Keep PRs focused on a single feature, bug fix, or improvement
+- Aim for PRs under 300 lines of code when possible
+- Split large features into smaller, sequential PRs
+- Include relevant tests and documentation with your changes
+- Review existing PRs (if requested) before creating new ones
+- Help merge ready PRs to prevent accumulation
+- Set aside a time for PR reviews daily
+- Rebase your branch before requesting review to ensure it's up-to-date
 
-- [About commit signature verification](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification)
-- [Signing commits](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits)
-- [Adding a GPG key to your GitHub account](https://docs.github.com/en/authentication/managing-commit-signature-verification/adding-a-gpg-key-to-your-github-account)
+## 🧩 Code Quality Principles
 
-## Pull Request Process
+### Simplicity First
+Main time cost of developing smart-contract is audits, not development itself. By solving things in simplest, clearest way we can reduce this cost dramatically.
 
-1. Create a branch following the naming convention
-2. Make your changes
-3. Ensure all commits are signed
-4. Create a PR targeting the `develop` branch
-5. Wait for CI checks and review
+- Implement the simplest solution that meets requirements
+- Avoid premature optimization or over-engineering
+- Write self-documenting code with clear variable and function names, with clear intent
+- Use comments as a last resort when things are not clear enough
 
-## Development Guidelines
+### Maintainability
+- Aim for high coherence and loose coupling
+- Adhere to [SOLID Principles](https://hackernoon.com/solid-principles-in-smart-contract-development) so we can ensure solidity (pun intended) of our code 
+- Consider future (maintenance, or other) costs in your design decisions
 
-- All code changes must have tests
-- Follow the existing code style
-- Update documentation as needed
+### Technical Debt Management
+- Apply the ["Boy Scout Rule"](https://deviq.com/principles/boy-scout-rule): Leave the code better than you found it
+- Address small issues before they become big problems
+- Document what you stumble upon and can't address now
+
+## 🔍 Code Review Process
+
+### As an Author
+- Self-review your code before requesting reviews
+- Provide context in the PR description about what changes were made and why
+- Be open to feedback and willing to make changes
+- Use the PR description to highlight areas where you'd like specific feedback
+
+### As a Reviewer
+- Be respectful and constructive in your feedback
+- Focus on the code, not the person
+- Stay in the scope of the PR during your review
+- Be specific, leave no room for confusion
+- Try to to approve ASAP when concerns are addressed
+
+## 🛠️ Development Workflow
+- We use [Gitflow](https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow) as Git branching model.
+- We use a precommit hook to automatically format, lint and test, ensuring no surprises on continuous integration run.
+
+## 🤝 Communication
+- Use clear, verbose language in all communications
+- Ask questions when something isn't clear
+- Share progress and blockers with the team
+- Be mindful of others' time and priorities
+
+## 🔒 Security Considerations
+- Always prioritize security and only then consider gas optimizations
+- Follow established security patterns for smart contracts
+- Consider edge cases and potential attack vectors
+- Document security assumptions and considerations
+
+---
+
+Thank you for contributing to Octant V2 Core!
