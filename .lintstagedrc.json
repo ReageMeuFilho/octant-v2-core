@@ -1,6 +1,0 @@
-{
-  "{src,test,scripts}/**/*.sol": [
-    "prettier --config .prettierrc --plugin=prettier-plugin-solidity --write",
-    "solhint"
-  ]
-} 
