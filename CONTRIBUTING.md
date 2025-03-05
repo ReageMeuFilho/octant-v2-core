@@ -61,8 +61,7 @@ Main time cost of developing smart-contract is audits, not development itself. B
 - Try to approve ASAP when concerns are addressed
 ## 🛠️ Development Workflow
 - We use [Gitflow](https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow) as Git branching model.
-- We use a precommit hook to automatically format, lint and test, ensuring no surprises on continuous integration run.
-
+- We use a pre-commit hook to automatically format, lint and test, ensuring no surprises on continuous integration run.
 ## 🤝 Communication
 - Use clear, verbose language in all communications
 - Ask questions when something isn't clear
