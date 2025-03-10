@@ -271,7 +271,7 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
         address receiver,
         address _owner,
         uint256 maxLoss
-    ) public override(TokenizedStrategy, ITokenizedStrategy) nonReentrant returns (uint256 shares) {
+    ) public virtual override(TokenizedStrategy, ITokenizedStrategy) nonReentrant returns (uint256 shares) {
         // Get the storage slot for all following calls.
         StrategyData storage S = super._strategyStorage();
         LockupInfo storage lockup = S.voluntaryLockups[_owner];
@@ -297,7 +297,7 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
         address receiver,
         address _owner,
         uint256 maxLoss
-    ) public override(TokenizedStrategy, ITokenizedStrategy) nonReentrant returns (uint256) {
+    ) public virtual override(TokenizedStrategy, ITokenizedStrategy) nonReentrant returns (uint256) {
         // Get the storage slot for all following calls.
         StrategyData storage S = super._strategyStorage();
         LockupInfo storage lockup = S.voluntaryLockups[_owner];
@@ -314,7 +314,7 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
         }
 
         // We need to return the actual amount withdrawn in case of a loss.
-        return super._withdraw(S, receiver, _owner, assets, shares, maxLoss);
+        return _withdraw(S, receiver, _owner, assets, shares, maxLoss);
     }
 
     /**
@@ -349,7 +349,7 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
         uint256 assets,
         address receiver,
         uint256 lockupDuration
-    ) internal returns (uint256 shares) {
+    ) internal virtual returns (uint256 shares) {
         StrategyData storage S = super._strategyStorage();
         require(!S.shutdown, DragonTokenizedStrategy__StrategyInShutdown());
 
@@ -363,11 +363,12 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
         );
 
         assets = type(uint256).max == assets ? S.asset.balanceOf(msg.sender) : assets;
+
         require((shares = _convertToShares(S, assets, Math.Rounding.Floor)) != 0, ZeroShares());
         require(assets < _maxDeposit(S, receiver), DragonTokenizedStrategy__DepositMoreThanMax());
         require(shares < _maxMint(S, receiver), DragonTokenizedStrategy__MintMoreThanMax());
 
-        super._deposit(S, receiver, assets, shares);
+        _deposit(S, receiver, assets, shares);
         _setOrExtendLockup(S, receiver, lockupDuration, super._balanceOf(S, receiver));
     }
 
@@ -403,7 +404,7 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
         uint256 shares,
         address receiver,
         uint256 lockupDuration
-    ) internal returns (uint256 assets) {
+    ) internal virtual returns (uint256 assets) {
         StrategyData storage S = super._strategyStorage();
         require((assets = _convertToAssets(S, shares, Math.Rounding.Ceil)) != 0, ZeroAssets());
         _depositWithLockup(assets, receiver, lockupDuration);
@@ -428,7 +429,8 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
      * @inheritdoc ITokenizedStrategy
      */
     function report()
-        external
+        public
+        virtual
         override(TokenizedStrategy, ITokenizedStrategy)
         nonReentrant
         onlyKeepers

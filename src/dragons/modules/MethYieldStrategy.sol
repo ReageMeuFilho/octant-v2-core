@@ -1,15 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.8.18;
 
-import { DragonBaseStrategy, ERC20 } from "src/dragons/vaults/DragonBaseStrategy.sol";
-import { Math } from "lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
-import { IBaseStrategy } from "src/interfaces/IBaseStrategy.sol";
-import { IStrategy } from "../../interfaces/IStrategy.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { DragonBaseStrategy } from "src/dragons/vaults/DragonBaseStrategy.sol";
 import { IERC4626Payable } from "src/interfaces/IERC4626Payable.sol";
 import { IMantleStaking } from "src/interfaces/IMantleStaking.sol";
 import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
 import { IMethYieldStrategy } from "src/interfaces/IMethYieldStrategy.sol";
+import { IYieldBearingDragonTokenizedStrategy } from "src/interfaces/IYieldBearingDragonTokenizedStrategy.sol";
 
 /**
  * @title MethYieldStrategy
@@ -116,10 +113,12 @@ contract MethYieldStrategy is DragonBaseStrategy, IMethYieldStrategy {
         // Get current exchange rate
         uint256 currentExchangeRate = _getCurrentExchangeRate();
 
-        // Get actual mETH balance
-        uint256 mEthBalance = asset.balanceOf(address(this));
+        // fetch available yield
+        uint256 availableYield = IYieldBearingDragonTokenizedStrategy(address(this)).availableYield();
 
-        // Get current accounting balance (includes previously reported profits)
+        // Get actual mETH balance
+        uint256 mEthBalance = asset.balanceOf(address(this)) - availableYield;
+
         uint256 accountingBalance = IERC4626Payable(address(this)).totalAssets();
 
         // Calculate the adjusted balance that accounts for value appreciation
