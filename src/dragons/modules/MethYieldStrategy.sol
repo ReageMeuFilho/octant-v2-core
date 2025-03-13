@@ -7,6 +7,7 @@ import { IMantleStaking } from "src/interfaces/IMantleStaking.sol";
 import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
 import { IMethYieldStrategy } from "src/interfaces/IMethYieldStrategy.sol";
 import { IYieldBearingDragonTokenizedStrategy } from "src/interfaces/IYieldBearingDragonTokenizedStrategy.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title MethYieldStrategy
@@ -116,8 +117,10 @@ contract MethYieldStrategy is DragonBaseStrategy, IMethYieldStrategy {
         // fetch available yield
         uint256 availableYield = IYieldBearingDragonTokenizedStrategy(address(this)).availableYield();
 
+        address assetAddress = IERC4626Payable(address(this)).asset();
+
         // Get actual mETH balance
-        uint256 mEthBalance = asset.balanceOf(address(this)) - availableYield;
+        uint256 mEthBalance = IERC20(assetAddress).balanceOf(address(this)) - availableYield;
 
         uint256 accountingBalance = IERC4626Payable(address(this)).totalAssets();
 
