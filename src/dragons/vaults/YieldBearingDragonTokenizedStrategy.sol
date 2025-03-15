@@ -3,14 +3,8 @@ pragma solidity ^0.8.25;
 
 import { DragonTokenizedStrategy } from "./DragonTokenizedStrategy.sol";
 import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
-
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
-
 import { IBaseStrategy } from "src/interfaces/IBaseStrategy.sol";
-
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-
-import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title YieldBearingDragonTokenizedStrategy
@@ -19,7 +13,6 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
  */
 contract YieldBearingDragonTokenizedStrategy is DragonTokenizedStrategy {
     using Math for uint256;
-    using SafeERC20 for ERC20;
 
     /**
      * @inheritdoc ITokenizedStrategy

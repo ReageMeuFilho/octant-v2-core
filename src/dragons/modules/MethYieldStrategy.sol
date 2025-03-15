@@ -128,7 +128,7 @@ contract MethYieldStrategy is DragonBaseStrategy, IMethYieldStrategy {
         // Calculate the profit in ETH terms
         uint256 deltaExchangeRate = currentExchangeRate > lastReportedExchangeRate
             ? currentExchangeRate - lastReportedExchangeRate
-            : 0; // Only capture positive yield
+            : 0; // Only capture positive yield (shouldn't happen)
 
         uint256 profitInEth = (mEthBalance.rayMul(deltaExchangeRate)).rayDiv(1e18);
 
@@ -139,15 +139,6 @@ contract MethYieldStrategy is DragonBaseStrategy, IMethYieldStrategy {
         lastReportedExchangeRate = currentExchangeRate;
 
         return profitInMeth;
-    }
-
-    /**
-     * @notice Set the last reported exchange rate (only for testing or initialization)
-     * @param _newRate The new exchange rate to set
-     * @dev Internal helper function that might be used in testing
-     */
-    function _setLastReportedExchangeRate(uint256 _newRate) internal {
-        lastReportedExchangeRate = _newRate;
     }
 
     /**
