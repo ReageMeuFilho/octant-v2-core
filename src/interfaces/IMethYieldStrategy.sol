@@ -3,8 +3,8 @@ pragma solidity >=0.8.18;
 
 interface IMethYieldStrategy {
     /**
-     * @notice Get the current exchange rate of mETH to ETH
-     * @return The current exchange rate (mETH to ETH ratio, scaled by 1e18)
+     * @notice Get the last reported exchange rate of mETH to ETH
+     * @return The last reported exchange rate (mETH to ETH ratio, scaled by 1e18)
      */
-    function getCurrentExchangeRate() external view returns (uint256);
+    function getLastReportedExchangeRate() external view returns (uint256);
 }
