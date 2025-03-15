@@ -1,28 +1,31 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity >=0.8.18;
+pragma solidity ^0.8.25;
 
 import { DragonBaseStrategy } from "src/dragons/vaults/DragonBaseStrategy.sol";
 import { IERC4626Payable } from "src/interfaces/IERC4626Payable.sol";
 import { IMantleStaking } from "src/interfaces/IMantleStaking.sol";
 import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
 import { IMethYieldStrategy } from "src/interfaces/IMethYieldStrategy.sol";
-import { IYieldBearingDragonTokenizedStrategy } from "src/interfaces/IYieldBearingDragonTokenizedStrategy.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+import { WadRayMath } from "src/libraries/Maths/WadRay.sol";
 
 /**
  * @title MethYieldStrategy
  * @notice A strategy that manages mETH (Mantle liquid staked ETH) and captures yield from its appreciation
- * @dev This strategy tracks the ETH value of mETH deposits and captures yield as mETH appreciates
+ * @dev This strategy tracks the ETH value of mETH deposits and captures yield as mETH appreciates in value.
+ *      The strategy works with YieldBearingDragonTokenizedStrategy to properly handle the yield accounting.
  */
 contract MethYieldStrategy is DragonBaseStrategy, IMethYieldStrategy {
+    using WadRayMath for uint256;
+
     /// @dev The Mantle staking contract that provides exchange rate information
     IMantleStaking public immutable MANTLE_STAKING = IMantleStaking(0xe3cBd06D7dadB3F4e6557bAb7EdD924CD1489E8f);
 
     /// @dev The ETH value of 1 mETH at the last harvest, scaled by 1e18
-    uint256 public lastExchangeRate;
+    uint256 internal lastReportedExchangeRate;
 
     /// @dev Initialize function, will be triggered when a new proxy is deployed
-    /// @dev owner of this module will the safe multisig that calls setUp function
     /// @param initializeParams Parameters of initialization encoded
     function setUp(bytes memory initializeParams) public override initializer {
         (address _owner, bytes memory data) = abi.decode(initializeParams, (address, bytes));
@@ -54,24 +57,25 @@ contract MethYieldStrategy is DragonBaseStrategy, IMethYieldStrategy {
             _regenGovernance
         );
 
+        // Initialize the exchange rate on setup
+        lastReportedExchangeRate = _getCurrentExchangeRate();
+
         setAvatar(_owner);
         setTarget(_owner);
         transferOwnership(_owner);
-
-        // Initialize the exchange rate
-        lastExchangeRate = _getCurrentExchangeRate();
     }
 
     /**
      * @inheritdoc IMethYieldStrategy
      */
-    function getCurrentExchangeRate() public view returns (uint256) {
-        return _getCurrentExchangeRate();
+    function getLastReportedExchangeRate() public view returns (uint256) {
+        return lastReportedExchangeRate;
     }
 
     /**
-     * @dev No funds deployment needed as mETH already generates yield
+     * @notice No funds deployment needed as mETH already generates yield
      * @param _amount Amount to deploy (ignored in this strategy)
+     * @dev This is a passive strategy, so no deployment action is needed
      */
     function _deployFunds(uint256 _amount) internal override {
         // No action needed - mETH is already a yield-bearing asset
@@ -79,8 +83,9 @@ contract MethYieldStrategy is DragonBaseStrategy, IMethYieldStrategy {
     }
 
     /**
-     * @dev Emergency withdrawal is just transferring mETH tokens
+     * @notice Emergency withdrawal function to transfer mETH tokens to emergency admin
      * @param _amount Amount of mETH to withdraw in emergency
+     * @dev Simple transfer of tokens to the emergency admin address
      */
     function _emergencyWithdraw(uint256 _amount) internal override {
         // Transfer the mETH tokens to the emergency admin
@@ -89,8 +94,9 @@ contract MethYieldStrategy is DragonBaseStrategy, IMethYieldStrategy {
     }
 
     /**
-     * @dev No funds to free as we're just transferring mETH tokens
+     * @notice No funds to free as we're just transferring mETH tokens
      * @param _amount Amount to free (ignored in this strategy)
+     * @dev Withdrawal is handled by the TokenizedStrategy layer
      */
     function _freeFunds(uint256 _amount) internal override {
         // No action needed - we just need to transfer mETH tokens
@@ -98,8 +104,9 @@ contract MethYieldStrategy is DragonBaseStrategy, IMethYieldStrategy {
     }
 
     /**
-     * @dev Gets the current exchange rate from the Mantle staking contract
+     * @notice Gets the current exchange rate from the Mantle staking contract
      * @return The current exchange rate (mETH to ETH ratio, scaled by 1e18)
+     * @dev Uses the Mantle staking contract as the authoritative source for exchange rates
      */
     function _getCurrentExchangeRate() internal view virtual returns (uint256) {
         // Calculate the exchange rate by determining how much ETH 1e18 mETH is worth
@@ -107,60 +114,54 @@ contract MethYieldStrategy is DragonBaseStrategy, IMethYieldStrategy {
     }
 
     /**
-     * @dev Captures yield by calculating the increase in ETH value of our mETH holdings
-     * @return totalAssets The total mETH balance after accounting for yield
+     * @notice Captures yield by calculating the increase in ETH value based on exchange rate changes
+     * @return profitInMeth The profit in mETH terms calculated from exchange rate appreciation
+     * @dev Uses ray math for precise calculations and converts ETH profit to mETH
      */
     function _harvestAndReport() internal virtual override returns (uint256) {
-        // Get current exchange rate
         uint256 currentExchangeRate = _getCurrentExchangeRate();
 
-        // fetch available yield
-        uint256 availableYield = IYieldBearingDragonTokenizedStrategy(address(this)).availableYield();
-
+        // Get the current balance of mETH in the strategy
         address assetAddress = IERC4626Payable(address(this)).asset();
+        uint256 mEthBalance = IERC20(assetAddress).balanceOf(address(this));
 
-        // Get actual mETH balance
-        uint256 mEthBalance = IERC20(assetAddress).balanceOf(address(this)) - availableYield;
+        // Calculate the profit in ETH terms
+        uint256 deltaExchangeRate = currentExchangeRate > lastReportedExchangeRate
+            ? currentExchangeRate - lastReportedExchangeRate
+            : 0; // Only capture positive yield
 
-        uint256 accountingBalance = IERC4626Payable(address(this)).totalAssets();
+        uint256 profitInEth = (mEthBalance.rayMul(deltaExchangeRate)).rayDiv(1e18);
 
-        // Calculate the adjusted balance that accounts for value appreciation
-        uint256 adjustedBalance;
-        if (currentExchangeRate > lastExchangeRate) {
-            // 1. Calculate the ETH value at current and previous rates
-            uint256 currentEthValue = (mEthBalance * currentExchangeRate) / 1e18;
-            uint256 previousEthValue = (mEthBalance * lastExchangeRate) / 1e18;
+        // Calculate the profit in mETH terms
+        uint256 profitInMeth = (profitInEth.rayMul(1e18)).rayDiv(currentExchangeRate);
 
-            // 2. The profit in ETH terms is the difference
-            uint256 profitInEth = currentEthValue - previousEthValue;
+        // Update the exchange rate for the next harvest
+        lastReportedExchangeRate = currentExchangeRate;
 
-            // 3. Convert this profit to mETH at the current exchange rate
-            uint256 profitInMEth = (profitInEth * 1e18) / currentExchangeRate;
-
-            // 4. Add this profit to the ACCOUNTING balance (not just the raw token balance)
-            adjustedBalance = accountingBalance + profitInMEth;
-        } else {
-            // No appreciation or depreciation
-            adjustedBalance = accountingBalance;
-        }
-
-        // Update the exchange rate for next time
-        lastExchangeRate = currentExchangeRate;
-
-        // Return the adjusted balance which includes the profit
-        return adjustedBalance;
+        return profitInMeth;
     }
 
     /**
-     * @dev No tending needed as mETH already generates yield
+     * @notice Set the last reported exchange rate (only for testing or initialization)
+     * @param _newRate The new exchange rate to set
+     * @dev Internal helper function that might be used in testing
+     */
+    function _setLastReportedExchangeRate(uint256 _newRate) internal {
+        lastReportedExchangeRate = _newRate;
+    }
+
+    /**
+     * @notice No tending needed as mETH already generates yield
+     * @dev This strategy is passive and doesn't require tending
      */
     function _tend(uint256 /*_idle*/) internal override {
         // No action needed - mETH is already a yield-bearing asset
     }
 
     /**
-     * @dev Always returns false as no tending is needed
+     * @notice Always returns false as no tending is needed
      * @return Always false as tending is not required
+     * @dev This strategy is passive and doesn't require tending
      */
     function _tendTrigger() internal pure override returns (bool) {
         return false;
