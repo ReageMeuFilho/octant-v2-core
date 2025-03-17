@@ -13,9 +13,9 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
     // DragonTokenizedStrategy storage slot
     bytes32 internal constant DRAGON_TOKENIZED_STRATEGY_STORAGE = keccak256("DragonTokenizedStrategy.storage");
 
-    // /**
-    //  * @inheritdoc IDragonTokenizedStrategy
-    //  */
+    /**
+     * @inheritdoc IDragonTokenizedStrategy
+     */
     function toggleDragonMode(bool enabled) external override onlyOperator {
         DragonTokenizedStrategyStorage storage S = _dragonTokenizedStrategyStorage();
         if (enabled == S.isDragonOnly) revert DragonTokenizedStrategy__NoOperation();
@@ -45,6 +45,8 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
         address _dragonRouter,
         address _regenGovernance
     ) external override(TokenizedStrategy, ITokenizedStrategy) {
+        // set dragon only to true
+        _dragonTokenizedStrategyStorage().isDragonOnly = true;
         __TokenizedStrategy_init(_asset, _name, _operator, _management, _keeper, _dragonRouter, _regenGovernance);
     }
 

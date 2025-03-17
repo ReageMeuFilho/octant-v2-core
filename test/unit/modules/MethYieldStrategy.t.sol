@@ -390,4 +390,56 @@ contract MethYieldStrategyTest is BaseTest {
             "Depositor should have received 10 ETH"
         );
     }
+
+    /**
+     * @notice Test emergency withdrawal functionality
+     */
+    function testEmergencyWithdraw() public {
+        // Reset state tracking variables
+        currentCycleRate = 0;
+
+        // First make sure dragon-only mode is disabled
+        bool isDragonOnly = IDragonTokenizedStrategy(address(strategy)).isDragonOnly();
+        if (isDragonOnly) {
+            vm.prank(temps.safe);
+            IDragonTokenizedStrategy(address(strategy)).toggleDragonMode(false);
+        }
+
+        // STEP 1: DEPOSIT
+        mockMeth.mint(depositor, 10 ether);
+        vm.startPrank(depositor);
+        mockMeth.approve(address(strategy), 10 ether);
+        IDragonTokenizedStrategy(address(strategy)).deposit(10 ether, depositor);
+        vm.stopPrank();
+
+        // Verify initial balance
+        assertEq(mockMeth.balanceOf(address(strategy)), 10 ether, "Initial balance should be 10 mETH");
+
+        // STEP 2: Set emergency admin
+        address emergencyAdmin = makeAddr("emergencyAdmin");
+        vm.prank(management);
+        ITokenizedStrategy(address(strategy)).setEmergencyAdmin(emergencyAdmin);
+
+        // Verify emergency admin was set
+        assertEq(
+            ITokenizedStrategy(address(strategy)).emergencyAdmin(),
+            emergencyAdmin,
+            "Emergency admin should be set correctly"
+        );
+
+        // STEP 3: Trigger emergency shutdown
+        vm.prank(emergencyAdmin);
+        ITokenizedStrategy(address(strategy)).shutdownStrategy();
+
+        // Verify strategy is shut down
+        assertTrue(ITokenizedStrategy(address(strategy)).isShutdown(), "Strategy should be shut down");
+
+        // STEP 4: Emergency withdraw
+        vm.prank(emergencyAdmin);
+        ITokenizedStrategy(address(strategy)).emergencyWithdraw(10 ether);
+
+        // Verify funds were transferred to emergency admin
+        assertEq(mockMeth.balanceOf(emergencyAdmin), 10 ether, "Emergency admin should have received all mETH");
+        assertEq(mockMeth.balanceOf(address(strategy)), 0, "Strategy should have 0 mETH");
+    }
 }
