@@ -10,25 +10,29 @@ import { IERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
 
 contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy {
-    bool public override isDragonOnly = true;
+    // DragonTokenizedStrategy storage slot
+    bytes32 internal constant DRAGON_TOKENIZED_STRATEGY_STORAGE = keccak256("DragonTokenizedStrategy.storage");
 
     // /**
     //  * @inheritdoc IDragonTokenizedStrategy
     //  */
     function toggleDragonMode(bool enabled) external override onlyOperator {
-        if (enabled == isDragonOnly) revert DragonTokenizedStrategy__NoOperation();
-        isDragonOnly = enabled;
+        DragonTokenizedStrategyStorage storage S = _dragonTokenizedStrategyStorage();
+        if (enabled == S.isDragonOnly) revert DragonTokenizedStrategy__NoOperation();
+        S.isDragonOnly = enabled;
         emit DragonModeToggled(enabled);
     }
 
     modifier onlyOperatorIfDragonMode() {
-        if (isDragonOnly && msg.sender != super._strategyStorage().operator) revert TokenizedStrategy__NotOperator();
+        DragonTokenizedStrategyStorage storage S = _dragonTokenizedStrategyStorage();
+        if (S.isDragonOnly && msg.sender != super._strategyStorage().operator) revert TokenizedStrategy__NotOperator();
         _;
     }
 
     modifier validateArgsForLockupFunctions(address receiver, uint256 lockupDuration) {
+        DragonTokenizedStrategyStorage storage S = _dragonTokenizedStrategyStorage();
         if (lockupDuration == 0) revert DragonTokenizedStrategy__ZeroLockupDuration();
-        if (!isDragonOnly && receiver != msg.sender) revert DragonTokenizedStrategy__InvalidReceiver();
+        if (!S.isDragonOnly && receiver != msg.sender) revert DragonTokenizedStrategy__InvalidReceiver();
         _;
     }
 
@@ -143,6 +147,14 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
         } else {
             return 0;
         }
+    }
+
+    /**
+     * @inheritdoc IDragonTokenizedStrategy
+     */
+    function isDragonOnly() external view returns (bool) {
+        DragonTokenizedStrategyStorage storage S = _dragonTokenizedStrategyStorage();
+        return S.isDragonOnly;
     }
 
     /**
@@ -512,5 +524,14 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
         bytes32
     ) external pure override(TokenizedStrategy, IERC20Permit) {
         revert DragonTokenizedStrategy__VaultSharesNotTransferable();
+    }
+
+    function _dragonTokenizedStrategyStorage() internal pure returns (DragonTokenizedStrategyStorage storage S) {
+        // Since STORAGE_SLOT is a constant, we have to put a variable
+        // on the stack to access it from an inline assembly block.
+        bytes32 slot = DRAGON_TOKENIZED_STRATEGY_STORAGE;
+        assembly ("memory-safe") {
+            S.slot := slot
+        }
     }
 }
