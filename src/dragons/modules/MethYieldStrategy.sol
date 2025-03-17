@@ -7,8 +7,8 @@ import { IMantleStaking } from "src/interfaces/IMantleStaking.sol";
 import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
 import { IMethYieldStrategy } from "src/interfaces/IMethYieldStrategy.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
 import { WadRayMath } from "src/libraries/Maths/WadRay.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title MethYieldStrategy
@@ -18,6 +18,7 @@ import { WadRayMath } from "src/libraries/Maths/WadRay.sol";
  */
 contract MethYieldStrategy is DragonBaseStrategy, IMethYieldStrategy {
     using WadRayMath for uint256;
+    using SafeERC20 for IERC20;
 
     /// @dev The Mantle staking contract that provides exchange rate information
     IMantleStaking public immutable MANTLE_STAKING = IMantleStaking(0xe3cBd06D7dadB3F4e6557bAb7EdD924CD1489E8f);
@@ -40,14 +41,11 @@ contract MethYieldStrategy is DragonBaseStrategy, IMethYieldStrategy {
             address _mETH
         ) = abi.decode(data, (address, address, address, address, uint256, address, address));
 
-        // The asset is mETH from Mantle
-        address _asset = _mETH;
-
         __Ownable_init(msg.sender);
         string memory _name = "Octant mETH Yield Strategy";
         __BaseStrategy_init(
             _tokenizedStrategyImplementation,
-            _asset,
+            _mETH,
             _owner,
             _management,
             _keeper,
@@ -90,7 +88,7 @@ contract MethYieldStrategy is DragonBaseStrategy, IMethYieldStrategy {
     function _emergencyWithdraw(uint256 _amount) internal override {
         // Transfer the mETH tokens to the emergency admin
         address emergencyAdmin = ITokenizedStrategy(address(this)).emergencyAdmin();
-        asset.transfer(emergencyAdmin, _amount);
+        IERC20(asset).safeTransfer(emergencyAdmin, _amount);
     }
 
     /**
@@ -122,8 +120,7 @@ contract MethYieldStrategy is DragonBaseStrategy, IMethYieldStrategy {
         uint256 currentExchangeRate = _getCurrentExchangeRate();
 
         // Get the current balance of mETH in the strategy
-        address assetAddress = IERC4626Payable(address(this)).asset();
-        uint256 mEthBalance = IERC20(assetAddress).balanceOf(address(this));
+        uint256 mEthBalance = IERC20(asset).balanceOf(address(this));
 
         // Calculate the profit in ETH terms
         uint256 deltaExchangeRate = currentExchangeRate > lastReportedExchangeRate
