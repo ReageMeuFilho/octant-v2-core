@@ -11,9 +11,6 @@ reports/
 # Ignore broadcast logs
 /broadcast
 
-# Docs
-docs/
-
 # Dotenv/direnv files
 .env
 .envrc
