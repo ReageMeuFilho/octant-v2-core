@@ -20,10 +20,10 @@ Detailed list of inherited contracts and their roles.
 
 ## Attack Surface:
 
-- AS1: havest() would be bricked if yield is kept accumulating for a long time which results in owner().balance exceeding maxYield. In that case the owner of the module would have to manually send the yield to the dragon router.
+- AS1: harvest() would be bricked if yield is kept accumulating for a long time which results in owner().balance exceeding maxYield. In that case the owner of the module would have to manually send the yield to the dragon router.
 - AS2: If the owner's safe multisig is exploited (ie. private keys are leaked) then attacker can increase the max yield and redirect the principal to the dragon router. In this case also the funds would not be lost. We will have rescue funds on the dragon router which may allow us to rescue these funds.
 
 ## Mitigation Strategies:
 
-- AS1: To migitate this we setup a bot that harvest at regular intervals to avoid owner().balance exceeding maxYield.
+- AS1: To mitigate this we setup a bot that harvests at regular intervals to avoid owner().balance exceeding maxYield.
 - AS2: We could add Octant Governance multisig as a second to the dragon's safe which would re-verify transactions and provide another layer of security.
