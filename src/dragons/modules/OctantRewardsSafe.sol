@@ -56,7 +56,7 @@ contract OctantRewardsSafe is Module {
     /// @dev Emitted when keeper confirm new `amount` of validators are added.
     event NewValidatorsConfirmed(uint256 newValidators, uint256 totalValidators);
     /// @dev Emitted when keeper confirm `amount` of validators are exited.
-    event ExitValidatorsConfirmed(uint256 validtorsExited, uint256 totalValidators);
+    event ExitValidatorsConfirmed(uint256 validatorsExited, uint256 totalValidators);
 
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
     /*                        MODIFIERS                           */
@@ -122,7 +122,7 @@ contract OctantRewardsSafe is Module {
         emit RequestNewValidators(amount, newValidators);
     }
 
-    /// @dev Request the number of validtors to be exited.
+    /// @dev Request the number of validators to be exited.
     ///      Can be only called by the owner of the module.
     /// @param amount Amount of validators to be exited.
     function requestExitValidators(uint256 amount) external onlyOwner {
@@ -171,14 +171,14 @@ contract OctantRewardsSafe is Module {
     /// @dev Confirm's validators are exited and withdraws principal to treasury.
     ///      Can be only called by the owner of the module.
     function confirmExitValidators() external onlyKeeper {
-        uint256 validtorsExited = exitedValidators;
-        require(validtorsExited != 0, OctantRewardsSafe__InvalidNumberOfValidators(validtorsExited));
+        uint256 validatorsExited = exitedValidators;
+        require(validatorsExited != 0, OctantRewardsSafe__InvalidNumberOfValidators(validatorsExited));
 
-        totalValidators -= validtorsExited;
+        totalValidators -= validatorsExited;
         exitedValidators = 0;
-        bool success = exec(treasury, validtorsExited * 32 ether, "", Enum.Operation.Call);
-        require(success, OctantRewardsSafe__TransferFailed(validtorsExited * 32 ether));
-        emit Transfer(owner(), treasury, validtorsExited * 32 ether);
-        emit ExitValidatorsConfirmed(validtorsExited, totalValidators);
+        bool success = exec(treasury, validatorsExited * 32 ether, "", Enum.Operation.Call);
+        require(success, OctantRewardsSafe__TransferFailed(validatorsExited * 32 ether));
+        emit Transfer(owner(), treasury, validatorsExited * 32 ether);
+        emit ExitValidatorsConfirmed(validatorsExited, totalValidators);
     }
 }

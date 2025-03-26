@@ -1,7 +1,7 @@
 # TokenizedStrategy.sol
 
 ## Executive Summary:
-We are forking the Yearn Tokenized Strategy to support yield donations that are agnistic to the underlying protocols principal deployed. We will use this as the core to a dragon vault. This will allow for the creation of sustainable sources of funded by the underlying principal as well as borrowing from existing Yearn V3 strategies to generate yield. This requires us to fork some of the TokenizedStrategy.sol implementation to manage yield and principal separately and securely. Our goals are to have:
+We are forking the Yearn Tokenized Strategy to support yield donations that are agnostic to the underlying protocols principal deployed. We will use this as the core to a dragon vault. This will allow for the creation of sustainable sources of funded by the underlying principal as well as borrowing from existing Yearn V3 strategies to generate yield. This requires us to fork some of the TokenizedStrategy.sol implementation to manage yield and principal separately and securely. Our goals are to have:
 
 1) Separate yield from principal: Users deposit assets and receive 1:1 vault tokens and the asset-to-share ratio should remain constant (1:1).
 2) Yield tracking: The strategy should earn yield as before but Yield must be tracked separately from the principal.

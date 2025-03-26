@@ -57,7 +57,7 @@ contract Trader is ITransformer, Ownable, Pausable {
                           STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Contract that temporary stores sold token and makes sure that Trader/beneficier gets fair price.
+    /// @notice Contract that temporary stores sold token and makes sure that Trader/beneficiary gets fair price.
     address public swapper;
     /// @notice Address of the contract that integrates Uniswap (or possibly some other exchange). Implements IUniV3Swap interface.
     address public integrator;
@@ -145,10 +145,10 @@ contract Trader is ITransformer, Ownable, Pausable {
     ///      address _quote - bought token. If it is ETH, use whatever address that ETH() function returns.
     ///      address _wethAddress - address of WETH.
     ///      address _beneficiary - bought token will be sent to this address
-    ///      address _swapper - address of the contact that makes sure beneficiery is not being shortchanged during swapping.
+    ///      address _swapper - address of the contact that makes sure beneficiary is not being shortchanged during swapping.
     ///              Must implement ISwapperImpl interface.
     ///      address _integrator - address of the contract that does actual swapping. Must implement ISwapperFlashCallback interface.
-    ///      address _oracle - oracle used by Splits' Swapper to ensure that beneficiery gets fair price.
+    ///      address _oracle - oracle used by Splits' Swapper to ensure that beneficiary gets fair price.
     /// @param initializeParams Parameters of initialization encoded
     constructor(bytes memory initializeParams) {
         (
@@ -202,7 +202,7 @@ contract Trader is ITransformer, Ownable, Pausable {
 
     /// @notice This is a helper function, that can be used to trigger swapper's initFlash.
     /// @param amount Amount of `base` token that will be traded for `quote` token.
-    /// @return Amount of `quote` token that beneficiery has received.
+    /// @return Amount of `quote` token that beneficiary has received.
     /// @dev If `transform` interface is not used, `convert` and `callInitFlash` provide an alternative integration path.
     function callInitFlash(uint256 amount) public returns (uint256) {
         uint256 oldQuoteBalance = safeBalanceOf(quote, beneficiary);
@@ -243,13 +243,13 @@ contract Trader is ITransformer, Ownable, Pausable {
         else return b;
     }
 
-    /// @notice Implements Transformer.trader interface. This function can be used to synchroniously convert one token to other token.
+    /// @notice Implements Transformer.trader interface. This function can be used to synchronously convert one token to other token.
     ///         Please note that amount needs to be carefully chosen (see `findSaleValue(...)`).
     ///         This function will throw if fromToken and toToken are different from base and quote respectively.
     /// @param fromToken needs to be set to value of `base()`.
     /// @param toToken needs to be set to value of `quote()`.
     /// @param amount needs to be set to what `findSaleValue(...)` returns.
-    /// @return amount of quote token that will be transferred to beneficiery.
+    /// @return amount of quote token that will be transferred to beneficiary.
     function transform(address fromToken, address toToken, uint256 amount) external payable returns (uint256) {
         if ((fromToken != base) || (toToken != quote)) revert Trader__ImpossibleConfiguration();
         if (fromToken == ETH) {
@@ -274,7 +274,7 @@ contract Trader is ITransformer, Ownable, Pausable {
 
     /// @notice Transfers funds that are to be converted by to target token by external converter.
     /// @param height that will be used as a source of randomness. One height value can be used only once.
-    /// @return amount of base token that is transfered to the swapper.
+    /// @return amount of base token that is transferred to the swapper.
     function convert(uint256 height) public whenNotPaused returns (uint256) {
         if (deadline < block.number) {
             deadline = nextDeadline();

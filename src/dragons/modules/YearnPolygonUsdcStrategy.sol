@@ -73,7 +73,7 @@ contract YearnPolygonUsdcStrategy is DragonBaseStrategy {
     }
 
     /* @dev As we are using yearn vault, the strategy accrues yield in the vault. so the value of strategy's shares
-     * is increased therfore to accrue rewards to the dragon router we have to withdraw all funds and deposit back the remaining funds after
+     * is increased therefore to accrue rewards to the dragon router we have to withdraw all funds and deposit back the remaining funds after
      * shares of dragon router are allocated.
      */
     function _harvestAndReport() internal override returns (uint256) {
