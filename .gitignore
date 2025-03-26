@@ -1,4 +1,8 @@
 .DS_Store
+reports/
+lcov.info
+gasreport.txt
+
 # IDE
 .idea/
 
@@ -9,7 +13,7 @@ coverage/
 reports/
 
 # Ignore broadcast logs
-/broadcast
+broadcast/
 
 # Dotenv/direnv files
 .env
