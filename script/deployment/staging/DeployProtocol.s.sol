@@ -16,6 +16,7 @@ import {DeployDragonTokenizedStrategy} from "script/deploy/DeployDragonTokenized
 import {DeployMockStrategy} from "script/deploy/DeployMockStrategy.sol";
 import {DeployHatsProtocol} from "script/deploy/DeployHatsProtocol.sol";
 import {LinearAllowanceSingletonForGnosisSafe} from "src/dragons/modules/LinearAllowanceSingletonForGnosisSafe.sol";
+import {DeployHats} from "script/deploy/DeployHats.sol";
 
 /**
  * @title DeployProtocol
@@ -37,6 +38,7 @@ contract DeployProtocol is Script {
     ModuleProxyFactory public moduleProxyFactory;
     LinearAllowanceSingletonForGnosisSafe public linearAllowanceSingletonForGnosisSafe;
     DragonTokenizedStrategy public dragonTokenizedStrategySingleton;
+    DeployHats public deployHats;
 
     // Deployed contract addresses
     address public safeAddress;
@@ -56,6 +58,7 @@ contract DeployProtocol is Script {
         deployDragonTokenizedStrategy = new DeployDragonTokenizedStrategy();
         deployDragonRouter = new DeployDragonRouter();
         deployMockStrategy = new DeployMockStrategy();
+        deployHats = new DeployHats();
     }
 
     function run() public {
@@ -128,18 +131,23 @@ contract DeployProtocol is Script {
         mockStrategyAddress = address(deployMockStrategy.mockStrategyProxy());
         if (mockStrategyAddress == address(0)) revert DeploymentFailed();
 
+        // Deploy HATS with random SALT
+        deployHats.deploy();
+
         // Log deployment addresses
         console2.log("\nDeployment Summary:");
         console2.log("------------------");
-        console2.log("Safe:                       ", safeAddress);
-        console2.log("Safe threshold:             ", SAFE_THRESHOLD);
-        console2.log("Safe owners:                ", SAFE_TOTAL_OWNERS);
-        console2.log("Module Proxy Factory:       ", moduleProxyFactoryAddress);
-        console2.log("Dragon Tokenized Strategy:  ", dragonTokenizedStrategyAddress);
-        console2.log("Dragon Router:              ", dragonRouterAddress);
-        console2.log("Split Checker:              ", address(deployDragonRouter.splitCheckerProxy()));
-        console2.log("Mock Strategy:              ", mockStrategyAddress);
-        console2.log("Linear Allowance Singleton: ", linearAllowanceSingletonForGnosisSafeAddress);
+        console2.log("Safe:                      ", safeAddress);
+        console2.log("Safe threshold:            ", SAFE_THRESHOLD);
+        console2.log("Safe owners:               ", SAFE_TOTAL_OWNERS);
+        console2.log("Module Proxy Factory:      ", moduleProxyFactoryAddress);
+        console2.log("Dragon Tokenized Strategy: ", dragonTokenizedStrategyAddress);
+        console2.log("Dragon Router:             ", dragonRouterAddress);
+        console2.log("Split Checker:             ", address(deployDragonRouter.splitCheckerProxy()));
+        console2.log("Mock Strategy:             ", mockStrategyAddress);
+        console2.log("Linear Allowance Singleton:", linearAllowanceSingletonForGnosisSafeAddress);
+        console2.log("Hats contract:             ", address(deployHats.hats()));
+        console2.log("Hats salt:                 ", vm.toString(deployHats.salt()));
         console2.log("------------------");
         console2.log("ENV|DRAGON_TOKENIZED_STRATEGY_ADDRESS=", dragonTokenizedStrategyAddress);
         console2.log("ENV|DRAGON_ROUTER_ADDRESS=", dragonRouterAddress);
