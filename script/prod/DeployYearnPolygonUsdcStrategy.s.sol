@@ -126,7 +126,7 @@ contract DeployYearnPolygonUsdcStrategy is DeployDragonRouter {
     function _deploySafe() internal {
         // Initialize owners and threshold
         owners = [vm.envAddress("OWNER")];
-        threshold = vm.envUint("THRESHOLD");
+        threshold = vm.envUint("SAFE_THRESHOLD");
 
         // Set the addresses for the Safe singleton and Proxy Factory
         safeSingleton = vm.envAddress("SAFE_SINGLETON");
