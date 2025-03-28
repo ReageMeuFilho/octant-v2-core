@@ -95,7 +95,6 @@ contract SplitChecker is ISplitChecker, Initializable {
     /// @param _maxOpexSplit New maximum split value (scaled by 1e18)
     function setMaxOpexSplit(uint256 _maxOpexSplit) external onlyGovernance {
         _setMaxOpexSplit(_maxOpexSplit);
-        emit MaxOpexSplitUpdated(_maxOpexSplit);
     }
 
     // =============================================================
