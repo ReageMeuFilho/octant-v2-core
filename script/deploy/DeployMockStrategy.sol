@@ -11,7 +11,6 @@ import {ISafe} from "src/interfaces/Safe.sol";
 import {IMockStrategy} from "test/mocks/IMockStrategy.sol";
 
 contract DeployMockStrategy is DeployModuleProxyFactory {
-    // DeployModuleProxyFactory public moduleProxyFactory;
     MockStrategy public mockStrategySingleton;
     IMockStrategy public mockStrategyProxy;
     MockYieldSource public mockYieldSource;
@@ -21,22 +20,11 @@ contract DeployMockStrategy is DeployModuleProxyFactory {
     address public dragonTokenizedStrategyAddress;
     address public dragonRouterProxyAddress;
 
-    function deploy(
-        address _safeAddress,
-        address _dragonTokenizedStrategyAddress,
-        address _dragonRouterProxyAddress
-    ) public virtual {
+    function deploy() public override {
         // Store addresses in storage
-        safeAddress = _safeAddress;
-        dragonTokenizedStrategyAddress = _dragonTokenizedStrategyAddress;
-        dragonRouterProxyAddress = _dragonRouterProxyAddress;
-
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
-        // Deploy module proxy factory first
-        DeployModuleProxyFactory.deploy();
-        
         // Deploy test token
         token = new MockERC20();
         
@@ -46,19 +34,42 @@ contract DeployMockStrategy is DeployModuleProxyFactory {
         // Deploy mock yield source
         mockYieldSource = new MockYieldSource(address(token));
 
+        vm.stopBroadcast();
+    }
+
+    function deploy(
+        address _safeAddress,
+        address _dragonTokenizedStrategyAddress,
+        address _dragonRouterProxyAddress
+    ) public virtual {
+        deploy(_safeAddress, _dragonTokenizedStrategyAddress, _dragonRouterProxyAddress, address(0));
+    }
+
+    function deploy(
+        address _safeAddress,
+        address _dragonTokenizedStrategyAddress,
+        address _dragonRouterProxyAddress,
+        address _moduleProxyFactoryAddress
+    ) public virtual {
+        // Store addresses in storage
+        safeAddress = _safeAddress;
+        dragonTokenizedStrategyAddress = _dragonTokenizedStrategyAddress;
+        dragonRouterProxyAddress = _dragonRouterProxyAddress;
+
+        deploy();
+
+        // Deploy module proxy factory first
+        if(_moduleProxyFactoryAddress == address(0)) {
+            DeployModuleProxyFactory.deploy();
+        } else {
+            moduleProxyFactory = ModuleProxyFactory(_moduleProxyFactoryAddress);
+        }
+
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        vm.startBroadcast(deployerPrivateKey);
+
         uint256 _maxReportDelay = 1 days;
         string memory _name = "Mock Dragon Strategy";
-
-        // console2.log("Safe Address:", safeAddress);
-        // console2.log("Dragon Tokenized Strategy Address:", dragonTokenizedStrategyAddress);
-        // console2.log("Mock Token:", address(token));
-        // console2.log("MockYieldSource:", address(mockYieldSource));
-        // console2.log("Management:", safeAddress);
-        // console2.log("Keeper:", safeAddress);
-        // console2.log("Dragon Router Proxy Address:", dragonRouterProxyAddress);
-        // console2.log("Max Report Delay:", _maxReportDelay);
-        // console2.log("Name:", _name);
-        // console2.log("MockStrategy Implementation:", address(mockStrategySingleton));
 
         // Prepare initialization data
         // First encode the strategy initialization parameters
@@ -76,7 +87,7 @@ contract DeployMockStrategy is DeployModuleProxyFactory {
 
         // Then encode the full initialization call with owner and params
         bytes memory initData = abi.encodeWithSignature(
-            "setUp(bytes)", 
+            "setUp(bytes)",
             abi.encode(safeAddress, strategyParams)
         );
 
@@ -87,16 +98,8 @@ contract DeployMockStrategy is DeployModuleProxyFactory {
             block.timestamp
         );
         mockStrategyProxy = IMockStrategy(payable(address(proxy)));
-        
-        // ISafe(safeAddress).enableModule(address(mockStrategyProxy));
 
-        // Log deployments
-        // console2.log("MockStrategy Implementation:", address(mockStrategySingleton));
-        // console2.log("MockStrategy Proxy:", address(mockStrategyProxy));
-        // console2.log("MockYieldSource:", address(mockYieldSource));
-        // console2.log("Mock Token:", address(token));
-        // console2.log("library address", address(mockStrategyProxy.tokenizedStrategyImplementation()));
-        // console2.log("hats initialized", dragonTokenizedStrategyAddress);
+        // ISafe(safeAddress).enableModule(address(mockStrategyProxy));
 
         vm.stopBroadcast();
     }
