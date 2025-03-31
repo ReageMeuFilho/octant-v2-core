@@ -2,7 +2,6 @@
 pragma solidity ^0.8.25;
 
 import "forge-std/Test.sol";
-import {console2} from "forge-std/console2.sol";
 import {ModuleProxyFactory} from "src/dragons/ModuleProxyFactory.sol";
 
 /**
@@ -16,11 +15,12 @@ contract DeployModuleProxyFactory is Test {
     ModuleProxyFactory public moduleProxyFactory;
 
     function deploy() public virtual {
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        vm.startBroadcast(deployerPrivateKey);
 
         // Deploy the factory
         moduleProxyFactory = new ModuleProxyFactory();
 
-        // Log deployment information
-        // console2.log("ModuleProxyFactory deployed at:", address(moduleProxyFactory));
+        vm.stopBroadcast();
     }
 }

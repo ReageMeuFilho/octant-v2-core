@@ -29,26 +29,24 @@ contract DeployHatsProtocol is Test {
     uint256 public branchHatId;
 
     // Deployed contracts
-    Hats public HATS;
+    Hats public hats;
     DragonHatter public dragonHatter;
     SimpleEligibilityAndToggle public simpleEligibilityAndToggle;
-
-   
 
     function deploy() public virtual {
         // Start broadcasting transactions
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
-        address deployer = msg.sender;
+        address deployer = vm.addr(deployerPrivateKey);
         // 1. Deploy Hats protocol
-        HATS = new Hats(PROTOCOL_NAME, BASE_IMAGE_URI);
+        hats = new Hats(PROTOCOL_NAME, BASE_IMAGE_URI);
           // Deploy DragonHatter with branch hat ID
 
         console2.log("HATS deployed");
-        console2.log("HATS address:", address(HATS));
+        console2.log("HATS address:", address(hats));
         console2.log("Deployer address:", deployer);
         // 2. Create TopHat (1) and mint to deployer
-        topHatId = HATS.mintTopHat(
+        topHatId = hats.mintTopHat(
             deployer,
             "Dragon Protocol Top Hat",
             string.concat(BASE_IMAGE_URI, "tophat")
@@ -58,7 +56,7 @@ contract DeployHatsProtocol is Test {
         simpleEligibilityAndToggle = new SimpleEligibilityAndToggle();
 
          // 3. Create Autonomous Admin Hat (1.1)
-        autonomousAdminHatId = HATS.createHat(
+        autonomousAdminHatId = hats.createHat(
             topHatId,
             "Dragon Protocol Autonomous Admin",
             DEFAULT_MAX_SUPPLY,
@@ -70,7 +68,7 @@ contract DeployHatsProtocol is Test {
         // Note: Initially unworn - can be used later for automation
 
         // 4. Create Dragon Admin Hat (1.1.1)
-        dragonAdminHatId = HATS.createHat(
+        dragonAdminHatId = hats.createHat(
             autonomousAdminHatId,
             "Dragon Protocol Admin",
             DEFAULT_MAX_SUPPLY,
@@ -79,24 +77,24 @@ contract DeployHatsProtocol is Test {
             true, // Mutable
             string.concat(BASE_IMAGE_URI, "dragon-admin")
         );
-        
+
         // Mint Dragon Admin hat to deployer so they can deploy DragonHatter
-        HATS.mintHat(dragonAdminHatId, deployer);
+        hats.mintHat(dragonAdminHatId, deployer);
 
          // Create branch hat with proper admin rights
-        branchHatId = HATS.createHat(
+        branchHatId = hats.createHat(
             dragonAdminHatId,
             "Dragon Protocol Vault Management",
             DEFAULT_MAX_SUPPLY,              // Only one admin for branch
             address(simpleEligibilityAndToggle),     // Will be set to DragonHatter after deployment
             address(simpleEligibilityAndToggle),     // Will be set to DragonHatter after deployment
-            true,          
-            ""            
+            true,
+            ""
         );
 
         // Deploy DragonHatter with branch hat ID
         dragonHatter = new DragonHatter(
-            address(HATS),
+            address(hats),
             dragonAdminHatId,
             branchHatId
         );
@@ -106,7 +104,7 @@ contract DeployHatsProtocol is Test {
         // HATS.setHatToggle(branchHatId, address(dragonHatter));
 
         // Mint branch hat to DragonHatter
-        HATS.mintHat(branchHatId, address(dragonHatter));
+        hats.mintHat(branchHatId, address(dragonHatter));
 
         // Initialize roles
         dragonHatter.initialize();
@@ -117,8 +115,8 @@ contract DeployHatsProtocol is Test {
         dragonHatter.grantRole(dragonHatter.EMERGENCY_ROLE(), deployer);
         dragonHatter.grantRole(dragonHatter.REGEN_GOVERNANCE_ROLE(), deployer);
 
-         vm.label(address(dragonHatter), "DragonHatter");
-        vm.label(address(simpleEligibilityAndToggle), "SimpleEligibilityAndToggle");    
+        vm.label(address(dragonHatter), "DragonHatter");
+        vm.label(address(simpleEligibilityAndToggle), "SimpleEligibilityAndToggle");
         vm.label(address(msg.sender), "Deployer");
        
         vm.stopBroadcast();

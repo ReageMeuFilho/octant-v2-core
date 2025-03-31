@@ -136,7 +136,7 @@ contract DeployProtocol is Script {
         console2.log("Dragon Tokenized Strategy:", dragonTokenizedStrategyAddress);
         console2.log("Dragon Router:", dragonRouterAddress);
         console2.log("Mock Strategy:", mockStrategyAddress);
-        console2.log("Hats Protocol:", address(deployHatsProtocol.HATS()));
+        console2.log("Hats Protocol:", address(deployHatsProtocol.hats()));
         console2.log("Dragon Hatter:", address(deployHatsProtocol.dragonHatter()));
 
         // Verify deployments
