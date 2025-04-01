@@ -52,6 +52,7 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
             revert DragonTokenizedStrategy__InvalidLockupDuration();
         }
         super._strategyStorage().MINIMUM_LOCKUP_DURATION = _lockupDuration;
+        emit LockupDurationSet(_lockupDuration);
     }
 
     /**
@@ -63,6 +64,7 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
             _rageQuitCooldownPeriod > RANGE_MAXIMUM_RAGE_QUIT_COOLDOWN_PERIOD
         ) revert DragonTokenizedStrategy__InvalidRageQuitCooldownPeriod();
         super._strategyStorage().RAGE_QUIT_COOLDOWN_PERIOD = _rageQuitCooldownPeriod;
+        emit RageQuitCooldownPeriodSet(_rageQuitCooldownPeriod);
     }
 
     function minimumLockupDuration() external view returns (uint256) {
@@ -119,7 +121,7 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
             }
         }
 
-        emit NewLockupSet(user, lockup.unlockTime, lockup.lockedShares);
+        emit NewLockupSet(user, lockup.lockupTime, lockup.unlockTime, lockup.lockedShares);
     }
 
     /**

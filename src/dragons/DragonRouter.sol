@@ -194,6 +194,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
      */
     function setClaimAutomation(address strategy, bool enable) external {
         userData[msg.sender][strategy].allowBotClaim = enable;
+        emit ClaimAutomationSet(msg.sender, strategy, enable);
     }
 
     /**
@@ -223,6 +224,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
 
         data.assetPerShare += (amount * SPLIT_PRECISION) / data.totalShares;
         data.totalAssets += amount;
+        emit Funded(strategy, data.assetPerShare, data.totalAssets);
     }
 
     /**
@@ -242,11 +244,23 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
                 _userData.assets += claimableAssets;
                 _userData.userAssetPerShare = 0;
                 _userData.splitPerShare = 0;
+                emit UserSplitUpdated(
+                    split.recipients[j],
+                    _userData.assets,
+                    _userData.userAssetPerShare,
+                    _userData.splitPerShare
+                );
             }
 
             /// @dev assign to new splitters
             for (uint256 j = 0; j < _split.recipients.length; j++) {
                 userData[_split.recipients[j]][strategies[i]].splitPerShare = _split.allocations[j];
+                emit UserSplitUpdated(
+                    _split.recipients[j],
+                    userData[_split.recipients[j]][strategies[i]].assets,
+                    userData[_split.recipients[j]][strategies[i]].userAssetPerShare,
+                    _split.allocations[j]
+                );
             }
 
             data.assetPerShare = 0;
@@ -256,6 +270,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
 
         split = _split;
         lastSetSplitTime = block.timestamp;
+        emit SplitSet(0, 0, _split.totalAllocations, lastSetSplitTime);
     }
 
     /**
@@ -288,6 +303,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
         UserData storage _userData = userData[_user][_strategy];
         _userData.assets = balanceOf(_user, _strategy) - _amount;
         _userData.userAssetPerShare = strategyData[_strategy].assetPerShare;
+        emit UserSplitUpdated(_user, _userData.assets, _userData.userAssetPerShare, _userData.splitPerShare);
     }
 
     /**
