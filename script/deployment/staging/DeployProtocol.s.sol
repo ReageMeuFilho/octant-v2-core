@@ -100,13 +100,17 @@ contract DeployProtocol is Script {
         console2.log("Autonomous Admin Hat ID:   ", deployHatsProtocol.autonomousAdminHatId());
         console2.log("Dragon Admin Hat ID:       ", deployHatsProtocol.dragonAdminHatId());
         console2.log("Branch Hat ID:             ", deployHatsProtocol.branchHatId());
-        console2.log("------------------");
-        console2.log("ENV DRAGON_TOKENIZED_STRATEGY_ADDRESS", dragonTokenizedStrategyAddress);
-        console2.log("ENV DRAGON_ROUTER_ADDRESS", dragonRouterAddress);
-        console2.log("ENV SPLIT_CHECKER_ADDRESS", splitCheckerAddress);
-        console2.log("ENV MOCK_STRATEGY_SINGLETON_ADDRESS", mockStrategySingletonAddress);
-        console2.log("ENV MOCK_TOKEN_ADDRESS", mockTokenAddress);
-        console2.log("ENV MOCK_YIELD_SOURCE_ADDRESS", mockYieldSourceAddress);
-        console2.log("ENV MODULE_PROXY_FACTORY_ADDRESS", moduleProxyFactoryAddress);
+
+        string memory contractAddressFilename = "./ci/contract_addresses.txt";
+        if(vm.exists(contractAddressFilename)) {
+            vm.removeFile(contractAddressFilename);
+        }
+        vm.writeLine(contractAddressFilename, string.concat("DRAGON_TOKENIZED_STRATEGY_ADDRESS=", vm.toString(dragonTokenizedStrategyAddress)));
+        vm.writeLine(contractAddressFilename, string.concat("DRAGON_ROUTER_ADDRESS=", vm.toString(dragonRouterAddress)));
+        vm.writeLine(contractAddressFilename, string.concat("SPLIT_CHECKER_ADDRESS=", vm.toString(splitCheckerAddress)));
+        vm.writeLine(contractAddressFilename, string.concat("MOCK_STRATEGY_SINGLETON_ADDRESS=", vm.toString(mockStrategySingletonAddress)));
+        vm.writeLine(contractAddressFilename, string.concat("MOCK_TOKEN_ADDRESS=", vm.toString(mockTokenAddress)));
+        vm.writeLine(contractAddressFilename, string.concat("MOCK_YIELD_SOURCE_ADDRESS=", vm.toString(mockYieldSourceAddress)));
+        vm.writeLine(contractAddressFilename, string.concat("MODULE_PROXY_FACTORY_ADDRESS=", vm.toString(moduleProxyFactoryAddress)));
     }
 }

@@ -8,7 +8,11 @@ optimizer_runs = 10_000_000
 solc = "0.8.28"
 verbosity = 3
 ast = true
-fs_permissions = [{ access = "read-write", path = "./cache/test-artifacts/" },{ access = "read", path = "./out/"}]
+fs_permissions = [
+  { access = "read-write", path = "./cache/test-artifacts/" },
+  { access = "read", path = "./out/"},
+  { access = "read-write", path = "./ci/" }
+]
 build_info = true
 extra_output = ["storageLayout"]
 seed = "0xDEADC0DE"

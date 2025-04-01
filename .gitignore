@@ -11,6 +11,7 @@ cache/
 out/
 coverage/
 reports/
+ci/contract_addresses.txt
 
 # Ignore broadcast logs
 broadcast/
