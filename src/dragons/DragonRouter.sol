@@ -35,8 +35,8 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
 
-    uint256 public DRAGON_SPLIT_COOLDOWN_PERIOD;
-    uint256 public SPLIT_DELAY;
+    uint256 public coolDownPeriod;
+    uint256 public splitDelay;
     ISplitChecker public splitChecker;
     address public opexVault;
     address public metapool;
@@ -59,7 +59,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
     /// @dev owner of this module will the safe multisig that calls setUp function
     /// @param initializeParams Parameters of initialization encoded
     function setUp(bytes memory initializeParams) public initializer {
-        DRAGON_SPLIT_COOLDOWN_PERIOD = 30 days;
+        coolDownPeriod = 30 days;
         (address _owner, bytes memory data) = abi.decode(initializeParams, (address, bytes));
 
         (
@@ -229,7 +229,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
      * @inheritdoc IDragonRouter
      */
     function setSplit(ISplitChecker.Split memory _split) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        if (block.timestamp - lastSetSplitTime < DRAGON_SPLIT_COOLDOWN_PERIOD) revert CooldownPeriodNotPassed();
+        if (block.timestamp - lastSetSplitTime < coolDownPeriod) revert CooldownPeriodNotPassed();
         splitChecker.checkSplit(_split, opexVault, metapool);
 
         for (uint256 i = 0; i < strategies.length; i++) {
@@ -309,8 +309,8 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
      * @param _cooldownPeriod New cooldown period in seconds
      */
     function _setCooldownPeriod(uint256 _cooldownPeriod) internal {
-        emit CooldownPeriodUpdated(DRAGON_SPLIT_COOLDOWN_PERIOD, _cooldownPeriod);
-        DRAGON_SPLIT_COOLDOWN_PERIOD = _cooldownPeriod;
+        emit CooldownPeriodUpdated(coolDownPeriod, _cooldownPeriod);
+        coolDownPeriod = _cooldownPeriod;
     }
 
     /**
@@ -341,8 +341,8 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
      * @param _splitDelay New split delay in seconds
      */
     function _setSplitDelay(uint256 _splitDelay) internal {
-        emit SplitDelayUpdated(SPLIT_DELAY, _splitDelay);
-        SPLIT_DELAY = _splitDelay;
+        emit SplitDelayUpdated(splitDelay, _splitDelay);
+        splitDelay = _splitDelay;
     }
 
     /**
