@@ -38,7 +38,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ReentrancyGuard {
 
     mapping(address => mapping(address => mapping(address => LinearAllowance))) public allowances; // safe -> delegate -> token -> allowance
 
-    function bookAllowance(LinearAllowance storage a) internal {
+    function updateAllowance(LinearAllowance storage a) internal {
         if (a.lastBookedAt != 0) {
             uint256 timeElapsed = block.timestamp - a.lastBookedAt;
             uint256 daysElapsed = timeElapsed / 1 days;
@@ -56,37 +56,63 @@ contract LinearAllowanceSingletonForGnosisSafe is ReentrancyGuard {
     /// @param dripRatePerDay The drip rate per day for the allowance.
     function setAllowance(address delegate, address token, uint256 dripRatePerDay) external {
         LinearAllowance storage a = allowances[msg.sender][delegate][token];
-        bookAllowance(a);
+        updateAllowance(a);
         a.dripRatePerDay = dripRatePerDay;
         emit AllowanceSet(msg.sender, delegate, token, dripRatePerDay);
     }
 
     /// @notice Execute a transfer of the allowance.
+    /// @dev msg.sender is the delegate.
     /// @param safe The address of the safe.
     /// @param token The address of the token.
-    /// @param to The address of the recipient.
-    function executeAllowanceTransfer(address safe, address token, address payable to) external nonReentrant {
+    /// @param to The address of the beneficiary.
+    /// @return amount The amount that was actually transferred
+    function executeAllowanceTransfer(
+        address safe,
+        address token,
+        address payable to
+    ) external nonReentrant returns (uint256) {
         LinearAllowance storage a = allowances[safe][msg.sender][token];
-        bookAllowance(a);
+        updateAllowance(a);
 
-        a.totalSpent += a.totalUnspent;
-        uint256 toTransfer = a.totalUnspent;
-        require(toTransfer > 0, NoAllowanceToTransfer(safe, msg.sender, token));
-        a.totalUnspent = 0;
-        emit AllowanceTransferred(safe, msg.sender, token, to, toTransfer);
+        require(a.totalUnspent > 0, NoAllowanceToTransfer(safe, msg.sender, token));
+
+        uint256 transferAmount;
 
         if (token == address(0)) {
-            require(
-                ISafe(payable(safe)).execTransactionFromModule(to, toTransfer, "", Enum.Operation.Call),
-                TransferFailed(safe, msg.sender, token)
-            );
+            // For ETH transfers, get the minimum of totalUnspent and safe balance
+            transferAmount = a.totalUnspent <= address(safe).balance ? a.totalUnspent : address(safe).balance;
+
+            if (transferAmount > 0) {
+                require(
+                    ISafe(payable(safe)).execTransactionFromModule(to, transferAmount, "", Enum.Operation.Call),
+                    TransferFailed(safe, msg.sender, token)
+                );
+            }
         } else {
-            bytes memory data = abi.encodeWithSelector(IERC20.transfer.selector, to, toTransfer);
-            require(
-                ISafe(payable(safe)).execTransactionFromModule(token, 0, data, Enum.Operation.Call),
-                TransferFailed(safe, msg.sender, token)
-            );
+            // For ERC20 transfers
+            try IERC20(token).balanceOf(safe) returns (uint256 tokenBalance) {
+                transferAmount = a.totalUnspent <= tokenBalance ? a.totalUnspent : tokenBalance;
+
+                if (transferAmount > 0) {
+                    bytes memory data = abi.encodeWithSelector(IERC20.transfer.selector, to, transferAmount);
+                    require(
+                        ISafe(payable(safe)).execTransactionFromModule(token, 0, data, Enum.Operation.Call),
+                        TransferFailed(safe, msg.sender, token)
+                    );
+                }
+            } catch {
+                revert TransferFailed(safe, msg.sender, token);
+            }
         }
+
+        // Update bookkeeping
+        a.totalSpent += transferAmount;
+        a.totalUnspent -= transferAmount;
+
+        emit AllowanceTransferred(safe, msg.sender, token, to, transferAmount);
+
+        return transferAmount;
     }
 
     /// @notice Get the allowance data for a token.

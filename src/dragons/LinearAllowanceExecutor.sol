@@ -11,12 +11,13 @@ contract LinearAllowanceExecutor {
     /// @param allowanceModule The allowance module to use.
     /// @param safe The address of the safe.
     /// @param token The address of the token.
+    /// @return transferredAmount The amount that was actually transferred
     function executeAllowanceTransfer(
         LinearAllowanceSingletonForGnosisSafe allowanceModule,
         address safe,
         address token
-    ) external {
-        allowanceModule.executeAllowanceTransfer(safe, token, payable(address(this)));
+    ) external returns (uint256) {
+        return allowanceModule.executeAllowanceTransfer(safe, token, payable(address(this)));
     }
 
     // @notice Get the total unspent allowance for a token.
