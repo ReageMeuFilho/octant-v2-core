@@ -124,7 +124,6 @@ contract TestLinearAllowanceIntegration is Test {
             // Full withdrawal case
             assertEq(allowanceData[1], 0, "Unspent allowance should be zero");
         }
-
         // Test that allowance stops accruing after rate set to 0
         vm.warp(block.timestamp + 5 days);
         vm.prank(safeAddress);
@@ -213,7 +212,6 @@ contract TestLinearAllowanceIntegration is Test {
             // Full withdrawal case
             assertEq(allowanceData[1], 0, "Unspent allowance should be zero");
         }
-
         // Test that allowance stops accruing after rate set to 0
         vm.warp(block.timestamp + 5 days);
         vm.prank(safeAddress);
