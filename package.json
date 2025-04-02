@@ -8,8 +8,8 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "format": "prettier --config .prettierrc --plugin=prettier-plugin-solidity '{contracts,src,test}/**/*.sol' -w",
-    "format:check": "prettier --config .prettierrc --plugin=prettier-plugin-solidity '{contracts,src,test}/**/*.sol' -c",
+    "format": "prettier --config .prettierrc --plugin=prettier-plugin-solidity '{script,src,test,verification}/**/*.sol' -w",
+    "format:check": "prettier --config .prettierrc --plugin=prettier-plugin-solidity '{script,src,test,verification}/**/*.sol' -c",
     "lint": "solhint './{src,scripts,test}/**/*.sol'",
     "precommit": "lint-staged",
     "build": "forge clean && forge compile",
@@ -18,7 +18,7 @@
     "gas": "forge snapshot --isolate --gas-report --diff .gas-snapshot > gasreport.txt",
     "coverage": "forge coverage --ir-minimum --report lcov",
     "coverage:genhtml": "genhtml lcov.info --branch-coverage --output-dir coverage --ignore-errors inconsistent,corrupt,category",
-    "slither:setup": "python3 -m venv .venv && . .venv/bin/activate && pip3 install slither-analyzer",
+    "slither:setup": "python3 -m venv .venv && .venv/bin/pip3 install slither-analyzer",
     "slither": ". .venv/bin/activate && slither ./ --exclude-dependencies --filter-paths \"test\" --print human-summary",
     "storage:generate": "./script/storage.sh generate",
     "storage:check": "./script/storage.sh check",
