@@ -255,6 +255,36 @@ interface ITokenizedStrategy is IERC4626Payable, IERC20Permit {
     function lastReport() external view returns (uint256);
 
     /**
+     * @notice Returns the Hats Protocol address
+     * @return The Hats Protocol address
+     */
+    function hats() external view returns (address);
+
+    /**
+     * @notice Returns the keeper hat ID
+     * @return The keeper hat ID
+     */
+    function keeperHat() external view returns (uint256);
+
+    /**
+     * @notice Returns the management hat ID
+     * @return The management hat ID
+     */
+    function managementHat() external view returns (uint256);
+
+    /**
+     * @notice Returns the emergency admin hat ID
+     * @return The emergency admin hat ID
+     */
+    function emergencyAdminHat() external view returns (uint256);
+
+    /**
+     * @notice Returns the regen governance hat ID
+     * @return The regen governance hat ID
+     */
+    function regenGovernanceHat() external view returns (uint256);
+
+    /**
      * @notice Checks if the strategy is currently shutdown
      * @return True if the strategy is shutdown, false otherwise
      */
