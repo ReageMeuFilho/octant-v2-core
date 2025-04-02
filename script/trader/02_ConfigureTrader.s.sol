@@ -2,12 +2,12 @@
 pragma solidity ^0.8.23;
 
 import "forge-std/Script.sol";
-import {HelperConfig} from "../helpers/HelperConfig.s.sol";
-import {Trader} from "src/routers-transformers/Trader.sol";
+import { HelperConfig } from "../helpers/HelperConfig.s.sol";
+import { Trader } from "src/routers-transformers/Trader.sol";
 
 contract DeployTraderHelper is Script {
     function run() external {
-        (,,, uint256 deployerKey,,,,,,) = new HelperConfig(false).activeNetworkConfig();
+        (, , , uint256 deployerKey, , , , , , ) = new HelperConfig(false).activeNetworkConfig();
 
         address traderAddress = vm.envAddress("TRADER");
         Trader trader = Trader(payable(traderAddress));

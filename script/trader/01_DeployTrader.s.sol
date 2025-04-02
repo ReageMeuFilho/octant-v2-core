@@ -2,18 +2,18 @@
 pragma solidity ^0.8.23;
 
 import "forge-std/Script.sol";
-import {Trader} from "src/routers-transformers/Trader.sol";
-import {UniV3Swap} from "src/vendor/0xSplits/UniV3Swap.sol";
-import {HelperConfig} from "../helpers/HelperConfig.s.sol";
-import {DeployTrader} from "../deploy/DeployTrader.sol";
+import { Trader } from "src/routers-transformers/Trader.sol";
+import { UniV3Swap } from "src/vendor/0xSplits/UniV3Swap.sol";
+import { HelperConfig } from "../helpers/HelperConfig.s.sol";
+import { DeployTrader } from "../deploy/DeployTrader.sol";
 
 contract DeployTraderHelper is DeployTrader {
     HelperConfig config = new HelperConfig(false);
     string buff = "";
 
     function run() external {
-        (address glmToken, address wethToken,, uint256 deployerKey,,,,, address uniV3Swap,) =
-            config.activeNetworkConfig();
+        (address glmToken, address wethToken, , uint256 deployerKey, , , , , address uniV3Swap, ) = config
+            .activeNetworkConfig();
         wethAddress = wethToken;
         glmAddress = glmToken;
         address base;
@@ -43,7 +43,8 @@ contract DeployTraderHelper is DeployTrader {
         preprompt2("Quote: ", vm.toString(quote));
         preprompt2("Fee: ", vm.toString(fee));
         preprompt2(
-            "V3 pool address: ", vm.toString(config.getPoolAddress(uniEthWrapper(base), uniEthWrapper(quote), fee))
+            "V3 pool address: ",
+            vm.toString(config.getPoolAddress(uniEthWrapper(base), uniEthWrapper(quote), fee))
         );
         initializer = UniV3Swap(payable(uniV3Swap));
         preprompt2("uniV3Swap at: ", vm.toString(address(initializer)));

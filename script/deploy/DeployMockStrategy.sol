@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import {console2} from "forge-std/Test.sol";
-import {ModuleProxyFactory} from "src/dragons/ModuleProxyFactory.sol";
-import {MockStrategy} from "test/mocks/MockStrategy.sol";
-import {MockYieldSource} from "test/mocks/MockYieldSource.sol";
-import {DeployModuleProxyFactory} from "./DeployModuleProxyFactory.sol";
-import {MockERC20} from "test/mocks/MockERC20.sol";
-import {ISafe} from "src/interfaces/Safe.sol";
-import {IMockStrategy} from "test/mocks/IMockStrategy.sol";
+import { console2 } from "forge-std/Test.sol";
+import { ModuleProxyFactory } from "src/dragons/ModuleProxyFactory.sol";
+import { MockStrategy } from "test/mocks/MockStrategy.sol";
+import { MockYieldSource } from "test/mocks/MockYieldSource.sol";
+import { DeployModuleProxyFactory } from "./DeployModuleProxyFactory.sol";
+import { MockERC20 } from "test/mocks/MockERC20.sol";
+import { ISafe } from "src/interfaces/Safe.sol";
+import { IMockStrategy } from "test/mocks/IMockStrategy.sol";
 
 contract DeployMockStrategy is DeployModuleProxyFactory {
     MockStrategy public mockStrategySingleton;
@@ -27,7 +27,7 @@ contract DeployMockStrategy is DeployModuleProxyFactory {
 
         // Deploy test token
         token = new MockERC20();
-        
+
         // Deploy implementation
         mockStrategySingleton = new MockStrategy();
 
@@ -59,7 +59,7 @@ contract DeployMockStrategy is DeployModuleProxyFactory {
         deploy();
 
         // Deploy module proxy factory first
-        if(_moduleProxyFactoryAddress == address(0)) {
+        if (_moduleProxyFactoryAddress == address(0)) {
             DeployModuleProxyFactory.deploy();
         } else {
             moduleProxyFactory = ModuleProxyFactory(_moduleProxyFactoryAddress);
@@ -86,17 +86,10 @@ contract DeployMockStrategy is DeployModuleProxyFactory {
         );
 
         // Then encode the full initialization call with owner and params
-        bytes memory initData = abi.encodeWithSignature(
-            "setUp(bytes)",
-            abi.encode(safeAddress, strategyParams)
-        );
+        bytes memory initData = abi.encodeWithSignature("setUp(bytes)", abi.encode(safeAddress, strategyParams));
 
         // Deploy and enable module on safe
-        address proxy = moduleProxyFactory.deployModule(
-            address(mockStrategySingleton),
-            initData,
-            block.timestamp
-        );
+        address proxy = moduleProxyFactory.deployModule(address(mockStrategySingleton), initData, block.timestamp);
         mockStrategyProxy = IMockStrategy(payable(address(proxy)));
 
         // ISafe(safeAddress).enableModule(address(mockStrategyProxy));

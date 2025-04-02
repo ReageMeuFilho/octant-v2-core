@@ -2,7 +2,7 @@
 pragma solidity ^0.8.25;
 
 import "forge-std/Test.sol";
-import {ModuleProxyFactory} from "src/dragons/ModuleProxyFactory.sol";
+import { ModuleProxyFactory } from "src/dragons/ModuleProxyFactory.sol";
 
 /**
  * @title DeployModuleProxyFactory

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import {console} from "forge-std/console.sol";
+import { console } from "forge-std/console.sol";
 import { Hats } from "lib/hats-protocol/src/Hats.sol";
 import { DragonHatter } from "src/hats/DragonHatter.sol";
 import { SimpleEligibilityAndToggle } from "src/hats/SimpleEligibilityAndToggle.sol";
@@ -40,22 +40,18 @@ contract DeployHatsProtocol is Test {
         address deployer = vm.addr(deployerPrivateKey);
         // 1. Deploy Hats protocol
         hats = new Hats(PROTOCOL_NAME, BASE_IMAGE_URI);
-          // Deploy DragonHatter with branch hat ID
+        // Deploy DragonHatter with branch hat ID
 
         console2.log("HATS deployed");
         console2.log("HATS address:", address(hats));
         console2.log("Deployer address:", deployer);
         // 2. Create TopHat (1) and mint to deployer
-        topHatId = hats.mintTopHat(
-            deployer,
-            "Dragon Protocol Top Hat",
-            string.concat(BASE_IMAGE_URI, "tophat")
-        );
+        topHatId = hats.mintTopHat(deployer, "Dragon Protocol Top Hat", string.concat(BASE_IMAGE_URI, "tophat"));
 
         // Deploy simple eligibility and toggle module
         simpleEligibilityAndToggle = new SimpleEligibilityAndToggle();
 
-         // 3. Create Autonomous Admin Hat (1.1)
+        // 3. Create Autonomous Admin Hat (1.1)
         autonomousAdminHatId = hats.createHat(
             topHatId,
             "Dragon Protocol Autonomous Admin",
@@ -81,23 +77,19 @@ contract DeployHatsProtocol is Test {
         // Mint Dragon Admin hat to deployer so they can deploy DragonHatter
         hats.mintHat(dragonAdminHatId, deployer);
 
-         // Create branch hat with proper admin rights
+        // Create branch hat with proper admin rights
         branchHatId = hats.createHat(
             dragonAdminHatId,
             "Dragon Protocol Vault Management",
-            DEFAULT_MAX_SUPPLY,              // Only one admin for branch
-            address(simpleEligibilityAndToggle),     // Will be set to DragonHatter after deployment
-            address(simpleEligibilityAndToggle),     // Will be set to DragonHatter after deployment
+            DEFAULT_MAX_SUPPLY, // Only one admin for branch
+            address(simpleEligibilityAndToggle), // Will be set to DragonHatter after deployment
+            address(simpleEligibilityAndToggle), // Will be set to DragonHatter after deployment
             true,
             ""
         );
 
         // Deploy DragonHatter with branch hat ID
-        dragonHatter = new DragonHatter(
-            address(hats),
-            dragonAdminHatId,
-            branchHatId
-        );
+        dragonHatter = new DragonHatter(address(hats), dragonAdminHatId, branchHatId);
 
         // Set eligibility and toggle to DragonHatter
         // HATS.setHatEligibility(branchHatId, address(dragonHatter));
@@ -118,7 +110,7 @@ contract DeployHatsProtocol is Test {
         vm.label(address(dragonHatter), "DragonHatter");
         vm.label(address(simpleEligibilityAndToggle), "SimpleEligibilityAndToggle");
         vm.label(address(msg.sender), "Deployer");
-       
+
         vm.stopBroadcast();
 
         // Log deployed addresses and hat IDs

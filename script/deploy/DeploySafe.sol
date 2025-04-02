@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxy.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
-import {LibString} from "solady/utils/LibString.sol";
+import { LibString } from "solady/utils/LibString.sol";
 
 /**
  * @title DeploySafe
@@ -118,7 +118,10 @@ contract DeploySafe is Test {
 
             // Set up deployment parameters
             setUpSafeDeployParams(
-                vm.envAddress("SAFE_SINGLETON"), vm.envAddress("SAFE_PROXY_FACTORY"), _owners, configuredThreshold
+                vm.envAddress("SAFE_SINGLETON"),
+                vm.envAddress("SAFE_PROXY_FACTORY"),
+                _owners,
+                configuredThreshold
             );
         }
 
