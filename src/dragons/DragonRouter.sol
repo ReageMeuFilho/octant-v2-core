@@ -284,7 +284,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
 
         _transferSplit(_user, _strategy, _amount);
 
-        emit SplitClaimed(_user, _strategy, _amount);
+        emit SplitClaimed(msg.sender, _user, _strategy, _amount);
     }
 
     receive() external payable override {}
