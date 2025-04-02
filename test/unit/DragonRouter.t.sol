@@ -148,7 +148,7 @@ contract DragonRouterTest is Test {
         routerTesting.setCooldownPeriod(newPeriod);
 
         // Test successful change
-        assertEq(routerTesting.DRAGON_SPLIT_COOLDOWN_PERIOD(), newPeriod);
+        assertEq(routerTesting.coolDownPeriod(), newPeriod);
     }
 
     function test_setCooldownPeriod_reverts() public {
@@ -289,7 +289,7 @@ contract DragonRouterTest is Test {
         uint256 newDelay = 7 days;
 
         // Get the current split delay for emit comparison
-        uint256 currentDelay = routerTesting.SPLIT_DELAY();
+        uint256 currentDelay = routerTesting.splitDelay();
 
         vm.prank(owner);
         vm.expectEmit(true, true, true, true);
@@ -297,7 +297,7 @@ contract DragonRouterTest is Test {
         routerTesting.setSplitDelay(newDelay);
 
         // Verify the split delay was updated
-        assertEq(routerTesting.SPLIT_DELAY(), newDelay);
+        assertEq(routerTesting.splitDelay(), newDelay);
     }
 
     function test_setSplitChecker() public {
@@ -534,7 +534,7 @@ contract DragonRouterTest is Test {
         allocations[1] = 70; // 70% to metapool
 
         // Need to wait for cooldown period
-        uint256 cooldownPeriod = routerTesting.DRAGON_SPLIT_COOLDOWN_PERIOD();
+        uint256 cooldownPeriod = routerTesting.coolDownPeriod();
         vm.warp(block.timestamp + cooldownPeriod + 1);
 
         // No need to mock - using routerTesting which has real implementation
