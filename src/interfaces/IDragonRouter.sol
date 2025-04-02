@@ -46,6 +46,10 @@ interface IDragonRouter {
     event SplitCheckerUpdated(address oldChecker, address newChecker);
     event UserTransformerSet(address indexed user, address transformer, address targetToken);
     event SplitClaimed(address indexed user, address indexed strategy, uint256 amount);
+    event ClaimAutomationSet(address indexed user, address indexed strategy, bool enabled);
+    event Funded(address indexed strategy, uint256 assetPerShare, uint256 totalAssets);
+    event UserSplitUpdated(address indexed recipient, uint256 assets, uint256 userAssetPerShare, uint256 splitPerShare);
+    event SplitSet(uint256 assetPerShare, uint256 totalAssets, uint256 totalShares, uint256 lastSetSplitTime);
 
     /*//////////////////////////////////////////////////////////////
                             CUSTOM ERRORS

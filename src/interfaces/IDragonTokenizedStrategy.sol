@@ -10,7 +10,10 @@ interface IDragonTokenizedStrategy is ITokenizedStrategy {
      * @param unlockTime The timestamp when shares will be unlocked
      * @param lockedShares The amount of shares locked
      */
-    event NewLockupSet(address indexed user, uint256 indexed unlockTime, uint256 indexed lockedShares);
+    event NewLockupSet(address indexed user, uint256 lockTime, uint256 unlockTime, uint256 lockedShares);
+
+    event LockupDurationSet(uint256 lockupDuration);
+    event RageQuitCooldownPeriodSet(uint256 rageQuitCooldownPeriod);
 
     /**
      * @notice Emitted when a user initiates rage quit

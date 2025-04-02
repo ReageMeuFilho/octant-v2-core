@@ -61,6 +61,7 @@ contract DragonRouterTest is Test {
     event SplitCheckerUpdated(address oldChecker, address newChecker);
     event UserTransformerSet(address indexed user, address transformer, address targetToken);
     event SplitClaimed(address indexed user, address indexed strategy, uint256 amount);
+    event ClaimAutomationSet(address indexed user, address indexed strategy, bool enabled);
 
     function setUp() public {
         // Use a known address for setup
@@ -388,6 +389,10 @@ contract DragonRouterTest is Test {
     }
 
     function test_setClaimAutomation() public {
+        // Expect the ClaimAutomationSet event with appropriate parameters
+        vm.expectEmit(true, true, true, true, address(routerTesting));
+        emit ClaimAutomationSet(user, strategies[0], true);
+
         vm.prank(user);
         routerTesting.setClaimAutomation(strategies[0], true);
 

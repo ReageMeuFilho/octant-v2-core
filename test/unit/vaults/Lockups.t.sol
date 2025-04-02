@@ -9,7 +9,7 @@ import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract LockupsTest is Setup {
     // Events to track
-    event NewLockupSet(address indexed user, uint256 indexed unlockTime, uint256 indexed lockedShares);
+    event NewLockupSet(address indexed user, uint256 lockTime, uint256 unlockTime, uint256 lockedShares);
     event RageQuitInitiated(address indexed user, uint256 indexed unlockTime);
 
     uint256 constant MINIMUM_LOCKUP_DURATION = 90 days;
@@ -33,7 +33,7 @@ contract LockupsTest is Setup {
 
         // Expect the NewLockupSet event with appropriate parameters
         vm.expectEmit(true, true, true, true, address(strategy));
-        emit NewLockupSet(user, block.timestamp + lockupDuration, depositAmount);
+        emit NewLockupSet(user, 1, block.timestamp + lockupDuration, depositAmount);
 
         vm.startPrank(user);
         uint256 sharesBefore = strategy.totalSupply();
@@ -65,7 +65,7 @@ contract LockupsTest is Setup {
         uint256 sharesToMint = 10_000e18;
 
         vm.expectEmit(true, true, true, true, address(strategy));
-        emit NewLockupSet(user, block.timestamp + lockupDuration, sharesToMint);
+        emit NewLockupSet(user, 1, block.timestamp + lockupDuration, sharesToMint);
 
         vm.startPrank(user);
         uint256 assetsBefore = asset.balanceOf(user);
