@@ -45,8 +45,8 @@ interface ITokenizedStrategy is IERC4626Payable, IERC20Permit {
         // Strategy Status
         uint8 entered; // To prevent reentrancy. Use uint8 for gas savings.
         bool shutdown; // Bool that can be used to stop deposits into the strategy.
-        uint256 MINIMUM_LOCKUP_DURATION;
-        uint256 RAGE_QUIT_COOLDOWN_PERIOD;
+        uint256 minimumLockupDuration;
+        uint256 rageQuitCooldownPeriod;
         address REGEN_GOVERNANCE;
         // Hats protocol integration
         IHats HATS;
