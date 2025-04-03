@@ -89,9 +89,10 @@ contract LinearAllowanceSingletonForGnosisSafe is ReentrancyGuard {
     }
 
     /// @notice Set the allowance for a delegate. To revoke, set dripRatePerDay to 0. Revoking will not cancel any unspent allowance.
+    /// @dev dripRatePerDay is compressed to 64 bits by trimming the least significant 32 bits.
     /// @param delegate The delegate to set the allowance for.
     /// @param token The token to set the allowance for. 0x0 is ETH.
-    /// @param dripRatePerDay The drip rate per day for the allowance.
+    /// @param dripRatePerDay The drip rate per day for the allowance. Input a value that is a multiple of 2^32 to avoid precision loss.
     function setAllowance(address delegate, address token, uint96 dripRatePerDay) external {
         LinearAllowance storage a = allowances[msg.sender][delegate][token];
         updateAllowance(a);
