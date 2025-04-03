@@ -111,7 +111,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ReentrancyGuard {
         address safe,
         address token,
         address payable to
-    ) external nonReentrant returns (uint256) {
+    ) external nonReentrant returns (uint112) {
         LinearAllowance storage a = allowances[safe][msg.sender][token];
         updateAllowance(a);
 

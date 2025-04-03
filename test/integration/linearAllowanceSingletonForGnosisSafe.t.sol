@@ -89,10 +89,8 @@ contract TestLinearAllowanceIntegration is Test {
         vm.assume(compressedDripRate > 0);
         daysElapsed = bound(daysElapsed, 1, (2 ** 15));
 
-        // Decompress the drip rate for calculations - contract uses 32-bit shift
         uint96 decompressedDripRate = decompress64to96(compressedDripRate);
 
-        // Calculate expected allowance
         uint112 expectedAllowance = uint112(decompressedDripRate * daysElapsed);
 
         safeBalance = bound(safeBalance, expectedAllowance / 10, expectedAllowance * 2);
@@ -127,19 +125,13 @@ contract TestLinearAllowanceIntegration is Test {
         uint256 expectedTransfer = expectedAllowance <= trimLast32BitsOf256(safeBalanceBefore)
             ? expectedAllowance
             : trimLast32BitsOf256(safeBalanceBefore);
-        console.log("expectedTransfer", expectedTransfer);
-        console.log("expectedAllowance", expectedAllowance);
-        console.log("safeBalanceBefore", safeBalanceBefore);
-        console.log("trimLast32BitsOf256(safeBalanceBefore)", trimLast32BitsOf256(safeBalanceBefore));
 
-        // Execute transfer
-        uint256 actualTransferred = allowanceExecutor.executeAllowanceTransfer(
+        uint112 actualTransferred = allowanceExecutor.executeAllowanceTransfer(
             allowanceModule,
             safeAddress,
             nativeToken
         );
 
-        // Verify actual transferred amounts
         assertEq(
             executorAddress.balance - executorBalanceBefore,
             actualTransferred,
@@ -152,7 +144,6 @@ contract TestLinearAllowanceIntegration is Test {
             "Safe balance should be reduced by transferred amount"
         );
 
-        // Verify actualTransferred matches expectedTransfer
         assertEq(actualTransferred, expectedTransfer, "Transferred amount should match expected");
 
         // Verify allowance bookkeeping
@@ -164,16 +155,7 @@ contract TestLinearAllowanceIntegration is Test {
 
         if (expectedAllowance > safeBalanceBefore) {
             // Partial withdrawal case - there should be remaining allowance
-
-            // IMPORTANT: We need to exactly match the contract's compression/decompression logic
-            // Contract logic:
-            // 1. First decompressedUnspent is calculated from a.totalUnspent
-            // 2. Then it's updated: decompressedUnspent -= transferAmount
-            // 3. Then it's compressed back: a.totalUnspent = uint80(decompressedUnspent >> 32)
-            // 4. Later when reading, it's decompressed again for display
-
-            uint256 expectedRemainingDecompressed = expectedAllowance - actualTransferred;
-
+            uint112 expectedRemainingDecompressed = uint112(expectedAllowance - actualTransferred);
             assertEq(allowanceData[1], expectedRemainingDecompressed, "Remaining unspent should match expected");
         } else {
             // Full withdrawal case - allowance should be zero
@@ -214,18 +196,13 @@ contract TestLinearAllowanceIntegration is Test {
         TestERC20 token = new TestERC20(tokenSupply);
         token.transfer(safeAddress, tokenSupply);
 
-        // First store the address
-        address nativeToken = allowanceModule.NATIVE_TOKEN();
-
-        // Then use the stored address in the expectRevert
         vm.expectRevert(
-            abi.encodeWithSelector(NoAllowanceToTransfer.selector, safeAddress, address(allowanceExecutor), nativeToken)
+            abi.encodeWithSelector(NoAllowanceToTransfer.selector, safeAddress, address(allowanceExecutor), token)
         );
-        allowanceExecutor.executeAllowanceTransfer(allowanceModule, safeAddress, nativeToken);
+        allowanceExecutor.executeAllowanceTransfer(allowanceModule, safeAddress, address(token));
 
-        // Set up allowance - pass the decompressed value (uint96) to match contract interface
         vm.prank(safeAddress);
-        allowanceModule.setAllowance(executorAddress, address(token), uint96(decompressedDripRate));
+        allowanceModule.setAllowance(executorAddress, address(token), decompressedDripRate);
 
         // Advance time to accrue allowance
         vm.warp(block.timestamp + daysElapsed * 1 days);
@@ -259,10 +236,8 @@ contract TestLinearAllowanceIntegration is Test {
             "Safe token balance should be reduced by transferred amount"
         );
 
-        // Verify actualTransferred matches expectedTransfer
         assertEq(actualTransferred, expectedTransfer, "Transferred amount should match expected");
 
-        // Verify allowance bookkeeping
         uint112[4] memory allowanceData = allowanceModule.getTokenAllowanceData(
             safeAddress,
             executorAddress,
@@ -271,9 +246,7 @@ contract TestLinearAllowanceIntegration is Test {
 
         if (expectedAllowance > safeBalanceBefore) {
             // Partial withdrawal case - there should be remaining allowance
-
             uint112 expectedRemainingDecompressed = uint112(expectedAllowance - actualTransferred);
-
             assertEq(allowanceData[1], expectedRemainingDecompressed, "Remaining unspent should match expected");
         } else {
             // Full withdrawal case - allowance should be zero

@@ -16,7 +16,7 @@ contract LinearAllowanceExecutor {
         LinearAllowanceSingletonForGnosisSafe allowanceModule,
         address safe,
         address token
-    ) external returns (uint256) {
+    ) external returns (uint112) {
         return allowanceModule.executeAllowanceTransfer(safe, token, payable(address(this)));
     }
 
