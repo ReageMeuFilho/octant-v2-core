@@ -30,7 +30,7 @@
     "storage:check": "./script/storage.sh check",
     "prepare": "husky",
     "postinstall": "shx chmod +x .husky/* || true",
-    "deploy:tenderly": "bash -c 'source .env && (cd lib/hats-protocol; git apply ../../ci/lib_hats_protocol_erc1155_import.diff || true) && forge script script/deployment/staging/DeployProtocol.s.sol --slow -f $RPC_URL && forge script script/deployment/staging/DeployProtocol.s.sol --slow --verify --broadcast -f $RPC_URL'"
+    "deploy:tenderly": "bash -c 'source .env; patch -fp1 -d lib/hats-protocol -i ../../ci/lib_hats_protocol_erc1155_import.diff; forge script script/deployment/staging/DeployProtocol.s.sol --slow -f $RPC_URL && forge script script/deployment/staging/DeployProtocol.s.sol --slow --verify --verifier custom --broadcast -f $RPC_URL'"
   },
   "keywords": [],
   "author": "",
