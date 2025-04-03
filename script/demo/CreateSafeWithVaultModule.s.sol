@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxy.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
-import {MockERC20} from "test/mocks/MockERC20.sol";
+import { MockERC20 } from "test/mocks/MockERC20.sol";
 import "forge-std/Script.sol";
 
 contract CreateSafeWithModule is Script {

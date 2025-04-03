@@ -2,19 +2,19 @@
 pragma solidity ^0.8.25;
 
 import "forge-std/Script.sol";
-import {console2} from "forge-std/console2.sol";
+import { console2 } from "forge-std/console2.sol";
 import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxy.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
-import {DragonTokenizedStrategy} from "src/dragons/vaults/DragonTokenizedStrategy.sol";
-import {ModuleProxyFactory} from "src/dragons/ModuleProxyFactory.sol";
+import { DragonTokenizedStrategy } from "src/dragons/vaults/DragonTokenizedStrategy.sol";
+import { ModuleProxyFactory } from "src/dragons/ModuleProxyFactory.sol";
 
-import {DeploySafe} from "script/deploy/DeploySafe.sol";
-import {DeployDragonRouter} from "script/deploy/DeployDragonRouter.sol";
-import {DeployModuleProxyFactory} from "script/deploy/DeployModuleProxyFactory.sol";
-import {DeployDragonTokenizedStrategy} from "script/deploy/DeployDragonTokenizedStrategy.sol";
-import {DeployMockStrategy} from "script/deploy/DeployMockStrategy.sol";
-import {DeployHatsProtocol} from "script/deploy/DeployHatsProtocol.sol";
+import { DeploySafe } from "script/deploy/DeploySafe.sol";
+import { DeployDragonRouter } from "script/deploy/DeployDragonRouter.sol";
+import { DeployModuleProxyFactory } from "script/deploy/DeployModuleProxyFactory.sol";
+import { DeployDragonTokenizedStrategy } from "script/deploy/DeployDragonTokenizedStrategy.sol";
+import { DeployMockStrategy } from "script/deploy/DeployMockStrategy.sol";
+import { DeployHatsProtocol } from "script/deploy/DeployHatsProtocol.sol";
 
 /**
  * @title DeployProtocol
@@ -64,9 +64,9 @@ contract DeployProtocol is Script {
         setUp();
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployerAddress = vm.rememberKey(deployerPrivateKey);
-        
+
         console2.log("Starting deployment with deployer:", deployerAddress);
-        
+
         vm.startBroadcast(deployerPrivateKey);
 
         // 1. Deploy Safe with single signer
@@ -84,7 +84,7 @@ contract DeployProtocol is Script {
             address(0) // No payment receiver
         );
 
-          // Deploy new Safe via factory
+        // Deploy new Safe via factory
         SafeProxyFactory factory = SafeProxyFactory(SAFE_PROXY_FACTORY);
         SafeProxy proxy = factory.createProxyWithNonce(
             SAFE_SINGLETON,
@@ -100,14 +100,14 @@ contract DeployProtocol is Script {
         console2.log("Deployer address:", deployerAddress);
 
         if (safeAddress == address(0)) revert DeploymentFailed();
-        
+
         // 2. Deploy Module Proxy Factory
         moduleProxyFactory = new ModuleProxyFactory();
         moduleProxyFactoryAddress = address(moduleProxyFactory);
         if (moduleProxyFactoryAddress == address(0)) revert DeploymentFailed();
-        
+
         // 4. Deploy Dragon Tokenized Strategy Implementation
-       
+
         dragonTokenizedStrategySingleton = new DragonTokenizedStrategy();
 
         vm.stopBroadcast();
@@ -118,15 +118,9 @@ contract DeployProtocol is Script {
         if (dragonRouterAddress == address(0)) revert DeploymentFailed();
 
         // 6. Deploy Mock Strategy
-        deployMockStrategy.deploy(
-            safeAddress,
-            dragonTokenizedStrategyAddress,
-            dragonRouterAddress
-        );
+        deployMockStrategy.deploy(safeAddress, dragonTokenizedStrategyAddress, dragonRouterAddress);
         mockStrategyAddress = address(deployMockStrategy.mockStrategyProxy());
         if (mockStrategyAddress == address(0)) revert DeploymentFailed();
-
-
 
         // Log deployment addresses
         console2.log("\nDeployment Summary:");
@@ -151,11 +145,11 @@ contract DeployProtocol is Script {
         require(safe.isOwner(vm.addr(vm.envUint("PRIVATE_KEY"))), "Deployer not Safe owner");
 
         // Verify Mock Strategy is enabled on Safe
-        if(!safe.isModuleEnabled(mockStrategyAddress)){
+        if (!safe.isModuleEnabled(mockStrategyAddress)) {
             console2.log("Mock Strategy not enabled on Safe");
         }
 
         // Additional security checks can be added here
         console2.log("\nAll deployments verified successfully!");
     }
-} 
+}

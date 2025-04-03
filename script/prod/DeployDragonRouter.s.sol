@@ -3,10 +3,10 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Script.sol";
 
-import {DragonRouter} from "../../src/dragons/DragonRouter.sol";
-import {SplitChecker} from "../../src/dragons/SplitChecker.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import { DragonRouter } from "../../src/dragons/DragonRouter.sol";
+import { SplitChecker } from "../../src/dragons/SplitChecker.sol";
+import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import { ProxyAdmin } from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 
 contract DeployDragonRouter is Script {
     // default splits
@@ -29,9 +29,11 @@ contract DeployDragonRouter is Script {
     }
 
     function deployDragonRouter() internal returns (address) {
-        try vm.prompt(
-            "Is the dragon router implementation already deployed? (if yes, provide the address) / (if no, provide 'no')"
-        ) returns (string memory res) {
+        try
+            vm.prompt(
+                "Is the dragon router implementation already deployed? (if yes, provide the address) / (if no, provide 'no')"
+            )
+        returns (string memory res) {
             if (keccak256(abi.encode(res)) == keccak256(abi.encode("no"))) {
                 dragonRouterImplementation = new DragonRouter();
                 console.log("Dragon Router Implementation deployed at:", address(dragonRouterImplementation));
@@ -42,7 +44,8 @@ contract DeployDragonRouter is Script {
             revert("Invalid Dragon Router Deployment Response");
         }
 
-        try vm.prompt("Is the split checker already deployed? (if yes, provide the address) / (if no, provide 'no')")
+        try
+            vm.prompt("Is the split checker already deployed? (if yes, provide the address) / (if no, provide 'no')")
         returns (string memory res) {
             if (keccak256(abi.encode(res)) == keccak256(abi.encode("no"))) {
                 try vm.prompt("Enter Proxy Admin Owner Address") returns (string memory proxyAdminRes) {
@@ -56,7 +59,9 @@ contract DeployDragonRouter is Script {
                     revert("Invalid Octant Governance Address");
                 }
 
-                try vm.prompt("Enter Max Opex Split (as a percentage, default: 0.5e18)") returns (string memory opexSplitRes) {
+                try vm.prompt("Enter Max Opex Split (as a percentage, default: 0.5e18)") returns (
+                    string memory opexSplitRes
+                ) {
                     if (keccak256(abi.encode(opexSplitRes)) != keccak256(abi.encode(""))) {
                         maxOpexSplit = vm.parseUint(opexSplitRes);
                     }

@@ -11,8 +11,9 @@ library TransferHelper {
     /// @param to The destination address of the transfer
     /// @param value The amount to be transferred
     function safeTransferFrom(address token, address from, address to, uint256 value) internal {
-        (bool success, bytes memory data) =
-            token.call(abi.encodeWithSelector(IERC20.transferFrom.selector, from, to, value));
+        (bool success, bytes memory data) = token.call(
+            abi.encodeWithSelector(IERC20.transferFrom.selector, from, to, value)
+        );
         require(success && (data.length == 0 || abi.decode(data, (bool))), "STF");
     }
 
@@ -41,7 +42,7 @@ library TransferHelper {
     /// @param to The destination of the transfer
     /// @param value The value to be transferred
     function safeTransferETH(address to, uint256 value) internal {
-        (bool success,) = to.call{value: value}(new bytes(0));
+        (bool success, ) = to.call{ value: value }(new bytes(0));
         require(success, "STE");
     }
 }

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {ModuleProxyFactory} from "../src/dragons/ModuleProxyFactory.sol";
-import {OctantRewardsSafe} from "../src/dragons/modules/OctantRewardsSafe.sol";
+import { ModuleProxyFactory } from "../src/dragons/ModuleProxyFactory.sol";
+import { OctantRewardsSafe } from "../src/dragons/modules/OctantRewardsSafe.sol";
 import "forge-std/Script.sol";
 
 contract DeployOctantModuleFactory is Script {

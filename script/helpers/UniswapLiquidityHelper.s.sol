@@ -2,7 +2,7 @@
 pragma solidity ^0.8.23;
 pragma abicoder v2;
 
-import {ABDKMath64x64} from "abdk-libraries-solidity/ABDKMath64x64.sol";
+import { ABDKMath64x64 } from "abdk-libraries-solidity/ABDKMath64x64.sol";
 import "./vendor/uniswap/libraries/TickMath.sol";
 import "./vendor/uniswap/interfaces/INonfungiblePositionManager.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
@@ -63,11 +63,12 @@ contract UniswapLiquidityHelper is IERC721Receiver {
         feeAmountTickSpacing[10000] = 200;
     }
 
-    function onERC721Received(address operator, address, uint256 tokenId, bytes calldata)
-        external
-        override
-        returns (bytes4)
-    {
+    function onERC721Received(
+        address operator,
+        address,
+        uint256 tokenId,
+        bytes calldata
+    ) external override returns (bytes4) {
         // get position information
         _createDeposit(operator, tokenId);
         return this.onERC721Received.selector;
@@ -79,10 +80,10 @@ contract UniswapLiquidityHelper is IERC721Receiver {
     /// @return amount0 The amount of token0
     /// @return amount1 The amount of token1
     /// @dev possible improvement to do is to make the msg.sender the owner of the NFT and approve the liquidity helper to perform operations
-    function mintNewPosition(uint256 amountToMint0Wei_, uint256 amountToMint1Wei_)
-        external
-        returns (uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1)
-    {
+    function mintNewPosition(
+        uint256 amountToMint0Wei_,
+        uint256 amountToMint1Wei_
+    ) external returns (uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1) {
         uint256 amount0ToMint = amountToMint0Wei_;
         uint256 amount1ToMint = amountToMint1Wei_;
 
@@ -158,7 +159,7 @@ contract UniswapLiquidityHelper is IERC721Receiver {
         // caller must be the owner of the NFT
         require(msg.sender == deposits[tokenId].owner, "Not the owner");
         // get liquidity data for tokenId
-        (,,,,,,, uint128 liquidity,,,,) = nonfungiblePositionManager.positions(tokenId);
+        (, , , , , , , uint128 liquidity, , , , ) = nonfungiblePositionManager.positions(tokenId);
         uint128 halfLiquidity = liquidity / 2;
         deposits[tokenId].liquidity = halfLiquidity;
 
@@ -172,7 +173,7 @@ contract UniswapLiquidityHelper is IERC721Receiver {
         // caller must be the owner of the NFT
         require(msg.sender == deposits[tokenId].owner, "Not the owner");
         // get liquidity data for tokenId
-        (,,,,,,, uint128 liquidity,,,,) = nonfungiblePositionManager.positions(tokenId);
+        (, , , , , , , uint128 liquidity, , , , ) = nonfungiblePositionManager.positions(tokenId);
         deposits[tokenId].liquidity = 0;
 
         _decreaseLiquidity(tokenId, liquidity);
@@ -183,23 +184,24 @@ contract UniswapLiquidityHelper is IERC721Receiver {
     /// @param tokenId The id of the erc721 token
     /// @param amount0 The amount to add of token0
     /// @param amount1 The amount to add of token1
-    function increaseLiquidityCurrentRange(uint256 tokenId, uint256 amountAdd0, uint256 amountAdd1)
-        external
-        returns (uint128 liquidity, uint256 amount0, uint256 amount1)
-    {
+    function increaseLiquidityCurrentRange(
+        uint256 tokenId,
+        uint256 amountAdd0,
+        uint256 amountAdd1
+    ) external returns (uint128 liquidity, uint256 amount0, uint256 amount1) {
         // Approve the position manager
         TransferHelper.safeApprove(token0Address, address(nonfungiblePositionManager), amountAdd0);
         TransferHelper.safeApprove(token1Address, address(nonfungiblePositionManager), amountAdd1);
 
         INonfungiblePositionManager.IncreaseLiquidityParams memory params = INonfungiblePositionManager
             .IncreaseLiquidityParams({
-            tokenId: tokenId,
-            amount0Desired: amountAdd0,
-            amount1Desired: amountAdd1,
-            amount0Min: 0,
-            amount1Min: 0,
-            deadline: block.timestamp
-        });
+                tokenId: tokenId,
+                amount0Desired: amountAdd0,
+                amount1Desired: amountAdd1,
+                amount0Min: 0,
+                amount1Min: 0,
+                deadline: block.timestamp
+            });
 
         (liquidity, amount0, amount1) = nonfungiblePositionManager.increaseLiquidity(params);
 
@@ -231,29 +233,31 @@ contract UniswapLiquidityHelper is IERC721Receiver {
     /**
      * Internal & Private functions
      */
-    function _decreaseLiquidity(uint256 tokenId, uint128 liquidity)
-        internal
-        returns (uint256 amount0, uint256 amount1)
-    {
+    function _decreaseLiquidity(
+        uint256 tokenId,
+        uint128 liquidity
+    ) internal returns (uint256 amount0, uint256 amount1) {
         // amount0Min and amount1Min are price slippage checks
         // if the amount received after burning is not greater than these minimums, transaction will fail
         INonfungiblePositionManager.DecreaseLiquidityParams memory params = INonfungiblePositionManager
             .DecreaseLiquidityParams({
-            tokenId: tokenId,
-            liquidity: liquidity,
-            amount0Min: 0,
-            amount1Min: 0,
-            deadline: block.timestamp
-        });
+                tokenId: tokenId,
+                liquidity: liquidity,
+                amount0Min: 0,
+                amount1Min: 0,
+                deadline: block.timestamp
+            });
 
         (amount0, amount1) = nonfungiblePositionManager.decreaseLiquidity(params);
     }
 
     function _createDeposit(address owner, uint256 tokenId) internal {
-        (,, address token0, address token1,,,, uint128 liquidity,,,,) = nonfungiblePositionManager.positions(tokenId);
+        (, , address token0, address token1, , , , uint128 liquidity, , , , ) = nonfungiblePositionManager.positions(
+            tokenId
+        );
 
         // set the owner and data for position
         // operator is msg.sender
-        deposits[tokenId] = Deposit({owner: owner, liquidity: liquidity, token0: token0, token1: token1});
+        deposits[tokenId] = Deposit({ owner: owner, liquidity: liquidity, token0: token0, token1: token1 });
     }
 }

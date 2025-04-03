@@ -1,107 +1,122 @@
-name: CI Pipeline
+# In steps following image build we're ignoring files uploaded to /_w/ directory as current code is in /app directory
+
+name: CI Pull Request
 on:
-  workflow_dispatch:
   pull_request:
-  push:
     branches:
       - main
+      - master
       - develop
+
+concurrency:
+  group: "pr-${{ github.sha }}"
+  cancel-in-progress: true
 
 env:
   FOUNDRY_PROFILE: ci
 
 jobs:
-  format:
-    name: Check formatting
-    runs-on: general
-
+  build-image:
+    name: Build Docker Image
+    runs-on:
+      - general
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
+          # use some obscure path to checkout the code with service account perms
+          # this is possible as $GITHUB_WORKSPACE is owned by the same service
+          # account
+          # see: https://github.com/actions/checkout/issues/211
+          path: __local
 
-      - name: Setup node
-        uses: actions/setup-node@v4
+      - name: Login to Docker registry
+        uses: docker/login-action@v3
         with:
-          node-version-file: 'package.json'
+          registry: europe-docker.pkg.dev
+          username: _json_key_base64
+          password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
 
-      - name: Install dependencies
-        run: "corepack enable && yarn install"
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/ci/core
+          tags: |
+            type=ref,event=pr
+            type=sha,prefix=,format=long
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: __local
+          file: __local/docker/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  format:
+    name: Check formatting
+    needs: build-image
+    runs-on: general
+    container:
+      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/ci/core:${{ github.sha }}
+      credentials:
+        username: _json_key_base64
+        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
+
+    steps:
       - name: Check formatting
-        run: "yarn format:check"
+        run: "cd /app; yarn format:check"
 
   lint:
     name: Run linter
+    needs: build-image
     runs-on: general
+    container:
+      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/ci/core:${{ github.sha }}
+      credentials:
+        username: _json_key_base64
+        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
 
     steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Setup node
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: 'package.json'
-
-      - name: Install dependencies
-        run: "corepack enable && yarn install"
-
       - name: Linter
-        run: "yarn lint"
+        run: "cd /app; yarn lint"
 
+  # Technically we don't need to build step is done during the docker build
   build:
     name: Build
+    needs: build-image
     runs-on: general
-    needs:
-      - format
-      - lint
+    container:
+      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/ci/core:${{ github.sha }}
+      credentials:
+        username: _json_key_base64
+        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
 
     steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Setup node
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: 'package.json'
-
-      - name: Install Foundry
-        uses: onbjerg/foundry-toolchain@v1
-
-      - name: Install dependencies
-        run: "corepack enable && yarn install"
-
       - name: Build
-        run: "yarn build"
+        run: "cd /app; yarn build"
 
   test:
     name: Test suite
+    needs: build-image
     runs-on: general
-    needs:
-      - build
+    container:
+      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/ci/core:${{ github.sha }}
+      credentials:
+        username: _json_key_base64
+        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
     permissions:
       contents: read
       actions: read
       checks: write
     steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Setup node
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: 'package.json'
-
-      - name: Install Foundry
-        uses: onbjerg/foundry-toolchain@v1
-
-      - name: Install dependencies
-        run: "corepack enable && yarn install"
-
       - name: Run tests
         env:
           TEST_RPC_URL: "${{ secrets.TEST_RPC_URL }}"
@@ -110,14 +125,14 @@ jobs:
           TEST_RPC_URL_POLYGON: "https://polygon-rpc.com"
           TEST_SAFE_SINGLETON_POLYGON: "0x41675C099F32341bf84BFc5382aF534df5C7461a"
           TEST_SAFE_PROXY_FACTORY_POLYGON: "0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67"
-        run: "yarn test:ci"
+        run: "cd /app; yarn test:ci"
 
       - name: Upload test artifact
         uses: actions/upload-artifact@v4  # upload test results
         if: success() || failure()        # run this step even if previous step failed
         with:
           name: test-results
-          path: reports/junit.xml
+          path: /app/reports/junit.xml
 
       - name: Prepare test report
         uses: dorny/test-reporter@v1

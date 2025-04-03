@@ -2,11 +2,11 @@
 pragma solidity ^0.8.25;
 
 import "forge-std/Test.sol";
-import {console2} from "forge-std/console2.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import { console2 } from "forge-std/console2.sol";
+import { ProxyAdmin } from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {SplitChecker} from "src/dragons/SplitChecker.sol";
+import { SplitChecker } from "src/dragons/SplitChecker.sol";
 
 /**
  * @title DeploySplitChecker

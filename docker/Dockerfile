@@ -1,0 +1,41 @@
+ARG NODE_VERSION=22
+
+FROM node:$NODE_VERSION AS builder
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+      python3-venv
+RUN curl -L https://foundry.paradigm.xyz | bash
+RUN /root/.foundry/bin/foundryup -i stable \
+    && rm /root/.foundry/bin/foundryup \
+    && strip /root/.foundry/bin/*
+WORKDIR /app
+COPY package.json yarn.lock .yarnrc.yml ./
+RUN corepack enable && corepack install
+RUN yarn install --immutable
+RUN yarn slither:setup
+COPY ./ ./
+RUN git submodule update --init --recursive
+RUN PATH="$PATH:/root/.foundry/bin" yarn build
+# Removed files we don't want to copy to destination container
+RUN rm -rf .git .gitmodules .yarn
+
+FROM node:$NODE_VERSION-slim AS deploy
+
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends \
+      gettext-base \
+      jq \
+    && apt clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+WORKDIR /app
+COPY --from=builder /root/.foundry/bin/ /usr/local/bin/
+COPY --from=builder /root/.svm/ /root/.svm/
+COPY --from=builder /app/ /app/
+RUN corepack enable && corepack install
+
+# Only to validate that forge is working properly
+RUN forge build --offline
+
+ENTRYPOINT [ "/usr/local/bin/yarn" ]
+CMD [ "deploy:tenderly" ]
