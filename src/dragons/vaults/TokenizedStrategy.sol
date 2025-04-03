@@ -688,6 +688,41 @@ abstract contract TokenizedStrategy is ITokenizedStrategy {
     /**
      * @inheritdoc ITokenizedStrategy
      */
+    function hats() external view returns (address) {
+        return address(_strategyStorage().HATS);
+    }
+
+    /**
+     * @inheritdoc ITokenizedStrategy
+     */
+    function keeperHat() external view returns (uint256) {
+        return _strategyStorage().KEEPER_HAT;
+    }
+
+    /**
+     * @inheritdoc ITokenizedStrategy
+     */
+    function managementHat() external view returns (uint256) {
+        return _strategyStorage().MANAGEMENT_HAT;
+    }
+
+    /**
+     * @inheritdoc ITokenizedStrategy
+     */
+    function emergencyAdminHat() external view returns (uint256) {
+        return _strategyStorage().EMERGENCY_ADMIN_HAT;
+    }
+
+    /**
+     * @inheritdoc ITokenizedStrategy
+     */
+    function regenGovernanceHat() external view returns (uint256) {
+        return _strategyStorage().REGEN_GOVERNANCE_HAT;
+    }
+
+    /**
+     * @inheritdoc ITokenizedStrategy
+     */
     function pricePerShare() external view returns (uint256) {
         StrategyData storage S = _strategyStorage();
         return _convertToAssets(S, 10 ** S.decimals, Math.Rounding.Floor);
