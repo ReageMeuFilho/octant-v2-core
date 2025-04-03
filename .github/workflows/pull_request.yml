@@ -1,3 +1,5 @@
+# In steps following image build we're ignoring files uploaded to /_w/ directory as current code is in /app directory
+
 name: CI Pull Request
 on:
   pull_request:
@@ -7,7 +9,7 @@ on:
       - develop
 
 concurrency:
-  group: "${{ github.ref }}-images"
+  group: "pr-${{ github.sha }}"
   cancel-in-progress: true
 
 env:
@@ -45,7 +47,7 @@ jobs:
             ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/ci/core
           tags: |
             type=ref,event=pr
-            type=sha,prefix=
+            type=sha,prefix=,format=long
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -63,28 +65,28 @@ jobs:
     needs: build-image
     runs-on: general
     container:
-      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/ci/core:pr-${{ github.event.pull_request.number }}
+      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/ci/core:${{ github.sha }}
       credentials:
         username: _json_key_base64
         password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
 
     steps:
       - name: Check formatting
-        run: "yarn format:check"
+        run: "cd /app; yarn format:check"
 
   lint:
     name: Run linter
     needs: build-image
     runs-on: general
     container:
-      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/ci/core:pr-${{ github.event.pull_request.number }}
+      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/ci/core:${{ github.sha }}
       credentials:
         username: _json_key_base64
         password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
 
     steps:
       - name: Linter
-        run: "yarn lint"
+        run: "cd /app; yarn lint"
 
   # Technically we don't need to build step is done during the docker build
   build:
@@ -92,21 +94,21 @@ jobs:
     needs: build-image
     runs-on: general
     container:
-      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/ci/core:pr-${{ github.event.pull_request.number }}
+      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/ci/core:${{ github.sha }}
       credentials:
         username: _json_key_base64
         password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
 
     steps:
       - name: Build
-        run: "yarn build"
+        run: "cd /app; yarn build"
 
   test:
     name: Test suite
     needs: build-image
     runs-on: general
     container:
-      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/ci/core:pr-${{ github.event.pull_request.number }}
+      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/ci/core:${{ github.sha }}
       credentials:
         username: _json_key_base64
         password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
@@ -123,14 +125,14 @@ jobs:
           TEST_RPC_URL_POLYGON: "https://polygon-rpc.com"
           TEST_SAFE_SINGLETON_POLYGON: "0x41675C099F32341bf84BFc5382aF534df5C7461a"
           TEST_SAFE_PROXY_FACTORY_POLYGON: "0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67"
-        run: "yarn test:ci"
+        run: "cd /app; yarn test:ci"
 
       - name: Upload test artifact
         uses: actions/upload-artifact@v4  # upload test results
         if: success() || failure()        # run this step even if previous step failed
         with:
           name: test-results
-          path: reports/junit.xml
+          path: /app/reports/junit.xml
 
       - name: Prepare test report
         uses: dorny/test-reporter@v1
