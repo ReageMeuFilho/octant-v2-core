@@ -27,6 +27,7 @@
     "lint": "solhint './{src,scripts,test}/**/*.sol'",
     "precommit": "lint-staged",
     "build": "forge clean && forge compile",
+    "build:contracts": "forge clean && forge compile --skip test --skip script",
     "test": "forge clean && forge test",
     "test:ci": "forge clean && mkdir -p reports && (forge test --junit > reports/junit.xml || forge test --summary)",
     "gas": "forge snapshot --isolate --gas-report --diff .gas-snapshot > gasreport.txt",
