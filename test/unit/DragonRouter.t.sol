@@ -60,7 +60,7 @@ contract DragonRouterTest is Test {
     event SplitDelayUpdated(uint256 oldDelay, uint256 newDelay);
     event SplitCheckerUpdated(address oldChecker, address newChecker);
     event UserTransformerSet(address indexed user, address transformer, address targetToken);
-    event SplitClaimed(address indexed user, address indexed strategy, uint256 amount);
+    event SplitClaimed(address indexed caller, address indexed owner, address indexed strategy, uint256 amount);
     event ClaimAutomationSet(address indexed user, address indexed strategy, bool enabled);
 
     function setUp() public {
@@ -601,7 +601,7 @@ contract DragonRouterTest is Test {
         // Test claiming by the user
         vm.prank(userWithBalance);
         vm.expectEmit(true, true, true, true);
-        emit SplitClaimed(userWithBalance, strategies[0], claimAmount);
+        emit SplitClaimed(userWithBalance, userWithBalance, strategies[0], claimAmount);
         routerTesting.claimSplit(userWithBalance, strategies[0], claimAmount);
         // Set user data for the second claim (reduced balance after first claim)
         routerTesting.setUserDataForTest(
@@ -625,7 +625,7 @@ contract DragonRouterTest is Test {
         address bot = makeAddr("bot");
         vm.prank(bot);
         vm.expectEmit(true, true, true, true);
-        emit SplitClaimed(userWithBalance, strategies[0], secondClaimAmount);
+        emit SplitClaimed(bot, userWithBalance, strategies[0], secondClaimAmount);
         routerTesting.claimSplit(userWithBalance, strategies[0], secondClaimAmount);
     }
     function test_claimSplit_reverts_zeroAmount() public {

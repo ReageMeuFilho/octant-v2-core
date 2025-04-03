@@ -246,6 +246,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
                 _userData.splitPerShare = 0;
                 emit UserSplitUpdated(
                     split.recipients[j],
+                    strategies[i],
                     _userData.assets,
                     _userData.userAssetPerShare,
                     _userData.splitPerShare
@@ -257,6 +258,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
                 userData[_split.recipients[j]][strategies[i]].splitPerShare = _split.allocations[j];
                 emit UserSplitUpdated(
                     _split.recipients[j],
+                    strategies[i],
                     userData[_split.recipients[j]][strategies[i]].assets,
                     userData[_split.recipients[j]][strategies[i]].userAssetPerShare,
                     _split.allocations[j]
@@ -284,7 +286,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
 
         _transferSplit(_user, _strategy, _amount);
 
-        emit SplitClaimed(_user, _strategy, _amount);
+        emit SplitClaimed(msg.sender, _user, _strategy, _amount);
     }
 
     receive() external payable override {}
@@ -303,7 +305,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
         UserData storage _userData = userData[_user][_strategy];
         _userData.assets = balanceOf(_user, _strategy) - _amount;
         _userData.userAssetPerShare = strategyData[_strategy].assetPerShare;
-        emit UserSplitUpdated(_user, _userData.assets, _userData.userAssetPerShare, _userData.splitPerShare);
+        emit UserSplitUpdated(_user, _strategy, _userData.assets, _userData.userAssetPerShare, _userData.splitPerShare);
     }
 
     /**
