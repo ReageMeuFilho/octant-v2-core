@@ -14,39 +14,77 @@ interface ISafe {
     ) external returns (bool success);
 }
 
-event AllowanceSet(address indexed safe, address indexed delegate, address indexed token, uint256 dripRatePerDay);
+event AllowanceSet(address indexed safe, address indexed delegate, address indexed token, uint96 dripRatePerDay);
 event AllowanceTransferred(
     address indexed safe,
     address indexed delegate,
     address indexed token,
     address to,
-    uint256 amount
+    uint112 amount
 );
 
 error NoAllowanceToTransfer(address safe, address delegate, address token);
 error TransferFailed(address safe, address delegate, address token);
+error BadERC20(address token);
 
 /// @title LinearAllowance
 /// @notice A module that allows a delegate to transfer allowances from a safe to a recipient.
 contract LinearAllowanceSingletonForGnosisSafe is ReentrancyGuard {
+    // Compress by trimming 32 le Lossy compression. Use values that are multiples of 2^32 to avoid precision loss.
+    uint8 public constant NUMBER_OF_LEAST_SIGNIFICANT_BITS_TO_TRIM = 32;
+    address public constant NATIVE_TOKEN = 0x0000000000000000000000000000000000000000;
+
+    // Maximum accumulation period is 2^(80-64) days, which is around 89 years.
     struct LinearAllowance {
-        uint256 dripRatePerDay;
-        uint256 totalUnspent;
-        uint256 totalSpent;
-        uint256 lastBookedAt; // 0 is a special case for uninitialized allowance
+        uint64 dripRatePerDay; // 32-bits compression. Decompressed size is 96 bits.
+        uint80 totalUnspent; // 32-bits compression. Decompressed size is 112 bits.
+        uint80 totalSpent; // 32-bits compression. Decompressed size is 112 bits.
+        uint32 lastBookedAt; // 0 is a special case for uninitialized allowance. Overflows in year 2106 in Gregorian calendar.
     }
 
     mapping(address => mapping(address => mapping(address => LinearAllowance))) public allowances; // safe -> delegate -> token -> allowance
+
+    function decompress80to112(uint80 input) internal pure returns (uint112) {
+        return uint112(input) << NUMBER_OF_LEAST_SIGNIFICANT_BITS_TO_TRIM;
+    }
+
+    function decompress64to96(uint64 input) internal pure returns (uint96) {
+        return uint96(input) << NUMBER_OF_LEAST_SIGNIFICANT_BITS_TO_TRIM;
+    }
+
+    function compress112to80(uint112 input) internal pure returns (uint80) {
+        return uint80(input >> NUMBER_OF_LEAST_SIGNIFICANT_BITS_TO_TRIM);
+    }
+
+    function compress96to64(uint96 input) internal pure returns (uint64) {
+        return uint64(input >> NUMBER_OF_LEAST_SIGNIFICANT_BITS_TO_TRIM);
+    }
+
+    function trimLast32BitsOf256(uint256 input) public pure returns (uint256) {
+        // Mask to preserve all bits except the last 32 bits
+        uint256 mask = uint256(0xFFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_FFFFFFFF_00000000);
+        return input & mask;
+    }
 
     function updateAllowance(LinearAllowance storage a) internal {
         if (a.lastBookedAt != 0) {
             uint256 timeElapsed = block.timestamp - a.lastBookedAt;
             uint256 daysElapsed = timeElapsed / 1 days;
-            a.totalUnspent += daysElapsed * a.dripRatePerDay;
-            a.lastBookedAt = block.timestamp;
+
+            // Decompress dripRatePerDay before calculation
+            uint96 decompressedDripRatePerDay = decompress64to96(a.dripRatePerDay);
+
+            // Decompress totalUnspent, add the accrued amount, then compress again
+            uint112 decompressedTotalUnspent = decompress80to112(a.totalUnspent);
+            uint112 accrued = uint112(daysElapsed) * decompressedDripRatePerDay;
+            uint112 newTotalUnspent = decompressedTotalUnspent + accrued;
+
+            // Compress before storing
+            a.totalUnspent = compress112to80(newTotalUnspent);
+            a.lastBookedAt = uint32(block.timestamp);
         } else {
             // Special case for uninitialized allowance
-            a.lastBookedAt = block.timestamp;
+            a.lastBookedAt = uint32(block.timestamp);
         }
     }
 
@@ -54,10 +92,11 @@ contract LinearAllowanceSingletonForGnosisSafe is ReentrancyGuard {
     /// @param delegate The delegate to set the allowance for.
     /// @param token The token to set the allowance for. 0x0 is ETH.
     /// @param dripRatePerDay The drip rate per day for the allowance.
-    function setAllowance(address delegate, address token, uint256 dripRatePerDay) external {
+    function setAllowance(address delegate, address token, uint96 dripRatePerDay) external {
         LinearAllowance storage a = allowances[msg.sender][delegate][token];
         updateAllowance(a);
-        a.dripRatePerDay = dripRatePerDay;
+        a.dripRatePerDay = compress96to64(dripRatePerDay);
+
         emit AllowanceSet(msg.sender, delegate, token, dripRatePerDay);
     }
 
@@ -75,13 +114,17 @@ contract LinearAllowanceSingletonForGnosisSafe is ReentrancyGuard {
         LinearAllowance storage a = allowances[safe][msg.sender][token];
         updateAllowance(a);
 
-        require(a.totalUnspent > 0, NoAllowanceToTransfer(safe, msg.sender, token));
+        uint112 decompressedTotalUnspent = decompress80to112(a.totalUnspent);
+        require(decompressedTotalUnspent > 0, NoAllowanceToTransfer(safe, msg.sender, token));
 
-        uint256 transferAmount;
+        uint112 trimmedSafeBalance = uint112(trimLast32BitsOf256(address(safe).balance));
 
-        if (token == address(0)) {
-            // For ETH transfers, get the minimum of totalUnspent and safe balance
-            transferAmount = a.totalUnspent <= address(safe).balance ? a.totalUnspent : address(safe).balance;
+        uint112 transferAmount;
+
+        if (token == NATIVE_TOKEN) {
+            transferAmount = decompressedTotalUnspent <= trimmedSafeBalance
+                ? decompressedTotalUnspent
+                : trimmedSafeBalance;
 
             if (transferAmount > 0) {
                 require(
@@ -90,9 +133,11 @@ contract LinearAllowanceSingletonForGnosisSafe is ReentrancyGuard {
                 );
             }
         } else {
-            // For ERC20 transfers
             try IERC20(token).balanceOf(safe) returns (uint256 tokenBalance) {
-                transferAmount = a.totalUnspent <= tokenBalance ? a.totalUnspent : tokenBalance;
+                uint112 trimmedTokenBalance = uint112(trimLast32BitsOf256(tokenBalance));
+                transferAmount = decompressedTotalUnspent <= trimmedTokenBalance
+                    ? decompressedTotalUnspent
+                    : trimmedTokenBalance;
 
                 if (transferAmount > 0) {
                     bytes memory data = abi.encodeWithSelector(IERC20.transfer.selector, to, transferAmount);
@@ -102,20 +147,26 @@ contract LinearAllowanceSingletonForGnosisSafe is ReentrancyGuard {
                     );
                 }
             } catch {
-                revert TransferFailed(safe, msg.sender, token);
+                revert BadERC20(token);
             }
         }
 
-        // Update bookkeeping
-        a.totalSpent += transferAmount;
-        a.totalUnspent -= transferAmount;
+        uint112 decompressedTotalSpent = uint112(a.totalSpent) << NUMBER_OF_LEAST_SIGNIFICANT_BITS_TO_TRIM;
+
+        // Update with transferred amount
+        decompressedTotalSpent += transferAmount;
+        decompressedTotalUnspent -= transferAmount;
+
+        // Compress before storing back
+        a.totalSpent = uint80(decompressedTotalSpent >> NUMBER_OF_LEAST_SIGNIFICANT_BITS_TO_TRIM);
+        a.totalUnspent = uint80(decompressedTotalUnspent >> NUMBER_OF_LEAST_SIGNIFICANT_BITS_TO_TRIM);
 
         emit AllowanceTransferred(safe, msg.sender, token, to, transferAmount);
 
         return transferAmount;
     }
 
-    /// @notice Get the allowance data for a token.
+    /// @notice Get the decompressed allowance data for a token.
     /// @param safe The address of the safe.
     /// @param delegate The address of the delegate.
     /// @param token The address of the token.
@@ -127,10 +178,10 @@ contract LinearAllowanceSingletonForGnosisSafe is ReentrancyGuard {
     ) public view returns (uint256[4] memory allowanceData) {
         LinearAllowance memory allowance = allowances[safe][delegate][token];
         allowanceData = [
-            allowance.dripRatePerDay,
-            allowance.totalUnspent,
-            allowance.totalSpent,
-            allowance.lastBookedAt
+            uint256(allowance.dripRatePerDay) << NUMBER_OF_LEAST_SIGNIFICANT_BITS_TO_TRIM,
+            uint256(allowance.totalUnspent) << NUMBER_OF_LEAST_SIGNIFICANT_BITS_TO_TRIM,
+            uint256(allowance.totalSpent) << NUMBER_OF_LEAST_SIGNIFICANT_BITS_TO_TRIM,
+            uint256(allowance.lastBookedAt)
         ];
     }
 
@@ -139,17 +190,22 @@ contract LinearAllowanceSingletonForGnosisSafe is ReentrancyGuard {
     /// @param delegate The address of the delegate.
     /// @param token The address of the token.
     /// @return totalAllowanceAsOfNow The total unspent allowance as of now.
-    function getTotalUnspent(address safe, address delegate, address token) public view returns (uint256) {
+    function getTotalUnspent(address safe, address delegate, address token) public view returns (uint112) {
         LinearAllowance memory allowance = allowances[safe][delegate][token];
 
-        // Handle uninitialized allowance (lastBookedAt == 0)
         if (allowance.lastBookedAt == 0) {
             return 0;
         }
 
         uint256 timeElapsed = block.timestamp - allowance.lastBookedAt;
         uint256 daysElapsed = timeElapsed / 1 days;
-        uint256 totalAllowanceAsOfNow = allowance.totalUnspent + allowance.dripRatePerDay * daysElapsed;
+
+        // Decompress both values
+        uint256 decompressedRate = uint256(allowance.dripRatePerDay) << NUMBER_OF_LEAST_SIGNIFICANT_BITS_TO_TRIM;
+        uint256 decompressedTotalUnspent = uint256(allowance.totalUnspent) << NUMBER_OF_LEAST_SIGNIFICANT_BITS_TO_TRIM;
+
+        // Calculate using decompressed values
+        uint112 totalAllowanceAsOfNow = uint112(decompressedTotalUnspent) + uint112(decompressedRate * daysElapsed);
 
         return totalAllowanceAsOfNow;
     }
