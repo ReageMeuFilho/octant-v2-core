@@ -151,15 +151,15 @@ contract LinearAllowanceSingletonForGnosisSafe is ReentrancyGuard {
             }
         }
 
-        uint112 decompressedTotalSpent = uint112(a.totalSpent) << NUMBER_OF_LEAST_SIGNIFICANT_BITS_TO_TRIM;
+        uint112 decompressedTotalSpent = decompress80to112(a.totalSpent);
 
         // Update with transferred amount
         decompressedTotalSpent += transferAmount;
         decompressedTotalUnspent -= transferAmount;
 
         // Compress before storing back
-        a.totalSpent = uint80(decompressedTotalSpent >> NUMBER_OF_LEAST_SIGNIFICANT_BITS_TO_TRIM);
-        a.totalUnspent = uint80(decompressedTotalUnspent >> NUMBER_OF_LEAST_SIGNIFICANT_BITS_TO_TRIM);
+        a.totalSpent = compress112to80(decompressedTotalSpent);
+        a.totalUnspent = compress112to80(decompressedTotalUnspent);
 
         emit AllowanceTransferred(safe, msg.sender, token, to, transferAmount);
 
@@ -175,13 +175,13 @@ contract LinearAllowanceSingletonForGnosisSafe is ReentrancyGuard {
         address safe,
         address delegate,
         address token
-    ) public view returns (uint256[4] memory allowanceData) {
+    ) public view returns (uint112[4] memory allowanceData) {
         LinearAllowance memory allowance = allowances[safe][delegate][token];
         allowanceData = [
-            uint256(allowance.dripRatePerDay) << NUMBER_OF_LEAST_SIGNIFICANT_BITS_TO_TRIM,
-            uint256(allowance.totalUnspent) << NUMBER_OF_LEAST_SIGNIFICANT_BITS_TO_TRIM,
-            uint256(allowance.totalSpent) << NUMBER_OF_LEAST_SIGNIFICANT_BITS_TO_TRIM,
-            uint256(allowance.lastBookedAt)
+            uint112(decompress64to96(allowance.dripRatePerDay)),
+            decompress80to112(allowance.totalUnspent),
+            decompress80to112(allowance.totalSpent),
+            uint112(allowance.lastBookedAt)
         ];
     }
 
@@ -201,11 +201,11 @@ contract LinearAllowanceSingletonForGnosisSafe is ReentrancyGuard {
         uint256 daysElapsed = timeElapsed / 1 days;
 
         // Decompress both values
-        uint256 decompressedRate = uint256(allowance.dripRatePerDay) << NUMBER_OF_LEAST_SIGNIFICANT_BITS_TO_TRIM;
-        uint256 decompressedTotalUnspent = uint256(allowance.totalUnspent) << NUMBER_OF_LEAST_SIGNIFICANT_BITS_TO_TRIM;
+        uint96 decompressedDripRatePerDay = decompress64to96(allowance.dripRatePerDay);
+        uint112 decompressedTotalUnspent = decompress80to112(allowance.totalUnspent);
 
         // Calculate using decompressed values
-        uint112 totalAllowanceAsOfNow = uint112(decompressedTotalUnspent) + uint112(decompressedRate * daysElapsed);
+        uint112 totalAllowanceAsOfNow = decompressedTotalUnspent + uint112(decompressedDripRatePerDay * daysElapsed);
 
         return totalAllowanceAsOfNow;
     }

@@ -156,7 +156,7 @@ contract TestLinearAllowanceIntegration is Test {
         assertEq(actualTransferred, expectedTransfer, "Transferred amount should match expected");
 
         // Verify allowance bookkeeping
-        uint256[4] memory allowanceData = allowanceModule.getTokenAllowanceData(
+        uint112[4] memory allowanceData = allowanceModule.getTokenAllowanceData(
             safeAddress,
             executorAddress,
             nativeToken
@@ -263,7 +263,7 @@ contract TestLinearAllowanceIntegration is Test {
         assertEq(actualTransferred, expectedTransfer, "Transferred amount should match expected");
 
         // Verify allowance bookkeeping
-        uint256[4] memory allowanceData = allowanceModule.getTokenAllowanceData(
+        uint112[4] memory allowanceData = allowanceModule.getTokenAllowanceData(
             safeAddress,
             executorAddress,
             address(token)
