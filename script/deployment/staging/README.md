@@ -24,9 +24,9 @@ The DeployProtocol script handles the sequential deployment of:
 Create `.env` file:
 ```
 PRIVATE_KEY=(deployer private key ex. MetaMask account)
-ETHERSCAN_API_KEY=(your Personal Tenderly accessToken)
 RPC_URL=https://rpc.ov2st.octant.build
 VERIFIER_URL=$RPC_URL/verify/etherscan
+VERIFIER_API_KEY=(your Personal Tenderly accessToken)
 MAX_OPEX_SPLIT=5 # to confirm
 MIN_METAPOOL_SPLIT=0 # to confirm
 ```
@@ -48,7 +48,7 @@ yarn deploy:tenderly
 
 2. If the dry run succeeds, execute the actual deployment:
    ```
-   forge script script/deployment/staging/DeployProtocol.s.sol:DeployProtocol --slow --rpc-url $RPC_URL --broadcast --verify
+   forge script script/deployment/staging/DeployProtocol.s.sol:DeployProtocol --slow --rpc-url $RPC_URL --broadcast --verify --verifier custom
    ```
 
 ## Post Deployment

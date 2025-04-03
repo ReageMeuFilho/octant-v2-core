@@ -20,7 +20,6 @@ fuzz = {runs = 256, max_test_rejects=65536}
 deny_warnings = true
 
 [profile.ci]
-verbosity = 4
 fuzz = {runs = 256, max_test_rejects=65536}
 [profile.local]
   fuzz = { runs = 50 }

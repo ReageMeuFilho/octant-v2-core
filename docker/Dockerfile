@@ -26,6 +26,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
       gettext-base \
       jq \
+      patch \
     && apt clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 WORKDIR /app
