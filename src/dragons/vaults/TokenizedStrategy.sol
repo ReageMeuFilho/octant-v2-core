@@ -199,8 +199,8 @@ abstract contract TokenizedStrategy is ITokenizedStrategy {
         S.keeper = _keeper;
 
         S.REGEN_GOVERNANCE = _regenGovernance;
-        S.MINIMUM_LOCKUP_DURATION = 90 days;
-        S.RAGE_QUIT_COOLDOWN_PERIOD = 90 days;
+        S.minimumLockupDuration = 90 days;
+        S.rageQuitCooldownPeriod = 90 days;
 
         // Emit event to signal a new strategy has been initialized.
         emit NewTokenizedStrategy(address(this), _asset, API_VERSION);
