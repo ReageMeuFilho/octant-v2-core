@@ -219,3 +219,29 @@ jobs:
 #
 #      - name: Run Slither
 #        run: "yarn slither:setup && yarn slither"
+
+  publish:
+    name: Publish
+    needs:
+      - build-image
+      - format
+      - lint
+      - test
+    runs-on: general
+    container:
+      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/ci/core:${{ github.sha }}
+      credentials:
+        username: _json_key_base64
+        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
+    if: ${{ (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main') }}
+    steps:
+      - name: Build
+        run: "cd /app; yarn build:contracts"
+      
+      - name: Authenticate to github npm registry
+        run: "cd /app; yarn npm login --publish --scope=@golemfoundation"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}
+
+      - name: Publish
+        run: "cd /app; yarn npm publish"
