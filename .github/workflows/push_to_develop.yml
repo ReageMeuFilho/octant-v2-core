@@ -248,7 +248,9 @@ jobs:
           yarn deploy:tenderly && (
             cp $CONTRACT_ADDRESSES $GITHUB_OUTPUT
             echo "# Smart contract addresses\n\n| Contract name | Address |\n|---|---|" > $GITHUB_STEP_SUMMARY
-            awk -F '=' '{gsub("_ADDRESS", "", $1); print "| `" $1 "` | `" $2 "` |"}' $CONTRACT_ADDRESSES >> $GITHUB_STEP_SUMMARY
+            grep ADDRESS $CONTRACT_ADDRESSES | awk -F '=' '{gsub("_ADDRESS", "", $1); print "| `" $1 "` | `" $2 "` |"}' >> $GITHUB_STEP_SUMMARY
+            echo "\n# Other variables\n\n| Variable | Value |\n|---|---|" >> $GITHUB_STEP_SUMMARY
+            grep -v ADDRESS $CONTRACT_ADDRESSES | awk -F '=' '{print "| `" $1 "` | `" $2 "` |"}' >> $GITHUB_STEP_SUMMARY
           )
 
       - name: Upload contract addresses artifact

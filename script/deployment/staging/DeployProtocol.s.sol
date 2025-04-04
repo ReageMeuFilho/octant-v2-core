@@ -98,15 +98,21 @@ contract DeployProtocol is Script {
         console2.log("Linear Allowance Singleton:", linearAllowanceSingletonForGnosisSafeAddress);
         console2.log("Hats contract:             ", hatsAddress);
         console2.log("DragonHatter:              ", address(deployHatsProtocol.dragonHatter()));
-        console2.log("Top Hat ID:                ", deployHatsProtocol.topHatId());
-        console2.log("Autonomous Admin Hat ID:   ", deployHatsProtocol.autonomousAdminHatId());
-        console2.log("Dragon Admin Hat ID:       ", deployHatsProtocol.dragonAdminHatId());
-        console2.log("Branch Hat ID:             ", deployHatsProtocol.branchHatId());
+        console2.log("------------------");
+        console2.log("Top Hat ID:                ", vm.toString(deployHatsProtocol.topHatId()));
+        console2.log("Autonomous Admin Hat ID:   ", vm.toString(deployHatsProtocol.autonomousAdminHatId()));
+        console2.log("Dragon Admin Hat ID:       ", vm.toString(deployHatsProtocol.dragonAdminHatId()));
+        console2.log("Branch Hat ID:             ", vm.toString(deployHatsProtocol.branchHatId()));
+        console2.log("------------------");
 
         string memory contractAddressFilename = "./ci/contract_addresses.txt";
         if (vm.exists(contractAddressFilename)) {
             vm.removeFile(contractAddressFilename);
         }
+        vm.writeLine(
+            contractAddressFilename,
+            string.concat("MODULE_PROXY_FACTORY_ADDRESS=", vm.toString(moduleProxyFactoryAddress))
+        );
         vm.writeLine(
             contractAddressFilename,
             string.concat("DRAGON_TOKENIZED_STRATEGY_ADDRESS=", vm.toString(dragonTokenizedStrategyAddress))
@@ -130,7 +136,28 @@ contract DeployProtocol is Script {
         );
         vm.writeLine(
             contractAddressFilename,
-            string.concat("MODULE_PROXY_FACTORY_ADDRESS=", vm.toString(moduleProxyFactoryAddress))
+            string.concat(
+                "LINEAR_ALLOWANCE_SINGLETON_FOR_GNOSIS_SAFE_ADDRESS=",
+                vm.toString(linearAllowanceSingletonForGnosisSafeAddress)
+            )
+        );
+        vm.writeLine(contractAddressFilename, string.concat("HATS_ADDRESS=", vm.toString(hatsAddress)));
+        vm.writeLine(
+            contractAddressFilename,
+            string.concat("DRAGON_HATTER_ADDRESS=", vm.toString(address(deployHatsProtocol.dragonHatter())))
+        );
+        vm.writeLine(contractAddressFilename, string.concat("TOP_HAT_ID=", vm.toString(deployHatsProtocol.topHatId())));
+        vm.writeLine(
+            contractAddressFilename,
+            string.concat("AUTONOMOUS_ADMIN_HAT_ID=", vm.toString(deployHatsProtocol.autonomousAdminHatId()))
+        );
+        vm.writeLine(
+            contractAddressFilename,
+            string.concat("DRAGON_ADMIN_HAT_ID=", vm.toString(deployHatsProtocol.dragonAdminHatId()))
+        );
+        vm.writeLine(
+            contractAddressFilename,
+            string.concat("BRANCH_HAT_ID=", vm.toString(deployHatsProtocol.branchHatId()))
         );
     }
 }
