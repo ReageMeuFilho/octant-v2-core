@@ -48,7 +48,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingletonForGn
 
     mapping(address => mapping(address => mapping(address => LinearAllowance))) public allowances; // safe -> delegate -> token -> allowance
 
-    function updateAllowance(LinearAllowance memory a) internal view returns (LinearAllowance memory) {
+    function _updateAllowance(LinearAllowance memory a) internal view returns (LinearAllowance memory) {
         if (a.lastBookedAtInSeconds != 0) {
             uint256 timeElapsed = block.timestamp - a.lastBookedAtInSeconds;
             uint256 daysElapsed = timeElapsed / 1 days;
@@ -65,7 +65,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingletonForGn
         LinearAllowance memory a = allowances[msg.sender][delegate][token];
 
         // Update cached memory values
-        a = updateAllowance(a);
+        a = _updateAllowance(a);
         a.dripRatePerDay = dripRatePerDay;
 
         // Write back to storage once
@@ -84,7 +84,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingletonForGn
         LinearAllowance memory a = allowances[safe][msg.sender][token];
 
         // Update cached memory values
-        a = updateAllowance(a);
+        a = _updateAllowance(a);
 
         if (a.totalUnspent == 0) revert NoAllowanceToTransfer(safe, msg.sender, token);
 
