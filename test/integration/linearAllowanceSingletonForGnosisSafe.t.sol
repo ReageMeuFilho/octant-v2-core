@@ -5,6 +5,7 @@ import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxy.sol";
 import { LinearAllowanceSingletonForGnosisSafe } from "src/dragons/modules/LinearAllowanceSingletonForGnosisSafe.sol";
+import { NATIVE_TOKEN } from "src/constants.sol";
 import "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 import { LinearAllowanceExecutor } from "../../src/dragons/LinearAllowanceExecutor.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -17,7 +18,6 @@ contract TestERC20 is ERC20 {
 
 contract TestLinearAllowanceIntegration is Test {
     address delegateContractOwner = makeAddr("delegateContractOwner");
-    address public ETH = address(0x0); // Native ETH
 
     Safe internal safeImpl;
     SafeProxyFactory internal safeProxyFactory;
@@ -28,7 +28,6 @@ contract TestLinearAllowanceIntegration is Test {
     function setUp() public {
         // Deploy module
         allowanceModule = new LinearAllowanceSingletonForGnosisSafe();
-
         // Deploy Safe infrastructure
         safeProxyFactory = new SafeProxyFactory();
         singleton = new Safe();
@@ -57,18 +56,16 @@ contract TestLinearAllowanceIntegration is Test {
     }
 
     // Test ETH allowance with both full and partial withdrawals
-    function testAllowanceWithETH(uint256 dripRatePerDay, uint256 daysElapsed, uint256 safeBalance) public {
+    function testAllowanceWithETH(uint128 dripRatePerDay, uint256 daysElapsed, uint256 safeBalance) public {
         // Constrain inputs to reasonable values
-        dripRatePerDay = bound(dripRatePerDay, 0.1 ether, 10 ether);
-        daysElapsed = bound(daysElapsed, 1, 30);
+        vm.assume(dripRatePerDay > 0 ether);
+        daysElapsed = uint32(bound(daysElapsed, 1, 2 ** 30));
 
         // Calculate expected allowance
-        uint256 expectedAllowance = dripRatePerDay * daysElapsed;
+        uint160 expectedAllowance = uint160(dripRatePerDay) * uint160(daysElapsed);
 
         // Constrain safeBalance to ensure we test both partial and full withdrawals
-        // By making safeBalance between 0.1x and 2x the expected allowance, we'll get a mix
-        // of partial withdrawals (<1x) and full withdrawals (>=1x)
-        safeBalance = bound(safeBalance, expectedAllowance / 10, expectedAllowance * 2);
+        safeBalance = bound(safeBalance, expectedAllowance / 2, expectedAllowance * 2);
 
         // Setup
         address safeAddress = address(safeImpl);
@@ -79,11 +76,11 @@ contract TestLinearAllowanceIntegration is Test {
 
         // Verify reverts with no allowance
         vm.expectRevert();
-        allowanceExecutor.executeAllowanceTransfer(allowanceModule, safeAddress, ETH);
+        allowanceExecutor.executeAllowanceTransfer(allowanceModule, safeAddress, NATIVE_TOKEN);
 
         // Set up allowance
         vm.prank(safeAddress);
-        allowanceModule.setAllowance(executorAddress, ETH, dripRatePerDay);
+        allowanceModule.setAllowance(executorAddress, NATIVE_TOKEN, uint128(dripRatePerDay));
 
         // Advance time to accrue allowance
         vm.warp(block.timestamp + daysElapsed * 1 days);
@@ -96,7 +93,7 @@ contract TestLinearAllowanceIntegration is Test {
         uint256 expectedTransfer = expectedAllowance <= safeBalanceBefore ? expectedAllowance : safeBalanceBefore;
 
         // Execute transfer
-        allowanceExecutor.executeAllowanceTransfer(allowanceModule, safeAddress, ETH);
+        allowanceExecutor.executeAllowanceTransfer(allowanceModule, safeAddress, NATIVE_TOKEN);
 
         // Verify correct amounts were transferred
         assertEq(
@@ -111,48 +108,50 @@ contract TestLinearAllowanceIntegration is Test {
         );
 
         // Verify allowance bookkeeping
-        uint256[4] memory allowanceData = allowanceModule.getTokenAllowanceData(safeAddress, executorAddress, ETH);
+        (, uint160 totalUnspent, , ) = allowanceModule.getTokenAllowanceData(
+            safeAddress,
+            executorAddress,
+            NATIVE_TOKEN
+        );
 
         if (expectedAllowance > safeBalanceBefore) {
             // Partial withdrawal case
             assertEq(
-                allowanceData[1],
+                totalUnspent,
                 expectedAllowance - safeBalanceBefore,
                 "Remaining unspent should equal original minus transferred"
             );
         } else {
             // Full withdrawal case
-            assertEq(allowanceData[1], 0, "Unspent allowance should be zero");
+            assertEq(totalUnspent, 0, "Unspent allowance should be zero");
         }
 
         // Test that allowance stops accruing after rate set to 0
         vm.warp(block.timestamp + 5 days);
         vm.prank(safeAddress);
-        allowanceModule.setAllowance(executorAddress, ETH, 0);
+        allowanceModule.setAllowance(executorAddress, NATIVE_TOKEN, 0);
 
-        uint256 unspentAfterZeroRate = allowanceModule.getTotalUnspent(safeAddress, executorAddress, ETH);
+        uint256 unspentAfterZeroRate = allowanceModule.getTotalUnspent(safeAddress, executorAddress, NATIVE_TOKEN);
         vm.warp(block.timestamp + 10 days);
 
         assertEq(
-            allowanceModule.getTotalUnspent(safeAddress, executorAddress, ETH),
+            allowanceModule.getTotalUnspent(safeAddress, executorAddress, NATIVE_TOKEN),
             unspentAfterZeroRate,
             "Balance should not increase after rate set to 0"
         );
     }
 
     // Test ERC20 allowance with both full and partial withdrawals
-    function testAllowanceWithERC20(uint256 dripRatePerDay, uint256 daysElapsed, uint256 tokenSupply) public {
+    function testAllowanceWithERC20(uint128 dripRatePerDay, uint256 daysElapsed, uint256 tokenSupply) public {
         // Constrain inputs to reasonable values
-        dripRatePerDay = bound(dripRatePerDay, 0.1 ether, 10 ether);
-        daysElapsed = bound(daysElapsed, 1, 30);
+        vm.assume(dripRatePerDay > 0 ether);
+        daysElapsed = uint32(bound(daysElapsed, 1, 2 ** 30));
 
         // Calculate expected allowance
-        uint256 expectedAllowance = dripRatePerDay * daysElapsed;
+        uint160 expectedAllowance = uint160(dripRatePerDay) * uint160(daysElapsed);
 
         // Constrain tokenSupply to ensure we test both partial and full withdrawals
-        // By making tokenSupply between 0.1x and 2x the expected allowance, we'll get a mix
-        // of partial withdrawals (<1x) and full withdrawals (>=1x)
-        tokenSupply = bound(tokenSupply, expectedAllowance / 10, expectedAllowance * 2);
+        tokenSupply = bound(tokenSupply, expectedAllowance / 2, expectedAllowance * 2);
 
         // Setup
         address safeAddress = address(safeImpl);
@@ -168,7 +167,7 @@ contract TestLinearAllowanceIntegration is Test {
 
         // Set up allowance
         vm.prank(safeAddress);
-        allowanceModule.setAllowance(executorAddress, address(token), dripRatePerDay);
+        allowanceModule.setAllowance(executorAddress, address(token), uint128(dripRatePerDay));
 
         // Advance time to accrue allowance
         vm.warp(block.timestamp + daysElapsed * 1 days);
@@ -196,7 +195,7 @@ contract TestLinearAllowanceIntegration is Test {
         );
 
         // Verify allowance bookkeeping
-        uint256[4] memory allowanceData = allowanceModule.getTokenAllowanceData(
+        (, uint160 totalUnspent, , ) = allowanceModule.getTokenAllowanceData(
             safeAddress,
             executorAddress,
             address(token)
@@ -205,13 +204,13 @@ contract TestLinearAllowanceIntegration is Test {
         if (expectedAllowance > safeBalanceBefore) {
             // Partial withdrawal case
             assertEq(
-                allowanceData[1],
+                totalUnspent,
                 expectedAllowance - safeBalanceBefore,
                 "Remaining unspent should equal original minus transferred"
             );
         } else {
             // Full withdrawal case
-            assertEq(allowanceData[1], 0, "Unspent allowance should be zero");
+            assertEq(totalUnspent, 0, "Unspent allowance should be zero");
         }
 
         // Test that allowance stops accruing after rate set to 0
