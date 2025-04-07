@@ -10,25 +10,29 @@ import { IERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
 
 contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy {
-    bool public override isDragonOnly = true;
+    // DragonTokenizedStrategy storage slot
+    bytes32 internal constant DRAGON_TOKENIZED_STRATEGY_STORAGE = keccak256("DragonTokenizedStrategy.storage");
 
-    // /**
-    //  * @inheritdoc IDragonTokenizedStrategy
-    //  */
+    /**
+     * @inheritdoc IDragonTokenizedStrategy
+     */
     function toggleDragonMode(bool enabled) external override onlyOperator {
-        if (enabled == isDragonOnly) revert DragonTokenizedStrategy__NoOperation();
-        isDragonOnly = enabled;
+        DragonTokenizedStrategyStorage storage S = _dragonTokenizedStrategyStorage();
+        if (enabled == S.isDragonOnly) revert DragonTokenizedStrategy__NoOperation();
+        S.isDragonOnly = enabled;
         emit DragonModeToggled(enabled);
     }
 
     modifier onlyOperatorIfDragonMode() {
-        if (isDragonOnly && msg.sender != super._strategyStorage().operator) revert TokenizedStrategy__NotOperator();
+        DragonTokenizedStrategyStorage storage S = _dragonTokenizedStrategyStorage();
+        if (S.isDragonOnly && msg.sender != super._strategyStorage().operator) revert TokenizedStrategy__NotOperator();
         _;
     }
 
     modifier validateArgsForLockupFunctions(address receiver, uint256 lockupDuration) {
+        DragonTokenizedStrategyStorage storage S = _dragonTokenizedStrategyStorage();
         if (lockupDuration == 0) revert DragonTokenizedStrategy__ZeroLockupDuration();
-        if (!isDragonOnly && receiver != msg.sender) revert DragonTokenizedStrategy__InvalidReceiver();
+        if (!S.isDragonOnly && receiver != msg.sender) revert DragonTokenizedStrategy__InvalidReceiver();
         _;
     }
 
@@ -41,6 +45,8 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
         address _dragonRouter,
         address _regenGovernance
     ) external override(TokenizedStrategy, ITokenizedStrategy) {
+        // set dragon only to true
+        _dragonTokenizedStrategyStorage().isDragonOnly = true;
         __TokenizedStrategy_init(_asset, _name, _operator, _management, _keeper, _dragonRouter, _regenGovernance);
     }
 
@@ -129,9 +135,9 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
      * @param user The user's address.
      * @return The amount of unlocked shares.
      */
-    function _userUnlockedShares(StrategyData storage S, address user) internal view returns (uint256) {
+    function _userUnlockedShares(StrategyData storage S, address user) internal view virtual returns (uint256) {
         LockupInfo memory lockup = super._strategyStorage().voluntaryLockups[user];
-        uint256 balance = super._balanceOf(S, user);
+        uint256 balance = _balanceOf(S, user);
 
         if (block.timestamp >= lockup.unlockTime) {
             return balance;
@@ -145,6 +151,14 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
         } else {
             return 0;
         }
+    }
+
+    /**
+     * @inheritdoc IDragonTokenizedStrategy
+     */
+    function isDragonOnly() external view returns (bool) {
+        DragonTokenizedStrategyStorage storage S = _dragonTokenizedStrategyStorage();
+        return S.isDragonOnly;
     }
 
     /**
@@ -197,7 +211,7 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
             lockup.unlockTime,
             lockup.lockedShares,
             lockup.isRageQuit,
-            super._balanceOf(S, user),
+            _balanceOf(S, user),
             _userUnlockedShares(S, user)
         );
     }
@@ -209,7 +223,7 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
         StrategyData storage S = super._strategyStorage();
         LockupInfo storage lockup = S.voluntaryLockups[msg.sender];
 
-        if (super._balanceOf(S, msg.sender) == 0) revert DragonTokenizedStrategy__NoSharesToRageQuit();
+        if (_balanceOf(S, msg.sender) == 0) revert DragonTokenizedStrategy__NoSharesToRageQuit();
         if (block.timestamp >= lockup.unlockTime) revert DragonTokenizedStrategy__SharesAlreadyUnlocked();
         if (lockup.isRageQuit) revert DragonTokenizedStrategy__RageQuitInProgress();
 
@@ -226,14 +240,11 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
     function _maxWithdraw(
         StrategyData storage S,
         address _owner
-    ) internal view override returns (uint256 maxWithdraw_) {
+    ) internal view virtual override returns (uint256 maxWithdraw_) {
         // Get the max the owner could withdraw currently.
 
         maxWithdraw_ = IBaseStrategy(address(this)).availableWithdrawLimit(_owner);
-        maxWithdraw_ = Math.min(
-            super._convertToAssets(S, _userUnlockedShares(S, _owner), Math.Rounding.Floor),
-            maxWithdraw_
-        );
+        maxWithdraw_ = Math.min(_convertToAssets(S, _userUnlockedShares(S, _owner), Math.Rounding.Floor), maxWithdraw_);
     }
 
     /// @dev Internal implementation of {maxRedeem}.
@@ -245,7 +256,7 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
         } else {
             maxRedeem_ = Math.min(
                 // Can't redeem more than the balance.
-                super._convertToShares(S, maxRedeem_, Math.Rounding.Floor),
+                _convertToShares(S, maxRedeem_, Math.Rounding.Floor),
                 _userUnlockedShares(S, _owner)
             );
         }
@@ -276,7 +287,7 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
         address receiver,
         address _owner,
         uint256 maxLoss
-    ) public override(TokenizedStrategy, ITokenizedStrategy) nonReentrant returns (uint256 shares) {
+    ) public virtual override(TokenizedStrategy, ITokenizedStrategy) nonReentrant returns (uint256 shares) {
         // Get the storage slot for all following calls.
         StrategyData storage S = super._strategyStorage();
         LockupInfo storage lockup = S.voluntaryLockups[_owner];
@@ -302,7 +313,7 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
         address receiver,
         address _owner,
         uint256 maxLoss
-    ) public override(TokenizedStrategy, ITokenizedStrategy) nonReentrant returns (uint256) {
+    ) public virtual override(TokenizedStrategy, ITokenizedStrategy) nonReentrant returns (uint256) {
         // Get the storage slot for all following calls.
         StrategyData storage S = super._strategyStorage();
         LockupInfo storage lockup = S.voluntaryLockups[_owner];
@@ -314,12 +325,12 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
 
         uint256 assets;
         // Check for rounding error or 0 value.
-        if ((assets = super._convertToAssets(S, shares, Math.Rounding.Floor)) == 0) {
+        if ((assets = _convertToAssets(S, shares, Math.Rounding.Floor)) == 0) {
             revert ZeroAssets();
         }
 
         // We need to return the actual amount withdrawn in case of a loss.
-        return super._withdraw(S, receiver, _owner, assets, shares, maxLoss);
+        return _withdraw(S, receiver, _owner, assets, shares, maxLoss);
     }
 
     /**
@@ -354,26 +365,27 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
         uint256 assets,
         address receiver,
         uint256 lockupDuration
-    ) internal returns (uint256 shares) {
+    ) internal virtual returns (uint256 shares) {
         StrategyData storage S = super._strategyStorage();
         require(!S.shutdown, DragonTokenizedStrategy__StrategyInShutdown());
 
         require(receiver != S.dragonRouter, Unauthorized());
         require(!S.voluntaryLockups[receiver].isRageQuit, DragonTokenizedStrategy__RageQuitInProgress());
         require(
-            super._balanceOf(S, receiver) == 0 ||
+            _balanceOf(S, receiver) == 0 ||
                 IBaseStrategy(address(this)).target() == address(receiver) ||
                 lockupDuration == 0,
             DragonTokenizedStrategy__ReceiverHasExistingShares()
         );
 
         assets = type(uint256).max == assets ? S.asset.balanceOf(msg.sender) : assets;
+
         require((shares = _convertToShares(S, assets, Math.Rounding.Floor)) != 0, ZeroShares());
         require(assets < _maxDeposit(S, receiver), DragonTokenizedStrategy__DepositMoreThanMax());
         require(shares < _maxMint(S, receiver), DragonTokenizedStrategy__MintMoreThanMax());
 
-        super._deposit(S, receiver, assets, shares);
-        _setOrExtendLockup(S, receiver, lockupDuration, super._balanceOf(S, receiver));
+        _deposit(S, receiver, assets, shares);
+        _setOrExtendLockup(S, receiver, lockupDuration, _balanceOf(S, receiver));
     }
 
     /**
@@ -408,9 +420,9 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
         uint256 shares,
         address receiver,
         uint256 lockupDuration
-    ) internal returns (uint256 assets) {
+    ) internal virtual returns (uint256 assets) {
         StrategyData storage S = super._strategyStorage();
-        require((assets = super._convertToAssets(S, shares, Math.Rounding.Ceil)) != 0, ZeroAssets());
+        require((assets = _convertToAssets(S, shares, Math.Rounding.Ceil)) != 0, ZeroAssets());
         _depositWithLockup(assets, receiver, lockupDuration);
         return assets;
     }
@@ -425,7 +437,7 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
 
         if (sharesBurned > 0) {
             // Burn shares from dragon router
-            super._burn(S, S.dragonRouter, sharesBurned);
+            _burn(S, S.dragonRouter, sharesBurned);
         }
     }
 
@@ -433,7 +445,8 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
      * @inheritdoc ITokenizedStrategy
      */
     function report()
-        external
+        public
+        virtual
         override(TokenizedStrategy, ITokenizedStrategy)
         nonReentrant
         onlyKeepers
@@ -450,7 +463,7 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
             unchecked {
                 profit = newTotalAssets - oldTotalAssets;
             }
-            super._mint(S, _dragonRouter, _convertToShares(S, profit, Math.Rounding.Floor));
+            _mint(S, _dragonRouter, _convertToShares(S, profit, Math.Rounding.Floor));
         } else {
             unchecked {
                 loss = oldTotalAssets - newTotalAssets;
@@ -515,5 +528,14 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
         bytes32
     ) external pure override(TokenizedStrategy, IERC20Permit) {
         revert DragonTokenizedStrategy__VaultSharesNotTransferable();
+    }
+
+    function _dragonTokenizedStrategyStorage() internal pure returns (DragonTokenizedStrategyStorage storage S) {
+        // Since STORAGE_SLOT is a constant, we have to put a variable
+        // on the stack to access it from an inline assembly block.
+        bytes32 slot = DRAGON_TOKENIZED_STRATEGY_STORAGE;
+        assembly ("memory-safe") {
+            S.slot := slot
+        }
     }
 }

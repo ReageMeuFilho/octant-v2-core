@@ -4,6 +4,10 @@ pragma solidity ^0.8.25;
 import { ITokenizedStrategy } from "./ITokenizedStrategy.sol";
 
 interface IDragonTokenizedStrategy is ITokenizedStrategy {
+    // DragonTokenizedStrategy storage slot
+    struct DragonTokenizedStrategyStorage {
+        bool isDragonOnly;
+    }
     /**
      * @notice Emitted when a new lockup is set for a user
      * @param user The user whose lockup was set
