@@ -6,6 +6,7 @@ import { Enum } from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { NATIVE_TOKEN } from "../../constants.sol";
 import { ILinearAllowanceSingletonForGnosisSafe } from "../../interfaces/ILinearAllowanceSingletonForGnosisSafe.sol";
+import { SafeCast } from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 interface ISafe {
     function execTransactionFromModule(
@@ -31,6 +32,12 @@ error TransferFailed(address safe, address delegate, address token);
 /// @title LinearAllowanceSingletonForGnosisSafe
 /// @notice See ILinearAllowanceSingletonForGnosisSafe
 contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingletonForGnosisSafe, ReentrancyGuard {
+    using SafeCast for uint256;
+    using SafeCast for uint192;
+    using SafeCast for uint160;
+    using SafeCast for uint128;
+    using SafeCast for uint32;
+
     struct LinearAllowance {
         uint128 dripRatePerDay; // Max value is 3.40e+38 approximately.
         uint160 totalUnspent; // Max value is 1.46e+48 approximately.
@@ -44,10 +51,10 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingletonForGn
         if (a.lastBookedAtInSeconds != 0) {
             uint256 timeElapsed = block.timestamp - a.lastBookedAtInSeconds;
             uint256 daysElapsed = timeElapsed / 1 days;
-            a.totalUnspent += uint160(daysElapsed * a.dripRatePerDay);
+            a.totalUnspent += (daysElapsed * a.dripRatePerDay).toUint160();
         }
 
-        a.lastBookedAtInSeconds = uint32(block.timestamp);
+        a.lastBookedAtInSeconds = block.timestamp.toUint32();
     }
 
     /// @inheritdoc ILinearAllowanceSingletonForGnosisSafe
@@ -73,9 +80,9 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingletonForGn
 
         if (token == NATIVE_TOKEN) {
             // For ETH transfers, get the minimum of totalUnspent and safe balance
-            transferAmount = a.totalUnspent <= uint160(address(safe).balance)
+            transferAmount = a.totalUnspent <= address(safe).balance.toUint160()
                 ? a.totalUnspent
-                : uint160(address(safe).balance);
+                : address(safe).balance.toUint160();
 
             if (transferAmount > 0) {
                 require(
@@ -86,7 +93,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingletonForGn
         } else {
             // For ERC20 transfers
             try IERC20(token).balanceOf(safe) returns (uint256 tokenBalance) {
-                transferAmount = a.totalUnspent <= uint160(tokenBalance) ? a.totalUnspent : uint160(tokenBalance);
+                transferAmount = a.totalUnspent <= tokenBalance.toUint160() ? a.totalUnspent : tokenBalance.toUint160();
 
                 if (transferAmount > 0) {
                     bytes memory data = abi.encodeWithSelector(IERC20.transfer.selector, to, transferAmount);

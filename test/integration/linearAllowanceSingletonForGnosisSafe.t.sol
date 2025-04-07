@@ -59,7 +59,7 @@ contract TestLinearAllowanceIntegration is Test {
     function testAllowanceWithETH(uint128 dripRatePerDay, uint256 daysElapsed, uint256 safeBalance) public {
         // Constrain inputs to reasonable values
         vm.assume(dripRatePerDay > 0 ether);
-        daysElapsed = uint32(bound(daysElapsed, 1, 2 ** 30));
+        daysElapsed = uint32(bound(daysElapsed, 1, 365 * 20));
 
         // Calculate expected allowance
         uint160 expectedAllowance = uint160(dripRatePerDay) * uint160(daysElapsed);
@@ -145,7 +145,7 @@ contract TestLinearAllowanceIntegration is Test {
     function testAllowanceWithERC20(uint128 dripRatePerDay, uint256 daysElapsed, uint256 tokenSupply) public {
         // Constrain inputs to reasonable values
         vm.assume(dripRatePerDay > 0 ether);
-        daysElapsed = uint32(bound(daysElapsed, 1, 2 ** 30));
+        daysElapsed = uint32(bound(daysElapsed, 1, 365 * 20));
 
         // Calculate expected allowance
         uint160 expectedAllowance = uint160(dripRatePerDay) * uint160(daysElapsed);
