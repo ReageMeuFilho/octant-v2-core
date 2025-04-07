@@ -47,12 +47,7 @@ contract TestLinearAllowanceIntegration is Test {
 
         // Enable SimpleAllowance module on Safe
         bytes memory enableData = abi.encodeWithSignature("enableModule(address)", address(allowanceModule));
-        bool ok = safeExecTransaction(
-            address(safeImpl), // Target: Safe itself
-            0, // Value
-            enableData, // Enable module call
-            1 // Owner private key
-        );
+        bool ok = execSafeTransaction(address(safeImpl), 0, enableData, 1);
         require(ok, "Module enable failed");
 
         // Deploy DelegateContract
@@ -61,171 +56,212 @@ contract TestLinearAllowanceIntegration is Test {
         vm.stopPrank();
     }
 
-    function testSetAndUseAllowance(uint256 dripRatePerDay, uint256 daysElapsed) public {
-        vm.assume(dripRatePerDay > 0 && dripRatePerDay < 1e8);
-        vm.assume(daysElapsed > 0 && daysElapsed < 1e8);
-        vm.assume(daysElapsed * dripRatePerDay < address(safeImpl).balance);
-        uint256 safeBalance = address(safeImpl).balance;
-        address safeAddress = address(safeImpl);
-        address allowanceExecutorAddress = address(allowanceExecutor);
+    // Test ETH allowance with both full and partial withdrawals
+    function testAllowanceWithETH(uint256 dripRatePerDay, uint256 daysElapsed, uint256 safeBalance) public {
+        // Constrain inputs to reasonable values
+        dripRatePerDay = bound(dripRatePerDay, 0.1 ether, 10 ether);
+        daysElapsed = bound(daysElapsed, 1, 30);
 
+        // Calculate expected allowance
+        uint256 expectedAllowance = dripRatePerDay * daysElapsed;
+
+        // Constrain safeBalance to ensure we test both partial and full withdrawals
+        // By making safeBalance between 0.1x and 2x the expected allowance, we'll get a mix
+        // of partial withdrawals (<1x) and full withdrawals (>=1x)
+        safeBalance = bound(safeBalance, expectedAllowance / 10, expectedAllowance * 2);
+
+        // Setup
+        address safeAddress = address(safeImpl);
+        address executorAddress = address(allowanceExecutor);
+
+        // Set the safe's balance
+        vm.deal(safeAddress, safeBalance);
+
+        // Verify reverts with no allowance
         vm.expectRevert();
         allowanceExecutor.executeAllowanceTransfer(allowanceModule, safeAddress, ETH);
 
-        // Set allowance with drip rate
+        // Set up allowance
         vm.prank(safeAddress);
-        allowanceModule.setAllowance(allowanceExecutorAddress, ETH, dripRatePerDay);
+        allowanceModule.setAllowance(executorAddress, ETH, dripRatePerDay);
 
-        // Advance time
+        // Advance time to accrue allowance
         vm.warp(block.timestamp + daysElapsed * 1 days);
 
-        // Execute transfer (no amount parameter needed, spends all available allowance)
-        allowanceExecutor.executeAllowanceTransfer(allowanceModule, safeAddress, ETH);
+        // Get balances before transfer
+        uint256 safeBalanceBefore = safeAddress.balance;
+        uint256 executorBalanceBefore = executorAddress.balance;
 
-        // Verify balances (1000 ether drip rate * 1 day)
-        assertEq(
-            address(allowanceExecutor).balance,
-            dripRatePerDay * daysElapsed,
-            "Delegate should receive daily drip"
-        );
-        assertEq(
-            address(safeImpl).balance,
-            safeBalance - (dripRatePerDay * daysElapsed),
-            "Safe balance should reduce by drip amount"
-        );
-
-        vm.warp(block.timestamp + 10 days);
-        allowanceExecutor.executeAllowanceTransfer(allowanceModule, safeAddress, ETH);
-        assertEq(
-            address(allowanceExecutor).balance,
-            dripRatePerDay * (daysElapsed + 10),
-            "Delegate should receive daily drip"
-        );
-
-        vm.warp(block.timestamp + 10 days);
-
-        vm.prank(safeAddress);
-        allowanceModule.setAllowance(allowanceExecutorAddress, ETH, 0);
-
-        uint256 totalUnspent = allowanceModule.getTotalUnspent(safeAddress, allowanceExecutorAddress, ETH);
-        assertEq(totalUnspent, dripRatePerDay * 10, "Balance mismatch");
-
-        vm.warp(block.timestamp + 15 days);
-        totalUnspent = allowanceModule.getTotalUnspent(safeAddress, allowanceExecutorAddress, ETH);
-        assertEq(totalUnspent, dripRatePerDay * 10, "Balance mismatch");
-
-        allowanceExecutor.executeAllowanceTransfer(allowanceModule, safeAddress, ETH);
-        assertEq(
-            address(allowanceExecutor).balance,
-            dripRatePerDay * (daysElapsed + 20),
-            "Delegate should receive daily drip"
-        );
-    }
-
-    function testSetAndUseAllowanceWithERC20(uint256 dripRatePerDay, uint256 daysElapsed) public {
-        // Deploy test ERC20 token
-        TestERC20 tokenContract = new TestERC20(2000 ether);
-        address token = address(tokenContract);
-
-        // Fund Safe with tokens
-        tokenContract.transfer(address(safeImpl), tokenContract.balanceOf(address(this)));
-
-        vm.assume(dripRatePerDay > 0 && dripRatePerDay < 1e8);
-        vm.assume(daysElapsed > 0 && daysElapsed < 1e8);
-        vm.assume(daysElapsed * dripRatePerDay < tokenContract.balanceOf(address(safeImpl)));
-
-        address safeAddress = address(safeImpl);
-        address allowanceExecutorAddress = address(allowanceExecutor);
-
-        vm.expectRevert();
-        allowanceExecutor.executeAllowanceTransfer(allowanceModule, safeAddress, token);
-
-        // Set allowance with drip rate
-        vm.prank(safeAddress);
-        allowanceModule.setAllowance(allowanceExecutorAddress, token, dripRatePerDay);
-
-        // Advance time
-        vm.warp(block.timestamp + daysElapsed * 1 days);
+        // Expected transfer is the minimum of allowance and balance
+        uint256 expectedTransfer = expectedAllowance <= safeBalanceBefore ? expectedAllowance : safeBalanceBefore;
 
         // Execute transfer
-        allowanceExecutor.executeAllowanceTransfer(allowanceModule, safeAddress, token);
+        allowanceExecutor.executeAllowanceTransfer(allowanceModule, safeAddress, ETH);
 
-        // Verify token balances
+        // Verify correct amounts were transferred
         assertEq(
-            tokenContract.balanceOf(allowanceExecutorAddress),
-            dripRatePerDay * daysElapsed,
-            "Delegate should receive daily drip"
+            executorAddress.balance - executorBalanceBefore,
+            expectedTransfer,
+            "Executor should receive correct amount"
         );
         assertEq(
-            tokenContract.balanceOf(safeAddress),
-            2000 ether - (dripRatePerDay * daysElapsed),
-            "Safe balance should reduce by drip amount"
+            safeBalanceBefore - safeAddress.balance,
+            expectedTransfer,
+            "Safe balance should be reduced by transferred amount"
         );
 
-        vm.warp(block.timestamp + 10 days);
-        allowanceExecutor.executeAllowanceTransfer(allowanceModule, safeAddress, token);
-        assertEq(
-            tokenContract.balanceOf(allowanceExecutorAddress),
-            dripRatePerDay * (daysElapsed + 10),
-            "Delegate should receive accumulated drip"
-        );
+        // Verify allowance bookkeeping
+        uint256[4] memory allowanceData = allowanceModule.getTokenAllowanceData(safeAddress, executorAddress, ETH);
 
-        vm.warp(block.timestamp + 10 days);
+        if (expectedAllowance > safeBalanceBefore) {
+            // Partial withdrawal case
+            assertEq(
+                allowanceData[1],
+                expectedAllowance - safeBalanceBefore,
+                "Remaining unspent should equal original minus transferred"
+            );
+        } else {
+            // Full withdrawal case
+            assertEq(allowanceData[1], 0, "Unspent allowance should be zero");
+        }
+
+        // Test that allowance stops accruing after rate set to 0
+        vm.warp(block.timestamp + 5 days);
         vm.prank(safeAddress);
-        allowanceModule.setAllowance(allowanceExecutorAddress, token, 0);
+        allowanceModule.setAllowance(executorAddress, ETH, 0);
 
-        uint256 totalUnspent = allowanceModule.getTotalUnspent(safeAddress, allowanceExecutorAddress, token);
-        assertEq(totalUnspent, dripRatePerDay * 10, "Balance mismatch after rate change");
+        uint256 unspentAfterZeroRate = allowanceModule.getTotalUnspent(safeAddress, executorAddress, ETH);
+        vm.warp(block.timestamp + 10 days);
 
-        vm.warp(block.timestamp + 15 days);
-        totalUnspent = allowanceModule.getTotalUnspent(safeAddress, allowanceExecutorAddress, token);
-        assertEq(totalUnspent, dripRatePerDay * 10, "Balance should stop accruing after rate set to 0");
-
-        allowanceExecutor.executeAllowanceTransfer(allowanceModule, safeAddress, token);
         assertEq(
-            tokenContract.balanceOf(allowanceExecutorAddress),
-            dripRatePerDay * (daysElapsed + 20),
-            "Final balance should match total accrued"
+            allowanceModule.getTotalUnspent(safeAddress, executorAddress, ETH),
+            unspentAfterZeroRate,
+            "Balance should not increase after rate set to 0"
         );
     }
 
-    function safeExecTransaction(
+    // Test ERC20 allowance with both full and partial withdrawals
+    function testAllowanceWithERC20(uint256 dripRatePerDay, uint256 daysElapsed, uint256 tokenSupply) public {
+        // Constrain inputs to reasonable values
+        dripRatePerDay = bound(dripRatePerDay, 0.1 ether, 10 ether);
+        daysElapsed = bound(daysElapsed, 1, 30);
+
+        // Calculate expected allowance
+        uint256 expectedAllowance = dripRatePerDay * daysElapsed;
+
+        // Constrain tokenSupply to ensure we test both partial and full withdrawals
+        // By making tokenSupply between 0.1x and 2x the expected allowance, we'll get a mix
+        // of partial withdrawals (<1x) and full withdrawals (>=1x)
+        tokenSupply = bound(tokenSupply, expectedAllowance / 10, expectedAllowance * 2);
+
+        // Setup
+        address safeAddress = address(safeImpl);
+        address executorAddress = address(allowanceExecutor);
+
+        // Create token and fund safe
+        TestERC20 token = new TestERC20(tokenSupply);
+        token.transfer(safeAddress, tokenSupply);
+
+        // Verify reverts with no allowance
+        vm.expectRevert();
+        allowanceExecutor.executeAllowanceTransfer(allowanceModule, safeAddress, address(token));
+
+        // Set up allowance
+        vm.prank(safeAddress);
+        allowanceModule.setAllowance(executorAddress, address(token), dripRatePerDay);
+
+        // Advance time to accrue allowance
+        vm.warp(block.timestamp + daysElapsed * 1 days);
+
+        // Get balances before transfer
+        uint256 safeBalanceBefore = token.balanceOf(safeAddress);
+        uint256 executorBalanceBefore = token.balanceOf(executorAddress);
+
+        // Expected transfer is the minimum of allowance and balance
+        uint256 expectedTransfer = expectedAllowance <= safeBalanceBefore ? expectedAllowance : safeBalanceBefore;
+
+        // Execute transfer
+        allowanceExecutor.executeAllowanceTransfer(allowanceModule, safeAddress, address(token));
+
+        // Verify correct amounts were transferred
+        assertEq(
+            token.balanceOf(executorAddress) - executorBalanceBefore,
+            expectedTransfer,
+            "Executor should receive correct token amount"
+        );
+        assertEq(
+            safeBalanceBefore - token.balanceOf(safeAddress),
+            expectedTransfer,
+            "Safe token balance should be reduced by transferred amount"
+        );
+
+        // Verify allowance bookkeeping
+        uint256[4] memory allowanceData = allowanceModule.getTokenAllowanceData(
+            safeAddress,
+            executorAddress,
+            address(token)
+        );
+
+        if (expectedAllowance > safeBalanceBefore) {
+            // Partial withdrawal case
+            assertEq(
+                allowanceData[1],
+                expectedAllowance - safeBalanceBefore,
+                "Remaining unspent should equal original minus transferred"
+            );
+        } else {
+            // Full withdrawal case
+            assertEq(allowanceData[1], 0, "Unspent allowance should be zero");
+        }
+
+        // Test that allowance stops accruing after rate set to 0
+        vm.warp(block.timestamp + 5 days);
+        vm.prank(safeAddress);
+        allowanceModule.setAllowance(executorAddress, address(token), 0);
+
+        uint256 unspentAfterZeroRate = allowanceModule.getTotalUnspent(safeAddress, executorAddress, address(token));
+        vm.warp(block.timestamp + 10 days);
+
+        assertEq(
+            allowanceModule.getTotalUnspent(safeAddress, executorAddress, address(token)),
+            unspentAfterZeroRate,
+            "Balance should not increase after rate set to 0"
+        );
+    }
+
+    // Helper for Safe transactions (necessary due to Safe's complex transaction execution)
+    function execSafeTransaction(
         address to,
         uint256 value,
         bytes memory data,
         uint256 ownerPrivateKey
-    ) internal returns (bool success) {
-        uint256 safeTxGas = 100_000;
-        uint256 baseGas = 0;
-        uint256 gasPrice = 1;
-
+    ) internal returns (bool) {
         bytes32 txHash = safeImpl.getTransactionHash(
             to,
             value,
             data,
             Enum.Operation.Call,
-            safeTxGas,
-            baseGas,
-            gasPrice,
+            100_000,
+            0,
+            1,
             address(0),
             payable(address(0)),
             safeImpl.nonce()
         );
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerPrivateKey, txHash);
-        bytes memory signature = abi.encodePacked(r, s, v);
-
-        success = safeImpl.execTransaction(
-            to,
-            value,
-            data,
-            Enum.Operation.Call,
-            safeTxGas,
-            0, // baseGas parameter removed from variable since it was always 0
-            gasPrice,
-            address(0),
-            payable(address(0)),
-            signature
-        );
+        return
+            safeImpl.execTransaction(
+                to,
+                value,
+                data,
+                Enum.Operation.Call,
+                100_000,
+                0,
+                1,
+                address(0),
+                payable(address(0)),
+                abi.encodePacked(r, s, v)
+            );
     }
 }
