@@ -4,6 +4,9 @@ pragma solidity ^0.8.0;
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { Enum } from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { NATIVE_TOKEN } from "../../constants.sol";
+import { ILinearAllowanceSingletonForGnosisSafe } from "../../interfaces/ILinearAllowanceSingletonForGnosisSafe.sol";
+import { SafeCast } from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 interface ISafe {
     function execTransactionFromModule(
@@ -26,47 +29,43 @@ event AllowanceTransferred(
 error NoAllowanceToTransfer(address safe, address delegate, address token);
 error TransferFailed(address safe, address delegate, address token);
 
-/// @title LinearAllowance
-/// @notice A module that allows a delegate to transfer allowances from a safe to a recipient.
-contract LinearAllowanceSingletonForGnosisSafe is ReentrancyGuard {
+/// @title LinearAllowanceSingletonForGnosisSafe
+/// @notice See ILinearAllowanceSingletonForGnosisSafe
+contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingletonForGnosisSafe, ReentrancyGuard {
+    using SafeCast for uint256;
+    using SafeCast for uint192;
+    using SafeCast for uint160;
+    using SafeCast for uint128;
+    using SafeCast for uint32;
+
     struct LinearAllowance {
-        uint256 dripRatePerDay;
-        uint256 totalUnspent;
-        uint256 totalSpent;
-        uint256 lastBookedAt; // 0 is a special case for uninitialized allowance
+        uint128 dripRatePerDay; // Max value is 3.40e+38 approximately.
+        uint160 totalUnspent; // Max value is 1.46e+48 approximately.
+        uint192 totalSpent; // Max value is 6.27e+57 approximately
+        uint32 lastBookedAtInSeconds; // Overflows in 2106.
     }
 
     mapping(address => mapping(address => mapping(address => LinearAllowance))) public allowances; // safe -> delegate -> token -> allowance
 
     function updateAllowance(LinearAllowance storage a) internal {
-        if (a.lastBookedAt != 0) {
-            uint256 timeElapsed = block.timestamp - a.lastBookedAt;
+        if (a.lastBookedAtInSeconds != 0) {
+            uint256 timeElapsed = block.timestamp - a.lastBookedAtInSeconds;
             uint256 daysElapsed = timeElapsed / 1 days;
-            a.totalUnspent += daysElapsed * a.dripRatePerDay;
-            a.lastBookedAt = block.timestamp;
-        } else {
-            // Special case for uninitialized allowance
-            a.lastBookedAt = block.timestamp;
+            a.totalUnspent += (daysElapsed * a.dripRatePerDay).toUint160();
         }
+
+        a.lastBookedAtInSeconds = block.timestamp.toUint32();
     }
 
-    /// @notice Set the allowance for a delegate. To revoke, set dripRatePerDay to 0. Revoking will not cancel any unspent allowance.
-    /// @param delegate The delegate to set the allowance for.
-    /// @param token The token to set the allowance for. 0x0 is ETH.
-    /// @param dripRatePerDay The drip rate per day for the allowance.
-    function setAllowance(address delegate, address token, uint256 dripRatePerDay) external {
+    /// @inheritdoc ILinearAllowanceSingletonForGnosisSafe
+    function setAllowance(address delegate, address token, uint128 dripRatePerDay) external {
         LinearAllowance storage a = allowances[msg.sender][delegate][token];
         updateAllowance(a);
         a.dripRatePerDay = dripRatePerDay;
         emit AllowanceSet(msg.sender, delegate, token, dripRatePerDay);
     }
 
-    /// @notice Execute a transfer of the allowance.
-    /// @dev msg.sender is the delegate.
-    /// @param safe The address of the safe.
-    /// @param token The address of the token.
-    /// @param to The address of the beneficiary.
-    /// @return amount The amount that was actually transferred
+    /// @inheritdoc ILinearAllowanceSingletonForGnosisSafe
     function executeAllowanceTransfer(
         address safe,
         address token,
@@ -77,11 +76,13 @@ contract LinearAllowanceSingletonForGnosisSafe is ReentrancyGuard {
 
         require(a.totalUnspent > 0, NoAllowanceToTransfer(safe, msg.sender, token));
 
-        uint256 transferAmount;
+        uint160 transferAmount;
 
-        if (token == address(0)) {
+        if (token == NATIVE_TOKEN) {
             // For ETH transfers, get the minimum of totalUnspent and safe balance
-            transferAmount = a.totalUnspent <= address(safe).balance ? a.totalUnspent : address(safe).balance;
+            transferAmount = a.totalUnspent <= address(safe).balance.toUint160()
+                ? a.totalUnspent
+                : address(safe).balance.toUint160();
 
             if (transferAmount > 0) {
                 require(
@@ -92,7 +93,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ReentrancyGuard {
         } else {
             // For ERC20 transfers
             try IERC20(token).balanceOf(safe) returns (uint256 tokenBalance) {
-                transferAmount = a.totalUnspent <= tokenBalance ? a.totalUnspent : tokenBalance;
+                transferAmount = a.totalUnspent <= tokenBalance.toUint160() ? a.totalUnspent : tokenBalance.toUint160();
 
                 if (transferAmount > 0) {
                     bytes memory data = abi.encodeWithSelector(IERC20.transfer.selector, to, transferAmount);
@@ -115,39 +116,33 @@ contract LinearAllowanceSingletonForGnosisSafe is ReentrancyGuard {
         return transferAmount;
     }
 
-    /// @notice Get the allowance data for a token.
-    /// @param safe The address of the safe.
-    /// @param delegate The address of the delegate.
-    /// @param token The address of the token.
-    /// @return allowanceData [dripRatePerDay, totalUnspent, totalSpent, lastBookedAt]
+    /// @inheritdoc ILinearAllowanceSingletonForGnosisSafe
     function getTokenAllowanceData(
         address safe,
         address delegate,
         address token
-    ) public view returns (uint256[4] memory allowanceData) {
+    )
+        public
+        view
+        returns (uint128 dripRatePerDay, uint160 totalUnspent, uint192 totalSpent, uint32 lastBookedAtInSeconds)
+    {
         LinearAllowance memory allowance = allowances[safe][delegate][token];
-        allowanceData = [
-            allowance.dripRatePerDay,
-            allowance.totalUnspent,
-            allowance.totalSpent,
-            allowance.lastBookedAt
-        ];
+        dripRatePerDay = allowance.dripRatePerDay;
+        totalUnspent = allowance.totalUnspent;
+        totalSpent = allowance.totalSpent;
+        lastBookedAtInSeconds = allowance.lastBookedAtInSeconds;
     }
 
-    /// @notice Get the total unspent allowance for a token.
-    /// @param safe The address of the safe.
-    /// @param delegate The address of the delegate.
-    /// @param token The address of the token.
-    /// @return totalAllowanceAsOfNow The total unspent allowance as of now.
+    /// @inheritdoc ILinearAllowanceSingletonForGnosisSafe
     function getTotalUnspent(address safe, address delegate, address token) public view returns (uint256) {
         LinearAllowance memory allowance = allowances[safe][delegate][token];
 
-        // Handle uninitialized allowance (lastBookedAt == 0)
-        if (allowance.lastBookedAt == 0) {
+        // Handle uninitialized allowance (lastBookedAtInSeconds == 0)
+        if (allowance.lastBookedAtInSeconds == 0) {
             return 0;
         }
 
-        uint256 timeElapsed = block.timestamp - allowance.lastBookedAt;
+        uint256 timeElapsed = block.timestamp - allowance.lastBookedAtInSeconds;
         uint256 daysElapsed = timeElapsed / 1 days;
         uint256 totalAllowanceAsOfNow = allowance.totalUnspent + allowance.dripRatePerDay * daysElapsed;
 
