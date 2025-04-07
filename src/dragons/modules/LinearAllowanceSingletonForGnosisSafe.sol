@@ -5,6 +5,7 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { Enum } from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { NATIVE_TOKEN } from "../../constants.sol";
+import { ILinearAllowanceSingletonForGnosisSafe } from "../../interfaces/ILinearAllowanceSingletonForGnosisSafe.sol";
 
 interface ISafe {
     function execTransactionFromModule(
@@ -27,9 +28,9 @@ event AllowanceTransferred(
 error NoAllowanceToTransfer(address safe, address delegate, address token);
 error TransferFailed(address safe, address delegate, address token);
 
-/// @title LinearAllowance
-/// @notice A module that allows a delegate to transfer allowances from a safe to a recipient.
-contract LinearAllowanceSingletonForGnosisSafe is ReentrancyGuard {
+/// @title LinearAllowanceSingletonForGnosisSafe
+/// @notice See ILinearAllowanceSingletonForGnosisSafe
+contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingletonForGnosisSafe, ReentrancyGuard {
     struct LinearAllowance {
         uint128 dripRatePerDay; // Max value is 3.40e+38 approximately.
         uint160 totalUnspent; // Max value is 1.46e+48 approximately.
@@ -51,10 +52,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ReentrancyGuard {
         }
     }
 
-    /// @notice Set the allowance for a delegate. To revoke, set dripRatePerDay to 0. Revoking will not cancel any unspent allowance.
-    /// @param delegate The delegate to set the allowance for.
-    /// @param token The token to set the allowance for. 0x0 is ETH.
-    /// @param dripRatePerDay The drip rate per day for the allowance.
+    /// @inheritdoc ILinearAllowanceSingletonForGnosisSafe
     function setAllowance(address delegate, address token, uint128 dripRatePerDay) external {
         LinearAllowance storage a = allowances[msg.sender][delegate][token];
         updateAllowance(a);
@@ -62,12 +60,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ReentrancyGuard {
         emit AllowanceSet(msg.sender, delegate, token, dripRatePerDay);
     }
 
-    /// @notice Execute a transfer of the allowance.
-    /// @dev msg.sender is the delegate.
-    /// @param safe The address of the safe.
-    /// @param token The address of the token.
-    /// @param to The address of the beneficiary.
-    /// @return amount The amount that was actually transferred
+    /// @inheritdoc ILinearAllowanceSingletonForGnosisSafe
     function executeAllowanceTransfer(
         address safe,
         address token,
@@ -118,14 +111,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ReentrancyGuard {
         return transferAmount;
     }
 
-    /// @notice Get the allowance data for a token.
-    /// @param safe The address of the safe.
-    /// @param delegate The address of the delegate.
-    /// @param token The address of the token.
-    /// @return dripRatePerDay The drip rate per day.
-    /// @return totalUnspent The total unspent allowance.
-    /// @return totalSpent The total spent allowance.
-    /// @return lastBookedAtInSeconds The last booked at timestamp in seconds.
+    /// @inheritdoc ILinearAllowanceSingletonForGnosisSafe
     function getTokenAllowanceData(
         address safe,
         address delegate,
@@ -142,11 +128,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ReentrancyGuard {
         lastBookedAtInSeconds = allowance.lastBookedAtInSeconds;
     }
 
-    /// @notice Get the total unspent allowance for a token.
-    /// @param safe The address of the safe.
-    /// @param delegate The address of the delegate.
-    /// @param token The address of the token.
-    /// @return totalAllowanceAsOfNow The total unspent allowance as of now.
+    /// @inheritdoc ILinearAllowanceSingletonForGnosisSafe
     function getTotalUnspent(address safe, address delegate, address token) public view returns (uint256) {
         LinearAllowance memory allowance = allowances[safe][delegate][token];
 
