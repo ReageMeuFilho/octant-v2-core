@@ -45,11 +45,9 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingletonForGn
             uint256 timeElapsed = block.timestamp - a.lastBookedAtInSeconds;
             uint256 daysElapsed = timeElapsed / 1 days;
             a.totalUnspent += uint160(daysElapsed * a.dripRatePerDay);
-            a.lastBookedAtInSeconds = uint32(block.timestamp);
-        } else {
-            // Special case for uninitialized allowance
-            a.lastBookedAtInSeconds = uint32(block.timestamp);
         }
+
+        a.lastBookedAtInSeconds = uint32(block.timestamp);
     }
 
     /// @inheritdoc ILinearAllowanceSingletonForGnosisSafe
