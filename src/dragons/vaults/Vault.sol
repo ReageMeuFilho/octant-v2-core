@@ -66,7 +66,8 @@ contract Vault is IVault {
     address private factory;
 
     // HashMap that records all the strategies that are allowed to receive assets from the vault.
-    mapping(address => StrategyParams) public strategies;
+    mapping(address => StrategyParams) private _strategies;
+
     // The current default withdrawal queue.
     address[] public defaultQueue;
     // Should the vault use the defaultQueue regardless whats passed in.
@@ -223,7 +224,7 @@ contract Vault is IVault {
 
         // Make sure every strategy in the new queue is active.
         for (uint256 i = 0; i < newDefaultQueue.length; i++) {
-            require(strategies[newDefaultQueue[i]].activation != 0, "inactive strategy");
+            require(_strategies[newDefaultQueue[i]].activation != 0, "inactive strategy");
         }
 
         // Save the new queue.
@@ -514,10 +515,10 @@ contract Vault is IVault {
      */
     function buyDebt(address strategy, uint256 amount) external override nonReentrant {
         _enforceRole(msg.sender, Roles.DEBT_PURCHASER);
-        require(strategies[strategy].activation != 0, "not active");
+        require(_strategies[strategy].activation != 0, "not active");
 
         // Cache the current debt.
-        uint256 currentDebt = strategies[strategy].currentDebt;
+        uint256 currentDebt = _strategies[strategy].currentDebt;
         uint256 _amount = amount;
 
         require(currentDebt > 0, "nothing to buy");
@@ -538,7 +539,7 @@ contract Vault is IVault {
 
         // Lower strategy debt
         uint256 newDebt = currentDebt - _amount;
-        strategies[strategy].currentDebt = newDebt;
+        _strategies[strategy].currentDebt = newDebt;
         // lower total debt
         totalDebt_ -= _amount;
         // Increase total idle
@@ -597,8 +598,8 @@ contract Vault is IVault {
      */
     function updateMaxDebtForStrategy(address strategy, uint256 newMaxDebt) external override {
         _enforceRole(msg.sender, Roles.MAX_DEBT_MANAGER);
-        require(strategies[strategy].activation != 0, "inactive strategy");
-        strategies[strategy].maxDebt = newMaxDebt;
+        require(_strategies[strategy].activation != 0, "inactive strategy");
+        _strategies[strategy].maxDebt = newMaxDebt;
 
         emit UpdatedMaxDebtForStrategy(msg.sender, strategy, newMaxDebt);
     }
@@ -972,7 +973,7 @@ contract Vault is IVault {
         address strategy,
         uint256 assetsNeeded
     ) external view override returns (uint256) {
-        uint256 currentDebt = strategies[strategy].currentDebt;
+        uint256 currentDebt = _strategies[strategy].currentDebt;
         require(currentDebt >= assetsNeeded, "not enough debt");
 
         return _assessShareOfUnrealisedLosses(strategy, currentDebt, assetsNeeded);
@@ -1026,6 +1027,15 @@ contract Vault is IVault {
                     address(this)
                 )
             );
+    }
+
+    /**
+     * @notice Get the strategy parameters for a given strategy.
+     * @param strategy The address of the strategy.
+     * @return The strategy parameters.
+     */
+    function strategies(address strategy) external view returns (StrategyParams memory) {
+        return _strategies[strategy];
     }
 
     /// SHARE MANAGEMENT ///
@@ -1424,10 +1434,10 @@ contract Vault is IVault {
     function _addStrategy(address newStrategy, bool addToQueue) internal {
         require(newStrategy != address(this) && newStrategy != address(0), "strategy cannot be zero address");
         require(IERC4626Payable(newStrategy).asset() == asset, "invalid asset");
-        require(strategies[newStrategy].activation == 0, "strategy already active");
+        require(_strategies[newStrategy].activation == 0, "strategy already active");
 
         // Add the new strategy to the mapping.
-        strategies[newStrategy] = StrategyParams({
+        _strategies[newStrategy] = StrategyParams({
             activation: block.timestamp,
             lastReport: block.timestamp,
             currentDebt: 0,
@@ -1446,12 +1456,12 @@ contract Vault is IVault {
      * @dev Revokes a strategy
      */
     function _revokeStrategy(address strategy, bool force) internal {
-        require(strategies[strategy].activation != 0, "strategy not active");
+        require(_strategies[strategy].activation != 0, "strategy not active");
 
-        if (strategies[strategy].currentDebt != 0) {
+        if (_strategies[strategy].currentDebt != 0) {
             require(force, "strategy has debt");
             // Vault realizes the full loss of outstanding debt.
-            uint256 loss = strategies[strategy].currentDebt;
+            uint256 loss = _strategies[strategy].currentDebt;
             // Adjust total vault debt.
             totalDebt_ -= loss;
 
@@ -1459,7 +1469,7 @@ contract Vault is IVault {
         }
 
         // Set strategy params all back to 0 (WARNING: it can be re-added).
-        strategies[strategy] = StrategyParams({ activation: 0, lastReport: 0, currentDebt: 0, maxDebt: 0 });
+        _strategies[strategy] = StrategyParams({ activation: 0, lastReport: 0, currentDebt: 0, maxDebt: 0 });
 
         // Remove strategy if it is in the default queue.
         address[] memory newQueue = new address[](defaultQueue.length - 1);
@@ -1491,7 +1501,7 @@ contract Vault is IVault {
         // How much we want the strategy to have.
         uint256 newDebt = targetDebt;
         // How much the strategy currently has.
-        uint256 currentDebt = strategies[strategy].currentDebt;
+        uint256 currentDebt = _strategies[strategy].currentDebt;
 
         // If the vault is shutdown we can only pull funds.
         if (shutdown_) {
@@ -1509,7 +1519,7 @@ contract Vault is IVault {
         }
 
         // Commit memory to storage.
-        strategies[strategy].currentDebt = newDebt;
+        _strategies[strategy].currentDebt = newDebt;
 
         emit DebtUpdated(strategy, currentDebt, newDebt);
         return newDebt;
@@ -1636,8 +1646,8 @@ contract Vault is IVault {
         uint256 currentDebt,
         uint256 newDebt
     ) internal view returns (uint256) {
-        if (newDebt > strategies[strategy].maxDebt) {
-            newDebt = strategies[strategy].maxDebt;
+        if (newDebt > _strategies[strategy].maxDebt) {
+            newDebt = _strategies[strategy].maxDebt;
             // Possible for current to be greater than max from reports.
             if (newDebt < currentDebt) {
                 return currentDebt;
@@ -1920,10 +1930,10 @@ contract Vault is IVault {
      * @dev Process withdrawal from a single strategy
      */
     function _processStrategyWithdrawal(address strategy) internal {
-        require(strategies[strategy].activation != 0, "inactive strategy");
+        require(_strategies[strategy].activation != 0, "inactive strategy");
 
         // Get strategy info
-        _wState.currentDebt = strategies[strategy].currentDebt;
+        _wState.currentDebt = _strategies[strategy].currentDebt;
         _wState.assetsToWithdraw = Math.min(_wState.assetsNeeded, _wState.currentDebt);
         _wState.maxWithdraw = IERC4626Payable(strategy).convertToAssets(
             IERC4626Payable(strategy).maxRedeem(address(this))
@@ -1981,7 +1991,7 @@ contract Vault is IVault {
     function _update100PercentLoss(address strategy) internal {
         uint256 oldDebt = _wState.currentDebt;
         uint256 newDebt = oldDebt - _wState.unrealisedLossesShare;
-        strategies[strategy].currentDebt = newDebt;
+        _strategies[strategy].currentDebt = newDebt;
         emit DebtUpdated(strategy, oldDebt, newDebt);
     }
 
@@ -2031,7 +2041,7 @@ contract Vault is IVault {
         // Update strategy debt
         uint256 oldDebt = _wState.currentDebt;
         uint256 newDebt = oldDebt - (_wState.assetsToWithdraw + _wState.unrealisedLossesShare);
-        strategies[strategy].currentDebt = newDebt;
+        _strategies[strategy].currentDebt = newDebt;
         emit DebtUpdated(strategy, oldDebt, newDebt);
     }
 
@@ -2056,7 +2066,7 @@ contract Vault is IVault {
 
         if (strategy != address(this)) {
             // Make sure we have a valid strategy.
-            require(strategies[strategy].activation != 0, "inactive strategy");
+            require(_strategies[strategy].activation != 0, "inactive strategy");
 
             // Vault assesses profits using 4626 compliant interface.
             // NOTE: It is important that a strategies `convertToAssets` implementation
@@ -2065,7 +2075,7 @@ contract Vault is IVault {
             // How much the vaults position is worth.
             totalAssetsAmount = IERC4626Payable(strategy).convertToAssets(strategySharesAmount);
             // How much the vault had deposited to the strategy.
-            currentDebtAmount = strategies[strategy].currentDebt;
+            currentDebtAmount = _strategies[strategy].currentDebt;
         } else {
             // Accrue any airdropped `asset` into `totalIdle`
             totalAssetsAmount = IERC20(asset).balanceOf(address(this));
@@ -2171,7 +2181,7 @@ contract Vault is IVault {
         // Issue fee shares if any
         _issueFeeShares(totalFeesShares, protocolFeesShares, protocolFeeRecipient);
 
-        strategies[strategy].lastReport = block.timestamp;
+        _strategies[strategy].lastReport = block.timestamp;
 
         return (updatedCurrentDebt, finalSharesToLock);
     }
@@ -2226,8 +2236,8 @@ contract Vault is IVault {
 
         // Handle 100% loss case
         if (maxWithdrawAmount == 0 && unrealisedLossesShareAmount > 0) {
-            strategies[strategy].currentDebt = currentDebtAmount - unrealisedLossesShareAmount;
-            emit DebtUpdated(strategy, currentDebtAmount, strategies[strategy].currentDebt);
+            _strategies[strategy].currentDebt = currentDebtAmount - unrealisedLossesShareAmount;
+            emit DebtUpdated(strategy, currentDebtAmount, _strategies[strategy].currentDebt);
         }
 
         return (assetsToWithdrawAmount, requestedAssetsAmount, assetsNeededAmount, currentTotalDebtAmount);
@@ -2258,7 +2268,7 @@ contract Vault is IVault {
         if (gain > 0) {
             updatedCurrentDebt = currentDebt + gain;
             if (strategy != address(this)) {
-                strategies[strategy].currentDebt = updatedCurrentDebt;
+                _strategies[strategy].currentDebt = updatedCurrentDebt;
                 totalDebt_ += gain;
             } else {
                 updatedCurrentDebt = currentDebt + gain + totalRefunds;
@@ -2267,7 +2277,7 @@ contract Vault is IVault {
         } else if (loss > 0) {
             updatedCurrentDebt = currentDebt - loss;
             if (strategy != address(this)) {
-                strategies[strategy].currentDebt = updatedCurrentDebt;
+                _strategies[strategy].currentDebt = updatedCurrentDebt;
                 totalDebt_ -= loss;
             } else {
                 updatedCurrentDebt = currentDebt + gain + totalRefunds;
@@ -2328,12 +2338,12 @@ contract Vault is IVault {
         uint256 loss = 0;
 
         // Determine which strategy queue to use
-        address[] memory _strategies = _getStrategyQueue(strategiesParam);
+        address[] memory _strategiesArray = _getStrategyQueue(strategiesParam);
 
         // Process each strategy in the queue
-        for (uint256 i = 0; i < _strategies.length; i++) {
-            address strategyAddress = _strategies[i];
-            require(strategies[strategyAddress].activation != 0, "inactive strategy");
+        for (uint256 i = 0; i < _strategiesArray.length; i++) {
+            address strategyAddress = _strategiesArray[i];
+            require(_strategies[strategyAddress].activation != 0, "inactive strategy");
 
             // Calculate how much can be withdrawn from this strategy
             (uint256 withdrawable, uint256 unrealizedLoss) = _calculateStrategyWithdrawal(
@@ -2384,7 +2394,7 @@ contract Vault is IVault {
         uint256 maxLoss,
         uint256 currentLoss
     ) internal view returns (uint256 withdrawable, uint256 unrealizedLoss) {
-        uint256 currentDebt = strategies[strategyAddress].currentDebt;
+        uint256 currentDebt = _strategies[strategyAddress].currentDebt;
 
         // Calculate how much to withdraw from this strategy
         uint256 toWithdraw = Math.min(needed, currentDebt);
