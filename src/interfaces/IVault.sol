@@ -141,7 +141,7 @@ interface IVault {
     function accountant() external view returns (address);
     function depositLimitModule() external view returns (address);
     function withdrawLimitModule() external view returns (address);
-    function roles(address account) external view returns (Roles);
+    function roles(address) external view returns (uint256);
     function roleManager() external view returns (address);
     function futureRoleManager() external view returns (address);
     function name() external view returns (string memory);

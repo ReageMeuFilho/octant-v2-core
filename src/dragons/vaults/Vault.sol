@@ -100,7 +100,7 @@ contract Vault is IVault {
 
     /// ROLES ///
     // HashMap mapping addresses to their roles
-    mapping(address => Roles) public override roles;
+    mapping(address => uint256) public roles;
     // Address that can add and remove roles to addresses.
     address public override roleManager;
     // Temporary variable to store the address of the next roleManager until the role is accepted.
@@ -383,7 +383,7 @@ contract Vault is IVault {
      */
     function _enforceRole(address account, Roles role) internal view {
         // Check bit at role position
-        require(uint256(roles[account]) & (1 << uint256(role)) != 0, "not allowed");
+        require(roles[account] & (1 << uint256(role)) != 0, "not allowed");
     }
 
     /**
@@ -395,8 +395,8 @@ contract Vault is IVault {
      */
     function setRole(address account, Roles role) external override {
         require(msg.sender == roleManager, "not allowed");
-        roles[account] = role;
-
+        // Store the enum value directly - Vyper style
+        roles[account] = 1 << uint256(role);
         emit RoleSet(account, role);
     }
 
@@ -409,12 +409,9 @@ contract Vault is IVault {
      */
     function addRole(address account, Roles role) external override {
         require(msg.sender == roleManager, "not allowed");
-
-        // Bitwise OR to add the role
-        Roles newRoles = Roles(uint256(roles[account]) | uint256(role));
-        roles[account] = newRoles;
-
-        emit RoleSet(account, newRoles);
+        // Add the role with a bitwise OR - Vyper style
+        roles[account] = roles[account] | (1 << uint256(role));
+        emit RoleSet(account, role);
     }
 
     /**
@@ -428,10 +425,8 @@ contract Vault is IVault {
         require(msg.sender == roleManager, "not allowed");
 
         // Bitwise AND with NOT to remove the role
-        Roles newRoles = Roles(uint256(roles[account]) & ~uint256(role));
-        roles[account] = newRoles;
-
-        emit RoleSet(account, newRoles);
+        roles[account] = roles[account] & ~uint256(role);
+        emit RoleSet(account, role);
     }
 
     /**
@@ -647,9 +642,8 @@ contract Vault is IVault {
         emit UpdateDepositLimit(0);
 
         // Add debt manager role to the sender
-        Roles newRoles = Roles(uint256(roles[msg.sender]) | (1 << uint256(Roles.DEBT_MANAGER)));
-        roles[msg.sender] = newRoles;
-        emit RoleSet(msg.sender, newRoles);
+        roles[msg.sender] = roles[msg.sender] | (1 << uint256(Roles.DEBT_MANAGER));
+        emit RoleSet(msg.sender, Roles.DEBT_MANAGER);
 
         emit Shutdown();
     }
@@ -2267,7 +2261,7 @@ contract Vault is IVault {
                 strategies[strategy].currentDebt = updatedCurrentDebt;
                 totalDebt_ += gain;
             } else {
-                updatedCurrentDebt = currentDebt + totalRefunds;
+                updatedCurrentDebt = currentDebt + gain + totalRefunds;
                 totalIdle_ = updatedCurrentDebt;
             }
         } else if (loss > 0) {
@@ -2276,7 +2270,7 @@ contract Vault is IVault {
                 strategies[strategy].currentDebt = updatedCurrentDebt;
                 totalDebt_ -= loss;
             } else {
-                updatedCurrentDebt = currentDebt + totalRefunds;
+                updatedCurrentDebt = currentDebt + gain + totalRefunds;
                 totalIdle_ = updatedCurrentDebt;
             }
         }
