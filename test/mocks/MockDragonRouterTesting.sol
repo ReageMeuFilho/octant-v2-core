@@ -86,6 +86,6 @@ contract MockDragonRouterTesting is DragonRouter {
         if (balanceOf(msg.sender, strategy) == 0) revert NoShares();
         userData[msg.sender][strategy].transformer = IDragonRouter.Transformer(ITransformer(transformer), targetToken);
 
-        emit UserTransformerSet(msg.sender, transformer, targetToken);
+        emit UserTransformerSet(msg.sender, strategy, transformer, targetToken);
     }
 }

@@ -59,7 +59,7 @@ contract DragonRouterTest is Test {
     event OpexVaultUpdated(address oldOpexVault, address newOpexVault);
     event SplitDelayUpdated(uint256 oldDelay, uint256 newDelay);
     event SplitCheckerUpdated(address oldChecker, address newChecker);
-    event UserTransformerSet(address indexed user, address transformer, address targetToken);
+    event UserTransformerSet(address indexed user, address indexed strategy, address transformer, address targetToken);
     event SplitClaimed(address indexed caller, address indexed owner, address indexed strategy, uint256 amount);
     event ClaimAutomationSet(address indexed user, address indexed strategy, bool enabled);
 
@@ -939,7 +939,7 @@ contract DragonRouterTest is Test {
         // Call setTransformer as the user
         vm.prank(userWithBalance);
         vm.expectEmit(true, true, true, true);
-        emit UserTransformerSet(userWithBalance, transformerImpl, targetToken);
+        emit UserTransformerSet(userWithBalance, strategies[0], transformerImpl, targetToken);
         routerTesting.setTransformerForTest(strategies[0], transformerImpl, targetToken);
 
         // Verify the transformer was set correctly

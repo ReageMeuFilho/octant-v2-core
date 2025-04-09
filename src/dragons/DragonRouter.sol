@@ -186,7 +186,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
         if (balanceOf(msg.sender, strategy) == 0) revert NoShares();
         userData[msg.sender][strategy].transformer = Transformer(ITransformer(transformer), targetToken);
 
-        emit UserTransformerSet(msg.sender, transformer, targetToken);
+        emit UserTransformerSet(msg.sender, strategy, transformer, targetToken);
     }
 
     /**
