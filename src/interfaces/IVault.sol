@@ -132,7 +132,7 @@ interface IVault {
     function asset() external view returns (address);
     function decimals() external view returns (uint8);
     // todo fix the following functions that are there as public variables
-    // function strategies(address strategy) external view returns (StrategyParams memory);
+    function strategies(address strategy) external view returns (StrategyParams memory);
     // function defaultQueue() external view returns (address[] memory);
     function useDefaultQueue() external view returns (bool);
     function autoAllocate() external view returns (bool);
