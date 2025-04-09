@@ -695,7 +695,7 @@ contract Vault is IVault {
      * @param receiver The address to receive the assets.
      * @param owner The address who's shares are being burnt.
      * @param maxLoss Optional amount of acceptable loss in Basis Points.
-     * @param strategies Optional array of strategies to withdraw from.
+     * @param strategiesArray Optional array of strategies to withdraw from.
      * @return The amount of shares actually burnt.
      */
     function withdraw(
@@ -703,10 +703,10 @@ contract Vault is IVault {
         address receiver,
         address owner,
         uint256 maxLoss,
-        address[] calldata strategies
+        address[] calldata strategiesArray
     ) external override nonReentrant returns (uint256) {
         uint256 shares = _convertToShares(assets, Rounding.ROUND_UP);
-        _redeem(msg.sender, receiver, owner, assets, shares, maxLoss, strategies);
+        _redeem(msg.sender, receiver, owner, assets, shares, maxLoss, strategiesArray);
         return shares;
     }
 
@@ -717,7 +717,7 @@ contract Vault is IVault {
      * @param receiver The address to receive the assets.
      * @param owner The address who's shares are being burnt.
      * @param maxLoss Optional amount of acceptable loss in Basis Points.
-     * @param strategies Optional array of strategies to withdraw from.
+     * @param strategiesArray Optional array of strategies to withdraw from.
      * @return The amount of assets actually withdrawn.
      */
     function redeem(
@@ -725,11 +725,11 @@ contract Vault is IVault {
         address receiver,
         address owner,
         uint256 maxLoss,
-        address[] calldata strategies
+        address[] calldata strategiesArray
     ) external override nonReentrant returns (uint256) {
         uint256 assets = _convertToAssets(shares, Rounding.ROUND_DOWN);
         // Always return the actual amount of assets withdrawn.
-        return _redeem(msg.sender, receiver, owner, assets, shares, maxLoss, strategies);
+        return _redeem(msg.sender, receiver, owner, assets, shares, maxLoss, strategiesArray);
     }
 
     /**
@@ -888,8 +888,8 @@ contract Vault is IVault {
      * @return The maximum amount of shares that can be minted.
      */
     function maxMint(address receiver) external view override returns (uint256) {
-        uint256 maxDeposit = _maxDeposit(receiver);
-        return _convertToShares(maxDeposit, Rounding.ROUND_DOWN);
+        uint256 maxDepositAmount = _maxDeposit(receiver);
+        return _convertToShares(maxDepositAmount, Rounding.ROUND_DOWN);
     }
 
     /**
@@ -899,15 +899,15 @@ contract Vault is IVault {
      *       incorrect returns values.
      * @param owner The address that owns the shares.
      * @param maxLoss Custom max_loss if any.
-     * @param strategies Custom strategies queue if any.
+     * @param strategiesArray Custom strategies queue if any.
      * @return The maximum amount of assets that can be withdrawn.
      */
     function maxWithdraw(
         address owner,
         uint256 maxLoss,
-        address[] calldata strategies
+        address[] calldata strategiesArray
     ) external view override returns (uint256) {
-        return _maxWithdraw(owner, maxLoss, strategies);
+        return _maxWithdraw(owner, maxLoss, strategiesArray);
     }
 
     /**
@@ -917,18 +917,18 @@ contract Vault is IVault {
      *       incorrect returns values.
      * @param owner The address that owns the shares.
      * @param maxLoss Custom max_loss if any.
-     * @param strategies Custom strategies queue if any.
+     * @param strategiesArray Custom strategies queue if any.
      * @return The maximum amount of shares that can be redeemed.
      */
     function maxRedeem(
         address owner,
         uint256 maxLoss,
-        address[] calldata strategies
+        address[] calldata strategiesArray
     ) external view override returns (uint256) {
         return
             Math.min(
                 // Min of the shares equivalent of max_withdraw or the full balance
-                _convertToShares(_maxWithdraw(owner, maxLoss, strategies), Rounding.ROUND_DOWN),
+                _convertToShares(_maxWithdraw(owner, maxLoss, strategiesArray), Rounding.ROUND_DOWN),
                 balanceOf_[owner]
             );
     }
@@ -1113,17 +1113,17 @@ contract Vault is IVault {
      */
     function _unlockedShares() internal view returns (uint256) {
         uint256 _fullProfitUnlockDate = fullProfitUnlockDate_;
-        uint256 unlockedShares = 0;
+        uint256 unlockedSharesAmount = 0;
 
         if (_fullProfitUnlockDate > block.timestamp) {
             // If we have not fully unlocked, we need to calculate how much has been.
-            unlockedShares = (profitUnlockingRate_ * (block.timestamp - lastProfitUpdate_)) / MAX_BPS_EXTENDED;
+            unlockedSharesAmount = (profitUnlockingRate_ * (block.timestamp - lastProfitUpdate_)) / MAX_BPS_EXTENDED;
         } else if (_fullProfitUnlockDate != 0) {
             // All shares have been unlocked
-            unlockedShares = balanceOf_[address(this)];
+            unlockedSharesAmount = balanceOf_[address(this)];
         }
 
-        return unlockedShares;
+        return unlockedSharesAmount;
     }
 
     /**
@@ -1179,20 +1179,20 @@ contract Vault is IVault {
             return assets;
         }
 
-        uint256 totalAssets = _totalAssets();
+        uint256 totalAssetsAmount = _totalAssets();
 
         // if totalSupply > 0 but totalAssets == 0, price_per_share = 0
-        if (totalAssets == 0) {
+        if (totalAssetsAmount == 0) {
             return 0;
         }
 
         uint256 numerator = assets * supply;
-        uint256 shares = numerator / totalAssets;
-        if (rounding == Rounding.ROUND_UP && numerator % totalAssets != 0) {
-            shares += 1;
+        uint256 sharesAmount = numerator / totalAssetsAmount;
+        if (rounding == Rounding.ROUND_UP && numerator % totalAssetsAmount != 0) {
+            sharesAmount += 1;
         }
 
-        return shares;
+        return sharesAmount;
     }
 
     /**
@@ -1256,12 +1256,12 @@ contract Vault is IVault {
             return _depositLimit;
         }
 
-        uint256 _totalAssets = _totalAssets();
-        if (_totalAssets >= _depositLimit) {
+        uint256 _totalAssetsAmount = _totalAssets();
+        if (_totalAssetsAmount >= _depositLimit) {
             return 0;
         }
 
-        return _depositLimit - _totalAssets;
+        return _depositLimit - _totalAssetsAmount;
     }
 
     /**
@@ -1557,11 +1557,11 @@ contract Vault is IVault {
 
         // Ensure we always have minimumTotalIdle when updating debt.
         uint256 _minimumTotalIdle = minimumTotalIdle;
-        uint256 totalIdle = totalIdle_;
+        uint256 totalIdleAmount = totalIdle_;
 
         // Respect minimum total idle in vault
-        if (totalIdle + assetsToWithdraw < _minimumTotalIdle) {
-            assetsToWithdraw = _minimumTotalIdle - totalIdle;
+        if (totalIdleAmount + assetsToWithdraw < _minimumTotalIdle) {
+            assetsToWithdraw = _minimumTotalIdle - totalIdleAmount;
             // Cant withdraw more than the strategy has.
             if (assetsToWithdraw > currentDebt) {
                 assetsToWithdraw = currentDebt;
@@ -1651,8 +1651,8 @@ contract Vault is IVault {
         }
 
         // Check if strategy accepts deposits
-        uint256 maxDeposit = IERC4626Payable(strategy).maxDeposit(address(this));
-        if (maxDeposit == 0) {
+        uint256 maxDepositAmount = IERC4626Payable(strategy).maxDeposit(address(this));
+        if (maxDepositAmount == 0) {
             return currentDebt;
         }
 
@@ -1671,24 +1671,24 @@ contract Vault is IVault {
         uint256 assetsToDeposit = newDebt - currentDebt;
 
         // Check strategy deposit limit
-        uint256 maxDeposit = IERC4626Payable(strategy).maxDeposit(address(this));
-        if (assetsToDeposit > maxDeposit) {
-            assetsToDeposit = maxDeposit;
+        uint256 maxDepositAmount = IERC4626Payable(strategy).maxDeposit(address(this));
+        if (assetsToDeposit > maxDepositAmount) {
+            assetsToDeposit = maxDepositAmount;
         }
 
         // Check vault minimum idle requirement
         uint256 _minimumTotalIdle = minimumTotalIdle;
-        uint256 totalIdle = totalIdle_;
+        uint256 totalIdleAmount = totalIdle_;
 
-        if (totalIdle <= _minimumTotalIdle) {
+        if (totalIdleAmount <= _minimumTotalIdle) {
             return 0;
         }
 
-        uint256 availableIdle = totalIdle - _minimumTotalIdle;
+        uint256 availableIdleAmount = totalIdleAmount - _minimumTotalIdle;
 
         // If insufficient funds to deposit, transfer only what is free.
-        if (assetsToDeposit > availableIdle) {
-            assetsToDeposit = availableIdle;
+        if (assetsToDeposit > availableIdleAmount) {
+            assetsToDeposit = availableIdleAmount;
         }
 
         return assetsToDeposit;
@@ -1882,11 +1882,11 @@ contract Vault is IVault {
         _initWithdrawalState(requestedAssets, currentTotalIdle);
 
         // Get strategies to withdraw from
-        address[] memory strategies = _getWithdrawalStrategies(strategiesParam);
+        address[] memory strategiesArray = _getWithdrawalStrategies(strategiesParam);
 
         // Process each strategy in the queue
-        for (uint256 i = 0; i < strategies.length; i++) {
-            _processStrategyWithdrawal(strategies[i]);
+        for (uint256 i = 0; i < strategiesArray.length; i++) {
+            _processStrategyWithdrawal(strategiesArray[i]);
 
             // If we've withdrawn enough, stop
             if (_wState.requestedAssets <= _wState.currentTotalIdle) {
@@ -2044,17 +2044,21 @@ contract Vault is IVault {
     /**
      * @dev Assesses the gain or loss for a strategy based on its current assets vs. debt
      * @param strategy The address of the strategy to assess
-     * @return totalAssets The total assets in the strategy
-     * @return currentDebt The current debt allocated to the strategy
-     * @return gain The amount of gain if any
-     * @return loss The amount of loss if any
+     * @return totalAssetsAmount The total assets in the strategy
+     * @return currentDebtAmount The current debt allocated to the strategy
+     * @return gainAmount The amount of gain if any
+     * @return lossAmount The amount of loss if any
      */
     function _assessStrategyGainOrLoss(
         address strategy
-    ) internal view returns (uint256 totalAssets, uint256 currentDebt, uint256 gain, uint256 loss) {
+    )
+        internal
+        view
+        returns (uint256 totalAssetsAmount, uint256 currentDebtAmount, uint256 gainAmount, uint256 lossAmount)
+    {
         // Initialize gain and loss
-        gain = 0;
-        loss = 0;
+        gainAmount = 0;
+        lossAmount = 0;
 
         if (strategy != address(this)) {
             // Make sure we have a valid strategy.
@@ -2063,29 +2067,29 @@ contract Vault is IVault {
             // Vault assesses profits using 4626 compliant interface.
             // NOTE: It is important that a strategies `convertToAssets` implementation
             // cannot be manipulated or else the vault could report incorrect gains/losses.
-            uint256 strategyShares = IERC4626Payable(strategy).balanceOf(address(this));
+            uint256 strategySharesAmount = IERC4626Payable(strategy).balanceOf(address(this));
             // How much the vaults position is worth.
-            totalAssets = IERC4626Payable(strategy).convertToAssets(strategyShares);
+            totalAssetsAmount = IERC4626Payable(strategy).convertToAssets(strategySharesAmount);
             // How much the vault had deposited to the strategy.
-            currentDebt = strategies[strategy].currentDebt;
+            currentDebtAmount = strategies[strategy].currentDebt;
         } else {
             // Accrue any airdropped `asset` into `totalIdle`
-            totalAssets = IERC20(asset).balanceOf(address(this));
-            currentDebt = totalIdle_;
+            totalAssetsAmount = IERC20(asset).balanceOf(address(this));
+            currentDebtAmount = totalIdle_;
         }
 
         /// Assess Gain or Loss ///
 
         // Compare reported assets vs. the current debt.
-        if (totalAssets > currentDebt) {
+        if (totalAssetsAmount > currentDebtAmount) {
             // We have a gain.
-            gain = totalAssets - currentDebt;
+            gainAmount = totalAssetsAmount - currentDebtAmount;
         } else {
             // We have a loss.
-            loss = currentDebt - totalAssets;
+            lossAmount = currentDebtAmount - totalAssetsAmount;
         }
 
-        return (totalAssets, currentDebt, gain, loss);
+        return (totalAssetsAmount, currentDebtAmount, gainAmount, lossAmount);
     }
 
     /**
@@ -2181,15 +2185,15 @@ contract Vault is IVault {
     // Helper functions:
 
     function _adjustVaultShares(uint256 sharesToLock, uint256 sharesToBurn) internal {
-        uint256 totalSupply = totalSupply_;
-        uint256 totalLockedShares = balanceOf_[address(this)];
-        uint256 endingSupply = totalSupply + sharesToLock - sharesToBurn - _unlockedShares();
+        uint256 totalSupplyAmount = totalSupply_;
+        uint256 totalLockedSharesAmount = balanceOf_[address(this)];
+        uint256 endingSupplyAmount = totalSupplyAmount + sharesToLock - sharesToBurn - _unlockedShares();
 
-        if (endingSupply > totalSupply) {
-            _issueShares(endingSupply - totalSupply, address(this));
-        } else if (totalSupply > endingSupply) {
-            uint256 toBurn = Math.min(totalSupply - endingSupply, totalLockedShares);
-            _burnShares(toBurn, address(this));
+        if (endingSupplyAmount > totalSupplyAmount) {
+            _issueShares(endingSupplyAmount - totalSupplyAmount, address(this));
+        } else if (totalSupplyAmount > endingSupplyAmount) {
+            uint256 toBurnAmount = Math.min(totalSupplyAmount - endingSupplyAmount, totalLockedSharesAmount);
+            _burnShares(toBurnAmount, address(this));
         }
     }
 
@@ -2205,34 +2209,34 @@ contract Vault is IVault {
      */
     function _handleUnrealizedLosses(
         address strategy,
-        uint256 currentDebt,
-        uint256 assetsToWithdraw,
-        uint256 maxWithdraw,
-        uint256 unrealisedLossesShare,
-        uint256 requestedAssets,
-        uint256 assetsNeeded,
-        uint256 currentTotalDebt
+        uint256 currentDebtAmount,
+        uint256 assetsToWithdrawAmount,
+        uint256 maxWithdrawAmount,
+        uint256 unrealisedLossesShareAmount,
+        uint256 requestedAssetsAmount,
+        uint256 assetsNeededAmount,
+        uint256 currentTotalDebtAmount
     ) internal returns (uint256, uint256, uint256, uint256) {
         // If max withdraw is limiting the amount to pull, adjust the portion of unrealized loss
-        if (maxWithdraw < assetsToWithdraw - unrealisedLossesShare) {
-            uint256 wanted = assetsToWithdraw - unrealisedLossesShare;
-            unrealisedLossesShare = (unrealisedLossesShare * maxWithdraw) / wanted;
-            assetsToWithdraw = maxWithdraw + unrealisedLossesShare;
+        if (maxWithdrawAmount < assetsToWithdrawAmount - unrealisedLossesShareAmount) {
+            uint256 wantedAmount = assetsToWithdrawAmount - unrealisedLossesShareAmount;
+            unrealisedLossesShareAmount = (unrealisedLossesShareAmount * maxWithdrawAmount) / wantedAmount;
+            assetsToWithdrawAmount = maxWithdrawAmount + unrealisedLossesShareAmount;
         }
 
         // User takes losses
-        assetsToWithdraw -= unrealisedLossesShare;
-        requestedAssets -= unrealisedLossesShare;
-        assetsNeeded -= unrealisedLossesShare;
-        currentTotalDebt -= unrealisedLossesShare;
+        assetsToWithdrawAmount -= unrealisedLossesShareAmount;
+        requestedAssetsAmount -= unrealisedLossesShareAmount;
+        assetsNeededAmount -= unrealisedLossesShareAmount;
+        currentTotalDebtAmount -= unrealisedLossesShareAmount;
 
         // Handle 100% loss case
-        if (maxWithdraw == 0 && unrealisedLossesShare > 0) {
-            strategies[strategy].currentDebt = currentDebt - unrealisedLossesShare;
-            emit DebtUpdated(strategy, currentDebt, strategies[strategy].currentDebt);
+        if (maxWithdrawAmount == 0 && unrealisedLossesShareAmount > 0) {
+            strategies[strategy].currentDebt = currentDebtAmount - unrealisedLossesShareAmount;
+            emit DebtUpdated(strategy, currentDebtAmount, strategies[strategy].currentDebt);
         }
 
-        return (assetsToWithdraw, requestedAssets, assetsNeeded, currentTotalDebt);
+        return (assetsToWithdrawAmount, requestedAssetsAmount, assetsNeededAmount, currentTotalDebtAmount);
     }
 
     /**
