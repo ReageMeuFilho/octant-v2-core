@@ -44,7 +44,7 @@ interface IDragonRouter {
     event CooldownPeriodUpdated(uint256 oldPeriod, uint256 newPeriod);
     event SplitDelayUpdated(uint256 oldDelay, uint256 newDelay);
     event SplitCheckerUpdated(address oldChecker, address newChecker);
-    event UserTransformerSet(address indexed user, address transformer, address targetToken);
+    event UserTransformerSet(address indexed user, address indexed strategy, address transformer, address targetToken);
     event SplitClaimed(address indexed caller, address indexed owner, address indexed strategy, uint256 amount);
     event ClaimAutomationSet(address indexed user, address indexed strategy, bool enabled);
     event Funded(address indexed strategy, uint256 assetPerShare, uint256 totalAssets);
