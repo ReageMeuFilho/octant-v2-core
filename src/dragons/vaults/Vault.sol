@@ -1502,7 +1502,6 @@ contract Vault is IVault {
         uint256 newDebt = targetDebt;
         // How much the strategy currently has.
         uint256 currentDebt = _strategies[strategy].currentDebt;
-
         // If the vault is shutdown we can only pull funds.
         if (shutdown_) {
             newDebt = 0;
@@ -2271,7 +2270,7 @@ contract Vault is IVault {
                 _strategies[strategy].currentDebt = updatedCurrentDebt;
                 totalDebt_ += gain;
             } else {
-                updatedCurrentDebt = currentDebt + gain + totalRefunds;
+                updatedCurrentDebt = currentDebt + totalRefunds;
                 totalIdle_ = updatedCurrentDebt;
             }
         } else if (loss > 0) {
@@ -2280,7 +2279,7 @@ contract Vault is IVault {
                 _strategies[strategy].currentDebt = updatedCurrentDebt;
                 totalDebt_ -= loss;
             } else {
-                updatedCurrentDebt = currentDebt + gain + totalRefunds;
+                updatedCurrentDebt = currentDebt + totalRefunds;
                 totalIdle_ = updatedCurrentDebt;
             }
         }
