@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.25;
 
+import { IVault } from "../../../../src/interfaces/IVault.sol";
+
 /**
  * @title Vault System Constants
  * @notice Constants used throughout the vault system
@@ -35,8 +37,8 @@ library Constants {
     uint256 constant ROLE_ALL = 16383;
 
     // Strategy change types
-    uint256 constant STRATEGY_CHANGE_ADDED = 1;
-    uint256 constant STRATEGY_CHANGE_REVOKED = 2;
+    IVault.StrategyChangeType constant STRATEGY_CHANGE_ADDED = IVault.StrategyChangeType.ADDED;
+    IVault.StrategyChangeType constant STRATEGY_CHANGE_REVOKED = IVault.StrategyChangeType.REVOKED;
 
     // Role status changes
     uint256 constant ROLE_STATUS_OPENED = 1;
