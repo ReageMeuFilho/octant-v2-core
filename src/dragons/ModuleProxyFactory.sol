@@ -4,7 +4,7 @@ pragma solidity >=0.8.0;
 import { ISafe } from "../interfaces/Safe.sol";
 
 contract ModuleProxyFactory {
-    event ModuleProxyCreation(address indexed proxy, address indexed masterCopy);
+    event ModuleProxyCreation(address indexed deployer, address indexed proxy, address indexed masterCopy);
 
     /// `target` can not be zero.
     error ZeroAddress(address target);
@@ -43,7 +43,7 @@ contract ModuleProxyFactory {
         (bool success, ) = proxy.call(initializer);
         if (!success) revert FailedInitialization();
 
-        emit ModuleProxyCreation(proxy, masterCopy);
+        emit ModuleProxyCreation(msg.sender, proxy, masterCopy);
     }
 
     function deployAndEnableModuleFromSafe(
