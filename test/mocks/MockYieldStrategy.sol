@@ -41,8 +41,8 @@ contract MockYieldStrategy is ERC20, IERC4626Payable {
     }
 
     // Report profits to vault
-    function report() external {
-        // Just a placeholder for tests to call
+    function report() external virtual {
+        asset = asset; // prevent compiler warning
     }
 
     // ERC-20 Functions
@@ -51,7 +51,7 @@ contract MockYieldStrategy is ERC20, IERC4626Payable {
     }
 
     // ERC-4626 Functions
-    function totalAssets() public view override returns (uint256) {
+    function totalAssets() public view virtual override returns (uint256) {
         return IERC20(asset).balanceOf(address(this));
     }
 
@@ -170,6 +170,12 @@ contract MockYieldStrategy is ERC20, IERC4626Payable {
 
         emit Withdraw(msg.sender, receiver, owner, assets, shares);
         return assets;
+    }
+
+    function simulateLoss(uint256 amount) external virtual {
+        // Transfer funds out of the strategy to simulate a loss
+        // This will make the strategy report less assets than it was allocated
+        IERC20(asset).transfer(msg.sender, amount);
     }
 
     // Permit functions as required by IERC4626Payable
