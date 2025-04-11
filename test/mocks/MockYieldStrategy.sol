@@ -6,6 +6,7 @@ import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { IERC4626Payable } from "../../src/interfaces/IERC4626Payable.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import { console } from "forge-std/console.sol";
 
 /**
  * @title MockYieldStrategy
@@ -52,6 +53,7 @@ contract MockYieldStrategy is ERC20, IERC4626Payable {
 
     // ERC-4626 Functions
     function totalAssets() public view virtual override returns (uint256) {
+        console.log("totalAssets in mock yield strategy", IERC20(asset).balanceOf(address(this)));
         return IERC20(asset).balanceOf(address(this));
     }
 
@@ -63,7 +65,7 @@ contract MockYieldStrategy is ERC20, IERC4626Payable {
         return (assets * supply) / totalAssets();
     }
 
-    function convertToAssets(uint256 shares) public view override returns (uint256) {
+    function convertToAssets(uint256 shares) public view virtual override returns (uint256) {
         uint256 supply = totalSupply();
         if (supply == 0) {
             return shares;
@@ -82,11 +84,11 @@ contract MockYieldStrategy is ERC20, IERC4626Payable {
         return convertToShares(maxDeposit(receiver));
     }
 
-    function maxWithdraw(address owner) public view override returns (uint256) {
+    function maxWithdraw(address owner) public view virtual override returns (uint256) {
         return convertToAssets(balanceOf(owner));
     }
 
-    function maxRedeem(address owner) public view override returns (uint256) {
+    function maxRedeem(address owner) public view virtual override returns (uint256) {
         return balanceOf(owner);
     }
 
@@ -99,6 +101,9 @@ contract MockYieldStrategy is ERC20, IERC4626Payable {
     }
 
     function previewWithdraw(uint256 assets) public view override returns (uint256) {
+        console.log("previewWithdraw", assets);
+        console.log("totalSupply()", totalSupply());
+        console.log("totalAssets()", totalAssets());
         uint256 supply = totalSupply();
         if (supply == 0 || totalAssets() == 0) {
             return 0;
@@ -110,7 +115,7 @@ contract MockYieldStrategy is ERC20, IERC4626Payable {
         return convertToAssets(shares);
     }
 
-    function deposit(uint256 assets, address receiver) public payable override returns (uint256) {
+    function deposit(uint256 assets, address receiver) public payable virtual override returns (uint256) {
         require(assets <= maxDeposit(receiver), "Deposit limit exceeded");
         uint256 shares = previewDeposit(assets);
 
@@ -155,7 +160,7 @@ contract MockYieldStrategy is ERC20, IERC4626Payable {
         return shares;
     }
 
-    function redeem(uint256 shares, address receiver, address owner) public override returns (uint256) {
+    function redeem(uint256 shares, address receiver, address owner) public virtual override returns (uint256) {
         uint256 assets = previewRedeem(shares);
 
         if (msg.sender != owner) {
