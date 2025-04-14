@@ -29,6 +29,11 @@ contract ModuleProxyFactory is IModuleProxyFactory {
         address _metapool,
         address _dragonRouterImplementation
     ) {
+        _ensureNonzeroAddress(_governance);
+        _ensureNonzeroAddress(_regenGovernance);
+        _ensureNonzeroAddress(_splitChecker);
+        _ensureNonzeroAddress(_metapool);
+        _ensureNonzeroAddress(_dragonRouterImplementation);
         GOVERNANCE = _governance;
         REGEN_GOVERNANCE = _regenGovernance;
         SPLIT_CHECKER = _splitChecker;
@@ -43,8 +48,7 @@ contract ModuleProxyFactory is IModuleProxyFactory {
     /// @custom:error ZeroAddress is thrown if the provided address is a zero address
     /// @custom:error TargetHasNoCode is thrown if the provided address has no code deployed
     function createProxy(address target, bytes32 salt) internal returns (address payable result) {
-        if (address(target) == address(0)) revert ZeroAddress();
-        if (address(target).code.length == 0) revert TargetHasNoCode(target);
+        _ensureNonzeroAddress(target);
         // NOTE: Magic number https://github.com/thebor1337/solidity_sandbox/blob/f8a678f4cbabd22831e646830e299c75e75dd76f/contracts/Proxy/ERC1167/Proxy.huff#L4
         bytes memory deployment = abi.encodePacked(
             hex"602d8060093d393df3363d3d373d3d3d363d73",
@@ -87,6 +91,8 @@ contract ModuleProxyFactory is IModuleProxyFactory {
         address opexVault,
         uint256 saltNonce
     ) public returns (address payable) {
+        _ensureNonzeroAddress(owner);
+        _ensureNonzeroAddress(opexVault);
         bytes memory data = abi.encode(strategies, GOVERNANCE, REGEN_GOVERNANCE, SPLIT_CHECKER, opexVault, METAPOOL);
         bytes memory initializer = abi.encode(owner, data);
 
@@ -115,5 +121,14 @@ contract ModuleProxyFactory is IModuleProxyFactory {
         );
 
         ISafe(address(this)).enableModule(proxy);
+    }
+
+    /// @notice Checks if the provided address is nonzero, reverts otherwise
+    /// @param address_ Address to check
+    /// @custom:error ZeroAddress is thrown if the provided address is a zero address
+    function _ensureNonzeroAddress(address address_) internal pure {
+        if (address_ == address(0)) {
+            revert ZeroAddress();
+        }
     }
 }

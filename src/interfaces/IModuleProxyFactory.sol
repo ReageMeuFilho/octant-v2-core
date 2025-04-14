@@ -11,9 +11,6 @@ interface IModuleProxyFactory {
     /// `target` can not be zero.
     error ZeroAddress();
 
-    /// `target` has no code deployed.
-    error TargetHasNoCode(address target);
-
     /// `address_` is already taken.
     error TakenAddress(address address_);
 
