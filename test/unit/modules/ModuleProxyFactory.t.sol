@@ -102,9 +102,7 @@ contract ModuleProxyFactoryTest is Test {
             dragonRouterSalt
         );
 
-        // LinearAllowance module deployment data
-        bytes memory linearAllowanceInit = abi.encodeWithSignature("setUp(address)", address(safe));
-
+        // Build transactions for MultiSend
         bytes memory tx1 = _buildDeployModuleTx(
             moduleProxyFactory,
             splitCheckerImpl,
@@ -119,13 +117,8 @@ contract ModuleProxyFactoryTest is Test {
             dragonRouterSalt
         );
 
-        uint256 linearAllowanceSalt = 300;
-        bytes memory tx3 = _buildEnableModuleTx(
-            moduleProxyFactory,
-            linearAllowanceImpl,
-            linearAllowanceInit,
-            linearAllowanceSalt
-        );
+        // Build transaction to enable LinearAllowance module (not deploy it)
+        bytes memory tx3 = _buildEnableModuleTx(linearAllowanceImpl);
 
         // Combine transactions
         bytes memory batchData = bytes.concat(tx1, tx2, tx3);
@@ -139,6 +132,7 @@ contract ModuleProxyFactoryTest is Test {
         assertTrue(success, "MultiSend transaction failed");
         assertTrue(predictedSplitChecker.code.length > 0, "SplitChecker not deployed");
         assertTrue(predictedDragonRouter.code.length > 0, "DragonRouter not deployed");
+        assertTrue(safe.modules(linearAllowanceImpl), "LinearAllowance module not enabled");
         assertEq(
             MockSafeDragonRouter(predictedDragonRouter).splitChecker(),
             predictedSplitChecker,
@@ -170,24 +164,14 @@ contract ModuleProxyFactoryTest is Test {
             );
     }
 
-    // Helper function to build an enable module transaction (delegatecall)
-    function _buildEnableModuleTx(
-        ModuleProxyFactory factory,
-        address implementation,
-        bytes memory initializer,
-        uint256 salt
-    ) internal pure returns (bytes memory) {
-        bytes memory callData = abi.encodeWithSelector(
-            factory.deployAndEnableModuleFromSafe.selector,
-            implementation,
-            initializer,
-            salt
-        );
+    // Helper function to build an enable module transaction directly
+    function _buildEnableModuleTx(address moduleAddress) internal view returns (bytes memory) {
+        bytes memory callData = abi.encodeWithSelector(MockSafe.enableModule.selector, moduleAddress);
 
         return
             abi.encodePacked(
-                uint8(1), // operation: DELEGATECALL
-                address(factory), // to: module factory
+                uint8(0), // operation: CALL (not DELEGATECALL since we're calling directly)
+                address(safe), // to: the safe itself
                 uint256(0), // value
                 uint256(callData.length), // data length
                 callData // data
