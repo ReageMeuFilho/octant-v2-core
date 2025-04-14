@@ -28,10 +28,10 @@ contract ModuleProxyFactoryTest is Test {
 
         // Deploy MultiSend contract
         multiSend = new MultiSend();
-        
+
         // Create mock Safe
         safe = new MockSafe();
-        
+
         // Deploy implementations
         splitCheckerImpl = address(new MockSplitChecker());
         dragonRouterImpl = address(new MockSafeDragonRouter(address(0)));
@@ -82,36 +82,28 @@ contract ModuleProxyFactoryTest is Test {
     }
 
     function testMultiSendBatchDeployment() public {
-        
         // Setup deployment data
         bytes memory splitCheckerInit = abi.encodeWithSignature("setUp()");
         uint256 splitCheckerSalt = 100;
-        
+
         // Calculate predicted addresses
         address predictedSplitChecker = moduleProxyFactory.getModuleAddress(
             splitCheckerImpl,
             splitCheckerInit,
             splitCheckerSalt
         );
-        
+
         // DragonRouter deployment data
-        bytes memory dragonRouterInit = abi.encodeWithSignature(
-            "setUp(address)",
-            predictedSplitChecker
-        );
+        bytes memory dragonRouterInit = abi.encodeWithSignature("setUp(address)", predictedSplitChecker);
         uint256 dragonRouterSalt = 200;
         address predictedDragonRouter = moduleProxyFactory.getModuleAddress(
             dragonRouterImpl,
             dragonRouterInit,
             dragonRouterSalt
         );
-        
-        // LinearAllowance module deployment data
-        bytes memory linearAllowanceInit = abi.encodeWithSignature(
-            "setUp(address)", 
-            address(safe)
-        );
 
+        // LinearAllowance module deployment data
+        bytes memory linearAllowanceInit = abi.encodeWithSignature("setUp(address)", address(safe));
 
         bytes memory tx1 = _buildDeployModuleTx(
             moduleProxyFactory,
@@ -119,14 +111,14 @@ contract ModuleProxyFactoryTest is Test {
             splitCheckerInit,
             splitCheckerSalt
         );
-        
+
         bytes memory tx2 = _buildDeployModuleTx(
             moduleProxyFactory,
             dragonRouterImpl,
             dragonRouterInit,
             dragonRouterSalt
         );
-        
+
         uint256 linearAllowanceSalt = 300;
         bytes memory tx3 = _buildEnableModuleTx(
             moduleProxyFactory,
@@ -134,17 +126,15 @@ contract ModuleProxyFactoryTest is Test {
             linearAllowanceInit,
             linearAllowanceSalt
         );
-        
+
         // Combine transactions
         bytes memory batchData = bytes.concat(tx1, tx2, tx3);
-        
 
         bool success = safe.execTransactionViaDelegateCall(
             address(multiSend),
             abi.encodeWithSelector(multiSend.multiSend.selector, batchData)
         );
-   
-        
+
         // Verify everything was deployed and initialized properly
         assertTrue(success, "MultiSend transaction failed");
         assertTrue(predictedSplitChecker.code.length > 0, "SplitChecker not deployed");
@@ -169,14 +159,15 @@ contract ModuleProxyFactoryTest is Test {
             initializer,
             salt
         );
-        
-        return abi.encodePacked(
-            uint8(0), // operation: CALL
-            address(factory), // to: module factory
-            uint256(0), // value
-            uint256(callData.length), // data length
-            callData // data
-        );
+
+        return
+            abi.encodePacked(
+                uint8(0), // operation: CALL
+                address(factory), // to: module factory
+                uint256(0), // value
+                uint256(callData.length), // data length
+                callData // data
+            );
     }
 
     // Helper function to build an enable module transaction (delegatecall)
@@ -192,13 +183,14 @@ contract ModuleProxyFactoryTest is Test {
             initializer,
             salt
         );
-        
-        return abi.encodePacked(
-            uint8(1), // operation: DELEGATECALL
-            address(factory), // to: module factory
-            uint256(0), // value
-            uint256(callData.length), // data length
-            callData // data
-        );
+
+        return
+            abi.encodePacked(
+                uint8(1), // operation: DELEGATECALL
+                address(factory), // to: module factory
+                uint256(0), // value
+                uint256(callData.length), // data length
+                callData // data
+            );
     }
 }

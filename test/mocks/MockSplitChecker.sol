@@ -3,7 +3,7 @@ pragma solidity >=0.7.0 <0.9.0;
 
 contract MockSplitChecker {
     bool public isInitialized;
-    
+
     function setUp() public {
         isInitialized = true;
     }
