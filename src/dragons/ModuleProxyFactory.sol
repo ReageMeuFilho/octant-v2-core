@@ -134,6 +134,28 @@ contract ModuleProxyFactory is IModuleProxyFactory {
         ISafe(address(this)).enableModule(proxy);
     }
 
+    function calculateProxyAddress(address target, bytes32 salt) public view returns (address) {
+        bytes memory deployment = abi.encodePacked(
+            hex"602d8060093d393df3363d3d373d3d3d363d73",
+            target,
+            hex"5af43d82803e903d91602b57fd5bf3"
+        );
+
+        bytes32 deploymentHash = keccak256(deployment);
+        bytes32 data = keccak256(abi.encodePacked(bytes1(0xff), address(this), salt, deploymentHash));
+
+        return address(uint160(uint256(data)));
+    }
+
+    function getModuleAddress(
+        address masterCopy,
+        bytes memory initializer,
+        uint256 saltNonce
+    ) public view returns (address) {
+        bytes32 salt = keccak256(abi.encodePacked(keccak256(initializer), saltNonce));
+        return calculateProxyAddress(masterCopy, salt);
+    }
+
     /// @notice Checks if the provided address is nonzero, reverts otherwise
     /// @param address_ Address to check
     /// @custom:error ZeroAddress is thrown if the provided address is a zero address
