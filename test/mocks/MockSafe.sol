@@ -7,4 +7,23 @@ contract MockSafe {
     function enableModule(address module) external {
         modules[module] = true;
     }
+
+        function execTransactionViaDelegateCall(address target, bytes memory data) external returns (bool success) {
+        // We wrap the call in assembly to have more control
+        assembly {
+            success := delegatecall(gas(), target, add(data, 0x20), mload(data), 0, 0)
+        }
+        
+        // If the delegatecall failed, we need to forward the revert message
+        if (!success) {
+            assembly {
+                let ptr := mload(0x40)
+                returndatacopy(ptr, 0, returndatasize())
+                revert(ptr, returndatasize())
+            }
+        }
+        
+        return success;
+    }
+
 }
