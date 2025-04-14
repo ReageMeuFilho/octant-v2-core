@@ -101,14 +101,24 @@ contract DeployProtocol is Script {
 
         if (safeAddress == address(0)) revert DeploymentFailed();
 
-        // 2. Deploy Module Proxy Factory
-        moduleProxyFactory = new ModuleProxyFactory();
-        moduleProxyFactoryAddress = address(moduleProxyFactory);
-        if (moduleProxyFactoryAddress == address(0)) revert DeploymentFailed();
-
         // 4. Deploy Dragon Tokenized Strategy Implementation
 
         dragonTokenizedStrategySingleton = new DragonTokenizedStrategy();
+
+        address governance = 0x0000000000000000000000000000000000000001;
+        address regenGovernance = 0x0000000000000000000000000000000000000001;
+        address splitChecker = 0x0000000000000000000000000000000000000001;
+        address metapool = 0x0000000000000000000000000000000000000001;
+        // Deploy Module Proxy Factory
+        moduleProxyFactory = new ModuleProxyFactory(
+            governance,
+            regenGovernance,
+            splitChecker,
+            metapool,
+            address(dragonTokenizedStrategySingleton)
+        );
+        moduleProxyFactoryAddress = address(moduleProxyFactory);
+        if (moduleProxyFactoryAddress == address(0)) revert DeploymentFailed();
 
         vm.stopBroadcast();
 

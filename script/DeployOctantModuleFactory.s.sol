@@ -6,12 +6,24 @@ import { OctantRewardsSafe } from "../src/dragons/modules/OctantRewardsSafe.sol"
 import "forge-std/Script.sol";
 
 contract DeployOctantModuleFactory is Script {
+    address public governance = 0x0000000000000000000000000000000000000001;
+    address public regenGovernance = 0x0000000000000000000000000000000000000001;
+    address public splitChecker = 0x0000000000000000000000000000000000000001;
+    address public metapool = 0x0000000000000000000000000000000000000001;
+    address public dragonRouterImplementation = 0x0000000000000000000000000000000000000001;
+
     function setUp() public {}
 
     function run() public {
         vm.startBroadcast();
 
-        ModuleProxyFactory factory = new ModuleProxyFactory();
+        ModuleProxyFactory factory = new ModuleProxyFactory(
+            governance,
+            regenGovernance,
+            splitChecker,
+            metapool,
+            dragonRouterImplementation
+        );
 
         OctantRewardsSafe octantModule = new OctantRewardsSafe();
 

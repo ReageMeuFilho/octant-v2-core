@@ -46,7 +46,18 @@ contract BaseTest is Test, TestPlus {
         }
 
         // deploy module proxy factory and test erc20 asset
-        moduleFactory = new ModuleProxyFactory();
+        address governance = 0x0000000000000000000000000000000000000001;
+        address regenGovernance = 0x0000000000000000000000000000000000000001;
+        address splitChecker = 0x0000000000000000000000000000000000000001;
+        address metapool = 0x0000000000000000000000000000000000000001;
+        address dragonRouterImplementation = 0x0000000000000000000000000000000000000001;
+        moduleFactory = new ModuleProxyFactory(
+            governance,
+            regenGovernance,
+            splitChecker,
+            metapool,
+            dragonRouterImplementation
+        );
 
         token = new MockERC20();
     }

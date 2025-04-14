@@ -326,7 +326,18 @@ contract SetupIntegrationTest is Test, TestPlus {
 
     // Modified implementation that skips broadcasting
     function _deployModuleProxyFactory() internal {
-        moduleProxyFactory = new ModuleProxyFactory();
+        address governance = 0x0000000000000000000000000000000000000001;
+        address regenGovernance = 0x0000000000000000000000000000000000000001;
+        address splitChecker = 0x0000000000000000000000000000000000000001;
+        address metapool = 0x0000000000000000000000000000000000000001;
+        address dragonRouterImplementation = 0x0000000000000000000000000000000000000001;
+        moduleProxyFactory = new ModuleProxyFactory(
+            governance,
+            regenGovernance,
+            splitChecker,
+            metapool,
+            dragonRouterImplementation
+        );
     }
 
     // Modified implementation that skips broadcasting
