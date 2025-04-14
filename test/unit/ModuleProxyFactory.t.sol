@@ -21,6 +21,31 @@ contract ModuleProxyFactoryTest is BaseTest {
         factory = new ModuleProxyFactory(governance, regenGovernance, splitChecker, metapool, dragonRouter);
     }
 
+    function setupFailsWithZeroGovernance() public {
+        vm.expectRevert("ZeroAddress");
+        new ModuleProxyFactory(address(0), regenGovernance, metapool, splitChecker, dragonRouter);
+    }
+
+    function setupFailsWithZeroRegenGovernance() public {
+        vm.expectRevert("ZeroAddress");
+        new ModuleProxyFactory(governance, address(0), metapool, splitChecker, dragonRouter);
+    }
+
+    function setupFailsWithZeroMetapool() public {
+        vm.expectRevert("ZeroAddress");
+        new ModuleProxyFactory(governance, regenGovernance, address(0), splitChecker, dragonRouter);
+    }
+
+    function setupFailsWithZeroSplitChecker() public {
+        vm.expectRevert("ZeroAddress");
+        new ModuleProxyFactory(governance, regenGovernance, metapool, address(0), dragonRouter);
+    }
+
+    function setupFailsWithZeroDragonRouter() public {
+        vm.expectRevert("ZeroAddress");
+        new ModuleProxyFactory(governance, regenGovernance, metapool, splitChecker, address(0));
+    }
+
     function testDeployDragonRouterWithFactory() public {
         DragonRouter router = DragonRouter(factory.deployDragonRouter(owner, strategies, opexVault, 100));
         assertTrue(router.hasRole(router.DEFAULT_ADMIN_ROLE(), owner));
