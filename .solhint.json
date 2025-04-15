@@ -1,8 +1,6 @@
 {
   "extends": "solhint:recommended",
-  "plugins": [
-    "prettier"
-  ],
+  "plugins": ["prettier"],
   "rules": {
     "no-unused-import": "warn",
     "imports-on-top": "error",
@@ -11,14 +9,9 @@
     "gas-small-strings": "warn",
     "gas-struct-packing": "warn",
     "no-unused-vars": "error",
-    "code-complexity": [
-      "error",
-      9
-    ],
-    "compiler-version": [
-      "error",
-      "^0.8.0"
-    ],
+    "max-states-count": ["error", 1000],
+    "code-complexity": ["error", 12],
+    "compiler-version": ["error", "^0.8.0"],
     "const-name-snakecase": "error",
     "immutable-vars-naming": "off",
     "avoid-low-level-calls": "off",

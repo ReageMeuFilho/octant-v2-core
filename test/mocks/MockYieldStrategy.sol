@@ -6,7 +6,6 @@ import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { IERC4626Payable } from "../../src/interfaces/IERC4626Payable.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
-import { console } from "forge-std/console.sol";
 
 /**
  * @title MockYieldStrategy
@@ -53,7 +52,6 @@ contract MockYieldStrategy is ERC20, IERC4626Payable {
 
     // ERC-4626 Functions
     function totalAssets() public view virtual override returns (uint256) {
-        console.log("totalAssets in mock yield strategy", IERC20(asset).balanceOf(address(this)));
         return IERC20(asset).balanceOf(address(this));
     }
 
@@ -101,9 +99,6 @@ contract MockYieldStrategy is ERC20, IERC4626Payable {
     }
 
     function previewWithdraw(uint256 assets) public view override returns (uint256) {
-        console.log("previewWithdraw", assets);
-        console.log("totalSupply()", totalSupply());
-        console.log("totalAssets()", totalAssets());
         uint256 supply = totalSupply();
         if (supply == 0 || totalAssets() == 0) {
             return 0;
