@@ -36,12 +36,12 @@ contract VaultRolesTest is Test {
 
     function testSetRole() public {
         // Gov can set role
-        vault.setRole(fish, IVault.Roles.DEBT_MANAGER);
+        vault.setRole(fish, uint256(IVault.Roles.DEBT_MANAGER));
 
         // Fish tries to set role (should fail)
         vm.prank(fish);
         vm.expectRevert("not allowed");
-        vault.setRole(fish, IVault.Roles.DEBT_MANAGER);
+        vault.setRole(fish, uint256(IVault.Roles.DEBT_MANAGER));
     }
 
     function testTransfersRoleManager() public {
