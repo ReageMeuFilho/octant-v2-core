@@ -12,7 +12,7 @@ contract MockFaultyAccountant is IAccountant {
 
     // Constants matching the original Vyper contract
     uint256 constant MAX_BPS = 10_000;
-    uint256 constant SECS_PER_YEAR = 31_556_952;
+    uint256 constant SECS_PER_YEAR = 365 days;
 
     // Fee configuration per strategy
     struct Fee {

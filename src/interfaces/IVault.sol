@@ -60,6 +60,32 @@ interface IVault {
     //////////////////////////////////////////////////////////////*/
 
     /**
+     * @notice Variables for the processReport function.
+     */
+    struct ProcessReportVars {
+        address asset;
+        uint256 totalAssets;
+        uint256 currentDebt;
+        uint256 gain;
+        uint256 loss;
+        uint256 totalFees;
+        uint256 totalRefunds;
+        uint256 totalFeesShares;
+        uint16 protocolFeeBps;
+        uint256 protocolFeesShares;
+        address protocolFeeRecipient;
+        uint256 sharesToBurn;
+        uint256 sharesToLock;
+        uint256 profitMaxUnlockTime;
+        uint256 totalSupply;
+        uint256 totalLockedShares;
+        uint256 endingSupply;
+        uint256 toBurn;
+        uint256 previouslyLockedTime;
+        uint256 fullProfitUnlockDate;
+        uint256 newProfitLockingPeriod;
+    }
+    /**
      * @notice Parameters for a strategy.
      * @param activation Timestamp when the strategy was added.
      * @param lastReport Timestamp of the strategies last report.
@@ -71,6 +97,46 @@ interface IVault {
         uint256 lastReport;
         uint256 currentDebt;
         uint256 maxDebt;
+    }
+
+    /**
+     * @notice State for a redeem operation.
+     * @param requestedAssets The requested assets to redeem.
+     * @param currentTotalIdle The current total idle of the vault.
+     * @param currentTotalDebt The current total debt of the vault.
+     * @param asset The asset of the vault.
+     * @param withdrawalStrategies The strategies to withdraw from.
+     * @param assetsNeeded The assets needed to fulfill the redeem request.
+     * @param previousBalance The previous balance of the vault.
+     */
+    struct RedeemState {
+        uint256 requestedAssets;
+        uint256 currentTotalIdle;
+        uint256 currentTotalDebt;
+        address asset;
+        address[] withdrawalStrategies;
+        uint256 assetsNeeded;
+        uint256 previousBalance;
+    }
+
+    /**
+     * @notice State for a withdrawal operation.
+     * @param requestedAssets The requested assets to withdraw.
+     * @param currentTotalIdle The current total idle of the vault.
+     * @param currentTotalDebt The current total debt of the vault.
+     * @param assetsNeeded The assets needed to fulfill the withdrawal request.
+     * @param previousBalance The previous balance of the vault.
+     */
+    struct WithdrawalState {
+        uint256 requestedAssets;
+        uint256 currentTotalIdle;
+        uint256 currentTotalDebt;
+        uint256 assetsNeeded;
+        uint256 previousBalance;
+        uint256 currentDebt;
+        uint256 assetsToWithdraw;
+        uint256 maxWithdraw;
+        uint256 unrealisedLossesShare;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -195,7 +261,7 @@ interface IVault {
 
     // ERC20 & ERC4626 Functions
     function deposit(uint256 assets, address receiver) external returns (uint256);
-    function mint(uint256 shares, address receiver) external returns (uint256);
+    // function mint(uint256 shares, address receiver) external returns (uint256);
     function withdraw(
         uint256 assets,
         address receiver,

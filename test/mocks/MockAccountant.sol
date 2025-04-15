@@ -7,13 +7,23 @@ import { IVault } from "../../src/interfaces/IVault.sol";
 
 // based off https://github.com/yearn/yearn-vaults-v3/blob/master/tests/unit/vault/test_strategy_accounting.py
 contract MockAccountant is IAccountant {
-    address public asset;
-    address public feeManager;
-
     // Constants matching the original Vyper contract
     uint256 constant MAX_BPS = 10_000;
     uint256 constant MAX_SHARE = 7_500; // 75% max fee cap
-    uint256 constant SECS_PER_YEAR = 31_556_952;
+    uint256 constant SECS_PER_YEAR = 365 days;
+
+    // Storage variables
+    address public feeManager;
+    address public futureFeeManager;
+    address public asset;
+
+    // Events
+    event CommitFeeManager(address indexed feeManager);
+    event ApplyFeeManager(address indexed feeManager);
+    event UpdatePerformanceFee(uint256 performanceFee);
+    event UpdateManagementFee(uint256 managementFee);
+    event UpdateRefundRatio(uint256 refundRatio);
+    event DistributeRewards(uint256 rewards);
 
     // Fee configuration per strategy
     struct Fee {
@@ -29,11 +39,6 @@ contract MockAccountant is IAccountant {
         feeManager = msg.sender;
     }
 
-    function setFees(address strategy, uint256 managementFee, uint256 performanceFee, uint256 refundRatio) external {
-        fees[strategy] = Fee({ managementFee: managementFee, performanceFee: performanceFee });
-        refundRatios[strategy] = refundRatio;
-    }
-
     function report(
         address strategy,
         uint256 gain,
@@ -44,7 +49,7 @@ contract MockAccountant is IAccountant {
         Fee memory fee = fees[strategy];
         uint256 duration = block.timestamp - strategyParams.lastReport;
 
-        // Calculate management fee based on time elapsed
+        // Calculate management fee based on time elapsed - matches Vyper implementation
         totalFees = (strategyParams.currentDebt * duration * fee.managementFee) / MAX_BPS / SECS_PER_YEAR;
 
         if (gain > 0) {
@@ -57,7 +62,7 @@ contract MockAccountant is IAccountant {
                 return (maximumFee, 0);
             }
         } else {
-            // Calculate refunds if there's a loss
+            // Calculate refunds if there's a loss - ONLY FOR LOSSES, not gains
             uint256 refundRatio = refundRatios[strategy];
             totalRefunds = (loss * refundRatio) / MAX_BPS;
 
@@ -68,5 +73,60 @@ contract MockAccountant is IAccountant {
         }
 
         return (totalFees, totalRefunds);
+    }
+
+    // Helper function to set fees for testing
+    function setFees(address strategy, uint256 managementFee, uint256 performanceFee, uint256 refundRatio) external {
+        fees[strategy] = Fee({ managementFee: managementFee, performanceFee: performanceFee });
+        refundRatios[strategy] = refundRatio;
+    }
+
+    // Additional functions from the Vyper contract
+    function distribute(IERC20 vault) external {
+        require(msg.sender == feeManager, "not fee manager");
+        uint256 rewards = vault.balanceOf(address(this));
+        vault.transfer(msg.sender, rewards);
+        emit DistributeRewards(rewards);
+    }
+
+    function setPerformanceFee(address strategy, uint256 performanceFee) external {
+        require(msg.sender == feeManager, "not fee manager");
+        require(performanceFee <= performanceFeeThreshold(), "exceeds performance fee threshold");
+        fees[strategy].performanceFee = performanceFee;
+        emit UpdatePerformanceFee(performanceFee);
+    }
+
+    function setManagementFee(address strategy, uint256 managementFee) external {
+        require(msg.sender == feeManager, "not fee manager");
+        require(managementFee <= managementFeeThreshold(), "exceeds management fee threshold");
+        fees[strategy].managementFee = managementFee;
+        emit UpdateManagementFee(managementFee);
+    }
+
+    function setRefundRatio(address strategy, uint256 refundRatio) external {
+        require(msg.sender == feeManager, "not fee manager");
+        refundRatios[strategy] = refundRatio;
+        emit UpdateRefundRatio(refundRatio);
+    }
+
+    function commitFeeManager(address _futureFeeManager) external {
+        require(msg.sender == feeManager, "not fee manager");
+        futureFeeManager = _futureFeeManager;
+        emit CommitFeeManager(_futureFeeManager);
+    }
+
+    function applyFeeManager() external {
+        require(msg.sender == feeManager, "not fee manager");
+        require(futureFeeManager != address(0), "future fee manager != zero address");
+        feeManager = futureFeeManager;
+        emit ApplyFeeManager(feeManager);
+    }
+
+    function performanceFeeThreshold() public pure returns (uint256) {
+        return MAX_BPS / 2;
+    }
+
+    function managementFeeThreshold() public pure returns (uint256) {
+        return MAX_BPS;
     }
 }
