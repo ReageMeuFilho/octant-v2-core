@@ -1,6 +1,6 @@
-# Dragon Protocol Deployment Guide (Sepolia Staging Fork)
+# Dragon Protocol Deployment Guide (Sepolia Mainnet Fork)
 
-This guide explains how to deploy the Dragon Protocol core components in a Staging environment or in your own Tenderly Sepolia Testnet.
+This guide explains how to deploy the Dragon Protocol core components in a Staging environment or in your own Tenderly Mainnet Testnet.
 
 ## Overview
 
@@ -15,16 +15,16 @@ The DeployProtocol script handles the sequential deployment of:
 
 ## Prerequisites
 
-1. Create your own Virtual TestNet in Tenderly (Sepolia, sync on) (https://docs.tenderly.co/virtual-testnets/quickstart)
+1. Create your own Virtual TestNet in Tenderly (Mainnet, sync on) (https://docs.tenderly.co/virtual-testnets/quickstart)
 2. Create Tenderly Personal accessToken (https://docs.tenderly.co/account/projects/how-to-generate-api-access-token#personal-account-access-tokens)
-3. Send some SepoliaETH (your own Sepolia TestNet RPC) to your deployer address (ex. MetaMask account) (https://docs.tenderly.co/virtual-testnets/unlimited-faucet)
+3. Send some ETH (your own Mainnet TestNet RPC) to your deployer address (ex. MetaMask account) (https://docs.tenderly.co/virtual-testnets/unlimited-faucet)
 
 ## Environment Setup
 
 Create `.env` file:
 ```
 PRIVATE_KEY=(deployer private key ex. MetaMask account)
-RPC_URL=https://rpc.ov2st.octant.build
+RPC_URL=https://rpc.ov2sm.octant.build
 VERIFIER_URL=$RPC_URL/verify/etherscan
 VERIFIER_API_KEY=(your Personal Tenderly accessToken)
 MAX_OPEX_SPLIT=5 # to confirm
