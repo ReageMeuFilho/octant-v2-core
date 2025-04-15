@@ -4,6 +4,7 @@ pragma solidity ^0.8.25;
 import { IAccountant } from "../../src/interfaces/IAccountant.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IVault } from "../../src/interfaces/IVault.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 // based off https://github.com/yearn/yearn-vaults-v3/blob/master/contracts/test/mocks/periphery/FlexibleAccountant.vy
 contract MockFlexibleAccountant is IAccountant {
@@ -12,7 +13,7 @@ contract MockFlexibleAccountant is IAccountant {
 
     // Constants matching the original Vyper contract
     uint256 constant MAX_BPS = 10_000;
-    uint256 constant SECS_PER_YEAR = 31_556_952;
+    uint256 constant SECS_PER_YEAR = 365 days;
 
     // Fee configuration per strategy
     struct Fee {
@@ -51,24 +52,14 @@ contract MockFlexibleAccountant is IAccountant {
         uint256 assetBalance = IERC20(asset).balanceOf(address(this));
 
         if (gain > 0) {
-            // Add performance fee if there's a gain
+            // Add performance fee
             totalFees += (gain * fee.performanceFee) / MAX_BPS;
 
-            // Calculate refunds in gain scenario
-            if (refundRatio > 0) {
-                totalRefunds = (gain * refundRatio) / MAX_BPS;
-                if (totalRefunds > assetBalance) {
-                    totalRefunds = assetBalance;
-                }
-            }
-        } else if (loss > 0) {
-            // Calculate refunds in loss scenario
-            if (refundRatio > 0) {
-                totalRefunds = (loss * refundRatio) / MAX_BPS;
-                if (totalRefunds > assetBalance) {
-                    totalRefunds = assetBalance;
-                }
-            }
+            // Calculate refunds for gains - CRITICAL difference from standard accountant
+            totalRefunds = Math.min(assetBalance, (gain * refundRatio) / MAX_BPS);
+        } else {
+            // Calculate refunds for losses
+            totalRefunds = Math.min(assetBalance, (loss * refundRatio) / MAX_BPS);
         }
 
         // Approve the vault to pull the refund
@@ -84,5 +75,9 @@ contract MockFlexibleAccountant is IAccountant {
         uint256 rewards = IERC20(vault).balanceOf(address(this));
         IERC20(vault).transfer(msg.sender, rewards);
         // Would emit DistributeRewards(rewards) in Vyper
+    }
+
+    function getFees(address strategy) external view returns (uint256, uint256) {
+        return (fees[strategy].managementFee, fees[strategy].performanceFee);
     }
 }

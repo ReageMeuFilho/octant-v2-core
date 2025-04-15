@@ -18,4 +18,9 @@ contract MockFactory {
         feeBps = bps;
         recipient = treasury;
     }
+
+    function setProtocolFeeConfig(uint16 bps, address treasury) external {
+        feeBps = bps;
+        recipient = treasury;
+    }
 }
