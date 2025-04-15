@@ -1,8 +1,16 @@
 {
-  "name": "@octant/v2-core",
-  "version": "0.0.1",
+  "name": "@golemfoundation/octant-v2-core",
+  "version": "0.1.1",
   "description": "",
   "packageManager": "yarn@4.7.0+sha512.5a0afa1d4c1d844b3447ee3319633797bcd6385d9a44be07993ae52ff4facabccafb4af5dcd1c2f9a94ac113e5e9ff56f6130431905884414229e284e37bb7c9",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/golemfoundation/octant-v2-core.git"
+  },
+  "bugs": {
+    "url": "https://github.com/golemfoundation/octant-v2-core/issues"
+  },
+  "homepage": "https://github.com/golemfoundation/octant-v2-core#readme",
   "engines": {
     "npm": "please-use-yarn",
     "node": ">=22.0.0"
@@ -19,6 +27,7 @@
     "lint": "solhint './{src,scripts,test}/**/*.sol'",
     "precommit": "lint-staged",
     "build": "forge clean && forge compile",
+    "build:contracts": "forge clean && forge compile --skip test --skip script",
     "test": "forge clean && forge test",
     "test:ci": "forge clean && mkdir -p reports && (forge test --junit > reports/junit.xml || forge test --summary)",
     "gas": "forge snapshot --isolate --gas-report --diff .gas-snapshot > gasreport.txt",
@@ -28,9 +37,10 @@
     "slither": ".venv/bin/slither ./ --exclude-dependencies --filter-paths \"test\" ",
     "storage:generate": "./script/storage.sh generate",
     "storage:check": "./script/storage.sh check",
-    "prepare": "husky",
-    "postinstall": "shx chmod +x .husky/* || true",
-    "deploy:tenderly": "bash -c 'source .env; patch -fp1 -d lib/hats-protocol -i ../../ci/lib_hats_protocol_erc1155_import.diff; forge script script/deployment/staging/DeployProtocol.s.sol --slow -f $RPC_URL && forge script script/deployment/staging/DeployProtocol.s.sol --slow --verify --verifier custom --broadcast -f $RPC_URL'"
+    "init": "husky && shx chmod +x .husky/*",
+    "deploy:tenderly": "bash -c 'source .env; patch -fp1 -d lib/hats-protocol -i ../../ci/lib_hats_protocol_erc1155_import.diff; forge script script/deployment/staging/DeployProtocol.s.sol --slow -f $RPC_URL && forge script script/deployment/staging/DeployProtocol.s.sol --slow --verify --verifier custom --broadcast -f $RPC_URL'",
+    "release": "release-it",
+    "lint:commits": "commitlint --last --verbose"
   },
   "keywords": [],
   "author": "",
@@ -40,7 +50,10 @@
     "dotenv": "^16.4.5"
   },
   "devDependencies": {
+    "@commitlint/cli": "^19.8.0",
+    "@commitlint/config-conventional": "^19.8.0",
     "@gnosis.pm/safe-contracts": "^1.3.0",
+    "@release-it/conventional-changelog": "^10.0.0",
     "dotenv": "^16.4.5",
     "ethers": "5",
     "forge-stack-tracer": "^1.0.3",
@@ -48,6 +61,7 @@
     "lint-staged": "^15.2.10",
     "prettier": "^3.3.3",
     "prettier-plugin-solidity": "^1.4.1",
+    "release-it": "^18.1.2",
     "shx": "^0.3.4",
     "solhint": "^5.0.3",
     "solhint-plugin-prettier": "^0.1.0",
@@ -55,6 +69,7 @@
   },
   "publishConfig": {
     "access": "restricted",
-    "provenance": true
+    "provenance": true,
+    "registry": "https://npm.pkg.github.com"
   }
 }

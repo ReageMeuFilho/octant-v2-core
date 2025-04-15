@@ -88,6 +88,24 @@ jobs:
       - name: Linter
         run: "cd /app; yarn lint"
 
+  lint-commits:
+    name: Lint commits
+    runs-on: general
+    container: node:22
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install
+
+      - name: Lint commits
+        run: yarn lint:commits
+
   # Technically we don't need to build step is done during the docker build
   build:
     name: Build
