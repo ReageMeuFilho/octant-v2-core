@@ -6,7 +6,7 @@ interface IModuleProxyFactory {
     event ModuleProxyCreation(address indexed deployer, address indexed proxy, address indexed masterCopy);
 
     /// @notice Emitted when a dragon router is created
-    event DragonRouterCreation(address indexed proxy, address indexed masterCopy);
+    event DragonRouterCreation(address indexed proxy, address indexed masterCopy, address indexed owner);
 
     /// `target` can not be zero.
     error ZeroAddress();
