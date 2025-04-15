@@ -216,7 +216,7 @@ contract Vault is IVault {
     }
 
     /**
-     * @notice Set the new default queue array.
+     * @notice Set the new default queue array (max 10 strategies)
      * @dev Will check each strategy to make sure it is active. But will not
      *      check that the same strategy is not added twice. maxRedeem and maxWithdraw
      *      return values may be inaccurate if a strategy is added twice.
@@ -224,6 +224,7 @@ contract Vault is IVault {
      */
     function setDefaultQueue(address[] calldata newDefaultQueue) external override {
         _enforceRole(msg.sender, Roles.QUEUE_MANAGER);
+        require(newDefaultQueue.length <= MAX_QUEUE, "max queue length reached");
 
         // Make sure every strategy in the new queue is active.
         for (uint256 i = 0; i < newDefaultQueue.length; i++) {
@@ -395,13 +396,13 @@ contract Vault is IVault {
      * @dev This will fully override an accounts current roles
      *      so it should include all roles the account should hold.
      * @param account The account to set the role for.
-     * @param role The roles the account should hold.
+     * @param rolesBitmask The roles the account should hold.
      */
-    function setRole(address account, Roles role) external override {
+    function setRole(address account, uint256 rolesBitmask) external override {
         require(msg.sender == roleManager, "not allowed");
-        // Store the enum value directly - Vyper style
-        roles[account] = 1 << uint256(role);
-        emit RoleSet(account, role);
+        // Store the enum value directly
+        roles[account] = rolesBitmask;
+        emit RoleSet(account, rolesBitmask);
     }
 
     /**
@@ -413,9 +414,9 @@ contract Vault is IVault {
      */
     function addRole(address account, Roles role) external override {
         require(msg.sender == roleManager, "not allowed");
-        // Add the role with a bitwise OR - Vyper style
+        // Add the role with a bitwise OR
         roles[account] = roles[account] | (1 << uint256(role));
-        emit RoleSet(account, role);
+        emit RoleSet(account, roles[account]);
     }
 
     /**
@@ -429,8 +430,8 @@ contract Vault is IVault {
         require(msg.sender == roleManager, "not allowed");
 
         // Bitwise AND with NOT to remove the role
-        roles[account] = roles[account] & ~uint256(role);
-        emit RoleSet(account, role);
+        roles[account] = roles[account] & ~(1 << uint256(role));
+        emit RoleSet(account, roles[account]);
     }
 
     /**
@@ -643,7 +644,8 @@ contract Vault is IVault {
 
         // Add debt manager role to the sender
         roles[msg.sender] = roles[msg.sender] | (1 << uint256(Roles.DEBT_MANAGER));
-        emit RoleSet(msg.sender, Roles.DEBT_MANAGER);
+        // todo might need to emit the combined roles
+        emit RoleSet(msg.sender, roles[msg.sender]);
 
         emit Shutdown();
     }
@@ -1804,23 +1806,34 @@ contract Vault is IVault {
         // Set strategy params all back to 0 (WARNING: it can be re-added).
         _strategies[strategy] = StrategyParams({ activation: 0, lastReport: 0, currentDebt: 0, maxDebt: 0 });
 
-        // Remove strategy if it is in the default queue.
-        address[] memory newQueue = new address[](defaultQueue.length - 1);
-        uint256 j = 0;
+        // First count how many strategies we'll keep to properly size the new array
+        uint256 strategiesInQueue = 0;
+        bool strategyFound = false;
 
         for (uint256 i = 0; i < defaultQueue.length; i++) {
-            // Add all strategies to the new queue besides the one revoked.
-            if (defaultQueue[i] != strategy) {
-                // Only increment j when we add to newQueue
-                if (j < newQueue.length) {
+            if (defaultQueue[i] == strategy) {
+                strategyFound = true;
+            } else {
+                strategiesInQueue++;
+            }
+        }
+
+        // Only create a new queue if the strategy was actually in the queue
+        if (strategyFound) {
+            address[] memory newQueue = new address[](strategiesInQueue);
+            uint256 j = 0;
+
+            for (uint256 i = 0; i < defaultQueue.length; i++) {
+                // Add all strategies to the new queue besides the one revoked
+                if (defaultQueue[i] != strategy) {
                     newQueue[j] = defaultQueue[i];
                     j++;
                 }
             }
-        }
 
-        // Set the default queue to our updated queue.
-        defaultQueue = newQueue;
+            // Set the default queue to our updated queue
+            defaultQueue = newQueue;
+        }
 
         emit StrategyChanged(strategy, StrategyChangeType.REVOKED);
     }
