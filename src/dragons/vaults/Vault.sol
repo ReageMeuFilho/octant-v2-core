@@ -162,7 +162,7 @@ contract Vault is IVault {
         address _roleManager,
         uint256 _profitMaxUnlockTime
     ) external override {
-        require(asset == address(this), "initialized");
+        require(asset == address(0), "initialized");
         require(_asset != address(0), "ZERO ADDRESS");
         require(_roleManager != address(0), "ZERO ADDRESS");
 
@@ -617,6 +617,7 @@ contract Vault is IVault {
         uint256 maxLoss
     ) external override nonReentrant returns (uint256) {
         _enforceRole(msg.sender, Roles.DEBT_MANAGER);
+        console.log("Updating debt for strategy", strategy);
         return _updateDebt(strategy, targetDebt, maxLoss);
     }
 
@@ -1920,6 +1921,7 @@ contract Vault is IVault {
         uint256 currentDebt = _strategies[strategy].currentDebt;
         // If the vault is shutdown we can only pull funds.
         if (shutdown_) {
+            console.log("Vault is shutdown, setting new debt to 0");
             newDebt = 0;
         }
 
@@ -2039,8 +2041,13 @@ contract Vault is IVault {
      * @dev Increases a strategy's debt by depositing assets
      */
     function _increaseStrategyDebt(address strategy, uint256 currentDebt, uint256 newDebt) internal returns (uint256) {
+        console.log("Increasing debt for strategy");
+        console.log("Current debt", currentDebt);
+        console.log("New debt", newDebt);
         // Apply max debt limit
         newDebt = _applyMaxDebtLimit(strategy, currentDebt, newDebt);
+
+        console.log("New debt after applying max debt limit", newDebt);
 
         // Calculate assets to deposit respecting strategy and vault limits
         uint256 assetsToDeposit = _calculateAssetsToDeposit(strategy, currentDebt, newDebt);
@@ -2061,6 +2068,7 @@ contract Vault is IVault {
         uint256 currentDebt,
         uint256 newDebt
     ) internal view returns (uint256) {
+        console.log("max debt", _strategies[strategy].maxDebt);
         if (newDebt > _strategies[strategy].maxDebt) {
             newDebt = _strategies[strategy].maxDebt;
             // Possible for current to be greater than max from reports.
