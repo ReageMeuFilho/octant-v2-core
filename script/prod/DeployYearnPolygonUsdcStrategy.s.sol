@@ -27,9 +27,6 @@ contract DeployYearnPolygonUsdcStrategy is DeployDragonRouter {
     SafeProxy proxy;
     bool isSafeDeployed;
 
-    address public regenGovernance = 0x0000000000000000000000000000000000000001;
-    address public splitChecker = 0x0000000000000000000000000000000000000001;
-
     /// @notice change this according to the strategy
     uint256 maxReportDelay = 7 days;
 
@@ -54,9 +51,9 @@ contract DeployYearnPolygonUsdcStrategy is DeployDragonRouter {
             if (keccak256(abi.encode(res)) == keccak256(abi.encode("no"))) {
                 moduleFactory = address(
                     new ModuleProxyFactory(
-                        governance,
-                        regenGovernance,
-                        splitChecker,
+                        msg.sender,
+                        msg.sender,
+                        address(splitCheckerImplementation),
                         metapool,
                         address(dragonRouterImplementation)
                     )

@@ -19,24 +19,35 @@ contract ModuleProxyFactory is IModuleProxyFactory {
     /// @notice Constructor
     /// @param _governance The governance address
     /// @param _regenGovernance The regen governance address
-    /// @param _splitChecker The split checker proxy address
+    /// @param _splitCheckerImplementation The split checker proxy address
     /// @param _metapool The metapool address
     /// @param _dragonRouterImplementation The dragon router implementation address
     constructor(
         address _governance,
         address _regenGovernance,
-        address _splitChecker,
         address _metapool,
+        address _splitCheckerImplementation,
         address _dragonRouterImplementation
     ) {
         _ensureNonzeroAddress(_governance);
         _ensureNonzeroAddress(_regenGovernance);
-        _ensureNonzeroAddress(_splitChecker);
+        _ensureNonzeroAddress(_splitCheckerImplementation);
         _ensureNonzeroAddress(_metapool);
         _ensureNonzeroAddress(_dragonRouterImplementation);
         GOVERNANCE = _governance;
         REGEN_GOVERNANCE = _regenGovernance;
-        SPLIT_CHECKER = _splitChecker;
+        uint256 DEFAULT_MAX_OPEX_SPLIT = 0.5e18;
+        uint256 DEFAULT_MIN_METAPOOL_SPLIT = 0.05e18;
+        SPLIT_CHECKER = deployModule(
+            _splitCheckerImplementation,
+            abi.encodeWithSignature(
+                "initialize(address,uint256,uint256)",
+                GOVERNANCE,
+                DEFAULT_MAX_OPEX_SPLIT,
+                DEFAULT_MIN_METAPOOL_SPLIT
+            ),
+            block.timestamp
+        );
         METAPOOL = _metapool;
         DRAGON_ROUTER_IMPLEMENTATION = _dragonRouterImplementation;
     }
@@ -80,7 +91,7 @@ contract ModuleProxyFactory is IModuleProxyFactory {
     }
 
     /// @notice Deploys a dragon router
-    /// @param owner The owner address
+    /// @param owner The owner address (the dragon vault safe)
     /// @param strategies The strategies addresses
     /// @param opexVault The opex vault address
     /// @param saltNonce The salt nonce
