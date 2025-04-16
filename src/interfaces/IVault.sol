@@ -173,7 +173,7 @@ interface IVault {
     event DebtUpdated(address indexed strategy, uint256 currentDebt, uint256 newDebt);
 
     // ROLE UPDATES
-    event RoleSet(address indexed account, Roles indexed role);
+    event RoleSet(address indexed account, uint256 indexed role);
 
     // STORAGE MANAGEMENT EVENTS
     event UpdateFutureRoleManager(address indexed futureRoleManager);
@@ -304,7 +304,7 @@ interface IVault {
     function setProfitMaxUnlockTime(uint256 newProfitMaxUnlockTime) external;
 
     // Role Management
-    function setRole(address account, Roles role) external;
+    function setRole(address account, uint256 roles) external;
     function addRole(address account, Roles role) external;
     function removeRole(address account, Roles role) external;
     function transferRoleManager(address roleManager) external;
