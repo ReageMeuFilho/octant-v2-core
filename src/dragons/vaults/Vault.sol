@@ -535,15 +535,14 @@ contract Vault is IVault {
 
         require(shares > 0, "cannot buy zero");
 
-        totalIdle_ = _wState.currentTotalIdle - _wState.requestedAssets;
-        totalDebt_ = _wState.currentTotalDebt;
-
         _erc20SafeTransferFrom(asset, msg.sender, address(this), _amount);
 
         // Lower strategy debt
         uint256 newDebt = currentDebt - _amount;
         _strategies[strategy].currentDebt = newDebt;
-        // lower total debt
+
+        totalDebt_ -= _amount;
+        totalIdle_ += _amount;
 
         // log debt change
         emit DebtUpdated(strategy, currentDebt, newDebt);
@@ -1251,6 +1250,7 @@ contract Vault is IVault {
 
         // If there is a deposit limit module set use that.
         address _depositLimitModule = depositLimitModule;
+
         if (_depositLimitModule != address(0)) {
             return IDepositLimitModule(_depositLimitModule).availableDepositLimit(receiver);
         }
@@ -1277,22 +1277,92 @@ contract Vault is IVault {
         uint256 maxLoss,
         address[] memory strategiesParam
     ) internal view returns (uint256) {
-        // Get the max amount for the owner if fully liquid.
-        uint256 maxAssets = _convertToAssets(balanceOf_[owner], Rounding.ROUND_DOWN);
+        MaxWithdrawVars memory vars;
 
-        // If there is a withdraw limit module use that.
-        if (withdrawLimitModule != address(0)) {
-            return _getWithdrawLimitFromModule(owner, maxAssets, maxLoss, strategiesParam);
+        // Get the max amount for the owner if fully liquid
+        vars.maxAssets = _convertToAssets(balanceOf_[owner], Rounding.ROUND_DOWN);
+
+        // If there is a withdraw limit module use that
+        address _withdrawLimitModule = withdrawLimitModule;
+        if (_withdrawLimitModule != address(0)) {
+            return
+                Math.min(
+                    IWithdrawLimitModule(_withdrawLimitModule).availableWithdrawLimit(owner, maxLoss, strategiesParam),
+                    vars.maxAssets
+                );
         }
 
-        // See if we have enough idle to service the withdraw.
-        uint256 currentIdle = totalIdle_;
-        if (maxAssets <= currentIdle) {
-            return maxAssets;
+        // See if we have enough idle to service the withdraw
+        vars.currentIdle = totalIdle_;
+        if (vars.maxAssets > vars.currentIdle) {
+            // Track how much we can pull
+            vars.have = vars.currentIdle;
+            vars.loss = 0;
+
+            // Determine which strategy queue to use
+            vars.withdrawalStrategies = strategiesParam.length != 0 && !useDefaultQueue
+                ? strategiesParam
+                : defaultQueue;
+
+            // Process each strategy in the queue
+            for (uint256 i = 0; i < vars.withdrawalStrategies.length; i++) {
+                address strategy = vars.withdrawalStrategies[i];
+                require(_strategies[strategy].activation != 0, "inactive strategy");
+
+                uint256 currentDebt = _strategies[strategy].currentDebt;
+                // Get the maximum amount the vault would withdraw from the strategy
+                uint256 toWithdraw = Math.min(vars.maxAssets - vars.have, currentDebt);
+
+                // Get any unrealized loss for the strategy
+                uint256 unrealizedLoss = _assessShareOfUnrealisedLosses(strategy, currentDebt, toWithdraw);
+
+                // See if any limit is enforced by the strategy
+                uint256 strategyLimit = IERC4626Payable(strategy).convertToAssets(
+                    IERC4626Payable(strategy).maxRedeem(address(this))
+                );
+
+                // Adjust accordingly if there is a max withdraw limit
+                uint256 realizableWithdraw = toWithdraw - unrealizedLoss;
+                if (strategyLimit < realizableWithdraw) {
+                    if (unrealizedLoss != 0) {
+                        // Lower unrealized loss proportional to the limit
+                        unrealizedLoss = (unrealizedLoss * strategyLimit) / realizableWithdraw;
+                    }
+                    // Still count the unrealized loss as withdrawable
+                    toWithdraw = strategyLimit + unrealizedLoss;
+                }
+
+                // If 0 move on to the next strategy
+                if (toWithdraw == 0) {
+                    continue;
+                }
+
+                // If there would be a loss with a non-maximum `maxLoss` value
+                if (unrealizedLoss > 0 && maxLoss < MAX_BPS) {
+                    // Check if the loss is greater than the allowed range
+                    if (vars.loss + unrealizedLoss > ((vars.have + toWithdraw) * maxLoss) / MAX_BPS) {
+                        // If so use the amounts up till now
+                        break;
+                    }
+                }
+
+                // Add to what we can pull
+                vars.have += toWithdraw;
+
+                // If we have all we need break
+                if (vars.have >= vars.maxAssets) {
+                    break;
+                }
+
+                // Add any unrealized loss to the total
+                vars.loss += unrealizedLoss;
+            }
+
+            // Update the max after going through the queue
+            vars.maxAssets = vars.have;
         }
 
-        // Calculate available assets from strategies
-        return _getMaxWithdrawFromStrategies(maxAssets, currentIdle, maxLoss, strategiesParam);
+        return vars.maxAssets;
     }
 
     /**
@@ -2357,73 +2427,6 @@ contract Vault is IVault {
                 _issueShares(protocolFeesShares, protocolFeeRecipient);
             }
         }
-    }
-
-    /**
-     * @dev Get withdrawal limit from the withdrawal limit module
-     */
-    function _getWithdrawLimitFromModule(
-        address owner,
-        uint256 maxAssets,
-        uint256 maxLoss,
-        address[] memory strategiesParam
-    ) internal view returns (uint256) {
-        return
-            Math.min(
-                // Use the min between the returned value and the max.
-                // Means the limit module doesn't need to account for balances or conversions.
-                IWithdrawLimitModule(withdrawLimitModule).availableWithdrawLimit(owner, maxLoss, strategiesParam),
-                maxAssets
-            );
-    }
-
-    /**
-     * @dev See if we have enough idle to service the withdraw.
-     * Calculate available assets from strategies if needed.
-     */
-    function _getMaxWithdrawFromStrategies(
-        uint256 maxAssets,
-        uint256 currentIdle,
-        uint256 maxLoss,
-        address[] memory strategiesParam
-    ) internal view returns (uint256) {
-        // Track how much we can pull.
-        uint256 have = currentIdle;
-        uint256 loss = 0;
-
-        // Determine which strategy queue to use
-        address[] memory _strategiesArray = _getStrategyQueue(strategiesParam);
-
-        // Process each strategy in the queue
-        for (uint256 i = 0; i < _strategiesArray.length; i++) {
-            address strategyAddress = _strategiesArray[i];
-            require(_strategies[strategyAddress].activation != 0, "inactive strategy");
-
-            // Calculate how much can be withdrawn from this strategy
-            (uint256 withdrawable, uint256 unrealizedLoss) = _calculateStrategyWithdrawal(
-                strategyAddress,
-                maxAssets - have,
-                have,
-                maxLoss,
-                loss
-            );
-
-            // If we can't withdraw anything, continue to next strategy
-            if (withdrawable == 0) {
-                continue;
-            }
-
-            // Add to what we can withdraw
-            have += withdrawable;
-            loss += unrealizedLoss;
-
-            // If we have enough, break the loop
-            if (have >= maxAssets) {
-                break;
-            }
-        }
-
-        return have;
     }
 
     /**

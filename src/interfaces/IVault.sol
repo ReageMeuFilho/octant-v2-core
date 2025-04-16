@@ -60,6 +60,17 @@ interface IVault {
     //////////////////////////////////////////////////////////////*/
 
     /**
+     * @notice Variables for the maxWithdraw function.
+     */
+    struct MaxWithdrawVars {
+        uint256 maxAssets;
+        uint256 currentIdle;
+        uint256 have;
+        uint256 loss;
+        address[] withdrawalStrategies;
+    }
+
+    /**
      * @notice Variables for the processReport function.
      */
     struct ProcessReportVars {
