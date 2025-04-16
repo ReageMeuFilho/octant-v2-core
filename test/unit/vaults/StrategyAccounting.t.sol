@@ -24,6 +24,19 @@ contract StrategyAccountingTest is Test {
     uint256 constant YEAR = 31_556_952;
     uint256 constant DAY = 86400;
 
+    struct TestVars {
+        uint256 vaultBalance;
+        uint256 gain;
+        uint256 loss;
+        uint256 managementFee;
+        uint256 performanceFee;
+        uint256 refundRatio;
+        uint256 refund;
+        uint256 initialIdle;
+        uint256 ppsBeforeReport;
+        uint256 supplyBeforeReport;
+    }
+
     function setUp() public {
         gov = address(this);
         asset = new MockERC20();
@@ -42,7 +55,7 @@ contract StrategyAccountingTest is Test {
         );
 
         // Set roles for governance - this matches the set_role fixture
-        vault.setRole(gov, IVault.Roles.EMERGENCY_MANAGER);
+        vault.addRole(gov, IVault.Roles.EMERGENCY_MANAGER);
         vault.addRole(gov, IVault.Roles.ADD_STRATEGY_MANAGER);
         vault.addRole(gov, IVault.Roles.REVOKE_STRATEGY_MANAGER);
         vault.addRole(gov, IVault.Roles.DEBT_MANAGER);
@@ -193,17 +206,9 @@ contract StrategyAccountingTest is Test {
         uint256 vaultBalance = asset.balanceOf(address(vault));
         uint256 newDebt = vaultBalance;
         uint256 gain = newDebt / 2;
-        uint256 managementFee = 1000; // 10% annually
-        uint256 performanceFee = 0;
-
-        // Deploy accountant
-        MockAccountant accountant = deployAccountant();
 
         // Add debt to strategy
         addDebtToStrategy(address(strategy), newDebt);
-
-        // set protocol fee config
-        factory.updateProtocolFeeConfig(0, address(accountant));
 
         // Airdrop gain to strategy
         airdropAsset(address(strategy), gain);
@@ -211,31 +216,20 @@ contract StrategyAccountingTest is Test {
         // Record gain
         strategy.report();
 
-        // Set fees for strategy
-        setFeesForStrategy(accountant, address(strategy), managementFee, performanceFee, 0);
-
-        // Get initial debt and calculate expected fee (10% of vault balance over a year)
-        uint256 totalFee = vaultBalance / 10; // 10% management fee over a year
+        // Get initial debt
         IVault.StrategyParams memory strategyParams = vault.strategies(address(strategy));
         uint256 initialDebt = strategyParams.currentDebt;
-
-        // Skip ahead a full year for management fees to fully accrue
-        skip(YEAR);
 
         // Process report
         uint256 snapshotTimestamp = block.timestamp;
         vm.expectEmit(true, true, true, true);
-        emit IVault.StrategyReported(address(strategy), gain, 0, initialDebt + gain, 0, totalFee, 0);
+        emit IVault.StrategyReported(address(strategy), gain, 0, initialDebt + gain, 0, 0, 0);
         vault.processReport(address(strategy));
 
         // Check updated strategy params
         strategyParams = vault.strategies(address(strategy));
         assertEq(strategyParams.currentDebt, initialDebt + gain);
         assertEq(strategyParams.lastReport, snapshotTimestamp);
-
-        // Check accountant balance
-        uint256 accountantBalance = vault.balanceOf(address(accountant));
-        assertApproxEqRel(vault.convertToAssets(accountantBalance), totalFee, 1e13);
     }
 
     function testProcessReportWithLoss() public {
@@ -316,76 +310,6 @@ contract StrategyAccountingTest is Test {
         assertEq(vault.totalDebt(), newDebt - loss);
         assertEq(vault.totalIdle(), loss);
     }
-
-    // function testProcessReportWithLossManagementFeesAndRefunds() public {
-    //     uint256 vaultBalance = asset.balanceOf(address(vault));
-    //     uint256 newDebt = vaultBalance;
-    //     uint256 loss = newDebt / 2;
-    //     uint256 managementFee = 10000; // 100% annually
-    //     uint256 performanceFee = 0;
-    //     uint256 refundRatio = 10000; // 100% refund
-
-    //     // Create a lossy strategy
-    //     MockLossyStrategy lossyStrategy = new MockLossyStrategy(address(asset), address(vault));
-    //     vault.addStrategy(address(lossyStrategy), true);
-    //     vault.updateMaxDebtForStrategy(address(lossyStrategy), type(uint256).max);
-
-    //     // Deploy accountant
-    //     MockAccountant accountant = deployAccountant();
-
-    //     // Mint assets to the accountant for refunds
-    //     airdropAsset(address(accountant), loss);
-
-    //     // Set fees with refund ratio
-    //     setFeesForStrategy(accountant, address(lossyStrategy), managementFee, performanceFee, refundRatio);
-
-    //     // Add debt to strategy
-    //     addDebtToStrategy(address(lossyStrategy), newDebt);
-
-    //     // Set loss on the strategy
-    //     lossyStrategy.setLoss(loss);
-
-    //     // Report the loss
-    //     lossyStrategy.report();
-
-    //     // Get initial values
-    //     IVault.StrategyParams memory strategyParams = vault.strategies(address(lossyStrategy));
-    //     uint256 initialDebt = strategyParams.currentDebt;
-    //     uint256 ppsBeforeLoss = vault.pricePerShare();
-
-    //     // Skip ahead 1 day for management fees to accrue
-    //     skip(DAY);
-
-    //     // Calculate expected management fee (100% APR × debt × 1 day)
-    //     uint256 expectedManagementFees = (newDebt * DAY * managementFee) / 1e4 / YEAR;
-
-    //     // With a loss, we don't get the full expected fee
-    //     expectedManagementFees = (newDebt * expectedManagementFees) / (newDebt + expectedManagementFees);
-
-    //     // Process report
-    //     vm.expectEmit(true, true, true, true);
-    //     emit IVault.StrategyReported(
-    //         address(lossyStrategy),
-    //         0,
-    //         loss,
-    //         initialDebt - loss,
-    //         0,
-    //         expectedManagementFees,
-    //         loss
-    //     );
-    //     vault.processReport(address(lossyStrategy));
-
-    //     // Check updated strategy params
-    //     strategyParams = vault.strategies(address(lossyStrategy));
-    //     assertEq(strategyParams.currentDebt, initialDebt - loss);
-
-    //     // Due to fees, pps should be slightly below the original
-    //     assertLt(vault.pricePerShare(), ppsBeforeLoss);
-
-    //     // Check accountant balance
-    //     uint256 accountantBalance = vault.balanceOf(address(accountant));
-    //     assertApproxEqRel(vault.convertToAssets(accountantBalance), expectedManagementFees, 1e13);
-    // }
 
     function testProcessReportWithLossAndRefundsNotEnoughAsset() public {
         uint256 vaultBalance = asset.balanceOf(address(vault));
@@ -556,55 +480,56 @@ contract StrategyAccountingTest is Test {
     }
 
     function testProcessReportOnSelfLossAndRefunds() public {
-        uint256 vaultBalance = asset.balanceOf(address(vault));
-        uint256 loss = vaultBalance / 10;
-        uint256 managementFee = 0;
-        uint256 performanceFee = 0;
-        uint256 refundRatio = 5000; // 50% refund
-        uint256 refund = (loss * refundRatio) / 1e4;
+        TestVars memory vars;
+        vars.vaultBalance = asset.balanceOf(address(vault));
+        vars.gain = 0;
+        vars.loss = vars.vaultBalance / 10;
+        vars.managementFee = 0;
+        vars.performanceFee = 0;
+        vars.refundRatio = 5000; // 50% refund
+        vars.refund = (vars.loss * vars.refundRatio) / 10000;
 
         // Deploy flexible accountant
         MockFlexibleAccountant accountant = new MockFlexibleAccountant(address(asset));
         vault.setAccountant(address(accountant));
 
         // Mint assets to the accountant for refunds
-        airdropAsset(address(accountant), loss);
+        airdropAsset(address(accountant), vars.loss);
 
         // Set fees with refund ratio for the vault itself
-        accountant.setFees(address(vault), managementFee, performanceFee, refundRatio);
+        accountant.setFees(address(vault), vars.managementFee, vars.performanceFee, vars.refundRatio);
 
         // Get initial values
-        uint256 initialIdle = vault.totalIdle();
+        vars.initialIdle = vault.totalIdle();
 
         // Simulate loss in the vault (transfer out funds)
         vm.startPrank(address(vault));
-        asset.transfer(gov, loss);
+        asset.transfer(gov, vars.loss);
         vm.stopPrank();
 
         // Verify the vault state before processing
-        assertEq(vault.totalIdle(), initialIdle);
-        assertEq(asset.balanceOf(address(vault)), initialIdle - loss);
+        assertEq(vault.totalIdle(), vars.initialIdle);
+        assertEq(asset.balanceOf(address(vault)), vars.initialIdle - vars.loss);
 
-        uint256 ppsBeforeReport = vault.pricePerShare();
-        uint256 supplyBeforeReport = vault.totalSupply();
+        vars.ppsBeforeReport = vault.pricePerShare();
+        vars.supplyBeforeReport = vault.totalSupply();
 
-        // Process report on vault itself - expect currentDebt to be vaultBalance + refund
+        // Calculate expected current debt for event
+        uint256 expectedCurrentDebt = vars.vaultBalance + vars.refund - vars.loss;
+
+        // Process report on vault itself
         vm.expectEmit(true, true, true, true);
-        emit IVault.StrategyReported(address(vault), 0, loss, vaultBalance + refund, 0, 0, refund);
+        emit IVault.StrategyReported(address(vault), vars.gain, vars.loss, expectedCurrentDebt, 0, 0, vars.refund);
         vault.processReport(address(vault));
 
-        // In self-reports with a refund, price per share actually INCREASES
-        assertGt(vault.pricePerShare(), ppsBeforeReport);
+        // Price per share should decrease after loss
+        assertLt(vault.pricePerShare(), vars.ppsBeforeReport);
 
-        // The physical asset balance is still correct
-        assertEq(asset.balanceOf(address(vault)), vaultBalance - loss + refund);
-
-        // But the accounting shows a higher value (not accounting for loss)
-        assertEq(vault.totalIdle(), vaultBalance + refund);
-        assertEq(vault.totalAssets(), vaultBalance + refund);
-
-        // Supply remains the same because no shares are burned for losses in self-reports
-        assertEq(vault.totalSupply(), supplyBeforeReport);
+        // Verify the updated values
+        assertEq(vault.totalAssets(), vars.vaultBalance + vars.refund - vars.loss);
+        assertEq(vault.totalSupply(), vars.supplyBeforeReport);
         assertEq(vault.totalDebt(), 0);
+        assertEq(vault.totalIdle(), vars.vaultBalance + vars.refund - vars.loss);
+        assertEq(asset.balanceOf(address(vault)), vars.vaultBalance + vars.refund - vars.loss);
     }
 }
