@@ -71,13 +71,12 @@ contract MockYieldStrategy is ERC20, IERC4626Payable {
         return (shares * totalAssets()) / supply;
     }
 
-    function maxDeposit(address receiver) public view override returns (uint256) {
+    function maxDeposit(address receiver) public view virtual override returns (uint256) {
         if (receiver != vault || !allowDeposits) {
             return 0;
         }
         return maxDebtLimit;
     }
-
     function maxMint(address receiver) public view override returns (uint256) {
         return convertToShares(maxDeposit(receiver));
     }
