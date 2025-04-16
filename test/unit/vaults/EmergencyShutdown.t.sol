@@ -36,7 +36,7 @@ contract EmergencyShutdownTest is Test {
         strategy = new MockYieldStrategy(address(asset), address(vault));
 
         // Set roles - equivalent to the fixture in the Python test
-        vault.setRole(gov, IVault.Roles.EMERGENCY_MANAGER);
+        vault.addRole(gov, IVault.Roles.EMERGENCY_MANAGER);
         vault.addRole(gov, IVault.Roles.ADD_STRATEGY_MANAGER);
         vault.addRole(gov, IVault.Roles.DEBT_MANAGER);
         vault.addRole(gov, IVault.Roles.MAX_DEBT_MANAGER);
@@ -59,7 +59,7 @@ contract EmergencyShutdownTest is Test {
 
     function testShutdownGivesDebtManagerRole() public {
         // Set panda as EMERGENCY_MANAGER only
-        vault.setRole(panda, IVault.Roles.EMERGENCY_MANAGER);
+        vault.setRole(panda, 1 << uint256(IVault.Roles.EMERGENCY_MANAGER));
 
         // Verify panda doesn't have DEBT_MANAGER initially
         assertTrue((vault.roles(panda) & (1 << uint256(IVault.Roles.DEBT_MANAGER))) == 0);
