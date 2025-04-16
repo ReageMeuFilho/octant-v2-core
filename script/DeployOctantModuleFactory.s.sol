@@ -3,14 +3,13 @@ pragma solidity ^0.8.0;
 
 import { ModuleProxyFactory } from "../src/dragons/ModuleProxyFactory.sol";
 import { OctantRewardsSafe } from "../src/dragons/modules/OctantRewardsSafe.sol";
+import { SplitChecker } from "../src/dragons/SplitChecker.sol";
+import { DragonRouter } from "../src/dragons/DragonRouter.sol";
 import "forge-std/Script.sol";
 
 contract DeployOctantModuleFactory is Script {
-    address public governance = 0x0000000000000000000000000000000000000001;
-    address public regenGovernance = 0x0000000000000000000000000000000000000001;
-    address public splitChecker = 0x0000000000000000000000000000000000000001;
-    address public metapool = 0x0000000000000000000000000000000000000001;
-    address public dragonRouterImplementation = 0x0000000000000000000000000000000000000001;
+    address public splitCheckerImplementation = address(new SplitChecker());
+    address public dragonRouterImplementation = address(new DragonRouter());
 
     function setUp() public {}
 
@@ -18,10 +17,10 @@ contract DeployOctantModuleFactory is Script {
         vm.startBroadcast();
 
         ModuleProxyFactory factory = new ModuleProxyFactory(
-            governance,
-            regenGovernance,
-            splitChecker,
-            metapool,
+            msg.sender,
+            msg.sender,
+            msg.sender,
+            splitCheckerImplementation,
             dragonRouterImplementation
         );
 

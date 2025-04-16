@@ -294,11 +294,9 @@ contract SetupIntegrationTest is Test, TestPlus {
 
         // Prepare initialization parameters for router
         address[] memory _strategies = new address[](0); // Empty array for initial setup
-        address[] memory _assets = new address[](0); // Empty array for initial setup
 
         bytes memory routerParams = abi.encode(
             _strategies, // strategy array
-            _assets, // asset array
             deployer, // governance
             deployer, // regen_governance
             address(splitCheckerProxy), // splitChecker
@@ -326,16 +324,16 @@ contract SetupIntegrationTest is Test, TestPlus {
 
     // Modified implementation that skips broadcasting
     function _deployModuleProxyFactory() internal {
-        address governance = 0x0000000000000000000000000000000000000001;
-        address regenGovernance = 0x0000000000000000000000000000000000000001;
-        address splitChecker = 0x0000000000000000000000000000000000000001;
-        address metapool = 0x0000000000000000000000000000000000000001;
-        address dragonRouterImplementation = 0x0000000000000000000000000000000000000001;
+        address governance = msg.sender;
+        address regenGovernance = msg.sender;
+        address splitCheckerImplementation = address(new SplitChecker());
+        address metapool = msg.sender;
+        address dragonRouterImplementation = address(new DragonRouter());
         moduleProxyFactory = new ModuleProxyFactory(
             governance,
             regenGovernance,
-            splitChecker,
             metapool,
+            splitCheckerImplementation,
             dragonRouterImplementation
         );
     }

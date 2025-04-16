@@ -4,6 +4,8 @@ pragma solidity ^0.8.0;
 import "forge-std/Test.sol";
 import { TestPlus } from "lib/solady/test/utils/TestPlus.sol";
 import { ModuleProxyFactory } from "src/dragons/ModuleProxyFactory.sol";
+import { SplitChecker } from "src/dragons/SplitChecker.sol";
+import { DragonRouter } from "src/dragons/DragonRouter.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
 import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
@@ -46,16 +48,16 @@ contract BaseTest is Test, TestPlus {
         }
 
         // deploy module proxy factory and test erc20 asset
-        address governance = 0x0000000000000000000000000000000000000001;
-        address regenGovernance = 0x0000000000000000000000000000000000000001;
-        address splitChecker = 0x0000000000000000000000000000000000000001;
-        address metapool = 0x0000000000000000000000000000000000000001;
-        address dragonRouterImplementation = 0x0000000000000000000000000000000000000001;
+        address governance = msg.sender;
+        address regenGovernance = msg.sender;
+        address metapool = msg.sender;
+        address splitCheckerImplementation = address(new SplitChecker());
+        address dragonRouterImplementation = address(new DragonRouter());
         moduleFactory = new ModuleProxyFactory(
             governance,
             regenGovernance,
-            splitChecker,
             metapool,
+            splitCheckerImplementation,
             dragonRouterImplementation
         );
 

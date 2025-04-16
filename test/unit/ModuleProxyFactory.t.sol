@@ -9,7 +9,7 @@ import { ISplitChecker } from "src/interfaces/ISplitChecker.sol";
 contract ModuleProxyFactoryTest is BaseTest {
     ModuleProxyFactory public factory;
     address public owner = makeAddr("owner");
-    address public splitChecker = makeAddr("splitChecker");
+    address public splitChecker = address(new SplitChecker());
     address public dragonRouter = address(new DragonRouter());
     address public governance = makeAddr("governance");
     address public regenGovernance = makeAddr("regenGovernance");
@@ -18,7 +18,7 @@ contract ModuleProxyFactoryTest is BaseTest {
     address[] public strategies;
 
     function setUp() public {
-        factory = new ModuleProxyFactory(governance, regenGovernance, splitChecker, metapool, dragonRouter);
+        factory = new ModuleProxyFactory(governance, regenGovernance, metapool, splitChecker, dragonRouter);
     }
 
     function setupFailsWithZeroGovernance() public {
