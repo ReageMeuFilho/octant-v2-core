@@ -10,7 +10,7 @@ import { MockSafe } from "../../mocks/MockSafe.sol";
 import { MockLinearAllowance } from "../../mocks/MockLinearAllowance.sol";
 import { MockSafeDragonRouter } from "../../mocks/MockSafeDragonRouter.sol";
 import { MultiSend } from "src/libraries/Safe/MultiSend.sol";
-import { MockSplitChecker } from "../../mocks/MockSplitChecker.sol";
+import { SplitChecker } from "src/dragons/SplitChecker.sol";
 
 contract ModuleProxyFactoryTest is Test {
     ModuleProxyFactory public moduleProxyFactory;
@@ -20,6 +20,7 @@ contract ModuleProxyFactoryTest is Test {
     address public linearAllowanceImpl;
     MultiSend public multiSend;
     MockSafe public safe;
+    address public governance;
 
     function setUp() public {
         moduleProxyFactory = new ModuleProxyFactory();
@@ -32,8 +33,11 @@ contract ModuleProxyFactoryTest is Test {
         // Create mock Safe
         safe = new MockSafe();
 
+        // Setup governance address
+        governance = address(this);
+
         // Deploy implementations
-        splitCheckerImpl = address(new MockSplitChecker());
+        splitCheckerImpl = address(new SplitChecker());
         dragonRouterImpl = address(new MockSafeDragonRouter(address(0)));
         linearAllowanceImpl = address(new MockLinearAllowance());
     }
@@ -82,8 +86,13 @@ contract ModuleProxyFactoryTest is Test {
     }
 
     function testMultiSendBatchDeployment() public {
-        // Setup deployment data
-        bytes memory splitCheckerInit = abi.encodeWithSignature("setUp()");
+        // Setup SplitChecker deployment data with proper initialization parameters
+        bytes memory splitCheckerInit = abi.encodeWithSignature(
+            "initialize(address,uint256,uint256)",
+            governance,
+            0.5e18, // 50% max opex
+            0.05e18 // 5% min metapool
+        );
         uint256 splitCheckerSalt = 100;
 
         // Calculate predicted addresses
@@ -133,6 +142,15 @@ contract ModuleProxyFactoryTest is Test {
         assertTrue(predictedSplitChecker.code.length > 0, "SplitChecker not deployed");
         assertTrue(predictedDragonRouter.code.length > 0, "DragonRouter not deployed");
         assertTrue(safe.modules(linearAllowanceImpl), "LinearAllowance module not enabled");
+
+        // Verify SplitChecker initialization
+        assertEq(
+            SplitChecker(predictedSplitChecker).governance(),
+            governance,
+            "SplitChecker governance not set correctly"
+        );
+
+        // Verify DragonRouter initialization with SplitChecker
         assertEq(
             MockSafeDragonRouter(predictedDragonRouter).splitChecker(),
             predictedSplitChecker,
