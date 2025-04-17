@@ -131,6 +131,29 @@ interface IVault {
     }
 
     /**
+     * @notice Variables for the updateDebt function.
+     */
+    struct UpdateDebtVars {
+        uint256 newDebt; // Target debt we want the strategy to have
+        uint256 currentDebt; // Current debt the strategy has
+        uint256 assetsToWithdraw; // Amount to withdraw when decreasing debt
+        uint256 assetsToDeposit; // Amount to deposit when increasing debt
+        uint256 minimumTotalIdle; // Minimum amount to keep in vault
+        uint256 totalIdle; // Current amount in vault
+        uint256 availableIdle; // Amount available for deposits
+        uint256 maxDebt; // Maximum debt for the strategy
+        uint256 maxDepositAmount; // Maximum amount strategy can accept
+        uint256 maxRedeemAmount; // Maximum amount strategy can redeem
+        uint256 withdrawable; // Amount that can be withdrawn
+        uint256 preBalance; // Balance before operation
+        uint256 postBalance; // Balance after operation
+        uint256 actualAmount; // Actual amount moved
+        bool isDebtDecrease; // Whether debt is being decreased
+        address _asset; // Cached asset address
+        uint256 unrealisedLossesShare; // Any unrealized losses
+    }
+
+    /**
      * @notice State for a withdrawal operation.
      * @param requestedAssets The requested assets to withdraw.
      * @param currentTotalIdle The current total idle of the vault.
