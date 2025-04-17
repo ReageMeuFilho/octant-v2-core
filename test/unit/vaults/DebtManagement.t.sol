@@ -45,7 +45,7 @@ contract DebtManagementTest is Test {
         lossyStrategy = new MockYieldStrategy(address(asset), address(vault));
 
         // Set roles
-        vault.setRole(gov, IVault.Roles.ADD_STRATEGY_MANAGER);
+        vault.addRole(gov, IVault.Roles.ADD_STRATEGY_MANAGER);
         vault.addRole(gov, IVault.Roles.REVOKE_STRATEGY_MANAGER);
         vault.addRole(gov, IVault.Roles.DEBT_MANAGER);
         vault.addRole(gov, IVault.Roles.MAX_DEBT_MANAGER);
