@@ -1,5 +1,4 @@
 {
-  "plugins": ["prettier-plugin-solidity"],
   "arrowParens": "avoid",
   "bracketSpacing": true,
   "endOfLine": "auto",
