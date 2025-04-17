@@ -64,13 +64,12 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
 
         (
             address[] memory _strategy,
-            address[] memory _asset,
             address _governance,
             address _regen_governance,
             address _splitChecker,
             address _opexVault,
             address _metapool
-        ) = abi.decode(data, (address[], address[], address, address, address, address, address));
+        ) = abi.decode(data, (address[], address, address, address, address, address));
 
         __AccessControl_init();
         __ReentrancyGuard_init();
@@ -80,7 +79,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
         _setOpexVault(_opexVault);
 
         for (uint256 i = 0; i < _strategy.length; i++) {
-            strategyData[_strategy[i]].asset = _asset[i];
+            strategyData[_strategy[i]].asset = ITokenizedStrategy(_strategy[i]).asset();
             strategyData[_strategy[i]].totalShares = SPLIT_PRECISION;
             userData[_metapool][_strategy[i]].splitPerShare = SPLIT_PRECISION;
         }
