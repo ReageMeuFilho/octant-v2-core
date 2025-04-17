@@ -1,35 +1,28 @@
-/* solhint-disable compiler-version, gas-custom-errors */
 // SPDX-License-Identifier: LGPL-3.0-only
-pragma solidity >=0.7.0 <0.9.0;
+pragma solidity >=0.8.0 <0.9.0;
 
 /**
- * @title Multi Send - Allows to batch multiple transactions into one.
- * @author Nick Dodson - <nick.dodson@consensys.net>
- * @author Gonçalo Sá - <goncalo.sa@consensys.net>
+ * @title Multi Send Call Only - Allows to batch multiple transactions into one, but only calls
+ * @notice The guard logic is not required here as this contract doesn't support nested delegate calls
  * @author Stefan George - @Georgi87
  * @author Richard Meissner - @rmeissner
  */
-contract MultiSend {
-    address private immutable MULTISEND_SINGLETON;
-
-    constructor() {
-        MULTISEND_SINGLETON = address(this);
-    }
-
+contract MultiSendCallOnly {
     /**
      * @dev Sends multiple transactions and reverts all if one fails.
      * @param transactions Encoded transactions. Each transaction is encoded as a packed bytes of
-     *                     operation as a uint8 with 0 for a call or 1 for a delegatecall (=> 1 byte),
+     *                     operation has to be uint8(0) in this version (=> 1 byte),
      *                     to as a address (=> 20 bytes),
      *                     value as a uint256 (=> 32 bytes),
      *                     data length as a uint256 (=> 32 bytes),
      *                     data as bytes.
      *                     see abi.encodePacked for more information on packed encoding
+     * @notice The code is for the most part the same as the normal MultiSend (to keep compatibility),
+     *         but reverts if a transaction tries to use a delegatecall.
      * @notice This method is payable as delegatecalls keep the msg.value from the previous call
      *         If the calling method (e.g. execTransaction) received ETH this would revert otherwise
      */
     function multiSend(bytes memory transactions) public payable {
-        require(address(this) != MULTISEND_SINGLETON, "MultiSend should only be called via delegatecall");
         /* solhint-disable no-inline-assembly */
         /// @solidity memory-safe-assembly
         assembly {
@@ -41,7 +34,7 @@ contract MultiSend {
                 // Post block is not used in "while mode"
             } {
                 // First byte of the data is the operation.
-                // We shift by 248 bits (256 - 8 [operation byte]) right, since mload will always load 32 bytes (a word).
+                // We shift by 248 bits (256 - 8 [operation byte]) it right since mload will always load 32 bytes (a word).
                 // This will also zero out unused data.
                 let operation := shr(0xf8, mload(add(transactions, i)))
                 // We offset the load address by 1 byte (operation byte)
@@ -60,8 +53,9 @@ contract MultiSend {
                 case 0 {
                     success := call(gas(), to, value, data, dataLength, 0, 0)
                 }
+                // This version does not allow delegatecalls
                 case 1 {
-                    success := delegatecall(gas(), to, data, dataLength, 0, 0)
+                    revert(0, 0)
                 }
                 if iszero(success) {
                     let ptr := mload(0x40)
@@ -72,6 +66,5 @@ contract MultiSend {
                 i := add(i, add(0x55, dataLength))
             }
         }
-        /* solhint-enable no-inline-assembly */
     }
 }
