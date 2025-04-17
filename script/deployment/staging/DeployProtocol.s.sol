@@ -40,11 +40,11 @@ contract DeployProtocol is Script {
 
     function setUp() public {
         // Initialize deployment scripts
-        deployModuleProxyFactory = new DeployModuleProxyFactory();
+        deployModuleProxyFactory = new DeployModuleProxyFactory(msg.sender, msg.sender, msg.sender);
         deployLinearAllowanceSingletonForGnosisSafe = new DeployLinearAllowanceSingletonForGnosisSafe();
         deployDragonTokenizedStrategy = new DeployDragonTokenizedStrategy();
         deployDragonRouter = new DeployDragonRouter();
-        deployMockStrategy = new DeployMockStrategy();
+        deployMockStrategy = new DeployMockStrategy(msg.sender, msg.sender, msg.sender);
         deployHatsProtocol = new DeployHatsProtocol();
     }
 

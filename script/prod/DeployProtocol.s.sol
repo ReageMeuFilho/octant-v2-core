@@ -8,6 +8,7 @@ import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxy.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
 import { DragonTokenizedStrategy } from "src/dragons/vaults/DragonTokenizedStrategy.sol";
 import { ModuleProxyFactory } from "src/dragons/ModuleProxyFactory.sol";
+import { SplitChecker } from "src/dragons/SplitChecker.sol";
 
 import { DeploySafe } from "script/deploy/DeploySafe.sol";
 import { DeployDragonRouter } from "script/deploy/DeployDragonRouter.sol";
@@ -38,6 +39,7 @@ contract DeployProtocol is Script {
     DeployMockStrategy public deployMockStrategy;
     ModuleProxyFactory public moduleProxyFactory;
     DragonTokenizedStrategy public dragonTokenizedStrategySingleton;
+    SplitChecker public splitCheckerSingleton;
 
     // Deployed contract addresses
     address public safeAddress;
@@ -52,11 +54,11 @@ contract DeployProtocol is Script {
     function setUp() public {
         // Initialize deployment scripts
         deploySafe = new DeploySafe();
-        deployModuleProxyFactory = new DeployModuleProxyFactory();
+        deployModuleProxyFactory = new DeployModuleProxyFactory(msg.sender, msg.sender, msg.sender);
         deployDragonTokenizedStrategy = new DeployDragonTokenizedStrategy();
         deployDragonRouter = new DeployDragonRouter();
         deployHatsProtocol = new DeployHatsProtocol();
-        deployMockStrategy = new DeployMockStrategy();
+        deployMockStrategy = new DeployMockStrategy(msg.sender, msg.sender, msg.sender);
     }
 
     function run() public {
@@ -85,12 +87,9 @@ contract DeployProtocol is Script {
         );
 
         // Deploy new Safe via factory
+        uint256 salt = block.timestamp; // Use timestamp as salt
         SafeProxyFactory factory = SafeProxyFactory(SAFE_PROXY_FACTORY);
-        SafeProxy proxy = factory.createProxyWithNonce(
-            SAFE_SINGLETON,
-            initializer,
-            block.timestamp // Use timestamp as salt
-        );
+        SafeProxy proxy = factory.createProxyWithNonce(SAFE_SINGLETON, initializer, salt);
 
         // Store deployed Safe
         safeAddress = address(proxy);
@@ -101,14 +100,28 @@ contract DeployProtocol is Script {
 
         if (safeAddress == address(0)) revert DeploymentFailed();
 
-        // 2. Deploy Module Proxy Factory
-        moduleProxyFactory = new ModuleProxyFactory();
-        moduleProxyFactoryAddress = address(moduleProxyFactory);
-        if (moduleProxyFactoryAddress == address(0)) revert DeploymentFailed();
-
         // 4. Deploy Dragon Tokenized Strategy Implementation
 
         dragonTokenizedStrategySingleton = new DragonTokenizedStrategy();
+        salt += 1;
+        SafeProxy governance = factory.createProxyWithNonce(SAFE_SINGLETON, initializer, salt);
+        salt += 1;
+        SafeProxy regenGovernance = factory.createProxyWithNonce(SAFE_SINGLETON, initializer, salt);
+        salt += 1;
+        SafeProxy metapool = factory.createProxyWithNonce(SAFE_SINGLETON, initializer, salt);
+
+        splitCheckerSingleton = new SplitChecker();
+
+        // Deploy Module Proxy Factory
+        moduleProxyFactory = new ModuleProxyFactory(
+            address(governance),
+            address(regenGovernance),
+            address(metapool),
+            address(splitCheckerSingleton),
+            address(dragonTokenizedStrategySingleton)
+        );
+        moduleProxyFactoryAddress = address(moduleProxyFactory);
+        if (moduleProxyFactoryAddress == address(0)) revert DeploymentFailed();
 
         vm.stopBroadcast();
 

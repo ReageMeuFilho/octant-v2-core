@@ -3,7 +3,6 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 import { TestPlus } from "lib/solady/test/utils/TestPlus.sol";
-import { ModuleProxyFactory } from "src/dragons/ModuleProxyFactory.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
 import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
