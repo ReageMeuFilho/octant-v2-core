@@ -1697,7 +1697,6 @@ contract Vault is IVault {
         if (vars.gain + vars.totalRefunds > 0 && vars.profitMaxUnlockTime != 0) {
             vars.sharesToLock = _convertToShares(vars.gain + vars.totalRefunds, Rounding.ROUND_DOWN);
         }
-        }
 
         // The total current supply including locked shares
         vars.totalSupply = _totalSupply();
