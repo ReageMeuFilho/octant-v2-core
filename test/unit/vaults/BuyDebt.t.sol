@@ -36,7 +36,7 @@ contract BuyDebtTest is Test {
         strategy = new MockYieldStrategy(address(asset), address(vault));
 
         // Set roles - equivalent to the fixture in the Python test
-        vault.setRole(gov, IVault.Roles.ADD_STRATEGY_MANAGER);
+        vault.addRole(gov, IVault.Roles.ADD_STRATEGY_MANAGER);
         vault.addRole(gov, IVault.Roles.REVOKE_STRATEGY_MANAGER);
         vault.addRole(gov, IVault.Roles.DEBT_MANAGER);
         vault.addRole(gov, IVault.Roles.MAX_DEBT_MANAGER);
@@ -150,9 +150,14 @@ contract BuyDebtTest is Test {
         uint256 beforeBalance = asset.balanceOf(gov);
         uint256 beforeShares = strategy.balanceOf(gov);
 
-        // Buy full debt
-        vm.expectEmit(true, true, false, true);
+        // Expect DebtUpdated event first
+        vm.expectEmit(true, true, true, true);
+        emit IVault.DebtUpdated(address(strategy), fishAmount, 0);
+
+        // Then expect DebtPurchased event
+        vm.expectEmit(true, true, true, true);
         emit IVault.DebtPurchased(address(strategy), fishAmount);
+
         vault.buyDebt(address(strategy), fishAmount);
 
         // Check results
