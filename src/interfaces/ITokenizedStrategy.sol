@@ -65,7 +65,7 @@ interface ITokenizedStrategy is IERC4626Payable, IERC20Permit {
 
     event NewTokenizedStrategy(address indexed strategy, address indexed asset, string apiVersion);
 
-    event Reported(uint256 profit, uint256 loss, uint256 protocolFees, uint256 performanceFees);
+    event Reported(address indexed dragonRouter, uint256 profit, uint256 loss, uint256 protocolFees, uint256 performanceFees);
 
     event UpdateKeeper(address indexed newKeeper);
 

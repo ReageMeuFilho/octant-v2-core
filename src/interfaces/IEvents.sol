@@ -21,7 +21,7 @@ interface IEvents {
      * @notice Emitted when the strategy reports `profit` or `loss` and
      * `performanceFees` and `protocolFees` are paid out.
      */
-    event Reported(uint256 profit, uint256 loss, uint256 protocolFees, uint256 performanceFees);
+    event Reported(address indexed dragonRouter, uint256 profit, uint256 loss, uint256 protocolFees, uint256 performanceFees);
 
     /**
      * @notice Emitted when the 'performanceFeeRecipient' address is

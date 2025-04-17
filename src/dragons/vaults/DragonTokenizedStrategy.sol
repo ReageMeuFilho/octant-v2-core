@@ -480,6 +480,7 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
         S.lastReport = uint96(block.timestamp);
 
         emit Reported(
+            _dragonRouter,
             profit,
             loss,
             0, // Protocol fees

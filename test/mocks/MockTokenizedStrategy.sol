@@ -31,7 +31,7 @@ contract MockTokenizedStrategy {
      * @notice Emitted when the strategy reports `profit` or `loss` and
      * `performanceFees` and `protocolFees` are paid out.
      */
-    event Reported(uint256 profit, uint256 loss, uint256 protocolFees, uint256 performanceFees);
+    event Reported(address indexed dragonRouter, uint256 profit, uint256 loss, uint256 protocolFees, uint256 performanceFees);
 
     /**
      * @notice Emitted when the 'keeper' address is updated to 'newKeeper'.
@@ -837,13 +837,14 @@ contract MockTokenizedStrategy {
 
         uint256 _oldTotalAssets = S.totalAssets;
         uint256 _newTotalAssets = IBaseStrategy(address(this)).harvestAndReport();
+        address _dragonRouter = S.dragonRouter;
 
         if (address(S.asset) == ETH) {
-            (bool success, ) = S.dragonRouter.call{ value: _newTotalAssets - _oldTotalAssets }("");
+            (bool success, ) = _dragonRouter.call{ value: _newTotalAssets - _oldTotalAssets }("");
             require(success, "Transfer Failed");
         } else {
             // Transfer the amount of underlying to the receiver.
-            S.asset.safeTransfer(S.dragonRouter, _newTotalAssets - _oldTotalAssets);
+            S.asset.safeTransfer(_dragonRouter, _newTotalAssets - _oldTotalAssets);
         }
 
         S.totalAssets = _newTotalAssets;
@@ -851,6 +852,7 @@ contract MockTokenizedStrategy {
 
         // Emit event with info
         emit Reported(
+            _dragonRouter,
             _newTotalAssets - _oldTotalAssets,
             0,
             0, // Protocol fees

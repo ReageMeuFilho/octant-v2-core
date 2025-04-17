@@ -151,7 +151,7 @@ contract Setup is ExtendedTest, IEvents {
 
         // Check the event matches the expected values
         vm.expectEmit(true, true, true, true, address(_strategy));
-        emit Reported(profit, 0, _protocolFees, 0);
+        emit Reported(_strategy.dragonRouter(), profit, 0, _protocolFees, 0);
 
         vm.prank(keeper);
         (uint256 _profit, uint256 _loss) = _strategy.report();
@@ -169,7 +169,7 @@ contract Setup is ExtendedTest, IEvents {
         yieldSource.simulateLoss(loss);
         // Check the event matches the expected values
         vm.expectEmit(true, true, true, _checkFees, address(_strategy));
-        emit Reported(0, loss, _protocolFees, 0);
+        emit Reported(_strategy.dragonRouter(), 0, loss, _protocolFees, 0);
 
         vm.prank(keeper);
         (uint256 _profit, uint256 _loss) = _strategy.report();
