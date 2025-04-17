@@ -9,7 +9,7 @@ import { MockModule } from "../../mocks/MockModule.sol";
 import { MockSafe } from "../../mocks/MockSafe.sol";
 import { MockLinearAllowance } from "../../mocks/MockLinearAllowance.sol";
 import { MockSafeDragonRouter } from "../../mocks/MockSafeDragonRouter.sol";
-import { MultiSend } from "src/libraries/Safe/MultiSend.sol";
+import { MultiSendCallOnly } from "src/libraries/Safe/MultiSendCallOnly.sol";
 import { SplitChecker } from "src/dragons/SplitChecker.sol";
 
 contract ModuleProxyFactoryTest is Test {
@@ -18,7 +18,7 @@ contract ModuleProxyFactoryTest is Test {
     address public splitCheckerImpl;
     address public dragonRouterImpl;
     address public linearAllowanceImpl;
-    MultiSend public multiSend;
+    MultiSendCallOnly public multiSendCallOnly;
     MockSafe public safe;
     address public governance;
 
@@ -27,8 +27,8 @@ contract ModuleProxyFactoryTest is Test {
         // Deploy a mock module implementation
         mockModuleMaster = address(new MockModule());
 
-        // Deploy MultiSend contract
-        multiSend = new MultiSend();
+        // Deploy MultiSendCallOnly contract
+        multiSendCallOnly = new MultiSendCallOnly();
 
         // Create mock Safe
         safe = new MockSafe();
@@ -133,8 +133,8 @@ contract ModuleProxyFactoryTest is Test {
         bytes memory batchData = bytes.concat(tx1, tx2, tx3);
 
         bool success = safe.execTransactionViaDelegateCall(
-            address(multiSend),
-            abi.encodeWithSelector(multiSend.multiSend.selector, batchData)
+            address(multiSendCallOnly),
+            abi.encodeWithSelector(multiSendCallOnly.multiSend.selector, batchData)
         );
 
         // Verify everything was deployed and initialized properly
