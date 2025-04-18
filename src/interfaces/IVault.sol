@@ -15,6 +15,52 @@ pragma solidity ^0.8.25;
  */
 interface IVault {
     /*//////////////////////////////////////////////////////////////
+                                 ERRORS
+    //////////////////////////////////////////////////////////////*/
+
+    error AlreadyInitialized();
+    error AlreadyShutdown();
+    error ZeroAddress();
+    error ProfitUnlockTimeTooLong();
+    error NotAllowed();
+    error NotFutureRoleManager();
+    error InsufficientFunds();
+    error InvalidOwner();
+    error PermitExpired();
+    error InvalidSignature();
+    error StrategyCannotBeZeroAddress();
+    error InvalidAsset();
+    error InactiveStrategy();
+    error StrategyAlreadyActive();
+    error StrategyNotActive();
+    error NothingToBuy();
+    error NothingToBuyWith();
+    error NotEnoughDebt();
+    error CannotBuyZero();
+    error NewDebtEqualsCurrentDebt();
+    error StrategyHasUnrealisedLosses();
+    error TooMuchLoss();
+    error ApprovalFailed();
+    error TransferFailed();
+    error VaultShutdown();
+    error UsingModule();
+    error UsingDepositLimit();
+    error MaxQueueLengthReached();
+    error ExceedDepositLimit();
+    error CannotDepositZero();
+    error CannotMintZero();
+    error NoAssetsToWithdraw();
+    error MaxLossExceeded();
+    error ExceedWithdrawLimit();
+    error InsufficientSharesToRedeem();
+    error InsufficientAssetsInVault();
+    error StrategyHasDebt();
+    error InvalidReceiver();
+    error InsufficientAllowance();
+    error Reentrancy();
+    error NoSharesToRedeem();
+
+    /*//////////////////////////////////////////////////////////////
                                  ENUMS
     //////////////////////////////////////////////////////////////*/
 
