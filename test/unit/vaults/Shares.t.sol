@@ -126,10 +126,10 @@ contract VaultSharesTest is Test {
         vm.startPrank(fish);
         asset.approve(address(vault), amount);
 
-        vm.expectRevert("exceed deposit limit");
+        vm.expectRevert(IVault.ExceedDepositLimit.selector);
         vault.deposit(amount, address(vault));
 
-        vm.expectRevert("exceed deposit limit");
+        vm.expectRevert(IVault.ExceedDepositLimit.selector);
         vault.deposit(amount, Constants.ZERO_ADDRESS);
 
         vm.stopPrank();
@@ -140,7 +140,7 @@ contract VaultSharesTest is Test {
         uint256 amount = 0;
 
         vm.startPrank(fish);
-        vm.expectRevert("cannot deposit zero");
+        vm.expectRevert(IVault.CannotDepositZero.selector);
         vault.deposit(amount, fish);
         vm.stopPrank();
     }
@@ -173,7 +173,7 @@ contract VaultSharesTest is Test {
         vm.startPrank(fish);
         asset.approve(address(vault), amount);
 
-        vm.expectRevert("exceed deposit limit");
+        vm.expectRevert(IVault.ExceedDepositLimit.selector);
         vault.deposit(amount, fish);
 
         vm.stopPrank();
@@ -187,7 +187,7 @@ contract VaultSharesTest is Test {
         vm.startPrank(fish);
         asset.approve(address(vault), amount);
 
-        vm.expectRevert("exceed deposit limit");
+        vm.expectRevert(IVault.ExceedDepositLimit.selector);
         vault.deposit(Constants.MAX_INT, fish);
 
         vm.stopPrank();
@@ -227,10 +227,10 @@ contract VaultSharesTest is Test {
         vm.startPrank(fish);
         asset.approve(address(vault), shares);
 
-        vm.expectRevert("exceed deposit limit");
+        vm.expectRevert(IVault.ExceedDepositLimit.selector);
         vault.mint(shares, address(vault));
 
-        vm.expectRevert("exceed deposit limit");
+        vm.expectRevert(IVault.ExceedDepositLimit.selector);
         vault.mint(shares, Constants.ZERO_ADDRESS);
 
         vm.stopPrank();
@@ -241,7 +241,7 @@ contract VaultSharesTest is Test {
         uint256 shares = 0;
 
         vm.startPrank(fish);
-        vm.expectRevert("cannot deposit zero");
+        vm.expectRevert(IVault.CannotDepositZero.selector);
         vault.mint(shares, fish);
         vm.stopPrank();
     }
@@ -273,7 +273,7 @@ contract VaultSharesTest is Test {
         vm.startPrank(fish);
         asset.approve(address(vault), amount);
 
-        vm.expectRevert("exceed deposit limit");
+        vm.expectRevert(IVault.ExceedDepositLimit.selector);
         vault.mint(shares, fish);
 
         vm.stopPrank();
@@ -332,7 +332,7 @@ contract VaultSharesTest is Test {
         asset.approve(address(vault), amount);
         vault.deposit(amount, fish);
 
-        vm.expectRevert("insufficient shares to redeem");
+        vm.expectRevert(IVault.InsufficientSharesToRedeem.selector);
         vault.withdraw(shares, fish, fish, 0, new address[](0));
         vm.stopPrank();
     }
@@ -342,7 +342,7 @@ contract VaultSharesTest is Test {
         uint256 shares = 0;
 
         vm.startPrank(fish);
-        vm.expectRevert("no shares to redeem");
+        vm.expectRevert(IVault.NoSharesToRedeem.selector);
         vault.withdraw(shares, fish, fish, 0, new address[](0));
         vm.stopPrank();
     }
@@ -422,7 +422,7 @@ contract VaultSharesTest is Test {
 
         // Withdraw as bunny to fish
         vm.startPrank(bunny);
-        vm.expectRevert("insufficient allowance");
+        vm.expectRevert(IVault.InsufficientAllowance.selector);
         vault.withdraw(shares, fish, fish, 0, new address[](0));
         vm.stopPrank();
     }
@@ -577,7 +577,7 @@ contract VaultSharesTest is Test {
         // Try to deposit (should revert)
         vm.startPrank(fish);
         asset.approve(address(vault), amount);
-        vm.expectRevert("cannot mint zero");
+        vm.expectRevert(IVault.CannotMintZero.selector);
         vault.deposit(amount, fish);
         vm.stopPrank();
 
@@ -613,7 +613,7 @@ contract VaultSharesTest is Test {
         // Try to mint (should revert)
         vm.startPrank(fish);
         asset.approve(address(vault), amount);
-        vm.expectRevert("cannot deposit zero");
+        vm.expectRevert(IVault.CannotDepositZero.selector);
         vault.mint(amount, fish);
         vm.stopPrank();
 

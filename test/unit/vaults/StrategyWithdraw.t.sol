@@ -64,7 +64,7 @@ contract StrategyWithdrawTest is Test {
 
         // Try to withdraw using inactive strategy
         vm.prank(fish);
-        vm.expectRevert("inactive strategy");
+        vm.expectRevert(IVault.InactiveStrategy.selector);
         vault.withdraw(shares, fish, fish, maxLoss, strategies);
     }
 
@@ -169,7 +169,7 @@ contract StrategyWithdrawTest is Test {
 
         // Try to withdraw
         vm.prank(fish);
-        vm.expectRevert("insufficient assets in vault");
+        vm.expectRevert(IVault.InsufficientAssetsInVault.selector);
         vault.withdraw(amountToWithdraw, fish, fish, maxLoss, strategies);
     }
 
@@ -239,7 +239,7 @@ contract StrategyWithdrawTest is Test {
 
         // Try to withdraw - should revert due to loss
         vm.prank(fish);
-        vm.expectRevert("too much loss");
+        vm.expectRevert(IVault.TooMuchLoss.selector);
         vault.withdraw(amountToWithdraw, fish, fish, maxLoss, strategies);
     }
 
@@ -579,7 +579,7 @@ contract StrategyWithdrawTest is Test {
 
         // Try to withdraw - should revert due to loss
         vm.prank(fish);
-        vm.expectRevert("too much loss");
+        vm.expectRevert(IVault.TooMuchLoss.selector);
         vault.withdraw(amountToWithdraw, fish, fish, maxLoss, strategies);
     }
 
@@ -692,7 +692,7 @@ contract StrategyWithdrawTest is Test {
 
         // Try to redeem with no allowed loss - should revert
         vm.prank(fish);
-        vm.expectRevert("too much loss");
+        vm.expectRevert(IVault.TooMuchLoss.selector);
         vault.redeem(shares, fish, fish, maxLoss, strategies);
     }
 
@@ -803,7 +803,7 @@ contract StrategyWithdrawTest is Test {
 
         // Try to redeem with no loss allowed (should revert)
         vm.prank(fish);
-        vm.expectRevert("too much loss");
+        vm.expectRevert(IVault.TooMuchLoss.selector);
         vault.redeem(shares, fish, fish, 0, strategies);
 
         // Now redeem with max loss allowed
@@ -928,7 +928,7 @@ contract StrategyWithdrawTest is Test {
 
         // Try to withdraw with no allowed loss - should revert
         vm.prank(fish);
-        vm.expectRevert("too much loss");
+        vm.expectRevert(IVault.TooMuchLoss.selector);
         vault.withdraw(amountToWithdraw, fish, fish, maxLoss, strategies);
     }
 
@@ -1067,7 +1067,7 @@ contract StrategyWithdrawTest is Test {
 
         // Try to redeem with no allowed loss - should revert
         vm.prank(fish);
-        vm.expectRevert("too much loss");
+        vm.expectRevert(IVault.TooMuchLoss.selector);
         vault.redeem(shares, fish, fish, maxLoss, strategies);
     }
 
@@ -1232,7 +1232,7 @@ contract StrategyWithdrawTest is Test {
 
         // Try to withdraw with max loss too high - should revert
         vm.prank(fish);
-        vm.expectRevert("max loss");
+        vm.expectRevert(IVault.MaxLossExceeded.selector);
         vault.withdraw(amount, fish, fish, maxLoss, new address[](0));
     }
 
@@ -1245,7 +1245,7 @@ contract StrategyWithdrawTest is Test {
 
         // Try to redeem with max loss too high - should revert
         vm.prank(fish);
-        vm.expectRevert("max loss");
+        vm.expectRevert(IVault.MaxLossExceeded.selector);
         vault.redeem(shares, fish, fish, maxLoss, new address[](0));
     }
 

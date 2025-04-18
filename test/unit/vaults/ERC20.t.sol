@@ -59,7 +59,7 @@ contract ERC20Test is Test {
         uint256 amount = 1;
 
         vm.prank(fish);
-        vm.expectRevert("insufficient funds");
+        vm.expectRevert(IVault.InsufficientFunds.selector);
         vault.transfer(bunny, amount);
     }
 

@@ -48,7 +48,7 @@ contract EmergencyShutdownTest is Test {
     function testShutdown() public {
         // Test that unauthorized users can't shut down
         vm.prank(panda);
-        vm.expectRevert("not allowed");
+        vm.expectRevert(IVault.NotAllowed.selector);
         vault.shutdownVault();
 
         // Test that authorized users can shut down
@@ -85,7 +85,7 @@ contract EmergencyShutdownTest is Test {
         assertEq(vault.maxDeposit(gov), 0);
 
         // Try to set deposit limit
-        vm.expectRevert("shutdown");
+        vm.expectRevert(IVault.VaultShutdown.selector);
         vault.setDepositLimit(1e18, false);
 
         // Verify deposit limit is still 0
@@ -106,7 +106,7 @@ contract EmergencyShutdownTest is Test {
         MockDepositLimitModule limitModule = new MockDepositLimitModule();
 
         // Try to set deposit limit module
-        vm.expectRevert("shutdown");
+        vm.expectRevert(IVault.VaultShutdown.selector);
         vault.setDepositLimitModule(address(limitModule), false);
 
         // Verify deposit limit is still 0
@@ -150,7 +150,7 @@ contract EmergencyShutdownTest is Test {
         // Try to deposit will fail at maxDeposit check
         asset.mint(address(this), depositAmount);
         asset.approve(address(vault), depositAmount);
-        vm.expectRevert("exceed deposit limit");
+        vm.expectRevert(IVault.ExceedDepositLimit.selector);
         vault.deposit(depositAmount, gov);
 
         // Vault balance unchanged

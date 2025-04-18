@@ -80,7 +80,7 @@ contract DebtManagementTest is Test {
         uint256 maxDebt = 1e18;
 
         // Try to update max debt - should revert
-        vm.expectRevert("inactive strategy");
+        vm.expectRevert(IVault.InactiveStrategy.selector);
         vault.updateMaxDebtForStrategy(address(inactiveStrategy), maxDebt);
     }
 
@@ -93,7 +93,7 @@ contract DebtManagementTest is Test {
 
         // Try to update debt as bunny - should revert
         vm.prank(bunny);
-        vm.expectRevert("not allowed");
+        vm.expectRevert(IVault.NotAllowed.selector);
         vault.updateDebt(address(strategy), newDebt, 0);
     }
 
@@ -162,7 +162,7 @@ contract DebtManagementTest is Test {
         vault.updateDebt(address(strategy), newDebt, 0);
 
         // Then try to set it to the same value
-        vm.expectRevert("new debt equals current debt");
+        vm.expectRevert(IVault.NewDebtEqualsCurrentDebt.selector);
         vault.updateDebt(address(strategy), newDebt, 0);
     }
 
@@ -344,11 +344,11 @@ contract DebtManagementTest is Test {
         uint256 initialPps = vault.pricePerShare();
 
         // With 0 max loss should revert
-        vm.expectRevert("too much loss");
+        vm.expectRevert(IVault.TooMuchLoss.selector);
         vault.updateDebt(address(_lossyStrategy), newDebt, 0);
 
         // Up to the loss percent should revert (999 bps < 1000 bps needed)
-        vm.expectRevert("too much loss");
+        vm.expectRevert(IVault.TooMuchLoss.selector);
         vault.updateDebt(address(_lossyStrategy), newDebt, 999);
 
         // With sufficient max loss should succeed
@@ -507,11 +507,11 @@ contract DebtManagementTest is Test {
         airdropAsset(address(vault), fishAmount);
 
         // With 0 max loss should revert
-        vm.expectRevert("too much loss");
+        vm.expectRevert(IVault.TooMuchLoss.selector);
         vault.updateDebt(address(_lossyStrategy), newDebt, 0);
 
         // Up to the loss percent should revert (999 bps < 1000 bps needed)
-        vm.expectRevert("too much loss");
+        vm.expectRevert(IVault.TooMuchLoss.selector);
         vault.updateDebt(address(_lossyStrategy), newDebt, 999);
 
         // With sufficient max loss should succeed

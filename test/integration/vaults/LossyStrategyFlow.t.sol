@@ -160,7 +160,7 @@ contract LossyStrategyFlowTest is Test {
 
         // User2 withdraws
         vm.startPrank(user2);
-        vm.expectRevert("insufficient shares to redeem");
+        vm.expectRevert(IVault.InsufficientSharesToRedeem.selector);
         vault.withdraw(depositAmount, user2, user2, 0, new address[](0));
 
         vault.redeem(vault.balanceOf(user2), user2, user2, 0, new address[](0));

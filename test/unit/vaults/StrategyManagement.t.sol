@@ -94,12 +94,12 @@ contract StrategyManagementTest is Test {
     }
 
     function testAddStrategyWithZeroAddressFails() public {
-        vm.expectRevert("strategy cannot be zero address");
+        vm.expectRevert(IVault.StrategyCannotBeZeroAddress.selector);
         vault.addStrategy(Constants.ZERO_ADDRESS, false);
     }
 
     function testAddStrategyWithActivationFails() public {
-        vm.expectRevert("strategy already active");
+        vm.expectRevert(IVault.StrategyAlreadyActive.selector);
         vault.addStrategy(address(strategy), false);
     }
 
@@ -107,7 +107,7 @@ contract StrategyManagementTest is Test {
         // Create strategy with the other vault's asset
         MockYieldStrategy mockTokenStrategy = createStrategy(address(mockToken));
 
-        vm.expectRevert("invalid asset");
+        vm.expectRevert(IVault.InvalidAsset.selector);
         vault.addStrategy(address(mockTokenStrategy), false);
     }
 
@@ -144,14 +144,14 @@ contract StrategyManagementTest is Test {
 
         addDebtToStrategy(strategy, newDebt);
 
-        vm.expectRevert("strategy has debt");
+        vm.expectRevert(IVault.StrategyHasDebt.selector);
         vault.revokeStrategy(address(strategy));
     }
 
     function testRevokeStrategyWithInactiveStrategyFails() public {
         MockYieldStrategy inactiveStrategy = createStrategy(address(asset));
 
-        vm.expectRevert("strategy not active");
+        vm.expectRevert(IVault.StrategyNotActive.selector);
         vault.revokeStrategy(address(inactiveStrategy));
     }
 
@@ -192,7 +192,7 @@ contract StrategyManagementTest is Test {
     function testForceRevokeStrategyWithInactiveStrategyFails() public {
         MockYieldStrategy inactiveStrategy = createStrategy(address(asset));
 
-        vm.expectRevert("strategy not active");
+        vm.expectRevert(IVault.StrategyNotActive.selector);
         vault.forceRevokeStrategy(address(inactiveStrategy));
     }
 }

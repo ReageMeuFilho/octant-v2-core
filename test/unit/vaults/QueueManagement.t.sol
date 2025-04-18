@@ -107,7 +107,7 @@ contract QueueManagementTest is Test {
         vault.setDefaultQueue(strategies);
 
         vm.prank(fish);
-        vm.expectRevert("insufficient assets in vault");
+        vm.expectRevert(IVault.InsufficientAssetsInVault.selector);
         vault.withdraw(shares, fish, fish, 0, new address[](0));
     }
 
@@ -149,7 +149,7 @@ contract QueueManagementTest is Test {
         addDebtToStrategy(strategyAddress, amount, 0);
 
         vm.prank(fish);
-        vm.expectRevert("inactive strategy");
+        vm.expectRevert(IVault.InactiveStrategy.selector);
         vault.withdraw(shares, fish, fish, 0, strategies);
     }
 
@@ -187,7 +187,7 @@ contract QueueManagementTest is Test {
         addDebtToStrategy(strategyAddress, amount, 0);
 
         vm.prank(fish);
-        vm.expectRevert("inactive strategy");
+        vm.expectRevert(IVault.InactiveStrategy.selector);
         vault.withdraw(shares, fish, fish, 0, strategies);
     }
 
@@ -464,7 +464,7 @@ contract QueueManagementTest is Test {
 
         // Should revert with "inactive strategy"
         vm.prank(gov);
-        vm.expectRevert("inactive strategy");
+        vm.expectRevert(IVault.InactiveStrategy.selector);
         vault.setDefaultQueue(newQueue);
     }
 

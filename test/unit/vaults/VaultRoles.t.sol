@@ -38,7 +38,7 @@ contract VaultRolesTest is Test {
 
         // Fish tries to set role (should fail)
         vm.prank(fish);
-        vm.expectRevert("not allowed");
+        vm.expectRevert(IVault.NotAllowed.selector);
         vault.setRole(fish, uint256(IVault.Roles.DEBT_MANAGER));
     }
 
@@ -70,7 +70,7 @@ contract VaultRolesTest is Test {
         assertEq(vault.futureRoleManager(), strategist);
 
         // Gov tries to accept (should fail)
-        vm.expectRevert("not future role manager");
+        vm.expectRevert(IVault.NotFutureRoleManager.selector);
         vault.acceptRoleManager();
 
         // State should remain unchanged
@@ -85,7 +85,7 @@ contract VaultRolesTest is Test {
 
         // Strategist tries to transfer role (should fail)
         vm.prank(strategist);
-        vm.expectRevert("not allowed");
+        vm.expectRevert(IVault.NotAllowed.selector);
         vault.transferRoleManager(strategist);
 
         // State should remain unchanged
@@ -110,7 +110,7 @@ contract VaultRolesTest is Test {
 
         // Strategist tries to accept (should fail)
         vm.prank(strategist);
-        vm.expectRevert("not future role manager");
+        vm.expectRevert(IVault.NotFutureRoleManager.selector);
         vault.acceptRoleManager();
 
         // Bunny accepts the role
