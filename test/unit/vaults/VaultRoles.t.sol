@@ -3,14 +3,17 @@ pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
 import { Vault } from "../../../src/dragons/vaults/Vault.sol";
+import { VaultFactory } from "../../../src/dragons/vaults/VaultFactory.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IVault } from "../../../src/interfaces/IVault.sol";
 import { MockERC20 } from "../../mocks/MockERC20.sol";
 import { Constants } from "./utils/constants.sol";
 
 contract VaultRolesTest is Test {
-    Vault public vault;
+    Vault vaultImplementation;
+    Vault vault;
     MockERC20 public asset;
+    VaultFactory vaultFactory;
     address public gov;
     address public fish;
     address public strategist;
@@ -24,14 +27,9 @@ contract VaultRolesTest is Test {
         asset = new MockERC20();
 
         // Create and initialize the vault
-        vault = new Vault();
-        vault.initialize(
-            address(asset),
-            "Test Vault",
-            "tvTEST",
-            gov,
-            7 days // profitMaxUnlockTime
-        );
+        vaultImplementation = new Vault();
+        vaultFactory = new VaultFactory("Test Vault", address(vaultImplementation), gov);
+        vault = Vault(vaultFactory.deployNewVault(address(asset), "Test Vault", "tvTEST", gov, 7 days));
     }
 
     function testSetRole() public {

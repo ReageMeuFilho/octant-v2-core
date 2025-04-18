@@ -3,6 +3,7 @@ pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
 import { Vault } from "../../../src/dragons/vaults/Vault.sol";
+import { VaultFactory } from "../../../src/dragons/vaults/VaultFactory.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IVault } from "../../../src/interfaces/IVault.sol";
 import { MockERC20 } from "../../mocks/MockERC20.sol";
@@ -11,10 +12,12 @@ import { Constants } from "./utils/constants.sol";
 import { Checks } from "./utils/checks.sol";
 
 contract StrategyManagementTest is Test {
+    Vault vaultImplementation;
     Vault vault;
     MockERC20 asset;
     MockERC20 mockToken;
     MockYieldStrategy strategy;
+    VaultFactory vaultFactory;
     address gov;
     address user;
     uint256 userAmount;
@@ -27,15 +30,11 @@ contract StrategyManagementTest is Test {
         asset = new MockERC20();
         mockToken = new MockERC20(); // Different asset for tests
 
+        vaultImplementation = new Vault();
+        vaultFactory = new VaultFactory("Test Vault", address(vaultImplementation), gov);
+
         // Create and initialize the vault
-        vault = new Vault();
-        vault.initialize(
-            address(asset),
-            "Test Vault",
-            "tvTEST",
-            gov,
-            7 days // profitMaxUnlockTime
-        );
+        vault = Vault(vaultFactory.deployNewVault(address(asset), "Test Vault", "tvTEST", gov, 7 days));
 
         // Set up roles for governance
         vault.addRole(gov, IVault.Roles.ADD_STRATEGY_MANAGER);
@@ -105,10 +104,6 @@ contract StrategyManagementTest is Test {
     }
 
     function testAddStrategyWithIncorrectAssetFails() public {
-        // Create a vault with a different asset
-        Vault otherVault = new Vault();
-        otherVault.initialize(address(mockToken), "Other Vault", "ovTEST", gov, 7 days);
-
         // Create strategy with the other vault's asset
         MockYieldStrategy mockTokenStrategy = createStrategy(address(mockToken));
 

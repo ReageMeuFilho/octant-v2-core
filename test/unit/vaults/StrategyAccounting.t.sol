@@ -3,6 +3,7 @@ pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
 import { Vault } from "../../../src/dragons/vaults/Vault.sol";
+import { VaultFactory } from "../../../src/dragons/vaults/VaultFactory.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IVault } from "../../../src/interfaces/IVault.sol";
 import { IAccountant } from "../../../src/interfaces/IAccountant.sol";
@@ -10,16 +11,17 @@ import { MockERC20 } from "../../mocks/MockERC20.sol";
 import { MockYieldStrategy } from "../../mocks/MockYieldStrategy.sol";
 import { MockAccountant } from "../../mocks/MockAccountant.sol";
 import { Constants } from "./utils/constants.sol";
-import { MockFactory } from "../../mocks/MockVaultFactory.sol";
 import { MockFlexibleAccountant } from "../../mocks/MockFlexibleAccountant.sol";
 import { MockFaultyAccountant } from "../../mocks/MockFaultyAccountant.sol";
 import { MockLossyStrategy } from "../../mocks/MockLossyStrategy.sol";
 
 contract StrategyAccountingTest is Test {
+    Vault vaultImplementation;
     Vault vault;
     MockERC20 asset;
     MockYieldStrategy strategy;
-    MockFactory factory;
+    VaultFactory vaultFactory;
+
     address gov;
     uint256 constant YEAR = 31_556_952;
     uint256 constant DAY = 86400;
@@ -41,18 +43,11 @@ contract StrategyAccountingTest is Test {
         gov = address(this);
         asset = new MockERC20();
 
-        factory = new MockFactory(100, gov);
+        vaultImplementation = new Vault();
+        vaultFactory = new VaultFactory("Test Vault", address(vaultImplementation), gov);
 
         // Create and initialize the vault
-        vault = new Vault();
-        vm.prank(address(factory));
-        vault.initialize(
-            address(asset),
-            "Test Vault",
-            "tvTEST",
-            gov,
-            7 days // profitMaxUnlockTime
-        );
+        vault = Vault(vaultFactory.deployNewVault(address(asset), "Test Vault", "tvTEST", gov, 7 days));
 
         // Set roles for governance - this matches the set_role fixture
         vault.addRole(gov, IVault.Roles.EMERGENCY_MANAGER);
@@ -162,7 +157,8 @@ contract StrategyAccountingTest is Test {
         MockAccountant accountant = deployAccountant();
 
         // update protocol fee config
-        factory.updateProtocolFeeConfig(0, address(accountant));
+        vaultFactory.setProtocolFeeRecipient(address(accountant));
+        vaultFactory.setProtocolFeeBps(uint16(managementFee));
 
         // Add debt to strategy
         addDebtToStrategy(address(strategy), newDebt);

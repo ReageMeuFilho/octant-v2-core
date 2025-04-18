@@ -3,6 +3,7 @@ pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
 import { Vault } from "../../../src/dragons/vaults/Vault.sol";
+import { VaultFactory } from "../../../src/dragons/vaults/VaultFactory.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IVault } from "../../../src/interfaces/IVault.sol";
 import { MockERC20 } from "../../mocks/MockERC20.sol";
@@ -14,10 +15,12 @@ import { MockWithdrawLimitModule } from "../../mocks/MockWithdrawLimitModule.sol
 import { MockDepositLimitModule } from "../../mocks/MockDepositLimitModule.sol";
 
 contract ERC4626Test is Test {
-    Vault public vault;
+    Vault vaultImplementation;
+    Vault vault;
     MockERC20 public asset;
     MockYieldStrategy public strategy;
     MockFactory public factory;
+    VaultFactory vaultFactory;
 
     address public gov = address(0x1);
     address public fish = address(0x2);
@@ -41,8 +44,9 @@ contract ERC4626Test is Test {
 
         // Deploy vault
         vm.startPrank(address(factory));
-        vault = new Vault();
-        vault.initialize(address(asset), "Test Vault", "vTST", gov, 7 days);
+        vaultImplementation = new Vault();
+        vaultFactory = new VaultFactory("Test Vault", address(vaultImplementation), gov);
+        vault = Vault(vaultFactory.deployNewVault(address(asset), "Test Vault", "vTST", gov, 7 days));
         vm.stopPrank();
 
         vm.startPrank(gov);
