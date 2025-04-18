@@ -1198,7 +1198,7 @@ contract ProfitUnlockingTest is Test {
 
         // Try to update strategy debt to 0 - should revert
         vm.prank(gov);
-        vm.expectRevert("new debt equals current debt");
+        vm.expectRevert(IVault.NewDebtEqualsCurrentDebt.selector);
         vault.updateDebt(address(strategy), 0, 0);
 
         // Verify strategy debt is already 0

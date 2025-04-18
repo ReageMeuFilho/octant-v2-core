@@ -109,7 +109,7 @@ contract StrategyAccountingTest is Test {
         MockYieldStrategy inactiveStrategy = new MockYieldStrategy(address(asset), address(vault));
 
         // Expect the process report to revert
-        vm.expectRevert("inactive strategy");
+        vm.expectRevert(IVault.InactiveStrategy.selector);
         vault.processReport(address(inactiveStrategy));
     }
 

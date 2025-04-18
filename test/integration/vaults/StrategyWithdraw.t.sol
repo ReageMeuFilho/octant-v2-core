@@ -179,7 +179,7 @@ contract MultipleStrategyWithdrawFlowTest is Test {
         liquidStrategyOnly[0] = address(liquidStrategy);
 
         vm.prank(whale);
-        vm.expectRevert("insufficient assets in vault");
+        vm.expectRevert(IVault.InsufficientAssetsInVault.selector);
         vault.withdraw(whaleBalance, whale, whale, 0, liquidStrategyOnly);
 
         // Withdraw remaining balance using both strategies

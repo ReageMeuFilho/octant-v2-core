@@ -379,7 +379,7 @@ contract ERC4626Test is Test {
         // Using inactive strategy when useDefaultQueue is false should revert
         address[] memory invalidStrategies = new address[](1);
         invalidStrategies[0] = address(vault); // vault is not a strategy
-        vm.expectRevert("inactive strategy");
+        vm.expectRevert(IVault.InactiveStrategy.selector);
         vault.maxWithdraw(fish, 22, invalidStrategies);
 
         // Enable useDefaultQueue
@@ -569,7 +569,7 @@ contract ERC4626Test is Test {
         // Using inactive strategy when useDefaultQueue is false should revert
         address[] memory invalidStrategies = new address[](1);
         invalidStrategies[0] = address(vault); // vault is not a strategy
-        vm.expectRevert("inactive strategy");
+        vm.expectRevert(IVault.InactiveStrategy.selector);
         vault.maxRedeem(fish, 22, invalidStrategies);
 
         // Enable useDefaultQueue
@@ -743,7 +743,7 @@ contract ERC4626Test is Test {
         assertEq(vault.maxDeposit(fish), 0, "Max deposit should be 0 for non-whitelisted");
 
         vm.prank(fish);
-        vm.expectRevert("exceed deposit limit");
+        vm.expectRevert(IVault.ExceedDepositLimit.selector);
         vault.deposit(assets, fish);
 
         // Whitelist fish and make deposit succeed
@@ -785,7 +785,7 @@ contract ERC4626Test is Test {
         assertEq(vault.maxMint(fish), 0, "Max mint should be 0 for non-whitelisted");
 
         vm.prank(fish);
-        vm.expectRevert("exceed deposit limit");
+        vm.expectRevert(IVault.ExceedDepositLimit.selector);
         vault.mint(assets, fish);
 
         // Whitelist fish and make mint succeed
@@ -830,7 +830,7 @@ contract ERC4626Test is Test {
 
         // Attempt withdraw - should fail
         vm.prank(fish);
-        vm.expectRevert("exceed withdraw limit");
+        vm.expectRevert(IVault.ExceedWithdrawLimit.selector);
         vault.withdraw(assets, fish, fish, 0, new address[](0));
 
         // Now set limit to match assets for successful withdraw
@@ -881,7 +881,7 @@ contract ERC4626Test is Test {
 
         // Attempt redeem - should fail
         vm.prank(fish);
-        vm.expectRevert("exceed withdraw limit");
+        vm.expectRevert(IVault.ExceedWithdrawLimit.selector);
         vault.redeem(shares, fish, fish, 0, new address[](0));
 
         // Now set limit to match shares for successful redeem

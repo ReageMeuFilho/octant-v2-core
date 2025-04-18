@@ -85,7 +85,7 @@ contract RoleBasedAccessTest is Test {
     function testAddStrategyNoAddStrategyManagerReverts() public {
         address newStrategy = createStrategy();
         vm.prank(bunny);
-        vm.expectRevert("not allowed");
+        vm.expectRevert(IVault.NotAllowed.selector);
         vault.addStrategy(newStrategy, true);
     }
 
@@ -106,7 +106,7 @@ contract RoleBasedAccessTest is Test {
 
     function testRevokeStrategyNoRevokeStrategyManagerReverts() public {
         vm.prank(bunny);
-        vm.expectRevert("not allowed");
+        vm.expectRevert(IVault.NotAllowed.selector);
         vault.revokeStrategy(address(strategy));
     }
 
@@ -126,7 +126,7 @@ contract RoleBasedAccessTest is Test {
 
     function testForceRevokeStrategyNoRevokeStrategyManagerReverts() public {
         vm.prank(bunny);
-        vm.expectRevert("not allowed");
+        vm.expectRevert(IVault.NotAllowed.selector);
         vault.forceRevokeStrategy(address(strategy));
     }
 
@@ -149,7 +149,7 @@ contract RoleBasedAccessTest is Test {
     function testSetMinimumTotalIdleNoMinIdleManagerReverts() public {
         uint256 minimumTotalIdle = 1;
         vm.prank(bunny);
-        vm.expectRevert("not allowed");
+        vm.expectRevert(IVault.NotAllowed.selector);
         vault.setMinimumTotalIdle(minimumTotalIdle);
     }
 
@@ -175,7 +175,7 @@ contract RoleBasedAccessTest is Test {
         uint256 maxDebtForStrategy = 1;
 
         vm.prank(bunny);
-        vm.expectRevert("not allowed");
+        vm.expectRevert(IVault.NotAllowed.selector);
         vault.updateMaxDebtForStrategy(address(strategy), maxDebtForStrategy);
     }
 
@@ -201,7 +201,7 @@ contract RoleBasedAccessTest is Test {
     function testSetDepositLimitNoDepositLimitManagerReverts() public {
         uint256 depositLimit = 1;
         vm.prank(bunny);
-        vm.expectRevert("not allowed");
+        vm.expectRevert(IVault.NotAllowed.selector);
         vault.setDepositLimit(depositLimit, false);
     }
 
@@ -236,7 +236,7 @@ contract RoleBasedAccessTest is Test {
 
         // Try to set deposit limit without override
         vm.prank(bunny);
-        vm.expectRevert("using module");
+        vm.expectRevert(IVault.UsingModule.selector);
         vault.setDepositLimit(depositLimit, false);
     }
 
@@ -265,7 +265,7 @@ contract RoleBasedAccessTest is Test {
 
     function testSetDepositLimitModuleNoDepositLimitManagerReverts() public {
         vm.prank(bunny);
-        vm.expectRevert("not allowed");
+        vm.expectRevert(IVault.NotAllowed.selector);
         vault.setDepositLimitModule(bunny, false);
     }
 
@@ -296,7 +296,7 @@ contract RoleBasedAccessTest is Test {
 
         // Try to set deposit limit module without override
         vm.prank(gov);
-        vm.expectRevert("using deposit limit");
+        vm.expectRevert(IVault.UsingDepositLimit.selector);
         vault.setDepositLimitModule(bunny, false);
     }
 
@@ -320,7 +320,7 @@ contract RoleBasedAccessTest is Test {
 
     function testSetWithdrawLimitModuleNoWithdrawLimitManagerReverts() public {
         vm.prank(bunny);
-        vm.expectRevert("not allowed");
+        vm.expectRevert(IVault.NotAllowed.selector);
         vault.setWithdrawLimitModule(bunny);
     }
 
@@ -344,7 +344,7 @@ contract RoleBasedAccessTest is Test {
 
     function testBuyDebtNoDebtPurchaserReverts() public {
         vm.prank(bunny);
-        vm.expectRevert("not allowed");
+        vm.expectRevert(IVault.NotAllowed.selector);
         vault.buyDebt(address(strategy), 0);
     }
 
@@ -388,7 +388,7 @@ contract RoleBasedAccessTest is Test {
 
     function testUpdateDebtNoDebtManagerReverts() public {
         vm.prank(bunny);
-        vm.expectRevert("not allowed");
+        vm.expectRevert(IVault.NotAllowed.selector);
         vault.updateDebt(address(strategy), 1e18, 0);
     }
 
@@ -422,7 +422,7 @@ contract RoleBasedAccessTest is Test {
 
     function testShutdownVaultNoEmergencyManagerReverts() public {
         vm.prank(bunny);
-        vm.expectRevert("not allowed");
+        vm.expectRevert(IVault.NotAllowed.selector);
         vault.shutdownVault();
     }
 
@@ -452,7 +452,7 @@ contract RoleBasedAccessTest is Test {
 
     function testProcessReportNoReportingManagerReverts() public {
         vm.prank(bunny);
-        vm.expectRevert("not allowed");
+        vm.expectRevert(IVault.NotAllowed.selector);
         vault.processReport(address(strategy));
     }
 
@@ -490,7 +490,7 @@ contract RoleBasedAccessTest is Test {
 
     function testSetAccountantNoAccountantManagerReverts() public {
         vm.prank(bunny);
-        vm.expectRevert("not allowed");
+        vm.expectRevert(IVault.NotAllowed.selector);
         vault.setAccountant(bunny);
     }
 
@@ -514,13 +514,13 @@ contract RoleBasedAccessTest is Test {
 
     function testSetDefaultQueueNoQueueManagerReverts() public {
         vm.prank(bunny);
-        vm.expectRevert("not allowed");
+        vm.expectRevert(IVault.NotAllowed.selector);
         vault.setDefaultQueue(new address[](0));
     }
 
     function testUseDefaultQueueNoQueueManagerReverts() public {
         vm.prank(bunny);
-        vm.expectRevert("not allowed");
+        vm.expectRevert(IVault.NotAllowed.selector);
         vault.setUseDefaultQueue(true);
     }
 
@@ -562,7 +562,7 @@ contract RoleBasedAccessTest is Test {
 
     function testSetProfitUnlockNoProfitUnlockManagerReverts() public {
         vm.prank(bunny);
-        vm.expectRevert("not allowed");
+        vm.expectRevert(IVault.NotAllowed.selector);
         vault.setProfitMaxUnlockTime(WEEK / 2);
     }
 
@@ -592,7 +592,7 @@ contract RoleBasedAccessTest is Test {
         uint256 currentTime = vault.profitMaxUnlockTime();
 
         vm.prank(bunny);
-        vm.expectRevert("profit unlock time too long");
+        vm.expectRevert(IVault.ProfitUnlockTimeTooLong.selector);
         vault.setProfitMaxUnlockTime(time);
 
         // Verify unchanged
@@ -716,7 +716,7 @@ contract RoleBasedAccessTest is Test {
         // Verify bunny can't add a strategy
         address newStrategy = createStrategy();
         vm.prank(bunny);
-        vm.expectRevert("not allowed");
+        vm.expectRevert(IVault.NotAllowed.selector);
         vault.addStrategy(newStrategy, true);
     }
 
@@ -727,7 +727,7 @@ contract RoleBasedAccessTest is Test {
 
         // Verify bunny can't set name
         vm.prank(bunny);
-        vm.expectRevert("not allowed");
+        vm.expectRevert(IVault.NotAllowed.selector);
         vault.setName(newName);
 
         // Give bunny ALL roles
@@ -736,7 +736,7 @@ contract RoleBasedAccessTest is Test {
 
         // Verify bunny still can't set name (only roleManager can)
         vm.prank(bunny);
-        vm.expectRevert("not allowed");
+        vm.expectRevert(IVault.NotAllowed.selector);
         vault.setName(newName);
 
         // Verify name unchanged
@@ -758,7 +758,7 @@ contract RoleBasedAccessTest is Test {
 
         // Verify bunny can't set symbol
         vm.prank(bunny);
-        vm.expectRevert("not allowed");
+        vm.expectRevert(IVault.NotAllowed.selector);
         vault.setSymbol(newSymbol);
 
         // Give bunny ALL roles
@@ -767,7 +767,7 @@ contract RoleBasedAccessTest is Test {
 
         // Verify bunny still can't set symbol (only roleManager can)
         vm.prank(bunny);
-        vm.expectRevert("not allowed");
+        vm.expectRevert(IVault.NotAllowed.selector);
         vault.setSymbol(newSymbol);
 
         // Verify symbol unchanged

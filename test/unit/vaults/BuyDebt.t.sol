@@ -57,7 +57,7 @@ contract BuyDebtTest is Test {
         asset.approve(address(vault), fishAmount);
 
         // Try to buy debt - should revert because strategy not active
-        vm.expectRevert("not active");
+        vm.expectRevert(IVault.InactiveStrategy.selector);
         vault.buyDebt(address(inactiveStrategy), fishAmount);
     }
 
@@ -73,7 +73,7 @@ contract BuyDebtTest is Test {
         asset.approve(address(vault), fishAmount);
 
         // Try to buy debt - should revert because strategy has no debt
-        vm.expectRevert("nothing to buy");
+        vm.expectRevert(IVault.NothingToBuy.selector);
         vault.buyDebt(address(strategy), fishAmount);
     }
 
@@ -92,7 +92,7 @@ contract BuyDebtTest is Test {
         asset.approve(address(vault), fishAmount);
 
         // Try to buy 0 debt - should revert
-        vm.expectRevert("nothing to buy with");
+        vm.expectRevert(IVault.NothingToBuyWith.selector);
         vault.buyDebt(address(strategy), 0);
     }
 

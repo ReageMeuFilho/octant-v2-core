@@ -89,7 +89,7 @@ contract DepositAndWithdrawTest is Test {
 
         // Try to deposit more than limit
         vm.startPrank(fish);
-        vm.expectRevert("exceed deposit limit");
+        vm.expectRevert(IVault.ExceedDepositLimit.selector);
         vault.deposit(amount, fish);
 
         // Deposit another quarter

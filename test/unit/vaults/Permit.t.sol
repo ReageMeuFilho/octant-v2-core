@@ -6,6 +6,7 @@ import { Setup } from "./Setup.sol";
 import { IERC20Permit } from "src/vendor/shamirlabs/IERC20Permit.sol";
 import { Vault } from "src/dragons/vaults/Vault.sol";
 import { VaultFactory } from "src/dragons/vaults/VaultFactory.sol";
+import { IVault } from "src/interfaces/IVault.sol";
 
 contract PermitTest is Setup {
     uint256 constant AMOUNT = 10 ** 18;
@@ -84,7 +85,7 @@ contract PermitTest is Setup {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(PRIVATE_KEY, digest);
 
         // Try to use the signature for AMOUNT instead
-        vm.expectRevert("invalid signature");
+        vm.expectRevert(IVault.InvalidSignature.selector);
         vm.prank(bunny);
         vault.permit(owner, bunny, AMOUNT, deadline, v, r, s);
     }
@@ -100,7 +101,7 @@ contract PermitTest is Setup {
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(PRIVATE_KEY, digest);
 
-        vm.expectRevert("permit expired");
+        vm.expectRevert(IVault.PermitExpired.selector);
         vm.prank(bunny);
         vault.permit(owner, bunny, AMOUNT, deadline, v, r, s);
     }
@@ -113,7 +114,7 @@ contract PermitTest is Setup {
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(PRIVATE_KEY, digest);
 
-        vm.expectRevert("invalid owner");
+        vm.expectRevert(IVault.InvalidOwner.selector);
         vm.prank(bunny);
         vault.permit(
             address(0), // Use zero address instead of the real owner
