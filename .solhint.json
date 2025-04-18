@@ -9,7 +9,6 @@
     "gas-small-strings": "warn",
     "gas-struct-packing": "warn",
     "no-unused-vars": "error",
-    "max-states-count": ["error", 1000],
     "code-complexity": ["error", 12],
     "compiler-version": ["error", "^0.8.0"],
     "const-name-snakecase": "error",
