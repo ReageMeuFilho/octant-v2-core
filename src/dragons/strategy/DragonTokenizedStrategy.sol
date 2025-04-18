@@ -52,7 +52,7 @@ import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import { IFactory } from "./interfaces/IFactory.sol";
-import { IBaseStrategy } from "./interfaces/IBaseStrategy.sol";
+import { IBaseStrategy } from "interfaces/IBaseStrategy.sol";
 
 /**
  * @title Yearn Tokenized Strategy
@@ -90,26 +90,14 @@ contract TokenizedStrategy {
     event NewTokenizedStrategy(address indexed strategy, address indexed asset, string apiVersion);
 
     /**
-     * @notice Emitted when the strategy reports `profit` or `loss` and
-     * `performanceFees` and `protocolFees` are paid out.
+     * @notice Emitted when the strategy reports `profit` or `loss`.
      */
-    event Reported(uint256 profit, uint256 loss, uint256 protocolFees, uint256 performanceFees);
-
-    /**
-     * @notice Emitted when the 'performanceFeeRecipient' address is
-     * updated to 'newPerformanceFeeRecipient'.
-     */
-    event UpdatePerformanceFeeRecipient(address indexed newPerformanceFeeRecipient);
+    event Reported(uint256 profit, uint256 loss);
 
     /**
      * @notice Emitted when the 'keeper' address is updated to 'newKeeper'.
      */
     event UpdateKeeper(address indexed newKeeper);
-
-    /**
-     * @notice Emitted when the 'performanceFee' is updated to 'newPerformanceFee'.
-     */
-    event UpdatePerformanceFee(uint16 newPerformanceFee);
 
     /**
      * @notice Emitted when the 'management' address is updated to 'newManagement'.
@@ -211,8 +199,6 @@ contract TokenizedStrategy {
         uint96 fullProfitUnlockDate; // The timestamp at which all locked shares will unlock.
         address keeper; // Address given permission to call {report} and {tend}.
         uint32 profitMaxUnlockTime; // The amount of seconds that the reported profit unlocks over.
-        uint16 performanceFee; // The percent in basis points of profit that is charged as a fee.
-        address performanceFeeRecipient; // The address to pay the `performanceFee` to.
         uint96 lastReport; // The last time a {report} was called.
 
 
@@ -224,6 +210,18 @@ contract TokenizedStrategy {
         // Strategy Status
         uint8 entered; // To prevent reentrancy. Use uint8 for gas savings.
         bool shutdown; // Bool that can be used to stop deposits into the strategy.
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            DEPLOYMENT
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @dev On contract creation we set `asset` for this contract to address(1).
+     * This prevents it from ever being initialized in the future.
+     */
+    constructor() {
+        _strategyStorage().asset = ERC20(address(1));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -327,10 +325,7 @@ contract TokenizedStrategy {
     /// @notice Value to set the `entered` flag to at the end of the call.
     uint8 internal constant NOT_ENTERED = 1;
 
-    /// @notice Maximum in Basis Points the Performance Fee can be set to.
-    uint16 public constant MAX_FEE = 5_000; // 50%
-
-    /// @notice Used for fee calculations.
+    /// @notice Used for calculations.
     uint256 internal constant MAX_BPS = 10_000;
     /// @notice Used for profit unlocking rate calculations.
     uint256 internal constant MAX_BPS_EXTENDED = 1_000_000_000_000;
@@ -354,14 +349,6 @@ contract TokenizedStrategy {
      * about collisions.
      */
     bytes32 internal constant BASE_STRATEGY_STORAGE = bytes32(uint256(keccak256("yearn.base.strategy.storage")) - 1);
-
-    /*//////////////////////////////////////////////////////////////
-                               IMMUTABLE
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Address of the previously deployed Vault factory that the
-    // protocol fee config is retrieved from.
-    address public immutable FACTORY;
 
     /*//////////////////////////////////////////////////////////////
                             STORAGE GETTER
@@ -403,14 +390,12 @@ contract TokenizedStrategy {
      * @param _asset Address of the underlying asset.
      * @param _name Name the strategy will use.
      * @param _management Address to set as the strategies `management`.
-     * @param _performanceFeeRecipient Address to receive performance fees.
      * @param _keeper Address to set as strategies `keeper`.
      */
     function initialize(
         address _asset,
         string memory _name,
         address _management,
-        address _performanceFeeRecipient,
         address _keeper
     ) external {
         // Cache storage pointer.
@@ -428,14 +413,6 @@ contract TokenizedStrategy {
 
         // Default to a 10 day profit unlock period.
         S.profitMaxUnlockTime = 10 days;
-        // Set address to receive performance fees.
-        // Can't be address(0) or we will be burning fees.
-        require(_performanceFeeRecipient != address(0), "ZERO ADDRESS");
-        // Can't mint shares to its self because of profit locking.
-        require(_performanceFeeRecipient != address(this), "self");
-        S.performanceFeeRecipient = _performanceFeeRecipient;
-        // Default to a 10% performance fee.
-        S.performanceFee = 1_000;
         // Set last report to this block.
         S.lastReport = uint96(block.timestamp);
 
@@ -954,13 +931,11 @@ contract TokenizedStrategy {
      * @notice Function for keepers to call to harvest and record all
      * profits accrued.
      *
-     * @dev This will account for any gains/losses since the last report
-     * and charge fees accordingly.
+     * @dev This will account for any gains/losses since the last report.
      *
-     * Any profit over the fees charged will be immediately locked
-     * so there is no change in PricePerShare. Then slowly unlocked
-     * over the `maxProfitUnlockTime` each second based on the
-     * calculated `profitUnlockingRate`.
+     * Any profit will be immediately locked so there is no change in 
+     * PricePerShare. Then slowly unlocked over the `maxProfitUnlockTime` 
+     * each second based on the calculated `profitUnlockingRate`.
      *
      * In case of a loss it will first attempt to offset the loss
      * with any remaining locked shares from the last report in
@@ -992,8 +967,6 @@ contract TokenizedStrategy {
         uint256 sharesToBurn = _unlockedShares(S);
 
         // Initialize variables needed throughout.
-        uint256 totalFees;
-        uint256 protocolFees;
         uint256 sharesToLock;
         uint256 _profitMaxUnlockTime = S.profitMaxUnlockTime;
         // Calculate profit/loss.
@@ -1007,49 +980,8 @@ contract TokenizedStrategy {
             // at the current PPS before any minting or burning.
             sharesToLock = _convertToShares(S, profit, Math.Rounding.Down);
 
-            // Cache the performance fee.
-            uint16 fee = S.performanceFee;
-            uint256 totalFeeShares;
-            // If we are charging a performance fee
-            if (fee != 0) {
-                // Asses performance fees.
-                unchecked {
-                    // Get in `asset` for the event.
-                    totalFees = (profit * fee) / MAX_BPS;
-                    // And in shares for the payment.
-                    totalFeeShares = (sharesToLock * fee) / MAX_BPS;
-                }
-
-                // Get the protocol fee config from the factory.
-                (uint16 protocolFeeBps, address protocolFeesRecipient) = IFactory(FACTORY).protocol_fee_config();
-
-                uint256 protocolFeeShares;
-                // Check if there is a protocol fee to charge.
-                if (protocolFeeBps != 0) {
-                    unchecked {
-                        // Calculate protocol fees based on the performance Fees.
-                        protocolFeeShares = (totalFeeShares * protocolFeeBps) / MAX_BPS;
-                        // Need amount in underlying for event.
-                        protocolFees = (totalFees * protocolFeeBps) / MAX_BPS;
-                    }
-
-                    // Mint the protocol fees to the recipient.
-                    _mint(S, protocolFeesRecipient, protocolFeeShares);
-                }
-
-                // Mint the difference to the strategy fee recipient.
-                unchecked {
-                    _mint(S, S.performanceFeeRecipient, totalFeeShares - protocolFeeShares);
-                }
-            }
-
             // Check if we are locking profit.
             if (_profitMaxUnlockTime != 0) {
-                // lock (profit - fees)
-                unchecked {
-                    sharesToLock -= totalFeeShares;
-                }
-
                 // If we are burning more than re-locking.
                 if (sharesToBurn > sharesToLock) {
                     // Burn the difference
@@ -1124,12 +1056,7 @@ contract TokenizedStrategy {
         S.lastReport = uint96(block.timestamp);
 
         // Emit event with info
-        emit Reported(
-            profit,
-            loss,
-            protocolFees, // Protocol fees
-            totalFees - protocolFees // Performance Fees
-        );
+        emit Reported(profit, loss);
     }
 
     /**
@@ -1285,23 +1212,6 @@ contract TokenizedStrategy {
     }
 
     /**
-     * @notice Get the current performance fee charged on profits.
-     * denominated in Basis Points where 10_000 == 100%
-     * @return . Current performance fee.
-     */
-    function performanceFee() external view returns (uint16) {
-        return _strategyStorage().performanceFee;
-    }
-
-    /**
-     * @notice Get the current address that receives the performance fees.
-     * @return . Address of performanceFeeRecipient
-     */
-    function performanceFeeRecipient() external view returns (address) {
-        return _strategyStorage().performanceFeeRecipient;
-    }
-
-    /**
      * @notice Gets the timestamp at which all profits will be unlocked.
      * @return . The full profit unlocking timestamp
      */
@@ -1410,38 +1320,6 @@ contract TokenizedStrategy {
         _strategyStorage().emergencyAdmin = _emergencyAdmin;
 
         emit UpdateEmergencyAdmin(_emergencyAdmin);
-    }
-
-    /**
-     * @notice Sets the performance fee to be charged on reported gains.
-     * @dev Can only be called by the current `management`.
-     *
-     * Denominated in Basis Points. So 100% == 10_000.
-     * Cannot set greater than to MAX_FEE.
-     *
-     * @param _performanceFee New performance fee.
-     */
-    function setPerformanceFee(uint16 _performanceFee) external onlyManagement {
-        require(_performanceFee <= MAX_FEE, "MAX FEE");
-        _strategyStorage().performanceFee = _performanceFee;
-
-        emit UpdatePerformanceFee(_performanceFee);
-    }
-
-    /**
-     * @notice Sets a new address to receive performance fees.
-     * @dev Can only be called by the current `management`.
-     *
-     * Cannot set to address(0).
-     *
-     * @param _performanceFeeRecipient New address to set `management` to.
-     */
-    function setPerformanceFeeRecipient(address _performanceFeeRecipient) external onlyManagement {
-        require(_performanceFeeRecipient != address(0), "ZERO ADDRESS");
-        require(_performanceFeeRecipient != address(this), "Cannot be self");
-        _strategyStorage().performanceFeeRecipient = _performanceFeeRecipient;
-
-        emit UpdatePerformanceFeeRecipient(_performanceFeeRecipient);
     }
 
     /**
@@ -1845,19 +1723,5 @@ contract TokenizedStrategy {
                     address(this)
                 )
             );
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            DEPLOYMENT
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @dev On contract creation we set `asset` for this contract to address(1).
-     * This prevents it from ever being initialized in the future.
-     * @param _factory Address of the factory of the same version for protocol fees.
-     */
-    constructor(address _factory) {
-        FACTORY = _factory;
-        _strategyStorage().asset = ERC20(address(1));
     }
 }

@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity >=0.8.25;
 
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-
+import { ERC20 } from "@openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 // TokenizedStrategy interface used for internal view delegateCalls.
-import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
+import { ITokenizedStrategy } from "interfaces/ITokenizedStrategy.sol";
 
 /**
  * @title YearnV3 Base Strategy
@@ -36,7 +34,7 @@ import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
  *  can be viewed within the Strategy by a simple call using the
  *  `TokenizedStrategy` variable. IE: TokenizedStrategy.globalVariable();.
  */
-abstract contract BaseStrategy is Initializable {
+abstract contract BaseStrategy {
     /*//////////////////////////////////////////////////////////////
                             MODIFIERS
     //////////////////////////////////////////////////////////////*/
@@ -90,12 +88,9 @@ abstract contract BaseStrategy is Initializable {
     
     /// @notice Thrown when a non-self address tries to call a self-only function
     error NotSelf();
-    
-    /// @notice Thrown when attempting to initialize an already initialized contract
-    error AlreadyInitialized();
 
     /*//////////////////////////////////////////////////////////////
-                            STORAGE
+                            CONSTANTS
     //////////////////////////////////////////////////////////////*/
 
     /**
@@ -107,18 +102,27 @@ abstract contract BaseStrategy is Initializable {
      * defined in this base or the strategy will end up being forwarded
      * through the fallback function, which will delegateCall this address.
      *
-     * This address should be set only once during initialization and never adjusted.
+     * This address should be the same for every strategy, never be adjusted
+     * and always be checked before any integration with the Strategy.
      */
-    address public tokenizedStrategyAddress;
-    
+    // NOTE: This is a placeholder address - should be updated for production use
+    address public constant TOKENIZED_STRATEGY_ADDRESS =
+        0x2e234DAe75C793f67A35089C9d99245E1C58470b;
+
+    /*//////////////////////////////////////////////////////////////
+                            IMMUTABLES
+    //////////////////////////////////////////////////////////////*/
+
     /**
      * @dev Underlying asset the Strategy is earning yield on.
-     * Stored here for retrievals within the strategy.
+     * Stored here for cheap retrievals within the strategy.
      */
-    ERC20 public asset;
+    ERC20 internal immutable asset;
     
     /**
-     * @dev This variable is used to retrieve storage data within the strategy
+     * @dev This variable is set to address(this) during initialization of each strategy.
+     *
+     * This can be used to retrieve storage data within the strategy
      * contract as if it were a linked library.
      *
      *       i.e. uint256 totalAssets = TokenizedStrategy.totalAssets()
@@ -127,62 +131,52 @@ abstract contract BaseStrategy is Initializable {
      * to a call to itself. Which will hit the fallback function and
      * delegateCall that to the actual TokenizedStrategy.
      */
-    ITokenizedStrategy public TokenizedStrategy;
+    ITokenizedStrategy internal immutable TokenizedStrategy;
 
     /**
-     * @notice BaseStrategy constructor that disables initializers to prevent implementation contract initialization
-     * @dev Uses OpenZeppelin's _disableInitializers to prevent the implementation from being initialized
-     */
-    constructor() {
-        _disableInitializers();
-    }
-    
-    /**
-     * @notice Initializes the strategy with the necessary parameters.
-     * 
-     * @dev This function can only be called once thanks to the OpenZeppelin
-     * Initializable contract. It sets up the strategy's core variables including
-     * the asset, TokenizedStrategy reference, and the tokenizedStrategyAddress.
-     * 
+     * @notice Used to initialize the strategy on deployment.
+     *
+     * This will set the `TokenizedStrategy` variable for easy
+     * internal view calls to the implementation. As well as
+     * initializing the default storage variables based on the
+     * parameters and using the deployer for the permissioned roles.
+     *
      * @param _asset Address of the underlying asset.
-     * @param _tokenizedStrategyAddress Address of the TokenizedStrategy implementation
-     * @param _name Name the strategy will use
+     * @param _name Name the strategy will use.
      * @param _management Address with management permissions
      * @param _keeper Address with keeper permissions
      * @param _emergencyAdmin Address with emergency admin permissions
+     * @param _donationAddress Address that will receive donations for this specific strategy
      */
-    function initialize(
+    constructor(
         address _asset,
-        address _tokenizedStrategyAddress,
         string memory _name,
         address _management,
         address _keeper,
-        address _emergencyAdmin
-    ) external initializer {
-        // Set up the asset
+        address _emergencyAdmin,
+        address _donationAddress
+    ) {
         asset = ERC20(_asset);
         
-        // Set the TokenizedStrategy for internal calls
+        // Set instance of the implementation for internal use.
         TokenizedStrategy = ITokenizedStrategy(address(this));
         
-        // Set the tokenizedStrategyAddress
-        tokenizedStrategyAddress = _tokenizedStrategyAddress;
-        
-        // Initialize the strategy's storage variables
+        // Initialize the strategy's storage variables.
         _delegateCall(
             abi.encodeCall(
                 ITokenizedStrategy.initialize, 
-                (_asset, _name, _management, _keeper, _emergencyAdmin)
+                (_asset, _name, _management, _keeper, _emergencyAdmin, _donationAddress)
             )
         );
         
         // Store the tokenizedStrategyAddress at the standard implementation
-        // address storage slot so etherscan picks up the interface
+        // address storage slot so etherscan picks up the interface. This gets
+        // stored on initialization and never updated.
         assembly {
             sstore(
                 // keccak256('eip1967.proxy.implementation' - 1)
                 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc,
-                _tokenizedStrategyAddress
+                TOKENIZED_STRATEGY_ADDRESS
             )
         }
     }
@@ -471,7 +465,7 @@ abstract contract BaseStrategy is Initializable {
      */
     function _delegateCall(bytes memory _calldata) internal returns (bytes memory) {
         // Delegate call the tokenized strategy with provided calldata.
-        (bool success, bytes memory result) = tokenizedStrategyAddress.delegatecall(_calldata);
+        (bool success, bytes memory result) = TOKENIZED_STRATEGY_ADDRESS.delegatecall(_calldata);
 
         // If the call reverted. Return the error.
         if (!success) {
@@ -500,7 +494,7 @@ abstract contract BaseStrategy is Initializable {
      */
     fallback() external {
         // load our target address
-        address _tokenizedStrategyAddress = tokenizedStrategyAddress;
+        address _tokenizedStrategyAddress = TOKENIZED_STRATEGY_ADDRESS;
         // Execute external function using delegatecall and return any value.
         assembly {
             // Copy function selector and any arguments.
