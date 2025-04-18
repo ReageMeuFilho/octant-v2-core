@@ -10,11 +10,15 @@ import { MockYieldStrategy } from "../../mocks/MockYieldStrategy.sol";
 import { Constants } from "./utils/constants.sol";
 import { IERC4626Payable } from "../../../src/interfaces/IERC4626Payable.sol";
 import { Checks } from "./utils/checks.sol";
+import { VaultFactory } from "../../../src/dragons/vaults/VaultFactory.sol";
 
 contract VaultSharesTest is Test {
+    Vault vaultImplementation;
     Vault vault;
     MockERC20 asset;
     MockYieldStrategy strategy;
+    VaultFactory vaultFactory;
+
     address gov;
     address fish;
     address bunny;
@@ -42,11 +46,13 @@ contract VaultSharesTest is Test {
 
         // Give fish some tokens
         asset.mint(fish, fishAmount);
+
+        vaultImplementation = new Vault();
+        vaultFactory = new VaultFactory("Test Vault", address(vaultImplementation), gov);
     }
 
     function createVault(uint256 depositLimit) internal returns (Vault) {
-        Vault newVault = new Vault();
-        newVault.initialize(address(asset), "Test Vault", "tvTEST", gov, WEEK);
+        Vault newVault = Vault(vaultFactory.deployNewVault(address(asset), "Test Vault", "tvTEST", gov, WEEK));
 
         // Set up roles for governance
         newVault.addRole(gov, IVault.Roles.DEPOSIT_LIMIT_MANAGER);

@@ -8,6 +8,7 @@ import { MockERC20 } from "../../mocks/MockERC20.sol";
 import { MockYieldStrategy } from "../../mocks/MockYieldStrategy.sol";
 import { MockLockedStrategy } from "../../mocks/MockLockedStrategy.sol";
 import { MockLossyStrategy } from "../../mocks/MockLossyStrategy.sol";
+import { VaultFactory } from "../../../src/dragons/vaults/VaultFactory.sol";
 
 contract StrategyWithdrawTest is Test {
     uint256 constant DAY = 86400;
@@ -18,6 +19,8 @@ contract StrategyWithdrawTest is Test {
     address gov;
     address fish;
     uint256 fishAmount;
+    VaultFactory vaultFactory;
+    Vault vaultImplementation;
 
     function setUp() public {
         gov = address(this);
@@ -27,14 +30,9 @@ contract StrategyWithdrawTest is Test {
         asset = new MockERC20();
 
         // Create and initialize the vault
-        vault = new Vault();
-        vault.initialize(
-            address(asset),
-            "Test Vault",
-            "tvTEST",
-            gov,
-            7 days // profitMaxUnlockTime
-        );
+        vaultImplementation = new Vault();
+        vaultFactory = new VaultFactory("Test Vault", address(vaultImplementation), gov);
+        vault = Vault(vaultFactory.deployNewVault(address(asset), "Test Vault", "tvTEST", gov, 7 days));
 
         // add roles
         vault.addRole(gov, IVault.Roles.ADD_STRATEGY_MANAGER);

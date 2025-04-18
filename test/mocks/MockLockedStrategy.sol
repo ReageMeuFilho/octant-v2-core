@@ -9,6 +9,10 @@ contract MockLockedStrategy is MockYieldStrategy {
 
     constructor(address _asset, address _vault) MockYieldStrategy(_asset, _vault) {}
 
+    function freeLockedFunds() external {
+        lockedFunds = 0;
+    }
+
     function setLockedFunds(uint256 _lockedFunds, uint256 _unlockTime) external {
         lockedFunds = _lockedFunds;
         unlockTime = block.timestamp + _unlockTime;

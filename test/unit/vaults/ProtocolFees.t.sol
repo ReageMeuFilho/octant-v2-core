@@ -3,19 +3,20 @@ pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
 import { Vault } from "../../../src/dragons/vaults/Vault.sol";
+import { VaultFactory } from "../../../src/dragons/vaults/VaultFactory.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IVault } from "../../../src/interfaces/IVault.sol";
 import { MockERC20 } from "../../mocks/MockERC20.sol";
 import { MockYieldStrategy } from "../../mocks/MockYieldStrategy.sol";
 import { MockFlexibleAccountant } from "../../mocks/MockFlexibleAccountant.sol";
-import { MockFactory } from "../../mocks/MockVaultFactory.sol";
 
 contract ProtocolFeesTest is Test {
-    Vault public vault;
+    Vault vaultImplementation;
+    Vault vault;
     MockERC20 public asset;
     MockYieldStrategy public strategy;
     MockFlexibleAccountant public accountant;
-    MockFactory public factory;
+    VaultFactory vaultFactory;
 
     address public gov = address(0x1);
     address public fish = address(0x2);
@@ -33,38 +34,39 @@ contract ProtocolFeesTest is Test {
         asset.mint(gov, 1_000_000e18);
         asset.mint(fish, fishAmount);
 
+        vaultImplementation = new Vault();
+
         // Deploy factory
         vm.prank(gov);
-        factory = new MockFactory(0, feeRecipient);
+        vaultFactory = new VaultFactory("Test Vault", address(vaultImplementation), gov);
 
         // Deploy accountant
         accountant = new MockFlexibleAccountant(address(asset));
     }
 
     function createVault() internal returns (Vault) {
-        vm.startPrank(address(factory));
-        Vault newVault = new Vault();
-        newVault.initialize(address(asset), "Test Vault", "vTST", gov, 7 days);
+        vm.startPrank(address(vaultFactory));
+        vault = Vault(vaultFactory.deployNewVault(address(asset), "Test Vault", "vTST", gov, 7 days));
         vm.stopPrank();
 
         vm.startPrank(gov);
         // Add roles to gov
-        newVault.addRole(gov, IVault.Roles.ADD_STRATEGY_MANAGER);
-        newVault.addRole(gov, IVault.Roles.REVOKE_STRATEGY_MANAGER);
-        newVault.addRole(gov, IVault.Roles.FORCE_REVOKE_MANAGER);
-        newVault.addRole(gov, IVault.Roles.DEBT_MANAGER);
-        newVault.addRole(gov, IVault.Roles.ACCOUNTANT_MANAGER);
-        newVault.addRole(gov, IVault.Roles.REPORTING_MANAGER);
-        newVault.addRole(gov, IVault.Roles.DEPOSIT_LIMIT_MANAGER);
-        newVault.addRole(gov, IVault.Roles.WITHDRAW_LIMIT_MANAGER);
-        newVault.addRole(gov, IVault.Roles.MAX_DEBT_MANAGER);
-        newVault.addRole(gov, IVault.Roles.MINIMUM_IDLE_MANAGER);
+        vault.addRole(gov, IVault.Roles.ADD_STRATEGY_MANAGER);
+        vault.addRole(gov, IVault.Roles.REVOKE_STRATEGY_MANAGER);
+        vault.addRole(gov, IVault.Roles.FORCE_REVOKE_MANAGER);
+        vault.addRole(gov, IVault.Roles.DEBT_MANAGER);
+        vault.addRole(gov, IVault.Roles.ACCOUNTANT_MANAGER);
+        vault.addRole(gov, IVault.Roles.REPORTING_MANAGER);
+        vault.addRole(gov, IVault.Roles.DEPOSIT_LIMIT_MANAGER);
+        vault.addRole(gov, IVault.Roles.WITHDRAW_LIMIT_MANAGER);
+        vault.addRole(gov, IVault.Roles.MAX_DEBT_MANAGER);
+        vault.addRole(gov, IVault.Roles.MINIMUM_IDLE_MANAGER);
 
         // Set deposit limit to max
-        newVault.setDepositLimit(type(uint256).max, true);
+        vault.setDepositLimit(type(uint256).max, true);
         vm.stopPrank();
 
-        return newVault;
+        return vault;
     }
 
     function createStrategy(Vault _vault) internal returns (MockYieldStrategy) {
@@ -91,8 +93,10 @@ contract ProtocolFeesTest is Test {
     }
 
     function setFactoryFeeConfig(uint256 protocolFee, address recipient) internal {
-        vm.prank(gov);
-        factory.setProtocolFeeConfig(uint16(protocolFee), recipient);
+        vm.startPrank(gov);
+        vaultFactory.setProtocolFeeRecipient(recipient);
+        vaultFactory.setProtocolFeeBps(uint16(protocolFee));
+        vm.stopPrank();
     }
 
     function setupWithAccountant(
@@ -127,7 +131,7 @@ contract ProtocolFeesTest is Test {
         uint256 amount = fishAmount / 10;
 
         // Verify factory has no protocol fee config
-        (uint256 fee, ) = factory.protocolFeeConfig();
+        (uint256 fee, ) = vaultFactory.protocolFeeConfig(address(0));
         assertEq(fee, 0, "Protocol fee should be 0");
 
         // Create vault and strategy
