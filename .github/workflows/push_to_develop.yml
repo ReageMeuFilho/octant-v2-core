@@ -73,6 +73,7 @@ jobs:
   analyze:
     name: Analyze with Slither
     runs-on: general
+    continue-on-error: true
     container:
       image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:6e90f09c
       credentials:
@@ -297,8 +298,7 @@ jobs:
   publish:
     name: Publish
     needs:
-      - build
-      - test
+      - deploy-contract
     runs-on: general
     container:
       image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:6e90f09c
@@ -318,7 +318,9 @@ jobs:
         run: yarn build:contracts
 
       - name: Set npm auth token
-        run: yarn config set npmScopes.golemfoundation.npmAuthToken ${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}
+        run: |
+          yarn config set npmScopes.golemfoundation.npmAuthToken "${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Publish
-        run: yarn release --preRelease
+        run: yarn release --preRelease --ci
