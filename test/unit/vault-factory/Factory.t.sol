@@ -138,7 +138,7 @@ contract VaultFactoryTest is Test {
 
         // Try to initialize the original vault
         vm.prank(gov);
-        vm.expectRevert("initialized");
+        vm.expectRevert(IVault.AlreadyInitialized.selector);
         IVault(original).initialize(address(asset), "first_vault", "fv", bunny, WEEK);
 
         // Deploy a new vault
@@ -152,7 +152,7 @@ contract VaultFactoryTest is Test {
 
         // Try to reinitialize the new vault
         vm.prank(gov);
-        vm.expectRevert("initialized");
+        vm.expectRevert(IVault.AlreadyInitialized.selector);
         newVault.initialize(address(asset), "first_vault", "fv", bunny, WEEK);
     }
 }
