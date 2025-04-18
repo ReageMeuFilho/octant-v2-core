@@ -16,8 +16,95 @@ env:
   FOUNDRY_PROFILE: ci
 
 jobs:
+  format:
+    name: Check formatting
+    runs-on: general
+    container:
+      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:6e90f09c
+      credentials:
+        username: _json_key_base64
+        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Init env
+        run: yarn install
+
+      - name: Check formatting
+        run: yarn format:check
+
+  lint:
+    name: Run linter
+    runs-on: general
+    container:
+      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:6e90f09c
+      credentials:
+        username: _json_key_base64
+        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Init env
+        run: yarn install
+
+      - name: Linter
+        run: yarn lint
+
+  lint-commits:
+    name: Lint commits
+    runs-on: general
+    container:
+      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:6e90f09c
+      credentials:
+        username: _json_key_base64
+        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Init env
+        run: yarn install
+
+      - name: Lint commits
+        run: yarn lint:commits
+
+  analyze:
+    name: Analyze with Slither
+    runs-on: general
+    container:
+      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:6e90f09c
+      credentials:
+        username: _json_key_base64
+        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Init env
+        run: yarn install
+
+      - name: Run Slither
+        shell: "bash {0}"
+        run: |
+          yarn slither:ci
+          exit_code=$?
+          echo '```' > $GITHUB_STEP_SUMMARY
+          cat reports/slither.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          exit $exit_code
+
   build-image:
     name: Build Docker Image
+    needs:
+      - format
+      - lint
+      - lint-commits
     runs-on:
       - general
     steps:
@@ -59,52 +146,6 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=registry,ref=${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/ci/core:buildcache
           cache-to: type=registry,ref=${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/ci/core:buildcache,mode=max
-
-  format:
-    name: Check formatting
-    needs: build-image
-    runs-on: general
-    container:
-      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/ci/core:${{ github.sha }}
-      credentials:
-        username: _json_key_base64
-        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
-
-    steps:
-      - name: Check formatting
-        run: "cd /app; yarn format:check"
-
-  lint:
-    name: Run linter
-    needs: build-image
-    runs-on: general
-    container:
-      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/ci/core:${{ github.sha }}
-      credentials:
-        username: _json_key_base64
-        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
-
-    steps:
-      - name: Linter
-        run: "cd /app; yarn lint"
-
-  lint-commits:
-    name: Lint commits
-    runs-on: general
-    container: node:22
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-
-      - name: Enable corepack
-        run: corepack enable
-
-      - name: Install dependencies
-        run: yarn install
-
-      - name: Lint commits
-        run: yarn lint:commits
 
   # Technically we don't need to build step is done during the docker build
   build:
@@ -214,26 +255,3 @@ jobs:
 #              repo: context.repo.repo,
 #              body: commentBody
 #            });
-
-#  # Blocked by OSU-502
-#  analyze:
-#    name: Analyze with Slither
-#    runs-on: general
-#    steps:
-#      - uses: actions/checkout@v4
-#        with:
-#          submodules: recursive
-#
-#      - name: Setup node
-#        uses: actions/setup-node@v4
-#        with:
-#          node-version-file: 'package.json'
-#
-#      - name: Install Foundry
-#        uses: onbjerg/foundry-toolchain@v1
-#
-#      - name: Install dependencies
-#        run: "corepack enable && yarn install"
-#
-#      - name: Run Slither
-#        run: "yarn slither:setup && yarn slither"
