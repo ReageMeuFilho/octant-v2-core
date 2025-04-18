@@ -18,12 +18,13 @@ contract ModuleProxyFactoryTest is Test {
     address public splitCheckerImpl;
     address public dragonRouterImpl;
     address public linearAllowanceImpl;
+    address public metapool;
     MultiSendCallOnly public multiSendCallOnly;
     MockSafe public safe;
     address public governance;
 
     function setUp() public {
-        moduleProxyFactory = new ModuleProxyFactory();
+        metapool = makeAddr("metapool");
         // Deploy a mock module implementation
         mockModuleMaster = address(new MockModule());
 
@@ -40,6 +41,14 @@ contract ModuleProxyFactoryTest is Test {
         splitCheckerImpl = address(new SplitChecker());
         dragonRouterImpl = address(new MockSafeDragonRouter(address(0)));
         linearAllowanceImpl = address(new MockLinearAllowance());
+
+        moduleProxyFactory = new ModuleProxyFactory(
+            governance,
+            governance,
+            metapool,
+            splitCheckerImpl,
+            dragonRouterImpl
+        );
     }
 
     function testCalculateProxyAddress() public {
