@@ -3,15 +3,16 @@ pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
 import { Vault } from "../../../src/dragons/vaults/Vault.sol";
+import { VaultFactory } from "../../../src/dragons/vaults/VaultFactory.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IVault } from "../../../src/interfaces/IVault.sol";
 import { MockERC20 } from "../../mocks/MockERC20.sol";
-import { MockFactory } from "../../mocks/MockVaultFactory.sol";
 
 contract ERC20Test is Test {
-    Vault public vault;
+    Vault vaultImplementation;
+    Vault vault;
     MockERC20 public asset;
-    MockFactory public factory;
+    VaultFactory vaultFactory;
 
     address public gov = address(0x1);
     address public fish = address(0x2);
@@ -30,12 +31,12 @@ contract ERC20Test is Test {
 
         // Deploy factory
         vm.prank(gov);
-        factory = new MockFactory(0, feeRecipient);
+        vaultImplementation = new Vault();
+        vaultFactory = new VaultFactory("Test Vault", address(vaultImplementation), gov);
 
         // Deploy vault
-        vm.startPrank(address(factory));
-        vault = new Vault();
-        vault.initialize(address(asset), "Test Vault", "vTST", gov, 7 days);
+        vm.startPrank(address(vaultFactory));
+        vault = Vault(vaultFactory.deployNewVault(address(asset), "Test Vault", "vTST", gov, 7 days));
         vm.stopPrank();
 
         vm.startPrank(gov);

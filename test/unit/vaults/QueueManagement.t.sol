@@ -10,14 +10,15 @@ import { MockYieldStrategy } from "../../mocks/MockYieldStrategy.sol";
 import { MockFactory } from "../../mocks/MockFactory.sol";
 import { MockAccountant } from "../../mocks/MockAccountant.sol";
 import { MockFlexibleAccountant } from "../../mocks/MockFlexibleAccountant.sol";
-
+import { VaultFactory } from "../../../src/dragons/vaults/VaultFactory.sol";
 contract QueueManagementTest is Test {
-    Vault public vault;
+    Vault vaultImplementation;
+    Vault vault;
     MockERC20 public asset;
     MockYieldStrategy public strategy;
     MockAccountant public accountant;
     MockFlexibleAccountant public flexibleAccountant;
-
+    VaultFactory vaultFactory;
     MockFactory public factory;
     address public gov = address(0x1);
     address public fish = address(0x2);
@@ -43,8 +44,9 @@ contract QueueManagementTest is Test {
 
         // Deploy vault
         vm.startPrank(address(factory));
-        vault = new Vault();
-        vault.initialize(address(asset), "Test Vault", "vTST", gov, 7 days);
+        vaultImplementation = new Vault();
+        vaultFactory = new VaultFactory("Test Vault", address(vaultImplementation), gov);
+        vault = Vault(vaultFactory.deployNewVault(address(asset), "Test Vault", "vTST", gov, 7 days));
         vm.stopPrank();
 
         vm.startPrank(gov);

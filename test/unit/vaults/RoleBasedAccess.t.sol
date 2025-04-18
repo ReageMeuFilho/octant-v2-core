@@ -7,18 +7,20 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IVault } from "../../../src/interfaces/IVault.sol";
 import { MockERC20 } from "../../mocks/MockERC20.sol";
 import { MockYieldStrategy } from "../../mocks/MockYieldStrategy.sol";
-import { MockFactory } from "../../mocks/MockFactory.sol";
+import { VaultFactory } from "../../../src/dragons/vaults/VaultFactory.sol";
+
 import { MockAccountant } from "../../mocks/MockAccountant.sol";
 import { MockFlexibleAccountant } from "../../mocks/MockFlexibleAccountant.sol";
 
 contract RoleBasedAccessTest is Test {
-    Vault public vault;
+    Vault vaultImplementation;
+    Vault vault;
     MockERC20 public asset;
     MockYieldStrategy public strategy;
     MockAccountant public accountant;
     MockFlexibleAccountant public flexibleAccountant;
+    VaultFactory vaultFactory;
 
-    MockFactory public factory;
     address public gov = address(0x1);
     address public bunny = address(0x4); // Added bunny address for role testing
     address public feeRecipient = address(0x3);
@@ -36,16 +38,18 @@ contract RoleBasedAccessTest is Test {
         asset = new MockERC20();
         asset.mint(gov, 1_000_000e18);
 
+        // deploy vault implementation
+        vaultImplementation = new Vault();
+
         // deploy factory
         vm.prank(gov);
-        factory = new MockFactory(0, feeRecipient);
+        vaultFactory = new VaultFactory("Test Vault", address(vaultImplementation), gov);
 
         flexibleAccountant = new MockFlexibleAccountant(address(asset));
 
         // Deploy vault
-        vm.startPrank(address(factory));
-        vault = new Vault();
-        vault.initialize(address(asset), "Test Vault", "vTST", gov, 7 days);
+        vm.startPrank(address(vaultFactory));
+        vault = Vault(vaultFactory.deployNewVault(address(asset), "Test Vault", "vTST", gov, 7 days));
         vm.stopPrank();
 
         vm.startPrank(gov);

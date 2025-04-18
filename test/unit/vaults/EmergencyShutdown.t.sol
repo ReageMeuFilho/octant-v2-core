@@ -3,6 +3,7 @@ pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
 import { Vault } from "../../../src/dragons/vaults/Vault.sol";
+import { VaultFactory } from "../../../src/dragons/vaults/VaultFactory.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IVault } from "../../../src/interfaces/IVault.sol";
 import { MockERC20 } from "../../mocks/MockERC20.sol";
@@ -10,9 +11,11 @@ import { MockYieldStrategy } from "../../mocks/MockYieldStrategy.sol";
 import { MockDepositLimitModule } from "../../mocks/MockDepositLimitModule.sol";
 
 contract EmergencyShutdownTest is Test {
+    Vault vaultImplementation;
     Vault vault;
     MockERC20 asset;
     MockYieldStrategy strategy;
+    VaultFactory vaultFactory;
     address gov;
     address panda;
 
@@ -22,15 +25,11 @@ contract EmergencyShutdownTest is Test {
 
         asset = new MockERC20();
 
+        vaultImplementation = new Vault();
+        vaultFactory = new VaultFactory("Test Vault", address(vaultImplementation), gov);
+
         // Create and initialize the vault
-        vault = new Vault();
-        vault.initialize(
-            address(asset),
-            "Test Vault",
-            "tvTEST",
-            gov,
-            7 days // profitMaxUnlockTime
-        );
+        vault = Vault(vaultFactory.deployNewVault(address(asset), "Test Vault", "tvTEST", gov, 7 days));
 
         // Set up strategy
         strategy = new MockYieldStrategy(address(asset), address(vault));

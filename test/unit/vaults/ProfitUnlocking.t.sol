@@ -3,23 +3,25 @@ pragma solidity ^0.8.25;
 
 import "forge-std/Test.sol";
 import { Vault } from "../../../src/dragons/vaults/Vault.sol";
+import { VaultFactory } from "../../../src/dragons/vaults/VaultFactory.sol";
 import { IVault } from "../../../src/interfaces/IVault.sol";
 import { MockERC20 } from "../../mocks/MockERC20.sol";
 import { MockYieldStrategy } from "../../mocks/MockYieldStrategy.sol";
 import { MockAccountant } from "../../mocks/MockAccountant.sol";
-import { MockFactory } from "../../mocks/MockVaultFactory.sol";
+
 import { IFactory } from "../../../src/interfaces/IFactory.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import { MockFlexibleAccountant } from "../../mocks/MockFlexibleAccountant.sol";
 
 contract ProfitUnlockingTest is Test {
+    Vault vaultImplementation;
     Vault vault;
     MockERC20 asset;
     MockYieldStrategy strategy;
     MockAccountant accountant;
     MockFlexibleAccountant flexibleAccountant;
+    VaultFactory vaultFactory;
 
-    MockFactory factory;
     address gov = address(0x1);
     address fish = address(0x2);
     address feeRecipient = address(0x3);
@@ -61,14 +63,14 @@ contract ProfitUnlockingTest is Test {
 
         // deploy factory
         vm.prank(gov);
-        factory = new MockFactory(0, feeRecipient);
 
         flexibleAccountant = new MockFlexibleAccountant(address(asset));
 
         // Deploy vault
-        vm.startPrank(address(factory));
-        vault = new Vault();
-        vault.initialize(address(asset), "Test Vault", "vTST", gov, 7 days);
+        vm.startPrank(address(gov));
+        vaultImplementation = new Vault();
+        vaultFactory = new VaultFactory("Test Vault", address(vaultImplementation), gov);
+        vault = Vault(vaultFactory.deployNewVault(address(asset), "Test Vault", "vTST", gov, 7 days));
         vm.stopPrank();
 
         vm.startPrank(gov);
@@ -2007,10 +2009,11 @@ contract ProfitUnlockingTest is Test {
 
         // Set up factory with protocol fee config
         vm.startPrank(gov);
-        factory.setProtocolFeeConfig(uint16(managementFee), bunny);
+        vaultFactory.setProtocolFeeRecipient(bunny);
+        vaultFactory.setProtocolFeeBps(uint16(managementFee));
         vm.stopPrank();
 
-        // Deploy accountant
+        // Deploy accountan
         vm.startPrank(gov);
         vault.setAccountant(address(flexibleAccountant));
         flexibleAccountant.setFees(address(strategy), managementFee, performanceFee, refundRatio);
