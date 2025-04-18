@@ -5,23 +5,38 @@ import { ISafe } from "../interfaces/Safe.sol";
 import { IModuleProxyFactory } from "../interfaces/IModuleProxyFactory.sol";
 
 contract ModuleProxyFactory is IModuleProxyFactory {
-    /// @notice The governance address
+    /*
+        @dev
+        The governance address
+    */
     address public immutable GOVERNANCE;
-    /// @notice The regen governance address
+    /*
+        @dev
+        The regen governance address
+    */
     address public immutable REGEN_GOVERNANCE;
     /// @notice The split checker proxy address
     address public immutable SPLIT_CHECKER;
-    /// @notice The metapool address
+    /*
+        @dev
+        The metapool address
+    */
     address public immutable METAPOOL;
-    /// @notice The dragon router implementation address
+    /*
+        @dev
+        The dragon router implementation address
+    */
     address public immutable DRAGON_ROUTER_IMPLEMENTATION;
 
-    /// @notice Constructor
-    /// @param _governance The governance address
-    /// @param _regenGovernance The regen governance address
-    /// @param _splitCheckerImplementation The split checker proxy address
-    /// @param _metapool The metapool address
-    /// @param _dragonRouterImplementation The dragon router implementation address
+    /* 
+        @dev
+        Constructor
+        @param _governance The governance address
+        @param _regenGovernance The regen governance address
+        @param _metapool The metapool address
+        @param _splitCheckerImplementation The split checker proxy address
+        @param _dragonRouterImplementation The dragon router implementation address
+    */
     constructor(
         address _governance,
         address _regenGovernance,
@@ -52,12 +67,7 @@ contract ModuleProxyFactory is IModuleProxyFactory {
         DRAGON_ROUTER_IMPLEMENTATION = _dragonRouterImplementation;
     }
 
-    /// @notice Creates a proxy for an arbitrary target
-    /// @param target The target address
-    /// @param salt The salt value
-    /// @return result The proxy address
-    /// @custom:error ZeroAddress is thrown if the provided address is a zero address
-    /// @custom:error TargetHasNoCode is thrown if the provided address has no code deployed
+    /* inheritdoc IModuleProxyFactory */
     function createProxy(address target, bytes32 salt) internal returns (address payable result) {
         _ensureNonzeroAddress(target);
         // NOTE: Magic number https://github.com/thebor1337/solidity_sandbox/blob/f8a678f4cbabd22831e646830e299c75e75dd76f/contracts/Proxy/ERC1167/Proxy.huff#L4
@@ -73,11 +83,7 @@ contract ModuleProxyFactory is IModuleProxyFactory {
         if (result == address(0)) revert TakenAddress(result);
     }
 
-    /// @notice Deploys a module proxy
-    /// @param masterCopy The master copy address
-    /// @param initializer The initializer data
-    /// @param saltNonce The salt nonce
-    /// @return proxy The proxy address
+    /* inheritdoc IModuleProxyFactory */
     function deployModule(
         address masterCopy,
         bytes memory initializer,
@@ -90,12 +96,7 @@ contract ModuleProxyFactory is IModuleProxyFactory {
         emit ModuleProxyCreation(msg.sender, proxy, masterCopy);
     }
 
-    /// @notice Deploys a dragon router
-    /// @param owner The owner address (the dragon vault safe)
-    /// @param strategies The strategies addresses
-    /// @param opexVault The opex vault address
-    /// @param saltNonce The salt nonce
-    /// @return proxy The proxy address
+    /* inheritdoc IModuleProxyFactory */
     function deployDragonRouter(
         address owner,
         address[] memory strategies,
@@ -115,11 +116,7 @@ contract ModuleProxyFactory is IModuleProxyFactory {
         return proxy;
     }
 
-    /// @notice Deploys a module and enables it on the provided safe
-    /// @param masterCopy The master copy address
-    /// @param data The data to pass to the initializer
-    /// @param saltNonce The salt nonce
-    /// @return proxy The proxy address
+    /* inheritdoc IModuleProxyFactory */
     function deployAndEnableModuleFromSafe(
         address masterCopy,
         bytes memory data,
@@ -134,6 +131,7 @@ contract ModuleProxyFactory is IModuleProxyFactory {
         ISafe(address(this)).enableModule(proxy);
     }
 
+    /* inheritdoc IModuleProxyFactory */
     function calculateProxyAddress(address target, bytes32 salt) public view returns (address) {
         bytes memory deployment = abi.encodePacked(
             hex"602d8060093d393df3363d3d373d3d3d363d73",
@@ -147,6 +145,7 @@ contract ModuleProxyFactory is IModuleProxyFactory {
         return address(uint160(uint256(data)));
     }
 
+    /* inheritdoc IModuleProxyFactory */
     function getModuleAddress(
         address masterCopy,
         bytes memory initializer,
@@ -156,9 +155,12 @@ contract ModuleProxyFactory is IModuleProxyFactory {
         return calculateProxyAddress(masterCopy, salt);
     }
 
-    /// @notice Checks if the provided address is nonzero, reverts otherwise
-    /// @param address_ Address to check
-    /// @custom:error ZeroAddress is thrown if the provided address is a zero address
+    /*
+        @dev
+        Checks if the provided address is nonzero, reverts otherwise
+        @param address_ Address to check
+        @custom:error ZeroAddress is thrown if the provided address is a zero address
+    */
     function _ensureNonzeroAddress(address address_) internal pure {
         if (address_ == address(0)) {
             revert ZeroAddress();
