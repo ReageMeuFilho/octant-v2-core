@@ -1,4 +1,4 @@
-/* solhint-disable gas-custom-errors, code-complexity */
+/* solhint-disable code-complexity */
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.25;
 
@@ -134,7 +134,7 @@ contract Vault is IVault {
     bool private locked;
 
     modifier nonReentrant() {
-        require(!locked, "reentrancy");
+        require(!locked, Reentrancy());
         locked = true;
         _;
         locked = false;
@@ -161,9 +161,9 @@ contract Vault is IVault {
         address _roleManager,
         uint256 _profitMaxUnlockTime
     ) external override {
-        require(asset == address(0), "initialized");
-        require(_asset != address(0), "ZERO ADDRESS");
-        require(_roleManager != address(0), "ZERO ADDRESS");
+        require(asset == address(0), AlreadyInitialized());
+        require(_asset != address(0), ZeroAddress());
+        require(_roleManager != address(0), ZeroAddress());
 
         asset = _asset;
         // Get the decimals for the vault to use.
@@ -173,7 +173,7 @@ contract Vault is IVault {
         factory = msg.sender;
 
         // Must be less than one year for report cycles
-        require(_profitMaxUnlockTime <= 31_556_952, "profit unlock time too long");
+        require(_profitMaxUnlockTime <= 31_556_952, ProfitUnlockTimeTooLong());
         profitMaxUnlockTime_ = _profitMaxUnlockTime;
 
         name = _name;
@@ -189,7 +189,7 @@ contract Vault is IVault {
      * @param _name The new name for the vault.
      */
     function setName(string memory _name) external override {
-        require(msg.sender == roleManager, "not allowed");
+        require(msg.sender == roleManager, NotAllowed());
         name = _name;
     }
 
@@ -199,7 +199,7 @@ contract Vault is IVault {
      * @param _symbol The new name for the vault.
      */
     function setSymbol(string memory _symbol) external override {
-        require(msg.sender == roleManager, "not allowed");
+        require(msg.sender == roleManager, NotAllowed());
         symbol = _symbol;
     }
 
@@ -223,11 +223,11 @@ contract Vault is IVault {
      */
     function setDefaultQueue(address[] calldata newDefaultQueue) external override {
         _enforceRole(msg.sender, Roles.QUEUE_MANAGER);
-        require(newDefaultQueue.length <= MAX_QUEUE, "max queue length reached");
+        require(newDefaultQueue.length <= MAX_QUEUE, MaxQueueLengthReached());
 
         // Make sure every strategy in the new queue is active.
         for (uint256 i = 0; i < newDefaultQueue.length; i++) {
-            require(_strategies[newDefaultQueue[i]].activation != 0, "inactive strategy");
+            require(_strategies[newDefaultQueue[i]].activation != 0, InactiveStrategy());
         }
 
         // Save the new queue.
@@ -272,7 +272,7 @@ contract Vault is IVault {
      * @param shouldOverride If a `depositLimitModule` already set should be overridden.
      */
     function setDepositLimit(uint256 _depositLimit, bool shouldOverride) external override {
-        require(shutdown_ == false, "shutdown");
+        require(shutdown_ == false, VaultShutdown());
         _enforceRole(msg.sender, Roles.DEPOSIT_LIMIT_MANAGER);
 
         // If we are overriding the deposit limit module.
@@ -284,7 +284,7 @@ contract Vault is IVault {
             }
         } else {
             // Make sure the depositLimitModule has been set to address(0).
-            require(depositLimitModule == address(0), "using module");
+            require(depositLimitModule == address(0), UsingModule());
         }
 
         depositLimit = _depositLimit;
@@ -301,7 +301,7 @@ contract Vault is IVault {
      * @param shouldOverride If a `depositLimit` already set should be overridden.
      */
     function setDepositLimitModule(address _depositLimitModule, bool shouldOverride) external override {
-        require(shutdown_ == false, "shutdown");
+        require(shutdown_ == false, VaultShutdown());
         _enforceRole(msg.sender, Roles.DEPOSIT_LIMIT_MANAGER);
 
         // If we are overriding the deposit limit
@@ -313,7 +313,7 @@ contract Vault is IVault {
             }
         } else {
             // Make sure the deposit_limit has been set to uint max.
-            require(depositLimit == type(uint256).max, "using deposit limit");
+            require(depositLimit == type(uint256).max, UsingDepositLimit());
         }
 
         depositLimitModule = _depositLimitModule;
@@ -360,7 +360,7 @@ contract Vault is IVault {
     function setProfitMaxUnlockTime(uint256 newProfitMaxUnlockTime) external override {
         _enforceRole(msg.sender, Roles.PROFIT_UNLOCK_MANAGER);
         // Must be less than one year for report cycles
-        require(newProfitMaxUnlockTime <= 31_556_952, "profit unlock time too long");
+        require(newProfitMaxUnlockTime <= 31_556_952, ProfitUnlockTimeTooLong());
 
         // If setting to 0 we need to reset any locked values.
         if (newProfitMaxUnlockTime == 0) {
@@ -387,7 +387,7 @@ contract Vault is IVault {
      */
     function _enforceRole(address account, Roles role) internal view {
         // Check bit at role position
-        require(roles[account] & (1 << uint256(role)) != 0, "not allowed");
+        require(roles[account] & (1 << uint256(role)) != 0, NotAllowed());
     }
 
     /**
@@ -398,7 +398,7 @@ contract Vault is IVault {
      * @param rolesBitmask The roles the account should hold.
      */
     function setRole(address account, uint256 rolesBitmask) external override {
-        require(msg.sender == roleManager, "not allowed");
+        require(msg.sender == roleManager, NotAllowed());
         // Store the enum value directly
         roles[account] = rolesBitmask;
         emit RoleSet(account, rolesBitmask);
@@ -412,7 +412,7 @@ contract Vault is IVault {
      * @param role The new role/s to add to account.
      */
     function addRole(address account, Roles role) external override {
-        require(msg.sender == roleManager, "not allowed");
+        require(msg.sender == roleManager, NotAllowed());
         // Add the role with a bitwise OR
         roles[account] = roles[account] | (1 << uint256(role));
         emit RoleSet(account, roles[account]);
@@ -426,7 +426,7 @@ contract Vault is IVault {
      * @param role The Role/s to remove.
      */
     function removeRole(address account, Roles role) external override {
-        require(msg.sender == roleManager, "not allowed");
+        require(msg.sender == roleManager, NotAllowed());
 
         // Bitwise AND with NOT to remove the role
         roles[account] = roles[account] & ~(1 << uint256(role));
@@ -441,7 +441,7 @@ contract Vault is IVault {
      * @param _roleManager The new role manager address.
      */
     function transferRoleManager(address _roleManager) external override {
-        require(msg.sender == roleManager, "not allowed");
+        require(msg.sender == roleManager, NotAllowed());
         futureRoleManager = _roleManager;
 
         emit UpdateFutureRoleManager(_roleManager);
@@ -451,7 +451,7 @@ contract Vault is IVault {
      * @notice Accept the role manager transfer.
      */
     function acceptRoleManager() external override {
-        require(msg.sender == futureRoleManager, "not future role manager");
+        require(msg.sender == futureRoleManager, NotFutureRoleManager());
         roleManager = msg.sender;
         futureRoleManager = address(0);
 
@@ -514,14 +514,14 @@ contract Vault is IVault {
      */
     function buyDebt(address strategy, uint256 amount) external override nonReentrant {
         _enforceRole(msg.sender, Roles.DEBT_PURCHASER);
-        require(_strategies[strategy].activation != 0, "not active");
+        require(_strategies[strategy].activation != 0, InactiveStrategy());
 
         // Cache the current debt.
         uint256 currentDebt = _strategies[strategy].currentDebt;
         uint256 _amount = amount;
 
-        require(currentDebt > 0, "nothing to buy");
-        require(_amount > 0, "nothing to buy with");
+        require(currentDebt > 0, NothingToBuy());
+        require(_amount > 0, NothingToBuyWith());
 
         if (_amount > currentDebt) {
             _amount = currentDebt;
@@ -532,7 +532,7 @@ contract Vault is IVault {
         // due to strategy issues so won't rely on its conversion rates.
         uint256 shares = (IERC4626Payable(strategy).balanceOf(address(this)) * _amount) / currentDebt;
 
-        require(shares > 0, "cannot buy zero");
+        require(shares > 0, CannotBuyZero());
 
         _erc20SafeTransferFrom(asset, msg.sender, address(this), _amount);
 
@@ -613,7 +613,7 @@ contract Vault is IVault {
      */
     function updateMaxDebtForStrategy(address strategy, uint256 newMaxDebt) external override {
         _enforceRole(msg.sender, Roles.MAX_DEBT_MANAGER);
-        require(_strategies[strategy].activation != 0, "inactive strategy");
+        require(_strategies[strategy].activation != 0, InactiveStrategy());
         _strategies[strategy].maxDebt = newMaxDebt;
 
         emit UpdatedMaxDebtForStrategy(msg.sender, strategy, newMaxDebt);
@@ -634,7 +634,7 @@ contract Vault is IVault {
             vars.newDebt = 0;
         }
 
-        require(vars.newDebt != vars.currentDebt, "new debt equals current debt");
+        require(vars.newDebt != vars.currentDebt, NewDebtEqualsCurrentDebt());
 
         // Determine if we're decreasing or increasing debt
         vars.isDebtDecrease = vars.currentDebt > vars.newDebt;
@@ -678,7 +678,7 @@ contract Vault is IVault {
                 vars.assetsToWithdraw
             );
 
-            require(vars.unrealisedLossesShare == 0, "strategy has unrealised losses");
+            require(vars.unrealisedLossesShare == 0, StrategyHasUnrealisedLosses());
 
             // Execute the withdrawal
             vars.preBalance = IERC20(vars._asset).balanceOf(address(this));
@@ -692,7 +692,7 @@ contract Vault is IVault {
             if (vars.actualAmount < vars.assetsToWithdraw && maxLoss < MAX_BPS) {
                 require(
                     vars.assetsToWithdraw - vars.actualAmount <= (vars.assetsToWithdraw * maxLoss) / MAX_BPS,
-                    "too much loss"
+                    TooMuchLoss()
                 );
             }
             // Handle case where we got more than expected
@@ -785,7 +785,7 @@ contract Vault is IVault {
      */
     function shutdownVault() external override {
         _enforceRole(msg.sender, Roles.EMERGENCY_MANAGER);
-        require(shutdown_ == false, "already shutdown");
+        require(shutdown_ == false, AlreadyShutdown());
 
         // Shutdown the vault.
         shutdown_ = true;
@@ -902,7 +902,7 @@ contract Vault is IVault {
      * @return True if the transfer was successful.
      */
     function transfer(address receiver, uint256 amount) external override returns (bool) {
-        require(receiver != address(this) && receiver != address(0), "invalid receiver");
+        require(receiver != address(this) && receiver != address(0), InvalidReceiver());
         _transfer(msg.sender, receiver, amount);
         return true;
     }
@@ -915,7 +915,7 @@ contract Vault is IVault {
      * @return True if the transfer was successful.
      */
     function transferFrom(address sender, address receiver, uint256 amount) external override returns (bool) {
-        require(receiver != address(this) && receiver != address(0), "invalid receiver");
+        require(receiver != address(this) && receiver != address(0), InvalidReceiver());
         _spendAllowance(sender, msg.sender, amount);
         _transfer(sender, receiver, amount);
         return true;
@@ -1132,7 +1132,7 @@ contract Vault is IVault {
         uint256 assetsNeeded
     ) external view override returns (uint256) {
         uint256 currentDebt = _strategies[strategy].currentDebt;
-        require(currentDebt >= assetsNeeded, "not enough debt");
+        require(currentDebt >= assetsNeeded, NotEnoughDebt());
 
         return _assessShareOfUnrealisedLosses(strategy, currentDebt, assetsNeeded);
     }
@@ -1205,7 +1205,7 @@ contract Vault is IVault {
         // Unlimited approval does nothing (saves an SSTORE)
         uint256 currentAllowance = allowance[owner][spender];
         if (currentAllowance < type(uint256).max) {
-            require(currentAllowance >= amount, "insufficient allowance");
+            require(currentAllowance >= amount, InsufficientAllowance());
             _approve(owner, spender, currentAllowance - amount);
         }
     }
@@ -1215,7 +1215,7 @@ contract Vault is IVault {
      */
     function _transfer(address sender, address receiver, uint256 amount) internal {
         uint256 senderBalance = balanceOf_[sender];
-        require(senderBalance >= amount, "insufficient funds");
+        require(senderBalance >= amount, InsufficientFunds());
         balanceOf_[sender] = senderBalance - amount;
         balanceOf_[receiver] += amount;
         emit Transfer(sender, receiver, amount);
@@ -1242,8 +1242,8 @@ contract Vault is IVault {
         bytes32 r,
         bytes32 s
     ) internal returns (bool) {
-        require(owner != address(0), "invalid owner");
-        require(deadline >= block.timestamp, "permit expired");
+        require(owner != address(0), InvalidOwner());
+        require(deadline >= block.timestamp, PermitExpired());
         uint256 nonce = nonces[owner];
         bytes32 digest = keccak256(
             abi.encodePacked(
@@ -1253,7 +1253,7 @@ contract Vault is IVault {
             )
         );
         address recoveredAddress = ecrecover(digest, v, r, s);
-        require(recoveredAddress != address(0) && recoveredAddress == owner, "invalid signature");
+        require(recoveredAddress != address(0) && recoveredAddress == owner, InvalidSignature());
 
         allowance[owner][spender] = amount;
         nonces[owner] = nonce + 1;
@@ -1364,7 +1364,7 @@ contract Vault is IVault {
         (bool success, bytes memory data) = token.call(
             abi.encodeWithSelector(IERC20.approve.selector, spender, amount)
         );
-        require(success && (data.length == 0 || abi.decode(data, (bool))), "approval failed");
+        require(success && (data.length == 0 || abi.decode(data, (bool))), ApprovalFailed());
     }
 
     /**
@@ -1374,7 +1374,7 @@ contract Vault is IVault {
         (bool success, bytes memory data) = token.call(
             abi.encodeWithSelector(IERC20.transferFrom.selector, sender, receiver, amount)
         );
-        require(success && (data.length == 0 || abi.decode(data, (bool))), "transfer failed");
+        require(success && (data.length == 0 || abi.decode(data, (bool))), TransferFailed());
     }
 
     /**
@@ -1384,7 +1384,7 @@ contract Vault is IVault {
         (bool success, bytes memory data) = token.call(
             abi.encodeWithSelector(IERC20.transfer.selector, receiver, amount)
         );
-        require(success && (data.length == 0 || abi.decode(data, (bool))), "transfer failed");
+        require(success && (data.length == 0 || abi.decode(data, (bool))), TransferFailed());
     }
 
     /**
@@ -1465,7 +1465,7 @@ contract Vault is IVault {
             // Process each strategy in the queue
             for (uint256 i = 0; i < vars.withdrawalStrategies.length; i++) {
                 address strategy = vars.withdrawalStrategies[i];
-                require(_strategies[strategy].activation != 0, "inactive strategy");
+                require(_strategies[strategy].activation != 0, InactiveStrategy());
 
                 uint256 currentDebt = _strategies[strategy].currentDebt;
                 // Get the maximum amount the vault would withdraw from the strategy
@@ -1527,9 +1527,9 @@ contract Vault is IVault {
      * @dev Handles deposit logic
      */
     function _deposit(address recipient, uint256 assets, uint256 shares) internal {
-        require(assets <= _maxDeposit(recipient), "exceed deposit limit");
-        require(assets > 0, "cannot deposit zero");
-        require(shares > 0, "cannot mint zero");
+        require(assets <= _maxDeposit(recipient), ExceedDepositLimit());
+        require(assets > 0, CannotDepositZero());
+        require(shares > 0, CannotMintZero());
 
         // Transfer the tokens to the vault first.
         _erc20SafeTransferFrom(asset, msg.sender, address(this), assets);
@@ -1598,9 +1598,9 @@ contract Vault is IVault {
      * @dev Adds a new strategy
      */
     function _addStrategy(address newStrategy, bool addToQueue) internal {
-        require(newStrategy != address(this) && newStrategy != address(0), "strategy cannot be zero address");
-        require(IERC4626Payable(newStrategy).asset() == asset, "invalid asset");
-        require(_strategies[newStrategy].activation == 0, "strategy already active");
+        require(newStrategy != address(this) && newStrategy != address(0), StrategyCannotBeZeroAddress());
+        require(IERC4626Payable(newStrategy).asset() == asset, InvalidAsset());
+        require(_strategies[newStrategy].activation == 0, StrategyAlreadyActive());
 
         // Add the new strategy to the mapping.
         _strategies[newStrategy] = StrategyParams({
@@ -1627,7 +1627,7 @@ contract Vault is IVault {
 
         if (strategy != address(this)) {
             // Make sure we have a valid strategy
-            require(_strategies[strategy].activation != 0, "inactive strategy");
+            require(_strategies[strategy].activation != 0, InactiveStrategy());
 
             // Vault assesses profits using 4626 compliant interface
             uint256 strategyShares = IERC4626(strategy).balanceOf(address(this));
@@ -1831,10 +1831,10 @@ contract Vault is IVault {
         uint256 maxLoss,
         address[] memory strategiesParam
     ) internal returns (uint256) {
-        require(receiver != address(0), "ZERO ADDRESS");
-        require(shares > 0, "no shares to redeem");
-        require(assets > 0, "no assets to withdraw");
-        require(maxLoss <= MAX_BPS, "max loss");
+        require(receiver != address(0), ZeroAddress());
+        require(shares > 0, NoSharesToRedeem());
+        require(assets > 0, NoAssetsToWithdraw());
+        require(maxLoss <= MAX_BPS, MaxLossExceeded());
 
         // If there is a withdraw limit module, check the max.
         address _withdrawLimitModule = withdrawLimitModule;
@@ -1842,11 +1842,11 @@ contract Vault is IVault {
             require(
                 assets <=
                     IWithdrawLimitModule(_withdrawLimitModule).availableWithdrawLimit(owner, maxLoss, strategiesParam),
-                "exceed withdraw limit"
+                ExceedWithdrawLimit()
             );
         }
 
-        require(balanceOf_[owner] >= shares, "insufficient shares to redeem");
+        require(balanceOf_[owner] >= shares, InsufficientSharesToRedeem());
 
         if (sender != owner) {
             _spendAllowance(owner, sender, shares);
@@ -1880,7 +1880,7 @@ contract Vault is IVault {
                 address strategy = state.withdrawalStrategies[i];
 
                 // Make sure we have a valid strategy
-                require(_strategies[strategy].activation != 0, "inactive strategy");
+                require(_strategies[strategy].activation != 0, InactiveStrategy());
 
                 // How much the strategy should have
                 uint256 currentDebt = _strategies[strategy].currentDebt;
@@ -1994,13 +1994,13 @@ contract Vault is IVault {
             }
 
             // If we exhaust the queue and still have insufficient total idle, revert
-            require(state.currentTotalIdle >= state.requestedAssets, "insufficient assets in vault");
+            require(state.currentTotalIdle >= state.requestedAssets, InsufficientAssetsInVault());
         }
 
         // Check if there is a loss and a non-default value was set
         if (assets > state.requestedAssets && maxLoss < MAX_BPS) {
             // Assure the loss is within the allowed range
-            require(assets - state.requestedAssets <= (assets * maxLoss) / MAX_BPS, "too much loss");
+            require(assets - state.requestedAssets <= (assets * maxLoss) / MAX_BPS, TooMuchLoss());
         }
 
         // First burn the corresponding shares from the redeemer
@@ -2021,10 +2021,10 @@ contract Vault is IVault {
      * @dev Revokes a strategy
      */
     function _revokeStrategy(address strategy, bool force) internal {
-        require(_strategies[strategy].activation != 0, "strategy not active");
+        require(_strategies[strategy].activation != 0, StrategyNotActive());
 
         if (_strategies[strategy].currentDebt != 0) {
-            require(force, "strategy has debt");
+            require(force, StrategyHasDebt());
             // Vault realizes the full loss of outstanding debt.
             uint256 loss = _strategies[strategy].currentDebt;
             // Adjust total vault debt.
