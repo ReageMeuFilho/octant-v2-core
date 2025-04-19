@@ -80,6 +80,11 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
      */
     event UpdatePendingManagement(address indexed newPendingManagement);
 
+    /**
+     * @notice Emitted when the donation address is updated.
+     */
+    event UpdateDonationAddress(address indexed newDonationAddress);
+
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
     //////////////////////////////////////////////////////////////*/
@@ -89,15 +94,17 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
      * @param _asset Address of the underlying asset.
      * @param _name Name the strategy will use.
      * @param _management Address to set as the strategies `management`.
-     * @param _performanceFeeRecipient Address to receive performance fees.
      * @param _keeper Address to set as strategies `keeper`.
+     * @param _emergencyAdmin Address to set as strategy's `emergencyAdmin`.
+     * @param _donationAddress Address that will receive donations for this specific strategy.
      */
     function initialize(
         address _asset,
         string memory _name,
         address _management,
-        address _performanceFeeRecipient,
-        address _keeper
+        address _keeper,
+        address _emergencyAdmin,
+        address _donationAddress
     ) external;
 
     /*//////////////////////////////////////////////////////////////
@@ -256,6 +263,12 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
     function emergencyAdmin() external view returns (address);
     
     /**
+     * @notice Get the current address that will receive donations from this strategy.
+     * @return Address of donationAddress
+     */
+    function donationAddress() external view returns (address);
+    
+    /**
      * @notice Get the current performance fee charged on profits.
      * denominated in Basis Points where 10_000 == 100%
      * @return Current performance fee.
@@ -330,6 +343,12 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
      * @param _emergencyAdmin New address to set `emergencyAdmin` to.
      */
     function setEmergencyAdmin(address _emergencyAdmin) external;
+    
+    /**
+     * @notice Sets a new address to receive donations from this strategy.
+     * @param _donationAddress New address to set `donationAddress` to.
+     */
+    function setDonationAddress(address _donationAddress) external;
     
     /**
      * @notice Sets the performance fee to be charged on reported gains.

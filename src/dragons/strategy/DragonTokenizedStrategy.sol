@@ -5,47 +5,35 @@ pragma solidity >=0.8.18;
 $$$$$$$$$$$$$$$$$$$$$$$$$B#j]->iiiiiiiiiiiiiiiiiiiiiiiiiiii>-?f*B$$$$$$$$$$$$$$$$$$$$$$$$$
 $$$$$$$$$$$$$$$$$$$$$@zj}~iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii~}fv@$$$$$$$$$$$$$$$$$$$$$
 $$$$$$$$$$$$$$$$$$@z(+iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii+)zB$$$$$$$$$$$$$$$$$$
-$$$$$$$$$$$$$$$$Mf~iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii~t#@$$$$$$$$$$$$$$$
-$$$$$$$$$$$$$@u[iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii?n@$$$$$$$$$$$$$
-$$$$$$$$$$$@z]iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii?u@$$$$$$$$$$$
-$$$$$$$$$$v]iiiiiiiiiiiiiiii,.';iiiiiiiiiiiiiiiiiiiiiiiiii;'."iiiiiiiiiiiiiiii?u$$$$$$$$$$
-$$$$$$$$%)>iiiiiiiiiiiiiii,.    ';iiiiiiiiiiiiiiiiiiiiii;'    ."iiiiiiiiiiiiiiii1%$$$$$$$$
-$$$$$$$c~iiiiiiiiiiiiiii,.        ';iiiiiiiiiiiiiiiiii;'        ."iiiiiiiiiiiiiii~u$$$$$$$
-$$$$$B/>iiiiiiiiiiiiii!'            `IiiiiiiiiiiiiiiI`            .Iiiiiiiiiiiiiii>|%$$$$$
-$$$$@)iiiiiiiiiiiiiiiii;'             `Iiiiiiiiiiil`             ';iiiiiiiiiiiiiiiii}@$$$$
-$$$B|iiiiiiiiiiiiiiiiiiii;'             `Iiiiiiil`             ';iiiiiiiiiiiiiiiiiiii1B$$$
-$$@)iiiiiiiiiiiiiiiiiiiiiii:'             `;iiI`             ':iiiiiiiiiiiiiiiiiiiiiii{B$$
-$$|iiiiiiiiiiiiiiiiiiiiiiiiii;'             ``             ':iiiiiiiiiiiiiiiiiiiiiiiiii1$$
-$v>iiiiiiiiiiiiiiiiiiiiiiiiiiii:'                        ':iiiiiiiiiiiiiiiiiiiiiiiiiiii>x$
-&?iiiiiiiiiiiiiiiiiiiiiiiiiiiiiii:'                    .,iiiiiiiiiiiiiiiiiiiiiiiiiiiiiii-W
-ziiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii:'                .,iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiv
--iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii:'            .,iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii-
-<iiiiiiiiiiiiiiiiiiii!.':iiiiiiiiiiiiii,          "iiiiiiiiiiiiii;'.Iiiiiiiiiiiiiiiiiiiii<
-iiiiiiiiiiiiiiiiiiiii'   ';iiiiiiiiiiiii          Iiiiiiiiiiiii;'   .iiiiiiiiiiiiiiiiiiiii
-iiiiiiiiiiiiiiiiiiii,      ';iiiiiiiiiii          IiiiiiiiiiiI`      `iiiiiiiiiiiiiiiiiiii
-iiiiiiiiiiiiiiiiiiii.        `Iiiiiiiiii          Iiiiiiiii!`         !iiiiiiiiiiiiiiiiiii
-iiiiiiiiiiiiiiiiiii;          :iiiiiiiii          Iiiiiiiii!          ,iiiiiiiiiiiiiiiiiii
-iiiiiiiiiiiiiiiiiii,          iiiiiiiiii          Iiiiiiiiii.         ^iiiiiiiiiiiiiiiiiii
-<iiiiiiiiiiiiiiiiii,          iiiiiiiiii          Iiiiiiiiii'         ^iiiiiiiiiiiiiiiiii<
--iiiiiiiiiiiiiiiiii;          Iiiiiiiiii          Iiiiiiiiii.         "iiiiiiiiiiiiiiiiii-
-ziiiiiiiiiiiiiiiiiii.         'iiiiiiiii''''''''''liiiiiiii^          liiiiiiiiiiiiiiiiiiv
-&?iiiiiiiiiiiiiiiiii^          ^iiiiiiiiiiiiiiiiiiiiiiiiii,          `iiiiiiiiiiiiiiiiii_W
-$u>iiiiiiiiiiiiiiiiii.          `!iiiiiiiiiiiiiiiiiiiiiii^          .liiiiiiiiiiiiiiiiiir$
-$$(iiiiiiiiiiiiiiiiii;.          ."iiiiiiiiiiiiiiiiiiii,.           :iiiiiiiiiiiiiiiiii}$$
-$$@{iiiiiiiiiiiiiiiiii;.           .`:iiiiiiiiiiiiii;^.            :iiiiiiiiiiiiiiiiii}B$$
-$$$B)iiiiiiiiiiiiiiiiii!'              '`",::::,"`'.             .Iiiiiiiiiiiiiiiiiii{%$$$
-$$$$@1iiiiiiiiiiiiiiiiiii,.                                     ^iiiiiiiiiiiiiiiiiii[@$$$$
-$$$$$B|>iiiiiiiiiiiiiiiiii!^.                                 `liiiiiiiiiiiiiiiiii>)%$$$$$
-$$$$$$$c~iiiiiiiiiiiiiiiiiiii"'                            ."!iiiiiiiiiiiiiiiiiii~n$$$$$$$
-$$$$$$$$B)iiiiiiiiiiiiiiiiiiiii!,`.                    .'"liiiiiiiiiiiiiiiiiiiii1%$$$$$$$$
-$$$$$$$$$@u]iiiiiiiiiiiiiiiiiiiiiiil,^`'..      ..''^,liiiiiiiiiiiiiiiiiiiiiii-x@$$$$$$$$$
-$$$$$$$$$$$@v?iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii-x$$$$$$$$$$$$
-$$$$$$$$$$$$$@n?iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii-rB$$$$$$$$$$$$$
-$$$$$$$$$$$$$$$$/~iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii<\*@$$$$$$$$$$$$$$$$
-$$$$$$$$$$$$$$$$$$Bc1~iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii~{v%$$$$$$$$$$$$$$$$$$
-$$$$$$$$$$$$$$$$$$$$$Bvf]<iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii<]tuB$$$$$$$$$$$$$$$$$$$$$
-$$$$$$$$$$$$$$$$$$$$$$$$$%zt-+>iiiiiiiiiiiiiiiiiiiiiiiiiiiii+_tc%$$$$$$$$$$$$$$$$$$$$$$$$$
-$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$W#u/|{+~>iiiiiiiiiiii><+{|/n#W$$$$$$$$$$$$$$$$$$$$$$$$$$$$*/
+$$$$$$$$$$$$$$$$Mf~iiiiiiiiiiiiiiiiiii   iiiiiiiiiiiiiiiiiiiiiiiiiiiiii~t#@$$$$$$$$$$$$$$$
+$$$$$$$$$$$$$@u[iiiiiiiiiiiiiiiiiii           ii   iiiiiiiiiiiiiiiiiiiiiii?n@$$$$$$$$$$$$$
+$$$$$$$$$$$@z]iiiiiiiiiiiiiiiiii                     iiiiiiiiiiiiiiiiiiiiiii?u@$$$$$$$$$$$
+$$$$$$$$$$v]iiiiiiiiiiiiiiiii        .-'   `'.      iiiiiiiiiiiiiiiiiiiiiiiiii?u$$$$$$$$$$
+$$$$$$$$%)>iiiiiiiiiiiiiiiiii       /         \       iiiiiiiiiiiiiiiiiiiiiiiiii1%$$$$$$$$
+$$$$$$$c~iiiiiiiiiiiiiiiiiiiiii     |         ;       iiiiiiiiiiiiiiiiiiiiiiiii>)%$$$$$$$$
+$$$$$B/>iiiiiiiiiiiiiiiiiii         |         |           ___.--,  iiiiiiiiiiiiiii~c$$$$$$
+$$$$@)iiiiiiiiiiiiiii      _.._     |0) ~ (0) |    _.---'`__.-( (_. iiiiiiiiiiiiiii/>B$$$$
+$$$B|iiiiiiiiiiiii  __.--'`_.. '.__.\    '--. \_.-' ,.--'`     `""` iiiiiiiiiiiiiiii(@$$$$
+$$@)iiiiiiiiiii    ( ,.--'`   ',__ /` ;   `, '.__.'`    __        iiiiiiiiiiiiiiiiiii($$$$
+$$$)iiiiiiiiiiii   _`) )  .---.__.' / ;   |\   \__..--""  """--.,_   iiiiiiiiiiiiiiiii@$$$
+$$%iiiiiiiiii    `---'  ' ''-._.-'` ./  /\ '.  \ _.-~~~````~~~-._`-.__.'iiiiiiiiiiiii\$$$$
+$$@iiiiiiiiiiiiiiiiii   | |  .' _.-' |  |   \  \  '.               `~---`iiiiiiiiiiiiii$$$
+$${[iiiiiiiiiiiiiii      \ \/ .'     \  \    '. '-._)               iiiiiiiiiiiiiiiiii~$$$
+$$uiiiiiiiiiiiiiiiiiii    \/ /        \  \     `=.__`~-       iiiiiiiiiiiiiiiiiiiiiii$$$$$
+$$@iiiiiiiiiiiiiiiiii      / /\         `) )     / / `"".`\     iiiiiiiiiiiiiiiiiiiii|B$$$
+$$@\iiiiiiiiiiiiiiiii ,_.-'.'\ \        / /     ( (     / /     iiiiiiiiiiiiiiiiiiii(@$$$$
+$$$$$iiiiiiiiiiiiiii `--~`   ) )    .-'.'       '.'.  | (      iiiiiiiiiiiiiiiiiiii/>B$$$$
+$$$$@iiiiiiiiiiiiiiii       (/`    ( (`      i    ) )  '-;        iiiiiiiiiiiiiiii~c$$$$$$
+$$$$$B]iiiiiiiiiiiiiiii      `   i  '-;      ii   (-'          iiiiiiiiiiiiiiiiii>)%$$$$$$
+4$$$$$$$B)iiiiiiiiiiiii  iiii!i             iii           liiiiiiiiiiiiiiiiiiiii1%$$$$$$$$
+$$$$$$$$$$@u]iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii-x@$$$$$$$
+$$$$$$$$$$$@v?iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii-x$$$$$$$$$$$
+$$$$$$$$$$$$$$@n?iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii-rB$$$$$$$$$$$$
+$$$$$$$$$$$$$$$$$/~iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii<\*@$$$$$$$$$$$$$$$
+$$$$$$$$$$$$$$$$$$$Bc1~iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii~{v%$$$$$$$$$$$$$$$$$
+$$$$$$$$$$$$$$$$$$$$$$Bvf]<iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii<]tuB$$$$$$$$$$$$$$$$$$$$
+4$$$$$$$$$$$$$$$$$$$$$$$$$%zt-+>iiiiiiiiiiiiiiiiiiiiiiiiiiiii+_tc%$$$$$$$$$$$$$$$$$$$$$$$$
+$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$W#u/|{+~>iiiiiiiiiiii><+{|/n#W$$$$$$$$$$$$$$$$$$$$$$$$$$$$*/
 
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -71,7 +59,7 @@ import { IBaseStrategy } from "interfaces/IBaseStrategy.sol";
  *  focused entirely on the strategy specific needs to easily and cheaply
  *  deploy their own permissionless 4626 compliant vault.
  */
-contract TokenizedStrategy {
+abstract contract TokenizedStrategy {
     using Math for uint256;
     using SafeERC20 for ERC20;
 
@@ -110,11 +98,6 @@ contract TokenizedStrategy {
     event UpdateEmergencyAdmin(address indexed newEmergencyAdmin);
 
     /**
-     * @notice Emitted when the 'profitMaxUnlockTime' is updated to 'newProfitMaxUnlockTime'.
-     */
-    event UpdateProfitMaxUnlockTime(uint256 newProfitMaxUnlockTime);
-
-    /**
      * @notice Emitted when the 'pendingManagement' address is updated to 'newPendingManagement'.
      */
     event UpdatePendingManagement(address indexed newPendingManagement);
@@ -150,6 +133,11 @@ contract TokenizedStrategy {
         uint256 assets,
         uint256 shares
     );
+
+    /**
+     * @notice Emitted when the donation address is updated.
+     */
+    event UpdateDonationAddress(address indexed newDonationAddress);
 
     /*//////////////////////////////////////////////////////////////
                         STORAGE STRUCT
@@ -191,14 +179,9 @@ contract TokenizedStrategy {
         uint256 totalAssets;
 
 
-        // Variables for profit reporting and locking.
-        // We use uint96 for timestamps to fit in the same slot as an address. That overflows in 2.5e+21 years.
-        // I know Yearn moves slowly but surely V4 will be out by then.
-        // If the timestamps ever overflow tell the cyborgs still using this code I'm sorry for being cheap.
-        uint256 profitUnlockingRate; // The rate at which locked profit is unlocking.
-        uint96 fullProfitUnlockDate; // The timestamp at which all locked shares will unlock.
+        // Variables for reporting.
+        // We use uint96 for timestamps to fit in the same slot as an address.
         address keeper; // Address given permission to call {report} and {tend}.
-        uint32 profitMaxUnlockTime; // The amount of seconds that the reported profit unlocks over.
         uint96 lastReport; // The last time a {report} was called.
 
 
@@ -206,6 +189,9 @@ contract TokenizedStrategy {
         address management; // Main address that can set all configurable variables.
         address pendingManagement; // Address that is pending to take over `management`.
         address emergencyAdmin; // Address to act in emergencies as well as `management`.
+
+        // Address that will receive donations from this strategy
+        address donationAddress;
 
         // Strategy Status
         uint8 entered; // To prevent reentrancy. Use uint8 for gas savings.
@@ -327,11 +313,6 @@ contract TokenizedStrategy {
 
     /// @notice Used for calculations.
     uint256 internal constant MAX_BPS = 10_000;
-    /// @notice Used for profit unlocking rate calculations.
-    uint256 internal constant MAX_BPS_EXTENDED = 1_000_000_000_000;
-
-    /// @notice Seconds per year for max profit unlocking time.
-    uint256 internal constant SECONDS_PER_YEAR = 31_556_952; // 365.2425 days
 
     /**
      * @dev Custom storage slot that will be used to store the
@@ -391,12 +372,16 @@ contract TokenizedStrategy {
      * @param _name Name the strategy will use.
      * @param _management Address to set as the strategies `management`.
      * @param _keeper Address to set as strategies `keeper`.
+     * @param _emergencyAdmin Address to set as strategy's `emergencyAdmin`.
+     * @param _donationAddress Address that will receive donations for this specific strategy.
      */
     function initialize(
         address _asset,
         string memory _name,
         address _management,
-        address _keeper
+        address _keeper,
+        address _emergencyAdmin,
+        address _donationAddress
     ) external {
         // Cache storage pointer.
         StrategyData storage S = _strategyStorage();
@@ -411,16 +396,24 @@ contract TokenizedStrategy {
         // Set decimals based off the `asset`.
         S.decimals = ERC20(_asset).decimals();
 
-        // Default to a 10 day profit unlock period.
-        S.profitMaxUnlockTime = 10 days;
         // Set last report to this block.
         S.lastReport = uint96(block.timestamp);
 
         // Set the default management address. Can't be 0.
         require(_management != address(0), "ZERO ADDRESS");
         S.management = _management;
-        // Set the keeper address
+        
+        // Set the keeper address, can't be 0
+        require(_keeper != address(0), "ZERO ADDRESS");
         S.keeper = _keeper;
+        
+        // Set the emergency admin address, can't be 0
+        require(_emergencyAdmin != address(0), "ZERO ADDRESS");
+        S.emergencyAdmin = _emergencyAdmin;
+        
+        // Set the donation address, can't be 0
+        require(_donationAddress != address(0), "ZERO ADDRESS");
+        S.donationAddress = _donationAddress;
 
         // Emit event to signal a new strategy has been initialized.
         emit NewTokenizedStrategy(address(this), _asset, API_VERSION);
@@ -738,7 +731,7 @@ contract TokenizedStrategy {
 
     /// @dev Internal implementation of {totalSupply}.
     function _totalSupply(StrategyData storage S) internal view returns (uint256) {
-        return S.totalSupply - _unlockedShares(S);
+        return S.totalSupply;
     }
 
     /// @dev Internal implementation of {convertToShares}.
@@ -929,135 +922,16 @@ contract TokenizedStrategy {
 
     /**
      * @notice Function for keepers to call to harvest and record all
-     * profits accrued.
+     * donations accrued.
      *
      * @dev This will account for any gains/losses since the last report.
-     *
-     * Any profit will be immediately locked so there is no change in 
-     * PricePerShare. Then slowly unlocked over the `maxProfitUnlockTime` 
-     * each second based on the calculated `profitUnlockingRate`.
-     *
-     * In case of a loss it will first attempt to offset the loss
-     * with any remaining locked shares from the last report in
-     * order to reduce any negative impact to PPS.
-     *
-     * Will then recalculate the new time to unlock profits over and the
-     * rate based on a weighted average of any remaining time from the
-     * last report and the new amount of shares to be locked.
      *
      * @return profit The notional amount of gain if any since the last
      * report in terms of `asset`.
      * @return loss The notional amount of loss if any since the last
      * report in terms of `asset`.
      */
-    function report() external nonReentrant onlyKeepers returns (uint256 profit, uint256 loss) {
-        // Cache storage pointer since its used repeatedly.
-        StrategyData storage S = _strategyStorage();
-
-        // Tell the strategy to report the real total assets it has.
-        // It should do all reward selling and redepositing now and
-        // account for deployed and loose `asset` so we can accurately
-        // account for all funds including those potentially airdropped
-        // and then have any profits immediately locked.
-        uint256 newTotalAssets = IBaseStrategy(address(this)).harvestAndReport();
-
-        uint256 oldTotalAssets = _totalAssets(S);
-
-        // Get the amount of shares we need to burn from previous reports.
-        uint256 sharesToBurn = _unlockedShares(S);
-
-        // Initialize variables needed throughout.
-        uint256 sharesToLock;
-        uint256 _profitMaxUnlockTime = S.profitMaxUnlockTime;
-        // Calculate profit/loss.
-        if (newTotalAssets > oldTotalAssets) {
-            // We have a profit.
-            unchecked {
-                profit = newTotalAssets - oldTotalAssets;
-            }
-
-            // We need to get the equivalent amount of shares
-            // at the current PPS before any minting or burning.
-            sharesToLock = _convertToShares(S, profit, Math.Rounding.Down);
-
-            // Check if we are locking profit.
-            if (_profitMaxUnlockTime != 0) {
-                // If we are burning more than re-locking.
-                if (sharesToBurn > sharesToLock) {
-                    // Burn the difference
-                    unchecked {
-                        _burn(S, address(this), sharesToBurn - sharesToLock);
-                    }
-                } else if (sharesToLock > sharesToBurn) {
-                    // Mint the shares to lock the strategy.
-                    unchecked {
-                        _mint(S, address(this), sharesToLock - sharesToBurn);
-                    }
-                }
-            }
-        } else {
-            // Expect we have a loss.
-            unchecked {
-                loss = oldTotalAssets - newTotalAssets;
-            }
-
-            // Check in case `else` was due to being equal.
-            if (loss != 0) {
-                // We will try and burn the unlocked shares and as much from any
-                // pending profit still unlocking to offset the loss to prevent any PPS decline post report.
-                sharesToBurn = Math.min(
-                    // Cannot burn more than we have.
-                    S.balances[address(this)],
-                    // Try and burn both the shares already unlocked and the amount for the loss.
-                    _convertToShares(S, loss, Math.Rounding.Down) + sharesToBurn
-                );
-            }
-
-            // Check if there is anything to burn.
-            if (sharesToBurn != 0) {
-                _burn(S, address(this), sharesToBurn);
-            }
-        }
-
-        // Update unlocking rate and time to fully unlocked.
-        uint256 totalLockedShares = S.balances[address(this)];
-        if (totalLockedShares != 0) {
-            uint256 previouslyLockedTime;
-            uint96 _fullProfitUnlockDate = S.fullProfitUnlockDate;
-            // Check if we need to account for shares still unlocking.
-            if (_fullProfitUnlockDate > block.timestamp) {
-                unchecked {
-                    // There will only be previously locked shares if time remains.
-                    // We calculate this here since it should be rare.
-                    previouslyLockedTime =
-                        (_fullProfitUnlockDate - block.timestamp) *
-                        (totalLockedShares - sharesToLock);
-                }
-            }
-
-            // newProfitLockingPeriod is a weighted average between the remaining
-            // time of the previously locked shares and the profitMaxUnlockTime.
-            uint256 newProfitLockingPeriod = (previouslyLockedTime + sharesToLock * _profitMaxUnlockTime) /
-                totalLockedShares;
-
-            // Calculate how many shares unlock per second.
-            S.profitUnlockingRate = (totalLockedShares * MAX_BPS_EXTENDED) / newProfitLockingPeriod;
-
-            // Calculate how long until the full amount of shares is unlocked.
-            S.fullProfitUnlockDate = uint96(block.timestamp + newProfitLockingPeriod);
-        } else {
-            // Only setting this to 0 will turn in the desired effect,
-            // no need to update profitUnlockingRate.
-            S.fullProfitUnlockDate = 0;
-        }
-
-        // Update the new total assets value.
-        S.totalAssets = newTotalAssets;
-        S.lastReport = uint96(block.timestamp);
-
-        // Emit event with info
-        emit Reported(profit, loss);
-    }
+    function report() external virtual nonReentrant onlyKeepers returns (uint256 profit, uint256 loss);
 
     /**
      * @notice Get how many shares have been unlocked since last report.
@@ -1071,21 +945,13 @@ contract TokenizedStrategy {
      * @dev To determine how many of the shares that were locked during the last
      * report have since unlocked.
      *
-     * If the `fullProfitUnlockDate` has passed the full strategy's balance will
-     * count as unlocked.
+     * Since we no longer track locked/unlocked shares, this always returns 0.
      *
      * @return unlocked The amount of shares that have unlocked.
      */
     function _unlockedShares(StrategyData storage S) internal view returns (uint256 unlocked) {
-        uint96 _fullProfitUnlockDate = S.fullProfitUnlockDate;
-        if (_fullProfitUnlockDate > block.timestamp) {
-            unchecked {
-                unlocked = (S.profitUnlockingRate * (block.timestamp - S.lastReport)) / MAX_BPS_EXTENDED;
-            }
-        } else if (_fullProfitUnlockDate != 0) {
-            // All shares have been unlocked.
-            unlocked = S.balances[address(this)];
-        }
+        // We no longer track locked/unlocked shares, so always return 0
+        return 0;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -1212,32 +1078,15 @@ contract TokenizedStrategy {
     }
 
     /**
-     * @notice Gets the timestamp at which all profits will be unlocked.
-     * @return . The full profit unlocking timestamp
+     * @notice Get the current address that will receive donations.
+     * @return Address of the donation recipient
      */
-    function fullProfitUnlockDate() external view returns (uint256) {
-        return uint256(_strategyStorage().fullProfitUnlockDate);
+    function donationAddress() external view returns (address) {
+        return _strategyStorage().donationAddress;
     }
 
     /**
-     * @notice The per second rate at which profits are unlocking.
-     * @dev This is denominated in EXTENDED_BPS decimals.
-     * @return . The current profit unlocking rate.
-     */
-    function profitUnlockingRate() external view returns (uint256) {
-        return _strategyStorage().profitUnlockingRate;
-    }
-
-    /**
-     * @notice Gets the current time profits are set to unlock over.
-     * @return . The current profit max unlock time.
-     */
-    function profitMaxUnlockTime() external view returns (uint256) {
-        return _strategyStorage().profitMaxUnlockTime;
-    }
-
-    /**
-     * @notice The timestamp of the last time protocol fees were charged.
+     * @notice The timestamp of the last time Yield was reported.
      * @return . The last report.
      */
     function lastReport() external view returns (uint256) {
@@ -1305,6 +1154,7 @@ contract TokenizedStrategy {
      * @param _keeper New address to set `keeper` to.
      */
     function setKeeper(address _keeper) external onlyManagement {
+        require(_keeper != address(0), "ZERO ADDRESS");
         _strategyStorage().keeper = _keeper;
 
         emit UpdateKeeper(_keeper);
@@ -1317,45 +1167,21 @@ contract TokenizedStrategy {
      * @param _emergencyAdmin New address to set `emergencyAdmin` to.
      */
     function setEmergencyAdmin(address _emergencyAdmin) external onlyManagement {
+        require(_emergencyAdmin != address(0), "ZERO ADDRESS");
         _strategyStorage().emergencyAdmin = _emergencyAdmin;
 
         emit UpdateEmergencyAdmin(_emergencyAdmin);
     }
 
     /**
-     * @notice Sets the time for profits to be unlocked over.
-     * @dev Can only be called by the current `management`.
-     *
-     * Denominated in seconds and cannot be greater than 1 year.
-     *
-     * NOTE: Setting to 0 will cause all currently locked profit
-     * to be unlocked instantly and should be done with care.
-     *
-     * `profitMaxUnlockTime` is stored as a uint32 for packing but can
-     * be passed in as uint256 for simplicity.
-     *
-     * @param _profitMaxUnlockTime New `profitMaxUnlockTime`.
+     * @notice Sets a new address to receive donations from this strategy.
+     * @param _donationAddress New address to set `donationAddress` to.
      */
-    function setProfitMaxUnlockTime(uint256 _profitMaxUnlockTime) external onlyManagement {
-        // Must be less than a year.
-        require(_profitMaxUnlockTime <= SECONDS_PER_YEAR, "too long");
-        StrategyData storage S = _strategyStorage();
+    function setDonationAddress(address _donationAddress) external onlyManagement {
+        require(_donationAddress != address(0), "ZERO ADDRESS");
+        _strategyStorage().donationAddress = _donationAddress;
 
-        // If we are setting to 0 we need to adjust amounts.
-        if (_profitMaxUnlockTime == 0) {
-            uint256 shares = S.balances[address(this)];
-            if (shares != 0) {
-                // Burn all shares if applicable.
-                _burn(S, address(this), shares);
-            }
-            // Reset unlocking variables
-            S.profitUnlockingRate = 0;
-            S.fullProfitUnlockDate = 0;
-        }
-
-        S.profitMaxUnlockTime = uint32(_profitMaxUnlockTime);
-
-        emit UpdateProfitMaxUnlockTime(_profitMaxUnlockTime);
+        emit UpdateDonationAddress(_donationAddress);
     }
 
     /**
@@ -1408,9 +1234,6 @@ contract TokenizedStrategy {
 
     /// @dev Internal implementation of {balanceOf}.
     function _balanceOf(StrategyData storage S, address account) internal view returns (uint256) {
-        if (account == address(this)) {
-            return S.balances[account] - _unlockedShares(S);
-        }
         return S.balances[account];
     }
 
