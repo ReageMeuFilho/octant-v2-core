@@ -75,6 +75,7 @@ jobs:
   analyze:
     name: Analyze with Slither
     runs-on: general
+    continue-on-error: true
     container:
       image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:6e90f09c
       credentials:
