@@ -319,7 +319,11 @@ interface IVault {
 
     function FACTORY() external view returns (address);
     function apiVersion() external pure returns (string memory);
-    function assessShareOfUnrealisedLosses(address strategy, uint256 assetsNeeded) external view returns (uint256);
+    function assessShareOfUnrealisedLosses(
+        address strategy,
+        uint256 currentDebt,
+        uint256 assetsNeeded
+    ) external view returns (uint256);
 
     function profitMaxUnlockTime() external view returns (uint256);
     function fullProfitUnlockDate() external view returns (uint256);
