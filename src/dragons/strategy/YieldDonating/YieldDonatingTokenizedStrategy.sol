@@ -6,13 +6,23 @@ import { DragonTokenizedStrategy } from "../DragonTokenizedStrategy.sol";
 
 /**
  * @title YieldDonatingTokenizedStrategy
+ * @author octant.finance
  * @notice A specialized version of DragonTokenizedStrategy designed for productive assets to generate and donate profits to the donation address
+ * @dev This strategy implements a yield donation mechanism by:
+ *      - Calling harvestAndReport to collect all profits from the underlying strategy
+ *      - Converting profits into shares using the standard conversion
+ *      - Minting these shares directly to the dragonRouter address
+ *      - Protecting against losses by burning shares from dragonRouter
  */
 contract YieldDonatingTokenizedStrategy is DragonTokenizedStrategy {
     using Math for uint256;
 
     /**
      * @inheritdoc ITokenizedStrategy
+     * @dev This implementation overrides the base report function to mint profit-derived shares to dragonRouter.
+     * When the strategy generates profits (newTotalAssets > oldTotalAssets), the difference is converted to shares 
+     * and minted to the dragonRouter. When losses occur, those losses can be offset by burning shares from dragonRouter
+     * through the _handleDragonLossProtection mechanism.
      */
     function report()
         public
@@ -59,7 +69,13 @@ contract YieldDonatingTokenizedStrategy is DragonTokenizedStrategy {
 
     /**
      * @dev Internal function to handle loss protection for dragon principal
-     * @param loss The amount of loss to protect against
+     * @param S Storage struct pointer to access strategy's storage variables
+     * @param loss The amount of loss in terms of asset to protect against
+     * 
+     * This function calculates how many shares would be equivalent to the loss amount,
+     * then burns up to that amount of shares from dragonRouter, limited by the router's
+     * actual balance. This effectively socializes the loss among all shareholders by
+     * burning shares from the donation recipient rather than reducing the value of all shares.
      */
     function _handleDragonLossProtection(StrategyData storage S, uint256 loss) internal {
         // Can only burn up to available shares

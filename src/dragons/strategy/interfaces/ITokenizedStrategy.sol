@@ -84,6 +84,11 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
      * @notice Emitted when the donation address is updated.
      */
     event UpdateDonationAddress(address indexed newDonationAddress);
+    
+    /**
+     * @notice Emitted when the dragon router address is updated.
+     */
+    event UpdateDragonRouter(address indexed newDragonRouter);
 
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
@@ -97,6 +102,7 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
      * @param _keeper Address to set as strategies `keeper`.
      * @param _emergencyAdmin Address to set as strategy's `emergencyAdmin`.
      * @param _donationAddress Address that will receive donations for this specific strategy.
+     * @param _dragonRouter Address that receives minted shares from yield in specialized strategies.
      */
     function initialize(
         address _asset,
@@ -104,7 +110,8 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
         address _management,
         address _keeper,
         address _emergencyAdmin,
-        address _donationAddress
+        address _donationAddress,
+        address _dragonRouter
     ) external;
 
     /*//////////////////////////////////////////////////////////////
@@ -269,6 +276,12 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
     function donationAddress() external view returns (address);
     
     /**
+     * @notice Get the current dragon router address that will receive minted shares.
+     * @return Address of dragonRouter
+     */
+    function dragonRouter() external view returns (address);
+    
+    /**
      * @notice Get the current performance fee charged on profits.
      * denominated in Basis Points where 10_000 == 100%
      * @return Current performance fee.
@@ -349,6 +362,12 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
      * @param _donationAddress New address to set `donationAddress` to.
      */
     function setDonationAddress(address _donationAddress) external;
+    
+    /**
+     * @notice Sets a new dragon router address to receive minted shares from yield.
+     * @param _dragonRouter New address to set `dragonRouter` to.
+     */
+    function setDragonRouter(address _dragonRouter) external;
     
     /**
      * @notice Sets the performance fee to be charged on reported gains.

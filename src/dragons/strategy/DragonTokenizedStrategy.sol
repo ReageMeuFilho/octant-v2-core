@@ -8,7 +8,7 @@ $$$$$$$$$$$$$$$$$$@z(+iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii+)zB$$$$$$$$
 $$$$$$$$$$$$$$$$Mf~iiiiiiiiiiiiiiiiiii   iiiiiiiiiiiiiiiiiiiiiiiiiiiiii~t#@$$$$$$$$$$$$$$$
 $$$$$$$$$$$$$@u[iiiiiiiiiiiiiiiiiii           ii   iiiiiiiiiiiiiiiiiiiiiii?n@$$$$$$$$$$$$$
 $$$$$$$$$$$@z]iiiiiiiiiiiiiiiiii                     iiiiiiiiiiiiiiiiiiiiiii?u@$$$$$$$$$$$
-$$$$$$$$$$v]iiiiiiiiiiiiiiiii        .-'   `'.      iiiiiiiiiiiiiiiiiiiiiiiiii?u$$$$$$$$$$
+$$$$$$$$$$v]iiiiiiiiiiiiiiiii        .-'   `'.      iiiiiiiiiiiiiiiiiiiiiiiiii?u$$$$$$$$
 $$$$$$$$%)>iiiiiiiiiiiiiiiiii       /         \       iiiiiiiiiiiiiiiiiiiiiiiiii1%$$$$$$$$
 $$$$$$$c~iiiiiiiiiiiiiiiiiiiiii     |         ;       iiiiiiiiiiiiiiiiiiiiiiiii>)%$$$$$$$$
 $$$$$B/>iiiiiiiiiiiiiiiiiii         |         |           ___.--,  iiiiiiiiiiiiiii~c$$$$$$
@@ -43,10 +43,13 @@ import { IFactory } from "./interfaces/IFactory.sol";
 import { IBaseStrategy } from "interfaces/IBaseStrategy.sol";
 
 /**
- * @title Yearn Tokenized Strategy
- * @author yearn.finance
+ * @title Tokenized Strategy (Octant V2 Fork)
+ * @author yearn.finance; forked and modified by octant.finance 
  * @notice
- *  This TokenizedStrategy can be used by anyone wishing to easily build
+ *  This TokenizedStrategy is a fork of Yearn's TokenizedStrategy that has been 
+ *  modified by Octant to support donation functionality and other security enhancements.
+ *
+ *  The original contract can be used by anyone wishing to easily build
  *  and deploy their own custom ERC4626 compliant single strategy Vault.
  *
  *  The TokenizedStrategy contract is meant to be used as the proxy
@@ -54,10 +57,29 @@ import { IBaseStrategy } from "interfaces/IBaseStrategy.sol";
  *  management for a custom strategy that inherits the `BaseStrategy`.
  *  Any function calls to the strategy that are not defined within that
  *  strategy will be forwarded through a delegateCall to this contract.
-
+ *
  *  A strategist only needs to override a few simple functions that are
  *  focused entirely on the strategy specific needs to easily and cheaply
  *  deploy their own permissionless 4626 compliant vault.
+ *
+ *  @dev Changes from Yearn V3:
+ *  - Added donationAddress to the StrategyData struct to enable donation functionality
+ *  - Added getter and setter for donationAddress
+ *  - Added validation checks for all critical addresses (management, keeper, emergencyAdmin, donationAddress)
+ *  - Enhanced initialize function to include emergencyAdmin and donationAddress parameters
+ *  - Standardized error messages for zero-address checks
+ *  - Removed the yield/profit unlocking mechanism (profits are immediately realized)
+ *  - Made the report() function virtual to enable specialized implementations
+ *  - Made this contract abstract as a base for specialized strategy implementations
+ *  - Added dragonRouter field to StrategyData struct for specialized yield handling
+ *
+ *  Two specialized implementations are provided:
+ *  - YieldDonatingTokenizedStrategy: Mints profits as new shares and sends them to a specified donation address
+ *  - YieldSkimmingTokenizedStrategy: Skims the appreciation of asset and dilutes the original shares by minting new ones to the donation address
+ *
+ *  WARNING: When creating custom strategies, DO NOT declare state variables outside
+ *  the StrategyData struct. Doing so risks storage collisions if the implementation
+ *  contract changes. Either extend the StrategyData struct or use a custom storage slot.
  */
 abstract contract TokenizedStrategy {
     using Math for uint256;
@@ -139,6 +161,11 @@ abstract contract TokenizedStrategy {
      */
     event UpdateDonationAddress(address indexed newDonationAddress);
 
+    /**
+     * @notice Emitted when the dragon router address is updated.
+     */
+    event UpdateDragonRouter(address indexed newDragonRouter);
+
     /*//////////////////////////////////////////////////////////////
                         STORAGE STRUCT
     //////////////////////////////////////////////////////////////*/
@@ -192,6 +219,9 @@ abstract contract TokenizedStrategy {
 
         // Address that will receive donations from this strategy
         address donationAddress;
+        
+        // Router that receives minted shares from yield in specialized strategies
+        address dragonRouter;
 
         // Strategy Status
         uint8 entered; // To prevent reentrancy. Use uint8 for gas savings.
@@ -374,6 +404,7 @@ abstract contract TokenizedStrategy {
      * @param _keeper Address to set as strategies `keeper`.
      * @param _emergencyAdmin Address to set as strategy's `emergencyAdmin`.
      * @param _donationAddress Address that will receive donations for this specific strategy.
+     * @param _dragonRouter Address that receives minted shares from yield in specialized strategies.
      */
     function initialize(
         address _asset,
@@ -381,7 +412,8 @@ abstract contract TokenizedStrategy {
         address _management,
         address _keeper,
         address _emergencyAdmin,
-        address _donationAddress
+        address _donationAddress,
+        address _dragonRouter
     ) external {
         // Cache storage pointer.
         StrategyData storage S = _strategyStorage();
@@ -414,6 +446,10 @@ abstract contract TokenizedStrategy {
         // Set the donation address, can't be 0
         require(_donationAddress != address(0), "ZERO ADDRESS");
         S.donationAddress = _donationAddress;
+        
+        // Set the dragon router address, can't be 0
+        require(_dragonRouter != address(0), "ZERO ADDRESS");
+        S.dragonRouter = _dragonRouter;
 
         // Emit event to signal a new strategy has been initialized.
         emit NewTokenizedStrategy(address(this), _asset, API_VERSION);
@@ -925,6 +961,12 @@ abstract contract TokenizedStrategy {
      * donations accrued.
      *
      * @dev This will account for any gains/losses since the last report.
+     * This function is virtual and meant to be overridden by specialized
+     * strategies that implement custom yield handling mechanisms.
+     *
+     * Two primary implementations are provided in specialized strategies:
+     * - YieldDonatingTokenizedStrategy: Mints shares from profits to the dragonRouter
+     * - YieldSkimmingTokenizedStrategy: Skims asset appreciation by diluting shares
      *
      * @return profit The notional amount of gain if any since the last
      * report in terms of `asset`.
@@ -1086,6 +1128,14 @@ abstract contract TokenizedStrategy {
     }
 
     /**
+     * @notice Get the current dragon router address that will receive minted shares.
+     * @return Address of the dragon router
+     */
+    function dragonRouter() external view returns (address) {
+        return _strategyStorage().dragonRouter;
+    }
+
+    /**
      * @notice The timestamp of the last time Yield was reported.
      * @return . The last report.
      */
@@ -1182,6 +1232,17 @@ abstract contract TokenizedStrategy {
         _strategyStorage().donationAddress = _donationAddress;
 
         emit UpdateDonationAddress(_donationAddress);
+    }
+
+    /**
+     * @notice Sets a new dragon router address to receive minted shares from yield.
+     * @param _dragonRouter New address to set `dragonRouter` to.
+     */
+    function setDragonRouter(address _dragonRouter) external onlyManagement {
+        require(_dragonRouter != address(0), "ZERO ADDRESS");
+        _strategyStorage().dragonRouter = _dragonRouter;
+
+        emit UpdateDragonRouter(_dragonRouter);
     }
 
     /**
