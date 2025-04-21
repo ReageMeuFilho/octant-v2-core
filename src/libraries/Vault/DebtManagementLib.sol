@@ -31,7 +31,7 @@ library DebtManagementLib {
         uint256 maxDepositAmount; // Strategy's max deposit amount
         bool isDebtDecrease; // Whether we're decreasing debt
     }
-
+    /* solhint-disable code-complexity */
     function updateDebt(
         mapping(address => IVault.StrategyParams) storage strategies,
         address strategy,
