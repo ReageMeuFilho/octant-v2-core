@@ -39,7 +39,6 @@ import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import { IFactory } from "./interfaces/IFactory.sol";
 import { IBaseStrategy } from "interfaces/IBaseStrategy.sol";
 
 /**
@@ -63,19 +62,18 @@ import { IBaseStrategy } from "interfaces/IBaseStrategy.sol";
  *  deploy their own permissionless 4626 compliant vault.
  *
  *  @dev Changes from Yearn V3:
- *  - Added donationAddress to the StrategyData struct to enable donation functionality
- *  - Added getter and setter for donationAddress
- *  - Added validation checks for all critical addresses (management, keeper, emergencyAdmin, donationAddress)
- *  - Enhanced initialize function to include emergencyAdmin and donationAddress parameters
+ *  - Added dragonRouter to the StrategyData struct to enable yield distribution
+ *  - Added getter and setter for dragonRouter
+ *  - Added validation checks for all critical addresses (management, keeper, emergencyAdmin, dragonRouter)
+ *  - Enhanced initialize function to include emergencyAdmin and dragonRouter parameters
  *  - Standardized error messages for zero-address checks
  *  - Removed the yield/profit unlocking mechanism (profits are immediately realized)
  *  - Made the report() function virtual to enable specialized implementations
  *  - Made this contract abstract as a base for specialized strategy implementations
- *  - Added dragonRouter field to StrategyData struct for specialized yield handling
  *
  *  Two specialized implementations are provided:
- *  - YieldDonatingTokenizedStrategy: Mints profits as new shares and sends them to a specified donation address
- *  - YieldSkimmingTokenizedStrategy: Skims the appreciation of asset and dilutes the original shares by minting new ones to the donation address
+ *  - YieldDonatingTokenizedStrategy: Mints profits as new shares and sends them to a specified dragon router
+ *  - YieldSkimmingTokenizedStrategy: Skims the appreciation of asset and dilutes the original shares by minting new ones to the dragon router
  *
  *  WARNING: When creating custom strategies, DO NOT declare state variables outside
  *  the StrategyData struct. Doing so risks storage collisions if the implementation
@@ -120,7 +118,7 @@ abstract contract TokenizedStrategy {
     event UpdateEmergencyAdmin(address indexed newEmergencyAdmin);
 
     /**
-     * @notice Emitted when the 'pendingManagement' address is updated to 'newPendingManagement'.
+     * @notice Emitted when the `pendingManagement` address is updated to `newPendingManagement`.
      */
     event UpdatePendingManagement(address indexed newPendingManagement);
 
@@ -155,11 +153,6 @@ abstract contract TokenizedStrategy {
         uint256 assets,
         uint256 shares
     );
-
-    /**
-     * @notice Emitted when the donation address is updated.
-     */
-    event UpdateDonationAddress(address indexed newDonationAddress);
 
     /**
      * @notice Emitted when the dragon router address is updated.
@@ -216,9 +209,6 @@ abstract contract TokenizedStrategy {
         address management; // Main address that can set all configurable variables.
         address pendingManagement; // Address that is pending to take over `management`.
         address emergencyAdmin; // Address to act in emergencies as well as `management`.
-
-        // Address that will receive donations from this strategy
-        address donationAddress;
         
         // Router that receives minted shares from yield in specialized strategies
         address dragonRouter;
@@ -403,7 +393,6 @@ abstract contract TokenizedStrategy {
      * @param _management Address to set as the strategies `management`.
      * @param _keeper Address to set as strategies `keeper`.
      * @param _emergencyAdmin Address to set as strategy's `emergencyAdmin`.
-     * @param _donationAddress Address that will receive donations for this specific strategy.
      * @param _dragonRouter Address that receives minted shares from yield in specialized strategies.
      */
     function initialize(
@@ -412,7 +401,6 @@ abstract contract TokenizedStrategy {
         address _management,
         address _keeper,
         address _emergencyAdmin,
-        address _donationAddress,
         address _dragonRouter
     ) external {
         // Cache storage pointer.
@@ -442,10 +430,6 @@ abstract contract TokenizedStrategy {
         // Set the emergency admin address, can't be 0
         require(_emergencyAdmin != address(0), "ZERO ADDRESS");
         S.emergencyAdmin = _emergencyAdmin;
-        
-        // Set the donation address, can't be 0
-        require(_donationAddress != address(0), "ZERO ADDRESS");
-        S.donationAddress = _donationAddress;
         
         // Set the dragon router address, can't be 0
         require(_dragonRouter != address(0), "ZERO ADDRESS");
@@ -1120,14 +1104,6 @@ abstract contract TokenizedStrategy {
     }
 
     /**
-     * @notice Get the current address that will receive donations.
-     * @return Address of the donation recipient
-     */
-    function donationAddress() external view returns (address) {
-        return _strategyStorage().donationAddress;
-    }
-
-    /**
      * @notice Get the current dragon router address that will receive minted shares.
      * @return Address of the dragon router
      */
@@ -1221,17 +1197,6 @@ abstract contract TokenizedStrategy {
         _strategyStorage().emergencyAdmin = _emergencyAdmin;
 
         emit UpdateEmergencyAdmin(_emergencyAdmin);
-    }
-
-    /**
-     * @notice Sets a new address to receive donations from this strategy.
-     * @param _donationAddress New address to set `donationAddress` to.
-     */
-    function setDonationAddress(address _donationAddress) external onlyManagement {
-        require(_donationAddress != address(0), "ZERO ADDRESS");
-        _strategyStorage().donationAddress = _donationAddress;
-
-        emit UpdateDonationAddress(_donationAddress);
     }
 
     /**

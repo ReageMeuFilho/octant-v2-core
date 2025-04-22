@@ -32,33 +32,17 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
     );
     
     /**
-     * @notice Emitted when the strategy reports `profit` or `loss` and
-     * `performanceFees` and `protocolFees` are paid out.
+     * @notice Emitted when the strategy reports `profit` or `loss`.
      */
     event Reported(
         uint256 profit,
-        uint256 loss,
-        uint256 protocolFees,
-        uint256 performanceFees
-    );
-    
-    /**
-     * @notice Emitted when the 'performanceFeeRecipient' address is
-     * updated to 'newPerformanceFeeRecipient'.
-     */
-    event UpdatePerformanceFeeRecipient(
-        address indexed newPerformanceFeeRecipient
+        uint256 loss
     );
     
     /**
      * @notice Emitted when the 'keeper' address is updated to 'newKeeper'.
      */
     event UpdateKeeper(address indexed newKeeper);
-    
-    /**
-     * @notice Emitted when the 'performanceFee' is updated to 'newPerformanceFee'.
-     */
-    event UpdatePerformanceFee(uint16 newPerformanceFee);
     
     /**
      * @notice Emitted when the 'management' address is updated to 'newManagement'.
@@ -71,20 +55,10 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
     event UpdateEmergencyAdmin(address indexed newEmergencyAdmin);
     
     /**
-     * @notice Emitted when the 'profitMaxUnlockTime' is updated to 'newProfitMaxUnlockTime'.
-     */
-    event UpdateProfitMaxUnlockTime(uint256 newProfitMaxUnlockTime);
-    
-    /**
      * @notice Emitted when the 'pendingManagement' address is updated to 'newPendingManagement'.
      */
     event UpdatePendingManagement(address indexed newPendingManagement);
 
-    /**
-     * @notice Emitted when the donation address is updated.
-     */
-    event UpdateDonationAddress(address indexed newDonationAddress);
-    
     /**
      * @notice Emitted when the dragon router address is updated.
      */
@@ -101,7 +75,6 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
      * @param _management Address to set as the strategies `management`.
      * @param _keeper Address to set as strategies `keeper`.
      * @param _emergencyAdmin Address to set as strategy's `emergencyAdmin`.
-     * @param _donationAddress Address that will receive donations for this specific strategy.
      * @param _dragonRouter Address that receives minted shares from yield in specialized strategies.
      */
     function initialize(
@@ -110,7 +83,6 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
         address _management,
         address _keeper,
         address _emergencyAdmin,
-        address _donationAddress,
         address _dragonRouter
     ) external;
 
@@ -215,21 +187,6 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
     function report() external returns (uint256 _profit, uint256 _loss);
 
     /*//////////////////////////////////////////////////////////////
-                              CONSTANTS
-    //////////////////////////////////////////////////////////////*/
-    
-    /**
-     * @notice Maximum in Basis Points the Performance Fee can be set to.
-     */
-    function MAX_FEE() external view returns (uint16);
-    
-    /**
-     * @notice Address of the previously deployed Vault factory that the
-     * protocol fee config is retrieved from.
-     */
-    function FACTORY() external view returns (address);
-
-    /*//////////////////////////////////////////////////////////////
                               GETTERS
     //////////////////////////////////////////////////////////////*/
     
@@ -270,47 +227,10 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
     function emergencyAdmin() external view returns (address);
     
     /**
-     * @notice Get the current address that will receive donations from this strategy.
-     * @return Address of donationAddress
-     */
-    function donationAddress() external view returns (address);
-    
-    /**
      * @notice Get the current dragon router address that will receive minted shares.
      * @return Address of dragonRouter
      */
     function dragonRouter() external view returns (address);
-    
-    /**
-     * @notice Get the current performance fee charged on profits.
-     * denominated in Basis Points where 10_000 == 100%
-     * @return Current performance fee.
-     */
-    function performanceFee() external view returns (uint16);
-    
-    /**
-     * @notice Get the current address that receives the performance fees.
-     * @return Address of performanceFeeRecipient
-     */
-    function performanceFeeRecipient() external view returns (address);
-    
-    /**
-     * @notice Gets the timestamp at which all profits will be unlocked.
-     * @return The full profit unlocking timestamp
-     */
-    function fullProfitUnlockDate() external view returns (uint256);
-    
-    /**
-     * @notice The per second rate at which profits are unlocking.
-     * @return The current profit unlocking rate.
-     */
-    function profitUnlockingRate() external view returns (uint256);
-    
-    /**
-     * @notice Gets the current time profits are set to unlock over.
-     * @return The current profit max unlock time.
-     */
-    function profitMaxUnlockTime() external view returns (uint256);
     
     /**
      * @notice The timestamp of the last time protocol fees were charged.
@@ -323,12 +243,6 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
      * @return Whether or not the strategy is shutdown.
      */
     function isShutdown() external view returns (bool);
-    
-    /**
-     * @notice Get how many shares have been unlocked since last report.
-     * @return The amount of shares that have unlocked.
-     */
-    function unlockedShares() external view returns (uint256);
 
     /*//////////////////////////////////////////////////////////////
                               SETTERS
@@ -358,36 +272,10 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
     function setEmergencyAdmin(address _emergencyAdmin) external;
     
     /**
-     * @notice Sets a new address to receive donations from this strategy.
-     * @param _donationAddress New address to set `donationAddress` to.
-     */
-    function setDonationAddress(address _donationAddress) external;
-    
-    /**
      * @notice Sets a new dragon router address to receive minted shares from yield.
      * @param _dragonRouter New address to set `dragonRouter` to.
      */
     function setDragonRouter(address _dragonRouter) external;
-    
-    /**
-     * @notice Sets the performance fee to be charged on reported gains.
-     * @param _performanceFee New performance fee.
-     */
-    function setPerformanceFee(uint16 _performanceFee) external;
-    
-    /**
-     * @notice Sets a new address to receive performance fees.
-     * @param _performanceFeeRecipient New address to set `performanceFeeRecipient` to.
-     */
-    function setPerformanceFeeRecipient(
-        address _performanceFeeRecipient
-    ) external;
-    
-    /**
-     * @notice Sets the time for profits to be unlocked over.
-     * @param _profitMaxUnlockTime New `profitMaxUnlockTime`.
-     */
-    function setProfitMaxUnlockTime(uint256 _profitMaxUnlockTime) external;
     
     /**
      * @notice Updates the name for the strategy.

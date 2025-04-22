@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.25;
 
-import { BaseStrategy } from "../BaseStrategy.sol";
-import { DragonTokenizedStrategy } from "../TokenizedStrategy.sol";
+import { DragonBaseStrategy } from "../DragonBaseStrategy.sol";
+import { DragonTokenizedStrategy } from "../DragonTokenizedStrategy.sol";
 
 /**
  * @title YieldSkimmingTokenizedStrategy
@@ -30,7 +30,13 @@ contract YieldSkimmingTokenizedStrategy is DragonTokenizedStrategy {
      * This approach works well for assets like LSTs (Liquid Staking Tokens) that 
      * continuously appreciate in value.
      */
-    function report() public override(DragonTokenizedStrategy) returns (uint256 profit, uint256 loss) {
+    function report() 
+        public 
+        override(TokenizedStrategy)
+        nonReentrant
+        onlyKeepers
+        returns (uint256 profit, uint256 loss) 
+    {
         StrategyData storage S = super._strategyStorage();
 
         // Get the profit in mETH terms
@@ -49,9 +55,7 @@ contract YieldSkimmingTokenizedStrategy is DragonTokenizedStrategy {
 
         emit Reported(
             profit,
-            loss,
-            0, // Protocol fees
-            0 // Performance Fees
+            loss
         );
 
         return (profit, loss);

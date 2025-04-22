@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.25;
 
-import { BaseStrategy } from "../DragonBaseStrategy.sol";
+import { DragonBaseStrategy } from "../DragonBaseStrategy.sol";
 import { DragonTokenizedStrategy } from "../DragonTokenizedStrategy.sol";
 
 /**
  * @title YieldDonatingTokenizedStrategy
  * @author octant.finance
- * @notice A specialized version of DragonTokenizedStrategy designed for productive assets to generate and donate profits to the donation address
+ * @notice A specialized version of DragonTokenizedStrategy designed for productive assets to generate and donate profits to the dragon router
  * @dev This strategy implements a yield donation mechanism by:
  *      - Calling harvestAndReport to collect all profits from the underlying strategy
  *      - Converting profits into shares using the standard conversion
@@ -61,9 +61,7 @@ contract YieldDonatingTokenizedStrategy is DragonTokenizedStrategy {
 
         emit Reported(
             profit,
-            loss,
-            0, // Protocol fees
-            0 // Performance Fees
+            loss
         );
     }
 
