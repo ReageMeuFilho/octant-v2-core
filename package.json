@@ -19,7 +19,8 @@
     "out",
     "src",
     "script",
-    "lib"
+    "lib",
+    "test"
   ],
   "scripts": {
     "format": "prettier --config .prettierrc --plugin=prettier-plugin-solidity '{script,src,test,verification}/**/*.sol' -w",
