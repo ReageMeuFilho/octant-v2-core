@@ -3,8 +3,8 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 import { TestPlus } from "lib/solady/test/utils/TestPlus.sol";
-import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
-import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
+import "safe-smart-account/contracts/proxies/SafeProxyFactory.sol";
+import "safe-smart-account/contracts/Safe.sol";
 
 import { SetupIntegrationTest } from "../Setup.t.sol";
 import { TokenizedStrategy__StrategyNotInShutdown, TokenizedStrategy__NotEmergencyAuthorized, TokenizedStrategy__HatsAlreadyInitialized, TokenizedStrategy__NotKeeperOrManagement, TokenizedStrategy__NotManagement } from "src/errors.sol";

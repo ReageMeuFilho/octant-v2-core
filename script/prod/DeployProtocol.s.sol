@@ -3,9 +3,9 @@ pragma solidity ^0.8.25;
 
 import "forge-std/Script.sol";
 import { console2 } from "forge-std/console2.sol";
-import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
-import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxy.sol";
-import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
+import "safe-smart-account/contracts/Safe.sol";
+import "safe-smart-account/contracts/proxies/SafeProxy.sol";
+import "safe-smart-account/contracts/proxies/SafeProxyFactory.sol";
 import { DragonTokenizedStrategy } from "src/dragons/vaults/DragonTokenizedStrategy.sol";
 import { ModuleProxyFactory } from "src/dragons/ModuleProxyFactory.sol";
 import { SplitChecker } from "src/dragons/SplitChecker.sol";

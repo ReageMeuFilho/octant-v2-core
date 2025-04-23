@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { Enum } from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
+import { Enum } from "safe-smart-account/contracts/common/Enum.sol";
 
 /// @dev Mock Safe that returns false on execTransactionFromModule
 contract FailSafe {

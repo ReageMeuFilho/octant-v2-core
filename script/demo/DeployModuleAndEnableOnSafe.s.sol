@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Script.sol";
-import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxy.sol";
+import "safe-smart-account/contracts/proxies/SafeProxy.sol";
 import { BatchScript } from "forge-safe/src/BatchScript.sol";
 
 import { ModuleProxyFactory } from "src/dragons/ModuleProxyFactory.sol";
