@@ -19,7 +19,8 @@
     "out",
     "src",
     "script",
-    "lib"
+    "lib",
+    "test"
   ],
   "scripts": {
     "format": "prettier --config .prettierrc --plugin=prettier-plugin-solidity '{script,src,test,verification}/**/*.sol' -w",
@@ -47,16 +48,14 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@gnosis.pm/safe-contracts": "^1.3.0",
     "@openzeppelin/upgrades-core": "^1.41.0",
     "dotenv": "^16.5.0"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.8.0",
     "@commitlint/config-conventional": "^19.8.0",
-    "@gnosis.pm/safe-contracts": "^1.3.0",
     "@release-it/conventional-changelog": "^10.0.0",
-    "ethers": "5",
-    "forge-stack-tracer": "^1.0.3",
     "husky": "^9.1.7",
     "lint-staged": "^15.5.1",
     "prettier": "^3.5.3",
