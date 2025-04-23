@@ -321,6 +321,9 @@ jobs:
         run: |
           yarn config set npmScopes.golemfoundation.npmAuthToken "${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}"
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --local user.email "birnam@wildland.io"
+          git config --local user.name "Housekeeper Bot"
+          git config --local user.signingkey "${HOUSEKEEPER_GITHUB_SIGNING_KEY_ID}"
 
       - name: Publish
         run: yarn release --preRelease --ci
