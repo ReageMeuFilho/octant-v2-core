@@ -71,7 +71,7 @@ contract Vault is IVault {
     address private factory;
 
     // HashMap that records all the strategies that are allowed to receive assets from the vault.
-    mapping(address => StrategyParams) private _strategies;
+    mapping(address => StrategyParams) internal _strategies;
 
     // The current default withdrawal queue.
     address[] internal _defaultQueue;
@@ -848,7 +848,6 @@ contract Vault is IVault {
     }
 
     /// EMERGENCY MANAGEMENT ///
-
     /**
      * @notice Shutdown the vault.
      */
@@ -886,7 +885,7 @@ contract Vault is IVault {
      * @param receiver The address to receive the shares.
      * @return The amount of shares minted.
      */
-    function deposit(uint256 assets, address receiver) external override nonReentrant returns (uint256) {
+    function deposit(uint256 assets, address receiver) external virtual nonReentrant returns (uint256) {
         uint256 amount = assets;
         // Deposit all if sent with max uint
         if (amount == type(uint256).max) {
@@ -904,7 +903,7 @@ contract Vault is IVault {
      * @param receiver The address to receive the shares.
      * @return The amount of assets deposited.
      */
-    function mint(uint256 shares, address receiver) external nonReentrant returns (uint256) {
+    function mint(uint256 shares, address receiver) external virtual nonReentrant returns (uint256) {
         uint256 assets = _convertToAssets(shares, Rounding.ROUND_UP);
         _deposit(receiver, assets, shares);
         return assets;
@@ -926,7 +925,7 @@ contract Vault is IVault {
         address owner,
         uint256 maxLoss,
         address[] calldata strategiesArray
-    ) external override nonReentrant returns (uint256) {
+    ) public virtual override nonReentrant returns (uint256) {
         uint256 shares = _convertToShares(assets, Rounding.ROUND_UP);
         _redeem(msg.sender, receiver, owner, assets, shares, maxLoss, strategiesArray);
         return shares;
@@ -948,7 +947,7 @@ contract Vault is IVault {
         address owner,
         uint256 maxLoss,
         address[] calldata strategiesArray
-    ) external override nonReentrant returns (uint256) {
+    ) public virtual override nonReentrant returns (uint256) {
         uint256 assets = _convertToAssets(shares, Rounding.ROUND_DOWN);
         // Always return the actual amount of assets withdrawn.
         return _redeem(msg.sender, receiver, owner, assets, shares, maxLoss, strategiesArray);
