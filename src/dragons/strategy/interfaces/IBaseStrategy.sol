@@ -4,10 +4,10 @@ pragma solidity >=0.8.18;
 /**
  * @title Yearn V3 Base Strategy Interface
  * @author yearn.finance
- * @notice 
+ * @notice
  *  This interface defines the functions that a BaseStrategy must implement
  *  to be compatible with the TokenizedStrategy contract.
- * 
+ *
  *  These are primarily the callback functions that the TokenizedStrategy
  *  will call on the Strategy during various operations like deposits,
  *  withdrawals and reporting.
@@ -89,4 +89,4 @@ interface IBaseStrategy {
      * @return . Calldata for the tend call.
      */
     function tendTrigger() external view returns (bool, bytes memory);
-} 
+}

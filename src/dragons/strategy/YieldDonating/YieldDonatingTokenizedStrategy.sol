@@ -20,7 +20,7 @@ contract YieldDonatingTokenizedStrategy is DragonTokenizedStrategy {
     /**
      * @inheritdoc ITokenizedStrategy
      * @dev This implementation overrides the base report function to mint profit-derived shares to dragonRouter.
-     * When the strategy generates profits (newTotalAssets > oldTotalAssets), the difference is converted to shares 
+     * When the strategy generates profits (newTotalAssets > oldTotalAssets), the difference is converted to shares
      * and minted to the dragonRouter. When losses occur, those losses can be offset by burning shares from dragonRouter
      * through the _handleDragonLossProtection mechanism.
      */
@@ -59,17 +59,14 @@ contract YieldDonatingTokenizedStrategy is DragonTokenizedStrategy {
         S.totalAssets = newTotalAssets;
         S.lastReport = uint96(block.timestamp);
 
-        emit Reported(
-            profit,
-            loss
-        );
+        emit Reported(profit, loss);
     }
 
     /**
      * @dev Internal function to handle loss protection for dragon principal
      * @param S Storage struct pointer to access strategy's storage variables
      * @param loss The amount of loss in terms of asset to protect against
-     * 
+     *
      * This function calculates how many shares would be equivalent to the loss amount,
      * then burns up to that amount of shares from dragonRouter, limited by the router's
      * actual balance. This effectively socializes the loss among all shareholders by

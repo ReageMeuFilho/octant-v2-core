@@ -43,9 +43,9 @@ import { IBaseStrategy } from "interfaces/IBaseStrategy.sol";
 
 /**
  * @title Tokenized Strategy (Octant V2 Fork)
- * @author yearn.finance; forked and modified by octant.finance 
+ * @author yearn.finance; forked and modified by octant.finance
  * @notice
- *  This TokenizedStrategy is a fork of Yearn's TokenizedStrategy that has been 
+ *  This TokenizedStrategy is a fork of Yearn's TokenizedStrategy that has been
  *  modified by Octant to support donation functionality and other security enhancements.
  *
  *  The original contract can be used by anyone wishing to easily build
@@ -422,15 +422,15 @@ abstract contract TokenizedStrategy {
         // Set the default management address. Can't be 0.
         require(_management != address(0), "ZERO ADDRESS");
         S.management = _management;
-        
+
         // Set the keeper address, can't be 0
         require(_keeper != address(0), "ZERO ADDRESS");
         S.keeper = _keeper;
-        
+
         // Set the emergency admin address, can't be 0
         require(_emergencyAdmin != address(0), "ZERO ADDRESS");
         S.emergencyAdmin = _emergencyAdmin;
-        
+
         // Set the dragon router address, can't be 0
         require(_dragonRouter != address(0), "ZERO ADDRESS");
         S.dragonRouter = _dragonRouter;
@@ -975,6 +975,7 @@ abstract contract TokenizedStrategy {
      *
      * @return unlocked The amount of shares that have unlocked.
      */
+    // solhint-disable-next-line no-unused-vars
     function _unlockedShares(StrategyData storage S) internal view returns (uint256 unlocked) {
         // We no longer track locked/unlocked shares, so always return 0
         return 0;

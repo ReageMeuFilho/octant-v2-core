@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {BaseHealthCheck} from "./BaseHealthCheck.sol";
-import {UniswapV3Swapper} from "./UniswapV3Swapper.sol";    
+import { BaseHealthCheck } from "./BaseHealthCheck.sol";
+import { UniswapV3Swapper } from "./UniswapV3Swapper.sol";
 
 /// @title yearn-v3-USDS-Farmer-USDC
 /// @author mil0x
@@ -21,13 +21,13 @@ contract USDSFarmerUSDC is BaseHealthCheck, UniswapV3Swapper {
 
     ///@notice Maximum acceptable swap slippage in case we are swapping through UniswapV3 instead of through PSM. (Depends also on maxAcceptableFeeOutPSM to initiate swap)
     uint256 public swapSlippageBPS; //in BPS
-    
+
     address private constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
     address private constant DAI = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
     address private constant USDS = 0xdC035D45d973E3EC169d2276DDab16f1e407384F;
     address private constant PSM = 0xf6e72Db5454dd049d0788e411b06CfAF16853042; //LITE-PSM
     address private constant DAI_USDS_EXCHANGER = 0x3225737a9Bbb6473CB4a45b7244ACa2BeFdB276A;
-    address private constant pocket = 0x37305B1cD40574E4C5Ce33f8e8306Be057fD7341;
+    address private constant POCKET = 0x37305B1cD40574E4C5Ce33f8e8306Be057fD7341;
     uint256 private constant SCALER = 1e12;
     uint256 private constant WAD = 1e18;
     uint256 private constant ASSET_DUST = 100;
@@ -57,10 +57,15 @@ contract USDSFarmerUSDC is BaseHealthCheck, UniswapV3Swapper {
     //////////////////////////////////////////////////////////////*/
 
     function availableDepositLimit(address /*_owner*/) public view override returns (uint256) {
-        if (IPSM(PSM).tin() == 0 && IPSM(PSM).tout() == 0) { //only allow deposits if PSM fee in and fee out are 0
+        if (IPSM(PSM).tin() == 0 && IPSM(PSM).tout() == 0) {
+            //only allow deposits if PSM fee in and fee out are 0
             uint256 totalDeposits = TokenizedStrategy.totalAssets();
             if (depositLimit > totalDeposits) {
-                return _min(_min(_balancePSM(), IVault(vault).maxDeposit(address(this))) / SCALER, depositLimit - totalDeposits); //minimum of DAI available in PSM, vault maximum deposit, and deposit limit 
+                return
+                    _min(
+                        _min(_balancePSM(), IVault(vault).maxDeposit(address(this))) / SCALER,
+                        depositLimit - totalDeposits
+                    ); //minimum of DAI available in PSM, vault maximum deposit, and deposit limit
             } else {
                 return 0;
             }
@@ -83,7 +88,11 @@ contract USDSFarmerUSDC is BaseHealthCheck, UniswapV3Swapper {
         if (IPSM(PSM).tout() >= maxAcceptableFeeOutPSM) {
             return IVault(vault).convertToAssets(IVault(vault).maxRedeem(address(this))) / SCALER; //vault maximum redeemable assets
         } else {
-            return _min(asset.balanceOf(pocket), IVault(vault).convertToAssets(IVault(vault).maxRedeem(address(this))) / SCALER); //minimum of PSM liquidity and vault maximum redeemable assets
+            return
+                _min(
+                    asset.balanceOf(POCKET),
+                    IVault(vault).convertToAssets(IVault(vault).maxRedeem(address(this))) / SCALER
+                ); //minimum of PSM liquidity and vault maximum redeemable assets
         }
     }
 
@@ -93,10 +102,11 @@ contract USDSFarmerUSDC is BaseHealthCheck, UniswapV3Swapper {
         _amount = IVault(vault).redeem(_amount, address(this), address(this)); //vault --> USDS
         IExchange(DAI_USDS_EXCHANGER).usdsToDai(address(this), _amount); //USDS -- 1:1 --> DAI
         uint256 feeOut = IPSM(PSM).tout(); //in WAD
-        if (feeOut >= maxAcceptableFeeOutPSM) { //if PSM fee is not 0
-            _swapFrom(DAI, address(asset), _amount, _amount * (MAX_BPS - swapSlippageBPS) / MAX_BPS / SCALER); //swap DAI --> USDC through Uniswap (in DAI amount)
+        if (feeOut >= maxAcceptableFeeOutPSM) {
+            //if PSM fee is not 0
+            _swapFrom(DAI, address(asset), _amount, (_amount * (MAX_BPS - swapSlippageBPS)) / MAX_BPS / SCALER); //swap DAI --> USDC through Uniswap (in DAI amount)
         } else {
-            IPSM(PSM).buyGem(address(this), _amount * WAD / (WAD + feeOut) / SCALER); // DAI --> USDC 1:1 through PSM (in USDC amount). Need to account for fees that will be added on top.
+            IPSM(PSM).buyGem(address(this), (_amount * WAD) / (WAD + feeOut) / SCALER); // DAI --> USDC 1:1 through PSM (in USDC amount). Need to account for fees that will be added on top.
         }
     }
 
@@ -153,7 +163,7 @@ contract USDSFarmerUSDC is BaseHealthCheck, UniswapV3Swapper {
         require(_maxAcceptableFeeOutPSM <= WAD);
         maxAcceptableFeeOutPSM = _maxAcceptableFeeOutPSM;
     }
-    
+
     /**
      * @notice Set the slippage for deposits in basis points.
      * @param _swapSlippageBPS the maximum slippage in basis points

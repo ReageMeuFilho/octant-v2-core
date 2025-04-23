@@ -86,7 +86,7 @@ abstract contract BaseStrategy {
     /*//////////////////////////////////////////////////////////////
                             ERRORS
     //////////////////////////////////////////////////////////////*/
-    
+
     /// @notice Thrown when a non-self address tries to call a self-only function
     error NotSelf();
 
@@ -107,8 +107,7 @@ abstract contract BaseStrategy {
      * and always be checked before any integration with the Strategy.
      */
     // NOTE: This is a placeholder address - should be updated for production use
-    address public constant TOKENIZED_STRATEGY_ADDRESS =
-        0x2e234DAe75C793f67A35089C9d99245E1C58470b;
+    address public constant TOKENIZED_STRATEGY_ADDRESS = 0x2e234DAe75C793f67A35089C9d99245E1C58470b;
 
     /*//////////////////////////////////////////////////////////////
                             IMMUTABLES
@@ -119,7 +118,7 @@ abstract contract BaseStrategy {
      * Stored here for cheap retrievals within the strategy.
      */
     ERC20 internal immutable asset;
-    
+
     /**
      * @dev This variable is set to address(this) during initialization of each strategy.
      *
@@ -158,18 +157,18 @@ abstract contract BaseStrategy {
         address _donationAddress
     ) {
         asset = ERC20(_asset);
-        
+
         // Set instance of the implementation for internal use.
         TokenizedStrategy = ITokenizedStrategy(address(this));
-        
+
         // Initialize the strategy's storage variables.
         _delegateCall(
             abi.encodeCall(
-                ITokenizedStrategy.initialize, 
+                ITokenizedStrategy.initialize,
                 (_asset, _name, _management, _keeper, _emergencyAdmin, _donationAddress)
             )
         );
-        
+
         // Store the tokenizedStrategyAddress at the standard implementation
         // address storage slot so etherscan picks up the interface. This gets
         // stored on initialization and never updated.
