@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "safe-smart-account/contracts/Safe.sol";
-import "safe-smart-account/contracts/proxies/SafeProxy.sol";
-import "safe-smart-account/contracts/proxies/SafeProxyFactory.sol";
+import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
+import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxy.sol";
+import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import "forge-std/Script.sol";
 

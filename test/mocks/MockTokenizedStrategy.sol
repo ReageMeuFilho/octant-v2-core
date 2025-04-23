@@ -4,7 +4,7 @@ pragma solidity >=0.8.18;
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { Enum } from "safe-smart-account/contracts/common/Enum.sol";
+import { Enum } from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 
 import { IBaseStrategy } from "src/interfaces/IBaseStrategy.sol";
 import { IAvatar } from "zodiac/interfaces/IAvatar.sol";

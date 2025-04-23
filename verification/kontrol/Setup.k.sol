@@ -8,7 +8,7 @@ import { DragonRouter } from "src/dragons/DragonRouter.sol";
 import { SplitChecker } from "src/dragons/SplitChecker.sol";
 import { DragonTokenizedStrategy } from "src/dragons/vaults/DragonTokenizedStrategy.sol";
 
-import "safe-smart-account/contracts/Safe.sol";
+import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
 
 import { YearnPolygonUsdcStrategy } from "src/dragons/modules/YearnPolygonUsdcStrategy.sol";
 import { IStrategy } from "src/interfaces/IStrategy.sol";

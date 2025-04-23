@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.8.0 <0.9.0;
 import "forge-std/Test.sol";
-import "safe-smart-account/contracts/Safe.sol";
-import "safe-smart-account/contracts/proxies/SafeProxyFactory.sol";
-import "safe-smart-account/contracts/proxies/SafeProxy.sol";
+import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
+import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
+import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxy.sol";
 import { LinearAllowanceSingletonForGnosisSafe } from "src/dragons/modules/LinearAllowanceSingletonForGnosisSafe.sol";
 import { NATIVE_TOKEN } from "src/constants.sol";
-import "safe-smart-account/contracts/common/Enum.sol";
+import "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 import { LinearAllowanceExecutor } from "../../src/dragons/LinearAllowanceExecutor.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 

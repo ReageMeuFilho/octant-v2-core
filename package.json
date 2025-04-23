@@ -20,7 +20,8 @@
     "src",
     "script",
     "lib",
-    "test"
+    "test",
+    "remappings.txt"
   ],
   "scripts": {
     "format": "prettier --config .prettierrc --plugin=prettier-plugin-solidity '{script,src,test,verification}/**/*.sol' -w",
