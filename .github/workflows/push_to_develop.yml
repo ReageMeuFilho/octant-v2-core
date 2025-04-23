@@ -319,7 +319,7 @@ jobs:
 
       - name: Set npm auth token
         run: |
-          yarn config set npmScopes.golemfoundation.npmAuthToken "${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}"
+          yarn config set -H npmScopes.golemfoundation.npmAuthToken "${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}"
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Publish
