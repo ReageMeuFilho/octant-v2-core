@@ -21,7 +21,9 @@
     "script",
     "lib",
     "test",
-    "remappings.txt"
+    "remappings.txt",
+    "foundry.toml",
+    "kontrol.toml"
   ],
   "scripts": {
     "format": "prettier --config .prettierrc --plugin=prettier-plugin-solidity '{script,src,test,verification}/**/*.sol' -w",
