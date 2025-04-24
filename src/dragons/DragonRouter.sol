@@ -234,12 +234,13 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
     function setSplit(ISplitChecker.Split memory _split) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (block.timestamp - lastSetSplitTime < coolDownPeriod) revert CooldownPeriodNotPassed();
         splitChecker.checkSplit(_split, opexVault, metapool);
-
-        for (uint256 i = 0; i < strategies.length; i++) {
+        uint256 strategiesLength = strategies.length;
+        for (uint256 i = 0; i < strategiesLength; i++) {
             StrategyData storage data = strategyData[strategies[i]];
 
             /// @dev updates old splitters
-            for (uint256 j = 0; j < split.recipients.length; j++) {
+            uint256 splitRecipientsLength = split.recipients.length;
+            for (uint256 j = 0; j < splitRecipientsLength; j++) {
                 UserData storage _userData = userData[split.recipients[j]][strategies[i]];
                 uint256 claimableAssets = _claimableAssets(_userData, strategies[i]);
                 _userData.assets += claimableAssets;
