@@ -112,7 +112,7 @@ contract ModuleProxyFactory is IModuleProxyFactory {
             deployModule(DRAGON_ROUTER_IMPLEMENTATION, abi.encodeWithSignature("setUp(bytes)", initializer), saltNonce)
         );
 
-        emit DragonRouterCreation(proxy, DRAGON_ROUTER_IMPLEMENTATION, owner);
+        emit DragonRouterCreation(owner, proxy, DRAGON_ROUTER_IMPLEMENTATION);
         return proxy;
     }
 
