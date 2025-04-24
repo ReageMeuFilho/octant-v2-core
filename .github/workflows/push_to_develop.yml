@@ -226,7 +226,8 @@ jobs:
 
       - name: Set npm auth token
         run: |
-          yarn config set npmScopes.golemfoundation.npmAuthToken "${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}"
+          yarn config set -H npmScopes.golemfoundation.npmAuthToken "${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}"
+          gpg --import <(echo ${HOUSEKEEPER_GITHUB_SIGNING_KEY} | base64 -d)
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config --local user.email "birnam@wildland.io"
           git config --local user.name "Housekeeper Bot"
