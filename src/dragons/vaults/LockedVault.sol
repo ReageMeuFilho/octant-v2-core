@@ -63,7 +63,7 @@ contract LockedVault is Vault, ILockedVault {
         if (balanceOf(msg.sender) == 0) revert NoSharesToRageQuit();
 
         LockupInfo storage lockup = voluntaryLockups[msg.sender];
-        if (block.timestamp >= lockup.unlockTime) revert SharesAlreadyUnlocked();
+        if (block.timestamp <= lockup.unlockTime) revert SharesAlreadyUnlocked();
 
         // Default unlock time based on vault's rage quit cooldown
         uint256 defaultUnlockTime = block.timestamp + rageQuitCooldownPeriod;
@@ -86,7 +86,9 @@ contract LockedVault is Vault, ILockedVault {
         address[] calldata strategiesArray
     ) public override(IVault, Vault) nonReentrant returns (uint256) {
         _checkUnlocked(owner);
-        return super.withdraw(assets, receiver, owner, maxLoss, strategiesArray);
+        uint256 shares = _convertToShares(assets, Rounding.ROUND_UP);
+        _redeem(msg.sender, receiver, owner, assets, shares, maxLoss, strategiesArray);
+        return shares;
     }
 
     /**
@@ -100,7 +102,9 @@ contract LockedVault is Vault, ILockedVault {
         address[] calldata strategiesArray
     ) public override(IVault, Vault) nonReentrant returns (uint256) {
         _checkUnlocked(owner);
-        return super.redeem(shares, receiver, owner, maxLoss, strategiesArray);
+        uint256 assets = _convertToAssets(shares, Rounding.ROUND_DOWN);
+        // Always return the actual amount of assets withdrawn.
+        return _redeem(msg.sender, receiver, owner, assets, shares, maxLoss, strategiesArray);
     }
 
     /**
