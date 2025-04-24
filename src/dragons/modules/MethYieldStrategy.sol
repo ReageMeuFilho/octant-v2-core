@@ -40,9 +40,18 @@ contract MethYieldStrategy is DragonBaseStrategy, IMethYieldStrategy {
             address _regenGovernance,
             address _mETH
         ) = abi.decode(data, (address, address, address, address, uint256, address, address));
-
+        // Effects
         __Ownable_init(msg.sender);
         string memory _name = "Octant mETH Yield Strategy";
+
+        setAvatar(_owner);
+        setTarget(_owner);
+        transferOwnership(_owner);
+
+        // Initialize the exchange rate on setup
+        lastReportedExchangeRate = _getCurrentExchangeRate();
+
+        // Interactions
         __BaseStrategy_init(
             _tokenizedStrategyImplementation,
             _mETH,
@@ -54,13 +63,6 @@ contract MethYieldStrategy is DragonBaseStrategy, IMethYieldStrategy {
             _name,
             _regenGovernance
         );
-
-        // Initialize the exchange rate on setup
-        lastReportedExchangeRate = _getCurrentExchangeRate();
-
-        setAvatar(_owner);
-        setTarget(_owner);
-        transferOwnership(_owner);
     }
 
     /**

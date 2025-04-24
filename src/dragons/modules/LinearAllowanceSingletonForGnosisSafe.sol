@@ -66,6 +66,8 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
             transferAmount = a.totalUnspent <= safeBalance.toUint160() ? a.totalUnspent : safeBalance.toUint160();
 
             if (transferAmount > 0) {
+                // False positive: marked nonReentrant
+                //slither-disable-next-line reentrancy-no-eth
                 bool success = ISafe(payable(safe)).execTransactionFromModule(
                     to,
                     transferAmount,
@@ -81,6 +83,8 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
 
                 if (transferAmount > 0) {
                     bytes memory data = abi.encodeWithSelector(IERC20.transfer.selector, to, transferAmount);
+                    // False positive: marked nonReentrant
+                    //slither-disable-next-line reentrancy-no-eth
                     bool success = ISafe(payable(safe)).execTransactionFromModule(token, 0, data, Enum.Operation.Call);
                     if (!success) revert TransferFailed(safe, msg.sender, token);
                 }
