@@ -31,12 +31,14 @@ contract Trader is ITransformer, Ownable, Pausable {
     /// @notice Address used to represent native ETH.
     address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     /// @notice Address of WETH wrapper
-    address public wethAddress;
+    address public immutable WETH_ADDRESS;
     /// @notice Token to be sold.
-    address public base;
+    address public immutable BASE;
     /// @notice Token to be bought.
     /// @dev Please note that contract that deals with quote token is the `swapper`. Here value of `quote` is purely informational.
-    address public quote;
+    address public immutable QUOTE;
+    /// @dev Price oracle used by splits to make sure that Trader gets fair price.
+    IOracle public immutable ORACLE;
 
     /*//////////////////////////////////////////////////////////////
                           PRIVATE VARIABLES
@@ -46,8 +48,6 @@ contract Trader is ITransformer, Ownable, Pausable {
     bytes private uniPair;
     /// @dev Base-to-quote pair encoded for price oracle used by splits.
     QuotePair private splitsPair;
-    /// @dev Price oracle used by splits to make sure that Trader gets fair price.
-    IOracle private oracle;
     /// @dev Parameters for the swap.
     ISwapRouter.ExactInputParams[] private exactInputParams;
     /// @dev Parameters for the oracle.
@@ -62,7 +62,7 @@ contract Trader is ITransformer, Ownable, Pausable {
     /// @notice Address of the contract that integrates Uniswap (or possibly some other exchange). Implements IUniV3Swap interface.
     address public integrator;
     /// @notice Beneficiary will receive quote token after the sale of base token.
-    address public beneficiary;
+    address public immutable BENEFICIARY;
     /// @notice `budget` needs to be spend before the end of the period (in blocks).
     uint256 public periodLength;
     /// @notice Total token to be spent before deadline. Please note that balance of quote token may differ from value of budget.
@@ -166,21 +166,21 @@ contract Trader is ITransformer, Ownable, Pausable {
                 (address, address, uint24, address, address, address, address, address, address)
             );
         _initializeOwner(msg.sender);
-        base = _base;
-        quote = _quote;
-        wethAddress = _wethAddress;
-        beneficiary = _beneficiary;
+        BASE = _base;
+        QUOTE = _quote;
+        WETH_ADDRESS = _wethAddress;
+        BENEFICIARY = _beneficiary;
         swapper = _swapper;
         integrator = _integrator;
-        oracle = IOracle(_oracle);
-        splitsPair = QuotePair({ base: splitsEthWrapper(base), quote: splitsEthWrapper(quote) });
-        uniPair = abi.encodePacked(uniEthWrapper(base), _fee, uniEthWrapper(quote));
+        ORACLE = IOracle(_oracle);
+        splitsPair = QuotePair({ base: splitsEthWrapper(BASE), quote: splitsEthWrapper(QUOTE) });
+        uniPair = abi.encodePacked(uniEthWrapper(BASE), _fee, uniEthWrapper(QUOTE));
         transferOwnership(_owner);
     }
 
     /// @dev This contract deals with native ETH, while Uniswap with WETH. This helper function does address conversion.
     function uniEthWrapper(address token) private view returns (address) {
-        if (token == ETH) return wethAddress;
+        if (token == ETH) return WETH_ADDRESS;
         else return token;
     }
 
@@ -205,7 +205,7 @@ contract Trader is ITransformer, Ownable, Pausable {
     /// @return Amount of `quote` token that beneficiary has received.
     /// @dev If `transform` interface is not used, `convert` and `callInitFlash` provide an alternative integration path.
     function callInitFlash(uint256 amount) public returns (uint256) {
-        uint256 oldQuoteBalance = safeBalanceOf(quote, beneficiary);
+        uint256 oldQuoteBalance = safeBalanceOf(QUOTE, BENEFICIARY);
 
         delete exactInputParams;
         exactInputParams.push(
@@ -224,7 +224,7 @@ contract Trader is ITransformer, Ownable, Pausable {
         );
         IUniV3Swap.FlashCallbackData memory data = IUniV3Swap.FlashCallbackData({
             exactInputParams: exactInputParams,
-            excessRecipient: address(beneficiary)
+            excessRecipient: address(BENEFICIARY)
         });
         IUniV3Swap.InitFlashParams memory params = IUniV3Swap.InitFlashParams({
             quoteParams: quoteParams,
@@ -232,7 +232,7 @@ contract Trader is ITransformer, Ownable, Pausable {
         });
         IUniV3Swap(payable(integrator)).initFlash(ISwapperImpl(swapper), params);
 
-        return safeBalanceOf(quote, beneficiary) - oldQuoteBalance;
+        return safeBalanceOf(QUOTE, BENEFICIARY) - oldQuoteBalance;
     }
 
     /// @dev Max function. Returns bigger of two unsigned integers.
@@ -251,12 +251,12 @@ contract Trader is ITransformer, Ownable, Pausable {
     /// @param amount needs to be set to what `findSaleValue(...)` returns.
     /// @return amount of quote token that will be transferred to beneficiary.
     function transform(address fromToken, address toToken, uint256 amount) external payable returns (uint256) {
-        if ((fromToken != base) || (toToken != quote)) revert Trader__ImpossibleConfiguration();
+        if ((fromToken != BASE) || (toToken != QUOTE)) revert Trader__ImpossibleConfiguration();
         if (fromToken == ETH) {
             if (msg.value != amount) revert Trader__ImpossibleConfiguration();
         } else {
             if (msg.value != 0) revert Trader__UnexpectedETH();
-            IERC20(base).safeTransferFrom(msg.sender, address(this), amount);
+            IERC20(BASE).safeTransferFrom(msg.sender, address(this), amount);
         }
 
         uint256 height;
@@ -297,8 +297,8 @@ contract Trader is ITransformer, Ownable, Pausable {
         lastHeight = height;
 
         uint256 balance = address(this).balance;
-        if (base != ETH) {
-            balance = IERC20(base).balanceOf(address(this));
+        if (BASE != ETH) {
+            balance = IERC20(BASE).balanceOf(address(this));
         }
 
         uint256 saleValue = getSaleValue(rand, 0);
@@ -307,10 +307,10 @@ contract Trader is ITransformer, Ownable, Pausable {
 
         spent = spent + saleValue;
 
-        if (base == ETH) {
+        if (BASE == ETH) {
             payable(swapper).transfer(saleValue);
         } else {
-            IERC20(base).safeTransfer(swapper, saleValue);
+            IERC20(BASE).safeTransfer(swapper, saleValue);
         }
 
         emit Traded(saleValue, balance - saleValue);
@@ -336,8 +336,8 @@ contract Trader is ITransformer, Ownable, Pausable {
         if (saleValue > saleValueHigh) revert Trader__SoftwareError();
 
         uint256 balance = address(this).balance;
-        if (base != ETH) {
-            balance = IERC20(base).balanceOf(address(this));
+        if (BASE != ETH) {
+            balance = IERC20(BASE).balanceOf(address(this));
         }
 
         if (saleValue > balance + transferAmount) {

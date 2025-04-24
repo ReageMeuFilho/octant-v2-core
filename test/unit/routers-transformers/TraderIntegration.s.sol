@@ -127,10 +127,10 @@ contract TestTraderIntegrationETH2GLM is Test, TestPlus, DeployTrader {
             abi.encode(unscaledAmountsToBeneficiary)
         );
 
-        uint256 amountToBeneficiary = trader.transform{ value: saleValue }(trader.base(), trader.quote(), saleValue);
+        uint256 amountToBeneficiary = trader.transform{ value: saleValue }(trader.BASE(), trader.QUOTE(), saleValue);
 
-        assert(IERC20(quoteAddress).balanceOf(trader.beneficiary()) > 0);
-        assert(IERC20(quoteAddress).balanceOf(trader.beneficiary()) == amountToBeneficiary);
+        assert(IERC20(quoteAddress).balanceOf(trader.BENEFICIARY()) > 0);
+        assert(IERC20(quoteAddress).balanceOf(trader.BENEFICIARY()) == amountToBeneficiary);
         emit log_named_uint("GLM price on Trader.transform(...)", amountToBeneficiary / saleValue);
     }
 

@@ -27,8 +27,8 @@ contract TraderRun is Script {
 
         trader = Trader(payable(vm.envAddress("TRADER")));
         ETH = trader.ETH();
-        base = trader.base();
-        quote = trader.quote();
+        base = trader.BASE();
+        quote = trader.QUOTE();
 
         console.log("ChainID:", block.chainid);
         console.log("Trader at", address(trader));
