@@ -4,6 +4,7 @@ pragma solidity ^0.8.25;
 import { Vault, IVault } from "src/dragons/vaults/Vault.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { ILockedVault } from "src/interfaces/ILockedVault.sol";
+
 /**
  * @title LockedVault
  * @notice Vault with modified unlocking mechanism similar to DragonTokenizedStrategy
@@ -114,7 +115,7 @@ contract LockedVault is Vault, ILockedVault {
     function _checkUnlocked(address owner) internal view {
         LockupInfo memory lockup = voluntaryLockups[owner];
 
-        if (block.timestamp < lockup.unlockTime) {
+        if (block.timestamp <= lockup.unlockTime || lockup.lockupTime == 0) {
             revert SharesStillLocked();
         }
     }
