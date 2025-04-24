@@ -35,7 +35,7 @@ abstract contract BaseHealthCheck is DragonBaseStrategy {
     // Defaults loss limit to 0.
     uint16 private _lossLimitRatio;
 
-    constructor(address _asset, string memory _name) BaseStrategy(_asset, _name) {}
+    constructor(address _asset, string memory _name) DragonBaseStrategy(_asset, _name) {}
 
     /**
      * @notice Returns the current profit limit ratio.

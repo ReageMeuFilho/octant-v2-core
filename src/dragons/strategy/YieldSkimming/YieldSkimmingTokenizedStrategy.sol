@@ -2,7 +2,8 @@
 pragma solidity >=0.8.25;
 
 import { IBaseStrategy } from "../interfaces/IBaseStrategy.sol";
-import { DragonTokenizedStrategy } from "../DragonTokenizedStrategy.sol";
+import { ITokenizedStrategy } from "../interfaces/ITokenizedStrategy.sol";
+import { DragonTokenizedStrategy, Math } from "../DragonTokenizedStrategy.sol";
 
 /**
  * @title YieldSkimmingTokenizedStrategy
@@ -32,7 +33,7 @@ contract YieldSkimmingTokenizedStrategy is DragonTokenizedStrategy {
      */
     function report()
         public
-        override(TokenizedStrategy)
+        override(DragonTokenizedStrategy)
         nonReentrant
         onlyKeepers
         returns (uint256 profit, uint256 loss)
@@ -62,17 +63,22 @@ contract YieldSkimmingTokenizedStrategy is DragonTokenizedStrategy {
      * @dev Override _deposit to ensure the exchange rate is updated before depositing
      * @param assets The amount of assets being deposited
      * @param receiver The address that will receive the shares
-     * @return shares The number of shares minted to the receiver
      *
      * This function calls report() first to ensure the latest exchange rate is used
      * when converting assets to shares, preventing stale exchange rates which could
      * lead to incorrect share issuance.
      */
-    function _deposit(uint256 assets, address receiver) internal override returns (uint256 shares) {
+
+    function _deposit(
+        StrategyData storage S,
+        address receiver,
+        uint256 assets,
+        uint256 shares
+    ) internal override(DragonTokenizedStrategy) {
         // report to update the exchange rate
         ITokenizedStrategy(address(this)).report();
 
-        shares = super._deposit(assets, receiver, lockupDuration);
+        shares = super._deposit(S, receiver, assets, shares);
 
         return shares;
     }

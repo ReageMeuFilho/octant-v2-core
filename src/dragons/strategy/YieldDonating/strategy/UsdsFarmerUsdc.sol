@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { BaseHealthCheck } from "./BaseHealthCheck.sol";
-import { UniswapV3Swapper } from "./UniswapV3Swapper.sol";
+import { BaseHealthCheck } from "../../periphery/BaseHealthCheck.sol";
+import { UniswapV3Swapper } from "../../periphery/UniswapV3Swapper.sol";
 
 /// @title yearn-v3-USDS-Farmer-USDC
 /// @author mil0x
