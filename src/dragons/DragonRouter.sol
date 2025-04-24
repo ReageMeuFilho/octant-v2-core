@@ -219,6 +219,8 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
         StrategyData storage data = strategyData[strategy];
         if (data.asset == address(0)) revert ZeroAddress();
 
+        // False positive: marked nonReentrant
+        //slither-disable-next-line reentrancy-no-eth
         ITokenizedStrategy(strategy).withdraw(amount, address(this), address(this), 0);
 
         data.assetPerShare += (amount * SPLIT_PRECISION) / data.totalShares;

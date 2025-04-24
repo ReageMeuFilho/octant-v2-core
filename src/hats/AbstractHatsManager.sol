@@ -4,7 +4,7 @@ pragma solidity ^0.8.19;
 import { IHats } from "lib/hats-protocol/src/Interfaces/IHats.sol";
 import { IHatsEligibility } from "src/interfaces/IHatsEligibility.sol";
 import { IHatsToggle } from "src/interfaces/IHatsToggle.sol";
-
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { Hats__InvalidAddressFor, Hats__InvalidHat, Hats__DoesNotHaveThisHat, Hats__HatAlreadyExists, Hats__HatDoesNotExist, Hats__TooManyInitialHolders, Hats__NotAdminOfHat } from "./HatsErrors.sol";
 
 /**
@@ -12,7 +12,7 @@ import { Hats__InvalidAddressFor, Hats__InvalidHat, Hats__DoesNotHaveThisHat, Ha
  * @notice Abstract pattern for managing hierarchical roles through Hats Protocol
  * @dev Implements base logic for creating and managing role-based hats under a branch
  */
-abstract contract AbstractHatsManager is IHatsEligibility, IHatsToggle {
+abstract contract AbstractHatsManager is ReentrancyGuard, IHatsEligibility, IHatsToggle {
     IHats public immutable HATS;
 
     // Core hat structure
@@ -57,12 +57,14 @@ abstract contract AbstractHatsManager is IHatsEligibility, IHatsToggle {
         string memory details,
         uint256 maxSupply,
         address[] memory initialHolders
-    ) internal virtual returns (uint256 hatId) {
+    ) internal virtual nonReentrant returns (uint256 hatId) {
         require(HATS.isAdminOfHat(msg.sender, adminHat), Hats__NotAdminOfHat(msg.sender, adminHat));
         require(roleHats[roleId] == 0, Hats__HatAlreadyExists(roleId));
         require(initialHolders.length <= maxSupply, Hats__TooManyInitialHolders(initialHolders.length, maxSupply));
 
         // Create role hat under branch
+        // False positive: marked nonReentrant
+        //slither-disable-next-line reentrancy-no-eth
         hatId = HATS.createHat(
             branchHat,
             details,
