@@ -1,0 +1,65 @@
+name: Deploy Smart Contracts
+on:
+  workflow_dispatch:
+
+
+concurrency:
+  group: "${{ github.ref }}-deploy-sc"
+  cancel-in-progress: true
+
+env:
+  FOUNDRY_PROFILE: ci
+
+jobs:
+  access-check:
+    name: Check access-rights
+    runs-on: general
+    if: github.ref == 'refs/heads/develop'
+    steps:
+      - name: Check pre-requisites
+        run: |
+          ALLOWED_USERS=("0xartem" "qGolem" "mslomnicki")
+          echo "Triggered by ${{ github.actor }}"
+          if [[ ! " ${ALLOWED_USERS[@]} " =~ " ${{ github.actor }} " ]]; then
+            echo "❌ Unauthorized user: ${{ github.actor }}"
+            exit 1
+          fi
+          echo "✅ Authorized user: ${{ github.actor }}"
+
+  deploy-contract:
+    name: Deploy contracts
+    runs-on: general
+    needs:
+      - access-check
+    container:
+      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/core:${{ github.sha }}
+      credentials:
+        username: _json_key_base64
+        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
+
+    steps:
+      - name: Deploy contracts
+        env:
+          PRIVATE_KEY: "${{ secrets.TESTNET_DEPLOYER_PRIVATE_KEY }}"
+          ETHERSCAN_API_KEY: "${{ secrets.TENDERLY_API_KEY }}"
+          RPC_URL: "${{ vars.TENDERLY_MAINNET_RPC_URL }}"
+          VERIFIER_URL: "${{ vars.TENDERLY_MAINNET_RPC_URL }}/verify/etherscan"
+          MAX_OPEX_SPLIT: "5"
+          MIN_METAPOOL_SPLIT: "0"
+          CONTRACT_ADDRESSES: "/app/ci/contract_addresses.txt"
+        run: |
+          cd /app
+          touch .env
+          yarn deploy:tenderly && (
+            cp $CONTRACT_ADDRESSES $GITHUB_OUTPUT
+            echo "# Smart contract addresses\n\n| Contract name | Address |\n|---|---|" > $GITHUB_STEP_SUMMARY
+            grep ADDRESS $CONTRACT_ADDRESSES | awk -F '=' '{gsub("_ADDRESS", "", $1); print "| `" $1 "` | `" $2 "` |"}' >> $GITHUB_STEP_SUMMARY
+            echo "\n# Other variables\n\n| Variable | Value |\n|---|---|" >> $GITHUB_STEP_SUMMARY
+            grep -v ADDRESS $CONTRACT_ADDRESSES | awk -F '=' '{print "| `" $1 "` | `" $2 "` |"}' >> $GITHUB_STEP_SUMMARY
+          )
+
+      - name: Upload contract addresses artifact
+        uses: actions/upload-artifact@v4  # upload test results
+        with:
+          name: contract_addresses.txt
+          path: /app/ci/contract_addresses.txt
