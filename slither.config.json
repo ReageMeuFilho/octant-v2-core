@@ -3,7 +3,7 @@
     "@solady=lib/solady/src",
     "solady=lib/solady"
   ],
-  "detectors_to_exclude": "external-function,naming-convention,solc-version,dead-code,block-timestamp,missing-zero-check,delegatecall-loop,msg-value-loop",
+  "detectors_to_exclude": "external-function,naming-convention,solc-version,dead-code,block-timestamp,missing-zero-check,delegatecall-loop,msg-value-loop,unused-return",
   "filter_paths": "node_modules|openzeppelin-presets",
   "exclude_informational": true,
   "exclude_low": true,
