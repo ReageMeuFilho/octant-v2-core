@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {DragonBaseStrategy} from "../DragonBaseStrategy.sol";
+import { DragonBaseStrategy } from "../DragonBaseStrategy.sol";
 
 /**
  *   @title Base Health Check
@@ -35,10 +35,7 @@ abstract contract BaseHealthCheck is DragonBaseStrategy {
     // Defaults loss limit to 0.
     uint16 private _lossLimitRatio;
 
-    constructor(
-        address _asset,
-        string memory _name
-    ) BaseStrategy(_asset, _name) {}
+    constructor(address _asset, string memory _name) BaseStrategy(_asset, _name) {}
 
     /**
      * @notice Returns the current profit limit ratio.
@@ -63,9 +60,7 @@ abstract contract BaseHealthCheck is DragonBaseStrategy {
      * @dev Denominated in basis points. I.E. 1_000 == 10%.
      * @param _newProfitLimitRatio The mew profit limit ratio.
      */
-    function setProfitLimitRatio(
-        uint256 _newProfitLimitRatio
-    ) external onlyManagement {
+    function setProfitLimitRatio(uint256 _newProfitLimitRatio) external onlyManagement {
         _setProfitLimitRatio(_newProfitLimitRatio);
     }
 
@@ -85,9 +80,7 @@ abstract contract BaseHealthCheck is DragonBaseStrategy {
      * @dev Denominated in basis points. I.E. 1_000 == 10%.
      * @param _newLossLimitRatio The new loss limit ratio.
      */
-    function setLossLimitRatio(
-        uint256 _newLossLimitRatio
-    ) external onlyManagement {
+    function setLossLimitRatio(uint256 _newLossLimitRatio) external onlyManagement {
         _setLossLimitRatio(_newLossLimitRatio);
     }
 
@@ -114,12 +107,7 @@ abstract contract BaseHealthCheck is DragonBaseStrategy {
      * @notice OVerrides the default {harvestAndReport} to include a healthcheck.
      * @return _totalAssets New totalAssets post report.
      */
-    function harvestAndReport()
-        external
-        override
-        onlySelf
-        returns (uint256 _totalAssets)
-    {
+    function harvestAndReport() external override onlySelf returns (uint256 _totalAssets) {
         // Let the strategy report.
         _totalAssets = _harvestAndReport();
 
@@ -144,16 +132,12 @@ abstract contract BaseHealthCheck is DragonBaseStrategy {
 
         if (_newTotalAssets > currentTotalAssets) {
             require(
-                ((_newTotalAssets - currentTotalAssets) <=
-                    (currentTotalAssets * uint256(_profitLimitRatio)) /
-                        MAX_BPS),
+                ((_newTotalAssets - currentTotalAssets) <= (currentTotalAssets * uint256(_profitLimitRatio)) / MAX_BPS),
                 "healthCheck"
             );
         } else if (currentTotalAssets > _newTotalAssets) {
             require(
-                (currentTotalAssets - _newTotalAssets <=
-                    ((currentTotalAssets * uint256(_lossLimitRatio)) /
-                        MAX_BPS)),
+                (currentTotalAssets - _newTotalAssets <= ((currentTotalAssets * uint256(_lossLimitRatio)) / MAX_BPS)),
                 "healthCheck"
             );
         }
