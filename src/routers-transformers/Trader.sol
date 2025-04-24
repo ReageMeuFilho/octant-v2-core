@@ -286,7 +286,7 @@ contract Trader is ITransformer, Ownable, Pausable {
 
         // handle randomness
         uint256 rand = getRandomNumber(height);
-        uint256 _chance = this.chance();
+        uint256 _chance = chance();
         if (rand > _chance) revert Trader__WrongHeight();
 
         // handle overspending
