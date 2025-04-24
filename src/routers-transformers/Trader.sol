@@ -368,7 +368,7 @@ contract Trader is ITransformer, Ownable, Pausable {
     /// @dev Returns true if mechanism is overspending. This may happen because randomness. Prevents mechanism from spending too much in a case of attack by a block producer.
     function hasOverspent(uint256 height) public view returns (bool) {
         if (height < spentResetBlock) return true;
-        return (spent > (height - spentResetBlock) * (budget / (deadline - spentResetBlock)));
+        return spent > (height - spentResetBlock) * budget / (deadline - spentResetBlock);
     }
 
     /// @notice Sets spending limits.
@@ -434,6 +434,7 @@ contract Trader is ITransformer, Ownable, Pausable {
         uint256 numberOfSales = (budget - spent).divUp(avgSale);
         uint256 blocks_left = remainingBlocks();
         if (blocks_left < numberOfSales) return type(uint256).max;
+        //slither-disable-next-line divide-before-multiply
         else return (type(uint256).max / blocks_left) * numberOfSales;
     }
 
@@ -448,7 +449,7 @@ contract Trader is ITransformer, Ownable, Pausable {
     /// @dev This reads configuration parameters, not current state of swapping process, which may diverge because of randomness.
     /// @return Average amount of token in wei to be sold in 24 hours.
     function spendADay() external view returns (uint256) {
-        return (budget / (deadline - spentResetBlock)) * BLOCKS_PER_DAY;
+        return (budget * BLOCKS_PER_DAY) / (deadline - spentResetBlock);
     }
 
     /// @notice Get random value for particular blockchain height.
