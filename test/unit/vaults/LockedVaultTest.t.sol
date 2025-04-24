@@ -145,7 +145,7 @@ contract LockedVaultTest is Test {
 
         // Should revert when trying to initiate again
         vm.prank(fish);
-        vm.expectRevert(ILockedVault.SharesAlreadyUnlocked.selector);
+        vm.expectRevert(ILockedVault.RageQuitAlreadyInitiated.selector);
         vault.initiateRageQuit();
     }
 

@@ -61,7 +61,7 @@ contract LockedVault is Vault, ILockedVault {
         if (balanceOf(msg.sender) == 0) revert NoSharesToRageQuit();
 
         LockupInfo storage lockup = voluntaryLockups[msg.sender];
-        if (block.timestamp <= lockup.unlockTime) revert SharesAlreadyUnlocked();
+        if (block.timestamp <= lockup.unlockTime) revert RageQuitAlreadyInitiated();
 
         // Default unlock time based on vault's rage quit cooldown
         uint256 defaultUnlockTime = block.timestamp + rageQuitCooldownPeriod;

@@ -7,7 +7,7 @@ interface ILockedVault is IVault {
     // Add necessary error definitions
     error InvalidRageQuitCooldownPeriod();
     error SharesStillLocked();
-    error SharesAlreadyUnlocked();
+    error RageQuitAlreadyInitiated();
     error NoSharesToRageQuit();
 
     // Events
