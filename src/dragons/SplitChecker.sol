@@ -113,8 +113,8 @@ contract SplitChecker is ISplitChecker, Initializable {
     /// @dev Ensures splits meet requirements for opex and metapool allocations
     function checkSplit(Split memory split, address opexVault, address metapool) external view override {
         if (split.recipients.length != split.allocations.length) revert InvalidSplit();
-        bool flag;
-        uint256 calculatedTotalAllocation;
+        bool flag = false;
+        uint256 calculatedTotalAllocation = 0;
         for (uint256 i = 0; i < split.recipients.length; i++) {
             if (split.recipients[i] == opexVault) {
                 if ((split.allocations[i] * SPLIT_PRECISION) / split.totalAllocations > maxOpexSplit) {

@@ -58,7 +58,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
         //slither-disable-next-line incorrect-equality
         if (a.totalUnspent == 0) revert NoAllowanceToTransfer(safe, msg.sender, token);
 
-        uint160 transferAmount;
+        uint160 transferAmount = 0;
 
         if (token == NATIVE_TOKEN) {
             // For ETH transfers, get the minimum of totalUnspent and safe balance

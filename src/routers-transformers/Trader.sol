@@ -260,7 +260,7 @@ contract Trader is ITransformer, Ownable, Pausable {
         }
 
         uint256 height;
-        uint256 saleValue;
+        uint256 saleValue = 0;
         for (height = max(block.number - 255, lastHeight + 1); height < block.number; height++) {
             if (canTrade(height)) {
                 saleValue = convert(height);
