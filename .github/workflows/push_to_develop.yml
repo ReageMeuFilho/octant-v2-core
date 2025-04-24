@@ -234,4 +234,4 @@ jobs:
           git config --local user.signingkey "${HOUSEKEEPER_GITHUB_SIGNING_KEY_ID}"
 
       - name: Publish
-        run: yarn release --preRelease --ci
+        run: yarn release --preRelease=develop --ci
