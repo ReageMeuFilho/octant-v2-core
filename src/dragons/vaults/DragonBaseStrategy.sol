@@ -143,6 +143,7 @@ abstract contract DragonBaseStrategy is BaseStrategy, Module {
      */
     function _delegateCall(bytes memory _calldata) internal returns (bytes memory) {
         // Delegate call the tokenized strategy with provided calldata.
+        //slither-disable-next-line controlled-delegatecall
         (bool success, bytes memory result) = tokenizedStrategyImplementation.delegatecall(_calldata);
 
         // If the call reverted. Return the error.

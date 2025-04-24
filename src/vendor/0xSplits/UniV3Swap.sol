@@ -98,6 +98,8 @@ contract UniV3Swap is ISwapperFlashCallback {
             weth9.withdraw(weth9Balance);
 
             // send req'd amt to swapper#payback
+            // False positive: totalAmount out is checked before sending
+            //slither-disable-next-line arbitrary-send-eth
             ISwapperImpl(msg.sender).payback{ value: amountToBeneficiary_ }();
 
             // xfr excess out

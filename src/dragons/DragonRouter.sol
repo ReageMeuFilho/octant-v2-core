@@ -389,6 +389,8 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
                 ? userTransformer.transformer.transform{ value: _amount }(_asset, userTransformer.targetToken, _amount)
                 : userTransformer.transformer.transform(_asset, userTransformer.targetToken, _amount);
             if (userTransformer.targetToken == NATIVE_TOKEN) {
+                // False positive: User balance is checked before sending
+                //slither-disable-next-line arbitrary-send-eth
                 (bool success, ) = _user.call{ value: _transformedAmount }("");
                 if (!success) revert TransferFailed();
             } else {
