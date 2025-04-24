@@ -528,7 +528,7 @@ abstract contract TokenizedStrategy is ITokenizedStrategy {
         ERC20 _asset = S.asset;
 
         uint256 idle = address(_asset) == ETH ? address(this).balance : _asset.balanceOf(address(this));
-        uint256 loss;
+        uint256 loss = 0;
         // Check if we need to withdraw funds.
         if (idle < assets) {
             // Tell Strategy to free what we need.

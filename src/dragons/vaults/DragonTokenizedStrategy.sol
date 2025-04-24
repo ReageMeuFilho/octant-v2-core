@@ -324,7 +324,7 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
             revert DragonTokenizedStrategy__SharesStillLocked();
         }
 
-        uint256 assets;
+        uint256 assets = 0;
         // Check for rounding error or 0 value.
         //slither-disable-next-line incorrect-equality
         if ((assets = _convertToAssets(S, shares, Math.Rounding.Floor)) == 0) {
