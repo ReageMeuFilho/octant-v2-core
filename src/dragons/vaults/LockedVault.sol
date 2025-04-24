@@ -2,7 +2,6 @@
 pragma solidity ^0.8.25;
 
 import { Vault, IVault } from "src/dragons/vaults/Vault.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { ILockedVault } from "src/interfaces/ILockedVault.sol";
 
 /**
@@ -18,8 +17,7 @@ contract LockedVault is Vault, ILockedVault {
     uint256 public rageQuitCooldownPeriod;
 
     // Constants
-    uint256 public constant RANGE_MINIMUM_LOCKUP_DURATION = 7 days;
-    uint256 public constant RANGE_MAXIMUM_LOCKUP_DURATION = 365 days;
+    uint256 public constant INITIAL_RAGE_QUIT_COOLDOWN_PERIOD = 7 days;
     uint256 public constant RANGE_MINIMUM_RAGE_QUIT_COOLDOWN_PERIOD = 1 days;
     uint256 public constant RANGE_MAXIMUM_RAGE_QUIT_COOLDOWN_PERIOD = 30 days;
 
@@ -34,10 +32,9 @@ contract LockedVault is Vault, ILockedVault {
         string memory _name,
         string memory _symbol,
         address _roleManager,
-        uint256 _profitMaxUnlockTime,
-        uint256 _rageQuitCooldownPeriod
-    ) external {
-        rageQuitCooldownPeriod = _rageQuitCooldownPeriod;
+        uint256 _profitMaxUnlockTime
+    ) public override(Vault, IVault) {
+        rageQuitCooldownPeriod = INITIAL_RAGE_QUIT_COOLDOWN_PERIOD;
         super.initialize(_asset, _name, _symbol, _roleManager, _profitMaxUnlockTime);
     }
 

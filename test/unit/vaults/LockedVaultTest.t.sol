@@ -49,14 +49,7 @@ contract LockedVaultTest is Test {
 
         // Initialize with rage quit cooldown period
         vm.expectRevert(); // Should revert since initialize was already called during deployment
-        vault.initialize(
-            address(asset),
-            "Locked Test Vault",
-            "vLTST",
-            gov,
-            defaultProfitMaxUnlockTime,
-            defaultRageQuitCooldown
-        );
+        vault.initialize(address(asset), "Locked Test Vault", "vLTST", gov, defaultProfitMaxUnlockTime);
         vm.stopPrank();
 
         vm.startPrank(gov);

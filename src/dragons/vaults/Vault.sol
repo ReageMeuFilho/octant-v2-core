@@ -163,7 +163,7 @@ contract Vault is IVault {
         string memory _symbol,
         address _roleManager,
         uint256 _profitMaxUnlockTime
-    ) public override {
+    ) public virtual override {
         require(asset == address(0), AlreadyInitialized());
         require(_asset != address(0), ZeroAddress());
         require(_roleManager != address(0), ZeroAddress());
