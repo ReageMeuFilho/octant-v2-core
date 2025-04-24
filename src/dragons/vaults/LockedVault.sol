@@ -3,52 +3,15 @@ pragma solidity ^0.8.25;
 
 import { Vault, IVault } from "src/dragons/vaults/Vault.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
-/**
- * @title IRageQuitHook
- * @notice Interface for strategies that implement rage quit hooks
- */
-interface IRageQuitHook {
-    /**
-     * @notice Hook called when a user initiates rage quit
-     * @param user Address of the user initiating rage quit
-     * @return minimumUnlockTime Minimum time required by the strategy
-     */
-    function onRageQuitInitiated(address user) external returns (uint256 minimumUnlockTime);
-}
-
+import { ILockedVault } from "src/interfaces/ILockedVault.sol";
 /**
  * @title LockedVault
  * @notice Vault with modified unlocking mechanism similar to DragonTokenizedStrategy
  * that consults strategies for minimum unlock times during rage quit
  */
-contract LockedVault is Vault {
-    // Add necessary error definitions
-    error InvalidLockupDuration();
-    error InvalidRageQuitCooldownPeriod();
-    error InsufficientLockupDuration();
-    error SharesStillLocked();
-    error RageQuitInProgress();
-    error SharesAlreadyUnlocked();
-    error NoSharesToRageQuit();
-    error ZeroLockupDuration();
-    error ExceedsUnlockedAmount();
-    error DepositNotAllowed();
-    error MintNotAllowed();
-
-    // Storage for lockup information per user
-    struct LockupInfo {
-        uint256 lockupTime; // When the lockup started
-        uint256 unlockTime; // When shares become fully unlocked
-        uint256 lockedShares; // Amount of locked shares
-        bool isRageQuit; // Whether user initiated rage quit
-    }
-
+contract LockedVault is Vault, ILockedVault {
     // Mapping of user address to their lockup info
     mapping(address => LockupInfo) public voluntaryLockups;
-
-    // Minimum required lockup duration
-    uint256 public minimumLockupDuration;
 
     // Cooldown period for rage quit
     uint256 public rageQuitCooldownPeriod;
@@ -59,33 +22,27 @@ contract LockedVault is Vault {
     uint256 public constant RANGE_MINIMUM_RAGE_QUIT_COOLDOWN_PERIOD = 1 days;
     uint256 public constant RANGE_MAXIMUM_RAGE_QUIT_COOLDOWN_PERIOD = 30 days;
 
-    event NewLockupSet(address indexed user, uint256 lockupTime, uint256 unlockTime, uint256 lockedShares);
-    event RageQuitInitiated(address indexed user, uint256 unlockTime);
-    event LockupDurationSet(uint256 lockupDuration);
-    event RageQuitCooldownPeriodSet(uint256 cooldownPeriod);
-    event StrategyRageQuitHookCalled(address indexed strategy, uint256 minimumUnlockTime, bool success);
-
     // Define onlyRegenGovernance modifier
     modifier onlyRegenGovernance() {
         // Implement access control logic
         _;
     }
 
-    /**
-     * @notice Set the lockup duration
-     * @param _lockupDuration New minimum lockup duration
-     */
-    function setLockupDuration(uint256 _lockupDuration) external onlyRegenGovernance {
-        if (_lockupDuration < RANGE_MINIMUM_LOCKUP_DURATION || _lockupDuration > RANGE_MAXIMUM_LOCKUP_DURATION) {
-            revert InvalidLockupDuration();
-        }
-        minimumLockupDuration = _lockupDuration;
-        emit LockupDurationSet(_lockupDuration);
+    function initialize(
+        address _asset,
+        string memory _name,
+        string memory _symbol,
+        address _roleManager,
+        uint256 _profitMaxUnlockTime,
+        uint256 _rageQuitCooldownPeriod
+    ) external {
+        rageQuitCooldownPeriod = _rageQuitCooldownPeriod;
+        super.initialize(_asset, _name, _symbol, _roleManager, _profitMaxUnlockTime);
     }
 
     /**
-     * @notice Set the rage quit cooldown period
-     * @param _rageQuitCooldownPeriod New rage quit cooldown period
+     * @notice Set the lockup duration
+     * @param _rageQuitCooldownPeriod New cooldown period for rage quit
      */
     function setRageQuitCooldownPeriod(uint256 _rageQuitCooldownPeriod) external onlyRegenGovernance {
         if (
@@ -107,106 +64,15 @@ contract LockedVault is Vault {
 
         LockupInfo storage lockup = voluntaryLockups[msg.sender];
         if (block.timestamp >= lockup.unlockTime) revert SharesAlreadyUnlocked();
-        if (lockup.isRageQuit) revert RageQuitInProgress();
 
         // Default unlock time based on vault's rage quit cooldown
         uint256 defaultUnlockTime = block.timestamp + rageQuitCooldownPeriod;
 
-        // Get all strategies from default queue
-        address[] memory strategies = defaultQueue;
-        uint256 maxStrategyUnlockTime = 0;
+        lockup.unlockTime = defaultUnlockTime;
 
-        // Call each strategy's hook to get minimum unlock times
-        for (uint256 i = 0; i < strategies.length; i++) {
-            address strategy = strategies[i];
-
-            // Skip inactive strategies
-            if (_strategies[strategy].activation == 0) continue;
-
-            // Try to call the hook, but don't revert if it fails
-            try IRageQuitHook(strategy).onRageQuitInitiated(msg.sender) returns (uint256 minimumUnlockTime) {
-                // If strategy returned a valid future timestamp
-                if (minimumUnlockTime > block.timestamp) {
-                    // Track the maximum unlock time required by any strategy
-                    if (minimumUnlockTime > maxStrategyUnlockTime) {
-                        maxStrategyUnlockTime = minimumUnlockTime;
-                    }
-                }
-                emit StrategyRageQuitHookCalled(strategy, minimumUnlockTime, true);
-            } catch {
-                // Strategy doesn't implement the hook or execution failed
-                emit StrategyRageQuitHookCalled(strategy, 0, false);
-            }
-        }
-
-        // Set unlock time to the longer of:
-        // 1. Default unlock time (current time + cooldown)
-        // 2. Maximum strategy-required unlock time
-        // 3. But never longer than the original unlock time
-        uint256 newUnlockTime;
-        if (maxStrategyUnlockTime > defaultUnlockTime) {
-            newUnlockTime = maxStrategyUnlockTime;
-        } else {
-            newUnlockTime = defaultUnlockTime;
-        }
-
-        // Don't extend beyond original unlock time
-        if (newUnlockTime > lockup.unlockTime) {
-            newUnlockTime = lockup.unlockTime;
-        }
-
-        // Update the lockup information
-        lockup.unlockTime = newUnlockTime;
         lockup.lockupTime = block.timestamp; // Set starting point for gradual unlocking
-        lockup.isRageQuit = true;
 
-        emit RageQuitInitiated(msg.sender, lockup.unlockTime);
-    }
-
-    /**
-     * @notice Deposit with lockup to earn yield
-     * @param assets Amount of assets to deposit
-     * @param receiver Address receiving the shares
-     * @param lockupDuration Duration to lock the shares
-     * @return shares Shares issued
-     */
-    function depositWithLockup(
-        uint256 assets,
-        address receiver,
-        uint256 lockupDuration
-    ) external returns (uint256 shares) {
-        uint256 amount = assets;
-        // Deposit all if sent with max uint
-        if (amount == type(uint256).max) {
-            amount = IERC20(asset).balanceOf(msg.sender);
-        }
-
-        shares = _convertToShares(amount, Rounding.ROUND_DOWN);
-        _deposit(receiver, amount, shares);
-
-        // Set or extend lockup
-        _setOrExtendLockup(receiver, lockupDuration, shares);
-
-        return shares;
-    }
-
-    function deposit(uint256, address) external override returns (uint256) {
-        revert DepositNotAllowed();
-    }
-
-    function mint(uint256, address) external override returns (uint256) {
-        revert MintNotAllowed();
-    }
-
-    function mintWithLockup(
-        uint256 shares,
-        address receiver,
-        uint256 lockupDuration
-    ) external nonReentrant returns (uint256) {
-        uint256 assets = _convertToAssets(shares, Rounding.ROUND_UP);
-        _deposit(receiver, assets, shares);
-        _setOrExtendLockup(receiver, lockupDuration, shares);
-        return assets;
+        emit RageQuitInitiated(msg.sender, lockup.lockupTime, defaultUnlockTime);
     }
 
     /**
@@ -218,18 +84,21 @@ contract LockedVault is Vault {
         address owner,
         uint256 maxLoss,
         address[] calldata strategiesArray
-    ) public override nonReentrant returns (uint256) {
+    ) public override(IVault, Vault) nonReentrant returns (uint256) {
         _checkUnlocked(owner);
         return super.withdraw(assets, receiver, owner, maxLoss, strategiesArray);
     }
 
+    /**
+     * @notice Override redeem function to check if shares are unlocked
+     */
     function redeem(
         uint256 shares,
         address receiver,
         address owner,
         uint256 maxLoss,
         address[] calldata strategiesArray
-    ) public override nonReentrant returns (uint256) {
+    ) public override(IVault, Vault) nonReentrant returns (uint256) {
         _checkUnlocked(owner);
         return super.redeem(shares, receiver, owner, maxLoss, strategiesArray);
     }
@@ -244,40 +113,5 @@ contract LockedVault is Vault {
         if (block.timestamp < lockup.unlockTime) {
             revert SharesStillLocked();
         }
-    }
-
-    /**
-     * @notice Utility function to set or extend a user's lockup
-     * @param user User address
-     * @param lockupDuration Duration to lock shares
-     * @param totalSharesLocked Total shares to lock
-     */
-    function _setOrExtendLockup(address user, uint256 lockupDuration, uint256 totalSharesLocked) internal {
-        LockupInfo storage lockup = voluntaryLockups[user];
-        uint256 currentTime = block.timestamp;
-
-        if (lockup.unlockTime <= currentTime) {
-            // New lockup
-            if (lockupDuration < minimumLockupDuration) {
-                revert InsufficientLockupDuration();
-            }
-            lockup.lockupTime = currentTime;
-            lockup.unlockTime = currentTime + lockupDuration;
-            lockup.lockedShares = totalSharesLocked;
-        } else {
-            // Update existing lockup
-            lockup.lockedShares = totalSharesLocked;
-
-            if (lockupDuration > 0) {
-                // Extend existing lockup
-                uint256 newUnlockTime = lockup.unlockTime + lockupDuration;
-                if (newUnlockTime < currentTime + minimumLockupDuration) {
-                    revert InsufficientLockupDuration();
-                }
-                lockup.unlockTime = newUnlockTime;
-            }
-        }
-
-        emit NewLockupSet(user, lockup.lockupTime, lockup.unlockTime, lockup.lockedShares);
     }
 }
