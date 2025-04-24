@@ -35,6 +35,11 @@ abstract contract DragonBaseStrategy is BaseStrategy, Module {
 
     address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE; // using this address to represent native ETH
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     /**
      * @notice Used to initialize the strategy on deployment.
      *
