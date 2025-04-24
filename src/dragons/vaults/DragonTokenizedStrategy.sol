@@ -297,6 +297,7 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
         if (assets > _maxWithdraw(S, _owner)) revert DragonTokenizedStrategy__WithdrawMoreThanMax();
 
         // Check for rounding error or 0 value.
+        //slither-disable-next-line incorrect-equality
         if ((shares = _convertToShares(S, assets, Math.Rounding.Ceil)) == 0) {
             revert ZeroShares();
         }
@@ -325,6 +326,7 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
 
         uint256 assets;
         // Check for rounding error or 0 value.
+        //slither-disable-next-line incorrect-equality
         if ((assets = _convertToAssets(S, shares, Math.Rounding.Floor)) == 0) {
             revert ZeroAssets();
         }
@@ -377,7 +379,7 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
                 lockupDuration == 0,
             DragonTokenizedStrategy__ReceiverHasExistingShares()
         );
-
+        //slither-disable-next-line incorrect-equality
         assets = type(uint256).max == assets ? S.asset.balanceOf(msg.sender) : assets;
 
         require((shares = _convertToShares(S, assets, Math.Rounding.Floor)) != 0, ZeroShares());

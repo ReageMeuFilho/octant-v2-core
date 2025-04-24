@@ -302,7 +302,7 @@ contract Trader is ITransformer, Ownable, Pausable {
         }
 
         uint256 saleValue = getSaleValue(rand, 0);
-
+        //slither-disable-next-line incorrect-equality incorrect-equality
         if (saleValue == 0) revert Trader__ZeroValueConvert();
 
         spent = spent + saleValue;
@@ -320,6 +320,7 @@ contract Trader is ITransformer, Ownable, Pausable {
     /// @dev Compute next deadline. If cached deadline (`deadline`) differs, `spent` needs to be reset.
     function nextDeadline() public view returns (uint256) {
         uint256 nextPeriodNo = (block.number - periodZero).divUp(periodLength);
+        //slither-disable-next-line incorrect-equality incorrect-equality
         if (nextPeriodNo == (block.number - periodZero) / periodLength) {
             nextPeriodNo = nextPeriodNo + 1;
         }
@@ -368,7 +369,7 @@ contract Trader is ITransformer, Ownable, Pausable {
     /// @dev Returns true if mechanism is overspending. This may happen because randomness. Prevents mechanism from spending too much in a case of attack by a block producer.
     function hasOverspent(uint256 height) public view returns (bool) {
         if (height < spentResetBlock) return true;
-        return spent > (height - spentResetBlock) * budget / (deadline - spentResetBlock);
+        return spent > ((height - spentResetBlock) * budget) / (deadline - spentResetBlock);
     }
 
     /// @notice Sets spending limits.
@@ -458,6 +459,7 @@ contract Trader is ITransformer, Ownable, Pausable {
     /// @dev Sourcing of randomness in this way enables tx inclusion in block which is different from block with randomness source. This prevents waste of gas on failed calls to `convert` even in absence of FlashBots-like infrastructure.
     function getRandomNumber(uint256 height) public view returns (uint256) {
         uint256 seed = uint256(blockhash(height));
+        //slither-disable-next-line incorrect-equality incorrect-equality
         if (seed == 0) {
             revert Trader__RandomnessUnsafeSeed();
         }

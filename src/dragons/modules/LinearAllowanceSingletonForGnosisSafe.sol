@@ -55,7 +55,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
 
         // Update cached memory values
         a = _updateAllowance(a);
-
+        //slither-disable-next-line incorrect-equality
         if (a.totalUnspent == 0) revert NoAllowanceToTransfer(safe, msg.sender, token);
 
         uint160 transferAmount;
@@ -140,6 +140,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
     function _updateAllowance(LinearAllowance memory a) internal view returns (LinearAllowance memory) {
         if (a.lastBookedAtInSeconds != 0) {
             uint256 timeElapsed = block.timestamp - a.lastBookedAtInSeconds;
+            //slither-disable-next-line incorrect-equality
             a.totalUnspent += (timeElapsed * a.dripRatePerDay).toUint160() / 1 days;
         }
 
