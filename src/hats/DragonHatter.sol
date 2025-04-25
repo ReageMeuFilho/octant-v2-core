@@ -43,7 +43,7 @@ contract DragonHatter is AbstractHatsManager {
         require(HATS.isWearerOfHat(address(this), branchHat), Hats__DoesNotHaveThisHat(address(this), branchHat));
 
         // Create keeper role hat (1.1.1.1.1)
-        createRole(
+        _createRole(
             KEEPER_ROLE,
             string("Dragon Protocol Keeper"),
             10, // Max 10 keepers
@@ -51,7 +51,7 @@ contract DragonHatter is AbstractHatsManager {
         );
 
         // Create management role hat (1.1.1.1.2)
-        createRole(
+        _createRole(
             MANAGEMENT_ROLE,
             string("Dragon Protocol Management"),
             5, // Max 5 managers
@@ -59,7 +59,7 @@ contract DragonHatter is AbstractHatsManager {
         );
 
         // Create emergency role hat (1.1.1.1.3)
-        createRole(
+        _createRole(
             EMERGENCY_ROLE,
             string("Dragon Protocol Emergency Responder"),
             3, // Max 3 emergency responders
@@ -67,7 +67,7 @@ contract DragonHatter is AbstractHatsManager {
         );
 
         // Create regen governance role hat (1.1.1.1.4)
-        createRole(
+        _createRole(
             REGEN_GOVERNANCE_ROLE,
             string("Dragon Protocol Regen Governance"),
             5, // Max 5 governance members
