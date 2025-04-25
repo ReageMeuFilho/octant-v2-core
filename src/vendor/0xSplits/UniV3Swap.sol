@@ -20,9 +20,6 @@ contract UniV3Swap is ISwapperFlashCallback {
     using SafeTransferLib for address;
     using TokenUtils for address;
 
-    error Unauthorized();
-    error InsufficientFunds();
-
     struct InitFlashParams {
         QuoteParams[] quoteParams;
         FlashCallbackData flashCallbackData;
@@ -36,6 +33,9 @@ contract UniV3Swap is ISwapperFlashCallback {
     ISwapperFactory public immutable swapperFactory;
     ISwapRouter public immutable swapRouter;
     WETH public immutable weth9;
+
+    error Unauthorized();
+    error InsufficientFunds();
 
     constructor(ISwapperFactory swapperFactory_, ISwapRouter swapRouter_, WETH weth9_) {
         swapperFactory = swapperFactory_;

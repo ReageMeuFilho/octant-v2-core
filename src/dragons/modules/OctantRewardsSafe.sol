@@ -70,27 +70,6 @@ contract OctantRewardsSafe is Module {
         _;
     }
 
-    /// @dev Initialize function, will be triggered when a new proxy is deployed
-    /// @dev owner of this module will the safe multisig that calls setUp function
-    /// @param initializeParams Parameters of initialization encoded
-    function setUp(bytes memory initializeParams) public override initializer {
-        (address _owner, bytes memory data) = abi.decode(initializeParams, (address, bytes));
-
-        (address _keeper, address _treasury, address _dragonRouter, uint256 _totalValidators, uint256 _maxYield) = abi
-            .decode(data, (address, address, address, uint256, uint256));
-
-        __Ownable_init(msg.sender);
-
-        keeper = _keeper;
-        treasury = _treasury;
-        dragonRouter = _dragonRouter;
-        totalValidators = _totalValidators;
-        maxYield = _maxYield;
-        setAvatar(_owner);
-        setTarget(_owner);
-        transferOwnership(_owner);
-    }
-
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
     /*                      PUBLIC FUNCTIONS                      */
     /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
@@ -182,5 +161,26 @@ contract OctantRewardsSafe is Module {
         require(success, OctantRewardsSafe__TransferFailed(validatorsExited * 32 ether));
         emit Transfer(owner(), treasury, validatorsExited * 32 ether);
         emit ExitValidatorsConfirmed(validatorsExited, totalValidators);
+    }
+
+    /// @dev Initialize function, will be triggered when a new proxy is deployed
+    /// @dev owner of this module will the safe multisig that calls setUp function
+    /// @param initializeParams Parameters of initialization encoded
+    function setUp(bytes memory initializeParams) public override initializer {
+        (address _owner, bytes memory data) = abi.decode(initializeParams, (address, bytes));
+
+        (address _keeper, address _treasury, address _dragonRouter, uint256 _totalValidators, uint256 _maxYield) = abi
+            .decode(data, (address, address, address, uint256, uint256));
+
+        __Ownable_init(msg.sender);
+
+        keeper = _keeper;
+        treasury = _treasury;
+        dragonRouter = _dragonRouter;
+        totalValidators = _totalValidators;
+        maxYield = _maxYield;
+        setAvatar(_owner);
+        setTarget(_owner);
+        transferOwnership(_owner);
     }
 }

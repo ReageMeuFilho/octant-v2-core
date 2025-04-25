@@ -45,6 +45,33 @@ abstract contract AbstractHatsManager is ReentrancyGuard, IHatsEligibility, IHat
     }
 
     /**
+     * @notice Allows admin to toggle role availability
+     */
+    function toggleBranch() external virtual {
+        require(HATS.isWearerOfHat(msg.sender, adminHat), Hats__DoesNotHaveThisHat(msg.sender, adminHat));
+        isActive = !isActive;
+    }
+
+    /**
+     * @notice Virtual function to check if an address is eligible for a role
+     * @dev Must be implemented by inheriting contracts
+     */
+    function getWearerStatus(
+        address wearer,
+        uint256 hatId
+    ) external view virtual override returns (bool eligible, bool standing);
+
+    /**
+     * @notice Checks if roles are currently enabled
+     * @param hatId The hat ID being checked
+     * @return bool Whether the hat is active
+     */
+    function getHatStatus(uint256 hatId) external view override returns (bool) {
+        require(hatId == branchHat || hatRoles[hatId] != 0, Hats__InvalidHat(hatId));
+        return isActive;
+    }
+
+    /**
      * @notice Grants a role to an address by minting the corresponding hat
      * @dev This function may only be called by the admin hat of this contract
      * @param roleId The role to grant
@@ -77,25 +104,6 @@ abstract contract AbstractHatsManager is ReentrancyGuard, IHatsEligibility, IHat
         // Burn role hat
         HATS.setHatWearerStatus(hatId, account, false, false);
         emit RoleRevoked(roleId, account, hatId);
-    }
-
-    /**
-     * @notice Virtual function to check if an address is eligible for a role
-     * @dev Must be implemented by inheriting contracts
-     */
-    function getWearerStatus(
-        address wearer,
-        uint256 hatId
-    ) external view virtual override returns (bool eligible, bool standing);
-
-    /**
-     * @notice Checks if roles are currently enabled
-     * @param hatId The hat ID being checked
-     * @return bool Whether the hat is active
-     */
-    function getHatStatus(uint256 hatId) external view override returns (bool) {
-        require(hatId == branchHat || hatRoles[hatId] != 0, Hats__InvalidHat(hatId));
-        return isActive;
     }
 
     /**
@@ -146,13 +154,5 @@ abstract contract AbstractHatsManager is ReentrancyGuard, IHatsEligibility, IHat
         }
 
         emit RoleHatCreated(roleId, hatId);
-    }
-
-    /**
-     * @notice Allows admin to toggle role availability
-     */
-    function toggleBranch() external virtual {
-        require(HATS.isWearerOfHat(msg.sender, adminHat), Hats__DoesNotHaveThisHat(msg.sender, adminHat));
-        isActive = !isActive;
     }
 }

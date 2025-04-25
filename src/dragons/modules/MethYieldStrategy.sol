@@ -104,16 +104,6 @@ contract MethYieldStrategy is DragonBaseStrategy, IMethYieldStrategy {
     }
 
     /**
-     * @notice Gets the current exchange rate from the Mantle staking contract
-     * @return The current exchange rate (mETH to ETH ratio, scaled by 1e18)
-     * @dev Uses the Mantle staking contract as the authoritative source for exchange rates
-     */
-    function _getCurrentExchangeRate() internal view virtual returns (uint256) {
-        // Calculate the exchange rate by determining how much ETH 1e18 mETH is worth
-        return MANTLE_STAKING.mETHToETH(1e18);
-    }
-
-    /**
      * @notice Captures yield by calculating the increase in ETH value based on exchange rate changes
      * @return profitInMeth The profit in mETH terms calculated from exchange rate appreciation
      * @dev Uses ray math for precise calculations and converts ETH profit to mETH
@@ -146,6 +136,16 @@ contract MethYieldStrategy is DragonBaseStrategy, IMethYieldStrategy {
      */
     function _tend(uint256 /*_idle*/) internal override {
         // No action needed - mETH is already a yield-bearing asset
+    }
+
+    /**
+     * @notice Gets the current exchange rate from the Mantle staking contract
+     * @return The current exchange rate (mETH to ETH ratio, scaled by 1e18)
+     * @dev Uses the Mantle staking contract as the authoritative source for exchange rates
+     */
+    function _getCurrentExchangeRate() internal view virtual returns (uint256) {
+        // Calculate the exchange rate by determining how much ETH 1e18 mETH is worth
+        return MANTLE_STAKING.mETHToETH(1e18);
     }
 
     /**
