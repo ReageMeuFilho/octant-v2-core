@@ -1,6 +1,6 @@
 # In steps following image build we're ignoring files uploaded to /_w/ directory as current code is in /app directory
 
-name: Push to develop
+name: 🤖 Push to develop
 on:
   push:
     branches:
