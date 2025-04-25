@@ -135,6 +135,16 @@ contract Trader is ITransformer, Ownable, Pausable {
     /// @notice This one indicates software error. Should never happen.
     error Trader__SoftwareError();
 
+    /// @dev Whenever spending parameters are re-configured, this modifier is used to check if requested spending is realistic.
+    modifier validateSpendingArgs() {
+        _;
+        if (budget != 0) {
+            if (saleValueLow == 0) revert Trader__ImpossibleConfigurationSaleValueLowIsZero();
+            if (getSafetyBlocks() > (deadline - block.number))
+                revert Trader__ImpossibleConfigurationSaleValueLowIsTooLow();
+        }
+    }
+
     /*//////////////////////////////////////////////////////////////
       INITIALIZER
     //////////////////////////////////////////////////////////////*/
@@ -178,26 +188,57 @@ contract Trader is ITransformer, Ownable, Pausable {
         transferOwnership(_owner);
     }
 
-    /// @dev This contract deals with native ETH, while Uniswap with WETH. This helper function does address conversion.
-    function uniEthWrapper(address token) private view returns (address) {
-        if (token == ETH) return WETH_ADDRESS;
-        else return token;
+    /// @dev receive if integration doesn't use `transform` function
+    receive() external payable {}
+
+    /// @notice Prevent this contract from spending base token.
+    /// @param enable Set to true to stop spending. Set to false to continue spending.
+    function emergencyStop(bool enable) external onlyOwner {
+        if (enable) _pause();
+        else _unpause();
     }
 
-    /// @dev This contract and Splits' Swapper use different addresses to represent ETH. This function does the conversion.
-    function splitsEthWrapper(address token) private pure returns (address) {
-        if (token == ETH) return address(0x0);
-        else return token;
+    /// @notice Set address of the contract that will receive token (base) to be converted to target token (quote).
+    /// @param swapper_ address of the contract handling the swapping.
+    function setSwapper(address swapper_, address integrator_) external onlyOwner {
+        emit SwapperChanged(swapper, swapper_, integrator, integrator_);
+        swapper = payable(swapper_);
+        integrator = integrator_;
     }
 
-    /// @dev Simplifies checking of balance for ETH and ERC20 tokens. ETH is represented by a particular address.
-    /// @return Balance of `token` currency associated with specified `owner`
-    function safeBalanceOf(address token, address owner) private view returns (uint256) {
-        if ((token == ETH) || (token == address(0x0))) {
-            return owner.balance;
+    /// @notice Implements Transformer.trader interface. This function can be used to synchronously convert one token to other token.
+    ///         Please note that amount needs to be carefully chosen (see `findSaleValue(...)`).
+    ///         This function will throw if fromToken and toToken are different from base and quote respectively.
+    /// @param fromToken needs to be set to value of `base()`.
+    /// @param toToken needs to be set to value of `quote()`.
+    /// @param amount needs to be set to what `findSaleValue(...)` returns.
+    /// @return amount of quote token that will be transferred to beneficiary.
+    function transform(address fromToken, address toToken, uint256 amount) external payable returns (uint256) {
+        if ((fromToken != BASE) || (toToken != QUOTE)) revert Trader__ImpossibleConfiguration();
+        if (fromToken == ETH) {
+            if (msg.value != amount) revert Trader__ImpossibleConfiguration();
         } else {
-            return IERC20(token).balanceOf(owner);
+            if (msg.value != 0) revert Trader__UnexpectedETH();
+            IERC20(BASE).safeTransferFrom(msg.sender, address(this), amount);
         }
+
+        uint256 height;
+        uint256 saleValue = 0;
+        for (height = max(block.number - 255, lastHeight + 1); height < block.number; height++) {
+            if (canTrade(height)) {
+                saleValue = convert(height);
+                break;
+            }
+        }
+        if (saleValue != amount) revert Trader__SoftwareError();
+
+        return callInitFlash(amount);
+    }
+
+    /// @dev This reads configuration parameters, not current state of swapping process, which may diverge because of randomness.
+    /// @return Average amount of token in wei to be sold in 24 hours.
+    function spendADay() external view returns (uint256) {
+        return (budget * BLOCKS_PER_DAY) / (deadline - spentResetBlock);
     }
 
     /// @notice This is a helper function, that can be used to trigger swapper's initFlash.
@@ -233,43 +274,6 @@ contract Trader is ITransformer, Ownable, Pausable {
         IUniV3Swap(payable(integrator)).initFlash(ISwapperImpl(swapper), params);
 
         return safeBalanceOf(QUOTE, BENEFICIARY) - oldQuoteBalance;
-    }
-
-    /// @dev Max function. Returns bigger of two unsigned integers.
-    /// @param a first compared value
-    /// @param b second compared value
-    function max(uint256 a, uint256 b) private pure returns (uint256) {
-        if (a > b) return a;
-        else return b;
-    }
-
-    /// @notice Implements Transformer.trader interface. This function can be used to synchronously convert one token to other token.
-    ///         Please note that amount needs to be carefully chosen (see `findSaleValue(...)`).
-    ///         This function will throw if fromToken and toToken are different from base and quote respectively.
-    /// @param fromToken needs to be set to value of `base()`.
-    /// @param toToken needs to be set to value of `quote()`.
-    /// @param amount needs to be set to what `findSaleValue(...)` returns.
-    /// @return amount of quote token that will be transferred to beneficiary.
-    function transform(address fromToken, address toToken, uint256 amount) external payable returns (uint256) {
-        if ((fromToken != BASE) || (toToken != QUOTE)) revert Trader__ImpossibleConfiguration();
-        if (fromToken == ETH) {
-            if (msg.value != amount) revert Trader__ImpossibleConfiguration();
-        } else {
-            if (msg.value != 0) revert Trader__UnexpectedETH();
-            IERC20(BASE).safeTransferFrom(msg.sender, address(this), amount);
-        }
-
-        uint256 height;
-        uint256 saleValue = 0;
-        for (height = max(block.number - 255, lastHeight + 1); height < block.number; height++) {
-            if (canTrade(height)) {
-                saleValue = convert(height);
-                break;
-            }
-        }
-        if (saleValue != amount) revert Trader__SoftwareError();
-
-        return callInitFlash(amount);
     }
 
     /// @notice Transfers funds that are to be converted by to target token by external converter.
@@ -317,6 +321,29 @@ contract Trader is ITransformer, Ownable, Pausable {
         return saleValue;
     }
 
+    /// @notice Sets spending limits.
+    /// @param low_ is a lower bound of sold token (in wei) for a single trade
+    /// @param high_ is a higher bound of sold token (in wei) for a single trade
+    /// @param budget_ sets amount of token (in wei) to be sold before deadline block height
+    function setSpending(uint256 low_, uint256 high_, uint256 budget_) public onlyOwner validateSpendingArgs {
+        lastHeight = block.number;
+        saleValueLow = low_;
+        saleValueHigh = high_;
+        budget = budget_;
+        if (spent > budget) spent = budget;
+        emit SpendingChanged(low_, high_, spent, budget);
+    }
+
+    /// @notice Configures spending periods. Budget will be fully spend before the end of each period.
+    /// @param length_ is length of a period in blocks.
+    /// @param height_ is a block height remarking the beginning of a period.
+    function configurePeriod(uint256 height_, uint256 length_) public onlyOwner validateSpendingArgs {
+        periodZero = height_;
+        periodLength = length_;
+        deadline = nextDeadline();
+        emit PeriodsChanged(height_, length_, deadline);
+    }
+
     /// @dev Compute next deadline. If cached deadline (`deadline`) differs, `spent` needs to be reset.
     function nextDeadline() public view returns (uint256) {
         uint256 nextPeriodNo = (block.number - periodZero).divUp(periodLength);
@@ -325,27 +352,6 @@ contract Trader is ITransformer, Ownable, Pausable {
             nextPeriodNo = nextPeriodNo + 1;
         }
         return periodZero + (periodLength * nextPeriodNo);
-    }
-
-    /// @dev Returns sale value, in a range from [saleValueLow, saleValueHigh).
-    ///      Returned value is capped so it doesn't exceed available funds.
-    /// @param rand value of randomness for this height
-    /// @param transferAmount value will be added to balance before determining sale value
-    function getSaleValue(uint256 rand, uint256 transferAmount) private view returns (uint256 saleValue) {
-        saleValue = getUniformInRange(saleValueLow, saleValueHigh, rand);
-        if (saleValue > saleValueHigh) revert Trader__SoftwareError();
-
-        uint256 balance = address(this).balance;
-        if (BASE != ETH) {
-            balance = IERC20(BASE).balanceOf(address(this));
-        }
-
-        if (saleValue > balance + transferAmount) {
-            saleValue = balance + transferAmount;
-        }
-        if (saleValue > budget - spent) {
-            saleValue = budget - spent;
-        }
     }
 
     /// @dev Finds a earliest block with unused randomness and returns its sale value. Useful if `transfer(...)` is used instead of `convert(...)`
@@ -370,54 +376,6 @@ contract Trader is ITransformer, Ownable, Pausable {
     function hasOverspent(uint256 height) public view returns (bool) {
         if (height < spentResetBlock) return true;
         return spent > ((height - spentResetBlock) * budget) / (deadline - spentResetBlock);
-    }
-
-    /// @notice Sets spending limits.
-    /// @param low_ is a lower bound of sold token (in wei) for a single trade
-    /// @param high_ is a higher bound of sold token (in wei) for a single trade
-    /// @param budget_ sets amount of token (in wei) to be sold before deadline block height
-    function setSpending(uint256 low_, uint256 high_, uint256 budget_) public onlyOwner validateSpendingArgs {
-        lastHeight = block.number;
-        saleValueLow = low_;
-        saleValueHigh = high_;
-        budget = budget_;
-        if (spent > budget) spent = budget;
-        emit SpendingChanged(low_, high_, spent, budget);
-    }
-
-    /// @notice Configures spending periods. Budget will be fully spend before the end of each period.
-    /// @param length_ is length of a period in blocks.
-    /// @param height_ is a block height remarking the beginning of a period.
-    function configurePeriod(uint256 height_, uint256 length_) public onlyOwner validateSpendingArgs {
-        periodZero = height_;
-        periodLength = length_;
-        deadline = nextDeadline();
-        emit PeriodsChanged(height_, length_, deadline);
-    }
-
-    /// @notice Prevent this contract from spending base token.
-    /// @param enable Set to true to stop spending. Set to false to continue spending.
-    function emergencyStop(bool enable) external onlyOwner {
-        if (enable) _pause();
-        else _unpause();
-    }
-
-    /// @dev Whenever spending parameters are re-configured, this modifier is used to check if requested spending is realistic.
-    modifier validateSpendingArgs() {
-        _;
-        if (budget != 0) {
-            if (saleValueLow == 0) revert Trader__ImpossibleConfigurationSaleValueLowIsZero();
-            if (getSafetyBlocks() > (deadline - block.number))
-                revert Trader__ImpossibleConfigurationSaleValueLowIsTooLow();
-        }
-    }
-
-    /// @notice Set address of the contract that will receive token (base) to be converted to target token (quote).
-    /// @param swapper_ address of the contract handling the swapping.
-    function setSwapper(address swapper_, address integrator_) external onlyOwner {
-        emit SwapperChanged(swapper, swapper_, integrator, integrator_);
-        swapper = payable(swapper_);
-        integrator = integrator_;
     }
 
     /// @notice Returns upper bound of number of blocks enough to sold remaining budget.
@@ -447,12 +405,6 @@ contract Trader is ITransformer, Ownable, Pausable {
         return deadline - block.number - safety_blocks;
     }
 
-    /// @dev This reads configuration parameters, not current state of swapping process, which may diverge because of randomness.
-    /// @return Average amount of token in wei to be sold in 24 hours.
-    function spendADay() external view returns (uint256) {
-        return (budget * BLOCKS_PER_DAY) / (deadline - spentResetBlock);
-    }
-
     /// @notice Get random value for particular blockchain height.
     /// @param height Height is block height to be used as a source of randomness. Will raise if called for blocks older than 256.
     /// @return a pseudorandom uint256 value in range [0, type(uint256).max]
@@ -479,6 +431,54 @@ contract Trader is ITransformer, Ownable, Pausable {
         return low + (((high - low) * (apply_domain(seed) >> 200)) / 2 ** (256 - 200));
     }
 
-    /// @dev receive if integration doesn't use `transform` function
-    receive() external payable {}
+    /// @dev This contract deals with native ETH, while Uniswap with WETH. This helper function does address conversion.
+    function uniEthWrapper(address token) private view returns (address) {
+        if (token == ETH) return WETH_ADDRESS;
+        else return token;
+    }
+
+    /// @dev Simplifies checking of balance for ETH and ERC20 tokens. ETH is represented by a particular address.
+    /// @return Balance of `token` currency associated with specified `owner`
+    function safeBalanceOf(address token, address owner) private view returns (uint256) {
+        if ((token == ETH) || (token == address(0x0))) {
+            return owner.balance;
+        } else {
+            return IERC20(token).balanceOf(owner);
+        }
+    }
+
+    /// @dev Returns sale value, in a range from [saleValueLow, saleValueHigh).
+    ///      Returned value is capped so it doesn't exceed available funds.
+    /// @param rand value of randomness for this height
+    /// @param transferAmount value will be added to balance before determining sale value
+    function getSaleValue(uint256 rand, uint256 transferAmount) private view returns (uint256 saleValue) {
+        saleValue = getUniformInRange(saleValueLow, saleValueHigh, rand);
+        if (saleValue > saleValueHigh) revert Trader__SoftwareError();
+
+        uint256 balance = address(this).balance;
+        if (BASE != ETH) {
+            balance = IERC20(BASE).balanceOf(address(this));
+        }
+
+        if (saleValue > balance + transferAmount) {
+            saleValue = balance + transferAmount;
+        }
+        if (saleValue > budget - spent) {
+            saleValue = budget - spent;
+        }
+    }
+
+    /// @dev This contract and Splits' Swapper use different addresses to represent ETH. This function does the conversion.
+    function splitsEthWrapper(address token) private pure returns (address) {
+        if (token == ETH) return address(0x0);
+        else return token;
+    }
+
+    /// @dev Max function. Returns bigger of two unsigned integers.
+    /// @param a first compared value
+    /// @param b second compared value
+    function max(uint256 a, uint256 b) private pure returns (uint256) {
+        if (a > b) return a;
+        else return b;
+    }
 }

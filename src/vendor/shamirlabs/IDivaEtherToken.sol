@@ -31,21 +31,21 @@ interface IDivaEtherTokenEvents {
 }
 
 interface IDivaEtherToken is IErrors, IDivaEtherTokenErrors, IERC20Permit {
-    function convertToAssets(uint256) external view returns (uint256);
-
-    function convertToShares(uint256) external view returns (uint256);
-
     function burnShares(uint256 shares) external returns (uint256);
 
     function deposit() external payable returns (uint256);
 
-    function depositFor(address) external payable returns (uint256);
-
-    function sharesOf(address) external view returns (uint256);
-
     function transferSharesFrom(address, address, uint256) external;
 
     function transferShares(address, uint256) external;
+
+    function depositFor(address) external payable returns (uint256);
+
+    function convertToAssets(uint256) external view returns (uint256);
+
+    function convertToShares(uint256) external view returns (uint256);
+
+    function sharesOf(address) external view returns (uint256);
 
     function totalSupply() external view returns (uint256);
 

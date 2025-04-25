@@ -54,18 +54,18 @@ contract YearnPolygonUsdcStrategy is DragonBaseStrategy {
         IERC20(YIELD_SOURCE).approve(_owner, type(uint256).max);
     }
 
+    function availableDepositLimit(address _user) public view override returns (uint256) {
+        uint256 actualLimit = super.availableDepositLimit(_user);
+        uint256 vaultLimit = IStrategy(YIELD_SOURCE).availableDepositLimit(address(this));
+        return Math.min(actualLimit, vaultLimit);
+    }
+
     function _deployFunds(uint256 _amount) internal override {
         uint256 limit = IBaseStrategy(YIELD_SOURCE).availableDepositLimit(address(this));
         _amount = Math.min(_amount, limit);
         if (_amount > 0) {
             IERC4626Payable(YIELD_SOURCE).deposit(_amount, address(this));
         }
-    }
-
-    function availableDepositLimit(address _user) public view override returns (uint256) {
-        uint256 actualLimit = super.availableDepositLimit(_user);
-        uint256 vaultLimit = IStrategy(YIELD_SOURCE).availableDepositLimit(address(this));
-        return Math.min(actualLimit, vaultLimit);
     }
 
     function _freeFunds(uint256 _amount) internal override {
