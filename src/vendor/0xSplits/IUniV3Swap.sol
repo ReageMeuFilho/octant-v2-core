@@ -7,9 +7,6 @@ import { ISwapperImpl } from "./SwapperImpl.sol";
 import { ISwapperFlashCallback } from "./ISwapperFlashCallback.sol";
 
 interface IUniV3Swap is ISwapperFlashCallback {
-    error Unauthorized();
-    error InsufficientFunds();
-
     struct InitFlashParams {
         QuoteParams[] quoteParams;
         FlashCallbackData flashCallbackData;
@@ -19,6 +16,9 @@ interface IUniV3Swap is ISwapperFlashCallback {
         ISwapRouter.ExactInputParams[] exactInputParams;
         address excessRecipient;
     }
+
+    error Unauthorized();
+    error InsufficientFunds();
 
     function initFlash(ISwapperImpl, InitFlashParams calldata) external payable;
 }

@@ -32,6 +32,18 @@ contract SplitChecker is ISplitChecker, Initializable {
     uint256 public minMetapoolSplit;
 
     // =============================================================
+    //                            EVENTS
+    // =============================================================
+
+    /// @notice Emitted when the maximum opex split is updated
+    /// @param newMaxOpexSplit The new maximum opex split value
+    event MaxOpexSplitUpdated(uint256 newMaxOpexSplit);
+
+    /// @notice Emitted when the minimum metapool split is updated
+    /// @param newMinMetapoolSplit The new minimum metapool split value
+    event MinMetapoolSplitUpdated(uint256 newMinMetapoolSplit);
+
+    // =============================================================
     //                            ERRORS
     // =============================================================
 
@@ -46,18 +58,6 @@ contract SplitChecker is ISplitChecker, Initializable {
 
     /// @notice Thrown when a value is below the required minimum
     error ValueBelowMinimum();
-
-    // =============================================================
-    //                            EVENTS
-    // =============================================================
-
-    /// @notice Emitted when the maximum opex split is updated
-    /// @param newMaxOpexSplit The new maximum opex split value
-    event MaxOpexSplitUpdated(uint256 newMaxOpexSplit);
-
-    /// @notice Emitted when the minimum metapool split is updated
-    /// @param newMinMetapoolSplit The new minimum metapool split value
-    event MinMetapoolSplitUpdated(uint256 newMinMetapoolSplit);
 
     // =============================================================
     //                            MODIFIERS

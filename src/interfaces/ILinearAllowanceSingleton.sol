@@ -4,6 +4,15 @@ pragma solidity ^0.8.0;
 /// @title ILinearAllowanceSingleton
 /// @notice Interface for a module that allows to delegate spending allowances with linear accrual
 interface ILinearAllowanceSingleton {
+    /// @notice Structure defining an allowance with linear accrual
+    /// @dev Packed struct to use storage slots efficiently
+    struct LinearAllowance {
+        uint128 dripRatePerDay; // Max value is 3.40e+38 approximately.
+        uint160 totalUnspent; // Max value is 1.46e+48 approximately.
+        uint192 totalSpent; // Max value is 6.27e+57 approximately
+        uint32 lastBookedAtInSeconds; // Overflows in 2106.
+    }
+
     /// @notice Emitted when an allowance is set for a delegate
     /// @param source The address of the source of the allowance
     /// @param delegate The delegate the allowance is set for
@@ -36,15 +45,6 @@ interface ILinearAllowanceSingleton {
     /// @param delegate The delegate attempting the transfer
     /// @param token The token being transferred
     error TransferFailed(address source, address delegate, address token);
-
-    /// @notice Structure defining an allowance with linear accrual
-    /// @dev Packed struct to use storage slots efficiently
-    struct LinearAllowance {
-        uint128 dripRatePerDay; // Max value is 3.40e+38 approximately.
-        uint160 totalUnspent; // Max value is 1.46e+48 approximately.
-        uint192 totalSpent; // Max value is 6.27e+57 approximately
-        uint32 lastBookedAtInSeconds; // Overflows in 2106.
-    }
 
     /// @notice Set the allowance for a delegate. To revoke, set dripRatePerDay to 0. Revoking will not cancel any unspent allowance.
     /// @param delegate The delegate to set the allowance for

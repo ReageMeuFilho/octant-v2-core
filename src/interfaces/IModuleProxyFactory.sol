@@ -19,28 +19,6 @@ interface IModuleProxyFactory {
 
     /* 
         @dev
-        Calculate the address of a module proxy
-        @param target The target address
-        @param salt The salt
-        @return proxy The proxy address
-    */
-    function calculateProxyAddress(address target, bytes32 salt) external view returns (address);
-
-    /* 
-        @dev
-        Calculate the address of a module proxy
-        @param masterCopy The master copy address
-        @param initializer The initializer data
-        @param saltNonce The salt nonce
-    */
-    function getModuleAddress(
-        address masterCopy,
-        bytes memory initializer,
-        uint256 saltNonce
-    ) external view returns (address);
-
-    /* 
-        @dev
         Deploy a module proxy
         @param masterCopy The master copy address
         @param initializer The initializer data
@@ -81,4 +59,26 @@ interface IModuleProxyFactory {
         address opexVault,
         uint256 saltNonce
     ) external returns (address payable);
+
+    /* 
+        @dev
+        Calculate the address of a module proxy
+        @param target The target address
+        @param salt The salt
+        @return proxy The proxy address
+    */
+    function calculateProxyAddress(address target, bytes32 salt) external view returns (address);
+
+    /* 
+        @dev
+        Calculate the address of a module proxy
+        @param masterCopy The master copy address
+        @param initializer The initializer data
+        @param saltNonce The salt nonce
+    */
+    function getModuleAddress(
+        address masterCopy,
+        bytes memory initializer,
+        uint256 saltNonce
+    ) external view returns (address);
 }
