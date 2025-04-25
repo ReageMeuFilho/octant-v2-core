@@ -47,7 +47,7 @@ contract YieldSkimmingTokenizedStrategy is DragonTokenizedStrategy {
         if (profit > 0) {
             // Mint shares based on the adjusted profit amount
             uint256 shares = _convertToSharesFromReport(S, profit, Math.Rounding.Floor);
-            // mint the mETH value
+            // mint the value
             _mint(S, _dragonRouter, shares);
         }
 
