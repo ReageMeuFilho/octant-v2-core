@@ -8,3 +8,4 @@ openzeppelin-upgradeable=lib/openzeppelin-contracts-upgradeable/contracts
 zodiac/=lib/zodiac/contracts/
 abdk-libraries-solidity=lib/abdk-libraries-solidity
 @gnosis.pm/safe-contracts/=lib/safe-smart-account
+@tokenized-strategy-periphery/=lib/tokenized-strategy-periphery/src/

@@ -453,7 +453,7 @@ abstract contract DragonTokenizedStrategy {
         // Checking max deposit will also check if shutdown.
         require(assets <= _maxDeposit(S, receiver), "ERC4626: deposit more than max");
         // Check for rounding error.
-        require((shares = _convertToShares(S, assets, Math.Rounding.Down)) != 0, "ZERO_SHARES");
+        require((shares = _convertToShares(S, assets, Math.Rounding.Floor)) != 0, "ZERO_SHARES");
 
         _deposit(S, receiver, assets, shares);
     }
@@ -472,7 +472,7 @@ abstract contract DragonTokenizedStrategy {
         // Checking max mint will also check if shutdown.
         require(shares <= _maxMint(S, receiver), "ERC4626: mint more than max");
         // Check for rounding error.
-        require((assets = _convertToAssets(S, shares, Math.Rounding.Up)) != 0, "ZERO_ASSETS");
+        require((assets = _convertToAssets(S, shares, Math.Rounding.Ceil)) != 0, "ZERO_ASSETS");
 
         _deposit(S, receiver, assets, shares);
     }
@@ -510,7 +510,7 @@ abstract contract DragonTokenizedStrategy {
         StrategyData storage S = _strategyStorage();
         require(assets <= _maxWithdraw(S, owner), "ERC4626: withdraw more than max");
         // Check for rounding error or 0 value.
-        require((shares = _convertToShares(S, assets, Math.Rounding.Up)) != 0, "ZERO_SHARES");
+        require((shares = _convertToShares(S, assets, Math.Rounding.Ceil)) != 0, "ZERO_SHARES");
 
         // Withdraw and track the actual amount withdrawn for loss check.
         _withdraw(S, receiver, owner, assets, shares, maxLoss);
@@ -551,7 +551,7 @@ abstract contract DragonTokenizedStrategy {
         require(shares <= _maxRedeem(S, owner), "ERC4626: redeem more than max");
         uint256 assets;
         // Check for rounding error or 0 value.
-        require((assets = _convertToAssets(S, shares, Math.Rounding.Down)) != 0, "ZERO_ASSETS");
+        require((assets = _convertToAssets(S, shares, Math.Rounding.Floor)) != 0, "ZERO_ASSETS");
 
         // We need to return the actual amount withdrawn in case of a loss.
         return _withdraw(S, receiver, owner, assets, shares, maxLoss);
@@ -597,7 +597,7 @@ abstract contract DragonTokenizedStrategy {
      * @return . Expected shares that `assets` represents.
      */
     function convertToShares(uint256 assets) external view returns (uint256) {
-        return _convertToShares(_strategyStorage(), assets, Math.Rounding.Down);
+        return _convertToShares(_strategyStorage(), assets, Math.Rounding.Floor);
     }
 
     /**
@@ -609,7 +609,7 @@ abstract contract DragonTokenizedStrategy {
      * @return . Expected amount of `asset` the shares represents.
      */
     function convertToAssets(uint256 shares) external view returns (uint256) {
-        return _convertToAssets(_strategyStorage(), shares, Math.Rounding.Down);
+        return _convertToAssets(_strategyStorage(), shares, Math.Rounding.Floor);
     }
 
     /**
@@ -622,7 +622,7 @@ abstract contract DragonTokenizedStrategy {
      * @return . Expected shares that would be issued.
      */
     function previewDeposit(uint256 assets) external view returns (uint256) {
-        return _convertToShares(_strategyStorage(), assets, Math.Rounding.Down);
+        return _convertToShares(_strategyStorage(), assets, Math.Rounding.Floor);
     }
 
     /**
@@ -636,7 +636,7 @@ abstract contract DragonTokenizedStrategy {
      * @return . The needed amount of `asset` for the mint.
      */
     function previewMint(uint256 shares) external view returns (uint256) {
-        return _convertToAssets(_strategyStorage(), shares, Math.Rounding.Up);
+        return _convertToAssets(_strategyStorage(), shares, Math.Rounding.Ceil);
     }
 
     /**
@@ -650,7 +650,7 @@ abstract contract DragonTokenizedStrategy {
      * @return . The amount of shares that would be burnt.
      */
     function previewWithdraw(uint256 assets) external view returns (uint256) {
-        return _convertToShares(_strategyStorage(), assets, Math.Rounding.Up);
+        return _convertToShares(_strategyStorage(), assets, Math.Rounding.Ceil);
     }
 
     /**
@@ -663,7 +663,7 @@ abstract contract DragonTokenizedStrategy {
      * @return . The amount of `asset` that would be returned.
      */
     function previewRedeem(uint256 shares) external view returns (uint256) {
-        return _convertToAssets(_strategyStorage(), shares, Math.Rounding.Down);
+        return _convertToAssets(_strategyStorage(), shares, Math.Rounding.Floor);
     }
 
     /**
@@ -790,7 +790,7 @@ abstract contract DragonTokenizedStrategy {
 
         maxMint_ = IBaseStrategy(address(this)).availableDepositLimit(receiver);
         if (maxMint_ != type(uint256).max) {
-            maxMint_ = _convertToShares(S, maxMint_, Math.Rounding.Down);
+            maxMint_ = _convertToShares(S, maxMint_, Math.Rounding.Floor);
         }
     }
 
@@ -802,9 +802,9 @@ abstract contract DragonTokenizedStrategy {
         // If there is no limit enforced.
         if (maxWithdraw_ == type(uint256).max) {
             // Saves a min check if there is no withdrawal limit.
-            maxWithdraw_ = _convertToAssets(S, _balanceOf(S, owner), Math.Rounding.Down);
+            maxWithdraw_ = _convertToAssets(S, _balanceOf(S, owner), Math.Rounding.Floor);
         } else {
-            maxWithdraw_ = Math.min(_convertToAssets(S, _balanceOf(S, owner), Math.Rounding.Down), maxWithdraw_);
+            maxWithdraw_ = Math.min(_convertToAssets(S, _balanceOf(S, owner), Math.Rounding.Floor), maxWithdraw_);
         }
     }
 
@@ -819,7 +819,7 @@ abstract contract DragonTokenizedStrategy {
         } else {
             maxRedeem_ = Math.min(
                 // Can't redeem more than the balance.
-                _convertToShares(S, maxRedeem_, Math.Rounding.Down),
+                _convertToShares(S, maxRedeem_, Math.Rounding.Floor),
                 _balanceOf(S, owner)
             );
         }
@@ -949,28 +949,6 @@ abstract contract DragonTokenizedStrategy {
      * report in terms of `asset`.
      */
     function report() external virtual returns (uint256 profit, uint256 loss);
-
-    /**
-     * @notice Get how many shares have been unlocked since last report.
-     * @return . The amount of shares that have unlocked.
-     */
-    function unlockedShares() external view returns (uint256) {
-        return _unlockedShares(_strategyStorage());
-    }
-
-    /**
-     * @dev To determine how many of the shares that were locked during the last
-     * report have since unlocked.
-     *
-     * Since we no longer track locked/unlocked shares, this always returns 0.
-     *
-     * @return unlocked The amount of shares that have unlocked.
-     */
-    // solhint-disable-next-line no-unused-vars
-    function _unlockedShares(StrategyData storage S) internal view returns (uint256 unlocked) {
-        // We no longer track locked/unlocked shares, so always return 0
-        return 0;
-    }
 
     /*//////////////////////////////////////////////////////////////
                             TENDING
@@ -1120,7 +1098,7 @@ abstract contract DragonTokenizedStrategy {
      */
     function pricePerShare() external view returns (uint256) {
         StrategyData storage S = _strategyStorage();
-        return _convertToAssets(S, 10 ** S.decimals, Math.Rounding.Down);
+        return _convertToAssets(S, 10 ** S.decimals, Math.Rounding.Floor);
     }
 
     /**

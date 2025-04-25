@@ -2,8 +2,12 @@
 pragma solidity ^0.8.0;
 
 import { BaseHealthCheck } from "../../periphery/BaseHealthCheck.sol";
-import { UniswapV3Swapper } from "../../periphery/UniswapV3Swapper.sol";
+import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import { IUniswapV2Router02 } from "@tokenized-strategy-periphery/interfaces/Uniswap/V2/IUniswapV2Router02.sol";
+import { UniswapV3Swapper } from "../../periphery/UniswapV3Swapper.sol";
+import { IStaking } from "../../interfaces/ISky.sol";
 /// @title yearn-v3-SkyCompounder
 /// @author mil0x
 /// @notice yearn v3 Strategy that autocompounds staking rewards.
@@ -35,7 +39,14 @@ contract SkyCompounder is BaseHealthCheck, UniswapV3Swapper {
 
     uint256 private constant ASSET_DUST = 100;
 
-    constructor(address _staking, string memory _name) BaseHealthCheck(USDS, _name) {
+    constructor(
+        address _staking,
+        string memory _name,
+        address _management,
+        address _keeper,
+        address _emergencyAdmin,
+        address _donationAddress
+    ) BaseHealthCheck(USDS, _name, _management, _keeper, _emergencyAdmin, _donationAddress) {
         require(IStaking(_staking).paused() == false, "paused");
         require(USDS == IStaking(_staking).stakingToken(), "!stakingToken");
         rewardsToken = IStaking(_staking).rewardsToken();

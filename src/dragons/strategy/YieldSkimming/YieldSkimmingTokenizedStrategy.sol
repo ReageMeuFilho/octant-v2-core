@@ -78,9 +78,8 @@ contract YieldSkimmingTokenizedStrategy is DragonTokenizedStrategy {
         // report to update the exchange rate
         ITokenizedStrategy(address(this)).report();
 
-        shares = super._deposit(S, receiver, assets, shares);
+        super._deposit(S, receiver, assets, shares);
 
-        return shares;
     }
 
     /**

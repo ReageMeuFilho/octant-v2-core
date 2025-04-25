@@ -2,7 +2,11 @@
 pragma solidity ^0.8.0;
 
 import { BaseHealthCheck } from "../../periphery/BaseHealthCheck.sol";
+import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { UniswapV3Swapper } from "../../periphery/UniswapV3Swapper.sol";
+import { IVault } from "../../interfaces/IVault.sol";
+import { IPSM, IExchange } from "../../interfaces/IPSM.sol";
 
 /// @title yearn-v3-USDS-Farmer-USDC
 /// @author mil0x
@@ -32,7 +36,14 @@ contract USDSFarmerUSDC is BaseHealthCheck, UniswapV3Swapper {
     uint256 private constant WAD = 1e18;
     uint256 private constant ASSET_DUST = 100;
 
-    constructor(address _vault, string memory _name) BaseHealthCheck(USDC, _name) {
+    constructor(
+        address _vault,
+        string memory _name,
+        address _management,
+        address _keeper,
+        address _emergencyAdmin,
+        address _donationAddress
+    ) BaseHealthCheck(USDC, _name, _management, _keeper, _emergencyAdmin, _donationAddress) {
         require(IVault(_vault).asset() == USDS, "!asset");
         vault = _vault;
         depositLimit = 100e6 * 1e6; //100M USDC deposit limit to start with
