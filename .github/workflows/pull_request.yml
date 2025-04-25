@@ -1,6 +1,6 @@
 # In steps following image build we're ignoring files uploaded to /_w/ directory as current code is in /app directory
 
-name: CI Pull Request
+name: 🤖 CI Pull Request
 on:
   pull_request:
     branches:

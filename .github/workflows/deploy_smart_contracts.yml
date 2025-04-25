@@ -1,4 +1,4 @@
-name: Deploy Smart Contracts
+name: ▶️ Deploy Smart Contracts
 on:
   workflow_dispatch:
 
@@ -87,6 +87,7 @@ jobs:
         run: yarn build:contracts
 
       - name: Set npm auth token
+        shell: bash
         run: |
           yarn config set -H npmScopes.golemfoundation.npmAuthToken "${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}"
           gpg --import <(echo ${HOUSEKEEPER_GITHUB_SIGNING_KEY} | base64 -d)
