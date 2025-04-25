@@ -241,11 +241,12 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
             /// @dev updates old splitters
             uint256 splitRecipientsLength = split.recipients.length;
             for (uint256 j = 0; j < splitRecipientsLength; j++) {
-                UserData storage _userData = userData[split.recipients[j]][strategies[i]];
+                UserData memory _userData = userData[split.recipients[j]][strategies[i]];
                 uint256 claimableAssets = _claimableAssets(_userData, strategies[i]);
                 _userData.assets += claimableAssets;
                 _userData.userAssetPerShare = 0;
                 _userData.splitPerShare = 0;
+                userData[split.recipients[j]][strategies[i]] = _userData;
                 emit UserSplitUpdated(
                     split.recipients[j],
                     strategies[i],
