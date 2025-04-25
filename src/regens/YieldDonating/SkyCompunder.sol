@@ -1,18 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {BaseHealthCheck} from "./BaseHealthCheck.sol";
-import {UniswapV3Swapper} from "./UniswapV3Swapper.sol";
+import { BaseHealthCheck } from "./BaseHealthCheck.sol";
+import { UniswapV3Swapper } from "./UniswapV3Swapper.sol";
 
+import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+import { IUniswapV2Router02 } from "@tokenized-strategy-periphery/interfaces/Uniswap/V2/IUniswapV2Router02.sol";
+import { UniswapV3Swapper } from "src/regens/periphery/UniswapV3Swapper.sol";
+import { IStaking } from "src/regens/interfaces/ISky.sol";
 /// @title yearn-v3-SkyCompounder
 /// @author mil0x
 /// @notice yearn v3 Strategy that autocompounds staking rewards.
 contract SkyCompounder is BaseHealthCheck, UniswapV3Swapper {
     using SafeERC20 for ERC20;
-    
+
     ///@notice Represents if we should claim rewards. Default to true.
     bool public claimRewards = true;
-    
+
     ///@notice Represents if we should use UniswapV3 (true) or UniswapV2 (false) to sell rewards. The default is false = UniswapV2.
     bool public useUniV3;
 
@@ -21,10 +27,10 @@ contract SkyCompounder is BaseHealthCheck, UniswapV3Swapper {
 
     ///@notice yearn governance
     address public constant GOV = 0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52;
-   
+
     address public immutable staking;
     address public immutable rewardsToken;
- 
+
     address private constant uniV2router = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D; // Uniswap V2 router on Mainnet
 
     // choices for base
@@ -35,7 +41,14 @@ contract SkyCompounder is BaseHealthCheck, UniswapV3Swapper {
 
     uint256 private constant ASSET_DUST = 100;
 
-    constructor(address _staking, string memory _name) BaseHealthCheck(USDS, _name) {
+    constructor(
+        address _staking,
+        string memory _name,
+        address _management,
+        address _keeper,
+        address _emergencyAdmin,
+        address _donationAddress
+    ) BaseHealthCheck(USDS, _name, _management, _keeper, _emergencyAdmin, _donationAddress) {
         require(IStaking(_staking).paused() == false, "paused");
         require(USDS == IStaking(_staking).stakingToken(), "!stakingToken");
         rewardsToken = IStaking(_staking).rewardsToken();
@@ -57,12 +70,13 @@ contract SkyCompounder is BaseHealthCheck, UniswapV3Swapper {
     function _harvestAndReport() internal override returns (uint256 _totalAssets) {
         if (claimRewards) {
             IStaking(staking).getReward();
-            if (useUniV3) { // UniV3
+            if (useUniV3) {
+                // UniV3
                 _swapFrom(rewardsToken, address(asset), balanceOfRewards(), 0); // minAmountOut = 0 since we only sell rewards
-            } else { // UniV2
+            } else {
+                // UniV2
                 _uniV2swapFrom(rewardsToken, address(asset), balanceOfRewards(), 0); // minAmountOut = 0 since we only sell rewards
             }
-            
         }
 
         uint256 balance = balanceOfAsset();
@@ -84,11 +98,20 @@ contract SkyCompounder is BaseHealthCheck, UniswapV3Swapper {
 
     function _uniV2swapFrom(address _from, address _to, uint256 _amountIn, uint256 _minAmountOut) internal {
         if (_amountIn > minAmountToSell) {
-            IUniswapV2Router02(uniV2router).swapExactTokensForTokens(_amountIn, _minAmountOut, _getTokenOutPath(_from, _to), address(this), block.timestamp);
+            IUniswapV2Router02(uniV2router).swapExactTokensForTokens(
+                _amountIn,
+                _minAmountOut,
+                _getTokenOutPath(_from, _to),
+                address(this),
+                block.timestamp
+            );
         }
     }
 
-    function _getTokenOutPath(address _tokenIn, address _tokenOut) internal view virtual returns (address[] memory _path) {
+    function _getTokenOutPath(
+        address _tokenIn,
+        address _tokenOut
+    ) internal view virtual returns (address[] memory _path) {
         address _base = base;
         bool isBase = _tokenIn == _base || _tokenOut == _base;
         _path = new address[](isBase ? 2 : 3);

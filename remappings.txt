@@ -11,3 +11,4 @@ abdk-libraries-solidity=lib/abdk-libraries-solidity
 @tokenized-strategy-periphery/=lib/tokenized-strategy-periphery/src/
 staker-test/=lib/staker/test/
 staker/=lib/staker/src/
+@tokenized-strategy-periphery/=lib/tokenized-strategy-periphery/src/
