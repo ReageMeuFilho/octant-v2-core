@@ -254,7 +254,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
         (address _owner, bytes memory data) = abi.decode(initializeParams, (address, bytes));
 
         (
-            address[] memory _strategy,
+            address[] memory _strategies,
             address _governance,
             address _regen_governance,
             address _splitChecker,
@@ -269,17 +269,17 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
         _setMetapool(_metapool);
         _setOpexVault(_opexVault);
 
-        for (uint256 i = 0; i < _strategy.length; i++) {
-            strategyData[_strategy[i]].asset = ITokenizedStrategy(_strategy[i]).asset();
-            strategyData[_strategy[i]].totalShares = SPLIT_PRECISION;
-            userData[_metapool][_strategy[i]].splitPerShare = SPLIT_PRECISION;
+        for (uint256 i = 0; i < _strategies.length; i++) {
+            strategyData[_strategies[i]].asset = ITokenizedStrategy(_strategies[i]).asset();
+            strategyData[_strategies[i]].totalShares = SPLIT_PRECISION;
+            userData[_metapool][_strategies[i]].splitPerShare = SPLIT_PRECISION;
         }
 
         split.recipients = [_metapool];
         split.allocations = [SPLIT_PRECISION];
         split.totalAllocations = SPLIT_PRECISION;
 
-        strategies = _strategy;
+        strategies = _strategies;
         _grantRole(DEFAULT_ADMIN_ROLE, _owner);
         _grantRole(GOVERNANCE_ROLE, _governance);
         _grantRole(REGEN_GOVERNANCE_ROLE, _regen_governance);
