@@ -4,7 +4,7 @@ pragma solidity ^0.8.19;
 import { IHats } from "lib/hats-protocol/src/Interfaces/IHats.sol";
 import { IHatsEligibility } from "src/interfaces/IHatsEligibility.sol";
 import { IHatsToggle } from "src/interfaces/IHatsToggle.sol";
-
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { Hats__InvalidAddressFor, Hats__InvalidHat, Hats__DoesNotHaveThisHat, Hats__HatAlreadyExists, Hats__HatDoesNotExist, Hats__TooManyInitialHolders, Hats__NotAdminOfHat } from "./HatsErrors.sol";
 
 /**
@@ -12,7 +12,7 @@ import { Hats__InvalidAddressFor, Hats__InvalidHat, Hats__DoesNotHaveThisHat, Ha
  * @notice Abstract pattern for managing hierarchical roles through Hats Protocol
  * @dev Implements base logic for creating and managing role-based hats under a branch
  */
-abstract contract AbstractHatsManager is IHatsEligibility, IHatsToggle {
+abstract contract AbstractHatsManager is ReentrancyGuard, IHatsEligibility, IHatsToggle {
     IHats public immutable HATS;
 
     // Core hat structure
@@ -42,54 +42,6 @@ abstract contract AbstractHatsManager is IHatsEligibility, IHatsToggle {
         require(HATS.isWearerOfHat(msg.sender, _adminHat), Hats__DoesNotHaveThisHat(msg.sender, _adminHat));
         adminHat = _adminHat;
         branchHat = _branchHat;
-    }
-
-    /**
-     * @notice Creates a new role hat under the branch
-     * @param roleId Unique identifier for the role
-     * @param details Human-readable description of the role
-     * @param maxSupply Maximum number of addresses that can hold this role
-     * @param initialHolders Optional array of addresses to grant the role to immediately
-     * @return hatId The ID of the newly created role hat
-     */
-    function createRole(
-        bytes32 roleId,
-        string memory details,
-        uint256 maxSupply,
-        address[] memory initialHolders
-    ) internal virtual returns (uint256 hatId) {
-        require(HATS.isAdminOfHat(msg.sender, adminHat), Hats__NotAdminOfHat(msg.sender, adminHat));
-        require(roleHats[roleId] == 0, Hats__HatAlreadyExists(roleId));
-        require(initialHolders.length <= maxSupply, Hats__TooManyInitialHolders(initialHolders.length, maxSupply));
-
-        // Create role hat under branch
-        hatId = HATS.createHat(
-            branchHat,
-            details,
-            uint32(maxSupply),
-            address(this), // this contract determines eligibility
-            address(this), // this contract controls activation
-            true, // can be modified by admin
-            "" // no custom image
-        );
-
-        roleHats[roleId] = hatId;
-        hatRoles[hatId] = roleId;
-
-        // Mint hats to initial holders
-        for (uint256 i = 0; i < initialHolders.length; i++) {
-            address holder = initialHolders[i];
-            require(holder != address(0), Hats__InvalidAddressFor("initial holder", holder));
-
-            // mintHat(
-            //    uint256 hatId,    // Hat ID to mint
-            //    address wearer    // Address to receive hat
-            // )
-            HATS.mintHat(hatId, holder);
-            emit RoleGranted(roleId, holder, hatId);
-        }
-
-        emit RoleHatCreated(roleId, hatId);
     }
 
     /**
@@ -144,6 +96,56 @@ abstract contract AbstractHatsManager is IHatsEligibility, IHatsToggle {
     function getHatStatus(uint256 hatId) external view override returns (bool) {
         require(hatId == branchHat || hatRoles[hatId] != 0, Hats__InvalidHat(hatId));
         return isActive;
+    }
+
+    /**
+     * @notice Creates a new role hat under the branch
+     * @param roleId Unique identifier for the role
+     * @param details Human-readable description of the role
+     * @param maxSupply Maximum number of addresses that can hold this role
+     * @param initialHolders Optional array of addresses to grant the role to immediately
+     * @return hatId The ID of the newly created role hat
+     */
+    function _createRole(
+        bytes32 roleId,
+        string memory details,
+        uint256 maxSupply,
+        address[] memory initialHolders
+    ) internal virtual nonReentrant returns (uint256 hatId) {
+        require(HATS.isAdminOfHat(msg.sender, adminHat), Hats__NotAdminOfHat(msg.sender, adminHat));
+        require(roleHats[roleId] == 0, Hats__HatAlreadyExists(roleId));
+        require(initialHolders.length <= maxSupply, Hats__TooManyInitialHolders(initialHolders.length, maxSupply));
+
+        // Create role hat under branch
+        // False positive: marked nonReentrant
+        //slither-disable-next-line reentrancy-no-eth
+        hatId = HATS.createHat(
+            branchHat,
+            details,
+            uint32(maxSupply),
+            address(this), // this contract determines eligibility
+            address(this), // this contract controls activation
+            true, // can be modified by admin
+            "" // no custom image
+        );
+
+        roleHats[roleId] = hatId;
+        hatRoles[hatId] = roleId;
+
+        // Mint hats to initial holders
+        for (uint256 i = 0; i < initialHolders.length; i++) {
+            address holder = initialHolders[i];
+            require(holder != address(0), Hats__InvalidAddressFor("initial holder", holder));
+
+            // mintHat(
+            //    uint256 hatId,    // Hat ID to mint
+            //    address wearer    // Address to receive hat
+            // )
+            HATS.mintHat(hatId, holder);
+            emit RoleGranted(roleId, holder, hatId);
+        }
+
+        emit RoleHatCreated(roleId, hatId);
     }
 
     /**

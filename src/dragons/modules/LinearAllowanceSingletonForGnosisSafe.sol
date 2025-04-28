@@ -55,10 +55,10 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
 
         // Update cached memory values
         a = _updateAllowance(a);
-
+        //slither-disable-next-line incorrect-equality
         if (a.totalUnspent == 0) revert NoAllowanceToTransfer(safe, msg.sender, token);
 
-        uint160 transferAmount;
+        uint160 transferAmount = 0;
 
         if (token == NATIVE_TOKEN) {
             // For ETH transfers, get the minimum of totalUnspent and safe balance
@@ -66,6 +66,8 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
             transferAmount = a.totalUnspent <= safeBalance.toUint160() ? a.totalUnspent : safeBalance.toUint160();
 
             if (transferAmount > 0) {
+                // False positive: marked nonReentrant
+                //slither-disable-next-line reentrancy-no-eth
                 bool success = ISafe(payable(safe)).execTransactionFromModule(
                     to,
                     transferAmount,
@@ -81,6 +83,8 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
 
                 if (transferAmount > 0) {
                     bytes memory data = abi.encodeWithSelector(IERC20.transfer.selector, to, transferAmount);
+                    // False positive: marked nonReentrant
+                    //slither-disable-next-line reentrancy-no-eth
                     bool success = ISafe(payable(safe)).execTransactionFromModule(token, 0, data, Enum.Operation.Call);
                     if (!success) revert TransferFailed(safe, msg.sender, token);
                 }
@@ -133,16 +137,15 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
         }
 
         uint256 timeElapsed = block.timestamp - allowance.lastBookedAtInSeconds;
-        uint256 daysElapsed = timeElapsed / 1 days;
 
-        return allowance.totalUnspent + allowance.dripRatePerDay * daysElapsed;
+        return allowance.totalUnspent + ((allowance.dripRatePerDay * timeElapsed) / 1 days);
     }
 
     function _updateAllowance(LinearAllowance memory a) internal view returns (LinearAllowance memory) {
         if (a.lastBookedAtInSeconds != 0) {
             uint256 timeElapsed = block.timestamp - a.lastBookedAtInSeconds;
-            uint256 daysElapsed = timeElapsed / 1 days;
-            a.totalUnspent += (daysElapsed * a.dripRatePerDay).toUint160();
+            //slither-disable-next-line incorrect-equality
+            a.totalUnspent += (timeElapsed * a.dripRatePerDay).toUint160() / 1 days;
         }
 
         a.lastBookedAtInSeconds = block.timestamp.toUint32();

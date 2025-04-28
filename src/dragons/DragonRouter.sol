@@ -219,6 +219,8 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
         StrategyData storage data = strategyData[strategy];
         if (data.asset == address(0)) revert ZeroAddress();
 
+        // False positive: marked nonReentrant
+        //slither-disable-next-line reentrancy-no-eth
         ITokenizedStrategy(strategy).withdraw(amount, address(this), address(this), 0);
 
         data.assetPerShare += (amount * SPLIT_PRECISION) / data.totalShares;
@@ -232,17 +234,19 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
     function setSplit(ISplitChecker.Split memory _split) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (block.timestamp - lastSetSplitTime < coolDownPeriod) revert CooldownPeriodNotPassed();
         splitChecker.checkSplit(_split, opexVault, metapool);
-
-        for (uint256 i = 0; i < strategies.length; i++) {
+        uint256 strategiesLength = strategies.length;
+        for (uint256 i = 0; i < strategiesLength; i++) {
             StrategyData storage data = strategyData[strategies[i]];
 
             /// @dev updates old splitters
-            for (uint256 j = 0; j < split.recipients.length; j++) {
-                UserData storage _userData = userData[split.recipients[j]][strategies[i]];
+            uint256 splitRecipientsLength = split.recipients.length;
+            for (uint256 j = 0; j < splitRecipientsLength; j++) {
+                UserData memory _userData = userData[split.recipients[j]][strategies[i]];
                 uint256 claimableAssets = _claimableAssets(_userData, strategies[i]);
                 _userData.assets += claimableAssets;
                 _userData.userAssetPerShare = 0;
                 _userData.splitPerShare = 0;
+                userData[split.recipients[j]][strategies[i]] = _userData;
                 emit UserSplitUpdated(
                     split.recipients[j],
                     strategies[i],
@@ -389,6 +393,8 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
                 ? userTransformer.transformer.transform{ value: _amount }(_asset, userTransformer.targetToken, _amount)
                 : userTransformer.transformer.transform(_asset, userTransformer.targetToken, _amount);
             if (userTransformer.targetToken == NATIVE_TOKEN) {
+                // False positive: User balance is checked before sending
+                //slither-disable-next-line arbitrary-send-eth
                 (bool success, ) = _user.call{ value: _transformedAmount }("");
                 if (!success) revert TransferFailed();
             } else {

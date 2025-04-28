@@ -460,6 +460,7 @@ abstract contract TokenizedStrategy is ITokenizedStrategy {
             if (address(_asset) == ETH) {
                 previousBalance = address(this).balance;
                 IAvatar(target).execTransactionFromModule(address(this), assets, "", Enum.Operation.Call);
+                //slither-disable-next-line incorrect-equality
                 require(address(this).balance == previousBalance + assets, TokenizedStrategy__DepositMoreThanMax());
             } else {
                 previousBalance = _asset.balanceOf(address(this));
@@ -469,6 +470,7 @@ abstract contract TokenizedStrategy is ITokenizedStrategy {
                     abi.encodeWithSignature("transfer(address,uint256)", address(this), assets),
                     Enum.Operation.Call
                 );
+                //slither-disable-next-line incorrect-equality
                 require(
                     _asset.balanceOf(address(this)) == previousBalance + assets,
                     TokenizedStrategy__TransferFailed()
@@ -526,7 +528,7 @@ abstract contract TokenizedStrategy is ITokenizedStrategy {
         ERC20 _asset = S.asset;
 
         uint256 idle = address(_asset) == ETH ? address(this).balance : _asset.balanceOf(address(this));
-        uint256 loss;
+        uint256 loss = 0;
         // Check if we need to withdraw funds.
         if (idle < assets) {
             // Tell Strategy to free what we need.
