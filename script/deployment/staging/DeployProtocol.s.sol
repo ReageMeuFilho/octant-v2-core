@@ -49,7 +49,7 @@ contract DeployProtocol is Script {
     }
 
     function run() public {
-        uint256 startingBlock = block.number;
+        string memory startingBlock = vm.toString(block.number);
 
         setUp();
 
@@ -90,7 +90,7 @@ contract DeployProtocol is Script {
         // Log deployment addresses
         console2.log("\nDeployment Summary:");
         console2.log("------------------");
-        console2.log("Starting block:            ", vm.toString(startingBlock));
+        console2.log("Starting block:            ", startingBlock);
         console2.log("Module Proxy Factory:      ", moduleProxyFactoryAddress);
         console2.log("Dragon Tokenized Strategy: ", dragonTokenizedStrategyAddress);
         console2.log("Dragon Router:             ", dragonRouterAddress);
@@ -112,7 +112,7 @@ contract DeployProtocol is Script {
         if (vm.exists(contractAddressFilename)) {
             vm.removeFile(contractAddressFilename);
         }
-        vm.writeLine(contractAddressFilename, string.concat("BLOCK_NUMBER=", vm.toString(startingBlock)));
+        vm.writeLine(contractAddressFilename, string.concat("BLOCK_NUMBER=", startingBlock));
         vm.writeLine(
             contractAddressFilename,
             string.concat("MODULE_PROXY_FACTORY_ADDRESS=", vm.toString(moduleProxyFactoryAddress))
