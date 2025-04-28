@@ -103,6 +103,8 @@ contract OctantRewardsSafe is Module {
         uint256 lastHarvestTime = lastHarvested;
         lastHarvested = block.timestamp;
         totalYield += yield;
+        // False positive: only events emitted after the call
+        //slither-disable-next-line reentrancy-no-eth
         bool success = exec(dragonRouter, yield, "", Enum.Operation.Call);
         require(success, OctantRewardsSafe__TransferFailed(yield));
         emit Transfer(owner(), dragonRouter, yield);

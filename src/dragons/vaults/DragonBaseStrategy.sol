@@ -35,6 +35,11 @@ abstract contract DragonBaseStrategy is BaseStrategy, Module {
 
     address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE; // using this address to represent native ETH
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     /**
      * @notice Used to initialize the strategy on deployment.
      *
@@ -143,6 +148,7 @@ abstract contract DragonBaseStrategy is BaseStrategy, Module {
      */
     function _delegateCall(bytes memory _calldata) internal returns (bytes memory) {
         // Delegate call the tokenized strategy with provided calldata.
+        //slither-disable-next-line controlled-delegatecall
         (bool success, bytes memory result) = tokenizedStrategyImplementation.delegatecall(_calldata);
 
         // If the call reverted. Return the error.
