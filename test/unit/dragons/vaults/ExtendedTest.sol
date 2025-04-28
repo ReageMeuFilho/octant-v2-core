@@ -4,7 +4,7 @@ pragma solidity >=0.8.18;
 import { BaseTest } from "../Base.t.sol";
 
 contract ExtendedTest is BaseTest {
-    // solhint-disable-next-line
+    // solhint-disable-next-line    
     function assertNeq(address a, address b) internal {
         if (a == b) {
             emit log("Error: a != b not satisfied [address]");

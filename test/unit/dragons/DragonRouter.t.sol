@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.25;
 
-import "../../lib/openzeppelin-contracts/contracts/utils/Strings.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 import "forge-std/Test.sol";
 import "src/dragons/SplitChecker.sol";
 import { DragonRouter } from "src/dragons/DragonRouter.sol";
@@ -28,7 +28,7 @@ import { MockDragonRouterTesting } from "test/mocks/MockDragonRouterTesting.sol"
 import { MockNativeTransformer } from "test/mocks/MockNativeTransformer.sol";
 import { MockStrategy } from "test/mocks/MockStrategy.sol";
 import { ISplitChecker } from "src/interfaces/ISplitChecker.sol";
-import { AccessControl } from "../../lib/openzeppelin-contracts/contracts/access/AccessControl.sol";
+import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
 
 contract DragonRouterTest is Test {
     DragonRouter public router;

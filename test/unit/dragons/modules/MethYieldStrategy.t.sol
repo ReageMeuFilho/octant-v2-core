@@ -10,9 +10,9 @@ import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
 import { IDragonTokenizedStrategy } from "src/interfaces/IDragonTokenizedStrategy.sol";
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
-import { MockMETH } from "../../mocks/MockMETH.sol";
-import { MockMantleStaking } from "../../mocks/MockMantleStaking.sol";
-import { MockMethYieldStrategy } from "../../mocks/MockMethYieldStrategy.sol";
+import { MockMETH } from "test/mocks/MockMETH.sol";
+import { MockMantleStaking } from "test/mocks/MockMantleStaking.sol";
+import { MockMethYieldStrategy } from "test/mocks/MockMethYieldStrategy.sol";
 import { console } from "forge-std/console.sol";
 import { IERC4626Payable } from "src/interfaces/IERC4626Payable.sol";
 import { DragonTokenizedStrategy__WithdrawMoreThanMax } from "src/errors.sol";
