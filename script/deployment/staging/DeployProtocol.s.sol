@@ -112,10 +112,7 @@ contract DeployProtocol is Script {
         if (vm.exists(contractAddressFilename)) {
             vm.removeFile(contractAddressFilename);
         }
-        vm.writeLine(
-            contractAddressFilename,
-            string.concat("BLOCK_NUMBER=", vm.toString(startingBlock))
-        );
+        vm.writeLine(contractAddressFilename, string.concat("BLOCK_NUMBER=", vm.toString(startingBlock)));
         vm.writeLine(
             contractAddressFilename,
             string.concat("MODULE_PROXY_FACTORY_ADDRESS=", vm.toString(moduleProxyFactoryAddress))
