@@ -1,17 +1,6 @@
 name: ▶️ Deploy Smart Contracts
 on:
   workflow_dispatch:
-    inputs:
-      bump-version:
-        description: 'Bump version'
-        type: choice
-        required: true
-        options:
-          - ''
-          - 'patch'
-          - 'minor'
-          - 'major'
-        default: ''
 
 concurrency:
   group: "${{ github.ref }}-deploy-sc"
@@ -112,7 +101,7 @@ jobs:
           GITHUB_TOKEN:  ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}
         run: |
-          yarn release ${{ inputs.bump-version }} --preRelease=develop --ci
+          yarn release --preRelease=develop --ci
 
       - name: Publish release
         if: github.ref_name == 'main'
@@ -120,4 +109,4 @@ jobs:
           GITHUB_TOKEN:  ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}
         run: |
-          yarn release ${{ inputs.bump-version }} --ci
+          yarn release --ci
