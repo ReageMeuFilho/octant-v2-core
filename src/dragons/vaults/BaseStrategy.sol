@@ -99,11 +99,151 @@ abstract contract BaseStrategy {
         _;
     }
 
+    /*//////////////////////////////////////////////////////////////
+                        TokenizedStrategy HOOKS
+    //////////////////////////////////////////////////////////////*/
+
     /**
-     * @dev Require that the msg.sender is this address.
+     * @notice Can deploy up to '_amount' of 'asset' in yield source.
+     * @dev Callback for the TokenizedStrategy to call during a {deposit}
+     * or {mint} to tell the strategy it can deploy funds.
+     *
+     * Since this can only be called after a {deposit} or {mint}
+     * delegateCall to the TokenizedStrategy msg.sender == address(this).
+     *
+     * Unless a whitelist is implemented this will be entirely permissionless
+     * and thus can be sandwiched or otherwise manipulated.
+     *
+     * @param _amount The amount of 'asset' that the strategy can
+     * attempt to deposit in the yield source.
      */
-    function _onlySelf() internal view {
-        if (msg.sender != address(this)) revert BaseStrategy__NotSelf();
+    function deployFunds(uint256 _amount) external virtual onlySelf {
+        _deployFunds(_amount);
+    }
+
+    /**
+     * @notice Should attempt to free the '_amount' of 'asset'.
+     * @dev Callback for the TokenizedStrategy to call during a withdraw
+     * or redeem to free the needed funds to service the withdraw.
+     *
+     * This can only be called after a 'withdraw' or 'redeem' delegateCall
+     * to the TokenizedStrategy so msg.sender == address(this).
+     *
+     * @param _amount The amount of 'asset' that the strategy should attempt to free up.
+     */
+    function freeFunds(uint256 _amount) external virtual onlySelf {
+        _freeFunds(_amount);
+    }
+
+    /**
+     * @notice Returns the accurate amount of all funds currently
+     * held by the Strategy.
+     * @dev Callback for the TokenizedStrategy to call during a report to
+     * get an accurate accounting of assets the strategy controls.
+     *
+     * This can only be called after a report() delegateCall to the
+     * TokenizedStrategy so msg.sender == address(this).
+     *
+     * @return . A trusted and accurate account for the total amount
+     * of 'asset' the strategy currently holds including idle funds.
+     */
+    function harvestAndReport() external virtual onlySelf returns (uint256) {
+        return _harvestAndReport();
+    }
+
+    /**
+     * @notice Will call the internal '_tend' when a keeper tends the strategy.
+     * @dev Callback for the TokenizedStrategy to initiate a _tend call in the strategy.
+     *
+     * This can only be called after a tend() delegateCall to the TokenizedStrategy
+     * so msg.sender == address(this).
+     *
+     * We name the function `tendThis` so that `tend` calls are forwarded to
+     * the TokenizedStrategy.
+     *
+     * @param _totalIdle The amount of current idle funds that can be
+     * deployed during the tend
+     */
+    function tendThis(uint256 _totalIdle) external virtual onlySelf {
+        _tend(_totalIdle);
+    }
+
+    /**
+     * @notice Will call the internal '_emergencyWithdraw' function.
+     * @dev Callback for the TokenizedStrategy during an emergency withdraw.
+     *
+     * This can only be called after a emergencyWithdraw() delegateCall to
+     * the TokenizedStrategy so msg.sender == address(this).
+     *
+     * We name the function `shutdownWithdraw` so that `emergencyWithdraw`
+     * calls are forwarded to the TokenizedStrategy.
+     *
+     * @param _amount The amount of asset to attempt to free.
+     */
+    function shutdownWithdraw(uint256 _amount) external virtual onlySelf {
+        _emergencyWithdraw(_amount);
+    }
+
+    /**
+     * @notice Returns if tend() should be called by a keeper.
+     *
+     * @return . Should return true if tend() should be called by keeper or false if not.
+     * @return . Calldata for the tend call.
+     */
+    function tendTrigger() external view virtual returns (bool, bytes memory) {
+        return (
+            // Return the status of the tend trigger.
+            _tendTrigger(),
+            // And the needed calldata either way.
+            abi.encodeWithSelector(ITokenizedStrategy.tend.selector)
+        );
+    }
+
+    /**
+     * @notice Gets the max amount of `asset` that an address can deposit.
+     * @dev Defaults to an unlimited amount for any address. But can
+     * be overridden by strategists.
+     *
+     * This function will be called before any deposit or mints to enforce
+     * any limits desired by the strategist. This can be used for either a
+     * traditional deposit limit or for implementing a whitelist etc.
+     *
+     *   EX:
+     *      if(isAllowed[_owner]) return super.availableDepositLimit(_owner);
+     *
+     * This does not need to take into account any conversion rates
+     * from shares to assets. But should know that any non max uint256
+     * amounts may be converted to shares. So it is recommended to keep
+     * custom amounts low enough as not to cause overflow when multiplied
+     * by `totalSupply`.
+     *
+     * @param . The address that is depositing into the strategy.
+     * @return . The available amount the `_owner` can deposit in terms of `asset`
+     */
+    function availableDepositLimit(address /*_owner*/) public view virtual returns (uint256) {
+        return type(uint256).max;
+    }
+
+    /**
+     * @notice Gets the max amount of `asset` that can be withdrawn.
+     * @dev Defaults to an unlimited amount for any address. But can
+     * be overridden by strategists.
+     *
+     * This function will be called before any withdraw or redeem to enforce
+     * any limits desired by the strategist. This can be used for illiquid
+     * or sandwichable strategies. It should never be lower than `totalIdle`.
+     *
+     *   EX:
+     *       return TokenIzedStrategy.totalIdle();
+     *
+     * This does not need to take into account the `_owner`'s share balance
+     * or conversion rates from shares to assets.
+     *
+     * @param . The address that is withdrawing from the strategy.
+     * @return . The available amount that can be withdrawn in terms of `asset`
+     */
+    function availableWithdrawLimit(address /*_owner*/) public view virtual returns (uint256) {
+        return type(uint256).max;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -198,78 +338,6 @@ abstract contract BaseStrategy {
     function _tend(uint256 _totalIdle) internal virtual {}
 
     /**
-     * @dev Optional trigger to override if tend() will be used by the strategy.
-     * This must be implemented if the strategy hopes to invoke _tend().
-     *
-     * @return . Should return true if tend() should be called by keeper or false if not.
-     */
-    function _tendTrigger() internal view virtual returns (bool) {
-        return false;
-    }
-
-    /**
-     * @notice Returns if tend() should be called by a keeper.
-     *
-     * @return . Should return true if tend() should be called by keeper or false if not.
-     * @return . Calldata for the tend call.
-     */
-    function tendTrigger() external view virtual returns (bool, bytes memory) {
-        return (
-            // Return the status of the tend trigger.
-            _tendTrigger(),
-            // And the needed calldata either way.
-            abi.encodeWithSelector(ITokenizedStrategy.tend.selector)
-        );
-    }
-
-    /**
-     * @notice Gets the max amount of `asset` that an address can deposit.
-     * @dev Defaults to an unlimited amount for any address. But can
-     * be overridden by strategists.
-     *
-     * This function will be called before any deposit or mints to enforce
-     * any limits desired by the strategist. This can be used for either a
-     * traditional deposit limit or for implementing a whitelist etc.
-     *
-     *   EX:
-     *      if(isAllowed[_owner]) return super.availableDepositLimit(_owner);
-     *
-     * This does not need to take into account any conversion rates
-     * from shares to assets. But should know that any non max uint256
-     * amounts may be converted to shares. So it is recommended to keep
-     * custom amounts low enough as not to cause overflow when multiplied
-     * by `totalSupply`.
-     *
-     * @param . The address that is depositing into the strategy.
-     * @return . The available amount the `_owner` can deposit in terms of `asset`
-     */
-    function availableDepositLimit(address /*_owner*/) public view virtual returns (uint256) {
-        return type(uint256).max;
-    }
-
-    /**
-     * @notice Gets the max amount of `asset` that can be withdrawn.
-     * @dev Defaults to an unlimited amount for any address. But can
-     * be overridden by strategists.
-     *
-     * This function will be called before any withdraw or redeem to enforce
-     * any limits desired by the strategist. This can be used for illiquid
-     * or sandwichable strategies. It should never be lower than `totalIdle`.
-     *
-     *   EX:
-     *       return TokenIzedStrategy.totalIdle();
-     *
-     * This does not need to take into account the `_owner`'s share balance
-     * or conversion rates from shares to assets.
-     *
-     * @param . The address that is withdrawing from the strategy.
-     * @return . The available amount that can be withdrawn in terms of `asset`
-     */
-    function availableWithdrawLimit(address /*_owner*/) public view virtual returns (uint256) {
-        return type(uint256).max;
-    }
-
-    /**
      * @dev Optional function for a strategist to override that will
      * allow management to manually withdraw deployed funds from the
      * yield source if a strategy is shutdown.
@@ -292,88 +360,20 @@ abstract contract BaseStrategy {
      */
     function _emergencyWithdraw(uint256 _amount) internal virtual {}
 
-    /*//////////////////////////////////////////////////////////////
-                        TokenizedStrategy HOOKS
-    //////////////////////////////////////////////////////////////*/
-
     /**
-     * @notice Can deploy up to '_amount' of 'asset' in yield source.
-     * @dev Callback for the TokenizedStrategy to call during a {deposit}
-     * or {mint} to tell the strategy it can deploy funds.
-     *
-     * Since this can only be called after a {deposit} or {mint}
-     * delegateCall to the TokenizedStrategy msg.sender == address(this).
-     *
-     * Unless a whitelist is implemented this will be entirely permissionless
-     * and thus can be sandwiched or otherwise manipulated.
-     *
-     * @param _amount The amount of 'asset' that the strategy can
-     * attempt to deposit in the yield source.
+     * @dev Require that the msg.sender is this address.
      */
-    function deployFunds(uint256 _amount) external virtual onlySelf {
-        _deployFunds(_amount);
+    function _onlySelf() internal view {
+        if (msg.sender != address(this)) revert BaseStrategy__NotSelf();
     }
 
     /**
-     * @notice Should attempt to free the '_amount' of 'asset'.
-     * @dev Callback for the TokenizedStrategy to call during a withdraw
-     * or redeem to free the needed funds to service the withdraw.
+     * @dev Optional trigger to override if tend() will be used by the strategy.
+     * This must be implemented if the strategy hopes to invoke _tend().
      *
-     * This can only be called after a 'withdraw' or 'redeem' delegateCall
-     * to the TokenizedStrategy so msg.sender == address(this).
-     *
-     * @param _amount The amount of 'asset' that the strategy should attempt to free up.
+     * @return . Should return true if tend() should be called by keeper or false if not.
      */
-    function freeFunds(uint256 _amount) external virtual onlySelf {
-        _freeFunds(_amount);
-    }
-
-    /**
-     * @notice Returns the accurate amount of all funds currently
-     * held by the Strategy.
-     * @dev Callback for the TokenizedStrategy to call during a report to
-     * get an accurate accounting of assets the strategy controls.
-     *
-     * This can only be called after a report() delegateCall to the
-     * TokenizedStrategy so msg.sender == address(this).
-     *
-     * @return . A trusted and accurate account for the total amount
-     * of 'asset' the strategy currently holds including idle funds.
-     */
-    function harvestAndReport() external virtual onlySelf returns (uint256) {
-        return _harvestAndReport();
-    }
-
-    /**
-     * @notice Will call the internal '_tend' when a keeper tends the strategy.
-     * @dev Callback for the TokenizedStrategy to initiate a _tend call in the strategy.
-     *
-     * This can only be called after a tend() delegateCall to the TokenizedStrategy
-     * so msg.sender == address(this).
-     *
-     * We name the function `tendThis` so that `tend` calls are forwarded to
-     * the TokenizedStrategy.
-     *
-     * @param _totalIdle The amount of current idle funds that can be
-     * deployed during the tend
-     */
-    function tendThis(uint256 _totalIdle) external virtual onlySelf {
-        _tend(_totalIdle);
-    }
-
-    /**
-     * @notice Will call the internal '_emergencyWithdraw' function.
-     * @dev Callback for the TokenizedStrategy during an emergency withdraw.
-     *
-     * This can only be called after a emergencyWithdraw() delegateCall to
-     * the TokenizedStrategy so msg.sender == address(this).
-     *
-     * We name the function `shutdownWithdraw` so that `emergencyWithdraw`
-     * calls are forwarded to the TokenizedStrategy.
-     *
-     * @param _amount The amount of asset to attempt to free.
-     */
-    function shutdownWithdraw(uint256 _amount) external virtual onlySelf {
-        _emergencyWithdraw(_amount);
+    function _tendTrigger() internal view virtual returns (bool) {
+        return false;
     }
 }
