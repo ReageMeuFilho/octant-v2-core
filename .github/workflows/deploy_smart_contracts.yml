@@ -1,7 +1,16 @@
 name: ▶️ Deploy Smart Contracts
 on:
   workflow_dispatch:
-
+    inputs:
+      bump-version:
+        description: 'Bump version'
+        type: choice
+        required: true
+        options:
+          - 'patch'
+          - 'minor'
+          - 'major'
+        default: 'patch'
 
 concurrency:
   group: "${{ github.ref }}-deploy-sc"
@@ -14,7 +23,7 @@ jobs:
   access-check:
     name: Check access-rights
     runs-on: general
-    if: github.ref == 'refs/heads/develop'
+    if: github.ref_name == 'develop' || github.ref_name == 'main'
     steps:
       - name: Check pre-requisites
         run: |
@@ -96,11 +105,18 @@ jobs:
           git config --local user.name "Housekeeper Bot"
           git config --local user.signingkey "${{ secrets.HOUSEKEEPER_GITHUB_SIGNING_KEY_ID }}"
 
-      - name: Publish
+      - name: Publish preRelease
+        if: github.ref_name == 'develop'
         env:
           GITHUB_TOKEN:  ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}
         run: |
-          echo "Deployed from ref ${{ github.ref }}"
-          echo "Deployed from ref_name ${{ github.ref_name }}"
-          echo "Deployed from base_ref ${{ github.base_ref }}"
-          yarn release --preRelease=develop --ci
+          yarn release ${{ inputs.bump-version }} --preRelease=develop --ci
+
+      - name: Publish release
+        if: github.ref_name == 'main'
+        env:
+          GITHUB_TOKEN:  ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}
+        run: |
+          yarn release ${{ inputs.bump-version }} --ci
