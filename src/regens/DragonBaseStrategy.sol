@@ -107,7 +107,7 @@ abstract contract DragonBaseStrategy {
      * and always be checked before any integration with the Strategy.
      */
     // NOTE: This is a placeholder address - should be updated for production use
-    address public constant TOKENIZED_STRATEGY_ADDRESS = 0x2e234DAe75C793f67A35089C9d99245E1C58470b;
+    address public constant TOKENIZED_STRATEGY_ADDRESS = 0x8cf7246a74704bBE59c9dF614ccB5e3d9717d8Ac;
 
     /*//////////////////////////////////////////////////////////////
                             IMMUTABLES

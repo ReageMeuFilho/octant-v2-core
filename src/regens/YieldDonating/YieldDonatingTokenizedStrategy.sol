@@ -13,8 +13,6 @@ import { IBaseStrategy } from "../interfaces/IBaseStrategy.sol";
  *      - Protecting against losses by burning shares from dragonRouter
  */
 contract YieldDonatingTokenizedStrategy is DragonTokenizedStrategy {
-    using Math for uint256;
-
     /**
      * @inheritdoc DragonTokenizedStrategy
      * @dev This implementation overrides the base report function to mint profit-derived shares to dragonRouter.
@@ -28,7 +26,7 @@ contract YieldDonatingTokenizedStrategy is DragonTokenizedStrategy {
         override(DragonTokenizedStrategy)
         nonReentrant
         onlyKeepers
-        returns (uint256 profit, uint256 loss)
+        returns (uint256 profit, uint256 loss) // TODO: check if this is of in the multistrategy vaults or if we need to pass it the fee amounts as zero anyway
     {
         // Cache storage pointer since its used repeatedly.
         StrategyData storage S = super._strategyStorage();
