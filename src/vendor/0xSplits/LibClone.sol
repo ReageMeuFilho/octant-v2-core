@@ -9,10 +9,10 @@ pragma solidity ^0.8.17;
 /// Enables us to accept hard gas-capped `sends` & `transfers` for maximum backwards
 /// composability.
 library LibClone {
-    error DeploymentFailed();
-
     uint256 private constant FREE_PTR = 0x40;
     uint256 private constant ZERO_PTR = 0x60;
+
+    error DeploymentFailed();
 
     /// @dev Deploys a modified minimal proxy of `implementation`
     function clone(address implementation) internal returns (address instance) {

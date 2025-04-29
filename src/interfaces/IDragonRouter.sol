@@ -133,14 +133,6 @@ interface IDragonRouter {
     function setCooldownPeriod(uint256 _cooldownPeriod) external;
 
     /**
-     * @notice Returns the balance of a user for a given strategy
-     * @param _user The address of the user
-     * @param _strategy The address of the strategy
-     * @return The balance of the user for the strategy
-     */
-    function balanceOf(address _user, address _strategy) external view returns (uint256);
-
-    /**
      * @dev Distributes new splits to all shareholders.
      * @param strategy The strategy address to fund from
      * @param amount The amount of tokens to distribute.
@@ -166,4 +158,12 @@ interface IDragonRouter {
      * @param _amount The amount of split to claim
      */
     function claimSplit(address _user, address _strategy, uint256 _amount) external;
+
+    /**
+     * @notice Returns the balance of a user for a given strategy
+     * @param _user The address of the user
+     * @param _strategy The address of the strategy
+     * @return The balance of the user for the strategy
+     */
+    function balanceOf(address _user, address _strategy) external view returns (uint256);
 }

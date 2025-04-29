@@ -68,22 +68,6 @@ contract ModuleProxyFactory is IModuleProxyFactory {
     }
 
     /* inheritdoc IModuleProxyFactory */
-    function createProxy(address target, bytes32 salt) internal returns (address payable result) {
-        _ensureNonzeroAddress(target);
-        // NOTE: Magic number https://github.com/thebor1337/solidity_sandbox/blob/f8a678f4cbabd22831e646830e299c75e75dd76f/contracts/Proxy/ERC1167/Proxy.huff#L4
-        bytes memory deployment = abi.encodePacked(
-            hex"602d8060093d393df3363d3d373d3d3d363d73",
-            target,
-            hex"5af43d82803e903d91602b57fd5bf3"
-        );
-        // solhint-disable-next-line no-inline-assembly
-        assembly {
-            result := create2(0, add(deployment, 0x20), mload(deployment), salt)
-        }
-        if (result == address(0)) revert TakenAddress(result);
-    }
-
-    /* inheritdoc IModuleProxyFactory */
     function deployModule(
         address masterCopy,
         bytes memory initializer,
@@ -153,6 +137,22 @@ contract ModuleProxyFactory is IModuleProxyFactory {
     ) public view returns (address) {
         bytes32 salt = keccak256(abi.encodePacked(keccak256(initializer), saltNonce));
         return calculateProxyAddress(masterCopy, salt);
+    }
+
+    /* inheritdoc IModuleProxyFactory */
+    function createProxy(address target, bytes32 salt) internal returns (address payable result) {
+        _ensureNonzeroAddress(target);
+        // NOTE: Magic number https://github.com/thebor1337/solidity_sandbox/blob/f8a678f4cbabd22831e646830e299c75e75dd76f/contracts/Proxy/ERC1167/Proxy.huff#L4
+        bytes memory deployment = abi.encodePacked(
+            hex"602d8060093d393df3363d3d373d3d3d363d73",
+            target,
+            hex"5af43d82803e903d91602b57fd5bf3"
+        );
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            result := create2(0, add(deployment, 0x20), mload(deployment), salt)
+        }
+        if (result == address(0)) revert TakenAddress(result);
     }
 
     /*

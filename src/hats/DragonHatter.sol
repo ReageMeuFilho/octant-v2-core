@@ -113,26 +113,6 @@ contract DragonHatter is AbstractHatsManager {
     }
 
     /**
-     * @notice Custom eligibility checks for each role
-     * @dev These can be extended with additional logic as needed
-     */
-    function _isEligibleKeeper(address) internal pure returns (bool) {
-        return true; // Base implementation - extend as needed
-    }
-
-    function _isEligibleManager(address) internal pure returns (bool) {
-        return true; // Base implementation - extend as needed
-    }
-
-    function _isEligibleEmergencyResponder(address) internal pure returns (bool) {
-        return true; // Base implementation - extend as needed
-    }
-
-    function _isEligibleRegenGovernance(address) internal pure returns (bool) {
-        return true; // Base implementation - extend as needed
-    }
-
-    /**
      * @notice Get the hat ID for a specific role
      * @param roleId The role identifier
      * @return hatId The corresponding hat ID
@@ -150,5 +130,25 @@ contract DragonHatter is AbstractHatsManager {
     function hasRole(address account, bytes32 roleId) external view returns (bool) {
         uint256 hatId = roleHats[roleId];
         return hatId != 0 && HATS.isWearerOfHat(account, hatId);
+    }
+
+    /**
+     * @notice Custom eligibility checks for each role
+     * @dev These can be extended with additional logic as needed
+     */
+    function _isEligibleKeeper(address) internal pure returns (bool) {
+        return true; // Base implementation - extend as needed
+    }
+
+    function _isEligibleManager(address) internal pure returns (bool) {
+        return true; // Base implementation - extend as needed
+    }
+
+    function _isEligibleEmergencyResponder(address) internal pure returns (bool) {
+        return true; // Base implementation - extend as needed
+    }
+
+    function _isEligibleRegenGovernance(address) internal pure returns (bool) {
+        return true; // Base implementation - extend as needed
     }
 }
