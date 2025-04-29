@@ -97,6 +97,8 @@ jobs:
           git config --local user.signingkey "${{ secrets.HOUSEKEEPER_GITHUB_SIGNING_KEY_ID }}"
 
       - name: Publish
+        env:
+          GITHUB_TOKEN:  ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Deployed from ref ${{ github.ref }}"
           echo "Deployed from ref_name ${{ github.ref_name }}"
