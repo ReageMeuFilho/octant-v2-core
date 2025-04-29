@@ -7,10 +7,11 @@ on:
         type: choice
         required: true
         options:
+          - ''
           - 'patch'
           - 'minor'
           - 'major'
-        default: 'patch'
+        default: ''
 
 concurrency:
   group: "${{ github.ref }}-deploy-sc"
