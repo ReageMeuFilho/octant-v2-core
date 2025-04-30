@@ -1,6 +1,6 @@
 {
   "name": "@golemfoundation/octant-v2-core",
-  "version": "0.1.1",
+  "version": "0.2.4-0",
   "description": "",
   "packageManager": "yarn@4.9.1+sha512.f95ce356460e05be48d66401c1ae64ef84d163dd689964962c6888a9810865e39097a5e9de748876c2e0bf89b232d583c33982773e9903ae7a76257270986538",
   "repository": {
@@ -20,7 +20,10 @@
     "src",
     "script",
     "lib",
-    "test"
+    "test",
+    "remappings.txt",
+    "foundry.toml",
+    "kontrol.toml"
   ],
   "scripts": {
     "format": "prettier --config .prettierrc --plugin=prettier-plugin-solidity '{script,src,test,verification}/**/*.sol' -w",
@@ -55,7 +58,7 @@
   "devDependencies": {
     "@commitlint/cli": "^19.8.0",
     "@commitlint/config-conventional": "^19.8.0",
-    "@release-it/conventional-changelog": "^10.0.0",
+    "@release-it/conventional-changelog": "^8.0.2",
     "husky": "^9.1.7",
     "lint-staged": "^15.5.1",
     "prettier": "^3.5.3",
