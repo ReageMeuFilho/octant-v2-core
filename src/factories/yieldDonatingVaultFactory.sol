@@ -34,7 +34,7 @@ contract YieldDonatingVaultFactory {
      */
     mapping(address => StrategyInfo[]) public strategies;
 
-    event UsdsStrategyDeploy(address deployer, address donationAddress, address strategyAddress);
+    event UsdsStrategyDeploy(address deployer, address donationAddress, address strategyAddress, string vaultTokenName);
 
     address usdsRewardAddress = 0x0650CAF159C5A49f711e8169D4336ECB9b950275;
 
@@ -65,7 +65,7 @@ contract YieldDonatingVaultFactory {
         );
 
         strategyAddress = CREATE3.deployDeterministic(bytecode, _salt);
-        emit UsdsStrategyDeploy(msg.sender, _donationAddress, strategyAddress);
+        emit UsdsStrategyDeploy(msg.sender, _donationAddress, strategyAddress, _name);
         StrategyInfo memory strategyInfo = StrategyInfo({
             deployerAddress: msg.sender,
             timestamp: block.timestamp,
@@ -75,4 +75,3 @@ contract YieldDonatingVaultFactory {
         strategies[msg.sender].push(strategyInfo);
     }
 }
-
