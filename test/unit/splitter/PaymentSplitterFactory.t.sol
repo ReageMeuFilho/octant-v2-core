@@ -42,6 +42,11 @@ contract PaymentSplitterFactoryTest is Test {
         payees[1] = bob;
         payees[2] = charlie;
 
+        string[] memory payeeNames = new string[](3);
+        payeeNames[0] = "GrantRoundOperator";
+        payeeNames[1] = "ESF";
+        payeeNames[2] = "OpEx";
+
         uint256[] memory shares = new uint256[](3);
         shares[0] = 50;
         shares[1] = 30;
@@ -49,7 +54,7 @@ contract PaymentSplitterFactoryTest is Test {
 
         // Create PaymentSplitter and capture events
         vm.recordLogs();
-        address splitterAddress = factory.createPaymentSplitter(payees, shares);
+        address splitterAddress = factory.createPaymentSplitter(payees, payeeNames, shares);
 
         // Verify splitter was created
         assertTrue(splitterAddress != address(0));
@@ -76,6 +81,11 @@ contract PaymentSplitterFactoryTest is Test {
         payees[1] = bob;
         payees[2] = charlie;
 
+        string[] memory payeeNames = new string[](3);
+        payeeNames[0] = "GrantRoundOperator";
+        payeeNames[1] = "ESF";
+        payeeNames[2] = "OpEx";
+
         uint256[] memory shares = new uint256[](3);
         shares[0] = 50;
         shares[1] = 30;
@@ -85,7 +95,7 @@ contract PaymentSplitterFactoryTest is Test {
 
         // Create PaymentSplitter and capture events
         vm.recordLogs();
-        address splitterAddress = factory.createPaymentSplitterWithETH{ value: ethAmount }(payees, shares);
+        address splitterAddress = factory.createPaymentSplitterWithETH{ value: ethAmount }(payees, payeeNames, shares);
 
         // Verify splitter was created
         assertTrue(splitterAddress != address(0));
@@ -122,6 +132,11 @@ contract PaymentSplitterFactoryTest is Test {
         payees[1] = bob;
         payees[2] = charlie;
 
+        string[] memory payeeNames = new string[](3);
+        payeeNames[0] = "GrantRoundOperator";
+        payeeNames[1] = "ESF";
+        payeeNames[2] = "OpEx";
+
         uint256[] memory shares = new uint256[](3);
         shares[0] = 50;
         shares[1] = 30;
@@ -130,7 +145,7 @@ contract PaymentSplitterFactoryTest is Test {
         uint256 ethAmount = 10 ether;
 
         // Create PaymentSplitter with ETH
-        address splitterAddress = factory.createPaymentSplitterWithETH{ value: ethAmount }(payees, shares);
+        address splitterAddress = factory.createPaymentSplitterWithETH{ value: ethAmount }(payees, payeeNames, shares);
         PaymentSplitter splitter = PaymentSplitter(payable(splitterAddress));
 
         // Release to Alice
@@ -153,13 +168,18 @@ contract PaymentSplitterFactoryTest is Test {
         payees[1] = bob;
         payees[2] = charlie;
 
+        string[] memory payeeNames = new string[](3);
+        payeeNames[0] = "GrantRoundOperator";
+        payeeNames[1] = "ESF";
+        payeeNames[2] = "OpEx";
+
         uint256[] memory shares = new uint256[](3);
         shares[0] = 50;
         shares[1] = 30;
         shares[2] = 20;
 
         // Create PaymentSplitter
-        address splitterAddress = factory.createPaymentSplitter(payees, shares);
+        address splitterAddress = factory.createPaymentSplitter(payees, payeeNames, shares);
         PaymentSplitter splitter = PaymentSplitter(payable(splitterAddress));
 
         // Send tokens to the splitter
@@ -189,16 +209,21 @@ contract PaymentSplitterFactoryTest is Test {
     function testInvalidInputToFactory() public {
         // Prepare invalid payees (empty array)
         address[] memory emptyPayees = new address[](0);
+        string[] memory emptyNames = new string[](0);
         uint256[] memory emptyShares = new uint256[](0);
 
         // Expect revert
         vm.expectRevert("PaymentSplitter: no payees");
-        factory.createPaymentSplitter(emptyPayees, emptyShares);
+        factory.createPaymentSplitter(emptyPayees, emptyNames, emptyShares);
 
         // Prepare invalid payees (mismatched arrays)
         address[] memory payees = new address[](2);
         payees[0] = alice;
         payees[1] = bob;
+
+        string[] memory payeeNames = new string[](2);
+        payeeNames[0] = "GrantRoundOperator";
+        payeeNames[1] = "ESF";
 
         uint256[] memory shares = new uint256[](3);
         shares[0] = 50;
@@ -207,7 +232,7 @@ contract PaymentSplitterFactoryTest is Test {
 
         // Expect revert
         vm.expectRevert("PaymentSplitter: payees and shares length mismatch");
-        factory.createPaymentSplitter(payees, shares);
+        factory.createPaymentSplitter(payees, payeeNames, shares);
     }
 
     // Test edge cases
@@ -216,11 +241,14 @@ contract PaymentSplitterFactoryTest is Test {
         address[] memory singlePayee = new address[](1);
         singlePayee[0] = alice;
 
+        string[] memory singleName = new string[](1);
+        singleName[0] = "GrantRoundOperator";
+
         uint256[] memory singleShare = new uint256[](1);
         singleShare[0] = 100;
 
         // Create PaymentSplitter with a single payee
-        address splitterAddress = factory.createPaymentSplitter(singlePayee, singleShare);
+        address splitterAddress = factory.createPaymentSplitter(singlePayee, singleName, singleShare);
         PaymentSplitter splitter = PaymentSplitter(payable(splitterAddress));
 
         // Verify splitter state
@@ -230,16 +258,18 @@ contract PaymentSplitterFactoryTest is Test {
 
         // Many payees case (testing with 10)
         address[] memory manyPayees = new address[](10);
+        string[] memory manyNames = new string[](10);
         uint256[] memory manyShares = new uint256[](10);
 
         for (uint256 i = 0; i < 10; i++) {
             // Create unique addresses
             manyPayees[i] = address(uint160(0x100 + i));
+            manyNames[i] = string(abi.encodePacked("Payee", i));
             manyShares[i] = 10; // Equal shares
         }
 
         // Create PaymentSplitter with many payees
-        address manySplitterAddress = factory.createPaymentSplitter(manyPayees, manyShares);
+        address manySplitterAddress = factory.createPaymentSplitter(manyPayees, manyNames, manyShares);
         PaymentSplitter manySplitter = PaymentSplitter(payable(manySplitterAddress));
 
         // Verify splitter state

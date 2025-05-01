@@ -45,13 +45,18 @@ contract PaymentSplitterFactoryTest is Test {
         payees[1] = bob;
         payees[2] = charlie;
 
+        string[] memory payeeNames = new string[](3);
+        payeeNames[0] = "Alice";
+        payeeNames[1] = "Bob";
+        payeeNames[2] = "Charlie";
+
         uint256[] memory shares = new uint256[](3);
         shares[0] = 50;
         shares[1] = 30;
         shares[2] = 20;
 
         // Create PaymentSplitter
-        address splitterAddress = factory.createPaymentSplitter(payees, shares);
+        address splitterAddress = factory.createPaymentSplitter(payees, payeeNames, shares);
         PaymentSplitter splitter = PaymentSplitter(payable(splitterAddress));
 
         // Send ETH to the splitter
@@ -91,6 +96,11 @@ contract PaymentSplitterFactoryTest is Test {
         payees[1] = bob;
         payees[2] = charlie;
 
+        string[] memory payeeNames = new string[](3);
+        payeeNames[0] = "Alice";
+        payeeNames[1] = "Bob";
+        payeeNames[2] = "Charlie";
+
         uint256[] memory shares = new uint256[](3);
         shares[0] = 50;
         shares[1] = 30;
@@ -104,7 +114,7 @@ contract PaymentSplitterFactoryTest is Test {
         uint256 charlieBalanceBefore = charlie.balance;
 
         // Create PaymentSplitter with ETH
-        address splitterAddress = factory.createPaymentSplitterWithETH{ value: ethAmount }(payees, shares);
+        address splitterAddress = factory.createPaymentSplitterWithETH{ value: ethAmount }(payees, payeeNames, shares);
         PaymentSplitter splitter = PaymentSplitter(payable(splitterAddress));
 
         // Release payments immediately
@@ -130,11 +140,15 @@ contract PaymentSplitterFactoryTest is Test {
         twoPayees[0] = alice;
         twoPayees[1] = bob;
 
+        string[] memory twoPayeeNames = new string[](2);
+        twoPayeeNames[0] = "Alice";
+        twoPayeeNames[1] = "Bob";
+
         uint256[] memory twoShares = new uint256[](2);
         twoShares[0] = 50;
         twoShares[1] = 50;
 
-        address splitter1Address = factory.createPaymentSplitter(twoPayees, twoShares);
+        address splitter1Address = factory.createPaymentSplitter(twoPayees, twoPayeeNames, twoShares);
 
         // Second splitter - complex split with treasury
         address[] memory fourPayees = new address[](4);
@@ -143,13 +157,19 @@ contract PaymentSplitterFactoryTest is Test {
         fourPayees[2] = charlie;
         fourPayees[3] = treasury;
 
+        string[] memory fourPayeeNames = new string[](4);
+        fourPayeeNames[0] = "Alice";
+        fourPayeeNames[1] = "Bob";
+        fourPayeeNames[2] = "Charlie";
+        fourPayeeNames[3] = "Treasury";
+
         uint256[] memory fourShares = new uint256[](4);
         fourShares[0] = 30;
         fourShares[1] = 25;
         fourShares[2] = 15;
         fourShares[3] = 30; // Treasury gets 30%
 
-        address splitter2Address = factory.createPaymentSplitter(fourPayees, fourShares);
+        address splitter2Address = factory.createPaymentSplitter(fourPayees, fourPayeeNames, fourShares);
 
         // Verify both splitters were created with correct configuration
         PaymentSplitter splitter1 = PaymentSplitter(payable(splitter1Address));
@@ -196,13 +216,18 @@ contract PaymentSplitterFactoryTest is Test {
         payees[1] = bob;
         payees[2] = charlie;
 
+        string[] memory payeeNames = new string[](3);
+        payeeNames[0] = "Alice";
+        payeeNames[1] = "Bob";
+        payeeNames[2] = "Charlie";
+
         uint256[] memory shares = new uint256[](3);
         shares[0] = 50;
         shares[1] = 30;
         shares[2] = 20;
 
         // Create PaymentSplitter
-        address splitterAddress = factory.createPaymentSplitter(payees, shares);
+        address splitterAddress = factory.createPaymentSplitter(payees, payeeNames, shares);
         PaymentSplitter splitter = PaymentSplitter(payable(splitterAddress));
 
         // Send both ETH and tokens to the splitter
@@ -239,13 +264,18 @@ contract PaymentSplitterFactoryTest is Test {
         payees[1] = bob;
         payees[2] = charlie;
 
+        string[] memory payeeNames = new string[](3);
+        payeeNames[0] = "Alice";
+        payeeNames[1] = "Bob";
+        payeeNames[2] = "Charlie";
+
         uint256[] memory shares = new uint256[](3);
         shares[0] = 50;
         shares[1] = 30;
         shares[2] = 20;
 
         // Create PaymentSplitter
-        address splitterAddress = factory.createPaymentSplitterWithETH{ value: 5 ether }(payees, shares);
+        address splitterAddress = factory.createPaymentSplitterWithETH{ value: 5 ether }(payees, payeeNames, shares);
         PaymentSplitter splitter = PaymentSplitter(payable(splitterAddress));
 
         // First round: Alice claims her share from the initial funding
@@ -296,6 +326,12 @@ contract PaymentSplitterFactoryTest is Test {
         revenueRecipients[2] = charlie; // CFO
         revenueRecipients[3] = treasury; // Company reserve
 
+        string[] memory revenuePayeeNames = new string[](4);
+        revenuePayeeNames[0] = "CEO";
+        revenuePayeeNames[1] = "CTO";
+        revenuePayeeNames[2] = "CFO";
+        revenuePayeeNames[3] = "CompanyReserve";
+
         uint256[] memory revenueShares = new uint256[](4);
         revenueShares[0] = 25; // 25% to CEO
         revenueShares[1] = 15; // 15% to CTO
@@ -303,7 +339,7 @@ contract PaymentSplitterFactoryTest is Test {
         revenueShares[3] = 50; // 50% to company reserve
 
         // 2. Deploy the splitter using the factory
-        address revenueSplitter = factory.createPaymentSplitter(revenueRecipients, revenueShares);
+        address revenueSplitter = factory.createPaymentSplitter(revenueRecipients, revenuePayeeNames, revenueShares);
 
         // 3. Business receives payment (simulated by sending ETH)
         uint256 businessRevenue = 100 ether;
@@ -348,13 +384,18 @@ contract PaymentSplitterFactoryTest is Test {
         payees[1] = bob;
         payees[2] = charlie;
 
+        string[] memory payeeNames = new string[](3);
+        payeeNames[0] = "Alice";
+        payeeNames[1] = "Bob";
+        payeeNames[2] = "Charlie";
+
         uint256[] memory shares = new uint256[](3);
         shares[0] = 50;
         shares[1] = 30;
         shares[2] = 20;
 
         // Create a valid splitter
-        address splitterAddress = factory.createPaymentSplitter(payees, shares);
+        address splitterAddress = factory.createPaymentSplitter(payees, payeeNames, shares);
         PaymentSplitter splitter = PaymentSplitter(payable(splitterAddress));
 
         // Scenario: Try to release funds when there are none
