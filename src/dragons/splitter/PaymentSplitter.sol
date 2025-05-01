@@ -1,3 +1,4 @@
+/* solhint-disable gas-custom-errors*/
 // SPDX-License-Identifier: MIT
 // OpenZeppelin Contracts (last updated v4.8.0) (finance/PaymentSplitter.sol)
 

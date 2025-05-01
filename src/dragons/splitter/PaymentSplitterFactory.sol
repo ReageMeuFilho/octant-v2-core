@@ -1,3 +1,4 @@
+/* solhint-disable gas-custom-errors*/
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
@@ -41,7 +42,7 @@ contract PaymentSplitterFactory {
         string[] memory payeeNames,
         uint256[] memory shares
     ) external returns (address) {
-        require(payees.length == payeeNames.length, "PaymentSplitterFactory: payees and payeeNames length mismatch");
+        require(payees.length == payeeNames.length, "PaymentSplitterFactory: length mismatch");
 
         // Create a new PaymentSplitter with the provided arguments
         PaymentSplitter paymentSplitter = new PaymentSplitter(payees, shares);
@@ -67,7 +68,7 @@ contract PaymentSplitterFactory {
         string[] memory payeeNames,
         uint256[] memory shares
     ) external payable returns (address) {
-        require(payees.length == payeeNames.length, "PaymentSplitterFactory: payees and payeeNames length mismatch");
+        require(payees.length == payeeNames.length, "PaymentSplitterFactory: length mismatch");
 
         // Create a new PaymentSplitter with the provided arguments
         PaymentSplitter paymentSplitter = new PaymentSplitter{ value: msg.value }(payees, shares);
