@@ -7,6 +7,7 @@ pragma solidity ^0.8.25;
 import { SafeERC20, IERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Address } from "@openzeppelin/contracts/utils/Address.sol";
 import { Context } from "@openzeppelin/contracts/utils/Context.sol";
+import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
 /**
  * @title PaymentSplitter
@@ -26,7 +27,7 @@ import { Context } from "@openzeppelin/contracts/utils/Context.sol";
  * tokens that apply fees during transfers, are likely to not be supported as expected. If in doubt, we encourage you
  * to run tests before sending real value to this contract.
  */
-contract PaymentSplitter is Context {
+contract PaymentSplitter is Initializable, Context {
     event PayeeAdded(address account, uint256 shares);
     event PaymentReleased(address to, uint256 amount);
     event ERC20PaymentReleased(IERC20 indexed token, address to, uint256 amount);
@@ -49,13 +50,8 @@ contract PaymentSplitter is Context {
      * All addresses in `payees` must be non-zero. Both arrays must have the same non-zero length, and there must be no
      * duplicates in `payees`.
      */
-    constructor(address[] memory payees, uint256[] memory shares_) payable {
-        require(payees.length == shares_.length, "PaymentSplitter: payees and shares length mismatch");
-        require(payees.length > 0, "PaymentSplitter: no payees");
-
-        for (uint256 i = 0; i < payees.length; i++) {
-            _addPayee(payees[i], shares_[i]);
-        }
+    constructor() payable {
+        _disableInitializers();
     }
 
     /**
@@ -69,6 +65,15 @@ contract PaymentSplitter is Context {
      */
     receive() external payable virtual {
         emit PaymentReceived(_msgSender(), msg.value);
+    }
+
+    function initialize(address[] memory payees, uint256[] memory shares_) public payable initializer {
+        require(payees.length == shares_.length, "PaymentSplitter: payees and shares length mismatch");
+        require(payees.length > 0, "PaymentSplitter: no payees");
+
+        for (uint256 i = 0; i < payees.length; i++) {
+            _addPayee(payees[i], shares_[i]);
+        }
     }
 
     /**
