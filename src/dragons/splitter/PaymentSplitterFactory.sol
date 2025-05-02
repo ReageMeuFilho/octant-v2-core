@@ -3,14 +3,18 @@
 pragma solidity ^0.8.25;
 
 import { PaymentSplitter } from "./PaymentSplitter.sol";
+import { Clones } from "@openzeppelin/contracts/proxy/Clones.sol";
 
 /**
  * @title PaymentSplitterFactory
- * @dev Factory contract to deploy new PaymentSplitter instances
- * This factory allows for the creation of new PaymentSplitter contracts with specified
- * payees and shares. It uses the CREATE opcode to deploy new instances.
+ * @dev Factory contract to deploy new PaymentSplitter instances as minimal proxies (ERC-1167)
+ * This factory allows for the creation of new PaymentSplitter proxies with specified
+ * payees and shares. It uses the Clones library to deploy minimal proxies.
  */
 contract PaymentSplitterFactory {
+    // Address of the implementation contract
+    address public immutable implementation;
+
     // Struct to store payment splitter information
     struct SplitterInfo {
         address splitterAddress;
@@ -31,6 +35,14 @@ contract PaymentSplitterFactory {
     );
 
     /**
+     * @dev Constructor deploys an implementation contract to be used as the base for all proxies
+     */
+    constructor() {
+        // Deploy the implementation contract
+        implementation = address(new PaymentSplitter());
+    }
+
+    /**
      * @dev Creates a new PaymentSplitter instance with the specified payees and shares
      * @param payees The addresses of the payees to receive payments
      * @param payeeNames Names for each payee (e.g., "GrantRoundOperator", "ESF", "OpEx")
@@ -42,18 +54,27 @@ contract PaymentSplitterFactory {
         string[] memory payeeNames,
         uint256[] memory shares
     ) external returns (address) {
-        require(payees.length == payeeNames.length, "PaymentSplitterFactory: length mismatch");
+        require(
+            payees.length == payeeNames.length && payees.length == shares.length,
+            "PaymentSplitterFactory: length mismatch"
+        );
 
-        // Create a new PaymentSplitter with the provided arguments
-        PaymentSplitter paymentSplitter = new PaymentSplitter(payees, shares);
+        // Create a minimal proxy
+        address paymentSplitter = Clones.clone(implementation);
+
+        // Initialize the proxy
+        bytes memory initData = abi.encodeWithSelector(PaymentSplitter.initialize.selector, payees, shares);
+
+        (bool success, ) = paymentSplitter.call(initData);
+        require(success, "PaymentSplitterFactory: initialization failed");
 
         // Store the deployed splitter info
-        deployerToSplitters[msg.sender].push(SplitterInfo(address(paymentSplitter), payees, payeeNames));
+        deployerToSplitters[msg.sender].push(SplitterInfo(paymentSplitter, payees, payeeNames));
 
         // Emit event for tracking
-        emit PaymentSplitterCreated(msg.sender, address(paymentSplitter), payees, payeeNames, shares);
+        emit PaymentSplitterCreated(msg.sender, paymentSplitter, payees, payeeNames, shares);
 
-        return address(paymentSplitter);
+        return paymentSplitter;
     }
 
     /**
@@ -70,16 +91,22 @@ contract PaymentSplitterFactory {
     ) external payable returns (address) {
         require(payees.length == payeeNames.length, "PaymentSplitterFactory: length mismatch");
 
-        // Create a new PaymentSplitter with the provided arguments
-        PaymentSplitter paymentSplitter = new PaymentSplitter{ value: msg.value }(payees, shares);
+        // Create a minimal proxy
+        address paymentSplitter = Clones.clone(implementation);
+
+        // Initialize the proxy with value
+        bytes memory initData = abi.encodeWithSelector(PaymentSplitter.initialize.selector, payees, shares);
+
+        (bool success, ) = paymentSplitter.call{ value: msg.value }(initData);
+        require(success, "PaymentSplitterFactory: initialization failed");
 
         // Store the deployed splitter info
-        deployerToSplitters[msg.sender].push(SplitterInfo(address(paymentSplitter), payees, payeeNames));
+        deployerToSplitters[msg.sender].push(SplitterInfo(paymentSplitter, payees, payeeNames));
 
         // Emit event for tracking
-        emit PaymentSplitterCreated(msg.sender, address(paymentSplitter), payees, payeeNames, shares);
+        emit PaymentSplitterCreated(msg.sender, paymentSplitter, payees, payeeNames, shares);
 
-        return address(paymentSplitter);
+        return paymentSplitter;
     }
 
     /**
