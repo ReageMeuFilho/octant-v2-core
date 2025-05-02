@@ -3,6 +3,7 @@ pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
 import { PaymentSplitter } from "src/dragons/splitter/PaymentSplitter.sol";
+import { PaymentSplitterFactory } from "src/dragons/splitter/PaymentSplitterFactory.sol";
 import { ERC20, IERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { MockERC20 } from "../../mocks/MockERC20.sol";
 
@@ -10,7 +11,7 @@ contract PaymentSplitterTest is Test {
     PaymentSplitter public splitter;
     MockERC20 public token;
 
-    address payable[] public payees;
+    address[] public payees;
     uint256[] public shares;
 
     // Test accounts
@@ -28,6 +29,12 @@ contract PaymentSplitterTest is Test {
         vm.deal(bob, INITIAL_ETH_AMOUNT);
         vm.deal(charlie, INITIAL_ETH_AMOUNT);
 
+        // Create payee names
+        string[] memory payeeNames = new string[](3);
+        payeeNames[0] = "GrantRoundOperator";
+        payeeNames[1] = "ESF";
+        payeeNames[2] = "OpEx";
+
         // Create payees and shares arrays
         payees = new address payable[](3);
         payees[0] = alice;
@@ -43,8 +50,11 @@ contract PaymentSplitterTest is Test {
         token = new MockERC20();
         token.mint(address(this), INITIAL_TOKEN_AMOUNT);
 
+        // payment splitter factory
+        PaymentSplitterFactory splitterFactory = new PaymentSplitterFactory();
+
         // Deploy PaymentSplitter
-        splitter = new PaymentSplitter(_convertToAddressArray(payees), shares);
+        splitter = PaymentSplitter(payable(splitterFactory.createPaymentSplitter(payees, payeeNames, shares)));
     }
 
     function _convertToAddressArray(address payable[] memory _payees) internal pure returns (address[] memory) {
@@ -66,45 +76,73 @@ contract PaymentSplitterTest is Test {
         assertEq(splitter.shares(charlie), 20);
     }
 
-    // Test constructor validation
-    function testConstructorValidation() public {
-        // Test unequal arrays
+    // Test initialization validation
+    function testInitializeValidation() public {
+        // Create a new factory for testing
+        PaymentSplitterFactory factory = new PaymentSplitterFactory();
+
+        // Test unequal arrays (payees and shares)
         address[] memory _payees = new address[](2);
         _payees[0] = alice;
         _payees[1] = bob;
+
+        string[] memory _payeeNames = new string[](2);
+        _payeeNames[0] = "Alice";
+        _payeeNames[1] = "Bob";
 
         uint256[] memory _shares = new uint256[](3);
         _shares[0] = 50;
         _shares[1] = 30;
         _shares[2] = 20;
 
-        vm.expectRevert("PaymentSplitter: payees and shares length mismatch");
-        new PaymentSplitter(_payees, _shares);
+        vm.expectRevert("PaymentSplitterFactory: length mismatch");
+        factory.createPaymentSplitter(_payees, _payeeNames, _shares);
 
         // Test empty arrays
         address[] memory emptyPayees = new address[](0);
+        string[] memory emptyNames = new string[](0);
         uint256[] memory emptyShares = new uint256[](0);
 
-        vm.expectRevert("PaymentSplitter: no payees");
-        new PaymentSplitter(emptyPayees, emptyShares);
+        vm.expectRevert("PaymentSplitterFactory: initialization failed");
+        factory.createPaymentSplitter(emptyPayees, emptyNames, emptyShares);
 
-        // Test zero address
+        // Test zero address payee
         address[] memory zeroAddressPayees = new address[](3);
         zeroAddressPayees[0] = alice;
         zeroAddressPayees[1] = address(0);
         zeroAddressPayees[2] = charlie;
 
-        vm.expectRevert("PaymentSplitter: account is the zero address");
-        new PaymentSplitter(zeroAddressPayees, shares);
+        string[] memory zeroAddressNames = new string[](3);
+        zeroAddressNames[0] = "Alice";
+        zeroAddressNames[1] = "Zero";
+        zeroAddressNames[2] = "Charlie";
+
+        uint256[] memory validShares = new uint256[](3);
+        validShares[0] = 50;
+        validShares[1] = 30;
+        validShares[2] = 20;
+
+        vm.expectRevert("PaymentSplitterFactory: initialization failed");
+        factory.createPaymentSplitter(zeroAddressPayees, zeroAddressNames, validShares);
 
         // Test zero shares
+        address[] memory validPayees = new address[](3);
+        validPayees[0] = alice;
+        validPayees[1] = bob;
+        validPayees[2] = charlie;
+
+        string[] memory validNames = new string[](3);
+        validNames[0] = "Alice";
+        validNames[1] = "Bob";
+        validNames[2] = "Charlie";
+
         uint256[] memory zeroShares = new uint256[](3);
         zeroShares[0] = 50;
         zeroShares[1] = 0;
         zeroShares[2] = 20;
 
-        vm.expectRevert("PaymentSplitter: shares are 0");
-        new PaymentSplitter(_convertToAddressArray(payees), zeroShares);
+        vm.expectRevert("PaymentSplitterFactory: initialization failed");
+        factory.createPaymentSplitter(validPayees, validNames, zeroShares);
 
         // Test duplicate payees
         address[] memory duplicatePayees = new address[](3);
@@ -112,8 +150,8 @@ contract PaymentSplitterTest is Test {
         duplicatePayees[1] = alice; // Duplicate
         duplicatePayees[2] = charlie;
 
-        vm.expectRevert("PaymentSplitter: account already has shares");
-        new PaymentSplitter(duplicatePayees, shares);
+        vm.expectRevert("PaymentSplitterFactory: initialization failed");
+        factory.createPaymentSplitter(duplicatePayees, validNames, validShares);
     }
 
     // Test receiving ETH

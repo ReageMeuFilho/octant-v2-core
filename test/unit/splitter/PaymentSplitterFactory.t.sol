@@ -213,7 +213,7 @@ contract PaymentSplitterFactoryTest is Test {
         uint256[] memory emptyShares = new uint256[](0);
 
         // Expect revert
-        vm.expectRevert("PaymentSplitter: no payees");
+        vm.expectRevert("PaymentSplitterFactory: initialization failed");
         factory.createPaymentSplitter(emptyPayees, emptyNames, emptyShares);
 
         // Prepare invalid payees (mismatched arrays)
@@ -231,7 +231,7 @@ contract PaymentSplitterFactoryTest is Test {
         shares[2] = 20;
 
         // Expect revert
-        vm.expectRevert("PaymentSplitter: payees and shares length mismatch");
+        vm.expectRevert("PaymentSplitterFactory: length mismatch");
         factory.createPaymentSplitter(payees, payeeNames, shares);
     }
 
