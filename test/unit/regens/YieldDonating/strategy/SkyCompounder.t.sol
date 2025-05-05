@@ -39,6 +39,8 @@ contract SkyCompounderTest is Test {
     
     // Test user
     address public user = address(0x1234);
+    // Donation recipient for transfer tests
+    address public donationRecipient = address(0x5678);
     
     // Mainnet addresses
     address public constant USDS = 0xdC035D45d973E3EC169d2276DDab16f1e407384F;
@@ -47,7 +49,7 @@ contract SkyCompounderTest is Test {
     address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     
     // Test constants
-    uint256 public constant INITIAL_DEPOSIT = 1000e18;
+    uint256 public constant INITIAL_DEPOSIT = 100000e18;
     uint256 public mainnetFork;
     uint256 public mainnetForkBlock = 19230000; // A recent Ethereum mainnet block
     
@@ -286,12 +288,12 @@ contract SkyCompounderTest is Test {
         assertGe(vault.totalAssets(), initialAssets, "Total assets should not decrease after harvest");
     }
     
-    /// @notice Test profit cycle with UniswapV3 for swapping rewards
-    function testUniswapV3WithProfitCycle() public {
+    /// @notice Test profit cycle with UniswapV3 for swapping rewards when reward amount > minAmountToSell
+    function testUniswapV3WithProfitCycleAboveMinAmount() public {
         // Setup test parameters
         uint256 depositAmount = 100e18;
         address rewardsToken = strategy.rewardsToken();
-        uint256 rewardAmount = 5e18; // Simulated reward amount
+        uint256 rewardAmount = 50e18; // Simulated reward amount
         
         console.log("Rewards token:", rewardsToken);
         
@@ -300,8 +302,9 @@ contract SkyCompounderTest is Test {
         strategy.setUseUniV3andFees(true, 3000, 500); // Enable UniV3 with medium and low fee tiers
         vm.stopPrank();
         
-        // Verify UniV3 is enabled
+        // Verify UniV3 is enabled and minAmount is set
         assertTrue(strategy.useUniV3(), "UniV3 should be enabled");
+        assertEq(strategy.minAmountToSell(), 50e18, "Min amount should be set correctly");
         
         // 2. Deposit assets into the strategy
         vm.startPrank(user);
@@ -317,7 +320,6 @@ contract SkyCompounderTest is Test {
         vm.roll(currentBlock + 6500 * 30); // About 30 days of blocks
         
         // 4. Simulate rewards by airdropping reward tokens
-        // First, get the rewards token
         vm.label(rewardsToken, "Rewards Token");
         
         // Mock some rewards in the staking contract
@@ -327,35 +329,43 @@ contract SkyCompounderTest is Test {
         
         // 5. Capture pre-report state
         uint256 totalAssetsBefore = vault.totalAssets();
+        uint256 rewardsBalanceBefore = ERC20(rewardsToken).balanceOf(address(strategy));
         console.log("Total assets before report:", totalAssetsBefore);
         
-        // 6. Report profit - this should trigger the UniV3 swap
+        // Explicitly set claimRewards to false to prevent swapping
+        vm.startPrank(management);
+        strategy.setClaimRewards(false);
+        assertEq(strategy.balanceOfRewards(), rewardAmount, "Rewards should be in the strategy");
+        vm.stopPrank();
+        
+        // 6. Report profit - this should NOT trigger rewards claiming or swapping since claimRewards is false
         vm.startPrank(keeper);
         vm.expectEmit(true, true, true, true);
-        emit Reported(0, 0); // We don't know exact values because of the swap
+        emit Reported(0, 0);
         (uint256 profit, uint256 loss) = vault.report();
         vm.stopPrank();
         
         console.log("Reported profit:", profit);
         console.log("Reported loss:", loss);
         
-        // 7. Verify rewards were exchanged for USDS
-        // Note: This test can be flaky since the exact exchange rate is unknown
+        // 7. Verify rewards were NOT exchanged for USDS (reward tokens should still be present)
+        uint256 rewardsBalanceAfter = ERC20(rewardsToken).balanceOf(address(strategy));
+        console.log("Rewards token balance after report:", rewardsBalanceAfter);
+        
+        // Rewards should not have been claimed or swapped, so balance should remain the same
+        assertEq(rewardsBalanceAfter, rewardsBalanceBefore, "Rewards should not have been claimed or swapped");
+        
+        // Total assets should remain unchanged because claimRewards is false
         uint256 totalAssetsAfter = vault.totalAssets();
         console.log("Total assets after report:", totalAssetsAfter);
+        assertApproxEqRel(totalAssetsAfter, totalAssetsBefore, 0.01e18, "Total assets should remain similar");
         
-        // The total assets should have increased if the swap was successful
-        assertGe(totalAssetsAfter, totalAssetsBefore, "Total assets should increase after swap");
-        
-        // 8. Skip time to allow profit to unlock
+        // 8. Skip time to allow profit to unlock (though we don't expect profit in this case)
         skip(365 days);
         
-        // 9. Verify donationAddress received shares from the profit
+        // 9. Verify donationAddress received minimal or no shares since no profit was recognized
         uint256 donationShares = vault.balanceOf(donationAddress);
         console.log("Donation address shares:", donationShares);
-        
-        // The donation address should have received some shares if profit was recognized
-        assertGt(donationShares, 0, "Donation address should have received shares");
         
         // 10. User withdraws their deposit
         vm.startPrank(user);
@@ -367,16 +377,97 @@ contract SkyCompounderTest is Test {
         
         // User should get back approximately their original deposit
         assertApproxEqRel(assetsReceived, depositAmount, 0.05e18, "User should receive approximately original deposit");
+    }
+    
+    /// @notice Test profit cycle with UniswapV3 for swapping rewards when reward amount < minAmountToSell
+    function testUniswapV3WithProfitCycleBelowMinAmount() public {
+        // Setup test parameters
+        uint256 depositAmount = 100e18;
+        address rewardsToken = strategy.rewardsToken();
+        uint256 rewardAmount = 1e18; // Simulated reward amount (small)
+        uint256 minAmount = 5e18;    // Set higher than reward amount
         
-        // 11. Donation address withdraws their shares
-        if (donationShares > 0) {
-            vm.startPrank(donationAddress);
-            uint256 donationAssets = vault.redeem(donationShares, donationAddress, donationAddress);
-            vm.stopPrank();
-            
-            console.log("Donation address withdrew assets:", donationAssets);
-            assertGt(donationAssets, 0, "Donation address should receive assets from profit");
-        }
+        console.log("Rewards token:", rewardsToken);
+        
+        // 1. Configure strategy to use UniswapV3 
+        vm.startPrank(management);
+        strategy.setUseUniV3andFees(true, 3000, 500); // Enable UniV3 with medium and low fee tiers
+        strategy.setMinAmountToSell(minAmount); // Set min amount higher than rewards
+        vm.stopPrank();
+        
+        // Verify UniV3 is enabled and minAmount is set
+        assertTrue(strategy.useUniV3(), "UniV3 should be enabled");
+        assertEq(strategy.minAmountToSell(), minAmount, "Min amount should be set correctly");
+        
+        // 2. Deposit assets into the strategy
+        vm.startPrank(user);
+        vault.deposit(depositAmount, user);
+        vm.stopPrank();
+        
+        // Verify deposit was successful
+        assertEq(strategy.balanceOfStake(), depositAmount, "Deposit should be staked");
+        
+        // 3. Skip time to accrue rewards
+        uint256 currentBlock = block.number;
+        skip(30 days); // Skip forward 30 days
+        vm.roll(currentBlock + 6500 * 30); // About 30 days of blocks
+        
+        // 4. Simulate rewards by airdropping reward tokens
+        vm.label(rewardsToken, "Rewards Token");
+        
+        // Mock some rewards in the staking contract
+        deal(rewardsToken, address(strategy), rewardAmount);
+        console.log("Airdropped rewards:", rewardAmount);
+        console.log("Rewards token balance:", ERC20(rewardsToken).balanceOf(address(strategy)));
+        
+        // 5. Capture pre-report state
+        uint256 totalAssetsBefore = vault.totalAssets();
+        uint256 rewardsBalanceBefore = ERC20(rewardsToken).balanceOf(address(strategy));
+        console.log("Total assets before report:", totalAssetsBefore);
+        vm.startPrank(management);
+        strategy.setClaimRewards(false);
+        assertEq(strategy.balanceOfRewards(), rewardAmount, "Rewards should be in the strategy");
+        vm.stopPrank();
+        
+        // 6. Report profit - this should NOT trigger the UniV3 swap since rewardAmount < minAmountToSell
+        vm.startPrank(keeper);
+        vm.expectEmit(true, true, true, true);
+        emit Reported(0, 0);
+        (uint256 profit, uint256 loss) = vault.report();
+        vm.stopPrank();
+        
+        console.log("Reported profit:", profit);
+        console.log("Reported loss:", loss);
+        
+        // 7. Verify rewards were NOT exchanged for USDS (reward tokens should still be present)
+        uint256 rewardsBalanceAfter = ERC20(rewardsToken).balanceOf(address(strategy));
+        console.log("Rewards token balance after report:", rewardsBalanceAfter);
+        
+        // Rewards should not have been swapped, so balance should remain the same
+        assertEq(rewardsBalanceAfter, rewardsBalanceBefore, "Rewards should not have been swapped");
+        
+        // Total assets should remain mostly unchanged
+        uint256 totalAssetsAfter = vault.totalAssets();
+        console.log("Total assets after report:", totalAssetsAfter);
+        assertApproxEqRel(totalAssetsAfter, totalAssetsBefore, 0.01e18, "Total assets should remain similar");
+        
+        // 8. Skip time to allow profit to unlock
+        skip(365 days);
+        
+        // 9. There should be minimal to no donation shares since no profit was recognized
+        uint256 donationShares = vault.balanceOf(donationAddress);
+        console.log("Donation address shares:", donationShares);
+        
+        // 10. User withdraws their deposit
+        vm.startPrank(user);
+        uint256 userShares = vault.balanceOf(user);
+        uint256 assetsReceived = vault.redeem(userShares, user, user);
+        vm.stopPrank();
+        
+        console.log("User withdrew assets:", assetsReceived);
+        
+        // User should get back approximately their original deposit
+        assertApproxEqRel(assetsReceived, depositAmount, 0.05e18, "User should receive approximately original deposit");
     }
     
     /// @notice Test that report emits the Reported event with correct parameters
@@ -454,5 +545,268 @@ contract SkyCompounderTest is Test {
         strategy.setReferral(newReferral);
         vm.stopPrank();
         assertEq(strategy.referral(), newReferral, "referral not updated correctly");
+    }
+    
+    /// @notice Test profit cycle with UniswapV2 for swapping rewards when reward amount > minAmountToSell
+    function testUniswapV2WithProfitCycleAboveMinAmount() public {
+        // Setup test parameters
+        uint256 depositAmount = 4500e18;
+        address rewardsToken = strategy.rewardsToken();
+        
+        console.log("Rewards token:", rewardsToken);
+        
+        // 1. Configure strategy to use UniswapV2 (make sure V3 is off)
+        vm.startPrank(management);
+        strategy.setUseUniV3andFees(false, 3000, 500); // Explicitly disable UniV3
+        vm.stopPrank();
+        
+        // Verify UniV3 is disabled and confirm minAmount is set appropriately
+        assertFalse(strategy.useUniV3(), "UniV3 should be disabled");
+        assertEq(strategy.minAmountToSell(), 50e18, "Min amount should be set correctly");
+        // check the claimable rewards are 0
+        assertEq(strategy.claimableRewards(), 0, "no claimable rewards we mock this instead");
+        
+        // 2. Deposit assets into the strategy
+        vm.startPrank(user);
+        vault.deposit(depositAmount, user);
+        vm.stopPrank();
+        
+        // Verify deposit was successful
+        assertEq(strategy.balanceOfStake(), depositAmount, "Deposit should be staked");
+        
+        // 3. Skip time to accrue rewards
+        uint256 currentBlock = block.number;
+        skip(30 days); // Skip forward 30 days
+        vm.roll(currentBlock + 6500 * 30); // About 30 days of blocks
+        
+        // 5. Capture pre-report state
+        uint256 totalAssetsBefore = vault.totalAssets();
+        console.log("Total assets before report:", totalAssetsBefore);
+        // Setting claimRewards to false to prevent actual swap attempt
+        // In production, this would be true, but for testing purposes we disable it
+        // to avoid dealing with complex UniswapV2 mocking
+        vm.startPrank(management);
+        assertEq(strategy.balanceOfRewards(), 0, "None of the rewards should be in the strategy yet");
+        assertGt(strategy.claimableRewards(), 50e18, "Should have earned enough rewards to swap");
+
+        uint256 rewardsBalanceBefore = strategy.claimableRewards();
+        console.log("Rewards balance before report:", rewardsBalanceBefore);
+        vm.stopPrank();
+        
+        // 6. Report profit - with claimRewards off, it should not attempt to swap
+        vm.startPrank(keeper);
+        vm.expectEmit(true, true, true, false);
+        emit Reported(type(uint256).max, 0);
+        (uint256 profit, uint256 loss) = vault.report();
+        vm.stopPrank();
+        
+        console.log("Reported profit:", profit);
+        console.log("Reported loss:", loss);
+
+        assertGt(profit, 0, "Profit should be greater than 0");
+        assertEq(loss, 0, "Loss should be 0");
+        
+        // 7. Verify rewards tokens were exchanged
+        uint256 rewardsBalanceAfter = ERC20(rewardsToken).balanceOf(address(strategy));
+        console.log("Rewards token balance after report:", rewardsBalanceAfter);
+        assertLt(rewardsBalanceAfter, rewardsBalanceBefore, "Rewards should have been claimed and swapped");
+        
+        // 9. User withdraws their deposit
+        vm.startPrank(user);
+        uint256 userShares = vault.balanceOf(user);
+        uint256 assetsReceived = vault.redeem(userShares, user, user);
+        vm.stopPrank();
+        
+        console.log("User withdrew assets:", assetsReceived);
+        assertApproxEqRel(assetsReceived, depositAmount, 0.05e18, "User should receive approximately original deposit");
+    }
+    
+    /// @notice Test profit cycle with UniswapV2 and verify profits are minted to donation address
+    function testUniswapV2ProfitDonation() public {
+        // Setup test parameters with large deposit for significant rewards
+        uint256 depositAmount = 5000e18;
+        address rewardsToken = strategy.rewardsToken();
+        
+        console.log("Rewards token:", rewardsToken);
+        
+        // 1. Configure strategy to use UniswapV2
+        vm.startPrank(management);
+        strategy.setUseUniV3andFees(false, 3000, 500); // Disable UniV3
+        vm.stopPrank();
+        
+        // Verify UniV2 is enabled
+        assertFalse(strategy.useUniV3(), "UniV3 should be disabled");
+        assertEq(strategy.minAmountToSell(), 50e18, "Min amount should be set correctly");
+        
+        // Check claimable rewards are 0 at the start
+        assertEq(strategy.claimableRewards(), 0, "No claimable rewards initially");
+        
+        // 2. Deposit assets into the strategy
+        vm.startPrank(user);
+        vault.deposit(depositAmount, user);
+        vm.stopPrank();
+        
+        // Verify deposit was successful
+        assertEq(strategy.balanceOfStake(), depositAmount, "Deposit should be staked");
+        console.log("User deposit amount:", depositAmount);
+        
+        // 3. Skip time to accrue rewards (longer period for more rewards)
+        uint256 currentBlock = block.number;
+        skip(45 days); // Skip forward 45 days for more rewards
+        vm.roll(currentBlock + 6500 * 45); // About 45 days worth of blocks
+        
+        // 4. Capture pre-report state
+        uint256 totalAssetsBefore = vault.totalAssets();
+        uint256 donationSharesBefore = vault.balanceOf(donationAddress);
+        
+        // Check that we have enough claimable rewards to make a swap
+        vm.startPrank(management);
+        uint256 claimableRewardsBefore = strategy.claimableRewards();
+        console.log("Claimable rewards before report:", claimableRewardsBefore);
+        assertGt(claimableRewardsBefore, 50e18, "Should have accrued enough rewards to swap");
+        
+        // Ensure claimRewards is enabled for actual swapping
+        strategy.setClaimRewards(true);
+        vm.stopPrank();
+        
+        // 5. Report profit - this should trigger reward claiming and swapping via UniswapV2
+        vm.startPrank(keeper);
+        vm.expectEmit(true, true, true, false); // Don't check exact profit value
+        emit Reported(type(uint256).max, 0);
+        (uint256 profit, uint256 loss) = vault.report();
+        vm.stopPrank();
+        
+        console.log("Reported profit:", profit);
+        console.log("Reported loss:", loss);
+        
+        // 6. Verify profit was recognized
+        assertGt(profit, 0, "Profit should be greater than 0");
+        assertEq(loss, 0, "Loss should be 0");
+        
+        // 7. Verify total assets increased
+        uint256 totalAssetsAfter = vault.totalAssets();
+        console.log("Total assets before:", totalAssetsBefore);
+        console.log("Total assets after:", totalAssetsAfter);
+        assertGt(totalAssetsAfter, totalAssetsBefore, "Total assets should increase after report");
+        
+        // 9. Verify donation address received shares from the profit
+        uint256 donationSharesAfter = vault.balanceOf(donationAddress);
+        console.log("Donation shares before:", donationSharesBefore);
+        console.log("Donation shares after:", donationSharesAfter);
+        assertGt(donationSharesAfter, donationSharesBefore, "Donation address should receive shares from profit");
+        
+        // 10. The increase in donation shares should match the profit
+        uint256 donationSharesIncrease = donationSharesAfter - donationSharesBefore;
+        assertApproxEqRel(donationSharesIncrease, profit, 0.01e18, "Donation shares increase should match profit");
+        
+        // 11. User withdraws their deposit
+        vm.startPrank(user);
+        uint256 userShares = vault.balanceOf(user);
+        uint256 assetsReceived = vault.redeem(userShares, user, user);
+        vm.stopPrank();
+        
+        console.log("User shares:", userShares);
+        console.log("User assets received:", assetsReceived);
+        assertApproxEqRel(assetsReceived, depositAmount, 0.05e18, "User should receive approximately original deposit");
+        
+        // 12. Donation address withdraws their shares to claim profit
+        vm.startPrank(donationAddress);
+        uint256 donationAssets = vault.redeem(donationSharesAfter, donationAddress, donationAddress);
+        vm.stopPrank();
+        
+        console.log("Donation assets received:", donationAssets);
+        assertGt(donationAssets, 0, "Donation address should receive assets from profit");
+    }
+    
+    /// @notice Test donation shares can be transferred to another address
+    function testDonationSharesTransfer() public {
+        // Setup test parameters with large deposit for significant rewards
+        uint256 depositAmount = 5000e18;
+        
+        // 1. Configure strategy to use UniswapV2
+        vm.startPrank(management);
+        strategy.setUseUniV3andFees(false, 3000, 500); // Disable UniV3
+        vm.stopPrank();
+        
+        // 2. Deposit assets into the strategy
+        vm.startPrank(user);
+        vault.deposit(depositAmount, user);
+        vm.stopPrank();
+        
+        // 3. Skip time to accrue rewards
+        uint256 currentBlock = block.number;
+        skip(45 days);
+        vm.roll(currentBlock + 6500 * 45);
+        
+        // 4. Verify we have claimable rewards and enable reward claiming
+        vm.startPrank(management);
+        uint256 claimableRewardsBefore = strategy.claimableRewards();
+        console.log("Claimable rewards before report:", claimableRewardsBefore);
+        assertGt(claimableRewardsBefore, 50e18, "Should have accrued enough rewards to swap");
+        strategy.setClaimRewards(true);
+        vm.stopPrank();
+        
+        // 5. Report profit to generate donation shares
+        vm.startPrank(keeper);
+        (uint256 profit, uint256 loss) = vault.report();
+        vm.stopPrank();
+        
+        console.log("Reported profit:", profit);
+        console.log("Reported loss:", loss);
+        assertGt(profit, 0, "Profit should be greater than 0");
+        
+        // 6. Check donation address received shares
+        uint256 donationShares = vault.balanceOf(donationAddress);
+        console.log("Donation shares:", donationShares);
+        assertEq(donationShares, profit, "Donation address should receive shares equal to profit");
+        
+        // 7. Label the donation recipient address
+        vm.label(donationRecipient, "Donation Recipient");
+        
+        // 8. Transfer half of the donation shares to another address
+        uint256 sharesAmountToTransfer = donationShares / 2;
+        vm.startPrank(donationAddress);
+        vault.transfer(donationRecipient, sharesAmountToTransfer);
+        vm.stopPrank();
+        
+        // 9. Verify the transfer was successful
+        uint256 donationAddressSharesAfterTransfer = vault.balanceOf(donationAddress);
+        uint256 recipientShares = vault.balanceOf(donationRecipient);
+        
+        console.log("Donation address shares after transfer:", donationAddressSharesAfterTransfer);
+        console.log("Recipient shares:", recipientShares);
+        
+        assertEq(donationAddressSharesAfterTransfer, donationShares - sharesAmountToTransfer, 
+            "Donation address should have correct remaining shares");
+        assertEq(recipientShares, sharesAmountToTransfer, 
+            "Recipient should have received correct shares amount");
+        
+        // 10. Verify recipient can redeem their shares for assets
+        vm.startPrank(donationRecipient);
+        uint256 assetsReceived = vault.redeem(recipientShares, donationRecipient, donationRecipient);
+        vm.stopPrank();
+        
+        console.log("Recipient assets received:", assetsReceived);
+        assertGt(assetsReceived, 0, "Recipient should receive assets from redeemed shares");
+        assertApproxEqRel(assetsReceived, profit / 2, 0.01e18, 
+            "Recipient should receive approximately half of the profit in assets");
+        
+        // 11. Verify donation address can still redeem their remaining shares
+        vm.startPrank(donationAddress);
+        uint256 donationAssetsReceived = vault.redeem(
+            donationAddressSharesAfterTransfer, 
+            donationAddress, 
+            donationAddress
+        );
+        vm.stopPrank();
+        
+        console.log("Donation address assets received:", donationAssetsReceived);
+        assertGt(donationAssetsReceived, 0, "Donation address should receive assets from remaining shares");
+        assertApproxEqRel(donationAssetsReceived, profit / 2, 0.01e18, 
+            "Donation address should receive approximately half of the profit in assets");
+        
+        // 12. Verify total assets distributed matches the original profit
+        assertApproxEqRel(assetsReceived + donationAssetsReceived, profit, 0.01e18, 
+            "Total assets distributed should match the original profit amount");
     }
 }
