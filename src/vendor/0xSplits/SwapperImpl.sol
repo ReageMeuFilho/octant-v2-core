@@ -5,6 +5,11 @@ import { IOracle } from "./IOracle.sol";
 import { QuotePair, QuoteParams } from "./LibQuotes.sol";
 
 interface ISwapperImpl {
+    error Invalid_AmountsToBeneficiary();
+    error Invalid_QuoteToken();
+    error InsufficientFunds_InContract();
+    error InsufficientFunds_FromTrader();
+
     struct InitParams {
         address owner;
         bool paused;
@@ -23,4 +28,5 @@ interface ISwapperImpl {
     function flash(QuoteParams[] calldata quoteParams_, bytes calldata callbackData_) external returns (uint256);
 
     function payback() external payable;
+    function defaultScaledOfferFactor() external view returns (uint32);
 }
