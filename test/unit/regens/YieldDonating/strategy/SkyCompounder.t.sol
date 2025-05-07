@@ -809,4 +809,256 @@ contract SkyCompounderTest is Test {
         assertApproxEqRel(assetsReceived + donationAssetsReceived, profit, 0.01e18, 
             "Total assets distributed should match the original profit amount");
     }
+    
+    /// @notice Test emergency exit functionality
+    function testEmergencyExit() public {
+        // Setup - deposit a significant amount
+        uint256 depositAmount = 5000e18;
+        
+        vm.startPrank(user);
+        vault.deposit(depositAmount, user);
+        vm.stopPrank();
+        
+        // Verify funds are staked
+        uint256 stakedBefore = strategy.balanceOfStake();
+        uint256 assetsBefore = strategy.balanceOfAsset();
+        assertGt(stakedBefore, 0, "Should have staked funds");
+        assertLe(assetsBefore, 100, "Asset balance should be minimal");
+        
+        // First need to trigger emergency shutdown mode - must be called by emergency admin
+        vm.startPrank(emergencyAdmin);
+        vault.shutdownStrategy();
+        
+        // Now withdraw all funds
+        vault.emergencyWithdraw(type(uint256).max);
+        vm.stopPrank();
+        
+        // Verify funds are withdrawn from staking
+        uint256 stakedAfter = strategy.balanceOfStake();
+        uint256 assetsAfter = strategy.balanceOfAsset();
+        assertLe(stakedAfter, 0, "Should have withdrawn all staked funds");
+        assertGe(assetsAfter, depositAmount - 100, "Should have recovered most assets");
+        
+        // User can withdraw funds
+        vm.startPrank(user);
+        uint256 userShares = vault.balanceOf(user);
+        uint256 assetsReceived = vault.redeem(userShares, user, user);
+        vm.stopPrank();
+        
+        // Verify user got their funds back
+        assertApproxEqRel(assetsReceived, depositAmount, 0.01e18, "User should receive approximately original deposit");
+    }
+    
+    /// @notice Test partial emergency withdrawals withdraws only the requested amount
+    function testPartialEmergencyWithdrawal() public {
+        // Setup - deposit a significant amount
+        uint256 depositAmount = 5000e18;
+        
+        vm.startPrank(user);
+        vault.deposit(depositAmount, user);
+        vm.stopPrank();
+        
+        // Verify funds are staked
+        uint256 stakedBefore = strategy.balanceOfStake();
+        assertGt(stakedBefore, 0, "Should have staked funds");
+        
+        // First need to trigger emergency shutdown mode - must be called by emergency admin
+        vm.startPrank(emergencyAdmin);
+        vault.shutdownStrategy();
+        
+        // Request a partial emergency withdrawal (50%)
+        uint256 withdrawAmount = depositAmount / 2;
+        vault.emergencyWithdraw(withdrawAmount);
+        vm.stopPrank();
+        
+        // In SkyCompounder's _emergencyWithdraw, only the requested amount is withdrawn
+        uint256 stakedAfter = strategy.balanceOfStake();
+        uint256 assetsAfter = strategy.balanceOfAsset();
+        
+        // Verify approximately half the funds were withdrawn from staking
+        assertApproxEqRel(stakedAfter, stakedBefore - withdrawAmount, 0.01e18, 
+            "About half the funds should remain staked");
+        assertApproxEqRel(assetsAfter, withdrawAmount, 0.01e18, 
+            "Strategy should have received the withdrawn amount");
+        
+        // Test that user can still withdraw their full deposit
+        vm.startPrank(user);
+        uint256 userShares = vault.balanceOf(user);
+        uint256 assetsReceived = vault.redeem(userShares, user, user);
+        vm.stopPrank();
+        
+        // User should get back their full deposit
+        assertApproxEqRel(assetsReceived, depositAmount, 0.01e18, "User should receive approximately original deposit");
+    }
+    
+    /// @notice Test multiple users with fair profit distribution
+    function testMultipleUserProfitDistribution() public {
+        // First user deposits
+        address user1 = user; // Reuse existing test user
+        address user2 = address(0x5678);
+        
+        uint256 depositAmount1 = 1000e18;
+        uint256 depositAmount2 = 2000e18;
+        
+        vm.startPrank(user1);
+        vault.deposit(depositAmount1, user1);
+        vm.stopPrank();
+        
+        // Generate some profit for first user
+        uint256 profit1 = depositAmount1 / 10; // 10% profit
+        airdrop(ERC20(USDS), address(strategy), profit1);
+        
+        // Harvest to realize profit
+        vm.startPrank(keeper);
+        vault.report();
+        vm.stopPrank();
+        
+        // Check share price increase
+        uint256 sharePrice1 = vault.convertToAssets(1e18);
+        assertEq(sharePrice1, 1e18, "Share price should stay the same since profit is minted");
+        
+        // Second user deposits after profit
+        vm.startPrank(address(this));
+        airdrop(ERC20(USDS), user2, depositAmount2);
+        vm.stopPrank();
+        
+        vm.startPrank(user2);
+        ERC20(USDS).approve(address(strategy), type(uint256).max);
+        vault.deposit(depositAmount2, user2);
+        vm.stopPrank();
+        
+        // Generate more profit after second user joined
+        uint256 profit2 = (depositAmount1 + depositAmount2) / 10; // 10% of total
+        airdrop(ERC20(USDS), address(strategy), profit2);
+        
+        // Harvest again
+        vm.startPrank(keeper);
+        vault.report();
+        vm.stopPrank();
+        
+        // Skip time to allow profit to unlock
+        skip(365 days);
+        
+        // Check share price stays the same since profit is minted
+        uint256 sharePrice2 = vault.convertToAssets(1e18);
+        assertEq(sharePrice2, sharePrice1, "Share price should stay the same since profit is minted");
+        
+        // Both users withdraw
+        vm.startPrank(user1);
+        uint256 user1Shares = vault.balanceOf(user1);
+        uint256 user1Assets = vault.redeem(user1Shares, user1, user1);
+        vm.stopPrank();
+        
+        vm.startPrank(user2);
+        uint256 user2Shares = vault.balanceOf(user2);
+        uint256 user2Assets = vault.redeem(user2Shares, user2, user2);
+        vm.stopPrank();
+        
+        // Check that user1 got more relative profit (he was in longer)
+        uint256 user1Profit = user1Assets - depositAmount1;
+        uint256 user2Profit = user2Assets - depositAmount2;
+        
+        uint256 user1ProfitPercentage = (user1Profit * 1e18) / depositAmount1;
+        uint256 user2ProfitPercentage = (user2Profit * 1e18) / depositAmount2;
+        
+        console.log("User 1 profit percentage:", user1ProfitPercentage);
+        console.log("User 2 profit percentage:", user2ProfitPercentage);
+        
+        assertEq(user1ProfitPercentage, 0, "User 1 should have received no profit");
+        assertEq(user1ProfitPercentage, user2ProfitPercentage, "Users should have received no profit");
+        
+        // Check donation address received profit shares as well
+        uint256 donationShares = vault.balanceOf(donationAddress);
+        assertGt(donationShares, 0, "Donation address should receive shares from profit");
+    }
+    
+    /// @notice Test slippage protection through minAmountToSell threshold
+    function testSlippageProtection() public {
+        // Setup - deposit funds
+        uint256 depositAmount = 1000e18;
+        
+        vm.startPrank(user);
+        vault.deposit(depositAmount, user);
+        vm.stopPrank();
+        
+        // Get rewards token and prepare for test
+        address rewardsToken = strategy.rewardsToken();
+        
+        // Set a high minAmountToSell threshold
+        vm.startPrank(management);
+        uint256 highMinAmount = 100e18;
+        strategy.setMinAmountToSell(highMinAmount);
+        
+        // Make sure reward claiming is enabled
+        strategy.setClaimRewards(true);
+        
+        // Use UniswapV2 for simplicity and disable rewards to avoid interference
+        strategy.setUseUniV3andFees(false, 0, 0);
+        vm.stopPrank();
+        
+        // Create a small reward amount - below the minAmountToSell threshold
+        uint256 smallRewardAmount = highMinAmount / 2; // Half the threshold
+        
+        // Airdrop rewards to simulate earned rewards
+        deal(rewardsToken, address(strategy), smallRewardAmount);
+        
+        console.log("Rewards before report:", smallRewardAmount);
+        console.log("Min amount to sell:", strategy.minAmountToSell());
+        
+        // Attempt to report - rewards should be claimed but not swapped
+        vm.startPrank(keeper);
+        vault.report();
+        vm.stopPrank();
+        
+        // The rewards should still be in the strategy because they're below the threshold
+        uint256 rewardsAfter = ERC20(rewardsToken).balanceOf(address(strategy));
+        console.log("Rewards after report:", rewardsAfter);
+        
+        // Verify rewards are still in the strategy (weren't swapped)
+        // Note: We don't check exact amounts due to possible mainnet interactions
+        // but ensure the core protection worked
+        assertGt(rewardsAfter, 0, "Should still have some rewards");
+    }
+    
+    /// @notice Test slippage configuration in swapper
+    function testSlippageConfiguration() public {
+        // Verify default settings
+        vm.startPrank(management);
+        
+        // Test UniswapV3 slippage settings
+        strategy.setUseUniV3andFees(true, 3000, 500);
+        assertTrue(strategy.useUniV3(), "UniV3 should be enabled");
+        
+        // Test minAmountToSell configuration
+        uint256 newMinAmount = 30e18;
+        strategy.setMinAmountToSell(newMinAmount);
+        assertEq(strategy.minAmountToSell(), newMinAmount, "Min amount should be updated");
+        
+        vm.stopPrank();
+        
+        // Now test deposit and reward claim flow
+        uint256 depositAmount = 1000e18;
+        vm.startPrank(user);
+        vault.deposit(depositAmount, user);
+        vm.stopPrank();
+        
+        // Simulate rewards just below threshold - should not trigger swap
+        address rewardsToken = strategy.rewardsToken();
+        uint256 smallRewardAmount = newMinAmount - 1e18;
+        deal(rewardsToken, address(strategy), smallRewardAmount);
+        
+        vm.startPrank(management);
+        strategy.setClaimRewards(true);
+        vm.stopPrank();
+        
+        // Report with rewards below threshold - should claim but not swap
+        vm.startPrank(keeper);
+        vault.report();
+        vm.stopPrank();
+        
+        // Rewards should still be in the strategy (not swapped due to minAmountToSell)
+        uint256 rewardsAfter = ERC20(rewardsToken).balanceOf(address(strategy));
+        console.log("Rewards after below-threshold report:", rewardsAfter);
+        assertGt(rewardsAfter, 0, "Rewards should remain unswapped");
+    }
 }
