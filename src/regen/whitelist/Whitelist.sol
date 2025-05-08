@@ -15,7 +15,7 @@ contract Whitelist is IWhitelist, Ownable {
         }
     }
 
-    function removeFromWhitelist(address[] memory accounts) external {
+    function removeFromWhitelist(address[] memory accounts) external onlyOwner {
         for (uint256 i = 0; i < accounts.length; i++) {
             isWhitelisted[accounts[i]] = false;
         }

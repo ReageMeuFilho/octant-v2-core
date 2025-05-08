@@ -16,23 +16,27 @@ import { Staker } from "staker/Staker.sol";
 import { StakerDelegateSurrogateVotes } from "staker/extensions/StakerDelegateSurrogateVotes.sol";
 import { StakerPermitAndStake } from "staker/extensions/StakerPermitAndStake.sol";
 import { StakerOnBehalf } from "staker/extensions/StakerOnBehalf.sol";
+import { IEarningPowerCalculator } from "staker/interfaces/IEarningPowerCalculator.sol";
 
-import { RegenEarningPowerCalculator } from "./RegenEarningPowerCalculator.sol";
 import { Whitelist } from "./whitelist/Whitelist.sol";
 import { IWhitelist } from "./whitelist/IWhitelist.sol";
 import { IWhitelistedEarningPowerCalculator } from "./IWhitelistedEarningPowerCalculator.sol";
-
 
 error NotWhitelisted(IWhitelist whitelist, address user);
 error NotImplemented();
 error CantAfford(uint256 requested, uint256 available);
 error GrantRoundSignUpFailed(address grantRound, address contributor, uint256 amount, uint256 preference);
 
-
 event StakerWhitelistSet(IWhitelist whitelist);
 event ContributionWhitelistSet(IWhitelist whitelist);
 event EarningPowerWhitelistSet(IWhitelist whitelist);
-event RewardContributed(Staker.DepositIdentifier depositId, address contributor, address grantRound, uint256 amount, uint256 preference);
+event RewardContributed(
+    Staker.DepositIdentifier depositId,
+    address contributor,
+    address grantRound,
+    uint256 amount,
+    uint256 preference
+);
 
 // TODO: Bind this to the real contract.
 interface IGrantRound {
@@ -52,12 +56,12 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
         address _admin,
         IWhitelist _stakerWhitelist,
         IWhitelist _contributionWhitelist,
-        IWhitelist _earningPowerWhitelist
+        IEarningPowerCalculator _earningPowerCalculator
     )
         Staker(
             _rewardsToken,
             _stakeToken,
-            new RegenEarningPowerCalculator(_admin, _earningPowerWhitelist),
+            _earningPowerCalculator,
             1e18, // maxBumpTip
             _admin
         )
@@ -70,20 +74,6 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
         contributionWhitelist = address(_contributionWhitelist) == address(0)
             ? new Whitelist()
             : _contributionWhitelist;
-
-        // Earning power calculator might be implementing a whitelist or not.
-        try
-            IERC165(address(earningPowerCalculator)).supportsInterface(
-                type(IWhitelistedEarningPowerCalculator).interfaceId
-            )
-        returns (bool isSupported) {
-            if (isSupported) {
-                IWhitelist earningPowerWhitelist = address(_earningPowerWhitelist) == address(0)
-                    ? new Whitelist()
-                    : _earningPowerWhitelist;
-                IWhitelistedEarningPowerCalculator(address(earningPowerCalculator)).setWhitelist(earningPowerWhitelist);
-            }
-        } catch {}
 
         // Override the maximum reward token fee for claiming rewards
         MAX_CLAIM_FEE = 1e18;
@@ -107,32 +97,40 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
     }
 
     /// @dev TODO: Implement this.
-    function contribute(DepositIdentifier _depositId, address _grantRoundAddress, uint256 _amount, uint256 _preference) public whenNotPaused {
+    function contribute(
+        DepositIdentifier _depositId,
+        address _grantRoundAddress,
+        uint256 _amount,
+        uint256 _preference
+    ) public whenNotPaused {
         _revertIfAddressZero(_grantRoundAddress);
 
         require(
             contributionWhitelist == IWhitelist(address(0)) || contributionWhitelist.isWhitelisted(msg.sender),
             NotWhitelisted(contributionWhitelist, msg.sender)
         );
-        
+
         // Make sure _amount is not greater than the amount of unclaimed rewards for this deposit.
         // Get the deposit
         Deposit storage deposit = deposits[_depositId];
-        
+
         // Calculate the unclaimed rewards for this deposit
         uint256 unclaimedAmount = _scaledUnclaimedReward(deposit) / SCALE_FACTOR;
-        
+
         // Ensure the amount is not greater than the unclaimed rewards
         require(_amount <= unclaimedAmount, CantAfford(_amount, unclaimedAmount));
-        
+
         // Update the deposit's unclaimed rewards by resetting the checkpoint
         uint256 scaledAmount = _amount * SCALE_FACTOR;
         deposit.scaledUnclaimedRewardCheckpoint = deposit.scaledUnclaimedRewardCheckpoint - scaledAmount;
-        
+
         // Call the external functions and send the rewards to the grant round
         // TODO: Bind this to the real contract.
         SafeERC20.safeTransfer(REWARD_TOKEN, _grantRoundAddress, _amount);
-        require(IGrantRound(_grantRoundAddress).signUp(_amount, _preference), GrantRoundSignUpFailed(_grantRoundAddress, msg.sender, _amount, _preference));
+        require(
+            IGrantRound(_grantRoundAddress).signUp(_amount, _preference),
+            GrantRoundSignUpFailed(_grantRoundAddress, msg.sender, _amount, _preference)
+        );
         emit RewardContributed(_depositId, msg.sender, _grantRoundAddress, _amount, _preference);
     }
 
