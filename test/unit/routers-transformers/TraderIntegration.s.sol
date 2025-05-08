@@ -37,7 +37,7 @@ contract TestTraderIntegrationETH2GLM is Test, TestPlus, DeployTrader {
         configureTrader(config, "ETHGLM");
     }
 
-    function prepare_trader_params(uint256 amountIn) public returns (UniV3Swap.InitFlashParams memory params){
+    function prepare_trader_params(uint256 amountIn) public returns (UniV3Swap.InitFlashParams memory params) {
         delete exactInputParams;
         exactInputParams.push(
             ISwapRouter.ExactInputParams({
@@ -57,10 +57,7 @@ contract TestTraderIntegrationETH2GLM is Test, TestPlus, DeployTrader {
             exactInputParams: exactInputParams,
             excessRecipient: address(oracle)
         });
-        params = UniV3Swap.InitFlashParams({
-            quoteParams: quoteParams,
-            flashCallbackData: data
-        });
+        params = UniV3Swap.InitFlashParams({ quoteParams: quoteParams, flashCallbackData: data });
     }
 
     function force_direct_trade(address aBase, uint256 exactIn, address aQuote) public returns (uint256) {
@@ -121,7 +118,7 @@ contract TestTraderIntegrationETH2GLM is Test, TestPlus, DeployTrader {
             forwardBlocks(1);
         }
         UniV3Swap.InitFlashParams memory params = prepare_trader_params(1 ether);
-        vm.expectRevert(bytes('OLD'));
+        vm.expectRevert(bytes("OLD"));
         initializer.initFlash(ISwapperImpl(swapper), params);
     }
 
@@ -200,15 +197,6 @@ contract TestTraderIntegrationETH2GLM is Test, TestPlus, DeployTrader {
         assertEq(trader.spent(), 1 ether);
         assertGt(swapper.balance, oldBalance);
 
-        /* // mock value of quote to avoid problems with stale oracle on CI */
-        /* uint256[] memory unscaledAmountsToBeneficiary = new uint256[](1); */
-        /* unscaledAmountsToBeneficiary[0] = 4228914774285437607589; */
-        /* vm.mockCall( */
-        /*     address(oracle), */
-        /*     abi.encodeWithSelector(IOracle.getQuoteAmounts.selector), */
-        /*     abi.encode(unscaledAmountsToBeneficiary) */
-        /* ); */
-
         uint256 oldGlmBalance = IERC20(quoteAddress).balanceOf(beneficiary);
 
         // now, do the actual swap
@@ -268,15 +256,6 @@ contract TestTraderIntegrationETH2GLM is Test, TestPlus, DeployTrader {
         forwardBlocks(100);
         uint256 saleValue = trader.findSaleValue(1.5 ether);
         assert(saleValue > 0);
-
-        /* // mock value of quote to avoid problems with stale oracle on CI */
-        /* uint256[] memory unscaledAmountsToBeneficiary = new uint256[](1); */
-        /* unscaledAmountsToBeneficiary[0] = 4228914774285437607589; */
-        /* vm.mockCall( */
-        /*     address(oracle), */
-        /*     abi.encodeWithSelector(IOracle.getQuoteAmounts.selector), */
-        /*     abi.encode(unscaledAmountsToBeneficiary) */
-        /* ); */
 
         uint256 amountToBeneficiary = trader.transform{ value: saleValue }(trader.BASE(), trader.QUOTE(), saleValue);
 
@@ -377,15 +356,6 @@ contract TestTraderIntegrationGLM2ETH is Test, TestPlus, DeployTrader {
         forwardBlocks(100);
         uint256 saleValue = trader.findSaleValue(15 ether);
         assert(saleValue > 0);
-
-        /* // mock value of quote to avoid problems with stale oracle on CI */
-        /* uint256[] memory unscaledAmountsToBeneficiary = new uint256[](1); */
-        /* unscaledAmountsToBeneficiary[0] = FixedPointMathLib.divWadUp(1, 4228914774285437607589); */
-        /* vm.mockCall( */
-        /*     address(oracle), */
-        /*     abi.encodeWithSelector(IOracle.getQuoteAmounts.selector), */
-        /*     abi.encode(unscaledAmountsToBeneficiary) */
-        /* ); */
 
         // do actual attempt to convert ERC20 to ETH
         uint256 amountToBeneficiary = trader.transform(glmAddress, ETH, saleValue);
