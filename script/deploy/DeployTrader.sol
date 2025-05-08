@@ -46,9 +46,15 @@ contract DeployTrader is Script {
         vm.label(beneficiary, "beneficiary");
     }
 
-    function forward(uint blocks) internal {
+    function forwardBlocks(uint blocks) internal {
         vm.roll(block.number + blocks);
         vm.warp(block.timestamp + blocks * 12);
+    }
+
+    function forwardSeconds(uint sec) internal {
+        uint blocks = sec / 12;
+        assert((blocks * 12) == sec);
+        forwardBlocks(blocks);
     }
 
     function configureTrader(HelperConfig _config, string memory _poolName) public {
@@ -78,7 +84,7 @@ contract DeployTrader is Script {
             IUniV3OracleImpl.InitParams({
                 owner: owner,
                 paused: false,
-                defaultPeriod: 1 minutes,
+                defaultPeriod: 30 minutes,
                 pairDetails: oraclePairDetails
             });
     }

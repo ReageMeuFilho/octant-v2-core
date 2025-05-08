@@ -63,7 +63,7 @@ contract TestTraderIntegrationETH2GLM is Test, TestPlus, DeployTrader {
         });
     }
 
-    function force_direct_trade(address aBase, uint256 exactIn, address aQuote) private returns (uint256) {
+    function force_direct_trade(address aBase, uint256 exactIn, address aQuote) public returns (uint256) {
         if (aBase == ETH) {
             vm.deal(address(this), exactIn);
         } else {
@@ -118,37 +118,54 @@ contract TestTraderIntegrationETH2GLM is Test, TestPlus, DeployTrader {
         uint cardinality = pool.slot0().observationCardinalityNext;
         for (uint i; i < cardinality; i++) {
             force_direct_trade(glmAddress, 7000 ether, ETH);
-            forward(1);
+            forwardBlocks(1);
         }
         UniV3Swap.InitFlashParams memory params = prepare_trader_params(1 ether);
         vm.expectRevert(bytes('OLD'));
         initializer.initFlash(ISwapperImpl(swapper), params);
     }
 
-    function test_oracle_waiting_fixes() external {
-        vm.deal(address(swapper), 1 ether);
+    function test_oracle_results_dont_change_in_the_block() external {
+        IOracle oracle = ISwapperImpl(swapper).oracle();
 
-        // first make sure that buffer is full of fresh observations
-        IUniswapV3Pool pool = IUniswapV3Pool(0x531b6A4b3F962208EA8Ed5268C642c84BB29be0b);
-        uint cardinality = pool.slot0().observationCardinalityNext;
-        for (uint i; i < cardinality; i++) {
-            force_direct_trade(glmAddress, 7000 ether, ETH);
-            forward(1);
-        }
+        // mine a block to ensure that no readings were added yet
+        forwardBlocks(1);
+        uint currentBlock = block.number;
+
+        // read oracle
         UniV3Swap.InitFlashParams memory params = prepare_trader_params(1 ether);
-        vm.expectRevert(bytes('OLD'));
-        initializer.initFlash(ISwapperImpl(swapper), params);
+        uint256[] memory unscaledAmountsToBeneficiary = oracle.getQuoteAmounts(params.quoteParams);
+        uint256 currentQuote = unscaledAmountsToBeneficiary[0];
+        assert(currentQuote > 10 ether); // a very conservative check here
 
-        // 10 blocks is 120 seconds > 30 seconds specified as secondsAgo
-        forward(10);
+        // add a reading by trading
+        force_direct_trade(glmAddress, 7000 ether, ETH);
 
-        // trader should succeed
-        params = prepare_trader_params(1 ether);
-        initializer.initFlash(ISwapperImpl(swapper), params);
+        // check oracle in the same block - quote should be the same
+        unscaledAmountsToBeneficiary = oracle.getQuoteAmounts(params.quoteParams);
+        assert(unscaledAmountsToBeneficiary[0] == currentQuote);
+
+        // for sanity, check if block is still the same
+        assert(block.number == currentBlock);
     }
 
-    /* function test_frontrunning_triggers_twap_protection() external { */
-    /* } */
+    function test_twap_frontrunning_triggers_protection() external {
+        vm.deal(address(swapper), 2 ether);
+        // mine a block to ensure that no readings were added yet
+        forwardBlocks(1);
+
+        uint currentBlock = block.number;
+
+        // someone rapidly moves the price in the beginning of the block
+        force_direct_trade(ETH, 2 ether, glmAddress);
+
+        // attempt to trade in the same block should fail
+        UniV3Swap.InitFlashParams memory params = prepare_trader_params(1 ether);
+        vm.expectRevert(UniV3Swap.InsufficientFunds.selector);
+        initializer.initFlash(ISwapperImpl(swapper), params);
+
+        assertEq(currentBlock, block.number);
+    }
 
     function test_convert_eth_to_glm() external {
         // effectively disable upper bound check and randomness check
@@ -161,19 +178,19 @@ contract TestTraderIntegrationETH2GLM is Test, TestPlus, DeployTrader {
         vm.stopPrank();
 
         uint256 oldBalance = swapper.balance;
-        forward(100);
+        forwardBlocks(100);
         trader.convert(block.number - 2);
         assertEq(trader.spent(), 1 ether);
         assertGt(swapper.balance, oldBalance);
 
-        // mock value of quote to avoid problems with stale oracle on CI
-        uint256[] memory unscaledAmountsToBeneficiary = new uint256[](1);
-        unscaledAmountsToBeneficiary[0] = 4228914774285437607589;
-        vm.mockCall(
-            address(oracle),
-            abi.encodeWithSelector(IOracle.getQuoteAmounts.selector),
-            abi.encode(unscaledAmountsToBeneficiary)
-        );
+        /* // mock value of quote to avoid problems with stale oracle on CI */
+        /* uint256[] memory unscaledAmountsToBeneficiary = new uint256[](1); */
+        /* unscaledAmountsToBeneficiary[0] = 4228914774285437607589; */
+        /* vm.mockCall( */
+        /*     address(oracle), */
+        /*     abi.encodeWithSelector(IOracle.getQuoteAmounts.selector), */
+        /*     abi.encode(unscaledAmountsToBeneficiary) */
+        /* ); */
 
         uint256 oldGlmBalance = IERC20(quoteAddress).balanceOf(beneficiary);
 
@@ -231,18 +248,18 @@ contract TestTraderIntegrationETH2GLM is Test, TestPlus, DeployTrader {
         trader.setSpending(0.5 ether, 1.5 ether, fakeBudget);
         vm.stopPrank();
 
-        forward(100);
+        forwardBlocks(100);
         uint256 saleValue = trader.findSaleValue(1.5 ether);
         assert(saleValue > 0);
 
-        // mock value of quote to avoid problems with stale oracle on CI
-        uint256[] memory unscaledAmountsToBeneficiary = new uint256[](1);
-        unscaledAmountsToBeneficiary[0] = 4228914774285437607589;
-        vm.mockCall(
-            address(oracle),
-            abi.encodeWithSelector(IOracle.getQuoteAmounts.selector),
-            abi.encode(unscaledAmountsToBeneficiary)
-        );
+        /* // mock value of quote to avoid problems with stale oracle on CI */
+        /* uint256[] memory unscaledAmountsToBeneficiary = new uint256[](1); */
+        /* unscaledAmountsToBeneficiary[0] = 4228914774285437607589; */
+        /* vm.mockCall( */
+        /*     address(oracle), */
+        /*     abi.encodeWithSelector(IOracle.getQuoteAmounts.selector), */
+        /*     abi.encode(unscaledAmountsToBeneficiary) */
+        /* ); */
 
         uint256 amountToBeneficiary = trader.transform{ value: saleValue }(trader.BASE(), trader.QUOTE(), saleValue);
 
@@ -271,7 +288,7 @@ contract TestTraderIntegrationETH2GLM is Test, TestPlus, DeployTrader {
         trader.setSpending(0.5 ether, 1.5 ether, fakeBudget);
         vm.stopPrank();
 
-        forward(300);
+        forwardBlocks(300);
         vm.expectRevert(Trader.Trader__WrongHeight.selector);
         trader.findSaleValue(1 ether);
     }
@@ -340,18 +357,18 @@ contract TestTraderIntegrationGLM2ETH is Test, TestPlus, DeployTrader {
         trader.setSpending(5 ether, 15 ether, fakeBudget);
         vm.stopPrank();
 
-        forward(100);
+        forwardBlocks(100);
         uint256 saleValue = trader.findSaleValue(15 ether);
         assert(saleValue > 0);
 
-        // mock value of quote to avoid problems with stale oracle on CI
-        uint256[] memory unscaledAmountsToBeneficiary = new uint256[](1);
-        unscaledAmountsToBeneficiary[0] = FixedPointMathLib.divWadUp(1, 4228914774285437607589);
-        vm.mockCall(
-            address(oracle),
-            abi.encodeWithSelector(IOracle.getQuoteAmounts.selector),
-            abi.encode(unscaledAmountsToBeneficiary)
-        );
+        /* // mock value of quote to avoid problems with stale oracle on CI */
+        /* uint256[] memory unscaledAmountsToBeneficiary = new uint256[](1); */
+        /* unscaledAmountsToBeneficiary[0] = FixedPointMathLib.divWadUp(1, 4228914774285437607589); */
+        /* vm.mockCall( */
+        /*     address(oracle), */
+        /*     abi.encodeWithSelector(IOracle.getQuoteAmounts.selector), */
+        /*     abi.encode(unscaledAmountsToBeneficiary) */
+        /* ); */
 
         // do actual attempt to convert ERC20 to ETH
         uint256 amountToBeneficiary = trader.transform(glmAddress, ETH, saleValue);
@@ -403,7 +420,7 @@ contract MisconfiguredSwapperTest is Test, TestPlus, DeployTrader {
         trader.setSpending(1 ether, 1 ether, fakeBudget);
         vm.stopPrank();
 
-        forward(100);
+        forwardBlocks(100);
         // revert without data
         vm.expectRevert();
         trader.convert(block.number - 2);

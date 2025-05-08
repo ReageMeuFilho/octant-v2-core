@@ -29,4 +29,5 @@ interface ISwapperImpl {
 
     function payback() external payable;
     function defaultScaledOfferFactor() external view returns (uint32);
+    function oracle() external returns (IOracle);
 }
