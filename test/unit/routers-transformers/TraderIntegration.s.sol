@@ -167,6 +167,23 @@ contract TestTraderIntegrationETH2GLM is Test, TestPlus, DeployTrader {
         assertEq(currentBlock, block.number);
     }
 
+    function test_twap_trade_in_other_direction_doesnt_trigger_protection() external {
+        vm.deal(address(swapper), 2 ether);
+        // mine a block to ensure that no readings were added yet
+        forwardBlocks(1);
+
+        uint currentBlock = block.number;
+
+        // someone rapidly moves the price in OTHER direction
+        force_direct_trade(glmAddress, 7000 ether, ETH);
+
+        // trade should succeed
+        UniV3Swap.InitFlashParams memory params = prepare_trader_params(1 ether);
+        initializer.initFlash(ISwapperImpl(swapper), params);
+
+        assertEq(currentBlock, block.number);
+    }
+
     function test_convert_eth_to_glm() external {
         // effectively disable upper bound check and randomness check
         uint256 fakeBudget = 1 ether;
