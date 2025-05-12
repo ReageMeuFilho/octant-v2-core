@@ -176,4 +176,16 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
             _isEnabled = false;
         }
     }
+
+    /// @notice Pauses the contract.
+    function pause() external whenNotPaused {
+        _revertIfNotAdmin();
+        _pause();
+    }
+
+    /// @notice Unpauses the contract.
+    function unpause() external whenPaused {
+        _revertIfNotAdmin();
+        _unpause();
+    }
 }

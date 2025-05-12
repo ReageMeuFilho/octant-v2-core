@@ -52,30 +52,30 @@ contract RegenIntegrationTest is Test {
         regenStaker.setRewardNotifier(address(this), true);
     }
 
-    function test_staker_whitelist_is_set() public view {
+    function test_StakerWhitelistIsSet() public view {
         assertEq(address(regenStaker.stakerWhitelist()), address(stakerWhitelist));
     }
 
-    function test_contribution_whitelist_is_set() public view {
+    function test_ContributionWhitelistIsSet() public view {
         assertEq(address(regenStaker.contributionWhitelist()), address(contributorWhitelist));
     }
 
-    function test_earning_power_whitelist_is_set() public view {
+    function test_EarningPowerWhitelistIsSet() public view {
         assertEq(
             address(IWhitelistedEarningPowerCalculator(address(regenStaker.earningPowerCalculator())).whitelist()),
             address(earningPowerWhitelist)
         );
     }
 
-    function test_earning_power_calculator_is_set() public view {
+    function test_EarningPowerCalculatorIsSet() public view {
         assertEq(address(regenStaker.earningPowerCalculator()), address(calculator));
     }
 
-    function test_staker_whitelist_disabled_allows_non_whitelisted_staking() public {
+    function test_AllowsStakingIfStakerWhitelistDisabled_RevertIf_ActiveAndUserNotWhitelisted() public {
         // First verify that non-admin cannot set the whitelist
         address nonAdmin = makeAddr("nonAdmin");
         vm.startPrank(nonAdmin);
-        vm.expectRevert(); // Should revert with Staker__Unauthorized
+        vm.expectRevert(abi.encodeWithSelector(Staker.Staker__Unauthorized.selector, bytes32("not admin"), nonAdmin));
         regenStaker.setStakerWhitelist(Whitelist(address(0)));
         vm.stopPrank();
 
@@ -109,11 +109,11 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
     }
 
-    function test_contribution_whitelist_disabled_allows_non_whitelisted_contribution() public {
+    function test_AllowsContributionIfContributorWhitelistDisabled_RevertIf_ActiveAndUserNotWhitelisted() public {
         // First verify that non-admin cannot set the whitelist
         address nonAdmin = makeAddr("nonAdmin");
         vm.startPrank(nonAdmin);
-        vm.expectRevert(); // Should revert with Staker__Unauthorized
+        vm.expectRevert(abi.encodeWithSelector(Staker.Staker__Unauthorized.selector, bytes32("not admin"), nonAdmin));
         regenStaker.setContributionWhitelist(Whitelist(address(0)));
         vm.stopPrank();
 
@@ -191,11 +191,13 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
     }
 
-    function test_earning_power_whitelist_disabled_allows_non_whitelisted_earning_power() public {
+    function test_GrantsEarningPowerToNewUserIfEarningPowerWhitelistDisabled_RevertIf_NonAdminDisablesCalculatorWhitelist()
+        public
+    {
         // First verify that non-admin cannot set the whitelist
         address nonAdmin = makeAddr("nonAdmin");
         vm.startPrank(nonAdmin);
-        vm.expectRevert(); // Should revert with OwnableUnauthorizedAccount
+        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", nonAdmin));
         IWhitelistedEarningPowerCalculator(address(calculator)).setWhitelist(Whitelist(address(0)));
         vm.stopPrank();
 
@@ -261,5 +263,138 @@ contract RegenIntegrationTest is Test {
         // Check earning power is granted
         uint256 newUserEarningPower = regenStaker.depositorTotalEarningPower(newUser);
         assertEq(newUserEarningPower, 1000); // Should have earning power despite not being on earning power whitelist
+    }
+
+    function test_RevertIf_PauseCalledByNonAdmin() public {
+        // Attempt to pause from a non-admin account
+        address nonAdmin = makeAddr("nonAdmin");
+        vm.startPrank(nonAdmin);
+        vm.expectRevert(abi.encodeWithSelector(Staker.Staker__Unauthorized.selector, bytes32("not admin"), nonAdmin));
+        regenStaker.pause();
+        vm.stopPrank();
+
+        // Pause as admin (this contract)
+        vm.startPrank(address(this));
+        regenStaker.pause();
+        assertTrue(regenStaker.paused(), "Contract should be paused");
+        vm.stopPrank();
+
+        // Unpause as admin to leave in a clean state for other tests
+        vm.startPrank(address(this));
+        regenStaker.unpause();
+        assertFalse(regenStaker.paused(), "Contract should be unpaused");
+        vm.stopPrank();
+    }
+
+    function test_RevertIf_UnpauseCalledByNonAdmin() public {
+        // First, pause the contract as admin
+        vm.startPrank(address(this));
+        regenStaker.pause();
+        assertTrue(regenStaker.paused(), "Contract should be paused before attempting unpause by non-admin");
+        vm.stopPrank();
+
+        // Attempt to unpause from a non-admin account
+        address nonAdmin = makeAddr("nonAdmin");
+        vm.startPrank(nonAdmin);
+        vm.expectRevert(abi.encodeWithSelector(Staker.Staker__Unauthorized.selector, bytes32("not admin"), nonAdmin));
+        regenStaker.unpause();
+        vm.stopPrank();
+
+        // Unpause as admin (this contract)
+        vm.startPrank(address(this));
+        regenStaker.unpause();
+        assertFalse(regenStaker.paused(), "Contract should be unpaused by admin");
+        vm.stopPrank();
+    }
+
+    function test_RevertIf_StakeWhenPaused() public {
+        // Setup a user
+        address user = makeAddr("user");
+
+        // Mint tokens and approve
+        stakeToken.mint(user, 100);
+        vm.startPrank(user);
+        stakeToken.approve(address(regenStaker), 100);
+        vm.stopPrank();
+
+        // Whitelist user for staking
+        address[] memory users = new address[](1);
+        users[0] = user;
+        stakerWhitelist.addToWhitelist(users);
+
+        // Pause the contract as admin
+        vm.startPrank(address(this));
+        regenStaker.pause();
+        assertTrue(regenStaker.paused(), "Contract should be paused");
+        vm.stopPrank();
+
+        // Attempt to stake while paused
+        vm.startPrank(user);
+        vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
+        regenStaker.stake(50, user);
+        vm.stopPrank();
+
+        // Unpause the contract for other tests
+        vm.startPrank(address(this));
+        regenStaker.unpause();
+        assertFalse(regenStaker.paused(), "Contract should be unpaused");
+        vm.stopPrank();
+    }
+
+    function test_RevertIf_ContributeWhenPaused() public {
+        // --- Setup for contribution ---
+        // Create a mock grant round
+        address mockGrantRound = makeAddr("mockGrantRound");
+        vm.mockCall(mockGrantRound, abi.encodeWithSelector(IGrantRound.signUp.selector), abi.encode(true));
+
+        // Create a depositor/contributor
+        address contributor = makeAddr("contributor");
+
+        // Mint tokens and approve
+        stakeToken.mint(contributor, 1000);
+        rewardToken.mint(address(regenStaker), 1_000_000_000_000_000_000); // 1e18 reward
+
+        vm.startPrank(contributor);
+        stakeToken.approve(address(regenStaker), 1000);
+
+        // Whitelist the contributor for staking, contribution, and earning power
+        address[] memory users = new address[](1);
+        users[0] = contributor;
+        vm.stopPrank(); // Stop contributor prank
+        stakerWhitelist.addToWhitelist(users);
+        contributorWhitelist.addToWhitelist(users);
+        earningPowerWhitelist.addToWhitelist(users);
+
+        // Stake tokens
+        vm.startPrank(contributor);
+        Staker.DepositIdentifier depositId = regenStaker.stake(1000, contributor);
+        vm.stopPrank();
+
+        // Notify rewards
+        vm.startPrank(address(this));
+        regenStaker.notifyRewardAmount(1_000_000_000_000_000_000);
+
+        // Fast forward time to accumulate rewards
+        vm.warp(block.timestamp + 28 days);
+        vm.stopPrank(); // Stop admin prank after notify/warp
+        // --- End Setup ---
+
+        // Pause the contract as admin
+        vm.startPrank(address(this));
+        regenStaker.pause();
+        assertTrue(regenStaker.paused(), "Contract should be paused");
+        vm.stopPrank();
+
+        // Attempt to contribute while paused
+        vm.startPrank(contributor);
+        vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
+        regenStaker.contribute(depositId, mockGrantRound, 1e12, 1);
+        vm.stopPrank();
+
+        // Unpause the contract for other tests
+        vm.startPrank(address(this));
+        regenStaker.unpause();
+        assertFalse(regenStaker.paused(), "Contract should be unpaused");
+        vm.stopPrank();
     }
 }
