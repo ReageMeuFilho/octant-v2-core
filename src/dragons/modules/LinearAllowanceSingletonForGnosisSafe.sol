@@ -21,9 +21,7 @@ interface ISafe {
 /// @notice See ILinearAllowanceSingletonForGnosisSafe
 contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, ReentrancyGuard {
     using SafeCast for uint256;
-    using SafeCast for uint192;
     using SafeCast for uint160;
-    using SafeCast for uint128;
     using SafeCast for uint32;
 
     mapping(address => mapping(address => mapping(address => LinearAllowance))) public allowances; // safe -> delegate -> token -> allowance
