@@ -22,22 +22,6 @@ import { Whitelist } from "./whitelist/Whitelist.sol";
 import { IWhitelist } from "./whitelist/IWhitelist.sol";
 import { IWhitelistedEarningPowerCalculator } from "./IWhitelistedEarningPowerCalculator.sol";
 
-error NotWhitelisted(IWhitelist whitelist, address user);
-error NotImplemented();
-error CantAfford(uint256 requested, uint256 available);
-error GrantRoundSignUpFailed(address grantRound, address contributor, uint256 amount, uint256 preference);
-
-event StakerWhitelistSet(IWhitelist whitelist);
-event ContributionWhitelistSet(IWhitelist whitelist);
-event EarningPowerWhitelistSet(IWhitelist whitelist);
-event RewardContributed(
-    Staker.DepositIdentifier depositId,
-    address contributor,
-    address grantRound,
-    uint256 amount,
-    uint256 preference
-);
-
 // TODO: Bind this to the real contract.
 interface IGrantRound {
     function signUp(uint256 _amount, uint256 _preference) external returns (bool success);
@@ -49,6 +33,22 @@ interface IGrantRound {
 contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndStake, StakerOnBehalf, Pausable {
     IWhitelist public stakerWhitelist;
     IWhitelist public contributionWhitelist;
+
+    error NotWhitelisted(IWhitelist whitelist, address user);
+    error NotImplemented();
+    error CantAfford(uint256 requested, uint256 available);
+    error GrantRoundSignUpFailed(address grantRound, address contributor, uint256 amount, uint256 preference);
+
+    event StakerWhitelistSet(IWhitelist whitelist);
+    event ContributionWhitelistSet(IWhitelist whitelist);
+    event EarningPowerWhitelistSet(IWhitelist whitelist);
+    event RewardContributed(
+        Staker.DepositIdentifier depositId,
+        address contributor,
+        address grantRound,
+        uint256 amount,
+        uint256 preference
+    );
 
     constructor(
         IERC20 _rewardsToken,

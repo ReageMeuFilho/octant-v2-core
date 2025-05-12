@@ -1,7 +1,7 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import { RegenStaker, NotWhitelisted } from "../../src/regen/RegenStaker.sol";
+import { RegenStaker } from "../../src/regen/RegenStaker.sol";
 import { RegenEarningPowerCalculator } from "../../src/regen/RegenEarningPowerCalculator.sol";
 import { Whitelist } from "../../src/regen/whitelist/Whitelist.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -90,7 +90,11 @@ contract RegenIntegrationTest is Test {
 
         // First attempt should revert because user is not whitelisted
         vm.expectRevert(
-            abi.encodeWithSelector(NotWhitelisted.selector, regenStaker.stakerWhitelist(), nonWhitelistedUser)
+            abi.encodeWithSelector(
+                RegenStaker.NotWhitelisted.selector,
+                regenStaker.stakerWhitelist(),
+                nonWhitelistedUser
+            )
         );
         regenStaker.stake(50, nonWhitelistedUser);
 
@@ -165,7 +169,7 @@ contract RegenIntegrationTest is Test {
         vm.startPrank(nonWhitelistedContributor);
         vm.expectRevert(
             abi.encodeWithSelector(
-                NotWhitelisted.selector,
+                RegenStaker.NotWhitelisted.selector,
                 regenStaker.contributionWhitelist(),
                 nonWhitelistedContributor
             )
