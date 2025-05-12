@@ -71,7 +71,7 @@ contract RegenIntegrationTest is Test {
         assertEq(address(regenStaker.earningPowerCalculator()), address(calculator));
     }
 
-    function test_DisablingStakerWhitelistAllowsNonWhitelistedStaking() public {
+    function test_staker_whitelist_disabled_allows_non_whitelisted_staking() public {
         // First verify that non-admin cannot set the whitelist
         address nonAdmin = makeAddr("nonAdmin");
         vm.startPrank(nonAdmin);
@@ -109,7 +109,7 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
     }
 
-    function test_DisablingContributionWhitelistAllowsNonWhitelistedContribution() public {
+    function test_contribution_whitelist_disabled_allows_non_whitelisted_contribution() public {
         // First verify that non-admin cannot set the whitelist
         address nonAdmin = makeAddr("nonAdmin");
         vm.startPrank(nonAdmin);
@@ -191,7 +191,7 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
     }
 
-    function test_DisablingEarningPowerWhitelistAllowsNonWhitelistedEarningPower() public {
+    function test_earning_power_whitelist_disabled_allows_non_whitelisted_earning_power() public {
         // First verify that non-admin cannot set the whitelist
         address nonAdmin = makeAddr("nonAdmin");
         vm.startPrank(nonAdmin);
