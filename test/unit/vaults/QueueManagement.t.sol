@@ -195,7 +195,7 @@ contract QueueManagementTest is Test {
 
     function testAddStrategyAddsToQueue() public {
         // Check empty queue initially
-        address[] memory queue = vault.getDefaultQueue();
+        address[] memory queue = vault.defaultQueue();
         assertEq(queue.length, 0, "Queue should start empty");
 
         // Add first strategy
@@ -204,7 +204,7 @@ contract QueueManagementTest is Test {
         vault.addStrategy(strategyOne, true);
 
         // Check queue contains the first strategy
-        queue = vault.getDefaultQueue();
+        queue = vault.defaultQueue();
         assertEq(queue.length, 1, "Queue should have one strategy");
         assertEq(queue[0], strategyOne, "First strategy should be in queue");
 
@@ -214,7 +214,7 @@ contract QueueManagementTest is Test {
         vault.addStrategy(strategyTwo, true);
 
         // Check queue contains both strategies in order
-        queue = vault.getDefaultQueue();
+        queue = vault.defaultQueue();
         assertEq(queue.length, 2, "Queue should have two strategies");
         assertEq(queue[0], strategyOne, "First strategy should be first in queue");
         assertEq(queue[1], strategyTwo, "Second strategy should be second in queue");
@@ -222,7 +222,7 @@ contract QueueManagementTest is Test {
 
     function testAddStrategyDontAddToQueue() public {
         // Check empty queue initially
-        address[] memory queue = vault.getDefaultQueue();
+        address[] memory queue = vault.defaultQueue();
         assertEq(queue.length, 0, "Queue should start empty");
 
         // Add first strategy without adding to queue
@@ -231,7 +231,7 @@ contract QueueManagementTest is Test {
         vault.addStrategy(strategyOne, false);
 
         // Check queue is still empty
-        queue = vault.getDefaultQueue();
+        queue = vault.defaultQueue();
         assertEq(queue.length, 0, "Queue should still be empty");
 
         // Check strategy is still active
@@ -244,13 +244,13 @@ contract QueueManagementTest is Test {
         vault.addStrategy(strategyTwo, false);
 
         // Check queue is still empty
-        queue = vault.getDefaultQueue();
+        queue = vault.defaultQueue();
         assertEq(queue.length, 0, "Queue should still be empty");
     }
 
     function testAddElevenStrategiesAddsTenToQueue() public {
         // Check empty queue initially
-        address[] memory queue = vault.getDefaultQueue();
+        address[] memory queue = vault.defaultQueue();
         assertEq(queue.length, 0, "Queue should start empty");
 
         // Add 10 strategies and check queue length increases each time
@@ -262,12 +262,12 @@ contract QueueManagementTest is Test {
             vm.prank(gov);
             vault.addStrategy(newStrategy, true);
 
-            queue = vault.getDefaultQueue();
+            queue = vault.defaultQueue();
             assertEq(queue.length, i + 1, "Queue length should increase");
         }
 
         // Store queue for comparison
-        address[] memory defaultQueue = vault.getDefaultQueue();
+        address[] memory defaultQueue = vault.defaultQueue();
         assertEq(defaultQueue.length, 10, "Default queue should have 10 strategies");
 
         // Add 11th strategy
@@ -282,7 +282,7 @@ contract QueueManagementTest is Test {
         assertGt(params.activation, 0, "Strategy should be active");
 
         // Check queue remains unchanged
-        address[] memory newQueue = vault.getDefaultQueue();
+        address[] memory newQueue = vault.defaultQueue();
         assertEq(newQueue.length, 10, "Queue should still have 10 strategies");
 
         // Verify 11th strategy isn't in queue
@@ -298,7 +298,7 @@ contract QueueManagementTest is Test {
 
     function testRevokeStrategyRemovesStrategyFromQueue() public {
         // Check empty queue initially
-        address[] memory queue = vault.getDefaultQueue();
+        address[] memory queue = vault.defaultQueue();
         assertEq(queue.length, 0, "Queue should start empty");
 
         // Add a strategy
@@ -307,7 +307,7 @@ contract QueueManagementTest is Test {
         vault.addStrategy(strategyOne, true);
 
         // Check queue contains the strategy
-        queue = vault.getDefaultQueue();
+        queue = vault.defaultQueue();
         assertEq(queue.length, 1, "Queue should have one strategy");
         assertEq(queue[0], strategyOne, "Strategy should be in queue");
 
@@ -319,7 +319,7 @@ contract QueueManagementTest is Test {
         Vault.StrategyParams memory params = vault.strategies(strategyOne);
         assertEq(params.activation, 0, "Strategy should not be active");
 
-        queue = vault.getDefaultQueue();
+        queue = vault.defaultQueue();
         assertEq(queue.length, 0, "Queue should be empty");
     }
 
@@ -333,7 +333,7 @@ contract QueueManagementTest is Test {
         Vault.StrategyParams memory params = vault.strategies(strategyOne);
         assertGt(params.activation, 0, "Strategy should be active");
 
-        address[] memory queue = vault.getDefaultQueue();
+        address[] memory queue = vault.defaultQueue();
         assertEq(queue.length, 0, "Queue should be empty");
 
         // Revoke the strategy
@@ -344,7 +344,7 @@ contract QueueManagementTest is Test {
         params = vault.strategies(strategyOne);
         assertEq(params.activation, 0, "Strategy should not be active");
 
-        queue = vault.getDefaultQueue();
+        queue = vault.defaultQueue();
         assertEq(queue.length, 0, "Queue should still be empty");
     }
 
@@ -359,7 +359,7 @@ contract QueueManagementTest is Test {
         vault.addStrategy(strategyTwo, true);
 
         // Check queue contains both strategies
-        address[] memory queue = vault.getDefaultQueue();
+        address[] memory queue = vault.defaultQueue();
         assertEq(queue.length, 2, "Queue should have two strategies");
         assertEq(queue[0], strategyOne, "First strategy should be first in queue");
         assertEq(queue[1], strategyTwo, "Second strategy should be second in queue");
@@ -372,7 +372,7 @@ contract QueueManagementTest is Test {
         Vault.StrategyParams memory params = vault.strategies(strategyOne);
         assertEq(params.activation, 0, "First strategy should not be active");
 
-        queue = vault.getDefaultQueue();
+        queue = vault.defaultQueue();
         assertEq(queue.length, 1, "Queue should have one strategy");
         assertEq(queue[0], strategyTwo, "Only second strategy should be in queue");
     }
@@ -389,7 +389,7 @@ contract QueueManagementTest is Test {
         }
 
         // Store queue for comparison
-        address[] memory defaultQueue = vault.getDefaultQueue();
+        address[] memory defaultQueue = vault.defaultQueue();
         assertEq(defaultQueue.length, 10, "Default queue should have 10 strategies");
 
         // Add 11th strategy
@@ -406,7 +406,7 @@ contract QueueManagementTest is Test {
         vault.revokeStrategy(eleventhStrategy);
 
         // Check queue is unchanged
-        address[] memory newQueue = vault.getDefaultQueue();
+        address[] memory newQueue = vault.defaultQueue();
         assertEq(newQueue.length, 10, "Queue should still have 10 strategies");
 
         // Verify queue is unchanged
@@ -426,7 +426,7 @@ contract QueueManagementTest is Test {
         vault.addStrategy(strategyTwo, true);
 
         // Check default queue order
-        address[] memory queue = vault.getDefaultQueue();
+        address[] memory queue = vault.defaultQueue();
         assertEq(queue.length, 2, "Queue should have two strategies");
         assertEq(queue[0], strategyOne, "First strategy should be first in queue");
         assertEq(queue[1], strategyTwo, "Second strategy should be second in queue");
@@ -442,7 +442,7 @@ contract QueueManagementTest is Test {
         vault.setDefaultQueue(newQueue);
 
         // Check new queue is set
-        queue = vault.getDefaultQueue();
+        queue = vault.defaultQueue();
         assertEq(queue.length, 2, "Queue should have two strategies");
         assertEq(queue[0], strategyTwo, "First strategy should now be the second strategy");
         assertEq(queue[1], strategyOne, "Second strategy should now be the first strategy");
