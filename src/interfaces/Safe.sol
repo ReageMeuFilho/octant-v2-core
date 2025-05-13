@@ -33,6 +33,13 @@ interface ISafe {
     ) external returns (bool success, bytes memory returnData);
 
     /**
+     * @notice Enables the module `module` for the Safe.
+     * @dev This can only be done via a Safe transaction.
+     * @param module Module to be enabled.
+     */
+    function enableModule(address module) external;
+
+    /**
      * @dev Checks whether the signature provided is valid for the provided data, hash. Will revert otherwise.
      * @param dataHash Hash of the data (could be either a message hash or transaction hash)
      * @param data That should be signed (this is passed to an external validator contract)
@@ -57,13 +64,6 @@ interface ISafe {
         address start,
         uint256 pageSize
     ) external view returns (address[] memory array, address next);
-
-    /**
-     * @notice Enables the module `module` for the Safe.
-     * @dev This can only be done via a Safe transaction.
-     * @param module Module to be enabled.
-     */
-    function enableModule(address module) external;
 
     /**
      * @notice Returns the number of required confirmations for a Safe transaction aka the threshold.

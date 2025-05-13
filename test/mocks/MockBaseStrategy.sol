@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.8.18;
 
-import {MockYieldSource} from "./MockYieldSource.sol";
-import {DragonBaseStrategy, ERC20} from "../../src/regens/DragonBaseStrategy.sol";
+import { MockYieldSource } from "./MockYieldSource.sol";
+import { DragonBaseStrategy, ERC20 } from "src/core/DragonBaseStrategy.sol";
 
 contract MockStrategy is DragonBaseStrategy {
     address public yieldSource;
@@ -37,9 +37,7 @@ contract MockStrategy is DragonBaseStrategy {
         if (balance > 0 && !TokenizedStrategy.isShutdown()) {
             MockYieldSource(yieldSource).deposit(balance);
         }
-        return
-            MockYieldSource(yieldSource).balance() +
-            ERC20(asset).balanceOf(address(this));
+        return MockYieldSource(yieldSource).balance() + ERC20(asset).balanceOf(address(this));
     }
 
     function _tend(uint256 /*_idle*/) internal override {

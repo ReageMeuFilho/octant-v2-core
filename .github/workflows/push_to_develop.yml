@@ -1,6 +1,6 @@
 # In steps following image build we're ignoring files uploaded to /_w/ directory as current code is in /app directory
 
-name: Push to develop
+name: 🤖 Push to develop
 on:
   push:
     branches:
@@ -14,8 +14,96 @@ env:
   FOUNDRY_PROFILE: ci
 
 jobs:
+  format:
+    name: Check formatting
+    runs-on: general
+    container:
+      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:3e595e3d
+      credentials:
+        username: _json_key_base64
+        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Init env
+        run: yarn install
+
+      - name: Check formatting
+        run: yarn format:check
+
+  lint:
+    name: Run linter
+    runs-on: general
+    container:
+      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:3e595e3d
+      credentials:
+        username: _json_key_base64
+        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Init env
+        run: yarn install
+
+      - name: Linter
+        run: yarn lint
+
+  lint-commits:
+    name: Lint commits
+    runs-on: general
+    container:
+      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:3e595e3d
+      credentials:
+        username: _json_key_base64
+        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Init env
+        run: yarn install
+
+      - name: Lint commits
+        run: yarn lint:commits
+
+  analyze:
+    name: Analyze with Slither
+    runs-on: general
+    continue-on-error: true
+    container:
+      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:3e595e3d
+      credentials:
+        username: _json_key_base64
+        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Init env
+        run: yarn install
+
+      - name: Run Slither
+        shell: "bash {0}"
+        run: |
+          yarn slither:ci
+          exit_code=$?
+          echo '```' > $GITHUB_STEP_SUMMARY
+          cat reports/slither.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          exit $exit_code
+
   build-image:
     name: Build Docker Image
+    needs:
+      - format
+      - lint
+      - lint-commits
     runs-on:
       - general
     steps:
@@ -55,36 +143,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  format:
-    name: Check formatting
-    needs: build-image
-    runs-on: general
-    container:
-      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/core:${{ github.sha }}
-      credentials:
-        username: _json_key_base64
-        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
-
-    steps:
-      - name: Check formatting
-        run: "cd /app; yarn format:check"
-
-  lint:
-    name: Run linter
-    needs: build-image
-    runs-on: general
-    container:
-      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/core:${{ github.sha }}
-      credentials:
-        username: _json_key_base64
-        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
-
-    steps:
-      - name: Linter
-        run: "cd /app; yarn lint"
+          cache-from: type=registry,ref=${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/core:buildcache
+          cache-to: type=registry,ref=${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/core:buildcache,mode=max
 
   # Technically we don't need to build step is done during the docker build
   build:
@@ -117,7 +177,7 @@ jobs:
     steps:
       - name: Run tests
         env:
-          TEST_RPC_URL: "${{ vars.TENDERLY_MAINNET_RPC_URL }}"
+          TEST_RPC_URL: "${{ vars.TEST_MAINNET_RPC_URL }}"
           TEST_SAFE_SINGLETON: "0x41675C099F32341bf84BFc5382aF534df5C7461a"
           TEST_SAFE_PROXY_FACTORY: "0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67"
           TEST_RPC_URL_POLYGON: "https://polygon-rpc.com"
@@ -140,121 +200,3 @@ jobs:
           name: Tests results                # Name of the check run which will be created
           path: '*.xml'                     # Path to test results (inside artifact .zip)
           reporter: java-junit              # Format of test results
-
-  #  # Coverage fails on 'Yul exception:Variable expr is 1 too deep in the stack'
-  #  coverage:
-  #    runs-on: general
-  #    permissions:
-  #      contents: read
-  #      pull-requests: write
-  #
-  #    steps:
-  #      - uses: actions/checkout@v4
-  #        with:
-  #          submodules: recursive
-  #
-  #      - name: Setup node
-  #        uses: actions/setup-node@v4
-  #        with:
-  #          node-version-file: 'package.json'
-  #
-  #      - name: Install Foundry
-  #        uses: onbjerg/foundry-toolchain@v1
-  #
-  #      - name: Install dependencies
-  #        run: "corepack enable && yarn install"
-  #
-  #      - name: Run Forge build
-  #        run: "forge --version && yarn build --sizes"
-  #
-  #      - name: Run forge coverage
-  #        id: coverage
-  #        env:
-  #          TEST_RPC_URL: "https://eth.llamarpc.com"
-  #          TEST_SAFE_SINGLETON: "0x41675C099F32341bf84BFc5382aF534df5C7461a"
-  #          TEST_SAFE_PROXY_FACTORY: "0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67"
-  #        run: |
-  #          {
-  #          echo 'COVERAGE<<EOF'
-  #          forge coverage --ir-minimum --summary | awk '/Test Summary:/{y=1;next}y'
-  #          echo EOF
-  #          } >> "$GITHUB_OUTPUT"
-  #
-  #      - name: Comment on PR
-  #        id: comment
-  #        uses: actions/github-script@v7
-  #        with:
-  #          github-token: ${{ secrets.TOKEN_GITHUB }}
-  #          script: |
-  #            const output = `${{ steps.coverage.outputs.COVERAGE }}`;
-  #            const commentBody = `Forge code coverage:\n${output}\n`;
-  #            github.rest.issues.createComment({
-  #              issue_number: context.issue.number,
-  #              owner: context.repo.owner,
-  #              repo: context.repo.repo,
-  #              body: commentBody
-  #            });
-
-  #  # Blocked by OSU-502
-  #  analyze:
-  #    name: Analyze with Slither
-  #    runs-on: general
-  #    steps:
-  #      - uses: actions/checkout@v4
-  #        with:
-  #          submodules: recursive
-  #
-  #      - name: Setup node
-  #        uses: actions/setup-node@v4
-  #        with:
-  #          node-version-file: 'package.json'
-  #
-  #      - name: Install Foundry
-  #        uses: onbjerg/foundry-toolchain@v1
-  #
-  #      - name: Install dependencies
-  #        run: "corepack enable && yarn install"
-  #
-  #      - name: Run Slither
-  #        run: "yarn slither:setup && yarn slither"
-
-  deploy-contract:
-    name: Deploy contracts to Sepolia
-    needs:
-      - lint
-      - format
-      - build
-      - test
-    runs-on: general
-    container:
-      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/core:${{ github.sha }}
-      credentials:
-        username: _json_key_base64
-        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
-
-    steps:
-      - name: Deploy contracts
-        env:
-          PRIVATE_KEY: "${{ secrets.TESTNET_DEPLOYER_PRIVATE_KEY }}"
-          ETHERSCAN_API_KEY: "${{ secrets.TENDERLY_API_KEY }}"
-          RPC_URL: "${{ vars.TENDERLY_SEPOLIA_RPC_URL }}"
-          VERIFIER_URL: "${{ vars.TENDERLY_SEPOLIA_RPC_URL }}/verify/etherscan"
-          MAX_OPEX_SPLIT: "5"
-          MIN_METAPOOL_SPLIT: "0"
-          CONTRACT_ADDRESSES: "/app/ci/contract_addresses.txt"
-        run: |
-          cd /app
-          touch .env
-          yarn deploy:tenderly && (
-            cp $CONTRACT_ADDRESSES $GITHUB_OUTPUT
-            echo "# Smart contract addresses\n\n| Contract name | Address |\n|---|---|" > $GITHUB_STEP_SUMMARY
-            grep ADDRESS $CONTRACT_ADDRESSES | awk -F '=' '{gsub("_ADDRESS", "", $1); print "| `" $1 "` | `" $2 "` |"}' >> $GITHUB_STEP_SUMMARY
-            echo "\n# Other variables\n\n| Variable | Value |\n|---|---|" >> $GITHUB_STEP_SUMMARY
-            grep -v ADDRESS $CONTRACT_ADDRESSES | awk -F '=' '{print "| `" $1 "` | `" $2 "` |"}' >> $GITHUB_STEP_SUMMARY
-          )
-
-      - name: Upload contract addresses artifact
-        uses: actions/upload-artifact@v4  # upload test results
-        with:
-          name: contract_addresses.txt
-          path: /app/ci/contract_addresses.txt

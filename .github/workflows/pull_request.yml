@@ -1,6 +1,6 @@
 # In steps following image build we're ignoring files uploaded to /_w/ directory as current code is in /app directory
 
-name: CI Pull Request
+name: 🤖 CI Pull Request
 on:
   pull_request:
     branches:
@@ -16,8 +16,96 @@ env:
   FOUNDRY_PROFILE: ci
 
 jobs:
+  format:
+    name: Check formatting
+    runs-on: general
+    container:
+      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:3e595e3d
+      credentials:
+        username: _json_key_base64
+        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Init env
+        run: yarn install
+
+      - name: Check formatting
+        run: yarn format:check
+
+  lint:
+    name: Run linter
+    runs-on: general
+    container:
+      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:3e595e3d
+      credentials:
+        username: _json_key_base64
+        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Init env
+        run: yarn install
+
+      - name: Linter
+        run: yarn lint
+
+  lint-commits:
+    name: Lint commits
+    runs-on: general
+    container:
+      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:3e595e3d
+      credentials:
+        username: _json_key_base64
+        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Init env
+        run: yarn install
+
+      - name: Lint commits
+        run: yarn lint:commits
+
+  analyze:
+    name: Analyze with Slither
+    runs-on: general
+    continue-on-error: true
+    container:
+      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:3e595e3d
+      credentials:
+        username: _json_key_base64
+        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Init env
+        run: yarn install
+
+      - name: Run Slither
+        shell: "bash {0}"
+        run: |
+          yarn slither:ci
+          exit_code=$?
+          echo '```' > $GITHUB_STEP_SUMMARY
+          cat reports/slither.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          exit $exit_code
+
   build-image:
     name: Build Docker Image
+    needs:
+      - format
+      - lint
+      - lint-commits
     runs-on:
       - general
     steps:
@@ -57,36 +145,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  format:
-    name: Check formatting
-    needs: build-image
-    runs-on: general
-    container:
-      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/ci/core:${{ github.sha }}
-      credentials:
-        username: _json_key_base64
-        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
-
-    steps:
-      - name: Check formatting
-        run: "cd /app; yarn format:check"
-
-  lint:
-    name: Run linter
-    needs: build-image
-    runs-on: general
-    container:
-      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/ci/core:${{ github.sha }}
-      credentials:
-        username: _json_key_base64
-        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
-
-    steps:
-      - name: Linter
-        run: "cd /app; yarn lint"
+          cache-from: type=registry,ref=${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/ci/core:buildcache
+          cache-to: type=registry,ref=${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/ci/core:buildcache,mode=max
 
   # Technically we don't need to build step is done during the docker build
   build:
@@ -119,7 +179,7 @@ jobs:
     steps:
       - name: Run tests
         env:
-          TEST_RPC_URL: "${{ vars.TENDERLY_MAINNET_RPC_URL }}"
+          TEST_RPC_URL: "${{ vars.TEST_MAINNET_RPC_URL }}"
           TEST_SAFE_SINGLETON: "0x41675C099F32341bf84BFc5382aF534df5C7461a"
           TEST_SAFE_PROXY_FACTORY: "0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67"
           TEST_RPC_URL_POLYGON: "https://polygon-rpc.com"
@@ -143,79 +203,112 @@ jobs:
           path: '*.xml'                     # Path to test results (inside artifact .zip)
           reporter: java-junit              # Format of test results
 
-#  # Coverage fails on 'Yul exception:Variable expr is 1 too deep in the stack'
-#  coverage:
-#    runs-on: general
-#    permissions:
-#      contents: read
-#      pull-requests: write
-#
-#    steps:
-#      - uses: actions/checkout@v4
-#        with:
-#          submodules: recursive
-#
-#      - name: Setup node
-#        uses: actions/setup-node@v4
-#        with:
-#          node-version-file: 'package.json'
-#
-#      - name: Install Foundry
-#        uses: onbjerg/foundry-toolchain@v1
-#
-#      - name: Install dependencies
-#        run: "corepack enable && yarn install"
-#
-#      - name: Run Forge build
-#        run: "forge --version && yarn build --sizes"
-#
-#      - name: Run forge coverage
-#        id: coverage
-#        env:
-#          TEST_RPC_URL: "https://eth.llamarpc.com"
-#          TEST_SAFE_SINGLETON: "0x41675C099F32341bf84BFc5382aF534df5C7461a"
-#          TEST_SAFE_PROXY_FACTORY: "0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67"
-#        run: |
-#          {
-#          echo 'COVERAGE<<EOF'
-#          forge coverage --ir-minimum --summary | awk '/Test Summary:/{y=1;next}y'
-#          echo EOF
-#          } >> "$GITHUB_OUTPUT"
-#
-#      - name: Comment on PR
-#        id: comment
-#        uses: actions/github-script@v7
-#        with:
-#          github-token: ${{ secrets.TOKEN_GITHUB }}
-#          script: |
-#            const output = `${{ steps.coverage.outputs.COVERAGE }}`;
-#            const commentBody = `Forge code coverage:\n${output}\n`;
-#            github.rest.issues.createComment({
-#              issue_number: context.issue.number,
-#              owner: context.repo.owner,
-#              repo: context.repo.repo,
-#              body: commentBody
-#            });
+  coverage:
+    name: Code Coverage
+    needs: [build-image]
+    runs-on: general
+    container:
+      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/ci/core:${{ github.sha }}
+      credentials:
+        username: _json_key_base64
+        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
+    steps:
+      - name: Generate Coverage Report
+        env:
+          TEST_RPC_URL: "${{ vars.TEST_MAINNET_RPC_URL }}"
+          TEST_SAFE_SINGLETON: "0x41675C099F32341bf84BFc5382aF534df5C7461a"
+          TEST_SAFE_PROXY_FACTORY: "0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67"
+          TEST_RPC_URL_POLYGON: "https://polygon-rpc.com"
+          TEST_SAFE_SINGLETON_POLYGON: "0x41675C099F32341bf84BFc5382aF534df5C7461a"
+          TEST_SAFE_PROXY_FACTORY_POLYGON: "0x4e1DCf7AD4e460CfD30791CCC4F9c8a4f820ec67"
+        run: |
+          cd /app
+          
+          # Comment out problematic lines
+          sed -i.bak '201,209s/^/\/\/ /' lib/hats-protocol/src/Hats.sol
+          
+          # Create markdown report header
+          echo "# Code Coverage Report for src/ files" > src_coverage.md
+          echo "" >> src_coverage.md
+          echo "| File | % Lines | % Statements | % Branches | % Funcs |" >> src_coverage.md
+          echo "|------|---------|--------------|------------|---------|" >> src_coverage.md
+          
+          # Run coverage
+          echo "Running coverage with --ir-minimum, this may take a while..."
+          if forge coverage --report summary --no-match-test "Skip" --ir-minimum > full_coverage.txt 2>coverage_error.txt; then
+            echo "Coverage completed successfully"
+            
+            # Process each src/ line and add emoji indicators
+            grep "| src/" full_coverage.txt | while read -r line; do
+              # Extract file path
+              file=$(echo "$line" | awk -F'|' '{print $2}' | xargs)
+              
+              # Extract numerical percentages and full data
+              lines_data=$(echo "$line" | awk -F'|' '{print $3}' | xargs)
+              stmts_data=$(echo "$line" | awk -F'|' '{print $4}' | xargs)
+              branch_data=$(echo "$line" | awk -F'|' '{print $5}' | xargs)
+              funcs_data=$(echo "$line" | awk -F'|' '{print $6}' | xargs)
+              
+              # Extract just the percentage values (before the %)
+              lines_pct=$(echo "$lines_data" | grep -o "^[0-9]\+\.[0-9]\+" || echo "0")
+              stmts_pct=$(echo "$stmts_data" | grep -o "^[0-9]\+\.[0-9]\+" || echo "0")
+              branch_pct=$(echo "$branch_data" | grep -o "^[0-9]\+\.[0-9]\+" || echo "0")
+              funcs_pct=$(echo "$funcs_data" | grep -o "^[0-9]\+\.[0-9]\+" || echo "0")
+              
+              # Compare as integers by removing decimal part (85.00 becomes 85)
+              lines_int=$(echo "$lines_pct" | cut -d. -f1)
+              stmts_int=$(echo "$stmts_pct" | cut -d. -f1)
+              branch_int=$(echo "$branch_pct" | cut -d. -f1)
+              funcs_int=$(echo "$funcs_pct" | cut -d. -f1)
+              
+              # Add emojis using integer comparison
+              if [ "$lines_int" -lt 85 ]; then
+                lines_formatted="🔴 $lines_data"
+              else
+                lines_formatted="✅ $lines_data"
+              fi
+              
+              if [ "$stmts_int" -lt 85 ]; then
+                stmts_formatted="🔴 $stmts_data"
+              else
+                stmts_formatted="✅ $stmts_data"
+              fi
+              
+              if [ "$branch_int" -lt 85 ]; then
+                branch_formatted="🔴 $branch_data"
+              else
+                branch_formatted="✅ $branch_data"
+              fi
+              
+              if [ "$funcs_int" -lt 85 ]; then
+                funcs_formatted="🔴 $funcs_data"
+              else
+                funcs_formatted="✅ $funcs_data"
+              fi
+              
+              # Output the formatted line
+              echo "| $file | $lines_formatted | $stmts_formatted | $branch_formatted | $funcs_formatted |" >> src_coverage.md
+            done
+          else
+            echo "Coverage failed with exit code $?"
+            echo "## ⚠️ Coverage Generation Failed" >> src_coverage.md
+            echo "" >> src_coverage.md
+            echo "Error output:" >> src_coverage.md
+            echo '```' >> src_coverage.md
+            cat coverage_error.txt >> src_coverage.md
+            echo '```' >> src_coverage.md
+          fi
+          
+          # Restore original file
+          mv lib/hats-protocol/src/Hats.sol.bak lib/hats-protocol/src/Hats.sol
+          
+          # Always output what we have to GitHub step summary
+          cat src_coverage.md >> $GITHUB_STEP_SUMMARY
+        continue-on-error: true
 
-#  # Blocked by OSU-502
-#  analyze:
-#    name: Analyze with Slither
-#    runs-on: general
-#    steps:
-#      - uses: actions/checkout@v4
-#        with:
-#          submodules: recursive
-#
-#      - name: Setup node
-#        uses: actions/setup-node@v4
-#        with:
-#          node-version-file: 'package.json'
-#
-#      - name: Install Foundry
-#        uses: onbjerg/foundry-toolchain@v1
-#
-#      - name: Install dependencies
-#        run: "corepack enable && yarn install"
-#
-#      - name: Run Slither
-#        run: "yarn slither:setup && yarn slither"
+      - name: Add PR Comment
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: coverage-report
+          path: /app/src_coverage.md

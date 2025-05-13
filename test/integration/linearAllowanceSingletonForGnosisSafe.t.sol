@@ -4,11 +4,12 @@ import "forge-std/Test.sol";
 import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxy.sol";
-import { LinearAllowanceSingletonForGnosisSafe } from "src/dragons/modules/LinearAllowanceSingletonForGnosisSafe.sol";
+import { LinearAllowanceSingletonForGnosisSafeWrapper } from "test/wrappers/LinearAllowanceSingletonForGnosisSafeWrapper.sol";
 import { NATIVE_TOKEN } from "src/constants.sol";
 import "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 import { LinearAllowanceExecutor } from "../../src/dragons/LinearAllowanceExecutor.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { ILinearAllowanceSingleton } from "../../src/interfaces/ILinearAllowanceSingleton.sol";
 
 contract TestERC20 is ERC20 {
     constructor(uint256 initialSupply) ERC20("TestToken", "TST") {
@@ -22,12 +23,14 @@ contract TestLinearAllowanceIntegration is Test {
     Safe internal safeImpl;
     SafeProxyFactory internal safeProxyFactory;
     Safe internal singleton;
-    LinearAllowanceSingletonForGnosisSafe internal allowanceModule;
+    LinearAllowanceSingletonForGnosisSafeWrapper internal allowanceModule;
     LinearAllowanceExecutor public allowanceExecutor;
+    address internal recipient = makeAddr("recipient");
+    address internal safe = makeAddr("safe");
 
     function setUp() public {
         // Deploy module
-        allowanceModule = new LinearAllowanceSingletonForGnosisSafe();
+        allowanceModule = new LinearAllowanceSingletonForGnosisSafeWrapper();
         // Deploy Safe infrastructure
         safeProxyFactory = new SafeProxyFactory();
         singleton = new Safe();
@@ -228,6 +231,148 @@ contract TestLinearAllowanceIntegration is Test {
         );
     }
 
+    function testGetTotalUnspentWithUninitializedAllowance() public view {
+        // Already passing, keeps the same
+        uint256 unspent = allowanceModule.getTotalUnspent(
+            address(safeImpl),
+            address(0x123), // Random delegate that hasn't been configured
+            address(NATIVE_TOKEN)
+        );
+
+        assertEq(unspent, 0, "Unspent amount should be 0 for uninitialized allowance");
+    }
+
+    function testExecuteAllowanceTransferFailingTokenTransfer() public {
+        // Set up token
+        TestERC20 token = new TestERC20(100 ether);
+
+        // Create a mock safe that returns false for execTransactionFromModule
+        MockFailingSafe failingSafe = new MockFailingSafe();
+
+        // Mint tokens to the failing safe
+        token.transfer(address(failingSafe), 100 ether);
+
+        // Prank as the failing safe to set allowance
+        vm.prank(address(failingSafe));
+        allowanceModule.setAllowance(address(allowanceExecutor), address(token), uint128(100 ether));
+
+        // Need to wait for allowance to accumulate
+        vm.warp(block.timestamp + 1 days);
+
+        // Attempt to execute allowance transfer
+        vm.prank(address(allowanceExecutor));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ILinearAllowanceSingleton.TransferFailed.selector,
+                address(failingSafe),
+                address(allowanceExecutor),
+                address(token)
+            )
+        );
+        allowanceModule.executeAllowanceTransfer(address(failingSafe), address(token), payable(address(recipient)));
+    }
+
+    function testExecuteAllowanceTransferEthTransferFailure() public {
+        // Create a contract that rejects ETH transfers
+        ContractThatRejectsETH rejector = new ContractThatRejectsETH();
+
+        // Setup the mock safe
+        MockSafeThatFailsEthTransfers failingSafe = new MockSafeThatFailsEthTransfers();
+        vm.deal(address(failingSafe), 100 ether);
+
+        // Create a delegate (executor) that we'll use
+        LinearAllowanceExecutor executor = new LinearAllowanceExecutor();
+
+        // Set allowance for ETH (using address(0) as native token)
+        vm.prank(address(failingSafe));
+        allowanceModule.setAllowance(address(executor), address(0), uint128(100 ether));
+
+        // Wait for allowance to accumulate
+        vm.warp(block.timestamp + 1 days);
+
+        // Try to transfer ETH - should fail
+        vm.prank(address(executor));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ILinearAllowanceSingleton.TransferFailed.selector,
+                address(failingSafe),
+                address(executor),
+                address(0)
+            )
+        );
+        allowanceModule.executeAllowanceTransfer(address(failingSafe), address(0), payable(address(rejector)));
+    }
+
+    function testUpdateAllowanceWithExistingAllowance() public {
+        // Create test token
+        TestERC20 testToken = new TestERC20(100 ether);
+
+        // Create a delegate (executor) that we'll use
+        LinearAllowanceExecutor executor = new LinearAllowanceExecutor();
+
+        // Create an allowance
+        vm.prank(address(safe));
+        allowanceModule.setAllowance(address(executor), address(testToken), uint128(100 ether));
+
+        // Fast forward time
+        vm.warp(block.timestamp + 1 days);
+
+        // Call setAllowance again which invokes _updateAllowance
+        vm.prank(address(safe));
+        allowanceModule.setAllowance(address(executor), address(testToken), uint128(200 ether));
+
+        // Verify the allowance was updated correctly
+        (uint128 dripRate, uint160 unspent, , uint32 lastBooked) = allowanceModule.getTokenAllowanceData(
+            address(safe),
+            address(executor),
+            address(testToken)
+        );
+
+        // Drip rate should be updated to 200 ether
+        assertEq(dripRate, 200 ether);
+
+        // Unspent should be around 100 ether (1 day's worth at 100 ether/day)
+        assertEq(unspent, 100 ether);
+
+        // Last booked should be updated to current time
+        assertEq(lastBooked, uint32(block.timestamp));
+
+        // Verify getTotalUnspent returns the correct value
+        uint256 unspentAmount = allowanceModule.getTotalUnspent(address(safe), address(executor), address(testToken));
+        assertEq(unspentAmount, 100 ether);
+    }
+
+    function testUpdateAllowanceReturnExplicitly() public {
+        // Deploy the wrapper contract
+        LinearAllowanceSingletonForGnosisSafeWrapper wrapper = new LinearAllowanceSingletonForGnosisSafeWrapper();
+
+        // move up 1 week to avoid underflow
+        vm.warp(block.timestamp + 1 weeks);
+
+        uint256 dripRate = 1 ether;
+
+        // Create a LinearAllowance struct with safe values
+        ILinearAllowanceSingleton.LinearAllowance memory allowance = ILinearAllowanceSingleton.LinearAllowance({
+            dripRatePerDay: uint128(dripRate),
+            totalUnspent: uint160(0),
+            totalSpent: uint192(0),
+            // Set a more recent timestamp to avoid large time differences
+            lastBookedAtInSeconds: uint32(block.timestamp - 1 hours) // Use 1 hour instead of 1 day
+        });
+
+        // Call the exposed function
+        ILinearAllowanceSingleton.LinearAllowance memory updatedAllowance = wrapper.exposeUpdateAllowance(allowance);
+
+        // Calculate expected unspent amount (1 ETH per day, for 1 hour = 1/24 ETH)
+        uint256 expectedUnspent = (dripRate * 1 hours) / 1 days;
+
+        // Verify the return value
+        assertEq(updatedAllowance.dripRatePerDay, dripRate);
+        assertEq(updatedAllowance.totalUnspent, uint160(expectedUnspent));
+        assertEq(updatedAllowance.lastBookedAtInSeconds, uint32(block.timestamp));
+        assertEq(updatedAllowance.totalSpent, 0, "Total spent should remain unchanged");
+    }
+
     // Helper for Safe transactions (necessary due to Safe's complex transaction execution)
     function execSafeTransaction(
         address to,
@@ -262,5 +407,42 @@ contract TestLinearAllowanceIntegration is Test {
                 payable(address(0)),
                 abi.encodePacked(r, s, v)
             );
+    }
+}
+
+// Helper contracts
+
+contract MockFailingSafe {
+    // Always returns false for execTransactionFromModule
+    function execTransactionFromModule(address, uint256, bytes memory, Enum.Operation) external pure returns (bool) {
+        return false;
+    }
+
+    // Need to handle ETH
+    receive() external payable {}
+}
+
+// Contract that fails when executing ETH transfers
+contract MockSafeThatFailsEthTransfers {
+    receive() external payable {}
+
+    function execTransactionFromModule(
+        address,
+        uint256 value,
+        bytes memory data,
+        Enum.Operation
+    ) external pure returns (bool) {
+        // Only fail for ETH transfers
+        if (data.length == 0 && value > 0) {
+            return false;
+        }
+        return true;
+    }
+}
+
+// Contract that rejects ETH transfers
+contract ContractThatRejectsETH {
+    receive() external payable {
+        revert("Cannot receive ETH");
     }
 }

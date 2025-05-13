@@ -20,13 +20,19 @@ contract DeployMockStrategy is DeployModuleProxyFactory {
     address public dragonTokenizedStrategyAddress;
     address public dragonRouterProxyAddress;
 
+    constructor(
+        address _governance,
+        address _regenGovernance,
+        address _metapool
+    ) DeployModuleProxyFactory(_governance, _regenGovernance, _metapool) {}
+
     function deploy() public override {
         // Store addresses in storage
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
         // Deploy test token
-        token = new MockERC20();
+        token = new MockERC20(18);
 
         // Deploy implementation
         mockStrategySingleton = new MockStrategy();

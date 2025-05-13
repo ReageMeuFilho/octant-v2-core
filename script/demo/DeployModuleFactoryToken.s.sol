@@ -4,19 +4,30 @@ pragma solidity ^0.8.0;
 import { ModuleProxyFactory } from "src/dragons/ModuleProxyFactory.sol";
 import { MockVaultModule } from "test/mocks/MockVaultModule.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
+import { SplitChecker } from "src/dragons/SplitChecker.sol";
+import { DragonRouter } from "src/dragons/DragonRouter.sol";
 import "forge-std/Script.sol";
 
 contract DeployModuleFactoryTestToken is Script {
+    address public splitCheckerImplementation = address(new SplitChecker());
+    address public dragonRouterImplementation = address(new DragonRouter());
+
     function setUp() public {}
 
     function run() public {
         vm.startBroadcast();
 
-        ModuleProxyFactory factory = new ModuleProxyFactory();
+        ModuleProxyFactory factory = new ModuleProxyFactory(
+            msg.sender,
+            msg.sender,
+            msg.sender,
+            splitCheckerImplementation,
+            dragonRouterImplementation
+        );
 
         MockVaultModule dragonVaultModule = new MockVaultModule();
 
-        MockERC20 testERC20 = new MockERC20();
+        MockERC20 testERC20 = new MockERC20(18);
 
         vm.stopBroadcast();
 

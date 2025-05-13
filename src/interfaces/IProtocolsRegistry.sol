@@ -22,9 +22,9 @@ interface IProtocolRegistry {
 
     function registerProtocol(string calldata name, address entrypoint) external;
 
+    function registerAllocationStrategy(uint256 protocolId, string calldata name, address entrypoint) external;
+
     function getProtocol(uint256 id) external view returns (address);
 
     function getProtocolName(uint256 id) external view returns (string memory);
-
-    function registerAllocationStrategy(uint256 protocolId, string calldata name, address entrypoint) external;
 }

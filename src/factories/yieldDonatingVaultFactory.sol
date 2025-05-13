@@ -2,7 +2,7 @@
 pragma solidity >=0.8.25;
 
 import { CREATE3 } from "@solady/utils/CREATE3.sol";
-import { SkyCompounder } from "src/regens/yieldDonating/strategy/SkyCompounder.sol";
+import { SkyCompounderStrategy } from "src/strategies/yieldDonating/SkyCompounderStrategy.sol";
 
 contract YieldDonatingVaultFactory {
     /**
@@ -34,7 +34,7 @@ contract YieldDonatingVaultFactory {
      */
     mapping(address => StrategyInfo[]) public strategies;
 
-    event UsdsStrategyDeploy(address deployer, address donationAddress, address strategyAddress);
+    event StrategyDeploy(address deployer, address donationAddress, address strategyAddress);
 
     address usdsRewardAddress = 0x0650CAF159C5A49f711e8169D4336ECB9b950275;
 
@@ -60,12 +60,12 @@ contract YieldDonatingVaultFactory {
         bytes32 _salt
     ) external returns (address strategyAddress) {
         bytes memory bytecode = abi.encodePacked(
-            type(SkyCompounder).creationCode,
+            type(SkyCompounderStrategy).creationCode,
             abi.encode(usdsRewardAddress, _name, _management, _keeper, _emergencyAdmin, _donationAddress)
         );
 
         strategyAddress = CREATE3.deployDeterministic(bytecode, _salt);
-        emit UsdsStrategyDeploy(msg.sender, _donationAddress, strategyAddress);
+        emit StrategyDeploy(msg.sender, _donationAddress, strategyAddress);
         StrategyInfo memory strategyInfo = StrategyInfo({
             deployerAddress: msg.sender,
             timestamp: block.timestamp,
@@ -75,4 +75,3 @@ contract YieldDonatingVaultFactory {
         strategies[msg.sender].push(strategyInfo);
     }
 }
-

@@ -1,21 +1,22 @@
 ARG NODE_VERSION=22
 
 FROM node:$NODE_VERSION AS builder
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-      python3-venv
+
+# Install Foundry
 RUN curl -L https://foundry.paradigm.xyz | bash
 RUN /root/.foundry/bin/foundryup -i stable \
     && rm /root/.foundry/bin/foundryup \
     && strip /root/.foundry/bin/*
+
 WORKDIR /app
 COPY package.json yarn.lock .yarnrc.yml ./
 RUN corepack enable && corepack install
 RUN yarn install --immutable
-RUN yarn slither:setup
+
 COPY ./ ./
 RUN git submodule update --init --recursive
 RUN PATH="$PATH:/root/.foundry/bin" yarn build
+
 # Removed files we don't want to copy to destination container
 RUN rm -rf .git .gitmodules .yarn
 

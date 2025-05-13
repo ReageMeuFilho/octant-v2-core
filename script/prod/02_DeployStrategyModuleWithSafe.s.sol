@@ -58,7 +58,7 @@ contract DeployStrategyModuleWithSafe is Script {
         module = address(mockStrategy);
 
         // Deploy the token
-        token = new MockERC20();
+        token = new MockERC20(18);
 
         // Deploy Mock Yield Source
         yieldSource = new MockYieldSource(address(token));
