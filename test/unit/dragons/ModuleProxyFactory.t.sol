@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import "./Base.t.sol";
+import { BaseTest } from "./Base.t.sol";
 import { ModuleProxyFactory } from "src/dragons/ModuleProxyFactory.sol";
 import { IModuleProxyFactory } from "src/interfaces/IModuleProxyFactory.sol";
 import { DragonRouter } from "src/dragons/DragonRouter.sol";
 import { ISplitChecker } from "src/interfaces/ISplitChecker.sol";
 import { ISafe } from "src/interfaces/Safe.sol";
-import { MockModule } from "../mocks/MockModule.sol";
-import { MockSafe } from "../mocks/MockSafe.sol";
-import { MockLinearAllowance } from "../mocks/MockLinearAllowance.sol";
-import { MockSafeDragonRouter } from "../mocks/MockSafeDragonRouter.sol";
+import { MockModule } from "../../mocks/MockModule.sol";
+import { MockSafe } from "../../mocks/MockSafe.sol";
+import { MockLinearAllowance } from "../../mocks/MockLinearAllowance.sol";
+import { MockSafeDragonRouter } from "../../mocks/MockSafeDragonRouter.sol";
 import { MultiSendCallOnly } from "src/libraries/Safe/MultiSendCallOnly.sol";
 import { SplitChecker } from "src/dragons/SplitChecker.sol";
 
