@@ -25,6 +25,13 @@ contract RegenIntegrationTest is Test {
     MockERC20 rewardToken;
     MockERC20Staking stakeToken;
 
+    // --- Constants for Reward Accrual Tests ---
+    uint256 private constant REWARD_AMOUNT = 30_000_000 * 1e18; // 30M tokens
+    uint256 private constant STAKE_AMOUNT = 1_000 * 1e18; // 1K tokens
+    uint256 private constant REWARD_PERIOD_DURATION = 30 days;
+
+    // --- End Constants ---
+
     function setUp() public {
         // Deploy mock tokens
         rewardToken = new MockERC20();
@@ -400,5 +407,221 @@ contract RegenIntegrationTest is Test {
         regenStaker.unpause();
         assertFalse(regenStaker.paused(), "Contract should be unpaused");
         vm.stopPrank();
+    }
+
+    function test_ContinuousReward_SingleStaker_FullPeriod() public {
+        address staker = makeAddr("staker");
+
+        // Whitelist staker for staking and earning power
+        address[] memory stakers = new address[](1);
+        stakers[0] = staker;
+        stakerWhitelist.addToWhitelist(stakers);
+        earningPowerWhitelist.addToWhitelist(stakers);
+
+        // Staker stakes
+        stakeToken.mint(staker, STAKE_AMOUNT);
+        vm.startPrank(staker);
+        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
+        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, staker);
+        vm.stopPrank();
+
+        // Admin notifies reward
+        rewardToken.mint(address(regenStaker), REWARD_AMOUNT); // Ensure contract has tokens
+        vm.startPrank(address(this));
+        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        vm.stopPrank();
+
+        // Warp to end of period
+        vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
+
+        // Staker claims reward
+        vm.startPrank(staker);
+        uint256 claimedAmount = regenStaker.claimReward(depositId);
+        vm.stopPrank();
+
+        assertApproxEqAbs(claimedAmount, REWARD_AMOUNT, 1e18, "Staker should receive full reward"); // Allow 1 token diff
+    }
+
+    function test_ContinuousReward_SingleStaker_JoinsLate() public {
+        address staker = makeAddr("stakerLate");
+
+        // Whitelist staker for staking and earning power
+        address[] memory stakers = new address[](1);
+        stakers[0] = staker;
+        stakerWhitelist.addToWhitelist(stakers);
+        earningPowerWhitelist.addToWhitelist(stakers);
+
+        // Admin notifies reward
+        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        vm.startPrank(address(this));
+        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        vm.stopPrank();
+
+        // Warp to mid-period
+        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2);
+
+        // Staker stakes late
+        stakeToken.mint(staker, STAKE_AMOUNT);
+        vm.startPrank(staker);
+        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
+        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, staker);
+        vm.stopPrank();
+
+        // Warp to end of period
+        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2);
+
+        // Staker claims reward
+        vm.startPrank(staker);
+        uint256 claimedAmount = regenStaker.claimReward(depositId);
+        vm.stopPrank();
+
+        assertApproxEqAbs(claimedAmount, REWARD_AMOUNT / 2, 1e18, "Late staker should receive half reward");
+    }
+
+    function test_ContinuousReward_SingleStaker_ClaimsMidPeriod() public {
+        address staker = makeAddr("stakerMidClaim");
+
+        address[] memory stakers = new address[](1); // Whitelist setup
+        stakers[0] = staker;
+        stakerWhitelist.addToWhitelist(stakers);
+        earningPowerWhitelist.addToWhitelist(stakers);
+
+        stakeToken.mint(staker, STAKE_AMOUNT);
+        vm.startPrank(staker);
+        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
+        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, staker);
+        vm.stopPrank();
+
+        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        vm.startPrank(address(this));
+        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2);
+
+        vm.startPrank(staker);
+        uint256 claimedAmount1 = regenStaker.claimReward(depositId);
+        vm.stopPrank();
+
+        assertApproxEqAbs(claimedAmount1, REWARD_AMOUNT / 2, 1e18, "Mid-period claim should be half reward");
+
+        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2); // To end of period
+
+        vm.startPrank(staker);
+        uint256 claimedAmount2 = regenStaker.claimReward(depositId);
+        vm.stopPrank();
+
+        assertApproxEqAbs(claimedAmount2, REWARD_AMOUNT / 2, 1e18, "Second claim should be remaining half");
+        assertApproxEqAbs(claimedAmount1 + claimedAmount2, REWARD_AMOUNT, 2e18, "Total claimed should be full reward");
+    }
+
+    function test_ContinuousReward_TwoStakers_StaggeredEntry_ProRataShare() public {
+        address stakerA = makeAddr("stakerA_Staggered");
+        address stakerB = makeAddr("stakerB_Staggered");
+
+        address[] memory stakerArrA = new address[](1);
+        stakerArrA[0] = stakerA;
+        address[] memory stakerArrB = new address[](1);
+        stakerArrB[0] = stakerB;
+        stakerWhitelist.addToWhitelist(stakerArrA);
+        earningPowerWhitelist.addToWhitelist(stakerArrA);
+        stakerWhitelist.addToWhitelist(stakerArrB);
+        earningPowerWhitelist.addToWhitelist(stakerArrB);
+
+        // Staker A stakes
+        stakeToken.mint(stakerA, STAKE_AMOUNT);
+        vm.startPrank(stakerA);
+        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
+        Staker.DepositIdentifier depositIdA = regenStaker.stake(STAKE_AMOUNT, stakerA);
+        vm.stopPrank();
+
+        // Admin notifies reward
+        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        vm.startPrank(address(this));
+        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        vm.stopPrank();
+
+        // Warp 1/3 period
+        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 3);
+
+        // Staker B stakes
+        stakeToken.mint(stakerB, STAKE_AMOUNT);
+        vm.startPrank(stakerB);
+        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
+        Staker.DepositIdentifier depositIdB = regenStaker.stake(STAKE_AMOUNT, stakerB);
+        vm.stopPrank();
+
+        // Warp remaining 2/3 period
+        vm.warp(block.timestamp + (REWARD_PERIOD_DURATION * 2) / 3);
+
+        // Claims
+        vm.startPrank(stakerA);
+        uint256 claimedA = regenStaker.claimReward(depositIdA);
+        vm.stopPrank();
+
+        vm.startPrank(stakerB);
+        uint256 claimedB = regenStaker.claimReward(depositIdB);
+        vm.stopPrank();
+
+        uint256 expectedA = (REWARD_AMOUNT / 3) + ((REWARD_AMOUNT * 2) / 3 / 2);
+        uint256 expectedB = ((REWARD_AMOUNT * 2) / 3 / 2);
+
+        assertApproxEqAbs(claimedA, expectedA, 1e18, "Staker A wrong amount");
+        assertApproxEqAbs(claimedB, expectedB, 1e18, "Staker B wrong amount");
+        assertApproxEqAbs(claimedA + claimedB, REWARD_AMOUNT, 2e18, "Total claimed wrong for staggered");
+    }
+
+    function test_ContinuousReward_TwoStakers_DifferentAmounts_ProRataShare() public {
+        address stakerA = makeAddr("stakerA_DiffAmt");
+        address stakerB = makeAddr("stakerB_DiffAmt");
+
+        address[] memory stakerArrA = new address[](1);
+        stakerArrA[0] = stakerA;
+        address[] memory stakerArrB = new address[](1);
+        stakerArrB[0] = stakerB;
+        stakerWhitelist.addToWhitelist(stakerArrA);
+        earningPowerWhitelist.addToWhitelist(stakerArrA);
+        stakerWhitelist.addToWhitelist(stakerArrB);
+        earningPowerWhitelist.addToWhitelist(stakerArrB);
+
+        // Staker A stakes STAKE_AMOUNT
+        stakeToken.mint(stakerA, STAKE_AMOUNT);
+        vm.startPrank(stakerA);
+        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
+        Staker.DepositIdentifier depositIdA = regenStaker.stake(STAKE_AMOUNT, stakerA);
+        vm.stopPrank();
+
+        // Staker B stakes 2 * STAKE_AMOUNT
+        stakeToken.mint(stakerB, STAKE_AMOUNT * 2);
+        vm.startPrank(stakerB);
+        stakeToken.approve(address(regenStaker), STAKE_AMOUNT * 2);
+        Staker.DepositIdentifier depositIdB = regenStaker.stake(STAKE_AMOUNT * 2, stakerB);
+        vm.stopPrank();
+
+        // Admin notifies reward
+        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        vm.startPrank(address(this));
+        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        vm.stopPrank();
+
+        // Warp full period
+        vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
+
+        // Claims
+        vm.startPrank(stakerA);
+        uint256 claimedA = regenStaker.claimReward(depositIdA);
+        vm.stopPrank();
+
+        vm.startPrank(stakerB);
+        uint256 claimedB = regenStaker.claimReward(depositIdB);
+        vm.stopPrank();
+
+        // Total earning power is effectively 3 units (1 from A, 2 from B)
+        uint256 expectedA = REWARD_AMOUNT / 3;
+        uint256 expectedB = (REWARD_AMOUNT * 2) / 3;
+
+        assertApproxEqAbs(claimedA, expectedA, 1e18, "Staker A (1x stake) wrong amount");
+        assertApproxEqAbs(claimedB, expectedB, 1e18, "Staker B (2x stake) wrong amount");
+        assertApproxEqAbs(claimedA + claimedB, REWARD_AMOUNT, 2e18, "Total claimed wrong for different amounts");
     }
 }
