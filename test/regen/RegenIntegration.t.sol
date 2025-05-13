@@ -439,7 +439,7 @@ contract RegenIntegrationTest is Test {
         uint256 claimedAmount = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        assertApproxEqAbs(claimedAmount, REWARD_AMOUNT, 1e18, "Staker should receive full reward"); // Allow 1 token diff
+        assertApproxEqAbs(claimedAmount, REWARD_AMOUNT, 1, "Staker should receive full reward"); // Allow 1 token diff
     }
 
     function test_ContinuousReward_SingleStaker_JoinsLate() public {
@@ -475,7 +475,7 @@ contract RegenIntegrationTest is Test {
         uint256 claimedAmount = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        assertApproxEqAbs(claimedAmount, REWARD_AMOUNT / 2, 1e18, "Late staker should receive half reward");
+        assertApproxEqAbs(claimedAmount, REWARD_AMOUNT / 2, 1, "Late staker should receive half reward");
     }
 
     function test_ContinuousReward_SingleStaker_ClaimsMidPeriod() public {
@@ -503,7 +503,7 @@ contract RegenIntegrationTest is Test {
         uint256 claimedAmount1 = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        assertApproxEqAbs(claimedAmount1, REWARD_AMOUNT / 2, 1e18, "Mid-period claim should be half reward");
+        assertApproxEqAbs(claimedAmount1, REWARD_AMOUNT / 2, 1, "Mid-period claim should be half reward");
 
         vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2); // To end of period
 
@@ -511,8 +511,8 @@ contract RegenIntegrationTest is Test {
         uint256 claimedAmount2 = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        assertApproxEqAbs(claimedAmount2, REWARD_AMOUNT / 2, 1e18, "Second claim should be remaining half");
-        assertApproxEqAbs(claimedAmount1 + claimedAmount2, REWARD_AMOUNT, 2e18, "Total claimed should be full reward");
+        assertApproxEqAbs(claimedAmount2, REWARD_AMOUNT / 2, 1, "Second claim should be remaining half");
+        assertApproxEqAbs(claimedAmount1 + claimedAmount2, REWARD_AMOUNT, 1 + 1, "Total claimed should be full reward");
     }
 
     function test_ContinuousReward_TwoStakers_StaggeredEntry_ProRataShare() public {
@@ -566,9 +566,9 @@ contract RegenIntegrationTest is Test {
         uint256 expectedA = (REWARD_AMOUNT / 3) + ((REWARD_AMOUNT * 2) / 3 / 2);
         uint256 expectedB = ((REWARD_AMOUNT * 2) / 3 / 2);
 
-        assertApproxEqAbs(claimedA, expectedA, 1e18, "Staker A wrong amount");
-        assertApproxEqAbs(claimedB, expectedB, 1e18, "Staker B wrong amount");
-        assertApproxEqAbs(claimedA + claimedB, REWARD_AMOUNT, 2e18, "Total claimed wrong for staggered");
+        assertApproxEqAbs(claimedA, expectedA, 1, "Staker A wrong amount");
+        assertApproxEqAbs(claimedB, expectedB, 1, "Staker B wrong amount");
+        assertApproxEqAbs(claimedA + claimedB, REWARD_AMOUNT, 1 + 1, "Total claimed wrong for staggered");
     }
 
     function test_ContinuousReward_TwoStakers_DifferentAmounts_ProRataShare() public {
@@ -620,8 +620,8 @@ contract RegenIntegrationTest is Test {
         uint256 expectedA = REWARD_AMOUNT / 3;
         uint256 expectedB = (REWARD_AMOUNT * 2) / 3;
 
-        assertApproxEqAbs(claimedA, expectedA, 1e18, "Staker A (1x stake) wrong amount");
-        assertApproxEqAbs(claimedB, expectedB, 1e18, "Staker B (2x stake) wrong amount");
-        assertApproxEqAbs(claimedA + claimedB, REWARD_AMOUNT, 2e18, "Total claimed wrong for different amounts");
+        assertApproxEqAbs(claimedA, expectedA, 1, "Staker A (1x stake) wrong amount");
+        assertApproxEqAbs(claimedB, expectedB, 1, "Staker B (2x stake) wrong amount");
+        assertApproxEqAbs(claimedA + claimedB, REWARD_AMOUNT, 1 + 1, "Total claimed wrong for different amounts");
     }
 }
