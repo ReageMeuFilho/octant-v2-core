@@ -279,7 +279,7 @@ interface IVault {
     function decimals() external view returns (uint8);
     // todo fix the following functions that are there as public variables
     function strategies(address strategy) external view returns (StrategyParams memory);
-    // function defaultQueue() external view returns (address[] memory);
+    function defaultQueue() external view returns (address[] memory);
     function useDefaultQueue() external view returns (bool);
     function autoAllocate() external view returns (bool);
     function minimumTotalIdle() external view returns (uint256);
@@ -295,7 +295,6 @@ interface IVault {
     function isShutdown() external view returns (bool);
     function unlockedShares() external view returns (uint256);
     function pricePerShare() external view returns (uint256);
-    function getDefaultQueue() external view returns (address[] memory);
     function nonces(address owner) external view returns (uint256);
 
     function totalSupply() external view returns (uint256);

@@ -74,7 +74,7 @@ contract Vault is IVault {
     mapping(address => StrategyParams) private _strategies;
 
     // The current default withdrawal queue.
-    address[] public defaultQueue;
+    address[] internal _defaultQueue;
     // Should the vault use the defaultQueue regardless whats passed in.
     bool public useDefaultQueue;
     // Should the vault automatically allocate funds to the first strategy in queue.
@@ -233,7 +233,7 @@ contract Vault is IVault {
         }
 
         // Save the new queue.
-        defaultQueue = newDefaultQueue;
+        _defaultQueue = newDefaultQueue;
 
         emit UpdateDefaultQueue(newDefaultQueue);
     }
@@ -486,14 +486,6 @@ contract Vault is IVault {
      */
     function pricePerShare() external view override returns (uint256) {
         return _convertToAssets(10 ** uint256(decimals), Rounding.ROUND_DOWN);
-    }
-
-    /**
-     * @notice Get the full default queue currently set.
-     * @return The current default withdrawal queue.
-     */
-    function getDefaultQueue() external view override returns (address[] memory) {
-        return defaultQueue;
     }
 
     /// REPORTING MANAGEMENT ///
@@ -1104,6 +1096,14 @@ contract Vault is IVault {
     }
 
     /**
+     * @notice Get the default queue of strategies.
+     * @return The default queue of strategies.
+     */
+    function defaultQueue() external view override returns (address[] memory) {
+        return _defaultQueue;
+    }
+
+    /**
      * @notice Get the maximum amount of assets that can be deposited.
      * @param receiver The address that will receive the shares.
      * @return The maximum amount of assets that can be deposited.
@@ -1512,7 +1512,7 @@ contract Vault is IVault {
             // Determine which strategy queue to use
             vars.withdrawalStrategies = strategiesParam.length != 0 && !useDefaultQueue
                 ? strategiesParam
-                : defaultQueue;
+                : _defaultQueue;
 
             // Process each strategy in the queue
             for (uint256 i = 0; i < vars.withdrawalStrategies.length; i++) {
@@ -1594,8 +1594,8 @@ contract Vault is IVault {
 
         emit Deposit(msg.sender, recipient, assets, shares);
 
-        if (autoAllocate && defaultQueue.length > 0) {
-            _updateDebt(defaultQueue[0], type(uint256).max, 0);
+        if (autoAllocate && _defaultQueue.length > 0) {
+            _updateDebt(_defaultQueue[0], type(uint256).max, 0);
         }
     }
 
@@ -1651,7 +1651,7 @@ contract Vault is IVault {
      */
     function _addStrategy(address newStrategy, bool addToQueue) internal {
         // Call the library function to handle the strategy addition logic
-        StrategyManagementLib.addStrategy(_strategies, defaultQueue, newStrategy, addToQueue, asset, MAX_QUEUE);
+        StrategyManagementLib.addStrategy(_strategies, _defaultQueue, newStrategy, addToQueue, asset, MAX_QUEUE);
 
         // Emit the strategy changed event
         emit StrategyChanged(newStrategy, StrategyChangeType.ADDED);
@@ -1704,7 +1704,7 @@ contract Vault is IVault {
             if (strategiesParam.length != 0 && !useDefaultQueue) {
                 state.withdrawalStrategies = strategiesParam;
             } else {
-                state.withdrawalStrategies = defaultQueue;
+                state.withdrawalStrategies = _defaultQueue;
             }
 
             // Calculate how much we need to withdraw from strategies
@@ -1860,7 +1860,7 @@ contract Vault is IVault {
      */
     function _revokeStrategy(address strategy, bool force) internal {
         // Call the library function to handle the revocation logic
-        uint256 loss = StrategyManagementLib.revokeStrategy(_strategies, defaultQueue, strategy, force);
+        uint256 loss = StrategyManagementLib.revokeStrategy(_strategies, _defaultQueue, strategy, force);
 
         // If there was a loss (force revoke with debt), update total vault debt
         if (loss > 0) {

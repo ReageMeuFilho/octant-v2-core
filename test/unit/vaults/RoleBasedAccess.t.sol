@@ -530,7 +530,7 @@ contract RoleBasedAccessTest is Test {
         vault.addRole(bunny, IVault.Roles.QUEUE_MANAGER);
 
         // Get initial queue
-        address[] memory initialQueue = vault.getDefaultQueue();
+        address[] memory initialQueue = vault.defaultQueue();
         assertGt(initialQueue.length, 0, "Initial queue should not be empty");
 
         // Set default queue with bunny
@@ -538,7 +538,7 @@ contract RoleBasedAccessTest is Test {
         vault.setDefaultQueue(new address[](0));
 
         // Verify new state
-        address[] memory newQueue = vault.getDefaultQueue();
+        address[] memory newQueue = vault.defaultQueue();
         assertEq(newQueue.length, 0, "Queue should be empty after setting");
     }
 
