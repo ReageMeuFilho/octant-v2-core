@@ -51,49 +51,7 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
     mapping(address strategy => StrategyData data) public strategyData;
     mapping(address user => mapping(address strategy => UserData data)) public userData;
 
-    /*//////////////////////////////////////////////////////////////
-                            INITIALIZER
-    //////////////////////////////////////////////////////////////*/
-
-    /// @dev Initialize function, will be triggered when a new proxy is deployed
-    /// @dev owner of this module will the safe multisig that calls setUp function
-    /// @param initializeParams Parameters of initialization encoded
-    function setUp(bytes memory initializeParams) public initializer {
-        coolDownPeriod = 30 days;
-        (address _owner, bytes memory data) = abi.decode(initializeParams, (address, bytes));
-
-        (
-            address[] memory _strategy,
-            address[] memory _asset,
-            address _governance,
-            address _regen_governance,
-            address _splitChecker,
-            address _opexVault,
-            address _metapool
-        ) = abi.decode(data, (address[], address[], address, address, address, address, address));
-
-        __AccessControl_init();
-        __ReentrancyGuard_init();
-
-        _setSplitChecker(_splitChecker);
-        _setMetapool(_metapool);
-        _setOpexVault(_opexVault);
-
-        for (uint256 i = 0; i < _strategy.length; i++) {
-            strategyData[_strategy[i]].asset = _asset[i];
-            strategyData[_strategy[i]].totalShares = SPLIT_PRECISION;
-            userData[_metapool][_strategy[i]].splitPerShare = SPLIT_PRECISION;
-        }
-
-        split.recipients = [_metapool];
-        split.allocations = [SPLIT_PRECISION];
-        split.totalAllocations = SPLIT_PRECISION;
-
-        strategies = _strategy;
-        _grantRole(DEFAULT_ADMIN_ROLE, _owner);
-        _grantRole(GOVERNANCE_ROLE, _governance);
-        _grantRole(REGEN_GOVERNANCE_ROLE, _regen_governance);
-    }
+    receive() external payable override {}
 
     /*//////////////////////////////////////////////////////////////
                             PUBLIC FUNCTIONS
@@ -207,19 +165,12 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
     /**
      * @inheritdoc IDragonRouter
      */
-    function balanceOf(address _user, address _strategy) public view returns (uint256) {
-        UserData memory _userData = userData[_user][_strategy];
-
-        return _userData.assets + _claimableAssets(_userData, _strategy);
-    }
-
-    /**
-     * @inheritdoc IDragonRouter
-     */
     function fundFromSource(address strategy, uint256 amount) external onlyRole(SPLIT_DISTRIBUTOR_ROLE) nonReentrant {
         StrategyData storage data = strategyData[strategy];
         if (data.asset == address(0)) revert ZeroAddress();
 
+        // False positive: marked nonReentrant
+        //slither-disable-next-line reentrancy-no-eth
         ITokenizedStrategy(strategy).withdraw(amount, address(this), address(this), 0);
 
         data.assetPerShare += (amount * SPLIT_PRECISION) / data.totalShares;
@@ -233,17 +184,19 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
     function setSplit(ISplitChecker.Split memory _split) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (block.timestamp - lastSetSplitTime < coolDownPeriod) revert CooldownPeriodNotPassed();
         splitChecker.checkSplit(_split, opexVault, metapool);
-
-        for (uint256 i = 0; i < strategies.length; i++) {
+        uint256 strategiesLength = strategies.length;
+        for (uint256 i = 0; i < strategiesLength; i++) {
             StrategyData storage data = strategyData[strategies[i]];
 
             /// @dev updates old splitters
-            for (uint256 j = 0; j < split.recipients.length; j++) {
-                UserData storage _userData = userData[split.recipients[j]][strategies[i]];
+            uint256 splitRecipientsLength = split.recipients.length;
+            for (uint256 j = 0; j < splitRecipientsLength; j++) {
+                UserData memory _userData = userData[split.recipients[j]][strategies[i]];
                 uint256 claimableAssets = _claimableAssets(_userData, strategies[i]);
                 _userData.assets += claimableAssets;
                 _userData.userAssetPerShare = 0;
                 _userData.splitPerShare = 0;
+                userData[split.recipients[j]][strategies[i]] = _userData;
                 emit UserSplitUpdated(
                     split.recipients[j],
                     strategies[i],
@@ -289,7 +242,57 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
         emit SplitClaimed(msg.sender, _user, _strategy, _amount);
     }
 
-    receive() external payable override {}
+    /*//////////////////////////////////////////////////////////////
+                            INITIALIZER
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Initialize function, will be triggered when a new proxy is deployed
+    /// @dev owner of this module will the safe multisig that calls setUp function
+    /// @param initializeParams Parameters of initialization encoded
+    function setUp(bytes memory initializeParams) public initializer {
+        coolDownPeriod = 30 days;
+        (address _owner, bytes memory data) = abi.decode(initializeParams, (address, bytes));
+
+        (
+            address[] memory _strategies,
+            address _governance,
+            address _regen_governance,
+            address _splitChecker,
+            address _opexVault,
+            address _metapool
+        ) = abi.decode(data, (address[], address, address, address, address, address));
+
+        __AccessControl_init();
+        __ReentrancyGuard_init();
+
+        _setSplitChecker(_splitChecker);
+        _setMetapool(_metapool);
+        _setOpexVault(_opexVault);
+
+        for (uint256 i = 0; i < _strategies.length; i++) {
+            strategyData[_strategies[i]].asset = ITokenizedStrategy(_strategies[i]).asset();
+            strategyData[_strategies[i]].totalShares = SPLIT_PRECISION;
+            userData[_metapool][_strategies[i]].splitPerShare = SPLIT_PRECISION;
+        }
+
+        split.recipients = [_metapool];
+        split.allocations = [SPLIT_PRECISION];
+        split.totalAllocations = SPLIT_PRECISION;
+
+        strategies = _strategies;
+        _grantRole(DEFAULT_ADMIN_ROLE, _owner);
+        _grantRole(GOVERNANCE_ROLE, _governance);
+        _grantRole(REGEN_GOVERNANCE_ROLE, _regen_governance);
+    }
+
+    /**
+     * @inheritdoc IDragonRouter
+     */
+    function balanceOf(address _user, address _strategy) public view returns (uint256) {
+        UserData memory _userData = userData[_user][_strategy];
+
+        return _userData.assets + _claimableAssets(_userData, _strategy);
+    }
 
     /*//////////////////////////////////////////////////////////////
                             INTERNAL FUNCTIONS
@@ -306,20 +309,6 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
         _userData.assets = balanceOf(_user, _strategy) - _amount;
         _userData.userAssetPerShare = strategyData[_strategy].assetPerShare;
         emit UserSplitUpdated(_user, _strategy, _userData.assets, _userData.userAssetPerShare, _userData.splitPerShare);
-    }
-
-    /**
-     * @notice Internal function to calculate the claimable assets for a user from a split
-     * @param _userData The user data
-     * @param _strategy The strategy address
-     * @return The claimable assets
-     */
-    function _claimableAssets(UserData memory _userData, address _strategy) internal view returns (uint256) {
-        StrategyData memory _stratData = strategyData[_strategy];
-        return
-            (_userData.splitPerShare *
-                _stratData.totalShares *
-                (_stratData.assetPerShare - _userData.userAssetPerShare)) / SPLIT_PRECISION;
     }
 
     /**
@@ -390,6 +379,8 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
                 ? userTransformer.transformer.transform{ value: _amount }(_asset, userTransformer.targetToken, _amount)
                 : userTransformer.transformer.transform(_asset, userTransformer.targetToken, _amount);
             if (userTransformer.targetToken == NATIVE_TOKEN) {
+                // False positive: User balance is checked before sending
+                //slither-disable-next-line arbitrary-send-eth
                 (bool success, ) = _user.call{ value: _transformedAmount }("");
                 if (!success) revert TransferFailed();
             } else {
@@ -403,5 +394,19 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
                 IERC20(_asset).safeTransfer(_user, _amount);
             }
         }
+    }
+
+    /**
+     * @notice Internal function to calculate the claimable assets for a user from a split
+     * @param _userData The user data
+     * @param _strategy The strategy address
+     * @return The claimable assets
+     */
+    function _claimableAssets(UserData memory _userData, address _strategy) internal view returns (uint256) {
+        StrategyData memory _stratData = strategyData[_strategy];
+        return
+            (_userData.splitPerShare *
+                _stratData.totalShares *
+                (_stratData.assetPerShare - _userData.userAssetPerShare)) / SPLIT_PRECISION;
     }
 }

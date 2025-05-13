@@ -29,8 +29,13 @@ yarn install
 
 3. Configure environment:
 
+Setup lint hooks
 ```bash
-# Copy the environment template
+yarn init
+```
+
+Copy the environment template
+```bash
 cp .env.template .env
 
 # Edit .env with your configuration

@@ -28,9 +28,15 @@ import { MockDragonRouterTesting } from "test/mocks/MockDragonRouterTesting.sol"
 import { MockNativeTransformer } from "test/mocks/MockNativeTransformer.sol";
 import { MockStrategy } from "test/mocks/MockStrategy.sol";
 import { ISplitChecker } from "src/interfaces/ISplitChecker.sol";
-import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
+import { AccessControl } from "../../lib/openzeppelin-contracts/contracts/access/AccessControl.sol";
+import { DragonTokenizedStrategy } from "src/dragons/vaults/DragonTokenizedStrategy.sol";
+import { DragonTokenizedStrategy } from "src/dragons/vaults/DragonTokenizedStrategy.sol";
+import { MockStrategy } from "test/mocks/MockStrategy.sol";
+import { MockYieldSource } from "test/mocks/MockYieldSource.sol";
+import { BaseTest } from "./Base.t.sol";
+import { console } from "forge-std/console.sol";
 
-contract DragonRouterTest is Test {
+contract DragonRouterTest is BaseTest {
     DragonRouter public router;
     MockDragonRouterTesting public routerTesting;
     SplitChecker public splitChecker;
@@ -64,6 +70,7 @@ contract DragonRouterTest is Test {
     event ClaimAutomationSet(address indexed user, address indexed strategy, bool enabled);
 
     function setUp() public {
+        _configure(true, "eth");
         // Use a known address for setup
         address setupActor = address(0x123);
 
@@ -84,15 +91,38 @@ contract DragonRouterTest is Test {
         splitChecker.initialize(governance, 0.5e18, 0.05e18); // 50% max opex, 5% min metapool
 
         // Setup mock strategies and assets
+        address keeper = makeAddr("keeper");
+        address dragonRouter = makeAddr("dragonRouter");
+        address management = makeAddr("management");
         for (uint256 i = 0; i < 3; i++) {
-            strategies.push(makeAddr(string.concat("strategy", vm.toString(i))));
-            assets.push(makeAddr(string.concat("asset", vm.toString(i))));
+            MockStrategy moduleImplementation = new MockStrategy();
+            DragonTokenizedStrategy tokenizedStrategyImplementation = new DragonTokenizedStrategy();
+            MockYieldSource yieldSource = new MockYieldSource(tokenizedStrategyImplementation.ETH());
+            string memory name = "Test Mock Strategy";
+            uint256 maxReportDelay = 9;
+            testTemps memory temps = _testTemps(
+                address(moduleImplementation),
+                abi.encode(
+                    address(tokenizedStrategyImplementation),
+                    tokenizedStrategyImplementation.ETH(),
+                    address(yieldSource),
+                    management,
+                    keeper,
+                    dragonRouter,
+                    maxReportDelay,
+                    name,
+                    regenGovernance
+                )
+            );
+            DragonTokenizedStrategy module = DragonTokenizedStrategy(payable(temps.module));
+            strategies.push(address(module));
+            assets.push(tokenizedStrategyImplementation.ETH());
         }
 
         // Create initialization parameters
         bytes memory initParams = abi.encode(
             owner, // setupActor will get DEFAULT_ADMIN_ROLE
-            abi.encode(strategies, assets, governance, regenGovernance, address(splitChecker), opexVault, metapool)
+            abi.encode(strategies, governance, regenGovernance, address(splitChecker), opexVault, metapool)
         );
 
         // Start a prank as the setupActor for ALL operations
@@ -322,7 +352,7 @@ contract DragonRouterTest is Test {
 
     function test_setTransformer() public {
         address userWithBalance = makeAddr("userWithBalance");
-        address targetToken = makeAddr("targetToken");
+        address targetToken = DragonTokenizedStrategy(strategies[0]).asset();
 
         // Set up user data with a non-zero balance
         routerTesting.setUserDataForTest(
@@ -449,10 +479,10 @@ contract DragonRouterTest is Test {
 
         // Create a list of strategies and assets including our mock
         address[] memory testStrategies = new address[](1);
-        testStrategies[0] = address(mockStrategy);
+        testStrategies[0] = strategies[0];
 
         address[] memory testAssets = new address[](1);
-        testAssets[0] = asset;
+        testAssets[0] = assets[0];
 
         // Set up a new router with our strategy already included
         vm.startPrank(owner);
@@ -461,15 +491,7 @@ contract DragonRouterTest is Test {
         // Create initialization parameters with our strategy
         bytes memory initParams = abi.encode(
             owner,
-            abi.encode(
-                testStrategies,
-                testAssets,
-                governance,
-                regenGovernance,
-                address(splitChecker),
-                opexVault,
-                metapool
-            )
+            abi.encode(testStrategies, governance, regenGovernance, address(splitChecker), opexVault, metapool)
         );
 
         // Initialize router
@@ -539,13 +561,13 @@ contract DragonRouterTest is Test {
 
         // No need to mock - using routerTesting which has real implementation
         vm.startPrank(owner);
-        routerTesting.setSplit(
+        router.setSplit(
             ISplitChecker.Split({ recipients: recipients, allocations: allocations, totalAllocations: 100 })
         );
         vm.stopPrank();
 
         // Verify the timestamp changed
-        assertGt(routerTesting.lastSetSplitTime(), block.timestamp - 10);
+        assertGt(router.lastSetSplitTime(), block.timestamp - 10);
     }
 
     function test_setSplit_reverts_cooldownNotPassed() public {
@@ -558,8 +580,13 @@ contract DragonRouterTest is Test {
         allocations[1] = 70;
 
         vm.prank(owner);
+        router.setSplit(
+            ISplitChecker.Split({ recipients: recipients, allocations: allocations, totalAllocations: 100 })
+        );
+
+        vm.prank(owner);
         vm.expectRevert(IDragonRouter.CooldownPeriodNotPassed.selector);
-        routerTesting.setSplit(
+        router.setSplit(
             ISplitChecker.Split({ recipients: recipients, allocations: allocations, totalAllocations: 100 })
         );
     }
@@ -861,10 +888,7 @@ contract DragonRouterTest is Test {
     // the removeStrategy function where it replaces a strategy with the last one
     function test_removeStrategy_middle() public {
         // Set up several strategies to ensure we can test removing a middle one
-        address[] memory testStrategies = new address[](3);
-        for (uint256 i = 0; i < 3; i++) {
-            testStrategies[i] = makeAddr(string.concat("testStrategy", vm.toString(i)));
-        }
+        address[] memory testStrategies = strategies;
 
         // Deploy new router with test strategies
         vm.startPrank(owner);
@@ -877,15 +901,7 @@ contract DragonRouterTest is Test {
         }
         bytes memory initParams = abi.encode(
             owner,
-            abi.encode(
-                testStrategies,
-                testAssets,
-                governance,
-                regenGovernance,
-                address(splitChecker),
-                opexVault,
-                metapool
-            )
+            abi.encode(testStrategies, governance, regenGovernance, address(splitChecker), opexVault, metapool)
         );
 
         testRouter.setUp(initParams);

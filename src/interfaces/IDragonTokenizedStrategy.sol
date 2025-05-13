@@ -33,16 +33,60 @@ interface IDragonTokenizedStrategy is ITokenizedStrategy {
     event DragonModeToggled(bool enabled);
 
     /**
-     * @notice Indicates if the strategy is in Dragon-only mode
-     * @return True if only the operator can deposit/mint, false otherwise
+     * @notice Deposits assets with a lockup period
+     * @param assets The amount of assets to deposit
+     * @param receiver The address to receive the shares
+     * @param lockupDuration The duration of the lockup in seconds
+     * @return shares The amount of shares minted
      */
-    function isDragonOnly() external view returns (bool);
+    function depositWithLockup(
+        uint256 assets,
+        address receiver,
+        uint256 lockupDuration
+    ) external payable returns (uint256 shares);
+
+    /**
+     * @notice Mints shares with a lockup period
+     * @param shares The amount of shares to mint
+     * @param receiver The address to receive the shares
+     * @param lockupDuration The duration of the lockup in seconds
+     * @return assets The amount of assets used
+     */
+    function mintWithLockup(
+        uint256 shares,
+        address receiver,
+        uint256 lockupDuration
+    ) external payable returns (uint256 assets);
+
+    /**
+     * @notice Initiates a rage quit, allowing gradual withdrawal over the cooldown period
+     * @dev Sets a cooldown period lockup and enables proportional withdrawals
+     */
+    function initiateRageQuit() external;
 
     /**
      * @notice Toggles the Dragon-only mode
      * @param enabled Whether to enable or disable Dragon-only mode
      */
     function toggleDragonMode(bool enabled) external;
+
+    /**
+     * @notice Sets the minimum lockup duration
+     * @param newDuration The new minimum lockup duration in seconds
+     */
+    function setLockupDuration(uint256 newDuration) external;
+
+    /**
+     * @notice Sets the rage quit cooldown period
+     * @param newPeriod The new rage quit cooldown period in seconds
+     */
+    function setRageQuitCooldownPeriod(uint256 newPeriod) external;
+
+    /**
+     * @notice Indicates if the strategy is in Dragon-only mode
+     * @return True if only the operator can deposit/mint, false otherwise
+     */
+    function isDragonOnly() external view returns (bool);
 
     /**
      * @notice Returns the amount of unlocked shares for a user
@@ -81,55 +125,11 @@ interface IDragonTokenizedStrategy is ITokenizedStrategy {
         );
 
     /**
-     * @notice Deposits assets with a lockup period
-     * @param assets The amount of assets to deposit
-     * @param receiver The address to receive the shares
-     * @param lockupDuration The duration of the lockup in seconds
-     * @return shares The amount of shares minted
-     */
-    function depositWithLockup(
-        uint256 assets,
-        address receiver,
-        uint256 lockupDuration
-    ) external payable returns (uint256 shares);
-
-    /**
-     * @notice Initiates a rage quit, allowing gradual withdrawal over the cooldown period
-     * @dev Sets a cooldown period lockup and enables proportional withdrawals
-     */
-    function initiateRageQuit() external;
-
-    /**
-     * @notice Mints shares with a lockup period
-     * @param shares The amount of shares to mint
-     * @param receiver The address to receive the shares
-     * @param lockupDuration The duration of the lockup in seconds
-     * @return assets The amount of assets used
-     */
-    function mintWithLockup(
-        uint256 shares,
-        address receiver,
-        uint256 lockupDuration
-    ) external payable returns (uint256 assets);
-
-    /**
      * @notice Returns the remaining cooldown time in seconds for a user's lock
      * @param user The address to check
      * @return remainingTime The time remaining in seconds until unlock (0 if already unlocked)
      */
     function getRemainingCooldown(address user) external view returns (uint256 remainingTime);
-
-    /**
-     * @notice Sets the minimum lockup duration
-     * @param newDuration The new minimum lockup duration in seconds
-     */
-    function setLockupDuration(uint256 newDuration) external;
-
-    /**
-     * @notice Sets the rage quit cooldown period
-     * @param newPeriod The new rage quit cooldown period in seconds
-     */
-    function setRageQuitCooldownPeriod(uint256 newPeriod) external;
 
     /**
      * @notice Returns the minimum lockup duration

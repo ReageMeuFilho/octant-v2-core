@@ -37,13 +37,24 @@ contract DeployTrader is Script {
     uint24 poolFee;
     address quoteAddress;
     address wethAddress;
-    uint32 defaultScaledOfferFactor = 100_00_00; // no discount or premium for oracle
+    uint32 defaultScaledOfferFactor = 98_00_00; // no discount or premium for oracle
 
     function run(address _owner, address _beneficiary) external {
         owner = _owner;
         vm.label(owner, "owner");
         beneficiary = _beneficiary;
         vm.label(beneficiary, "beneficiary");
+    }
+
+    function forwardBlocks(uint blocks) internal {
+        vm.roll(block.number + blocks);
+        vm.warp(block.timestamp + blocks * 12);
+    }
+
+    function forwardSeconds(uint sec) internal {
+        uint blocks = sec / 12;
+        assert((blocks * 12) == sec);
+        forwardBlocks(blocks);
     }
 
     function configureTrader(HelperConfig _config, string memory _poolName) public {
@@ -114,12 +125,12 @@ contract DeployTrader is Script {
         );
 
         delete pairScaledOfferFactors;
-        pairScaledOfferFactors.push(
-            ISwapperImpl.SetPairScaledOfferFactorParams({
-                quotePair: fromTo,
-                scaledOfferFactor: 100_00_00 // no discount or premium for the oracle
-            })
-        );
+        /* pairScaledOfferFactors.push( */
+        /*     ISwapperImpl.SetPairScaledOfferFactorParams({ */
+        /*         quotePair: fromTo, */
+        /*         scaledOfferFactor: 0 // zero means that defaultScaledOfferFactor will be used instead
+        /*     }) */
+        /* ); */
 
         IUniV3OracleImpl.InitParams memory initOracleParams = _initOracleParams();
         oracleParams.createOracleParams = CreateOracleParams({
