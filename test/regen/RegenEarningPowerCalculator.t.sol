@@ -80,23 +80,49 @@ contract RegenEarningPowerCalculatorTest is Test {
     }
 
     function test_GetEarningPower_UserNotWhitelisted() public view {
-        // staker1 is NOT on default whitelist
         uint256 stakedAmount = 100e18;
         uint256 earningPower = calculator.getEarningPower(stakedAmount, staker1, address(0));
-        assertEq(earningPower, 0, "EP should be 0 for non-whitelisted user");
+        assertEq(earningPower, 0);
+    }
+
+    function test_GetEarningPower_ZeroStake_Whitelisted() public {
+        _whitelistAddress(staker1);
+        uint256 earningPower = calculator.getEarningPower(0, staker1, address(0));
+        assertEq(earningPower, 0);
+    }
+
+    function test_GetEarningPower_ZeroStake_WhitelistDisabled() public {
+        vm.prank(owner);
+        calculator.setWhitelist(IWhitelist(address(0)));
+        uint256 earningPower = calculator.getEarningPower(0, staker1, address(0));
+        assertEq(earningPower, 0);
     }
 
     function test_GetEarningPower_CappedAtUint96Max() public {
         vm.prank(owner);
-        calculator.setWhitelist(IWhitelist(address(0))); // Disable whitelist to focus on capping
+        calculator.setWhitelist(IWhitelist(address(0))); // Disable whitelist to focus on capping behavior
 
-        uint256 stakedAmount = uint256(type(uint96).max) + 1000;
-        uint256 earningPower = calculator.getEarningPower(stakedAmount, staker1, address(0));
-        assertEq(earningPower, type(uint96).max, "EP should be capped at uint96.max");
+        uint256 stakedAmountOverMax = uint256(type(uint96).max) + 1000;
+        uint256 earningPowerOverMax = calculator.getEarningPower(stakedAmountOverMax, staker1, address(0));
+        assertEq(earningPowerOverMax, type(uint96).max);
 
         uint256 stakedAmountExactlyMax = type(uint96).max;
-        earningPower = calculator.getEarningPower(stakedAmountExactlyMax, staker1, address(0));
-        assertEq(earningPower, type(uint96).max, "EP should be uint96.max if staked is uint96.max");
+        uint256 earningPowerExactlyMax = calculator.getEarningPower(stakedAmountExactlyMax, staker1, address(0));
+        assertEq(earningPowerExactlyMax, type(uint96).max);
+    }
+
+    function test_GetEarningPower_CappedAtUint96Max_UserWhitelisted() public {
+        _whitelistAddress(staker1);
+        uint256 stakedAmount = uint256(type(uint96).max) + 1000;
+        uint256 earningPower = calculator.getEarningPower(stakedAmount, staker1, address(0));
+        assertEq(earningPower, type(uint96).max);
+    }
+
+    function test_GetEarningPower_CappedAtUint96Max_UserNotWhitelisted() public view {
+        // staker1 is NOT whitelisted by default
+        uint256 stakedAmount = uint256(type(uint96).max) + 1000;
+        uint256 earningPower = calculator.getEarningPower(stakedAmount, staker1, address(0));
+        assertEq(earningPower, 0);
     }
 
     function test_GetNewEarningPower_BecomesWhitelisted() public {
@@ -204,10 +230,8 @@ contract RegenEarningPowerCalculatorTest is Test {
     }
 
     function test_GetNewEarningPower_CappedAtUint96Max_RemainsEligible_NoBump() public {
-        address[] memory users = new address[](1);
-        users[0] = staker1;
-        whitelist.addToWhitelist(users);
-        // oldEP was type(uint96).max, newEP is type(uint96).max. No significant change.
+        _whitelistAddress(staker1);
+        // Old and new EP are type(uint96).max, so no significant change.
         _checkNewEarningPower(
             uint256(type(uint96).max) + 1000,
             staker1,
@@ -215,6 +239,37 @@ contract RegenEarningPowerCalculatorTest is Test {
             type(uint96).max,
             false,
             "CappedAtUint96Max_RemainsEligible_NoBump"
+        );
+    }
+
+    function test_GetNewEarningPower_StakeDropsFromMax_Whitelisted() public {
+        _whitelistAddress(staker1);
+        _checkNewEarningPower(50e18, staker1, type(uint96).max, 50e18, true, "StakeDropsFromMax_Whitelisted");
+    }
+
+    function test_GetNewEarningPower_WhitelistDisabled_CappedAndQualifiesBump() public {
+        vm.prank(owner);
+        calculator.setWhitelist(IWhitelist(address(0)));
+        _checkNewEarningPower(
+            uint256(type(uint96).max) + 1,
+            staker1,
+            10e18,
+            type(uint96).max,
+            true,
+            "WhitelistDisabled_Capped_QualifiesBump"
+        );
+    }
+
+    function test_GetNewEarningPower_WhitelistDisabled_CappedNoBump() public {
+        vm.prank(owner);
+        calculator.setWhitelist(IWhitelist(address(0)));
+        _checkNewEarningPower(
+            uint256(type(uint96).max) + 1,
+            staker1,
+            type(uint96).max,
+            type(uint96).max,
+            false,
+            "WhitelistDisabled_Capped_NoBump"
         );
     }
 
@@ -275,5 +330,11 @@ contract RegenEarningPowerCalculatorTest is Test {
         (uint256 newEP, bool qualifies) = calculator.getNewEarningPower(stakedAmount, stakerAddr, address(0), oldEP);
         assertEq(newEP, expectedNewEP, string(abi.encodePacked("New EP mismatch: ", reason)));
         assertEq(qualifies, expectedQualifiesForBump, string(abi.encodePacked("QualifiesForBump mismatch: ", reason)));
+    }
+
+    function _whitelistAddress(address addr) internal {
+        address[] memory users = new address[](1);
+        users[0] = addr;
+        whitelist.addToWhitelist(users);
     }
 }
