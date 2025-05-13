@@ -40,15 +40,17 @@ contract DeployProtocol is Script {
 
     function setUp() public {
         // Initialize deployment scripts
-        deployModuleProxyFactory = new DeployModuleProxyFactory();
+        deployModuleProxyFactory = new DeployModuleProxyFactory(msg.sender, msg.sender, msg.sender);
         deployLinearAllowanceSingletonForGnosisSafe = new DeployLinearAllowanceSingletonForGnosisSafe();
         deployDragonTokenizedStrategy = new DeployDragonTokenizedStrategy();
         deployDragonRouter = new DeployDragonRouter();
-        deployMockStrategy = new DeployMockStrategy();
+        deployMockStrategy = new DeployMockStrategy(msg.sender, msg.sender, msg.sender);
         deployHatsProtocol = new DeployHatsProtocol();
     }
 
     function run() public {
+        string memory startingBlock = vm.toString(block.number);
+
         setUp();
 
         // Deploy Module Proxy Factory
@@ -88,6 +90,7 @@ contract DeployProtocol is Script {
         // Log deployment addresses
         console2.log("\nDeployment Summary:");
         console2.log("------------------");
+        console2.log("Starting block:            ", startingBlock);
         console2.log("Module Proxy Factory:      ", moduleProxyFactoryAddress);
         console2.log("Dragon Tokenized Strategy: ", dragonTokenizedStrategyAddress);
         console2.log("Dragon Router:             ", dragonRouterAddress);
@@ -109,6 +112,7 @@ contract DeployProtocol is Script {
         if (vm.exists(contractAddressFilename)) {
             vm.removeFile(contractAddressFilename);
         }
+        vm.writeLine(contractAddressFilename, string.concat("BLOCK_NUMBER=", startingBlock));
         vm.writeLine(
             contractAddressFilename,
             string.concat("MODULE_PROXY_FACTORY_ADDRESS=", vm.toString(moduleProxyFactoryAddress))

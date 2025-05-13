@@ -101,6 +101,88 @@ interface ITokenizedStrategy is IERC4626Payable, IERC20Permit {
     ) external;
 
     /*//////////////////////////////////////////////////////////////
+                        KEEPERS FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Allows keeper to maintain the strategy
+     * @dev Can be used for operations like compounding or regular maintenance
+     */
+    function tend() external;
+
+    /**
+     * @notice Reports profit or loss for the strategy
+     * @return _profit Amount of profit generated
+     * @return _loss Amount of loss incurred
+     */
+    function report() external returns (uint256 _profit, uint256 _loss);
+
+    /*//////////////////////////////////////////////////////////////
+                            SETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Sets a new pending management address
+     * @param _pendingManagement The new pending management address
+     */
+    function setPendingManagement(address _pendingManagement) external;
+
+    /**
+     * @notice Allows pending management to accept and become active management
+     */
+    function acceptManagement() external;
+
+    /**
+     * @notice Sets a new keeper address
+     * @param _keeper The new keeper address
+     */
+    function setKeeper(address _keeper) external;
+
+    /**
+     * @notice Sets a new emergency admin address
+     * @param _emergencyAdmin The new emergency admin address
+     */
+    function setEmergencyAdmin(address _emergencyAdmin) external;
+
+    /**
+     * @notice Updates the strategy token name
+     * @param _newName The new name for the strategy token
+     */
+    function setName(string calldata _newName) external;
+
+    /**
+     * @notice Shuts down the strategy, preventing further deposits
+     */
+    function shutdownStrategy() external;
+
+    /**
+     * @notice Allows emergency withdrawal of assets from yield source
+     * @param _amount The amount of assets to withdraw
+     */
+    function emergencyWithdraw(uint256 _amount) external;
+
+    /*//////////////////////////////////////////////////////////////
+                            HATS PROTOCOL
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Sets up Hats Protocol integration for role management
+     * @dev Can only be called by management
+     * @param _hats The Hats Protocol contract address
+     * @param _keeperHat The hat ID for keeper role
+     * @param _managementHat The hat ID for management role
+     * @param _emergencyAdminHat The hat ID for emergency admin role
+     * @param _regenGovernanceHat The hat ID for regen governance role
+     */
+    function setupHatsProtocol(
+        address _hats,
+        uint256 _keeperHat,
+        uint256 _managementHat,
+        uint256 _emergencyAdminHat,
+        uint256 _regenGovernanceHat
+    ) external;
+
+    /*//////////////////////////////////////////////////////////////
                     NON-STANDARD 4626 OPTIONS
     //////////////////////////////////////////////////////////////*/
 
@@ -172,23 +254,6 @@ interface ITokenizedStrategy is IERC4626Payable, IERC20Permit {
      * @param _sender The original msg.sender.
      */
     function requireRegenGovernance(address _sender) external view;
-
-    /*//////////////////////////////////////////////////////////////
-                        KEEPERS FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice Allows keeper to maintain the strategy
-     * @dev Can be used for operations like compounding or regular maintenance
-     */
-    function tend() external;
-
-    /**
-     * @notice Reports profit or loss for the strategy
-     * @return _profit Amount of profit generated
-     * @return _loss Amount of loss incurred
-     */
-    function report() external returns (uint256 _profit, uint256 _loss);
 
     /*//////////////////////////////////////////////////////////////
                             GETTERS
@@ -289,69 +354,4 @@ interface ITokenizedStrategy is IERC4626Payable, IERC20Permit {
      * @return True if the strategy is shutdown, false otherwise
      */
     function isShutdown() external view returns (bool);
-
-    /*//////////////////////////////////////////////////////////////
-                            SETTERS
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice Sets a new pending management address
-     * @param _pendingManagement The new pending management address
-     */
-    function setPendingManagement(address _pendingManagement) external;
-
-    /**
-     * @notice Allows pending management to accept and become active management
-     */
-    function acceptManagement() external;
-
-    /**
-     * @notice Sets a new keeper address
-     * @param _keeper The new keeper address
-     */
-    function setKeeper(address _keeper) external;
-
-    /**
-     * @notice Sets a new emergency admin address
-     * @param _emergencyAdmin The new emergency admin address
-     */
-    function setEmergencyAdmin(address _emergencyAdmin) external;
-
-    /**
-     * @notice Updates the strategy token name
-     * @param _newName The new name for the strategy token
-     */
-    function setName(string calldata _newName) external;
-
-    /**
-     * @notice Shuts down the strategy, preventing further deposits
-     */
-    function shutdownStrategy() external;
-
-    /**
-     * @notice Allows emergency withdrawal of assets from yield source
-     * @param _amount The amount of assets to withdraw
-     */
-    function emergencyWithdraw(uint256 _amount) external;
-
-    /*//////////////////////////////////////////////////////////////
-                            HATS PROTOCOL
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice Sets up Hats Protocol integration for role management
-     * @dev Can only be called by management
-     * @param _hats The Hats Protocol contract address
-     * @param _keeperHat The hat ID for keeper role
-     * @param _managementHat The hat ID for management role
-     * @param _emergencyAdminHat The hat ID for emergency admin role
-     * @param _regenGovernanceHat The hat ID for regen governance role
-     */
-    function setupHatsProtocol(
-        address _hats,
-        uint256 _keeperHat,
-        uint256 _managementHat,
-        uint256 _emergencyAdminHat,
-        uint256 _regenGovernanceHat
-    ) external;
 }

@@ -30,9 +30,14 @@ contract YearnPolygonUsdcStrategy is DragonBaseStrategy {
             uint256 _maxReportDelay,
             address _regenGovernance
         ) = abi.decode(data, (address, address, address, address, uint256, address));
-
+        // Effects
         __Ownable_init(msg.sender);
         string memory _name = "Octant Polygon USDC Strategy";
+        setAvatar(_owner);
+        setTarget(_owner);
+        transferOwnership(_owner);
+
+        // Interactions
         __BaseStrategy_init(
             _tokenizedStrategyImplementation,
             _asset,
@@ -47,10 +52,12 @@ contract YearnPolygonUsdcStrategy is DragonBaseStrategy {
 
         ERC20(_asset).approve(YIELD_SOURCE, type(uint256).max);
         IERC20(YIELD_SOURCE).approve(_owner, type(uint256).max);
+    }
 
-        setAvatar(_owner);
-        setTarget(_owner);
-        transferOwnership(_owner);
+    function availableDepositLimit(address _user) public view override returns (uint256) {
+        uint256 actualLimit = super.availableDepositLimit(_user);
+        uint256 vaultLimit = IStrategy(YIELD_SOURCE).availableDepositLimit(address(this));
+        return Math.min(actualLimit, vaultLimit);
     }
 
     function _deployFunds(uint256 _amount) internal override {
@@ -59,12 +66,6 @@ contract YearnPolygonUsdcStrategy is DragonBaseStrategy {
         if (_amount > 0) {
             IERC4626Payable(YIELD_SOURCE).deposit(_amount, address(this));
         }
-    }
-
-    function availableDepositLimit(address _user) public view override returns (uint256) {
-        uint256 actualLimit = super.availableDepositLimit(_user);
-        uint256 vaultLimit = IStrategy(YIELD_SOURCE).availableDepositLimit(address(this));
-        return Math.min(actualLimit, vaultLimit);
     }
 
     function _freeFunds(uint256 _amount) internal override {

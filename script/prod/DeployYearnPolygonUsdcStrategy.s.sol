@@ -49,7 +49,15 @@ contract DeployYearnPolygonUsdcStrategy is DeployDragonRouter {
             vm.prompt("Is the module factory already deployed? (if yes, provide the address) / (if no, provide 'no')")
         returns (string memory res) {
             if (keccak256(abi.encode(res)) == keccak256(abi.encode("no"))) {
-                moduleFactory = address(new ModuleProxyFactory());
+                moduleFactory = address(
+                    new ModuleProxyFactory(
+                        msg.sender,
+                        msg.sender,
+                        address(splitCheckerImplementation),
+                        metapool,
+                        address(dragonRouterImplementation)
+                    )
+                );
                 console.log("Module Factory deployed at:", moduleFactory);
             } else {
                 moduleFactory = vm.parseAddress(res);
