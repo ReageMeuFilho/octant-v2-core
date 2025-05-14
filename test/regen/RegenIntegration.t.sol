@@ -779,7 +779,7 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         // Admin notifies first reward part
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT_PART_1 + REWARD_AMOUNT_PART_2); // Mint total upfront
+        rewardToken.mint(address(regenStaker), REWARD_AMOUNT); // Mint total for both parts
         vm.startPrank(address(this));
         regenStaker.notifyRewardAmount(REWARD_AMOUNT_PART_1);
         vm.stopPrank();
@@ -795,8 +795,6 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         // Admin notifies second reward part
-        // This should reset the period. Remaining from part 1 is REWARD_AMOUNT_PART_1 / 2.
-        // New total to distribute over a fresh REWARD_PERIOD_DURATION: (REWARD_AMOUNT_PART_1 / 2) + REWARD_AMOUNT_PART_2
         vm.startPrank(address(this));
         regenStaker.notifyRewardAmount(REWARD_AMOUNT_PART_2);
         vm.stopPrank();
@@ -813,22 +811,14 @@ contract RegenIntegrationTest is Test {
         uint256 claimedB = regenStaker.claimReward(depositIdB);
         vm.stopPrank();
 
-        // Calculations for expected amounts:
-        // Staker A's earnings from the first part of REWARD_AMOUNT_PART_1 (was alone):
         uint256 earningsA_phase1 = REWARD_AMOUNT_PART_1 / 2;
-
-        // Amount remaining from REWARD_AMOUNT_PART_1 when second notification hit:
         uint256 remaining_part1 = REWARD_AMOUNT_PART_1 / 2;
-        // Total rewards for the new period:
         uint256 total_for_new_period = remaining_part1 + REWARD_AMOUNT_PART_2;
-
-        // Staker A and B share total_for_new_period equally for the full new duration
         uint256 earnings_each_phase2 = total_for_new_period / 2;
 
         uint256 expectedA = earningsA_phase1 + earnings_each_phase2;
         uint256 expectedB = earnings_each_phase2;
 
-        // Using a small delta due to potential minor timing/rounding effects with multiple phases
         assertApproxEqAbs(
             claimedA,
             expectedA,
@@ -843,9 +833,402 @@ contract RegenIntegrationTest is Test {
         );
         assertApproxEqAbs(
             claimedA + claimedB,
-            REWARD_AMOUNT,
+            REWARD_AMOUNT, // Total original reward
             MIN_ASSERT_TOLERANCE * 2,
             "Total claimed does not match total rewards notified"
+        );
+    }
+
+    // --- Tests for Stake Deposits and Withdrawals Requirements ---
+
+    function test_StakeDeposit_MultipleDepositsSingleUser() public {
+        address user = makeAddr("multiDepositUser");
+
+        // Whitelist user
+        address[] memory userArr = new address[](1);
+        userArr[0] = user;
+        stakerWhitelist.addToWhitelist(userArr);
+        earningPowerWhitelist.addToWhitelist(userArr);
+
+        // Mint tokens for two stakes
+        stakeToken.mint(user, STAKE_AMOUNT * 2);
+        vm.startPrank(user);
+        stakeToken.approve(address(regenStaker), STAKE_AMOUNT * 2);
+
+        // First stake
+        Staker.DepositIdentifier depositId1 = regenStaker.stake(STAKE_AMOUNT, user);
+        // Second stake
+        Staker.DepositIdentifier depositId2 = regenStaker.stake(STAKE_AMOUNT, user);
+        vm.stopPrank();
+
+        assertEq(regenStaker.depositorTotalStaked(user), STAKE_AMOUNT * 2, "Total staked incorrect");
+        // Assuming earning power is 1:1 with stake amount for simplicity here
+        assertEq(regenStaker.depositorTotalEarningPower(user), STAKE_AMOUNT * 2, "Total earning power incorrect");
+
+        // Notify rewards
+        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        vm.startPrank(address(this));
+        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        vm.stopPrank();
+
+        // Warp full period
+        vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
+
+        // Claim for first deposit
+        vm.startPrank(user);
+        uint256 claimed1 = regenStaker.claimReward(depositId1);
+        // Claim for second deposit
+        uint256 claimed2 = regenStaker.claimReward(depositId2);
+        vm.stopPrank();
+
+        // Each deposit should get half of the total reward since they staked the same amount for the full period
+        assertApproxEqAbs(claimed1, REWARD_AMOUNT / 2, MIN_ASSERT_TOLERANCE, "Claimed amount for deposit 1 incorrect");
+        assertApproxEqAbs(claimed2, REWARD_AMOUNT / 2, MIN_ASSERT_TOLERANCE, "Claimed amount for deposit 2 incorrect");
+        assertApproxEqAbs(claimed1 + claimed2, REWARD_AMOUNT, MIN_ASSERT_TOLERANCE * 2, "Total claimed incorrect");
+    }
+
+    function test_StakeDeposit_StakeMore_UpdatesBalanceAndRewards() public {
+        address user = makeAddr("stakeMoreUser");
+        uint256 initialStake = STAKE_AMOUNT / 2;
+        uint256 additionalStake = STAKE_AMOUNT / 2;
+
+        // Whitelist user
+        address[] memory userArr = new address[](1);
+        userArr[0] = user;
+        stakerWhitelist.addToWhitelist(userArr);
+        earningPowerWhitelist.addToWhitelist(userArr);
+
+        // Mint tokens
+        stakeToken.mint(user, initialStake + additionalStake);
+        vm.startPrank(user);
+        stakeToken.approve(address(regenStaker), initialStake + additionalStake);
+
+        // Initial stake
+        Staker.DepositIdentifier depositId = regenStaker.stake(initialStake, user);
+        vm.stopPrank();
+
+        assertEq(regenStaker.depositorTotalStaked(user), initialStake);
+        assertEq(regenStaker.depositorTotalEarningPower(user), initialStake);
+
+        // Setup and stake otherStaker BEFORE notifying rewards (MOVED HERE)
+        address otherStaker = makeAddr("otherStakerForStakeMore");
+        address[] memory otherStakerArr = new address[](1);
+        otherStakerArr[0] = otherStaker;
+        stakerWhitelist.addToWhitelist(otherStakerArr);
+        earningPowerWhitelist.addToWhitelist(otherStakerArr);
+        stakeToken.mint(otherStaker, STAKE_AMOUNT);
+        vm.startPrank(otherStaker);
+        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
+        regenStaker.stake(STAKE_AMOUNT, otherStaker);
+        vm.stopPrank();
+
+        // Notify rewards
+        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        vm.startPrank(address(this));
+        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        vm.stopPrank();
+
+        // Warp half period
+        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2);
+
+        // Stake more
+        vm.startPrank(user);
+        regenStaker.stakeMore(depositId, additionalStake);
+        vm.stopPrank();
+
+        assertEq(regenStaker.depositorTotalStaked(user), initialStake + additionalStake);
+        assertEq(regenStaker.depositorTotalEarningPower(user), initialStake + additionalStake);
+
+        // Warp remaining half period
+        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2);
+
+        // Claim rewards
+        vm.startPrank(user);
+        uint256 claimedAmount = regenStaker.claimReward(depositId);
+        vm.stopPrank();
+
+        // Expected: (REWARD_AMOUNT / 2) * (initialStake / (initialStake)) for first half (as user was only staker)
+        // + (REWARD_AMOUNT / 2) * ((initialStake + additionalStake) / (initialStake + additionalStake)) for second half
+        // Simplified: (REWARD_AMOUNT / 2) * (1/2 share during first half, relative to total stake then) + (REWARD_AMOUNT / 2) * (total share during second half)
+        // If user is the only staker:
+        // First half: initialStake was totalEarningPower. User earned (REWARD_AMOUNT / REWARD_PERIOD_DURATION) * (REWARD_PERIOD_DURATION / 2) = REWARD_AMOUNT / 2
+        // For this, user\'s share was 1. So user got all of (REWARD_AMOUNT / 2)
+        // Second half: (initialStake + additionalStake) was totalEarningPower. User earned (REWARD_AMOUNT / 2)
+        // Oh, the base staker contract distributes based on share of totalEarningPower.
+        // If this user is the only one, they get all rewards.
+        // Reward for 1st half period: (REWARD_AMOUNT / 2) because they had 100% of earning power (initialStake)
+        // Reward for 2nd half period: (REWARD_AMOUNT / 2) because they had 100% of earning power (initialStake + additionalStake)
+        // This calculation will be simpler if only one staker.
+
+        // If user is sole staker:
+        // Reward rate = REWARD_AMOUNT / REWARD_PERIOD_DURATION
+        // Earnings 1st half = (REWARD_AMOUNT / REWARD_PERIOD_DURATION) * (REWARD_PERIOD_DURATION / 2) = REWARD_AMOUNT / 2
+        // Earnings 2nd half = (REWARD_AMOUNT / REWARD_PERIOD_DURATION) * (REWARD_PERIOD_DURATION / 2) = REWARD_AMOUNT / 2
+        // Total = REWARD_AMOUNT
+        // This test doesn\'t quite test the pro-rata shift well if there\'s only one user.
+        // Let\'s add another staker to make the shares change.
+
+        // Recalculate rewards for \'user\'
+        // Total EP phase 1 = initialStake (user) + STAKE_AMOUNT (otherStaker)
+        // User share phase 1 = initialStake / (initialStake + STAKE_AMOUNT)
+        // Earnings user phase 1 = (REWARD_AMOUNT / 2) * (initialStake / (initialStake + STAKE_AMOUNT))
+
+        // Total EP phase 2 = (initialStake + additionalStake) (user) + STAKE_AMOUNT (otherStaker)
+        // User share phase 2 = (initialStake + additionalStake) / ((initialStake + additionalStake) + STAKE_AMOUNT)
+        // Earnings user phase 2 = (REWARD_AMOUNT / 2) * ((initialStake + additionalStake) / ((initialStake + additionalStake) + STAKE_AMOUNT))
+
+        uint256 totalEpPhase1 = initialStake + STAKE_AMOUNT;
+        uint256 earningsUserPhase1 = ((REWARD_AMOUNT / 2) * initialStake) / totalEpPhase1;
+
+        uint256 totalEpPhase2 = (initialStake + additionalStake) + STAKE_AMOUNT;
+        uint256 earningsUserPhase2 = ((REWARD_AMOUNT / 2) * (initialStake + additionalStake)) / totalEpPhase2;
+
+        uint256 expectedUserRewards = earningsUserPhase1 + earningsUserPhase2;
+
+        assertApproxEqAbs(
+            claimedAmount,
+            expectedUserRewards,
+            MIN_ASSERT_TOLERANCE * 2,
+            "Claimed amount after stakeMore incorrect"
+        );
+    }
+
+    function test_StakeWithdraw_PartialWithdraw_ReducesBalanceAndImpactsRewards() public {
+        address user = makeAddr("partialWithdrawUser");
+        uint256 withdrawAmount = STAKE_AMOUNT / 4;
+
+        // Whitelist and stake
+        address[] memory userArr = new address[](1);
+        userArr[0] = user;
+        stakerWhitelist.addToWhitelist(userArr);
+        earningPowerWhitelist.addToWhitelist(userArr);
+        stakeToken.mint(user, STAKE_AMOUNT);
+        vm.startPrank(user);
+        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
+        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, user);
+        vm.stopPrank();
+
+        // Notify rewards
+        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        vm.startPrank(address(this));
+        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        vm.stopPrank();
+
+        // Warp half period
+        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2);
+
+        // Check claimable before withdraw (user is only staker)
+        uint256 claimableBeforeWithdraw = regenStaker.unclaimedReward(depositId);
+        assertApproxEqAbs(
+            claimableBeforeWithdraw,
+            REWARD_AMOUNT / 2,
+            MIN_ASSERT_TOLERANCE,
+            "Claimable before withdraw incorrect"
+        );
+
+        // Partial withdraw
+        vm.startPrank(user);
+        regenStaker.withdraw(depositId, withdrawAmount);
+        vm.stopPrank();
+
+        assertEq(
+            regenStaker.depositorTotalStaked(user),
+            STAKE_AMOUNT - withdrawAmount,
+            "Total staked after partial withdraw incorrect"
+        );
+        assertEq(
+            regenStaker.depositorTotalEarningPower(user),
+            STAKE_AMOUNT - withdrawAmount,
+            "Total EP after partial withdraw incorrect"
+        );
+
+        // Warp remaining half period
+        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2);
+
+        // Claim rewards
+        vm.startPrank(user);
+        uint256 claimedAfterWithdraw = regenStaker.claimReward(depositId); // This claims all accumulated
+        vm.stopPrank();
+
+        // Expected: REWARD_AMOUNT / 2 (from first half, full stake)
+        // + REWARD_AMOUNT / 2 (from second half, reduced stake, but still 100% share if only staker)
+        // This logic is simple if user is the only staker. They get all rewards.
+        // The important part is that `withdraw` doesn't lose *already accrued* rewards.
+        // The `claimReward` call after withdraw should include rewards accrued *before* withdraw.
+        // `unclaimedReward` before withdraw was REWARD_AMOUNT / 2.
+        // After withdraw, and warping, the new rewards for 2nd half are also REWARD_AMOUNT / 2 (as user is only staker).
+        // So total claimed should be REWARD_AMOUNT.
+
+        assertApproxEqAbs(
+            claimedAfterWithdraw,
+            REWARD_AMOUNT,
+            MIN_ASSERT_TOLERANCE,
+            "Total claimed after partial withdraw incorrect"
+        );
+    }
+
+    function test_StakeWithdraw_FullWithdraw_BalanceZero_ClaimsAccrued_NoFutureRewards() public {
+        address user = makeAddr("fullWithdrawUser");
+
+        // Whitelist and stake
+        address[] memory userArr = new address[](1);
+        userArr[0] = user;
+        stakerWhitelist.addToWhitelist(userArr);
+        earningPowerWhitelist.addToWhitelist(userArr);
+        stakeToken.mint(user, STAKE_AMOUNT);
+        vm.startPrank(user);
+        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
+        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, user);
+        vm.stopPrank();
+
+        // Notify rewards
+        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        vm.startPrank(address(this));
+        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        vm.stopPrank();
+
+        // Warp half period
+        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2);
+
+        // Full withdraw
+        vm.startPrank(user);
+        regenStaker.withdraw(depositId, STAKE_AMOUNT);
+        vm.stopPrank();
+
+        assertEq(regenStaker.depositorTotalStaked(user), 0, "Total staked after full withdraw should be 0");
+        assertEq(regenStaker.depositorTotalEarningPower(user), 0, "Total EP after full withdraw should be 0");
+
+        // Claim accrued rewards immediately after withdraw
+        vm.startPrank(user);
+        uint256 claimedImmediately = regenStaker.claimReward(depositId);
+        vm.stopPrank();
+        // Should be rewards for the first half
+        assertApproxEqAbs(
+            claimedImmediately,
+            REWARD_AMOUNT / 2,
+            MIN_ASSERT_TOLERANCE,
+            "Claimed immediately after full withdraw incorrect"
+        );
+
+        // Warp remaining half period
+        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2);
+
+        // Attempt to claim again (should get 0 new rewards)
+        vm.startPrank(user);
+        uint256 claimedLater = regenStaker.claimReward(depositId);
+        vm.stopPrank();
+        assertEq(claimedLater, 0, "Should claim 0 rewards later as no stake was present");
+    }
+
+    function test_StakeWithdraw_FullWithdrawAndRestake_ResetsTimeAdvantage() public {
+        address stakerA = makeAddr("stakerA_WithdrawRestake");
+        address stakerB = makeAddr("stakerB_Continuous"); // Stays for full duration
+
+        // Whitelist stakers
+        address[] memory arrA = new address[](1);
+        arrA[0] = stakerA;
+        stakerWhitelist.addToWhitelist(arrA);
+        earningPowerWhitelist.addToWhitelist(arrA);
+        address[] memory arrB = new address[](1);
+        arrB[0] = stakerB;
+        stakerWhitelist.addToWhitelist(arrB);
+        earningPowerWhitelist.addToWhitelist(arrB);
+
+        // Mint tokens
+        stakeToken.mint(stakerA, STAKE_AMOUNT * 2); // For initial stake and re-stake
+        stakeToken.mint(stakerB, STAKE_AMOUNT);
+
+        // T0: Staker A and B stake
+        vm.startPrank(stakerA);
+        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
+        Staker.DepositIdentifier depositIdA1 = regenStaker.stake(STAKE_AMOUNT, stakerA);
+        vm.stopPrank();
+
+        vm.startPrank(stakerB);
+        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
+        Staker.DepositIdentifier depositIdB = regenStaker.stake(STAKE_AMOUNT, stakerB);
+        vm.stopPrank();
+
+        // Notify rewards
+        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        vm.startPrank(address(this));
+        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        vm.stopPrank();
+
+        // Warp to T1 (1/3 of period)
+        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 3);
+
+        // T1: Staker A fully withdraws depositIdA1
+        vm.startPrank(stakerA);
+        regenStaker.withdraw(depositIdA1, STAKE_AMOUNT);
+        // Claim rewards from first stake period for A
+        uint256 claimedA_period1 = regenStaker.claimReward(depositIdA1);
+        vm.stopPrank();
+
+        // Warp to T2 (2/3 of period total, or 1/3 since T1)
+        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 3);
+
+        // T2: Staker A re-stakes (new deposit)
+        vm.startPrank(stakerA);
+        stakeToken.approve(address(regenStaker), STAKE_AMOUNT); // Approve for the new stake
+        Staker.DepositIdentifier depositIdA2 = regenStaker.stake(STAKE_AMOUNT, stakerA);
+        vm.stopPrank();
+
+        // Warp to T_end (remaining 1/3 of period)
+        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 3);
+
+        // At T_end: Claim rewards for Staker A (depositIdA2) and Staker B (depositIdB)
+        vm.startPrank(stakerA);
+        uint256 claimedA_period2 = regenStaker.claimReward(depositIdA2);
+        vm.stopPrank();
+
+        vm.startPrank(stakerB);
+        uint256 claimedB_total = regenStaker.claimReward(depositIdB);
+        vm.stopPrank();
+
+        // --- Expected Calculations ---
+        // Phase 1 (0 to T1 = 1/3 duration): Staker A and B both staked STAKE_AMOUNT. Total EP = 2 * STAKE_AMOUNT. Each gets 1/2.
+        // Reward for phase 1 = REWARD_AMOUNT / 3
+        uint256 expected_claimedA_period1 = (REWARD_AMOUNT / 3) / 2;
+        assertApproxEqAbs(
+            claimedA_period1,
+            expected_claimedA_period1,
+            MIN_ASSERT_TOLERANCE,
+            "Staker A phase 1 claim incorrect"
+        );
+
+        // Phase 2 (T1 to T2 = 1/3 duration): Only Staker B staked STAKE_AMOUNT. Total EP = STAKE_AMOUNT. B gets all.
+        // Reward for phase 2 = REWARD_AMOUNT / 3
+        // Staker B accumulated this entirely.
+
+        // Phase 3 (T2 to T_end = 1/3 duration): Staker A and B both staked STAKE_AMOUNT. Total EP = 2 * STAKE_AMOUNT. Each gets 1/2.
+        // Reward for phase 3 = REWARD_AMOUNT / 3
+        uint256 expected_claimedA_period2 = (REWARD_AMOUNT / 3) / 2;
+        assertApproxEqAbs(
+            claimedA_period2,
+            expected_claimedA_period2,
+            MIN_ASSERT_TOLERANCE,
+            "Staker A phase 2 (re-stake) claim incorrect"
+        );
+
+        // Total for B: (Phase1_B_share) + (Phase2_B_share) + (Phase3_B_share)
+        // Phase1_B_share = (REWARD_AMOUNT / 3) / 2
+        // Phase2_B_share = REWARD_AMOUNT / 3 (all of it)
+        // Phase3_B_share = (REWARD_AMOUNT / 3) / 2
+        uint256 expected_claimedB_total = (REWARD_AMOUNT / 3) / 2 + (REWARD_AMOUNT / 3) + (REWARD_AMOUNT / 3) / 2;
+        assertApproxEqAbs(
+            claimedB_total,
+            expected_claimedB_total,
+            MIN_ASSERT_TOLERANCE * 2,
+            "Staker B total claim incorrect"
+        ); // Higher tolerance for sum
+
+        uint256 totalClaimedRewards = claimedA_period1 + claimedA_period2 + claimedB_total;
+        assertApproxEqAbs(
+            totalClaimedRewards,
+            REWARD_AMOUNT,
+            MIN_ASSERT_TOLERANCE * 3,
+            "Overall total rewards claimed mismatch"
         );
     }
 }
