@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+// Tests are named according https://github.com/ScopeLift/scopelint/blob/1857e3940bfe92ac5a136827374f4b27ff083971/src/check/validators/test_names.rs#L106-L143
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
@@ -32,6 +34,13 @@ contract RegenIntegrationTest is Test {
     uint256 private constant MIN_ASSERT_TOLERANCE = 1;
 
     // --- End Constants ---
+
+    // Helper function to extract claimer from deposit tuple
+    function _getClaimerFromDeposit(Staker.DepositIdentifier depositId) internal view returns (address) {
+        // solhint-disable-next-line no-empty-blocks
+        (, , , , address claimer, , ) = regenStaker.deposits(depositId);
+        return claimer;
+    }
 
     function setUp() public {
         // Deploy mock tokens
@@ -1229,6 +1238,160 @@ contract RegenIntegrationTest is Test {
             REWARD_AMOUNT,
             MIN_ASSERT_TOLERANCE * 3,
             "Overall total rewards claimed mismatch"
+        );
+    }
+
+    // --- Tests for Reward Claiming Requirements ---
+
+    function test_RewardClaiming_ClaimByDesignatedClaimer_Succeeds() public {
+        address owner = makeAddr("depositOwner");
+        address designatedClaimer = makeAddr("designatedClaimer");
+
+        // Whitelist owner for staking and earning power
+        address[] memory ownerArr = new address[](1);
+        ownerArr[0] = owner;
+        stakerWhitelist.addToWhitelist(ownerArr);
+        earningPowerWhitelist.addToWhitelist(ownerArr);
+
+        // Owner stakes
+        stakeToken.mint(owner, STAKE_AMOUNT);
+        vm.startPrank(owner);
+        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
+        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, owner);
+
+        // Owner designates designatedClaimer as the claimer for the deposit
+        regenStaker.alterClaimer(depositId, designatedClaimer);
+        vm.stopPrank(); // Stop owner's prank
+
+        address retrievedClaimer = _getClaimerFromDeposit(depositId);
+        assertEq(retrievedClaimer, designatedClaimer, "Claimer not set correctly");
+
+        // Admin notifies reward
+        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        vm.startPrank(address(this));
+        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        vm.stopPrank();
+
+        // Warp to mid-period
+        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2);
+
+        // Designated claimer claims reward
+        uint256 initialBalanceClaimer = rewardToken.balanceOf(designatedClaimer);
+        vm.startPrank(designatedClaimer);
+        uint256 claimedAmount1 = regenStaker.claimReward(depositId);
+        vm.stopPrank();
+
+        assertApproxEqAbs(
+            claimedAmount1,
+            REWARD_AMOUNT / 2,
+            MIN_ASSERT_TOLERANCE,
+            "Claimer did not receive correct first half reward"
+        );
+        assertEq(
+            rewardToken.balanceOf(designatedClaimer),
+            initialBalanceClaimer + claimedAmount1,
+            "Claimer did not receive tokens for first claim"
+        );
+
+        // Warp to end of period
+        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2);
+
+        // Designated claimer claims reward again
+        initialBalanceClaimer = rewardToken.balanceOf(designatedClaimer);
+        vm.startPrank(designatedClaimer);
+        uint256 claimedAmount2 = regenStaker.claimReward(depositId);
+        vm.stopPrank();
+
+        assertApproxEqAbs(
+            claimedAmount2,
+            REWARD_AMOUNT / 2,
+            MIN_ASSERT_TOLERANCE,
+            "Claimer did not receive correct second half reward"
+        );
+        assertEq(
+            rewardToken.balanceOf(designatedClaimer),
+            initialBalanceClaimer + claimedAmount2,
+            "Claimer did not receive tokens for second claim"
+        );
+
+        assertApproxEqAbs(
+            claimedAmount1 + claimedAmount2,
+            REWARD_AMOUNT,
+            MIN_ASSERT_TOLERANCE * 2,
+            "Total claimed by claimer incorrect"
+        );
+    }
+
+    function test_RewardClaiming_RevertIf_ClaimByNonOwnerNonClaimer() public {
+        address owner = makeAddr("depositOwner2");
+        address designatedClaimer = makeAddr("designatedClaimer2");
+        address unrelatedUser = makeAddr("unrelatedUser");
+
+        // Whitelist owner
+        address[] memory ownerArr = new address[](1);
+        ownerArr[0] = owner;
+        stakerWhitelist.addToWhitelist(ownerArr);
+        earningPowerWhitelist.addToWhitelist(ownerArr);
+
+        // Owner stakes and sets designatedClaimer
+        stakeToken.mint(owner, STAKE_AMOUNT);
+        vm.startPrank(owner);
+        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
+        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, owner);
+        regenStaker.alterClaimer(depositId, designatedClaimer);
+        vm.stopPrank();
+
+        // Notify reward and warp
+        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        vm.startPrank(address(this));
+        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        vm.stopPrank();
+        vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
+
+        // Unrelated user attempts to claim
+        vm.startPrank(unrelatedUser);
+        vm.expectRevert(
+            abi.encodeWithSelector(Staker.Staker__Unauthorized.selector, bytes32("not claimer or owner"), unrelatedUser)
+        );
+        regenStaker.claimReward(depositId);
+        vm.stopPrank();
+    }
+
+    function test_RewardClaiming_OwnerCanStillClaimAfterDesignatingNewClaimer() public {
+        address owner = makeAddr("depositOwner3");
+        address newClaimer = makeAddr("newClaimer3");
+
+        // Whitelist owner
+        address[] memory ownerArr = new address[](1);
+        ownerArr[0] = owner;
+        stakerWhitelist.addToWhitelist(ownerArr);
+        earningPowerWhitelist.addToWhitelist(ownerArr);
+
+        // Owner stakes and sets newClaimer
+        stakeToken.mint(owner, STAKE_AMOUNT);
+        vm.startPrank(owner);
+        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
+        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, owner);
+        regenStaker.alterClaimer(depositId, newClaimer);
+        vm.stopPrank(); // Stop owner's prank
+
+        // Admin notifies reward and warp
+        vm.startPrank(address(this));
+        rewardToken.mint(address(regenStaker), REWARD_AMOUNT); // Mint tokens to the staker contract
+        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        vm.stopPrank();
+        vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
+
+        // Original owner attempts to claim
+        vm.startPrank(owner);
+        uint256 claimedByOwner = regenStaker.claimReward(depositId);
+        vm.stopPrank();
+
+        assertApproxEqAbs(
+            claimedByOwner,
+            REWARD_AMOUNT,
+            MIN_ASSERT_TOLERANCE,
+            "Owner should be able to claim full reward after designating another claimer"
         );
     }
 }
