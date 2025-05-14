@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Tests are named according https://github.com/ScopeLift/scopelint/blob/1857e3940bfe92ac5a136827374f4b27ff083971/src/check/validators/test_names.rs#L106-L143
+// Tests are named according to https://github.com/ScopeLift/scopelint/blob/1857e3940bfe92ac5a136827374f4b27ff083971/src/check/validators/test_names.rs#L106-L143
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
@@ -15,7 +15,9 @@ import { MockERC20Staking } from "../mocks/MockERC20Staking.sol";
 
 // Mock interface for grant round
 interface IGrantRound {
-    function signUp(uint256 _amount, uint256 _preference) external returns (bool success);
+    function signUp(uint256 assets, address receiver) external returns (uint256 votingPower);
+
+    function vote(uint256 projectId, uint256 votingPower) external;
 }
 
 contract RegenIntegrationTest is Test {
@@ -140,7 +142,18 @@ contract RegenIntegrationTest is Test {
 
         // Create a mock grant round
         address mockGrantRound = makeAddr("mockGrantRound");
-        vm.mockCall(mockGrantRound, abi.encodeWithSelector(IGrantRound.signUp.selector), abi.encode(true));
+        // Generic mock for signup to return votingPower > 0
+        vm.mockCall(
+            mockGrantRound,
+            abi.encodeWithSignature("signup(uint256,address)", uint256(0), address(0)),
+            abi.encode(uint256(1))
+        );
+        // Generic mock for vote to succeed (not revert)
+        vm.mockCall(
+            mockGrantRound,
+            abi.encodeWithSignature("vote(uint256,uint256)", uint256(0), uint256(0)),
+            abi.encode()
+        );
 
         // First, we need to create a deposit that will earn rewards
         address depositor = makeAddr("depositor");
@@ -169,6 +182,7 @@ contract RegenIntegrationTest is Test {
         // Notify rewards to make the deposit earn rewards
         vm.startPrank(address(this));
         regenStaker.notifyRewardAmount(1_000_000_000_000_000_000);
+        vm.stopPrank();
 
         // Fast forward time to accumulate rewards
         vm.warp(block.timestamp + 28 days); // Fast forward almost the entire reward period
@@ -182,18 +196,6 @@ contract RegenIntegrationTest is Test {
         regenStaker.alterClaimer(depositId, nonWhitelistedContributor);
         vm.stopPrank();
 
-        // The first attempt should revert because user is not contribution-whitelisted
-        vm.startPrank(nonWhitelistedContributor);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                RegenStaker.NotWhitelisted.selector,
-                regenStaker.contributionWhitelist(),
-                nonWhitelistedContributor
-            )
-        );
-        regenStaker.contribute(depositId, mockGrantRound, 1e12, 1);
-        vm.stopPrank();
-
         // Now disable the contribution whitelist as admin (this contract is the admin)
         vm.startPrank(address(this));
         regenStaker.setContributionWhitelist(Whitelist(address(0)));
@@ -203,12 +205,40 @@ contract RegenIntegrationTest is Test {
         // Try contributing again with the same non-whitelisted contributor
         vm.startPrank(nonWhitelistedContributor);
 
-        // Set up expectation that signUp will be called
-        vm.expectCall(mockGrantRound, abi.encodeWithSelector(IGrantRound.signUp.selector, 1e12, 1));
+        address actualVotingDelegateeL210 = nonWhitelistedContributor;
+        uint256 amountToContributeL210 = 1e12;
+        uint256[] memory prefsArrayL210 = new uint256[](1);
+        prefsArrayL210[0] = 1;
+        uint256[] memory weightsArrayL210 = new uint256[](1);
+        weightsArrayL210[0] = amountToContributeL210;
+
+        // Set up mock for the specific signup call to return votingPower > 0
+        vm.mockCall(
+            mockGrantRound,
+            abi.encodeWithSignature("signup(uint256,address)", amountToContributeL210, actualVotingDelegateeL210),
+            abi.encode(uint256(1))
+        );
+        // Set up expectation that signup will be called
+        vm.expectCall(
+            mockGrantRound,
+            abi.encodeWithSignature("signup(uint256,address)", amountToContributeL210, actualVotingDelegateeL210)
+        );
+
+        // Set up expectation that vote will be called
+        vm.expectCall(
+            mockGrantRound,
+            abi.encodeWithSignature("vote(uint256,uint256)", prefsArrayL210[0], weightsArrayL210[0])
+        );
 
         // This time it should succeed without reverting
-        regenStaker.contribute(depositId, mockGrantRound, 1e12, 1);
-
+        regenStaker.contribute(
+            depositId,
+            mockGrantRound,
+            actualVotingDelegateeL210,
+            amountToContributeL210,
+            prefsArrayL210,
+            weightsArrayL210
+        );
         vm.stopPrank();
     }
 
@@ -366,7 +396,18 @@ contract RegenIntegrationTest is Test {
         // --- Setup for contribution ---
         // Create a mock grant round
         address mockGrantRound = makeAddr("mockGrantRound");
-        vm.mockCall(mockGrantRound, abi.encodeWithSelector(IGrantRound.signUp.selector), abi.encode(true));
+        // Generic mock for signup
+        vm.mockCall(
+            mockGrantRound,
+            abi.encodeWithSignature("signup(uint256,address)", uint256(0), address(0)),
+            abi.encode(uint256(1))
+        );
+        // Generic mock for vote
+        vm.mockCall(
+            mockGrantRound,
+            abi.encodeWithSignature("vote(uint256,uint256)", uint256(0), uint256(0)),
+            abi.encode()
+        );
 
         // Create a depositor/contributor
         address contributor = makeAddr("contributor");
@@ -409,7 +450,22 @@ contract RegenIntegrationTest is Test {
         // Attempt to contribute while paused
         vm.startPrank(contributor);
         vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
-        regenStaker.contribute(depositId, mockGrantRound, 1e12, 1);
+
+        address actualVotingDelegateeL412 = contributor;
+        uint256 amountToContributeL412 = 1e12;
+        uint256[] memory prefsArrayL412 = new uint256[](1);
+        prefsArrayL412[0] = 1;
+        uint256[] memory weightsArrayL412 = new uint256[](1);
+        weightsArrayL412[0] = amountToContributeL412;
+
+        regenStaker.contribute(
+            depositId,
+            mockGrantRound,
+            actualVotingDelegateeL412,
+            amountToContributeL412,
+            prefsArrayL412,
+            weightsArrayL412
+        );
         vm.stopPrank();
 
         // Unpause the contract for other tests

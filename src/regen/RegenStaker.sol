@@ -24,7 +24,22 @@ import { IWhitelistedEarningPowerCalculator } from "./IWhitelistedEarningPowerCa
 
 // TODO: Bind this to the real contract.
 interface IGrantRound {
-    function signUp(uint256 _amount, uint256 _preference) external returns (bool success);
+    /// @notice Grants voting power to `receiver` by
+    /// depositing exactly `assets` of underlying tokens.
+    /// @param assets The amount of underlying to deposit in.
+    /// @param receiver The address to receive the `shares`.
+    /// @return votingPower The actual amount of votingPower issued.
+    function signup(uint256 assets, address receiver) external returns (uint256 votingPower);
+
+    /// @notice Process a vote for a project with a contribution amount and vote weight
+    /// @dev This function validates and processes votes according to the implemented formula
+    /// @dev Must check if the user can vote in _processVote
+    /// @dev Must check if the project is whitelisted in _processVote
+    /// @dev Must update the project tally in _processVote
+    /// Only keepers can call this function to prevent spam and ensure proper vote processing.
+    /// @param projectId The ID of the project being voted for
+    /// @param votingPower the votingPower msg.sender will assign to projectId, must be checked in _processVote by strategist
+    function vote(uint256 projectId, uint256 votingPower) external;
 }
 
 /// @title RegenStaker
@@ -37,18 +52,16 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
     error NotWhitelisted(IWhitelist whitelist, address user);
     error NotImplemented();
     error CantAfford(uint256 requested, uint256 available);
-    error GrantRoundSignUpFailed(address grantRound, address contributor, uint256 amount, uint256 preference);
-
+    error GrantRoundSignUpFailed(address grantRound, address contributor, uint256 amount, address votingDelegatee);
+    error PreferencesAndPreferenceWeightsMustHaveTheSameLength();
+    error InvalidNumberOfPreferences(uint actual, uint min, uint max);
+    event GrantRoundVoteFailed(address grantRound, address contributor, uint256 projectId, uint256 votingPower);
     event StakerWhitelistSet(IWhitelist whitelist);
     event ContributionWhitelistSet(IWhitelist whitelist);
     event EarningPowerWhitelistSet(IWhitelist whitelist);
-    event RewardContributed(
-        Staker.DepositIdentifier depositId,
-        address contributor,
-        address grantRound,
-        uint256 amount,
-        uint256 preference
-    );
+
+    uint256 public constant MIN_PREFERENCES = 1;
+    uint256 public constant MAX_PREFERENCES = 16;
 
     constructor(
         IERC20 _rewardsToken,
@@ -96,18 +109,28 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
         _depositId = _stake(msg.sender, amount, delegatee, msg.sender);
     }
 
-    /// @dev TODO: Implement this.
     function contribute(
         DepositIdentifier _depositId,
         address _grantRoundAddress,
+        address _votingDelegatee,
         uint256 _amount,
-        uint256 _preference
+        uint256[] memory _preferences,
+        uint256[] memory _preferenceWeights
     ) public whenNotPaused {
         _revertIfAddressZero(_grantRoundAddress);
 
         require(
             contributionWhitelist == IWhitelist(address(0)) || contributionWhitelist.isWhitelisted(msg.sender),
             NotWhitelisted(contributionWhitelist, msg.sender)
+        );
+
+        require(
+            _preferences.length == _preferenceWeights.length,
+            PreferencesAndPreferenceWeightsMustHaveTheSameLength()
+        );
+        require(
+            _preferences.length >= MIN_PREFERENCES && _preferences.length <= MAX_PREFERENCES,
+            InvalidNumberOfPreferences(_preferences.length, MIN_PREFERENCES, MAX_PREFERENCES)
         );
 
         // Make sure _amount is not greater than the amount of unclaimed rewards for this deposit.
@@ -124,14 +147,18 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
         uint256 scaledAmount = _amount * SCALE_FACTOR;
         deposit.scaledUnclaimedRewardCheckpoint = deposit.scaledUnclaimedRewardCheckpoint - scaledAmount;
 
-        // Call the external functions and send the rewards to the grant round
-        // TODO: Bind this to the real contract.
-        SafeERC20.safeTransfer(REWARD_TOKEN, _grantRoundAddress, _amount);
+        // Call the external functions
+        SafeERC20.safeIncreaseAllowance(REWARD_TOKEN, _grantRoundAddress, _amount);
         require(
-            IGrantRound(_grantRoundAddress).signUp(_amount, _preference),
-            GrantRoundSignUpFailed(_grantRoundAddress, msg.sender, _amount, _preference)
+            IGrantRound(_grantRoundAddress).signup(_amount, _votingDelegatee) > 0,
+            GrantRoundSignUpFailed(_grantRoundAddress, msg.sender, _amount, _votingDelegatee)
         );
-        emit RewardContributed(_depositId, msg.sender, _grantRoundAddress, _amount, _preference);
+
+        for (uint256 i = 0; i < _preferences.length; i++) {
+            try IGrantRound(_grantRoundAddress).vote(_preferences[i], _preferenceWeights[i]) {} catch {
+                emit GrantRoundVoteFailed(_grantRoundAddress, msg.sender, _preferences[i], _preferenceWeights[i]);
+            }
+        }
     }
 
     /// @notice Sets the whitelist for the staker. If the whitelist is not set, the staking will be open to all users.
