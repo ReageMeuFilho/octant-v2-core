@@ -177,33 +177,6 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
         contributionWhitelist = _contributionWhitelist;
     }
 
-    /// @notice Sets the whitelist for the earning power. If the whitelist is not set, the earning power will be open to all users.
-    /// @notice If the earning power calculator is not implementing a whitelist, this function will revert.
-    /// @param _earningPowerWhitelist The whitelist to set.
-    function setEarningPowerWhitelist(Whitelist _earningPowerWhitelist) external {
-        _revertIfNotAdmin();
-        emit EarningPowerWhitelistSet(_earningPowerWhitelist);
-        IWhitelistedEarningPowerCalculator(address(earningPowerCalculator)).setWhitelist(_earningPowerWhitelist);
-    }
-
-    /// @notice Checks if the earning power whitelist is enabled.
-    /// @notice If the earning power calculator is not implementing a whitelist, this function will return false.
-    /// @return _isEnabled True if the earning power whitelist is enabled, false otherwise.
-    function isEarningPowerWhitelistEnabled() external view returns (bool _isEnabled) {
-        try
-            IERC165(address(earningPowerCalculator)).supportsInterface(
-                type(IWhitelistedEarningPowerCalculator).interfaceId
-            )
-        returns (bool isSupported) {
-            _isEnabled =
-                isSupported &&
-                IWhitelistedEarningPowerCalculator(address(earningPowerCalculator)).whitelist() !=
-                IWhitelist(address(0));
-        } catch {
-            _isEnabled = false;
-        }
-    }
-
     /// @notice Pauses the contract.
     function pause() external whenNotPaused {
         _revertIfNotAdmin();
