@@ -35,7 +35,20 @@ contract YieldSkimmingVaultFactory {
 
     event MorphoStrategyDeploy(address deployer, address donationAddress, address strategyAddress);
 
-    address morphoVaultAddress = 0xbEef047a543E45807105E51A8BBEFCc5950fcfBa; // Morpho Steakhouse vault
+    address public morphoVaultAddress;
+
+    constructor() {
+        morphoVaultAddress = address(
+            new Morpho(
+                0xBEEF01735c132Ada46AA9aA4c54623cAA92A64CB, // steakhouse vault
+                "Morpho Steakhouse",
+                address(1),
+                address(1),
+                address(1),
+                address(1)
+            )
+        );
+    }
 
     /**
      * @notice Deploys a new Morpho strategy for the Yield Skimming Vault.
