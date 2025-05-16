@@ -5,12 +5,14 @@
 
 pragma solidity ^0.8.0;
 
+// OpenZeppelin Imports
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 import { EIP712 } from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
+// Staker Library Imports
 import { IERC20Staking } from "staker/interfaces/IERC20Staking.sol";
 import { Staker } from "staker/Staker.sol";
 import { StakerDelegateSurrogateVotes } from "staker/extensions/StakerDelegateSurrogateVotes.sol";
@@ -18,10 +20,12 @@ import { StakerPermitAndStake } from "staker/extensions/StakerPermitAndStake.sol
 import { StakerOnBehalf } from "staker/extensions/StakerOnBehalf.sol";
 import { IEarningPowerCalculator } from "staker/interfaces/IEarningPowerCalculator.sol";
 
+// Local Imports
 import { Whitelist } from "./whitelist/Whitelist.sol";
 import { IWhitelist } from "./whitelist/IWhitelist.sol";
 import { IWhitelistedEarningPowerCalculator } from "./IWhitelistedEarningPowerCalculator.sol";
 
+// Interfaces (if defined locally)
 // TODO: Bind this to the real contract.
 interface IGrantRound {
     /// @notice Grants voting power to `receiver` by
@@ -49,19 +53,20 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
     IWhitelist public stakerWhitelist;
     IWhitelist public contributionWhitelist;
 
+    uint256 public constant MIN_PREFERENCES = 1;
+    uint256 public constant MAX_PREFERENCES = 16;
+
+    event StakerWhitelistSet(IWhitelist whitelist);
+    event ContributionWhitelistSet(IWhitelist whitelist);
+    event EarningPowerWhitelistSet(IWhitelist whitelist); // Note: No direct setter in RegenStaker currently
+    event GrantRoundVoteFailed(address grantRound, address contributor, uint256 projectId, uint256 votingPower);
+
     error NotWhitelisted(IWhitelist whitelist, address user);
-    error NotImplemented();
     error CantAfford(uint256 requested, uint256 available);
     error GrantRoundSignUpFailed(address grantRound, address contributor, uint256 amount, address votingDelegatee);
     error PreferencesAndPreferenceWeightsMustHaveTheSameLength();
-    error InvalidNumberOfPreferences(uint actual, uint min, uint max);
-    event GrantRoundVoteFailed(address grantRound, address contributor, uint256 projectId, uint256 votingPower);
-    event StakerWhitelistSet(IWhitelist whitelist);
-    event ContributionWhitelistSet(IWhitelist whitelist);
-    event EarningPowerWhitelistSet(IWhitelist whitelist);
-
-    uint256 public constant MIN_PREFERENCES = 1;
-    uint256 public constant MAX_PREFERENCES = 16;
+    error InvalidNumberOfPreferences(uint256 actual, uint256 min, uint256 max); // Changed uint to uint256 for consistency
+    error NotImplemented(); // Note: Currently unused
 
     constructor(
         IERC20 _rewardsToken,
@@ -82,15 +87,12 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
         StakerDelegateSurrogateVotes(_stakeToken)
         EIP712("RegenStaker", "1")
     {
-        // Initialize whitelists
         stakerWhitelist = address(_stakerWhitelist) == address(0) ? new Whitelist() : _stakerWhitelist;
         contributionWhitelist = address(_contributionWhitelist) == address(0)
             ? new Whitelist()
             : _contributionWhitelist;
 
-        // Override the maximum reward token fee for claiming rewards
         MAX_CLAIM_FEE = 1e18;
-        // At deployment, there should be no reward claiming fee
         _setClaimFeeParameters(ClaimFeeParameters({ feeAmount: 0, feeCollector: address(0) }));
     }
 
@@ -107,58 +109,6 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
             NotWhitelisted(stakerWhitelist, msg.sender)
         );
         _depositId = _stake(msg.sender, amount, delegatee, msg.sender);
-    }
-
-    function contribute(
-        DepositIdentifier _depositId,
-        address _grantRoundAddress,
-        address _votingDelegatee,
-        uint256 _amount,
-        uint256[] memory _preferences,
-        uint256[] memory _preferenceWeights
-    ) public whenNotPaused {
-        _revertIfAddressZero(_grantRoundAddress);
-
-        require(
-            contributionWhitelist == IWhitelist(address(0)) || contributionWhitelist.isWhitelisted(msg.sender),
-            NotWhitelisted(contributionWhitelist, msg.sender)
-        );
-
-        require(
-            _preferences.length == _preferenceWeights.length,
-            PreferencesAndPreferenceWeightsMustHaveTheSameLength()
-        );
-        require(
-            _preferences.length >= MIN_PREFERENCES && _preferences.length <= MAX_PREFERENCES,
-            InvalidNumberOfPreferences(_preferences.length, MIN_PREFERENCES, MAX_PREFERENCES)
-        );
-
-        // Make sure _amount is not greater than the amount of unclaimed rewards for this deposit.
-        // Get the deposit
-        Deposit storage deposit = deposits[_depositId];
-
-        // Calculate the unclaimed rewards for this deposit
-        uint256 unclaimedAmount = _scaledUnclaimedReward(deposit) / SCALE_FACTOR;
-
-        // Ensure the amount is not greater than the unclaimed rewards
-        require(_amount <= unclaimedAmount, CantAfford(_amount, unclaimedAmount));
-
-        // Update the deposit's unclaimed rewards by resetting the checkpoint
-        uint256 scaledAmount = _amount * SCALE_FACTOR;
-        deposit.scaledUnclaimedRewardCheckpoint = deposit.scaledUnclaimedRewardCheckpoint - scaledAmount;
-
-        // Call the external functions
-        SafeERC20.safeIncreaseAllowance(REWARD_TOKEN, _grantRoundAddress, _amount);
-        require(
-            IGrantRound(_grantRoundAddress).signup(_amount, _votingDelegatee) > 0,
-            GrantRoundSignUpFailed(_grantRoundAddress, msg.sender, _amount, _votingDelegatee)
-        );
-
-        for (uint256 i = 0; i < _preferences.length; i++) {
-            try IGrantRound(_grantRoundAddress).vote(_preferences[i], _preferenceWeights[i]) {} catch {
-                emit GrantRoundVoteFailed(_grantRoundAddress, msg.sender, _preferences[i], _preferenceWeights[i]);
-            }
-        }
     }
 
     /// @notice Sets the whitelist for the staker. If the whitelist is not set, the staking will be open to all users.
@@ -203,5 +153,49 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
             revert Staker__Unauthorized("not claimer or owner", msg.sender);
         }
         return _claimReward(_depositId, deposit, msg.sender);
+    }
+
+    function contribute(
+        DepositIdentifier _depositId,
+        address _grantRoundAddress,
+        address _votingDelegatee,
+        uint256 _amount,
+        uint256[] memory _preferences,
+        uint256[] memory _preferenceWeights
+    ) public whenNotPaused {
+        _revertIfAddressZero(_grantRoundAddress);
+
+        require(
+            contributionWhitelist == IWhitelist(address(0)) || contributionWhitelist.isWhitelisted(msg.sender),
+            NotWhitelisted(contributionWhitelist, msg.sender)
+        );
+
+        require(
+            _preferences.length == _preferenceWeights.length,
+            PreferencesAndPreferenceWeightsMustHaveTheSameLength()
+        );
+        require(
+            _preferences.length >= MIN_PREFERENCES && _preferences.length <= MAX_PREFERENCES,
+            InvalidNumberOfPreferences(_preferences.length, MIN_PREFERENCES, MAX_PREFERENCES)
+        );
+
+        Deposit storage deposit = deposits[_depositId];
+        uint256 unclaimedAmount = _scaledUnclaimedReward(deposit) / SCALE_FACTOR;
+        require(_amount <= unclaimedAmount, CantAfford(_amount, unclaimedAmount));
+
+        uint256 scaledAmount = _amount * SCALE_FACTOR;
+        deposit.scaledUnclaimedRewardCheckpoint = deposit.scaledUnclaimedRewardCheckpoint - scaledAmount;
+
+        SafeERC20.safeIncreaseAllowance(REWARD_TOKEN, _grantRoundAddress, _amount);
+        require(
+            IGrantRound(_grantRoundAddress).signup(_amount, _votingDelegatee) > 0,
+            GrantRoundSignUpFailed(_grantRoundAddress, msg.sender, _amount, _votingDelegatee)
+        );
+
+        for (uint256 i = 0; i < _preferences.length; i++) {
+            try IGrantRound(_grantRoundAddress).vote(_preferences[i], _preferenceWeights[i]) {} catch {
+                emit GrantRoundVoteFailed(_grantRoundAddress, msg.sender, _preferences[i], _preferenceWeights[i]);
+            }
+        }
     }
 }

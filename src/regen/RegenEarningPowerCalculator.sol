@@ -15,16 +15,19 @@ contract RegenEarningPowerCalculator is IWhitelistedEarningPowerCalculator, Owna
         emit WhitelistSet(_whitelist);
     }
 
-    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165, IERC165) returns (bool) {
-        return
-            interfaceId == type(IWhitelistedEarningPowerCalculator).interfaceId || super.supportsInterface(interfaceId);
-    }
+    function getEarningPower(
+        uint256 stakedAmount,
+        address staker,
+        address /*_delegatee*/
+    ) external view override returns (uint256) {
+        uint256 const_uint96_max = uint256(type(uint96).max);
+        uint256 cappedAmount;
+        if (stakedAmount > const_uint96_max) {
+            cappedAmount = const_uint96_max;
+        } else {
+            cappedAmount = stakedAmount;
+        }
 
-    // For whitelisted users, return their staked amount
-    // For non-whitelisted users, return 0
-    function getEarningPower(uint256 stakedAmount, address staker, address) external view returns (uint256) {
-        // Staker.sol uses uint96 for the earning power, so we cap the amount at that.
-        uint256 cappedAmount = stakedAmount > type(uint96).max ? type(uint96).max : stakedAmount;
         if (address(whitelist) == address(0)) return cappedAmount;
         else if (whitelist.isWhitelisted(staker)) return cappedAmount;
         else return 0;
@@ -33,43 +36,45 @@ contract RegenEarningPowerCalculator is IWhitelistedEarningPowerCalculator, Owna
     function getNewEarningPower(
         uint256 stakedAmount,
         address staker,
-        address,
+        address, // _delegatee - unused
         uint256 oldEarningPower
-    ) external view returns (uint256, bool) {
-        // Staker.sol uses uint96 for the earning power, so we cap the amount at that.
-        uint256 cappedAmount = stakedAmount > type(uint96).max ? type(uint96).max : stakedAmount;
-
-        // Calculate new earning power based on whitelist status
-        uint256 newEarningPower;
-        if (address(whitelist) == address(0)) {
-            newEarningPower = cappedAmount;
-        } else if (whitelist.isWhitelisted(staker)) {
-            newEarningPower = cappedAmount;
+    ) external view override returns (uint256 newCalculatedEarningPower, bool qualifiesForBump) {
+        uint256 const_uint96_max = uint256(type(uint96).max);
+        uint256 cappedAmount;
+        if (stakedAmount > const_uint96_max) {
+            cappedAmount = const_uint96_max;
         } else {
-            newEarningPower = 0;
+            cappedAmount = stakedAmount;
         }
 
-        // Determine if this qualifies for a bump
-        bool qualifiesForBump = false;
+        if (address(whitelist) == address(0)) {
+            newCalculatedEarningPower = cappedAmount;
+        } else if (whitelist.isWhitelisted(staker)) {
+            newCalculatedEarningPower = cappedAmount;
+        } else {
+            newCalculatedEarningPower = 0;
+        }
 
-        // Case 1: Whitelist status changes (going from earning to not earning or vice versa)
-        if ((oldEarningPower > 0 && newEarningPower == 0) || (oldEarningPower == 0 && newEarningPower > 0)) {
+        if (
+            (oldEarningPower > 0 && newCalculatedEarningPower == 0) ||
+            (oldEarningPower == 0 && newCalculatedEarningPower > 0)
+        ) {
             qualifiesForBump = true;
-        }
-        // Case 2: Significant change in earning power (e.g., doubled or halved)
-        // Only check when both values are non-zero to avoid division by zero
-        else if (oldEarningPower > 0 && newEarningPower > 0) {
-            // Check if value doubled or halved (significant enough change to warrant a bump)
-            if (newEarningPower >= oldEarningPower * 2 || newEarningPower * 2 <= oldEarningPower) {
+        } else if (oldEarningPower > 0 && newCalculatedEarningPower > 0) {
+            if (newCalculatedEarningPower >= oldEarningPower * 2 || newCalculatedEarningPower * 2 <= oldEarningPower) {
                 qualifiesForBump = true;
             }
         }
-
-        return (newEarningPower, qualifiesForBump);
+        // else qualifiesForBump remains false (default)
     }
 
-    function setWhitelist(IWhitelist _whitelist) public onlyOwner {
+    function setWhitelist(IWhitelist _whitelist) public override onlyOwner {
         whitelist = _whitelist;
         emit WhitelistSet(_whitelist);
+    }
+
+    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165, IERC165) returns (bool) {
+        return
+            interfaceId == type(IWhitelistedEarningPowerCalculator).interfaceId || super.supportsInterface(interfaceId);
     }
 }
