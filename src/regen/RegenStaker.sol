@@ -215,7 +215,7 @@ contract RegenStaker is
 
         // Account for claim fees
         uint256 fee = claimFeeParameters.feeAmount;
-        require(_amount >= fee, CantAfford(fee, _amount)); // Ensure gross amount covers fee
+        require(_amount >= fee, CantAfford(fee, _amount));
         amountContributedToGrant = _amount - fee;
 
         // Update deposit's reward checkpoint by the gross amount used

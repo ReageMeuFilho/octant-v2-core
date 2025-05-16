@@ -1923,4 +1923,128 @@ contract RegenIntegrationTest is Test {
         regenStaker.withdraw(depositId, STAKE_AMOUNT / 2);
         vm.stopPrank();
     }
+
+    function test_Contribute_FeeDeducted_And_NetValuesUsed() public {
+        address user = makeAddr("feeUser_focused");
+        address mockGrantRound = makeAddr("mockGrantRoundFee_focused");
+        address votingDelegatee = makeAddr("votingDelegateeFee_focused");
+        address feeCollector = makeAddr("feeCollector_focused");
+        uint256 amountToContributeGross = 1000e18;
+        uint256 feeAmount = 1e17; // Changed: 0.1e18, less than MAX_CLAIM_FEE (1e18)
+        uint256 expectedAmountToGrantRoundNet = amountToContributeGross - feeAmount;
+
+        uint256[] memory prefs = new uint256[](1);
+        prefs[0] = 1;
+        uint256[] memory weights = new uint256[](1);
+        weights[0] = expectedAmountToGrantRoundNet;
+
+        // Setup user & deposit
+        address[] memory userArr = new address[](1);
+        userArr[0] = user;
+        stakerWhitelist.addToWhitelist(userArr);
+        earningPowerWhitelist.addToWhitelist(userArr);
+        contributorWhitelist.addToWhitelist(userArr);
+        stakeToken.mint(user, STAKE_AMOUNT);
+        vm.startPrank(user);
+        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
+        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, user);
+        vm.stopPrank();
+
+        // Setup rewards and fees
+        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        vm.startPrank(address(this)); // Admin
+        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        Staker.ClaimFeeParameters memory feeParams = Staker.ClaimFeeParameters({
+            feeAmount: uint96(feeAmount),
+            feeCollector: feeCollector
+        });
+        regenStaker.setClaimFeeParameters(feeParams);
+        vm.stopPrank();
+        vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
+
+        // Mock external calls
+        vm.mockCall(
+            mockGrantRound,
+            abi.encodeWithSignature("signup(uint256,address)", expectedAmountToGrantRoundNet, votingDelegatee),
+            abi.encode(uint256(1))
+        );
+        vm.mockCall(
+            mockGrantRound,
+            abi.encodeWithSignature("vote(uint256,uint256)", prefs[0], weights[0]),
+            abi.encode()
+        );
+
+        uint256 collectorInitialBalance = rewardToken.balanceOf(feeCollector);
+
+        // Expect calls
+        vm.expectCall(
+            mockGrantRound,
+            abi.encodeWithSignature("signup(uint256,address)", expectedAmountToGrantRoundNet, votingDelegatee)
+        );
+        vm.expectCall(mockGrantRound, abi.encodeWithSignature("vote(uint256,uint256)", prefs[0], weights[0]));
+
+        vm.startPrank(user);
+        uint256 returnedAmount = regenStaker.contribute(
+            depositId,
+            mockGrantRound,
+            votingDelegatee,
+            amountToContributeGross,
+            prefs,
+            weights
+        );
+        vm.stopPrank();
+
+        assertEq(returnedAmount, expectedAmountToGrantRoundNet, "Returned net amount incorrect");
+        assertEq(
+            rewardToken.balanceOf(feeCollector),
+            collectorInitialBalance + feeAmount,
+            "Fee collector balance incorrect"
+        );
+    }
+
+    function test_RevertIf_Contribute_AmountLessThanFee() public {
+        address user = makeAddr("amountLessThanFeeUser");
+        address mockGrantRound = makeAddr("mockGrantRoundLessThanFee");
+        address votingDelegatee = makeAddr("votingDelegateeLessThanFee");
+        address feeCollector = makeAddr("feeCollectorForLessThanFee");
+
+        uint256 feeAmount = 1e17; // Changed: 0.1e18, less than MAX_CLAIM_FEE (1e18)
+        uint256 amountToContributeGross = feeAmount - 1; // Less than fee
+
+        uint256[] memory prefs = new uint256[](1);
+        prefs[0] = 1;
+        uint256[] memory weights = new uint256[](1);
+        weights[0] = 1; // Dummy, won't be used
+
+        // Setup: User stakes, has rewards, on contributor whitelist
+        address[] memory userArr = new address[](1);
+        userArr[0] = user;
+        stakerWhitelist.addToWhitelist(userArr);
+        earningPowerWhitelist.addToWhitelist(userArr);
+        contributorWhitelist.addToWhitelist(userArr);
+
+        stakeToken.mint(user, STAKE_AMOUNT);
+        vm.startPrank(user);
+        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
+        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, user);
+        vm.stopPrank();
+
+        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        vm.startPrank(address(this));
+        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        // Set claim fee parameters
+        Staker.ClaimFeeParameters memory feeParams = Staker.ClaimFeeParameters({
+            feeAmount: uint96(feeAmount),
+            feeCollector: feeCollector
+        });
+        regenStaker.setClaimFeeParameters(feeParams);
+        vm.stopPrank();
+        vm.warp(block.timestamp + REWARD_PERIOD_DURATION); // Accrue rewards
+
+        vm.startPrank(user);
+        // Expect CantAfford(requestedFee, availableAmount)
+        vm.expectRevert(abi.encodeWithSelector(RegenStaker.CantAfford.selector, feeAmount, amountToContributeGross));
+        regenStaker.contribute(depositId, mockGrantRound, votingDelegatee, amountToContributeGross, prefs, weights);
+        vm.stopPrank();
+    }
 }
