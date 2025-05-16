@@ -6,6 +6,7 @@ import { IWhitelist } from "./whitelist/IWhitelist.sol";
 import { IWhitelistedEarningPowerCalculator } from "./IWhitelistedEarningPowerCalculator.sol";
 import { ERC165 } from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract RegenEarningPowerCalculator is IWhitelistedEarningPowerCalculator, Ownable, ERC165 {
     IWhitelist public override whitelist;
@@ -20,17 +21,10 @@ contract RegenEarningPowerCalculator is IWhitelistedEarningPowerCalculator, Owna
         address staker,
         address /*_delegatee*/
     ) external view override returns (uint256) {
-        uint256 const_uint96_max = uint256(type(uint96).max);
-        uint256 cappedAmount;
-        if (stakedAmount > const_uint96_max) {
-            cappedAmount = const_uint96_max;
-        } else {
-            cappedAmount = stakedAmount;
+        if (address(whitelist) != address(0) && !whitelist.isWhitelisted(staker)) {
+            return 0;
         }
-
-        if (address(whitelist) == address(0)) return cappedAmount;
-        else if (whitelist.isWhitelisted(staker)) return cappedAmount;
-        else return 0;
+        return Math.min(stakedAmount, uint256(type(uint96).max));
     }
 
     function getNewEarningPower(
@@ -39,20 +33,10 @@ contract RegenEarningPowerCalculator is IWhitelistedEarningPowerCalculator, Owna
         address, // _delegatee - unused
         uint256 oldEarningPower
     ) external view override returns (uint256 newCalculatedEarningPower, bool qualifiesForBump) {
-        uint256 const_uint96_max = uint256(type(uint96).max);
-        uint256 cappedAmount;
-        if (stakedAmount > const_uint96_max) {
-            cappedAmount = const_uint96_max;
-        } else {
-            cappedAmount = stakedAmount;
-        }
-
-        if (address(whitelist) == address(0)) {
-            newCalculatedEarningPower = cappedAmount;
-        } else if (whitelist.isWhitelisted(staker)) {
-            newCalculatedEarningPower = cappedAmount;
-        } else {
+        if (address(whitelist) != address(0) && !whitelist.isWhitelisted(staker)) {
             newCalculatedEarningPower = 0;
+        } else {
+            newCalculatedEarningPower = Math.min(stakedAmount, uint256(type(uint96).max));
         }
 
         if (

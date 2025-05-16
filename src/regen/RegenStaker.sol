@@ -11,6 +11,7 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 import { EIP712 } from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import { SafeCast } from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 // Staker Library Imports
 import { IERC20Staking } from "staker/interfaces/IERC20Staking.sol";
@@ -50,6 +51,8 @@ interface IGrantRound {
 /// @author [Golem Foundation](https://golem.foundation)
 /// @notice This contract is an extended version of the Staker contract by [ScopeLift](https://scopelift.co).
 contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndStake, StakerOnBehalf, Pausable {
+    using SafeCast for uint256;
+
     IWhitelist public stakerWhitelist;
     IWhitelist public contributionWhitelist;
 
@@ -58,15 +61,20 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
 
     event StakerWhitelistSet(IWhitelist whitelist);
     event ContributionWhitelistSet(IWhitelist whitelist);
-    event EarningPowerWhitelistSet(IWhitelist whitelist); // Note: No direct setter in RegenStaker currently
     event GrantRoundVoteFailed(address grantRound, address contributor, uint256 projectId, uint256 votingPower);
+    event RewardContributed(
+        DepositIdentifier depositId,
+        address contributor,
+        address grantRound,
+        uint256 amount,
+        uint256 preference
+    );
 
     error NotWhitelisted(IWhitelist whitelist, address user);
     error CantAfford(uint256 requested, uint256 available);
     error GrantRoundSignUpFailed(address grantRound, address contributor, uint256 amount, address votingDelegatee);
     error PreferencesAndPreferenceWeightsMustHaveTheSameLength();
     error InvalidNumberOfPreferences(uint256 actual, uint256 min, uint256 max); // Changed uint to uint256 for consistency
-    error NotImplemented(); // Note: Currently unused
 
     constructor(
         IERC20 _rewardsToken,
@@ -180,7 +188,15 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
         );
 
         Deposit storage deposit = deposits[_depositId];
-        uint256 unclaimedAmount = _scaledUnclaimedReward(deposit) / SCALE_FACTOR;
+
+        // Checkpoint rewards before calculating unclaimed amount and subtracting
+        _checkpointGlobalReward();
+        _checkpointReward(deposit); // This updates deposit.scaledUnclaimedRewardCheckpoint to current accrued value
+
+        // Calculate the unclaimed rewards for this deposit using the now-updated checkpoint
+        uint256 unclaimedAmount = deposit.scaledUnclaimedRewardCheckpoint / SCALE_FACTOR;
+
+        // Ensure the amount is not greater than the unclaimed rewards
         require(_amount <= unclaimedAmount, CantAfford(_amount, unclaimedAmount));
 
         uint256 scaledAmount = _amount * SCALE_FACTOR;
@@ -192,10 +208,39 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
             GrantRoundSignUpFailed(_grantRoundAddress, msg.sender, _amount, _votingDelegatee)
         );
 
+        emit RewardContributed(
+            _depositId,
+            msg.sender,
+            _grantRoundAddress,
+            _amount,
+            _preferences.length > 0 ? _preferences[0] : type(uint256).max
+        );
+
         for (uint256 i = 0; i < _preferences.length; i++) {
             try IGrantRound(_grantRoundAddress).vote(_preferences[i], _preferenceWeights[i]) {} catch {
                 emit GrantRoundVoteFailed(_grantRoundAddress, msg.sender, _preferences[i], _preferenceWeights[i]);
             }
         }
+
+        // Update earning power, similar to _claimReward and other Staker.sol functions
+        uint256 newCalculatedEarningPower = earningPowerCalculator.getEarningPower(
+            deposit.balance,
+            deposit.owner,
+            deposit.delegatee
+        );
+
+        totalEarningPower = _calculateTotalEarningPower(
+            deposit.earningPower, // old value from deposit
+            newCalculatedEarningPower,
+            totalEarningPower // current global total
+        );
+        depositorTotalEarningPower[deposit.owner] = _calculateTotalEarningPower(
+            deposit.earningPower, // old value from deposit
+            newCalculatedEarningPower,
+            depositorTotalEarningPower[deposit.owner] // current depositor total
+        );
+        deposit.earningPower = newCalculatedEarningPower.toUint96();
+
+        emit RewardClaimed(_depositId, msg.sender, _amount, deposit.earningPower); // Emits the new earning power
     }
 }
