@@ -222,6 +222,30 @@ contract RegenStaker is
         uint256 scaledAmountConsumed = _amount * SCALE_FACTOR;
         deposit.scaledUnclaimedRewardCheckpoint = deposit.scaledUnclaimedRewardCheckpoint - scaledAmountConsumed;
 
+        // Update earning power, similar to _claimReward logic
+        uint256 newCalculatedEarningPower = earningPowerCalculator.getEarningPower(
+            deposit.balance,
+            deposit.owner,
+            deposit.delegatee
+        );
+        if (deposit.earningPower != newCalculatedEarningPower) {
+            // Only update if it actually changed
+            totalEarningPower = _calculateTotalEarningPower(
+                deposit.earningPower,
+                newCalculatedEarningPower,
+                totalEarningPower
+            );
+            depositorTotalEarningPower[deposit.owner] = _calculateTotalEarningPower(
+                deposit.earningPower,
+                newCalculatedEarningPower,
+                depositorTotalEarningPower[deposit.owner]
+            );
+            deposit.earningPower = newCalculatedEarningPower.toUint96();
+        }
+
+        // Emit Staker.RewardClaimed event for compatibility/observers, using net amount
+        emit RewardClaimed(_depositId, msg.sender, amountContributedToGrant, deposit.earningPower);
+
         // Transfer fee if applicable
         if (fee > 0) {
             SafeERC20.safeTransfer(REWARD_TOKEN, claimFeeParameters.feeCollector, fee);
@@ -248,30 +272,6 @@ contract RegenStaker is
                 emit GrantRoundVoteFailed(_grantRoundAddress, msg.sender, _preferences[i], _preferenceWeights[i]);
             }
         }
-
-        // Update earning power, similar to _claimReward logic
-        uint256 newCalculatedEarningPower = earningPowerCalculator.getEarningPower(
-            deposit.balance,
-            deposit.owner,
-            deposit.delegatee
-        );
-        if (deposit.earningPower != newCalculatedEarningPower) {
-            // Only update if it actually changed
-            totalEarningPower = _calculateTotalEarningPower(
-                deposit.earningPower,
-                newCalculatedEarningPower,
-                totalEarningPower
-            );
-            depositorTotalEarningPower[deposit.owner] = _calculateTotalEarningPower(
-                deposit.earningPower,
-                newCalculatedEarningPower,
-                depositorTotalEarningPower[deposit.owner]
-            );
-            deposit.earningPower = newCalculatedEarningPower.toUint96();
-        }
-
-        // Emit Staker.RewardClaimed event for compatibility/observers, using net amount
-        emit RewardClaimed(_depositId, msg.sender, amountContributedToGrant, deposit.earningPower);
 
         return amountContributedToGrant;
     }
