@@ -190,7 +190,7 @@ contract RegenStaker is
         uint256 _amount,
         uint256[] memory _preferences,
         uint256[] memory _preferenceWeights
-    ) public whenNotPaused nonReentrant {
+    ) public whenNotPaused nonReentrant returns (uint256 amountContributedToGrant) {
         _revertIfAddressZero(_grantRoundAddress);
         require(
             contributionWhitelist == IWhitelist(address(0)) || contributionWhitelist.isWhitelisted(msg.sender),
@@ -207,58 +207,72 @@ contract RegenStaker is
 
         Deposit storage deposit = deposits[_depositId];
 
-        // Checkpoint rewards before calculating unclaimed amount and subtracting
         _checkpointGlobalReward();
-        _checkpointReward(deposit); // This updates deposit.scaledUnclaimedRewardCheckpoint to current accrued value
+        _checkpointReward(deposit);
 
-        // Calculate the unclaimed rewards for this deposit using the now-updated checkpoint
         uint256 unclaimedAmount = deposit.scaledUnclaimedRewardCheckpoint / SCALE_FACTOR;
-
-        // Ensure the amount is not greater than the unclaimed rewards
         require(_amount <= unclaimedAmount, CantAfford(_amount, unclaimedAmount));
 
-        uint256 scaledAmount = _amount * SCALE_FACTOR;
-        deposit.scaledUnclaimedRewardCheckpoint = deposit.scaledUnclaimedRewardCheckpoint - scaledAmount;
+        // Account for claim fees
+        uint256 fee = claimFeeParameters.feeAmount;
+        require(_amount >= fee, CantAfford(fee, _amount)); // Ensure gross amount covers fee
+        amountContributedToGrant = _amount - fee;
 
-        SafeERC20.safeIncreaseAllowance(REWARD_TOKEN, _grantRoundAddress, _amount);
+        // Update deposit's reward checkpoint by the gross amount used
+        uint256 scaledAmountConsumed = _amount * SCALE_FACTOR;
+        deposit.scaledUnclaimedRewardCheckpoint = deposit.scaledUnclaimedRewardCheckpoint - scaledAmountConsumed;
+
+        // Transfer fee if applicable
+        if (fee > 0) {
+            SafeERC20.safeTransfer(REWARD_TOKEN, claimFeeParameters.feeCollector, fee);
+        }
+
+        // Perform grant round actions with the net amount
+        SafeERC20.safeIncreaseAllowance(REWARD_TOKEN, _grantRoundAddress, amountContributedToGrant);
         require(
-            IGrantRound(_grantRoundAddress).signup(_amount, _votingDelegatee) > 0,
-            GrantRoundSignUpFailed(_grantRoundAddress, msg.sender, _amount, _votingDelegatee)
+            IGrantRound(_grantRoundAddress).signup(amountContributedToGrant, _votingDelegatee) > 0,
+            GrantRoundSignUpFailed(_grantRoundAddress, msg.sender, amountContributedToGrant, _votingDelegatee)
         );
 
         emit RewardContributed(
             _depositId,
             msg.sender,
             _grantRoundAddress,
-            _amount,
+            amountContributedToGrant, // Log the net amount contributed to grant
             _preferences.length > 0 ? _preferences[0] : type(uint256).max
         );
 
         for (uint256 i = 0; i < _preferences.length; i++) {
+            // Note: _preferenceWeights are used here. Ensure they relate to amountContributedToGrant if intended.
             try IGrantRound(_grantRoundAddress).vote(_preferences[i], _preferenceWeights[i]) {} catch {
                 emit GrantRoundVoteFailed(_grantRoundAddress, msg.sender, _preferences[i], _preferenceWeights[i]);
             }
         }
 
-        // Update earning power, similar to _claimReward and other Staker.sol functions
+        // Update earning power, similar to _claimReward logic
         uint256 newCalculatedEarningPower = earningPowerCalculator.getEarningPower(
             deposit.balance,
             deposit.owner,
             deposit.delegatee
         );
+        if (deposit.earningPower != newCalculatedEarningPower) {
+            // Only update if it actually changed
+            totalEarningPower = _calculateTotalEarningPower(
+                deposit.earningPower,
+                newCalculatedEarningPower,
+                totalEarningPower
+            );
+            depositorTotalEarningPower[deposit.owner] = _calculateTotalEarningPower(
+                deposit.earningPower,
+                newCalculatedEarningPower,
+                depositorTotalEarningPower[deposit.owner]
+            );
+            deposit.earningPower = newCalculatedEarningPower.toUint96();
+        }
 
-        totalEarningPower = _calculateTotalEarningPower(
-            deposit.earningPower, // old value from deposit
-            newCalculatedEarningPower,
-            totalEarningPower // current global total
-        );
-        depositorTotalEarningPower[deposit.owner] = _calculateTotalEarningPower(
-            deposit.earningPower, // old value from deposit
-            newCalculatedEarningPower,
-            depositorTotalEarningPower[deposit.owner] // current depositor total
-        );
-        deposit.earningPower = newCalculatedEarningPower.toUint96();
+        // Emit Staker.RewardClaimed event for compatibility/observers, using net amount
+        emit RewardClaimed(_depositId, msg.sender, amountContributedToGrant, deposit.earningPower);
 
-        emit RewardClaimed(_depositId, msg.sender, _amount, deposit.earningPower); // Emits the new earning power
+        return amountContributedToGrant;
     }
 }
