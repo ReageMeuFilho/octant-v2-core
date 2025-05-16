@@ -1414,20 +1414,20 @@ contract RegenIntegrationTest is Test {
     }
 
     function test_RewardClaiming_OwnerCanStillClaimAfterDesignatingNewClaimer() public {
-        address owner = makeAddr("depositOwner3");
+        address ownerAddr = makeAddr("depositOwner3");
         address newClaimer = makeAddr("newClaimer3");
 
         // Whitelist owner
         address[] memory ownerArr = new address[](1);
-        ownerArr[0] = owner;
+        ownerArr[0] = ownerAddr;
         stakerWhitelist.addToWhitelist(ownerArr);
         earningPowerWhitelist.addToWhitelist(ownerArr);
 
         // Owner stakes and sets newClaimer
-        stakeToken.mint(owner, STAKE_AMOUNT);
-        vm.startPrank(owner);
+        stakeToken.mint(ownerAddr, STAKE_AMOUNT);
+        vm.startPrank(ownerAddr);
         stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, owner);
+        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, ownerAddr);
         regenStaker.alterClaimer(depositId, newClaimer);
         vm.stopPrank(); // Stop owner's prank
 
@@ -1439,7 +1439,7 @@ contract RegenIntegrationTest is Test {
         vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
 
         // Original owner attempts to claim
-        vm.startPrank(owner);
+        vm.startPrank(ownerAddr);
         uint256 claimedByOwner = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
@@ -1449,5 +1449,128 @@ contract RegenIntegrationTest is Test {
             MIN_ASSERT_TOLERANCE,
             "Owner should be able to claim full reward after designating another claimer"
         );
+    }
+
+    // --- Tests for Admin-Managed Reward Periods and Whitelist Controls ---
+
+    function test_RevertIf_NotifyRewardAmount_NotNotifier() public {
+        address notNotifier = makeAddr("notNotifier");
+        // Ensure notNotifier is not the admin (address(this) is admin and notifier by default)
+        assertTrue(notNotifier != address(this), "notNotifier should not be the admin");
+
+        vm.startPrank(notNotifier);
+        vm.expectRevert(
+            abi.encodeWithSelector(Staker.Staker__Unauthorized.selector, bytes32("not notifier"), notNotifier)
+        );
+        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        vm.stopPrank();
+    }
+
+    function test_AdminManaged_SetCalculatorWhitelist_Succeeds_RevertIf_NonOwner() public {
+        Whitelist newEarningWhitelist = new Whitelist();
+        address nonOwnerOfCalculator = makeAddr("nonOwnerOfCalculator"); // Different from admin/owner of RegenStaker
+
+        // Admin of RegenStaker (address(this)) is owner of calculator, sets a new earning power whitelist
+        vm.startPrank(address(this));
+        calculator.setWhitelist(newEarningWhitelist);
+        vm.stopPrank();
+        assertEq(
+            address(IWhitelistedEarningPowerCalculator(address(calculator)).whitelist()),
+            address(newEarningWhitelist)
+        );
+
+        // Admin disables the earning power whitelist
+        vm.startPrank(address(this));
+        calculator.setWhitelist(Whitelist(address(0)));
+        vm.stopPrank();
+        assertEq(address(IWhitelistedEarningPowerCalculator(address(calculator)).whitelist()), address(0));
+
+        // Non-owner of calculator attempts to set earning power whitelist
+        vm.startPrank(nonOwnerOfCalculator);
+        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", nonOwnerOfCalculator));
+        calculator.setWhitelist(newEarningWhitelist);
+        vm.stopPrank();
+    }
+
+    // --- Tests for Security and Integrity Requirements ---
+
+    function test_RevertIf_NotifyRewardAmount_InsufficientContractBalance() public {
+        // address(this) is already set as a reward notifier in setUp.
+        uint256 notifyAmount = 1000e18;
+
+        // Ensure contract has less than notifyAmount (e.g., 0 or a smaller amount)
+        // rewardToken.mint(address(regenStaker), notifyAmount / 2); // Optional: mint a smaller amount
+        // For this test, let's assume balance is 0 initially for REWARD_TOKEN if not minted.
+
+        vm.startPrank(address(this)); // Admin/Notifier
+        // The Staker__InsufficientRewardBalance error is from the base Staker contract.
+        vm.expectRevert(Staker.Staker__InsufficientRewardBalance.selector);
+        regenStaker.notifyRewardAmount(notifyAmount);
+        vm.stopPrank();
+    }
+
+    function test_RevertIf_WithdrawWhenPaused() public {
+        address user = makeAddr("withdrawPausedUser");
+        // Whitelist and stake
+        address[] memory userArr = new address[](1);
+        userArr[0] = user;
+        stakerWhitelist.addToWhitelist(userArr);
+        earningPowerWhitelist.addToWhitelist(userArr);
+        stakeToken.mint(user, STAKE_AMOUNT);
+        vm.startPrank(user);
+        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
+        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, user);
+        vm.stopPrank();
+
+        // Pause the contract
+        vm.startPrank(address(this)); // Admin
+        regenStaker.pause();
+        assertTrue(regenStaker.paused(), "Contract should be paused");
+        vm.stopPrank();
+
+        // Attempt to withdraw while paused
+        vm.startPrank(user);
+        vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
+        regenStaker.withdraw(depositId, STAKE_AMOUNT / 2);
+        vm.stopPrank();
+
+        // Unpause for other tests
+        vm.startPrank(address(this));
+        regenStaker.unpause();
+        vm.stopPrank();
+    }
+
+    function test_RevertIf_ClaimRewardWhenPaused() public {
+        address user = makeAddr("claimPausedUser");
+        // Whitelist, stake, and accrue rewards
+        address[] memory userArr = new address[](1);
+        userArr[0] = user;
+        stakerWhitelist.addToWhitelist(userArr);
+        earningPowerWhitelist.addToWhitelist(userArr);
+        stakeToken.mint(user, STAKE_AMOUNT);
+        vm.startPrank(user);
+        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
+        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, user);
+        vm.stopPrank();
+
+        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        vm.startPrank(address(this)); // Admin
+        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2); // Accrue some rewards
+        // Pause the contract
+        regenStaker.pause();
+        assertTrue(regenStaker.paused(), "Contract should be paused");
+        vm.stopPrank(); // Admin prank ends
+
+        // Attempt to claim reward while paused
+        vm.startPrank(user);
+        vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
+        regenStaker.claimReward(depositId);
+        vm.stopPrank();
+
+        // Unpause for other tests
+        vm.startPrank(address(this));
+        regenStaker.unpause();
+        vm.stopPrank();
     }
 }

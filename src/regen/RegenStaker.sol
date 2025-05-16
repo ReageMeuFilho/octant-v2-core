@@ -188,4 +188,20 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
         _revertIfNotAdmin();
         _unpause();
     }
+
+    /// @notice Withdraw staked tokens from an existing deposit.
+    function withdraw(Staker.DepositIdentifier _depositId, uint256 _amount) external override whenNotPaused {
+        Deposit storage deposit = deposits[_depositId];
+        _revertIfNotDepositOwner(deposit, msg.sender);
+        _withdraw(deposit, _depositId, _amount);
+    }
+
+    /// @notice Claim reward tokens earned by a given deposit.
+    function claimReward(Staker.DepositIdentifier _depositId) external override whenNotPaused returns (uint256) {
+        Deposit storage deposit = deposits[_depositId];
+        if (deposit.claimer != msg.sender && deposit.owner != msg.sender) {
+            revert Staker__Unauthorized("not claimer or owner", msg.sender);
+        }
+        return _claimReward(_depositId, deposit, msg.sender);
+    }
 }
