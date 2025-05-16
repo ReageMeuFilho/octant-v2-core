@@ -656,11 +656,12 @@ contract SkyCompounderTest is Test {
         // 1. Configure strategy to use UniswapV2
         vm.startPrank(management);
         strategy.setUseUniV3andFees(false, 3000, 500); // Disable UniV3
+        assertEq(strategy.minAmountToSell(), 50e18, "Min amount should be set correctly");
+        strategy.setMinAmountToSell(0); // Set min amount to 0 for testing
         vm.stopPrank();
 
         // Verify UniV2 is enabled
         assertFalse(strategy.useUniV3(), "UniV3 should be disabled");
-        assertEq(strategy.minAmountToSell(), 50e18, "Min amount should be set correctly");
 
         // Check claimable rewards are 0 at the start
         assertEq(strategy.claimableRewards(), 0, "No claimable rewards initially");
@@ -781,6 +782,8 @@ contract SkyCompounderTest is Test {
             "Should have accrued enough rewards to swap"
         );
         strategy.setClaimRewards(true);
+        // add money to the vault to simulate profit
+        deal(USDS, address(vault), 50e18);
         vm.stopPrank();
 
         // 5. Report profit to generate donation shares

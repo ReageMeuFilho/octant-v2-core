@@ -3,10 +3,14 @@ pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
 import {HarnessProperQF} from "../harness/HarnessProperQF.sol";
+import {ProperQF} from "src/allocation-mechanism/voting-strategy/ProperQF.sol";
 import {console2 as console} from "forge-std/console2.sol";
 
 contract ProperQFTest is Test {
     HarnessProperQF public qf;
+    
+    // Capture AlphaUpdated event
+    event AlphaUpdated(uint256 oldNumerator, uint256 oldDenominator, uint256 newNumerator, uint256 newDenominator);
     
     function setUp() public {
         qf = new HarnessProperQF();
@@ -98,7 +102,68 @@ contract ProperQFTest is Test {
 
     function test_zero_contribution_reverts() public {
         vm.expectRevert("Contribution must be positive");
-        qf.exposed_processVote(1, 0,0);
+        qf.exposed_processVote(1, 0, 0);
+    }
+
+    function test_zero_voteWeight_reverts() public {
+        vm.expectRevert("Square root of contribution must be positive");
+        qf.exposed_processVote(1, 100, 0);
+    }
+
+    function test_voteWeight_too_large_reverts() public {
+        // Set voteWeight to 11 when contribution is 100
+        // 11^2 = 121 which is > 100
+        vm.expectRevert("Square root of contribution must be less than or equal to contribution");
+        qf.exposed_processVote(1, 100, 11);
+    }
+
+    function test_setAlpha_zero_denominator_reverts() public {
+        // Try to set alpha with zero denominator
+        vm.expectRevert("Denominator must be positive");
+        qf.exposed_setAlpha(1, 0);
+    }
+
+    function test_setAlpha_numerator_greater_than_denominator_reverts() public {
+        // Try to set alpha with numerator > denominator (alpha > 1)
+        vm.expectRevert("Alpha must be <= 1");
+        qf.exposed_setAlpha(11, 10);
+    }
+
+    function test_setAlpha_success() public {
+        // Set alpha to 0.6 (6/10)
+        qf.exposed_setAlpha(6, 10);
+        (uint256 numerator, uint256 denominator) = qf.getAlpha();
+        assertEq(numerator, 6, "Alpha numerator should be 6");
+        assertEq(denominator, 10, "Alpha denominator should be 10");
+
+        // Check that an AlphaUpdated event was emitted
+        vm.expectEmit(true, true, true, true);
+        emit AlphaUpdated(6, 10, 7, 10);
+        qf.exposed_setAlpha(7, 10);
+    }
+
+    function test_setAlphaDecimal_success() public {
+        // Set alpha to 0.75 using decimal format
+        qf.exposed_setAlphaDecimal(75 * 10**16); // 0.75e18
+        
+        (uint256 numerator, uint256 denominator) = qf.getAlpha();
+        assertEq(numerator, 75 * 10**16, "Alpha numerator should be 0.75e18");
+        assertEq(denominator, 10**18, "Alpha denominator should be 1e18");
+    }
+
+    function test_setAlphaPercentage_success() public {
+        // Set alpha to 80% using percentage format
+        qf.exposed_setAlphaPercentage(80);
+        
+        (uint256 numerator, uint256 denominator) = qf.getAlpha();
+        assertEq(numerator, 80, "Alpha numerator should be 80");
+        assertEq(denominator, 100, "Alpha denominator should be 100");
+    }
+
+    function test_setAlphaDecimal_over_one_reverts() public {
+        // Try to set alpha to 1.1 using decimal format
+        vm.expectRevert("Alpha must be <= 1");
+        qf.exposed_setAlphaDecimal(11 * 10**17); // 1.1e18
     }
 
     function test_multiple_projects_votes() public {
@@ -317,5 +382,63 @@ contract ProperQFTest is Test {
 
         // Log gas usage
         console.log("Gas used for processing vote (warm storage):", gasUsed);
+    }
+
+    function test_setAlphaPercentage_over_hundred_reverts() public {
+        // Try to set alpha to 101% using percentage format
+        vm.expectRevert("Percentage must be <= 100");
+        qf.exposed_setAlphaPercentage(101);
+    }
+
+    function test_getTally_with_alpha() public {
+        // Set up project with some contributions
+        uint256 projectId = 1;
+        uint256 contribution = 100e18;
+        uint256 sqrtContribution = qf.exposed_sqrt(contribution);
+        
+        qf.exposed_processVote(projectId, contribution, sqrtContribution);
+        
+        // Test with default alpha (1.0)
+        {
+            (uint256 sumC, uint256 sumSR, uint256 quadraticFunding, uint256 linearFunding) = qf.getTally(projectId);
+            
+            // Check correct values returned with default alpha (10000/10000 = 1.0)
+            assertEq(sumC, contribution);
+            assertEq(sumSR, sqrtContribution);
+            assertEq(quadraticFunding, sqrtContribution * sqrtContribution);
+            assertEq(linearFunding, contribution);
+        }
+        
+        // Change alpha to 0.6 (60/100)
+        qf.exposed_setAlpha(60, 100);
+        
+        // Test with alpha of 0.6
+        {
+            (uint256 sumC, uint256 sumSR, uint256 quadraticFunding, uint256 linearFunding) = qf.getTally(projectId);
+            
+            // Check correct values returned with alpha = 0.6
+            assertEq(sumC, contribution);
+            assertEq(sumSR, sqrtContribution);
+            
+            // quadraticFunding should be 60% of the square
+            uint256 expectedQuadratic = (sqrtContribution * sqrtContribution * 60) / 100;
+            assertEq(quadraticFunding, expectedQuadratic);
+            
+            // linearFunding stays the same
+            assertEq(linearFunding, contribution);
+        }
+    }
+
+    function test_getAlpha() public {
+        // Check default alpha values
+        (uint256 numerator, uint256 denominator) = qf.getAlpha();
+        assertEq(numerator, 10000, "Default alpha numerator should be 10000");
+        assertEq(denominator, 10000, "Default alpha denominator should be 10000");
+        
+        // Set a new alpha and check that getAlpha returns the new values
+        qf.exposed_setAlpha(3, 5);
+        (numerator, denominator) = qf.getAlpha();
+        assertEq(numerator, 3, "Alpha numerator should be updated to 3");
+        assertEq(denominator, 5, "Alpha denominator should be updated to 5");
     }
 } 

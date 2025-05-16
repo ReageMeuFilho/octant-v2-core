@@ -1,25 +1,85 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity >=0.8.18;
 
+/**$$$$$$$$$$$$$$$$$$$$$$$$$$$&Mr/|1+~>>iiiiiiiiiii>~+{|tuMW$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+$$$$$$$$$$$$$$$$$$$$$$$$$B#j]->iiiiiiiiiiiiiiiiiiiiiiiiiiii>-?f*B$$$$$$$$$$$$$$$$$$$$$$$$$
+$$$$$$$$$$$$$$$$$$$$$@zj}~iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii~}fv@$$$$$$$$$$$$$$$$$$$$$
+$$$$$$$$$$$$$$$$$$@z(+iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii+)zB$$$$$$$$$$$$$$$$$$
+$$$$$$$$$$$$$$$$Mf~iiiiiiiiiiiiiiiiiii   iiiiiiiiiiiiiiiiiiiiiiiiiiiiii~t#@$$$$$$$$$$$$$$$
+$$$$$$$$$$$$$@u[iiiiiiiiiiiiiiiiiii           ii   iiiiiiiiiiiiiiiiiiiiiii?n@$$$$$$$$$$$$$
+$$$$$$$$$$$@z]iiiiiiiiiiiiiiiiii                     iiiiiiiiiiiiiiiiiiiiiii?u@$$$$$$$$$$$
+$$$$$$$$$$v]iiiiiiiiiiiiiiiii        .-'   `'.      iiiiiiiiiiiiiiiiiiiiiiiiii?u$$$$$$$$
+$$$$$$$$%)>iiiiiiiiiiiiiiiiii       /         \       iiiiiiiiiiiiiiiiiiiiiiiiii1%$$$$$$$$
+$$$$$$$c~iiiiiiiiiiiiiiiiiiiiii     |         ;       iiiiiiiiiiiiiiiiiiiiiiiii>)%$$$$$$$$
+$$$$$B/>iiiiiiiiiiiiiiiiiii         |         |           ___.--,  iiiiiiiiiiiiiii~c$$$$$$
+$$$$@)iiiiiiiiiiiiiii      _.._     |0) ~ (0) |    _.---'`__.-( (_. iiiiiiiiiiiiiii/>B$$$$
+$$$B|iiiiiiiiiiiii  __.--'`_.. '.__.\    '--. \_.-' ,.--'`     `""` iiiiiiiiiiiiiiii(@$$$$
+$$@)iiiiiiiiiii    ( ,.--'`   ',__ /` ;   `, '.__.'`    __        iiiiiiiiiiiiiiiiiii($$$$
+$$$)iiiiiiiiiiii   _`) )  .---.__.' / ;   |\   \__..--""  """--.,_   iiiiiiiiiiiiiiiii@$$$
+$$%iiiiiiiiii    `---'  ' ''-._.-'` ./  /\ '.  \ _.-~~~````~~~-._`-.__.'iiiiiiiiiiiii\$$$$
+$$@iiiiiiiiiiiiiiiiii   | |  .' _.-' |  |   \  \  '.               `~---`iiiiiiiiiiiiii$$$
+$${[iiiiiiiiiiiiiii      \ \/ .'     \  \    '. '-._)               iiiiiiiiiiiiiiiiii~$$$
+$$uiiiiiiiiiiiiiiiiiii    \/ /        \  \     `=.__`~-       iiiiiiiiiiiiiiiiiiiiiii$$$$$
+$$@iiiiiiiiiiiiiiiiii      / /\         `) )     / / `"".`\     iiiiiiiiiiiiiiiiiiiii|B$$$
+$$@\iiiiiiiiiiiiiiiii ,_.-'.'\ \        / /     ( (     / /     iiiiiiiiiiiiiiiiiiii(@$$$$
+$$$$$iiiiiiiiiiiiiii `--~`   ) )    .-'.'       '.'.  | (      iiiiiiiiiiiiiiiiiiii/>B$$$$
+$$$$@iiiiiiiiiiiiiiii       (/`    ( (`      i    ) )  '-;        iiiiiiiiiiiiiiii~c$$$$$$
+$$$$$B]iiiiiiiiiiiiiiii      `   i  '-;      ii   (-'          iiiiiiiiiiiiiiiiii>)%$$$$$$
+4$$$$$$$B)iiiiiiiiiiiii  iiii!i             iii           liiiiiiiiiiiiiiiiiiiii1%$$$$$$$$
+$$$$$$$$$$@u]iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii-x@$$$$$$$
+$$$$$$$$$$$@v?iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii-x$$$$$$$$$$$
+$$$$$$$$$$$$$$@n?iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii-rB$$$$$$$$$$$$
+$$$$$$$$$$$$$$$$$/~iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii<\*@$$$$$$$$$$$$$$$
+$$$$$$$$$$$$$$$$$$$Bc1~iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii~{v%$$$$$$$$$$$$$$$$$
+$$$$$$$$$$$$$$$$$$$$$$Bvf]<iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii<]tuB$$$$$$$$$$$$$$$$$$$$
+4$$$$$$$$$$$$$$$$$$$$$$$$$%zt-+>iiiiiiiiiiiiiiiiiiiiiiiiiiiii+_tc%$$$$$$$$$$$$$$$$$$$$$$$$
+$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$W#u/|{+~>iiiiiiiiiiii><+{|/n#W$$$$$$$$$$$$$$$$$$$$$$$$$$$$*/
+
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import { IBaseImpactStrategy } from "src/interfaces/IBaseImpactStrategy.sol";
-import { IProjectRegistry } from "src/interfaces/IProjectRegistry.sol";
+import { IBaseStrategy } from "../regens/interfaces/IBaseStrategy.sol";
 
 /**
- * @title Tokenized Impact Strategy
- * @author octant.finance
+ * @title Tokenized Strategy (Octant V2 Fork)
+ * @author yearn.finance; forked and modified by octant.finance
  * @notice
- *  This TokenizedImpactStrategy implements all the required functionality
- *  for impact strategies using quadratic funding and voting mechanisms.
+ *  This TokenizedStrategy is a fork of Yearn's TokenizedStrategy that has been
+ *  modified by Octant to support donation functionality and other security enhancements.
  *
- *  The contract is meant to be used as the proxy implementation contract
- *  that will handle all logic, storage, and management for a custom
- *  strategy that inherits the `BaseImpactStrategy`.
+ *  The original contract can be used by anyone wishing to easily buildIBaseStrategy
+ *  and deploy their own custom ERC4626 compliant single strategy Vault.
+ *
+ *  The TokenizedStrategy contract is meant to be used as the proxy
+ *  implementation contract that will handle all logic, storage and
+ *  management for a custom strategy that inherits the `BaseStrategy`.
+ *  Any function calls to the strategy that are not defined within that
+ *  strategy will be forwarded through a delegateCall to this contract.
+ *
+ *  A strategist only needs to override a few simple functions that are
+ *  focused entirely on the strategy specific needs to easily and cheaply
+ *  deploy their own permissionless 4626 compliant vault.
+ *
+ *  @dev Changes from Yearn V3:
+ *  - Added dragonRouter to the StrategyData struct to enable yield distribution
+ *  - Added getter and setter for dragonRouter
+ *  - Added validation checks for all critical addresses (management, keeper, emergencyAdmin, dragonRouter)
+ *  - Enhanced initialize function to include emergencyAdmin and dragonRouter parameters
+ *  - Standardized error messages for zero-address checks
+ *  - Removed the yield/profit unlocking mechanism (profits are immediately realized)
+ *  - Made the report() function virtual to enable specialized implementations
+ *  - Made this contract abstract as a base for specialized strategy implementations
+ *
+ *  Two specialized implementations are provided:
+ *  - YieldDonatingTokenizedStrategy: Mints profits as new shares and sends them to a specified dragon router
+ *  - YieldSkimmingTokenizedStrategy: Skims the appreciation of asset and dilutes the original shares by minting new ones to the dragon router
+ *
+ *  WARNING: When creating custom strategies, DO NOT declare state variables outside
+ *  the StrategyData struct. Doing so risks storage collisions if the implementation
+ *  contract changes. Either extend the StrategyData struct or use a custom storage slot.
  */
-contract TokenizedImpactStrategy {
+abstract contract DragonTokenizedStrategy {
     using Math for uint256;
     using SafeERC20 for ERC20;
 
@@ -30,6 +90,12 @@ contract TokenizedImpactStrategy {
      * @notice Emitted when a strategy is shutdown.
      */
     event StrategyShutdown();
+
+    /**
+     * @notice Emitted on the initialization of any new `strategy` that uses `asset`
+     * with this specific `apiVersion`.
+     */
+    event NewTokenizedStrategy(address indexed strategy, address indexed asset, string apiVersion);
 
     /**
      * @notice Emitted when the 'keeper' address is updated to 'newKeeper'.
@@ -47,7 +113,7 @@ contract TokenizedImpactStrategy {
     event UpdateEmergencyAdmin(address indexed newEmergencyAdmin);
 
     /**
-     * @notice Emitted when the 'pendingManagement' address is updated to 'newPendingManagement'.
+     * @notice Emitted when the `pendingManagement` address is updated to `newPendingManagement`.
      */
     event UpdatePendingManagement(address indexed newPendingManagement);
 
@@ -66,12 +132,6 @@ contract TokenizedImpactStrategy {
     event Transfer(address indexed from, address indexed to, uint256 value);
 
     /**
-     * @notice Emitted when the `caller` has exchanged `assets` for `shares`,
-     * and transferred those `shares` to `owner`.
-     */
-    event Deposit(address indexed caller, address indexed owner, uint256 assets, uint256 shares);
-
-    /**
      * @notice Emitted when the `caller` has exchanged `owner`s `shares` for `assets`,
      * and transferred those `assets` to `receiver`.
      */
@@ -82,17 +142,6 @@ contract TokenizedImpactStrategy {
         uint256 assets,
         uint256 shares
     );
-    
-    /**
-     * @notice Emitted when the 'projectRegistry' address is updated to 'newProjectRegistry'.
-     */
-    event UpdateProjectRegistry(address indexed projectRegistry);
-
-    /**
-     * @notice Emitted on the initialization of any new `strategy` that uses `asset`
-     * with this specific `apiVersion`.
-     */
-    event NewTokenizedStrategy(address indexed strategy, address indexed asset, string apiVersion);
 
     /*//////////////////////////////////////////////////////////////
                         STORAGE STRUCT
@@ -114,40 +163,46 @@ contract TokenizedImpactStrategy {
      * will not increase memory related gas usage.
      */
     // prettier-ignore
+    // solhint-disable gas-struct-packing, gas-small-strings
     struct StrategyData {
-        // The ERC20 compliant underlying asset that will be
-        // used by the Strategy
-        ERC20 asset;
-        mapping(address => uint256) votingPower; // Mapping of voting power for each account
-        uint256 totalVotingPower; // Total voting power for the strategy
-        uint256 finalizedTotalShares; // Total shares after the tally is finalized
-        bool finalizedTally; // Flag to indicate if the tally is finalized
-        mapping(address => bool) claimedShares; // Mapping of claims for each project
-
-
-        // These are the corresponding ERC20 variables needed for the
-        // strategies token that is issued and burned on each deposit or withdraw.
-        uint8 decimals; // The amount of decimals that `asset` and strategy use.
-        string name; // The name of the token for the strategy.
-        uint256 totalSupply; // The total amount of shares currently issued.
         mapping(address => uint256) nonces; // Mapping of nonces used for permit functions.
         mapping(address => uint256) balances; // Mapping to track current balances for each account that holds shares.
         mapping(address => mapping(address => uint256)) allowances; // Mapping to track the allowances for the strategies shares.
+        
+        // These are the corresponding ERC20 variables needed for the
+        // strategies token that is issued and burned on each deposit or withdraw.
+        ERC20 asset; // The ERC20 compliant underlying asset that will be used by the Strategy
+        string name; // The name of the token for the strategy.
+        uint256 totalSupply; // The total amount of shares currently issued.
+        uint256 totalAssets; // We manually track `totalAssets` to prevent PPS manipulation through airdrops.
 
-
-        // We manually track `totalAssets` to prevent PPS manipulation through airdrops.
-        uint256 totalAssets;
-        address projectRegistry;
+        // Variables for reporting.
+        // We use uint96 for timestamps to fit in the same slot as an address.
+        address keeper; // Address given permission to call {report} and {tend}.
+        uint96 lastReport; // The last time a {report} was called.
 
         // Access management variables.
-        address keeper; // Address given permission to call {report} and {tend}.
         address management; // Main address that can set all configurable variables.
         address pendingManagement; // Address that is pending to take over `management`.
         address emergencyAdmin; // Address to act in emergencies as well as `management`.
+        address dragonRouter; // Router that receives minted shares from yield in specialized strategies
 
         // Strategy Status
+        uint8 decimals; // The amount of decimals that `asset` and strategy use.
         uint8 entered; // To prevent reentrancy. Use uint8 for gas savings.
         bool shutdown; // Bool that can be used to stop deposits into the strategy.
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            DEPLOYMENT
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @dev On contract creation we set `asset` for this contract to address(1).
+     * This prevents it from ever being initialized in the future.
+     */
+    constructor() {
+        _strategyStorage().asset = ERC20(address(1));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -245,13 +300,13 @@ contract TokenizedImpactStrategy {
 
     /// @notice API version this TokenizedStrategy implements.
     string internal constant API_VERSION = "3.0.4";
+
     /// @notice Value to set the `entered` flag to during a call.
     uint8 internal constant ENTERED = 2;
     /// @notice Value to set the `entered` flag to at the end of the call.
     uint8 internal constant NOT_ENTERED = 1;
-    /// @notice Seconds per year for max profit unlocking time.
-    uint256 internal constant SECONDS_PER_YEAR = 31_556_952; // 365.2425 days
-    /// @notice Used for fee calculations.
+
+    /// @notice Used for calculations.
     uint256 internal constant MAX_BPS = 10_000;
 
     /**
@@ -311,15 +366,17 @@ contract TokenizedImpactStrategy {
      * @param _asset Address of the underlying asset.
      * @param _name Name the strategy will use.
      * @param _management Address to set as the strategies `management`.
-     * @param _projectRegistry Address to receive performance fees.
      * @param _keeper Address to set as strategies `keeper`.
+     * @param _emergencyAdmin Address to set as strategy's `emergencyAdmin`.
+     * @param _dragonRouter Address that receives minted shares from yield in specialized strategies.
      */
     function initialize(
         address _asset,
         string memory _name,
         address _management,
-        address _projectRegistry,
-        address _keeper
+        address _keeper,
+        address _emergencyAdmin,
+        address _dragonRouter
     ) external {
         // Cache storage pointer.
         StrategyData storage S = _strategyStorage();
@@ -334,21 +391,72 @@ contract TokenizedImpactStrategy {
         // Set decimals based off the `asset`.
         S.decimals = ERC20(_asset).decimals();
 
-        // Set address to receive performance fees.
-        // Can't be address(0) or we will be burning fees.
-        require(_projectRegistry != address(0), "ZERO ADDRESS");
-        // Can't mint shares to its self because of profit locking.
-        require(_projectRegistry != address(this), "self");
-        S.projectRegistry = _projectRegistry;
+        // Set last report to this block.
+        S.lastReport = uint96(block.timestamp);
 
         // Set the default management address. Can't be 0.
         require(_management != address(0), "ZERO ADDRESS");
         S.management = _management;
-        // Set the keeper address
+
+        // Set the keeper address, can't be 0
+        require(_keeper != address(0), "ZERO ADDRESS");
         S.keeper = _keeper;
+
+        // Set the emergency admin address, can't be 0
+        require(_emergencyAdmin != address(0), "ZERO ADDRESS");
+        S.emergencyAdmin = _emergencyAdmin;
+
+        // Set the dragon router address, can't be 0
+        require(_dragonRouter != address(0), "ZERO ADDRESS");
+        S.dragonRouter = _dragonRouter;
 
         // Emit event to signal a new strategy has been initialized.
         emit NewTokenizedStrategy(address(this), _asset, API_VERSION);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                      ERC4626 WRITE METHODS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Redeems exactly `shares` from `owner` and
+     * sends `assets` of underlying tokens to `receiver`.
+     * @dev This will default to allowing any loss passed to be realized.
+     * @param shares The amount of shares burnt.
+     * @param receiver The address to receive `assets`.
+     * @param owner The address whose shares are burnt.
+     * @return assets The actual amount of underlying withdrawn.
+     */
+    function redeem(uint256 shares, address receiver, address owner) external returns (uint256) {
+        // We default to not limiting a potential loss.
+        return redeem(shares, receiver, owner, MAX_BPS);
+    }
+
+    /**
+     * @notice Redeems exactly `shares` from `owner` and
+     * sends `assets` of underlying tokens to `receiver`.
+     * @dev This includes an added parameter to allow for losses.
+     * @param shares The amount of shares burnt.
+     * @param receiver The address to receive `assets`.
+     * @param owner The address whose shares are burnt.
+     * @param maxLoss The amount of acceptable loss in Basis points.
+     * @return . The actual amount of underlying withdrawn.
+     */
+    function redeem(
+        uint256 shares,
+        address receiver,
+        address owner,
+        uint256 maxLoss
+    ) public nonReentrant returns (uint256) {
+        // Get the storage slot for all following calls.
+        StrategyData storage S = _strategyStorage();
+        require(shares <= _maxRedeem(S, owner), "ERC4626: redeem more than max");
+        uint256 assets;
+        // Check for rounding error or 0 value.
+        require((assets = _convertToAssets(S, shares, Math.Rounding.Floor)) != 0, "ZERO_ASSETS");
+
+        // We need to return the actual amount withdrawn in case of a loss.
+        return _withdraw(S, receiver, owner, assets, shares, maxLoss);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -408,33 +516,6 @@ contract TokenizedImpactStrategy {
 
     /**
      * @notice Allows an on-chain or off-chain user to simulate
-     * the effects of their deposit at the current block, given
-     * current on-chain conditions.
-     * @dev This will round down.
-     *
-     * @param assets The amount of `asset` to deposits.
-     * @return . Expected shares that would be issued.
-     */
-    function previewDeposit(uint256 assets) external view returns (uint256) {
-        return _convertToShares(_strategyStorage(), assets, Math.Rounding.Floor);
-    }
-
-    /**
-     * @notice Allows an on-chain or off-chain user to simulate
-     * the effects of their withdrawal at the current block,
-     * given current on-chain conditions.
-     * @dev This is used instead of convertToShares so that it can
-     * round up for safer withdraws.
-     *
-     * @param assets The amount of `asset` that would be withdrawn.
-     * @return . The amount of shares that would be burnt.
-     */
-    function previewWithdraw(uint256 assets) external view returns (uint256) {
-        return _convertToShares(_strategyStorage(), assets, Math.Rounding.Ceil);
-    }
-
-    /**
-     * @notice Allows an on-chain or off-chain user to simulate
      * the effects of their redemption at the current block,
      * given current on-chain conditions.
      * @dev This will round down.
@@ -444,18 +525,6 @@ contract TokenizedImpactStrategy {
      */
     function previewRedeem(uint256 shares) external view returns (uint256) {
         return _convertToAssets(_strategyStorage(), shares, Math.Rounding.Floor);
-    }
-
-    /**
-     * @notice Total number of underlying assets that can
-     * be deposited into the strategy, where `receiver`
-     * corresponds to the receiver of the shares of a {deposit} call.
-     *
-     * @param receiver The address receiving the shares.
-     * @return . The max that `receiver` can deposit in `asset`.
-     */
-    function maxDeposit(address receiver) external view returns (uint256) {
-        return _maxDeposit(_strategyStorage(), receiver);
     }
 
     /**
@@ -470,52 +539,13 @@ contract TokenizedImpactStrategy {
         return _maxRedeem(_strategyStorage(), owner);
     }
 
-    /*//////////////////////////////////////////////////////////////
-                      ERC4626 WRITE METHODS
-    //////////////////////////////////////////////////////////////*/
-
     /**
-     * @notice Grants voting power to `receiver` by
-     * depositing exactly `assets` of underlying tokens.
-     * @param assets The amount of underlying to deposit in.
-     * @param receiver The address to receive the `shares`.
-     * @return votes The actual amount of shares issued.
+     * @notice Variable `maxLoss` is ignored.
+     * @dev Accepts a `maxLoss` variable in order to match the multi
+     * strategy vaults ABI.
      */
-    function deposit(uint256 assets, address receiver) external nonReentrant returns (uint256 votes) {
-        // Get the storage slot for all following calls.
-        StrategyData storage S = _strategyStorage();
-
-        // Deposit full balance if using max uint.
-        if (assets == type(uint256).max) {
-            assets = S.asset.balanceOf(msg.sender);
-        }
-
-        // Checking max deposit will also check if shutdown.
-        require(assets <= _maxDeposit(S, receiver), "ERC4626: deposit more than max");
-        // Check for rounding error.
-        require((votes = IBaseImpactStrategy(address(this)).convertToVotes(assets)) != 0, "ZERO_SHARES");
-
-        _deposit(S, receiver, assets, votes);
-    }
-
-    /**
-     * @notice Redeems exactly `shares` from `owner` and
-     * sends `assets` of underlying tokens to `receiver`.
-     * @dev This will default to allowing any loss passed to be realized.
-     * @param shares The amount of shares burnt.
-     * @param receiver The address to receive `assets`.
-     * @param owner The address whose shares are burnt.
-     * @return assets The actual amount of underlying withdrawn.
-     */
-    function redeem(uint256 shares, address receiver, address owner) external returns (uint256) {
-        StrategyData storage S = _strategyStorage();
-        require(shares <= _maxRedeem(S, owner), "ERC4626: redeem more than max");
-        uint256 assets;
-        // Check for rounding error or 0 value.
-        require((assets = _convertToAssets(S, shares, Math.Rounding.Floor)) != 0, "ZERO_ASSETS");
-
-        // We need to return the actual amount withdrawn in case of a loss.
-        return _withdraw(S, receiver, owner, assets, shares, MAX_BPS);
+    function maxRedeem(address owner, uint256 /*maxLoss*/) external view returns (uint256) {
+        return _maxRedeem(_strategyStorage(), owner);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -528,11 +558,8 @@ contract TokenizedImpactStrategy {
     }
 
     /// @dev Internal implementation of {totalSupply}.
-    /// @notice Returns totalShares if finalized, otherwise returns zero
-    /// @dev totalShares is capped at type(uint256).max to prevent overflow
     function _totalSupply(StrategyData storage S) internal view returns (uint256) {
-        // If finalized, return totalShares capped at max uint256, otherwise return totalAssets
-        return S.finalizedTally ? S.finalizedTotalShares : 0;
+        return S.totalSupply;
     }
 
     /// @dev Internal implementation of {convertToShares}.
@@ -565,18 +592,10 @@ contract TokenizedImpactStrategy {
         return supply == 0 ? shares : shares.mulDiv(_totalAssets(S), supply, _rounding);
     }
 
-    /// @dev Internal implementation of {maxDeposit}.
-    function _maxDeposit(StrategyData storage S, address receiver) internal view returns (uint256) {
-        // Cannot deposit when shutdown or to the strategy.
-        if (S.shutdown || receiver == address(this)) return 0;
-
-        return IBaseImpactStrategy(address(this)).availableDepositLimit(receiver);
-    }
-
     /// @dev Internal implementation of {maxRedeem}.
     function _maxRedeem(StrategyData storage S, address owner) internal view returns (uint256 maxRedeem_) {
         // Get the max the owner could withdraw currently.
-        maxRedeem_ = IBaseImpactStrategy(address(this)).availableWithdrawLimit(owner);
+        maxRedeem_ = IBaseStrategy(address(this)).availableWithdrawLimit(owner);
 
         // Conversion would overflow and saves a min check if there is no withdrawal limit.
         if (maxRedeem_ == type(uint256).max) {
@@ -595,32 +614,6 @@ contract TokenizedImpactStrategy {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev Function to be called during {deposit}.
-     *
-     * This function handles all logic including transfers,
-     * and accounting.
-     *
-     * We do all external calls before updating any internal
-     * values to prevent view reentrancy issues from the token
-     * transfers or the _deployFunds() calls.
-     */
-    function _deposit(StrategyData storage S, address receiver, uint256 assets, uint256 votes) internal {
-        // Cache storage variables used more than once.
-        ERC20 _asset = S.asset;
-
-        // Need to transfer before minting or ERC777s could reenter.
-        _asset.safeTransferFrom(msg.sender, address(this), assets);
-
-        // Adjust total Assets.
-        S.totalAssets += assets;
-
-        // add voting power
-        _addVotingPower(S, receiver, votes);
-
-        emit Deposit(msg.sender, receiver, assets, votes);
-    }
-
-    /**
      * @dev To be called during {redeem} and {withdraw}.
      *
      * This will handle all logic, transfers and accounting
@@ -637,7 +630,6 @@ contract TokenizedImpactStrategy {
         uint256 shares,
         uint256 maxLoss
     ) internal returns (uint256) {
-        require(S.finalizedTally, "tally not finalized");
         require(receiver != address(0), "ZERO ADDRESS");
         require(maxLoss <= MAX_BPS, "exceeds MAX_BPS");
 
@@ -649,8 +641,35 @@ contract TokenizedImpactStrategy {
         // Cache `asset` since it is used multiple times..
         ERC20 _asset = S.asset;
 
+        uint256 idle = _asset.balanceOf(address(this));
+        uint256 loss;
+        // Check if we need to withdraw funds.
+        if (idle < assets) {
+            // Tell Strategy to free what we need.
+            unchecked {
+                IBaseStrategy(address(this)).freeFunds(assets - idle);
+            }
+
+            // Return the actual amount withdrawn. Adjust for potential under withdraws.
+            idle = _asset.balanceOf(address(this));
+
+            // If we didn't get enough out then we have a loss.
+            if (idle < assets) {
+                unchecked {
+                    loss = assets - idle;
+                }
+                // If a non-default max loss parameter was set.
+                if (maxLoss < MAX_BPS) {
+                    // Make sure we are within the acceptable range.
+                    require(loss <= (assets * maxLoss) / MAX_BPS, "too much loss");
+                }
+                // Lower the amount to be withdrawn.
+                assets = idle;
+            }
+        }
+
         // Update assets based on how much we took.
-        S.totalAssets -= assets;
+        S.totalAssets -= (assets + loss);
 
         _burn(S, owner, shares);
 
@@ -663,31 +682,32 @@ contract TokenizedImpactStrategy {
         return assets;
     }
 
-    /**
-     * @dev Adds voting power to an account
-     * @param account The address to add voting power to
-     * @param votes The amount of voting power to add
-     */
-    function _addVotingPower(StrategyData storage S, address account, uint256 votes) internal {
-        require(!S.finalizedTally, "tally finalized");
-        require(account != address(0), "ZERO ADDRESS");
-        S.totalVotingPower += votes;
-        unchecked {
-            S.votingPower[account] += votes;
-        }
-        //TODO: emit event?
-    }
+    /*//////////////////////////////////////////////////////////////
+                            TENDING
+    //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev Removes voting power from an account
-     * @param account The address to remove voting power from
-     * @param votes The amount of voting power to remove
+     * @notice For a 'keeper' to 'tend' the strategy if a custom
+     * tendTrigger() is implemented.
+     *
+     * @dev Both 'tendTrigger' and '_tend' will need to be overridden
+     * for this to be used.
+     *
+     * This will callback the internal '_tend' call in the BaseStrategy
+     * with the total current amount available to the strategy to deploy.
+     *
+     * This is a permissioned function so if desired it could
+     * be used for illiquid or manipulatable strategies to compound
+     * rewards, perform maintenance or deposit/withdraw funds.
+     *
+     * This will not cause any change in PPS. Total assets will
+     * be the same before and after.
+     *
+     * A report() call will be needed to record any profits or losses.
      */
-    function _removeVotingPower(StrategyData storage S, address account, uint256 votes) internal {
-        S.totalVotingPower -= votes;
-        unchecked {
-            S.votingPower[account] -= votes;
-        }
+    function tend() external nonReentrant onlyKeepers {
+        // Tend the strategy with the current loose balance.
+        IBaseStrategy(address(this)).tendThis(_strategyStorage().asset.balanceOf(address(this)));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -730,50 +750,7 @@ contract TokenizedImpactStrategy {
         require(_strategyStorage().shutdown, "not shutdown");
 
         // Withdraw from the yield source.
-        IBaseImpactStrategy(address(this)).shutdownWithdraw(amount);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            TENDING
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice Process a vote for a project with a contribution amount and vote weight
-     * @dev This function validates and processes votes according to the implemented formula
-     * @dev Must check that the voteWeight is appropriate for the contribution amount in _processVote
-     * @dev Must check if the user can vote in _processVote
-     * @dev Must check if the project exists in _processVote
-     * @dev Must update the project tally in _processVote
-     * Only keepers can call this function to prevent spam and ensure proper vote processing.
-     *
-     * @param projectId The ID of the project being voted for
-     * @param contribution The amount being contributed to the project
-     * @param voteWeight the weight of the vote, must be checked in _processVote by strategist
-     */
-    function vote(uint256 projectId, uint256 contribution, uint256 voteWeight) external nonReentrant {
-        StrategyData storage S = _strategyStorage();
-        // Tend the strategy with the current loose balance.
-        IBaseImpactStrategy(address(this)).processVote(projectId, contribution, voteWeight);
-        _removeVotingPower(S, msg.sender, contribution);
-    }
-
-    /**
-     * @notice Returns the current funding metrics for a specific project
-     * @dev This function aggregates all the relevant funding data for a project
-     * @dev By convention project 0 should return 0 for projectShares
-     * @param projectId The ID of the project to tally
-     * @return projectShares The total shares allocated to this project
-     * @return totalShares The total shares across all projects
-     */
-    function projectTally(uint256 projectId) external view returns (uint256 projectShares, uint256 totalShares) {
-        return IBaseImpactStrategy(address(this)).tally(projectId);
-    }
-
-    /// @notice finalize the tally by assigning the totalShares to the totalAssets and setting the finalizedTally to true
-    function finalizeTally(uint256 totalShares) external onlyManagement {
-        uint256 finalizedTotalShares = IBaseImpactStrategy(address(this)).finalize(totalShares);
-        _strategyStorage().finalizedTotalShares = finalizedTotalShares;
-        _strategyStorage().finalizedTally = true;
+        IBaseStrategy(address(this)).shutdownWithdraw(amount);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -829,6 +806,14 @@ contract TokenizedImpactStrategy {
     }
 
     /**
+     * @notice The timestamp of the last time Yield was reported.
+     * @return . The last report.
+     */
+    function lastReport() external view returns (uint256) {
+        return uint256(_strategyStorage().lastReport);
+    }
+
+    /**
      * @notice Get the price per share.
      * @dev This value offers limited precision. Integrations that require
      * exact precision should use convertToAssets or convertToShares instead.
@@ -846,14 +831,6 @@ contract TokenizedImpactStrategy {
      */
     function isShutdown() external view returns (bool) {
         return _strategyStorage().shutdown;
-    }
-
-    /**
-     * @notice Get the current address that receives the performance fees.
-     * @return . Address of projectRegistry
-     */
-    function projectRegistry() public view returns (IProjectRegistry) {
-        return IProjectRegistry(_strategyStorage().projectRegistry);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -897,6 +874,7 @@ contract TokenizedImpactStrategy {
      * @param _keeper New address to set `keeper` to.
      */
     function setKeeper(address _keeper) external onlyManagement {
+        require(_keeper != address(0), "ZERO ADDRESS");
         _strategyStorage().keeper = _keeper;
 
         emit UpdateKeeper(_keeper);
@@ -909,6 +887,7 @@ contract TokenizedImpactStrategy {
      * @param _emergencyAdmin New address to set `emergencyAdmin` to.
      */
     function setEmergencyAdmin(address _emergencyAdmin) external onlyManagement {
+        require(_emergencyAdmin != address(0), "ZERO ADDRESS");
         _strategyStorage().emergencyAdmin = _emergencyAdmin;
 
         emit UpdateEmergencyAdmin(_emergencyAdmin);
@@ -920,22 +899,6 @@ contract TokenizedImpactStrategy {
      */
     function setName(string calldata _name) external onlyManagement {
         _strategyStorage().name = _name;
-    }
-
-    /**
-     * @notice Sets a new address to receive performance fees.
-     * @dev Can only be called by the current `management`.
-     *
-     * Cannot set to address(0).
-     *
-     * @param _projectRegistry New address to set `management` to.
-     */
-    function setProjectRegistry(address _projectRegistry) external onlyManagement {
-        require(_projectRegistry != address(0), "ZERO ADDRESS");
-        require(_projectRegistry != address(this), "Cannot be self");
-        _strategyStorage().projectRegistry = _projectRegistry;
-
-        emit UpdateProjectRegistry(_projectRegistry);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -980,13 +943,7 @@ contract TokenizedImpactStrategy {
 
     /// @dev Internal implementation of {balanceOf}.
     function _balanceOf(StrategyData storage S, address account) internal view returns (uint256) {
-        IProjectRegistry projectRegistry = projectRegistry();
-        uint256 projectId = projectRegistry.getProjectId(account);
-        (uint256 projectShares, ) = IBaseImpactStrategy(address(this)).tally(projectId);
-        if (account == address(this)) {
-            return 0;
-        }
-        return S.balances[account] + projectShares;
+        return S.balances[account];
     }
 
     /**
@@ -1105,9 +1062,17 @@ contract TokenizedImpactStrategy {
      * - `from` must have a balance of at least `amount`.
      *
      */
-    // solhint-disable-next-line no-unused-vars
-    function _transfer(StrategyData storage S, address from, address to, uint256 amount) internal pure {
-        require(false, "cannot transfer shares");
+    function _transfer(StrategyData storage S, address from, address to, uint256 amount) internal {
+        require(from != address(0), "ERC20: transfer from the zero address");
+        require(to != address(0), "ERC20: transfer to the zero address");
+        require(to != address(this), "ERC20 transfer to strategy");
+
+        S.balances[from] -= amount;
+        unchecked {
+            S.balances[to] += amount;
+        }
+
+        emit Transfer(from, to, amount);
     }
 
     /** @dev Creates `amount` tokens and assigns them to `account`, increasing
@@ -1121,7 +1086,6 @@ contract TokenizedImpactStrategy {
      *
      */
     function _mint(StrategyData storage S, address account, uint256 amount) internal {
-        require(!S.finalizedTally, "tally finalized");
         require(account != address(0), "ERC20: mint to the zero address");
 
         S.totalSupply += amount;
@@ -1291,17 +1255,5 @@ contract TokenizedImpactStrategy {
                     address(this)
                 )
             );
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            DEPLOYMENT
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @dev On contract creation we set `asset` for this contract to address(1).
-     * This prevents it from ever being initialized in the future.
-     */
-    constructor() {
-        _strategyStorage().asset = ERC20(address(1));
     }
 }

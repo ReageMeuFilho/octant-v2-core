@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {ProperQF} from "src/impact-strategy/voting-strategy/ProperQF.sol";
+import { ProperQF } from "src/allocation-mechanism/voting-strategy/ProperQF.sol";
 
 contract HarnessProperQF is ProperQF {
     // Expose internal functions for testing
@@ -45,4 +45,5 @@ contract HarnessProperQF is ProperQF {
         uint256 newDenominator = 100;
         ProperQF._setAlpha(newNumerator, newDenominator);
     }
-} 
+}
+
