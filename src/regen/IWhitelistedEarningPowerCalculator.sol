@@ -15,7 +15,11 @@ import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol
 interface IWhitelistedEarningPowerCalculator is IEarningPowerCalculator, IERC165 {
     event WhitelistSet(IWhitelist whitelist);
 
+    /// @notice Sets the whitelist for the earning power calculator
+    /// @param _whitelist The whitelist to set
     function setWhitelist(IWhitelist _whitelist) external;
 
+    /// @notice Returns the whitelist for the earning power calculator
+    /// @return The whitelist
     function whitelist() external view returns (IWhitelist);
 }

@@ -163,6 +163,13 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
         return _claimReward(_depositId, deposit, msg.sender);
     }
 
+    /// @notice Contributes to a grant round.
+    /// @param _depositId The deposit identifier for the staked amount.
+    /// @param _grantRoundAddress The address of the grant round.
+    /// @param _votingDelegatee The address of the delegatee to delegate voting power to.
+    /// @param _amount The amount of reward tokens to contribute.
+    /// @param _preferences The preferences for the contribution.
+    /// @param _preferenceWeights The preference weights for the contribution.
     function contribute(
         DepositIdentifier _depositId,
         address _grantRoundAddress,
@@ -172,12 +179,10 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
         uint256[] memory _preferenceWeights
     ) public whenNotPaused {
         _revertIfAddressZero(_grantRoundAddress);
-
         require(
             contributionWhitelist == IWhitelist(address(0)) || contributionWhitelist.isWhitelisted(msg.sender),
             NotWhitelisted(contributionWhitelist, msg.sender)
         );
-
         require(
             _preferences.length == _preferenceWeights.length,
             PreferencesAndPreferenceWeightsMustHaveTheSameLength()
