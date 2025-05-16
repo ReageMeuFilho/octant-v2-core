@@ -12,6 +12,7 @@ import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 import { EIP712 } from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import { SafeCast } from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 // Staker Library Imports
 import { IERC20Staking } from "staker/interfaces/IERC20Staking.sol";
@@ -50,7 +51,14 @@ interface IGrantRound {
 /// @title RegenStaker
 /// @author [Golem Foundation](https://golem.foundation)
 /// @notice This contract is an extended version of the Staker contract by [ScopeLift](https://scopelift.co).
-contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndStake, StakerOnBehalf, Pausable {
+contract RegenStaker is
+    Staker,
+    StakerDelegateSurrogateVotes,
+    StakerPermitAndStake,
+    StakerOnBehalf,
+    Pausable,
+    ReentrancyGuard
+{
     using SafeCast for uint256;
 
     IWhitelist public stakerWhitelist;
@@ -111,7 +119,7 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
     function stake(
         uint256 amount,
         address delegatee
-    ) external override(Staker) whenNotPaused returns (DepositIdentifier _depositId) {
+    ) external override(Staker) whenNotPaused nonReentrant returns (DepositIdentifier _depositId) {
         require(
             stakerWhitelist == IWhitelist(address(0)) || stakerWhitelist.isWhitelisted(msg.sender),
             NotWhitelisted(stakerWhitelist, msg.sender)
@@ -148,14 +156,19 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
     }
 
     /// @notice Withdraw staked tokens from an existing deposit.
-    function withdraw(Staker.DepositIdentifier _depositId, uint256 _amount) external override whenNotPaused {
+    function withdraw(
+        Staker.DepositIdentifier _depositId,
+        uint256 _amount
+    ) external override whenNotPaused nonReentrant {
         Deposit storage deposit = deposits[_depositId];
         _revertIfNotDepositOwner(deposit, msg.sender);
         _withdraw(deposit, _depositId, _amount);
     }
 
     /// @notice Claim reward tokens earned by a given deposit.
-    function claimReward(Staker.DepositIdentifier _depositId) external override whenNotPaused returns (uint256) {
+    function claimReward(
+        Staker.DepositIdentifier _depositId
+    ) external override whenNotPaused nonReentrant returns (uint256) {
         Deposit storage deposit = deposits[_depositId];
         if (deposit.claimer != msg.sender && deposit.owner != msg.sender) {
             revert Staker__Unauthorized("not claimer or owner", msg.sender);
@@ -177,7 +190,7 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
         uint256 _amount,
         uint256[] memory _preferences,
         uint256[] memory _preferenceWeights
-    ) public whenNotPaused {
+    ) public whenNotPaused nonReentrant {
         _revertIfAddressZero(_grantRoundAddress);
         require(
             contributionWhitelist == IWhitelist(address(0)) || contributionWhitelist.isWhitelisted(msg.sender),
