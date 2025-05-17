@@ -2,7 +2,7 @@
 pragma solidity >=0.8.25;
 
 import { CREATE3 } from "@solady/utils/CREATE3.sol";
-import { Morpho } from "src/regens/YieldSkimming/strategy/Morpho.sol";
+import { MorphoCompounder } from "src/regens/YieldSkimming/strategy/MorphoCompounder.sol";
 
 contract YieldSkimmingVaultFactory {
     /**
@@ -39,9 +39,9 @@ contract YieldSkimmingVaultFactory {
 
     constructor() {
         morphoVaultAddress = address(
-            new Morpho(
-                0xBEEF01735c132Ada46AA9aA4c54623cAA92A64CB, // steakhouse vault
-                "Morpho Steakhouse",
+            new MorphoCompounder(
+                0x074134A2784F4F66b6ceD6f68849382990Ff3215, // Morpho yield vault
+                "Morpho Compounder",
                 address(1),
                 address(1),
                 address(1),
@@ -51,7 +51,7 @@ contract YieldSkimmingVaultFactory {
     }
 
     /**
-     * @notice Deploys a new Morpho strategy for the Yield Skimming Vault.
+     * @notice Deploys a new MorphoCompounder strategy for the Yield Skimming Vault.
      * @dev This function uses CREATE3 to deploy a new strategy contract deterministically.
      *      The strategy is initialized with the provided parameters, and its address is
      *      returned upon successful deployment. The function emits a `MorphoStrategyDeploy` event.
@@ -72,7 +72,7 @@ contract YieldSkimmingVaultFactory {
         bytes32 _salt
     ) external returns (address strategyAddress) {
         bytes memory bytecode = abi.encodePacked(
-            type(Morpho).creationCode,
+            type(MorphoCompounder).creationCode,
             abi.encode(morphoVaultAddress, _name, _management, _keeper, _emergencyAdmin, _donationAddress)
         );
 
