@@ -18,19 +18,19 @@ contract MorphoCompounder is BaseHealthCheck, UniswapV3Swapper {
     using WadRayMath for uint256;
     using SafeERC20 for IERC20;
 
-    /// @dev The yield vault that provides exchange rate information
-    address public immutable yieldVault;
-
     /// @dev The exchange rate at the last harvest, scaled by 1e18
     uint256 internal lastReportedExchangeRate;
 
     /// @notice yearn governance
     address public constant GOV = 0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52;
 
-    uint256 private constant ASSET_DUST = 100;
+    modifier onlyGovernance() {
+        require(msg.sender == GOV, "!gov");
+        _;
+    }
 
     constructor(
-        address _yieldVault,
+        address _asset,
         string memory _name,
         address _management,
         address _keeper,
@@ -38,7 +38,7 @@ contract MorphoCompounder is BaseHealthCheck, UniswapV3Swapper {
         address _donationAddress
     )
         BaseHealthCheck(
-            address(ITokenizedStrategy(_yieldVault)), // shares address
+            _asset, // shares address
             _name,
             _management,
             _keeper,
@@ -46,13 +46,39 @@ contract MorphoCompounder is BaseHealthCheck, UniswapV3Swapper {
             _donationAddress
         )
     {
-        yieldVault = _yieldVault;
-
         // Initialize the exchange rate on setup
         lastReportedExchangeRate = _getCurrentExchangeRate();
+    }
 
-        // Approve the yield vault to spend the asset
-        IERC20(asset).forceApprove(yieldVault, type(uint256).max);
+    /// @notice Sweep of non-asset ERC20 tokens to governance (onlyGovernance)
+    /// @param _token The ERC20 token to sweep
+    function sweep(address _token) external onlyGovernance {
+        require(_token != address(asset), "!asset");
+        IERC20(_token).safeTransfer(GOV, IERC20(_token).balanceOf(address(this)));
+    }
+
+    /**
+     * @notice Get the current balance of the asset
+     * @return The asset balance in this contract
+     */
+    function balanceOfAsset() public view returns (uint256) {
+        return IERC20(asset).balanceOf(address(this));
+    }
+
+    /**
+     * @notice Get the current balance of shares in the yield vault
+     * @return The yield vault share balance
+     */
+    function balanceOfShares() public view returns (uint256) {
+        return IERC20(asset).balanceOf(address(this));
+    }
+
+    /**
+     * @notice Returns the last reported exchange rate
+     * @return The last reported exchange rate
+     */
+    function getLastReportedExchangeRate() public view returns (uint256) {
+        return lastReportedExchangeRate;
     }
 
     /**
@@ -60,9 +86,7 @@ contract MorphoCompounder is BaseHealthCheck, UniswapV3Swapper {
      * @param _amount Amount to deploy
      */
     function _deployFunds(uint256 _amount) internal override {
-        if (_amount > ASSET_DUST) {
-            IERC20(asset).safeTransfer(yieldVault, _amount);
-        }
+        // no action needed
     }
 
     /**
@@ -70,9 +94,29 @@ contract MorphoCompounder is BaseHealthCheck, UniswapV3Swapper {
      * @param _amount Amount to withdraw in emergency
      */
     function _emergencyWithdraw(uint256 _amount) internal override {
-        // Transfer tokens directly to the emergency admin
-        address emergencyAdmin = ITokenizedStrategy(address(this)).emergencyAdmin();
-        IERC20(asset).safeTransfer(emergencyAdmin, _amount);
+        // nothing to do here as assets are always held in the strategy
+    }
+
+    function _executeHealthCheck(uint256 /*_newTotalAssets*/) internal override {
+        if (!doHealthCheck) {
+            doHealthCheck = true;
+            return;
+        }
+
+        // // Get the current total assets from the implementation.
+        // uint256 currentTotalAssets = TokenizedStrategy.totalAssets();
+
+        // if (_newTotalAssets > currentTotalAssets) {
+        //     require(
+        //         ((_newTotalAssets - currentTotalAssets) <= (currentTotalAssets * uint256(_profitLimitRatio)) / MAX_BPS),
+        //         "healthCheck"
+        //     );
+        // } else if (currentTotalAssets > _newTotalAssets) {
+        //     require(
+        //         (currentTotalAssets - _newTotalAssets <= ((currentTotalAssets * uint256(_lossLimitRatio)) / MAX_BPS)),
+        //         "healthCheck"
+        //     );
+        // }
     }
 
     /**
@@ -80,11 +124,7 @@ contract MorphoCompounder is BaseHealthCheck, UniswapV3Swapper {
      * @param _amount Amount to free
      */
     function _freeFunds(uint256 _amount) internal override {
-        // Withdraw the needed amount from the yield vault
-        if (_amount > ASSET_DUST) {
-            // The TokenizedStrategy layer will handle the withdrawal
-            ITokenizedStrategy(yieldVault).withdraw(_amount, address(this), address(this));
-        }
+        // no action needed
     }
 
     /**
@@ -102,13 +142,13 @@ contract MorphoCompounder is BaseHealthCheck, UniswapV3Swapper {
             ? currentExchangeRate - lastReportedExchangeRate
             : 0; // Only capture positive yield
 
-        uint256 profitInUSDC = (assetBalance * deltaExchangeRate) / ERC20(asset).decimals();
+        uint256 profitInValue = (assetBalance * deltaExchangeRate) / ERC20(asset).decimals();
 
-        uint256 profitInShares = (profitInUSDC * ERC20(yieldVault).decimals()) / currentExchangeRate;
+        uint256 profitInYieldVaultShares = (profitInValue * ERC20(asset).decimals()) / currentExchangeRate;
 
         lastReportedExchangeRate = currentExchangeRate;
 
-        return profitInShares;
+        return profitInYieldVaultShares;
     }
 
     /**
@@ -124,7 +164,7 @@ contract MorphoCompounder is BaseHealthCheck, UniswapV3Swapper {
      */
     function _getCurrentExchangeRate() internal view virtual returns (uint256) {
         // Call the pricePerShare function on the yield vault
-        return ITokenizedStrategy(yieldVault).pricePerShare();
+        return ITokenizedStrategy(address(asset)).pricePerShare();
     }
 
     /**
@@ -133,45 +173,5 @@ contract MorphoCompounder is BaseHealthCheck, UniswapV3Swapper {
      */
     function _tendTrigger() internal pure override returns (bool) {
         return false;
-    }
-
-    /**
-     * @notice Get the current balance of the asset
-     * @return The asset balance in this contract
-     */
-    function balanceOfAsset() public view returns (uint256) {
-        return IERC20(asset).balanceOf(address(this));
-    }
-
-    /**
-     * @notice Get the current balance of shares in the yield vault
-     * @return The yield vault share balance
-     */
-    function balanceOfShares() public view returns (uint256) {
-        return IERC20(yieldVault).balanceOf(address(this));
-    }
-
-    /**
-     * @notice Returns the last reported exchange rate
-     * @return The last reported exchange rate
-     */
-    function getLastReportedExchangeRate() public view returns (uint256) {
-        return lastReportedExchangeRate;
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                GOVERNANCE:
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Sweep of non-asset ERC20 tokens to governance (onlyGovernance)
-    /// @param _token The ERC20 token to sweep
-    function sweep(address _token) external onlyGovernance {
-        require(_token != address(asset), "!asset");
-        IERC20(_token).safeTransfer(GOV, IERC20(_token).balanceOf(address(this)));
-    }
-
-    modifier onlyGovernance() {
-        require(msg.sender == GOV, "!gov");
-        _;
     }
 }
