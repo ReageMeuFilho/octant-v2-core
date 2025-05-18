@@ -35,21 +35,6 @@ contract YieldSkimmingVaultFactory {
 
     event MorphoStrategyDeploy(address deployer, address donationAddress, address strategyAddress);
 
-    address public morphoVaultAddress;
-
-    constructor() {
-        morphoVaultAddress = address(
-            new MorphoCompounder(
-                0x074134A2784F4F66b6ceD6f68849382990Ff3215, // Morpho yield vault
-                "Morpho Compounder",
-                address(1),
-                address(1),
-                address(1),
-                address(1)
-            )
-        );
-    }
-
     /**
      * @notice Deploys a new MorphoCompounder strategy for the Yield Skimming Vault.
      * @dev This function uses CREATE3 to deploy a new strategy contract deterministically.
@@ -64,6 +49,7 @@ contract YieldSkimmingVaultFactory {
      * @return strategyAddress The address of the newly deployed strategy contract.
      */
     function createStrategy(
+        address _asset,
         string memory _name,
         address _management,
         address _keeper,
@@ -73,7 +59,7 @@ contract YieldSkimmingVaultFactory {
     ) external returns (address strategyAddress) {
         bytes memory bytecode = abi.encodePacked(
             type(MorphoCompounder).creationCode,
-            abi.encode(morphoVaultAddress, _name, _management, _keeper, _emergencyAdmin, _donationAddress)
+            abi.encode(_asset, _name, _management, _keeper, _emergencyAdmin, _donationAddress)
         );
 
         strategyAddress = CREATE3.deployDeterministic(bytecode, _salt);
