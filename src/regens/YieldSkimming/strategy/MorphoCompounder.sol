@@ -2,7 +2,7 @@
 pragma solidity ^0.8.25;
 
 import { BaseHealthCheck } from "../../periphery/BaseHealthCheck.sol";
-import { UniswapV3Swapper } from "../../periphery/UniswapV3Swapper.sol";
+
 import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -14,12 +14,18 @@ import { WadRayMath } from "src/libraries/Maths/WadRay.sol";
  * @notice A strategy that manages deposits in a Morpho yield source and captures yield
  * @dev This strategy tracks the value of deposits and captures yield as the price per share increases
  */
-contract MorphoCompounder is BaseHealthCheck, UniswapV3Swapper {
+contract MorphoCompounder is BaseHealthCheck {
     using WadRayMath for uint256;
     using SafeERC20 for IERC20;
 
     /// @dev The exchange rate at the last harvest, scaled by 1e18
-    uint256 internal lastReportedExchangeRate;
+    uint256 internal _lastReportedExchangeRate;
+
+    // Default profit limit to 100%. // todo create functions to update them (profit and loss)
+    uint16 private _profitLimitRatio = uint16(MAX_BPS);
+
+    // Defaults loss limit to 0.
+    uint16 private _lossLimitRatio;
 
     /// @notice yearn governance
     address public constant GOV = 0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52;
@@ -47,7 +53,7 @@ contract MorphoCompounder is BaseHealthCheck, UniswapV3Swapper {
         )
     {
         // Initialize the exchange rate on setup
-        lastReportedExchangeRate = _getCurrentExchangeRate();
+        _lastReportedExchangeRate = _getCurrentExchangeRate();
     }
 
     /// @notice Sweep of non-asset ERC20 tokens to governance (onlyGovernance)
@@ -78,7 +84,7 @@ contract MorphoCompounder is BaseHealthCheck, UniswapV3Swapper {
      * @return The last reported exchange rate
      */
     function getLastReportedExchangeRate() public view returns (uint256) {
-        return lastReportedExchangeRate;
+        return _lastReportedExchangeRate;
     }
 
     /**
@@ -97,26 +103,21 @@ contract MorphoCompounder is BaseHealthCheck, UniswapV3Swapper {
         // nothing to do here as assets are always held in the strategy
     }
 
-    function _executeHealthCheck(uint256 /*_newTotalAssets*/) internal override {
+    function _executeHealthCheck(uint256 _profit) internal override {
         if (!doHealthCheck) {
             doHealthCheck = true;
             return;
         }
 
-        // // Get the current total assets from the implementation.
-        // uint256 currentTotalAssets = TokenizedStrategy.totalAssets();
+        // Get the current total assets from the implementation.
+        uint256 currentTotalAssets = TokenizedStrategy.totalAssets();
 
-        // if (_newTotalAssets > currentTotalAssets) {
-        //     require(
-        //         ((_newTotalAssets - currentTotalAssets) <= (currentTotalAssets * uint256(_profitLimitRatio)) / MAX_BPS),
-        //         "healthCheck"
-        //     );
-        // } else if (currentTotalAssets > _newTotalAssets) {
-        //     require(
-        //         (currentTotalAssets - _newTotalAssets <= ((currentTotalAssets * uint256(_lossLimitRatio)) / MAX_BPS)),
-        //         "healthCheck"
-        //     );
-        // }
+        if (_profit > 0) {
+            require(
+                (_profit <= (currentTotalAssets * uint256(_profitLimitRatio)) / MAX_BPS),
+                "healthCheck: profit limit exceeded"
+            );
+        }
     }
 
     /**
@@ -138,15 +139,15 @@ contract MorphoCompounder is BaseHealthCheck, UniswapV3Swapper {
         uint256 assetBalance = IERC20(asset).balanceOf(address(this));
 
         // Calculate the profit based on exchange rate difference
-        uint256 deltaExchangeRate = currentExchangeRate > lastReportedExchangeRate
-            ? currentExchangeRate - lastReportedExchangeRate
+        uint256 deltaExchangeRate = currentExchangeRate > _lastReportedExchangeRate
+            ? currentExchangeRate - _lastReportedExchangeRate
             : 0; // Only capture positive yield
 
         uint256 profitInValue = (assetBalance * deltaExchangeRate) / ERC20(asset).decimals();
 
         uint256 profitInYieldVaultShares = (profitInValue * ERC20(asset).decimals()) / currentExchangeRate;
 
-        lastReportedExchangeRate = currentExchangeRate;
+        _lastReportedExchangeRate = currentExchangeRate;
 
         return profitInYieldVaultShares;
     }
