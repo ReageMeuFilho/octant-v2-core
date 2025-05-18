@@ -31,13 +31,7 @@ contract YieldSkimmingTokenizedStrategy is DragonTokenizedStrategy {
      * This approach works well for assets like LSTs (Liquid Staking Tokens) that
      * continuously appreciate in value.
      */
-    function report()
-        public
-        override(DragonTokenizedStrategy)
-        nonReentrant
-        onlyKeepers
-        returns (uint256 profit, uint256 loss)
-    {
+    function report() public override(DragonTokenizedStrategy) returns (uint256 profit, uint256 loss) {
         StrategyData storage S = super._strategyStorage();
 
         // Get the profit in mETH terms
@@ -79,7 +73,6 @@ contract YieldSkimmingTokenizedStrategy is DragonTokenizedStrategy {
         ITokenizedStrategy(address(this)).report();
 
         super._deposit(S, receiver, assets, shares);
-
     }
 
     /**
