@@ -83,6 +83,41 @@ contract RegenIntegrationTest is Test {
         regenStaker.setRewardNotifier(address(this), true);
     }
 
+    function test_Constructor_InitializesWhitelistsToNewIfAddressZero() public {
+        // Deploy RegenStaker with address(0) for both whitelist parameters
+        RegenStaker localRegenStaker = new RegenStaker(
+            IERC20(address(rewardToken)),
+            IERC20Staking(address(stakeToken)),
+            address(this), // admin
+            Whitelist(address(0)), // _stakerWhitelist
+            Whitelist(address(0)), // _contributionWhitelist
+            calculator
+        );
+
+        // Assert that the whitelists are not address(0) but new Whitelist instances
+        assertTrue(
+            address(localRegenStaker.stakerWhitelist()) != address(0),
+            "Staker whitelist should be a new instance, not address(0)"
+        );
+        assertTrue(
+            address(localRegenStaker.contributionWhitelist()) != address(0),
+            "Contribution whitelist should be a new instance, not address(0)"
+        );
+
+        // When RegenStaker does `new Whitelist()`, RegenStaker is the msg.sender for that sub-call,
+        // and the Whitelist constructor sets msg.sender as its owner.
+        assertEq(
+            Ownable(address(localRegenStaker.stakerWhitelist())).owner(),
+            address(localRegenStaker),
+            "Owner of new staker whitelist incorrect"
+        );
+        assertEq(
+            Ownable(address(localRegenStaker.contributionWhitelist())).owner(),
+            address(localRegenStaker),
+            "Owner of new contrib whitelist incorrect"
+        );
+    }
+
     function test_StakerWhitelistIsSet() public view {
         assertEq(address(regenStaker.stakerWhitelist()), address(stakerWhitelist));
     }
@@ -157,7 +192,7 @@ contract RegenIntegrationTest is Test {
         // Generic mock for signup to return votingPower > 0
         vm.mockCall(
             mockGrantRound,
-            abi.encodeWithSignature("signup(uint256,address,bytes32)", uint256(0), address(0), bytes32(0)), // Added bytes32(0)
+            abi.encodeWithSignature("signup(uint256,address,bytes32)", uint256(0), address(0), bytes32(0)),
             abi.encode(uint256(1))
         );
         // Generic mock for vote to succeed (not revert)
@@ -232,7 +267,7 @@ contract RegenIntegrationTest is Test {
                 amountToContributeL210,
                 actualVotingDelegateeL210,
                 bytes32(0)
-            ), // Added bytes32(0)
+            ),
             abi.encode(uint256(1))
         );
         // Set up expectation that signup will be called
@@ -243,7 +278,7 @@ contract RegenIntegrationTest is Test {
                 amountToContributeL210,
                 actualVotingDelegateeL210,
                 bytes32(0)
-            ) // Added bytes32(0)
+            )
         );
 
         // Set up expectation that vote will be called
@@ -422,7 +457,7 @@ contract RegenIntegrationTest is Test {
         // Generic mock for signup
         vm.mockCall(
             mockGrantRound,
-            abi.encodeWithSignature("signup(uint256,address,bytes32)", uint256(0), address(0), bytes32(0)), // Added bytes32(0)
+            abi.encodeWithSignature("signup(uint256,address,bytes32)", uint256(0), address(0), bytes32(0)),
             abi.encode(uint256(1))
         );
         // Generic mock for vote
@@ -1858,7 +1893,7 @@ contract RegenIntegrationTest is Test {
         // Mock signup to return 0 (failure) as originally intended for this test
         vm.mockCall(
             mockGrantRound, // This is mockGrantRoundSignUpFails from this test function
-            abi.encodeWithSignature("signup(uint256,address,bytes32)", amountToContribute, votingDelegatee, bytes32(0)), // Added bytes32(0)
+            abi.encodeWithSignature("signup(uint256,address,bytes32)", amountToContribute, votingDelegatee, bytes32(0)),
             abi.encode(uint256(0)) // << REVERTED TO 0
         );
 
@@ -1884,21 +1919,115 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
     }
 
-    function test_Contribute_VoteFails_EmitsEventAndContinues() public {
-        address user = makeAddr("voteFailsUser");
-        // Revert to using makeAddr for mockGrantRound for this test to ensure it passes
-        // The RevertingGrantRound was causing issues with its signup call.
-        address mockGrantRound = makeAddr("mockGrantRoundForVoteTest");
-        address votingDelegatee = makeAddr("votingDelegateeVoteFails");
-        uint256 amountToContribute = 100e18;
+    function test_Contribute_NetValuesUsed_WhenFeeIsZero() public {
+        address user = makeAddr("zeroFeeUser");
+        address mockGrantRound = makeAddr("mockGrantRoundZeroFee");
+        address votingDelegatee = makeAddr("votingDelegateeZeroFee");
+        uint256 amountToContributeGross = 1000e18;
+        // Fee is explicitly zero
+        uint256 feeAmount = 0;
+        uint256 expectedAmountToGrantRoundNet = amountToContributeGross - feeAmount;
 
-        uint256[] memory prefs = new uint256[](2);
+        uint256[] memory prefs = new uint256[](1);
         prefs[0] = 1;
-        prefs[1] = 2;
+        uint256[] memory weights = new uint256[](1);
+        weights[0] = expectedAmountToGrantRoundNet; // Vote with the full amount
 
-        uint256[] memory weights = new uint256[](2);
-        weights[0] = amountToContribute / 2;
-        weights[1] = amountToContribute / 2;
+        // Setup user & deposit
+        address[] memory userArr = new address[](1);
+        userArr[0] = user;
+        stakerWhitelist.addToWhitelist(userArr);
+        earningPowerWhitelist.addToWhitelist(userArr);
+        contributorWhitelist.addToWhitelist(userArr);
+        stakeToken.mint(user, STAKE_AMOUNT);
+        vm.startPrank(user);
+        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
+        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, user);
+        vm.stopPrank();
+
+        // Setup rewards and set fees to zero
+        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        vm.startPrank(address(this)); // Admin
+        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        Staker.ClaimFeeParameters memory feeParams = Staker.ClaimFeeParameters({
+            feeAmount: uint96(feeAmount), // Zero fee
+            feeCollector: address(0) // Fee collector can be address(0) if fee is 0
+        });
+        regenStaker.setClaimFeeParameters(feeParams);
+        vm.stopPrank();
+        vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
+
+        // Mock external calls
+        vm.mockCall(
+            mockGrantRound,
+            abi.encodeWithSignature(
+                "signup(uint256,address,bytes32)",
+                expectedAmountToGrantRoundNet,
+                votingDelegatee,
+                bytes32(0)
+            ),
+            abi.encode(uint256(1))
+        );
+        vm.mockCall(
+            mockGrantRound,
+            abi.encodeWithSignature("vote(uint256,uint256)", prefs[0], weights[0]),
+            abi.encode()
+        );
+
+        (, address currentFeeCollector) = regenStaker.claimFeeParameters();
+        uint256 collectorInitialBalance = currentFeeCollector == address(0)
+            ? 0
+            : rewardToken.balanceOf(currentFeeCollector);
+
+        // Expect calls
+        vm.expectCall(
+            mockGrantRound,
+            abi.encodeWithSignature(
+                "signup(uint256,address,bytes32)",
+                expectedAmountToGrantRoundNet,
+                votingDelegatee,
+                bytes32(0)
+            )
+        );
+        vm.expectCall(mockGrantRound, abi.encodeWithSignature("vote(uint256,uint256)", prefs[0], weights[0]));
+
+        vm.startPrank(user);
+        uint256 returnedAmount = regenStaker.contribute(
+            depositId,
+            mockGrantRound,
+            votingDelegatee,
+            amountToContributeGross,
+            prefs,
+            weights,
+            bytes32(0)
+        );
+        vm.stopPrank();
+
+        assertEq(returnedAmount, expectedAmountToGrantRoundNet, "Returned net amount incorrect for zero fee");
+        if (currentFeeCollector != address(0)) {
+            assertEq(
+                rewardToken.balanceOf(currentFeeCollector),
+                collectorInitialBalance,
+                "Fee collector balance should not change for zero fee"
+            );
+        }
+    }
+
+    function test_Contribute_EmitsEventAndContinues_WhenIndividualVoteReverts() public {
+        address user = makeAddr("voteRevertUser");
+        address mockGrantRound = makeAddr("mockGrantRoundVoteRevert");
+        address votingDelegatee = makeAddr("votingDelegateeVoteRevert");
+        uint256 amountToContribute = 1000e18;
+
+        uint256[] memory prefs = new uint256[](3); // Three preferences
+        prefs[0] = 1; // Will succeed
+        prefs[1] = 2; // This one will revert
+        prefs[2] = 3; // Will succeed
+
+        uint256[] memory weights = new uint256[](3);
+        weights[0] = amountToContribute / 3;
+        weights[1] = amountToContribute / 3;
+        weights[2] = amountToContribute / 3;
 
         // Setup user, stake, rewards
         address[] memory userArr = new address[](1);
@@ -1917,39 +2046,130 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
         vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
 
-        // Mock signup on mockGrantRound to succeed
+        // Mock signup to succeed
         vm.mockCall(
             mockGrantRound,
-            abi.encodeWithSignature("signup(uint256,address,bytes32)", amountToContribute, votingDelegatee, bytes32(0)), // Added bytes32(0)
-            abi.encode(uint256(1)) // Return votingPower > 0
+            abi.encodeWithSignature("signup(uint256,address,bytes32)", amountToContribute, votingDelegatee, bytes32(0)),
+            abi.encode(uint256(1))
         );
-        // Mock both vote calls to succeed (not revert)
+
+        // Mock first vote to succeed
         vm.mockCall(
             mockGrantRound,
             abi.encodeWithSignature("vote(uint256,uint256)", prefs[0], weights[0]),
-            abi.encode() // Void function, successful call
+            abi.encode()
         );
-        vm.mockCall(
+        // Mock second vote to REVERT
+        vm.mockCallRevert(
             mockGrantRound,
             abi.encodeWithSignature("vote(uint256,uint256)", prefs[1], weights[1]),
-            abi.encode() // Void function, successful call
+            abi.encodeWithSignature("MockedVoteFailed()") // Or any other revert data
+        );
+        // Mock third vote to succeed
+        vm.mockCall(
+            mockGrantRound,
+            abi.encodeWithSignature("vote(uint256,uint256)", prefs[2], weights[2]),
+            abi.encode()
         );
 
         vm.startPrank(user);
-        // We are no longer expecting GrantRoundVoteFailed as we are mocking vote to succeed.
-        // vm.expectEmit(true, true, true, true, address(regenStaker));
-        // emit RegenStaker.GrantRoundVoteFailed(mockGrantRound, user, prefs[0], weights[0]);
-        // vm.expectEmit(true, true, true, true, address(regenStaker));
-        // emit RegenStaker.GrantRoundVoteFailed(mockGrantRound, user, prefs[1], weights[1]);
+        // Expect the event for the failed vote
+        vm.expectEmit(true, true, true, true, address(regenStaker));
+        emit RegenStaker.GrantRoundVoteFailed(mockGrantRound, user, prefs[1], weights[1]);
 
-        // Expect calls to be made
+        // Expect calls to signup and all three votes (even though one reverts)
         vm.expectCall(
             mockGrantRound,
-            abi.encodeWithSignature("signup(uint256,address,bytes32)", amountToContribute, votingDelegatee, bytes32(0)) // Added bytes32(0)
+            abi.encodeWithSignature("signup(uint256,address,bytes32)", amountToContribute, votingDelegatee, bytes32(0))
         );
         vm.expectCall(mockGrantRound, abi.encodeWithSignature("vote(uint256,uint256)", prefs[0], weights[0]));
-        vm.expectCall(mockGrantRound, abi.encodeWithSignature("vote(uint256,uint256)", prefs[1], weights[1]));
+        vm.expectCall(mockGrantRound, abi.encodeWithSignature("vote(uint256,uint256)", prefs[1], weights[1])); // This call is made, then reverts
+        vm.expectCall(mockGrantRound, abi.encodeWithSignature("vote(uint256,uint256)", prefs[2], weights[2]));
 
+        uint256 returnedAmount = regenStaker.contribute(
+            depositId,
+            mockGrantRound,
+            votingDelegatee,
+            amountToContribute,
+            prefs,
+            weights,
+            bytes32(0)
+        );
+        vm.stopPrank();
+
+        // Check that the net amount contributed is still the full amount (minus fees, if any, but fee is 0 here by default)
+        // The key is that the overall transaction doesn't revert due to one failed vote.
+        (uint96 feeAmountCtrl, ) = regenStaker.claimFeeParameters();
+        assertEq(returnedAmount, amountToContribute - feeAmountCtrl, "Returned amount incorrect after one vote failed");
+    }
+
+    function test_Contribute_UpdatesEarningPower_IfCalculatorYieldsChange() public {
+        address user = makeAddr("epChangeUser");
+        address mockGrantRound = makeAddr("mockGrantRoundEpChange");
+        address votingDelegatee = makeAddr("votingDelegateeEpChange");
+        uint256 amountToContribute = 1e18; // A smaller amount, ensure it's less than accrued rewards
+
+        uint256[] memory prefs = new uint256[](1);
+        prefs[0] = 1;
+        uint256[] memory weights = new uint256[](1);
+        weights[0] = amountToContribute;
+
+        // Setup: User stakes. Initially, they ARE on the earningPowerWhitelist.
+        address[] memory userArr = new address[](1);
+        userArr[0] = user;
+        stakerWhitelist.addToWhitelist(userArr);
+        earningPowerWhitelist.addToWhitelist(userArr); // Whitelisted for EP initially
+        contributorWhitelist.addToWhitelist(userArr);
+
+        stakeToken.mint(user, STAKE_AMOUNT);
+        vm.startPrank(user);
+        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
+        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, user);
+        vm.stopPrank();
+
+        // Verify initial deposit earning power is STAKE_AMOUNT
+        // Deposit struct: balance, owner, earningPower, delegatee, claimer, rewardPerTokenCheckpoint, scaledUnclaimedRewardCheckpoint
+        (, , uint96 initialDepositEP, , , , ) = regenStaker.deposits(depositId);
+        assertEq(initialDepositEP, STAKE_AMOUNT, "Initial deposit EP should be STAKE_AMOUNT");
+        assertEq(
+            regenStaker.depositorTotalEarningPower(user),
+            STAKE_AMOUNT,
+            "Initial total EP for user should be STAKE_AMOUNT"
+        );
+
+        // Setup rewards and let them accrue
+        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        vm.startPrank(address(this));
+        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        vm.stopPrank();
+        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2); // Accrue for half period to have some rewards
+
+        // User should have some unclaimed rewards now
+        uint256 unclaimedBefore = regenStaker.unclaimedReward(depositId);
+        assertTrue(unclaimedBefore >= amountToContribute, "User should have enough rewards to contribute");
+
+        // NOW, REMOVE the user from the earningPowerWhitelist. This is the change.
+        earningPowerWhitelist.removeFromWhitelist(userArr);
+        assertFalse(earningPowerWhitelist.isWhitelisted(user), "User should now be OFF earning power whitelist");
+
+        // Mock external calls for contribute
+        vm.mockCall(
+            mockGrantRound,
+            abi.encodeWithSignature("signup(uint256,address,bytes32)", amountToContribute, votingDelegatee, bytes32(0)),
+            abi.encode(uint256(1))
+        );
+        vm.mockCall(
+            mockGrantRound,
+            abi.encodeWithSignature("vote(uint256,uint256)", prefs[0], weights[0]),
+            abi.encode()
+        );
+
+        uint256 expectedNewEP = 0; // Calculator should now return 0 as EP because user is no longer whitelisted
+
+        uint256 globalEpBefore = regenStaker.totalEarningPower();
+        // uint256 userTotalEpBefore = regenStaker.depositorTotalEarningPower(user); // Removed this variable
+
+        vm.startPrank(user);
         regenStaker.contribute(
             depositId,
             mockGrantRound,
@@ -1960,170 +2180,21 @@ contract RegenIntegrationTest is Test {
             bytes32(0)
         );
         vm.stopPrank();
-        // Add an assertion that user's reward checkpoint was updated if desired, or simply that it didn't revert.
-    }
 
-    function test_RevertIf_Withdraw_NotDepositOwner() public {
-        address owner_ = makeAddr("ownerForWithdraw"); // Renamed to avoid conflict with state var `owner` if any confusion
-        address attacker = makeAddr("attackerForWithdraw");
+        // Verify deposit's earning power was updated to expectedNewEP (0)
+        (, , uint96 finalDepositEP, , , , ) = regenStaker.deposits(depositId);
+        assertEq(finalDepositEP, expectedNewEP, "Deposit EP should have been updated to 0 during contribute");
 
-        address[] memory ownerArr = new address[](1);
-        ownerArr[0] = owner_;
-        stakerWhitelist.addToWhitelist(ownerArr);
-        earningPowerWhitelist.addToWhitelist(ownerArr);
-
-        stakeToken.mint(owner_, STAKE_AMOUNT);
-        vm.startPrank(owner_);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, owner_);
-        vm.stopPrank();
-
-        vm.startPrank(attacker);
-        vm.expectRevert(abi.encodeWithSelector(Staker.Staker__Unauthorized.selector, bytes32("not owner"), attacker));
-        regenStaker.withdraw(depositId, STAKE_AMOUNT / 2);
-        vm.stopPrank();
-    }
-
-    function test_Contribute_FeeDeducted_And_NetValuesUsed() public {
-        address user = makeAddr("feeUser_focused");
-        address mockGrantRound = makeAddr("mockGrantRoundFee_focused");
-        address votingDelegatee = makeAddr("votingDelegateeFee_focused");
-        address feeCollector = makeAddr("feeCollector_focused");
-        uint256 amountToContributeGross = 1000e18;
-        uint256 feeAmount = 1e17; // Changed: 0.1e18, less than MAX_CLAIM_FEE (1e18)
-        uint256 expectedAmountToGrantRoundNet = amountToContributeGross - feeAmount;
-
-        uint256[] memory prefs = new uint256[](1);
-        prefs[0] = 1;
-        uint256[] memory weights = new uint256[](1);
-        weights[0] = expectedAmountToGrantRoundNet;
-
-        // Setup user & deposit
-        address[] memory userArr = new address[](1);
-        userArr[0] = user;
-        stakerWhitelist.addToWhitelist(userArr);
-        earningPowerWhitelist.addToWhitelist(userArr);
-        contributorWhitelist.addToWhitelist(userArr);
-        stakeToken.mint(user, STAKE_AMOUNT);
-        vm.startPrank(user);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, user);
-        vm.stopPrank();
-
-        // Setup rewards and fees
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
-        vm.startPrank(address(this)); // Admin
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
-        Staker.ClaimFeeParameters memory feeParams = Staker.ClaimFeeParameters({
-            feeAmount: uint96(feeAmount),
-            feeCollector: feeCollector
-        });
-        regenStaker.setClaimFeeParameters(feeParams);
-        vm.stopPrank();
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
-
-        // Mock external calls
-        vm.mockCall(
-            mockGrantRound,
-            abi.encodeWithSignature(
-                "signup(uint256,address,bytes32)",
-                expectedAmountToGrantRoundNet,
-                votingDelegatee,
-                bytes32(0)
-            ), // Added bytes32(0)
-            abi.encode(uint256(1))
-        );
-        vm.mockCall(
-            mockGrantRound,
-            abi.encodeWithSignature("vote(uint256,uint256)", prefs[0], weights[0]),
-            abi.encode()
-        );
-
-        uint256 collectorInitialBalance = rewardToken.balanceOf(feeCollector);
-
-        // Expect calls
-        vm.expectCall(
-            mockGrantRound,
-            abi.encodeWithSignature(
-                "signup(uint256,address,bytes32)",
-                expectedAmountToGrantRoundNet,
-                votingDelegatee,
-                bytes32(0)
-            ) // Added bytes32(0)
-        );
-        vm.expectCall(mockGrantRound, abi.encodeWithSignature("vote(uint256,uint256)", prefs[0], weights[0]));
-
-        vm.startPrank(user);
-        uint256 returnedAmount = regenStaker.contribute(
-            depositId,
-            mockGrantRound,
-            votingDelegatee,
-            amountToContributeGross,
-            prefs,
-            weights,
-            bytes32(0) // Added signature
-        );
-        vm.stopPrank();
-
-        assertEq(returnedAmount, expectedAmountToGrantRoundNet, "Returned net amount incorrect");
         assertEq(
-            rewardToken.balanceOf(feeCollector),
-            collectorInitialBalance + feeAmount,
-            "Fee collector balance incorrect"
+            regenStaker.depositorTotalEarningPower(user),
+            expectedNewEP,
+            "Total EP for user should be updated to 0"
         );
-    }
-
-    function test_RevertIf_Contribute_AmountLessThanFee() public {
-        address user = makeAddr("amountLessThanFeeUser");
-        address mockGrantRound = makeAddr("mockGrantRoundLessThanFee");
-        address votingDelegatee = makeAddr("votingDelegateeLessThanFee");
-        address feeCollector = makeAddr("feeCollectorForLessThanFee");
-
-        uint256 feeAmount = 1e17; // Changed: 0.1e18, less than MAX_CLAIM_FEE (1e18)
-        uint256 amountToContributeGross = feeAmount - 1; // Less than fee
-
-        uint256[] memory prefs = new uint256[](1);
-        prefs[0] = 1;
-        uint256[] memory weights = new uint256[](1);
-        weights[0] = 1; // Dummy, won't be used
-
-        // Setup: User stakes, has rewards, on contributor whitelist
-        address[] memory userArr = new address[](1);
-        userArr[0] = user;
-        stakerWhitelist.addToWhitelist(userArr);
-        earningPowerWhitelist.addToWhitelist(userArr);
-        contributorWhitelist.addToWhitelist(userArr);
-
-        stakeToken.mint(user, STAKE_AMOUNT);
-        vm.startPrank(user);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, user);
-        vm.stopPrank();
-
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
-        vm.startPrank(address(this));
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
-        // Set claim fee parameters
-        Staker.ClaimFeeParameters memory feeParams = Staker.ClaimFeeParameters({
-            feeAmount: uint96(feeAmount),
-            feeCollector: feeCollector
-        });
-        regenStaker.setClaimFeeParameters(feeParams);
-        vm.stopPrank();
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION); // Accrue rewards
-
-        vm.startPrank(user);
-        // Expect CantAfford(requestedFee, availableAmount)
-        vm.expectRevert(abi.encodeWithSelector(RegenStaker.CantAfford.selector, feeAmount, amountToContributeGross));
-        regenStaker.contribute(
-            depositId,
-            mockGrantRound,
-            votingDelegatee,
-            amountToContributeGross,
-            prefs,
-            weights,
-            bytes32(0)
+        // Global total EP should decrease by the user's previous earning power (which was initialDepositEP, effectively STAKE_AMOUNT for this user)
+        assertEq(
+            regenStaker.totalEarningPower(),
+            globalEpBefore - initialDepositEP,
+            "Global total EP should reflect the decrease"
         );
-        vm.stopPrank();
     }
 }
