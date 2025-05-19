@@ -34,8 +34,9 @@ interface IGrantRound {
     /// depositing exactly `assets` of underlying tokens.
     /// @param assets The amount of underlying to deposit in.
     /// @param receiver The address to receive the `shares`.
+    /// @param signature The signature of the user.
     /// @return votingPower The actual amount of votingPower issued.
-    function signup(uint256 assets, address receiver) external returns (uint256 votingPower);
+    function signup(uint256 assets, address receiver, bytes32 signature) external returns (uint256 votingPower);
 
     /// @notice Process a vote for a project with a contribution amount and vote weight
     /// @dev This function validates and processes votes according to the implemented formula
@@ -183,13 +184,15 @@ contract RegenStaker is
     /// @param _amount The amount of reward tokens to contribute.
     /// @param _preferences The preferences for the contribution.
     /// @param _preferenceWeights The preference weights for the contribution.
+    /// @param _signature The signature for the IGrantRound.signup call.
     function contribute(
         DepositIdentifier _depositId,
         address _grantRoundAddress,
         address _votingDelegatee,
         uint256 _amount,
         uint256[] memory _preferences,
-        uint256[] memory _preferenceWeights
+        uint256[] memory _preferenceWeights,
+        bytes32 _signature
     ) public whenNotPaused nonReentrant returns (uint256 amountContributedToGrant) {
         _revertIfAddressZero(_grantRoundAddress);
         require(
@@ -254,7 +257,7 @@ contract RegenStaker is
         // Perform grant round actions with the net amount
         SafeERC20.safeIncreaseAllowance(REWARD_TOKEN, _grantRoundAddress, amountContributedToGrant);
         require(
-            IGrantRound(_grantRoundAddress).signup(amountContributedToGrant, _votingDelegatee) > 0,
+            IGrantRound(_grantRoundAddress).signup(amountContributedToGrant, _votingDelegatee, _signature) > 0,
             GrantRoundSignUpFailed(_grantRoundAddress, msg.sender, amountContributedToGrant, _votingDelegatee)
         );
 

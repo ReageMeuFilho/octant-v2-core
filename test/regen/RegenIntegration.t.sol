@@ -16,14 +16,14 @@ import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol"; // For Sta
 
 // Mock interface for grant round (Defined ONCE)
 interface IGrantRound {
-    function signUp(uint256 assets, address receiver) external returns (uint256 votingPower);
+    function signUp(uint256 assets, address receiver, bytes32 signature) external returns (uint256 votingPower);
 
     function vote(uint256 projectId, uint256 votingPower) external;
 }
 
 // Helper contract for testing vote failures (Defined ONCE, after IGrantRound)
 contract RevertingGrantRound is IGrantRound {
-    function signUp(uint256, address) external pure override returns (uint256) {
+    function signUp(uint256, address, bytes32) external pure override returns (uint256) {
         return 1; // Successful signup
     }
 
@@ -157,7 +157,7 @@ contract RegenIntegrationTest is Test {
         // Generic mock for signup to return votingPower > 0
         vm.mockCall(
             mockGrantRound,
-            abi.encodeWithSignature("signup(uint256,address)", uint256(0), address(0)),
+            abi.encodeWithSignature("signup(uint256,address,bytes32)", uint256(0), address(0), bytes32(0)), // Added bytes32(0)
             abi.encode(uint256(1))
         );
         // Generic mock for vote to succeed (not revert)
@@ -227,13 +227,23 @@ contract RegenIntegrationTest is Test {
         // Set up mock for the specific signup call to return votingPower > 0
         vm.mockCall(
             mockGrantRound,
-            abi.encodeWithSignature("signup(uint256,address)", amountToContributeL210, actualVotingDelegateeL210),
+            abi.encodeWithSignature(
+                "signup(uint256,address,bytes32)",
+                amountToContributeL210,
+                actualVotingDelegateeL210,
+                bytes32(0)
+            ), // Added bytes32(0)
             abi.encode(uint256(1))
         );
         // Set up expectation that signup will be called
         vm.expectCall(
             mockGrantRound,
-            abi.encodeWithSignature("signup(uint256,address)", amountToContributeL210, actualVotingDelegateeL210)
+            abi.encodeWithSignature(
+                "signup(uint256,address,bytes32)",
+                amountToContributeL210,
+                actualVotingDelegateeL210,
+                bytes32(0)
+            ) // Added bytes32(0)
         );
 
         // Set up expectation that vote will be called
@@ -249,7 +259,8 @@ contract RegenIntegrationTest is Test {
             actualVotingDelegateeL210,
             amountToContributeL210,
             prefsArrayL210,
-            weightsArrayL210
+            weightsArrayL210,
+            bytes32(0) // Added signature
         );
         vm.stopPrank();
     }
@@ -411,7 +422,7 @@ contract RegenIntegrationTest is Test {
         // Generic mock for signup
         vm.mockCall(
             mockGrantRound,
-            abi.encodeWithSignature("signup(uint256,address)", uint256(0), address(0)),
+            abi.encodeWithSignature("signup(uint256,address,bytes32)", uint256(0), address(0), bytes32(0)), // Added bytes32(0)
             abi.encode(uint256(1))
         );
         // Generic mock for vote
@@ -476,7 +487,8 @@ contract RegenIntegrationTest is Test {
             actualVotingDelegateeL412,
             amountToContributeL412,
             prefsArrayL412,
-            weightsArrayL412
+            weightsArrayL412,
+            bytes32(0) // Added signature
         );
         vm.stopPrank();
 
@@ -1620,7 +1632,7 @@ contract RegenIntegrationTest is Test {
         vm.startPrank(user);
         // Staker.sol's _revertIfAddressZero uses Staker__InvalidAddress error
         vm.expectRevert(Staker.Staker__InvalidAddress.selector);
-        regenStaker.contribute(depositId, address(0), votingDelegatee, amountToContribute, prefs, weights);
+        regenStaker.contribute(depositId, address(0), votingDelegatee, amountToContribute, prefs, weights, bytes32(0));
         vm.stopPrank();
     }
 
@@ -1658,7 +1670,15 @@ contract RegenIntegrationTest is Test {
         // Action: Attempt to contribute with mismatched array lengths
         vm.startPrank(user);
         vm.expectRevert(RegenStaker.PreferencesAndPreferenceWeightsMustHaveTheSameLength.selector);
-        regenStaker.contribute(depositId, mockGrantRound, votingDelegatee, amountToContribute, prefs, weights);
+        regenStaker.contribute(
+            depositId,
+            mockGrantRound,
+            votingDelegatee,
+            amountToContribute,
+            prefs,
+            weights,
+            bytes32(0)
+        );
         vm.stopPrank();
     }
 
@@ -1693,7 +1713,15 @@ contract RegenIntegrationTest is Test {
 
         vm.startPrank(user);
         vm.expectRevert(abi.encodeWithSelector(RegenStaker.InvalidNumberOfPreferences.selector, 0, minP, maxP));
-        regenStaker.contribute(depositId, mockGrantRound, votingDelegatee, amountToContribute, prefs, weights);
+        regenStaker.contribute(
+            depositId,
+            mockGrantRound,
+            votingDelegatee,
+            amountToContribute,
+            prefs,
+            weights,
+            bytes32(0)
+        );
         vm.stopPrank();
     }
 
@@ -1733,7 +1761,15 @@ contract RegenIntegrationTest is Test {
 
         vm.startPrank(user);
         vm.expectRevert(abi.encodeWithSelector(RegenStaker.InvalidNumberOfPreferences.selector, count, minP, maxP));
-        regenStaker.contribute(depositId, mockGrantRound, votingDelegatee, amountToContribute, prefs, weights);
+        regenStaker.contribute(
+            depositId,
+            mockGrantRound,
+            votingDelegatee,
+            amountToContribute,
+            prefs,
+            weights,
+            bytes32(0)
+        );
         vm.stopPrank();
     }
 
@@ -1781,7 +1817,15 @@ contract RegenIntegrationTest is Test {
         // For now, let's try to get the exact available amount.
         uint256 unclaimed = regenStaker.unclaimedReward(depositId);
         vm.expectRevert(abi.encodeWithSelector(RegenStaker.CantAfford.selector, amountToContribute, unclaimed));
-        regenStaker.contribute(depositId, mockGrantRound, votingDelegatee, amountToContribute, prefs, weights);
+        regenStaker.contribute(
+            depositId,
+            mockGrantRound,
+            votingDelegatee,
+            amountToContribute,
+            prefs,
+            weights,
+            bytes32(0)
+        );
         vm.stopPrank();
     }
 
@@ -1814,7 +1858,7 @@ contract RegenIntegrationTest is Test {
         // Mock signup to return 0 (failure) as originally intended for this test
         vm.mockCall(
             mockGrantRound, // This is mockGrantRoundSignUpFails from this test function
-            abi.encodeWithSignature("signup(uint256,address)", amountToContribute, votingDelegatee),
+            abi.encodeWithSignature("signup(uint256,address,bytes32)", amountToContribute, votingDelegatee, bytes32(0)), // Added bytes32(0)
             abi.encode(uint256(0)) // << REVERTED TO 0
         );
 
@@ -1828,7 +1872,15 @@ contract RegenIntegrationTest is Test {
                 votingDelegatee
             )
         );
-        regenStaker.contribute(depositId, mockGrantRound, votingDelegatee, amountToContribute, prefs, weights);
+        regenStaker.contribute(
+            depositId,
+            mockGrantRound,
+            votingDelegatee,
+            amountToContribute,
+            prefs,
+            weights,
+            bytes32(0)
+        );
         vm.stopPrank();
     }
 
@@ -1868,7 +1920,7 @@ contract RegenIntegrationTest is Test {
         // Mock signup on mockGrantRound to succeed
         vm.mockCall(
             mockGrantRound,
-            abi.encodeWithSignature("signup(uint256,address)", amountToContribute, votingDelegatee),
+            abi.encodeWithSignature("signup(uint256,address,bytes32)", amountToContribute, votingDelegatee, bytes32(0)), // Added bytes32(0)
             abi.encode(uint256(1)) // Return votingPower > 0
         );
         // Mock both vote calls to succeed (not revert)
@@ -1893,12 +1945,20 @@ contract RegenIntegrationTest is Test {
         // Expect calls to be made
         vm.expectCall(
             mockGrantRound,
-            abi.encodeWithSignature("signup(uint256,address)", amountToContribute, votingDelegatee)
+            abi.encodeWithSignature("signup(uint256,address,bytes32)", amountToContribute, votingDelegatee, bytes32(0)) // Added bytes32(0)
         );
         vm.expectCall(mockGrantRound, abi.encodeWithSignature("vote(uint256,uint256)", prefs[0], weights[0]));
         vm.expectCall(mockGrantRound, abi.encodeWithSignature("vote(uint256,uint256)", prefs[1], weights[1]));
 
-        regenStaker.contribute(depositId, mockGrantRound, votingDelegatee, amountToContribute, prefs, weights);
+        regenStaker.contribute(
+            depositId,
+            mockGrantRound,
+            votingDelegatee,
+            amountToContribute,
+            prefs,
+            weights,
+            bytes32(0)
+        );
         vm.stopPrank();
         // Add an assertion that user's reward checkpoint was updated if desired, or simply that it didn't revert.
     }
@@ -1965,7 +2025,12 @@ contract RegenIntegrationTest is Test {
         // Mock external calls
         vm.mockCall(
             mockGrantRound,
-            abi.encodeWithSignature("signup(uint256,address)", expectedAmountToGrantRoundNet, votingDelegatee),
+            abi.encodeWithSignature(
+                "signup(uint256,address,bytes32)",
+                expectedAmountToGrantRoundNet,
+                votingDelegatee,
+                bytes32(0)
+            ), // Added bytes32(0)
             abi.encode(uint256(1))
         );
         vm.mockCall(
@@ -1979,7 +2044,12 @@ contract RegenIntegrationTest is Test {
         // Expect calls
         vm.expectCall(
             mockGrantRound,
-            abi.encodeWithSignature("signup(uint256,address)", expectedAmountToGrantRoundNet, votingDelegatee)
+            abi.encodeWithSignature(
+                "signup(uint256,address,bytes32)",
+                expectedAmountToGrantRoundNet,
+                votingDelegatee,
+                bytes32(0)
+            ) // Added bytes32(0)
         );
         vm.expectCall(mockGrantRound, abi.encodeWithSignature("vote(uint256,uint256)", prefs[0], weights[0]));
 
@@ -1990,7 +2060,8 @@ contract RegenIntegrationTest is Test {
             votingDelegatee,
             amountToContributeGross,
             prefs,
-            weights
+            weights,
+            bytes32(0) // Added signature
         );
         vm.stopPrank();
 
@@ -2044,7 +2115,15 @@ contract RegenIntegrationTest is Test {
         vm.startPrank(user);
         // Expect CantAfford(requestedFee, availableAmount)
         vm.expectRevert(abi.encodeWithSelector(RegenStaker.CantAfford.selector, feeAmount, amountToContributeGross));
-        regenStaker.contribute(depositId, mockGrantRound, votingDelegatee, amountToContributeGross, prefs, weights);
+        regenStaker.contribute(
+            depositId,
+            mockGrantRound,
+            votingDelegatee,
+            amountToContributeGross,
+            prefs,
+            weights,
+            bytes32(0)
+        );
         vm.stopPrank();
     }
 }
