@@ -1,7 +1,7 @@
 # Trader.sol
 
 ## Executive summary
-Trader is a contract that allows its deployer to DCA into a token (quote token) in terms of base token at random times. In situation when there exist a separation between principal and agent (as in company and employee situation) Trader allows agent to convert one token into other in a way which precludes accusation of insider trading. Agent (the deployer) is on equal terms with everyone else w.r.t knowledge of when trades will occur. Other useful functionality offered by Trader is long-term automation of the process.
+Trader is a contract that allows its deployer to DCA into a token (quote token) in terms of base token at random times. In situation when there exist a separation between principal and agent (as in company and employee situation) Trader allows agent to convert one token into other in a way which precludes accusation of insider trading. Agent (the deployer) is on equal terms with everyone else w.r.t knowledge of when trades will occur. Other useful functionality offered by Trader is long-term automation of the process. This happens at some cost in terms of gas and slippage.
 
 ### Core functionality
 1. DCA at random times on a pair of tokens.
@@ -10,6 +10,10 @@ Trader is a contract that allows its deployer to DCA into a token (quote token) 
    Trader will spent its *budget* before a *deadline*. Deadlines occur at the end of each *period*. A single *budget* will be spent in a single *period*. Notion of budget is different from amount of base token held by the Trader.
 3. Driven by MEV searchers.
    MEV searchers are incentivised to execute trades, sending transactions, paying for gas and getting whatever MEV they can get. Contract attempts to control how much MEV can be extracted by utilizing TWAP oracle for price information.
+
+### Limitations
+Deadlines as implemented have two limitations, one on spending side, other on trading side. Randomness functionality (spending side) depend on chain enforcing average block times. Without such enforcement, deadline might be missed. I.e. if we are in a middle of the period and chain has stopped producing blocks, we will not be able to spend the other half of the budget. On trading side, deadline might be missed becasue of bad market conditions: times of very high volatility on a traded pair. In such case, consider changing spending limits in next period.
+Other limitation is linked to a way integration with exchange is done. Trading is done against a single uniswap v3 pool. This limits the amount of available liquidity. More work is needed to figure out if TWAP protection can be exteneded to trades via a router.
 
 ### Responsibilities
 `Trader.sol` implements triggering at random times, periods, budgets, deadlines and overspending protection. It doesn't directly integrate with an exchange. This responsibility outsourced to a pair of contracts. `UniV3Swap.sol` does trading via Uniswap V3 and `SwapperImpl.sol` does consult the TWAP oracle and makes sure principal (`beneficiary` in Trader's parlance) is not being short-changed during the trade. Both contracts are a part of [0xSplits project](https://github.com/0xSplits/splits-swapper/). They are denoted as `integrator` and `swapper` inside `Trader.sol`.
@@ -26,3 +30,23 @@ This means that we need to roll a dice as late as possible, and not pay any gas 
 On a separate note. To exploit blockhash grinding ability, attacker needs to build block N-1 and exploit their special knowledge in block N. This MEV opportunity is in multi-block MEV class - thing that wasn't observed yet on mainnet. Multi-block MEV exploitation breaks many things in Ethereum ecosystem. Among them are TWAPs and censorship resistance of network as whole.
 
 To summarize: we use `blockhash` as a source of randomness. We are aware of its drawbacks. If we will see attacks against it, we can switch to `block.prevrandao` and redeploy.
+
+### How trader integrates with splitter-swapper
+```mermaid TD
+sequenceDiagram
+
+searcher ->> uniV3Swap: initFlash()
+uniV3Swap ->> Swapper: flash()
+Swapper ->> oracle: getQuoteAmounts()
+oracle -->> Swapper: quote
+Swapper ->> baseToken: transfer("swapper -> uniV3Swap")
+Swapper ->> uniV3Swap: swapperFlashCallback
+uniV3Swap ->> uniV3Pool: exactInput() // swap base to quote
+uniV3Pool -->> uniV3Swap: returns amount
+uniV3Swap ->> quoteToken: transfer("uniV3Swap -> swapper")
+uniV3Swap -->> Swapper: callback returns amount
+note over Swapper: reverts if amount < quote
+Swapper ->> quoteToken: transfer("swapper -> beneficiary")
+Swapper -->> uniV3Swap: flash returns
+uniV3Swap -->> searcher: initFlash returns
+```
