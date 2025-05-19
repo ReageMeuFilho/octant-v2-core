@@ -6,7 +6,7 @@ import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MorphoCompounder } from "src/regens/YieldSkimming/strategy/MorphoCompounder.sol";
 import { BaseHealthCheck } from "src/regens/periphery/BaseHealthCheck.sol";
 import { UniswapV3Swapper } from "src/regens/periphery/UniswapV3Swapper.sol";
-import { YieldSkimmingVaultFactory } from "src/factories/YieldSkimmingVaultFactory.sol";
+import { MorphoCompounderVaultFactory } from "src/factories/MorphoCompounderVaultFactory.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IVault } from "src/regens/interfaces/IVault.sol";
@@ -26,7 +26,7 @@ contract MorphoCompounderTest is Test {
 
     // Factory for creating strategies
     YieldSkimmingTokenizedStrategy tokenizedStrategy;
-    YieldSkimmingVaultFactory public factory;
+    MorphoCompounderVaultFactory public factory;
 
     // Strategy parameters
     address public management;
@@ -111,7 +111,7 @@ contract MorphoCompounderTest is Test {
         donationAddress = address(0x4);
 
         // Deploy factory
-        factory = new YieldSkimmingVaultFactory();
+        factory = new MorphoCompounderVaultFactory();
 
         // Deploy strategy using the factory's createStrategy method
         vm.startPrank(management);

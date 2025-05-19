@@ -4,7 +4,7 @@ pragma solidity >=0.8.25;
 import { CREATE3 } from "@solady/utils/CREATE3.sol";
 import { MorphoCompounder } from "src/regens/YieldSkimming/strategy/MorphoCompounder.sol";
 
-contract YieldSkimmingVaultFactory {
+contract MorphoCompounderVaultFactory {
     /**
      * @dev Struct to store information about a strategy.
      * @param deployerAddress The address of the deployer who created the strategy.
