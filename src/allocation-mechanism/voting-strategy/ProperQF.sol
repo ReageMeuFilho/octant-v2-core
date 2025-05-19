@@ -21,7 +21,7 @@ abstract contract ProperQF {
     uint256 public totalFunding; // Total funding across all projects
 
     /// @dev Event emitted when alpha value is updated
-    event AlphaUpdated(uint256 oldNumerator, uint256 oldDenominator, uint256 newNumerator, uint256 newDenominator);
+    event AlphaUpdated(uint256 indexed oldNumerator, uint256 indexed oldDenominator, uint256 indexed newNumerator, uint256 newDenominator);
 
     /**
      * @notice This function is used to process a vote and update the tally for the voting strategy
@@ -31,12 +31,20 @@ abstract contract ProperQF {
      */
     function _processVote(uint256 projectId, uint256 contribution, uint256 voteWeight) internal virtual {
         require(contribution > 0, "Contribution must be positive");
-        require(voteWeight > 0, "Square root of contribution must be positive");
+        require(voteWeight > 0, "Vote weight must be positive");
+        
+        // Validate square root relationship with safe multiplication
+        uint256 voteWeightSquared = voteWeight * voteWeight;
+        require(voteWeightSquared / voteWeight == voteWeight, "Vote weight overflow");
+        require(voteWeightSquared <= contribution, "Invalid vote weight for contribution");
+        
+        // Validate square root approximation within 10% tolerance
+        uint256 actualSqrt = _sqrt(contribution);
+        uint256 tolerance = actualSqrt / 10; // 10% tolerance
         require(
-            voteWeight ** 2 <= contribution,
-            "Square root of contribution must be less than or equal to contribution"
+            voteWeight >= actualSqrt - tolerance && voteWeight <= actualSqrt + tolerance,
+            "Vote weight outside 10% tolerance of square root"
         );
-        // should be within 10% of the contribution
 
         Project storage project = projects[projectId];
 
@@ -47,18 +55,31 @@ abstract contract ProperQF {
         // Compute new quadratic and linear terms
         uint256 newQuadraticFunding = (newSumSquareRoots * newSumSquareRoots);
 
-        // Update global sums
+        // Update global sums with underflow protection
+        require(totalQuadraticSum >= project.quadraticFunding, "Quadratic sum underflow");
+        require(totalLinearSum >= project.linearFunding, "Linear sum underflow");
+        
         totalQuadraticSum = totalQuadraticSum - project.quadraticFunding + newQuadraticFunding;
         totalLinearSum = totalLinearSum - project.linearFunding + newSumContributions;
-        //TODO: this should be a function that is dynamically calculated to take alpha into account, this is total funding for everyone
-        totalFunding = totalQuadraticSum + totalLinearSum;
+        
+        // Calculate total funding with alpha weighting
+        totalFunding = _calculateWeightedTotalFunding();
 
         // Update project state
         project.sumSquareRoots = newSumSquareRoots;
         project.sumContributions = newSumContributions;
-        //TODO: instead of storing this just calculate the total funding for the project and divide by total funding from everyone
         project.quadraticFunding = newQuadraticFunding;
         project.linearFunding = newSumContributions;
+    }
+    
+    /**
+     * @dev Calculate weighted total funding using alpha parameter
+     * @return The weighted total funding across all projects
+     */
+    function _calculateWeightedTotalFunding() internal view returns (uint256) {
+        uint256 weightedQuadratic = Math.mulDiv(totalQuadraticSum, alphaNumerator, alphaDenominator);
+        uint256 weightedLinear = Math.mulDiv(totalLinearSum, alphaDenominator - alphaNumerator, alphaDenominator);
+        return weightedQuadratic + weightedLinear;
     }
 
     /**
@@ -100,7 +121,7 @@ abstract contract ProperQF {
             project.sumContributions, // Total contributions
             project.sumSquareRoots, // Sum of square roots
             Math.mulDiv(project.quadraticFunding, alphaNumerator, alphaDenominator), // Quadratic funding term
-            Math.mulDiv(project.linearFunding, alphaDenominator, alphaDenominator) // Linear funding term
+            Math.mulDiv(project.linearFunding, alphaDenominator - alphaNumerator, alphaDenominator) // Linear funding term
         );
     }
 
