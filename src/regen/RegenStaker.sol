@@ -27,8 +27,52 @@ import { Whitelist } from "./whitelist/Whitelist.sol";
 import { IWhitelist } from "./whitelist/IWhitelist.sol";
 import { IWhitelistedEarningPowerCalculator } from "./IWhitelistedEarningPowerCalculator.sol";
 
-// Interfaces (if defined locally)
-// TODO: Bind this to the real contract.
+// --- EIP-712 Specification for IGrantRound Implementations ---
+// To ensure security against replay attacks for the `signup` method,
+// any contract implementing the `IGrantRound` interface is expected to:
+//
+// 1. Be EIP-712 Compliant:
+//    The `IGrantRound` contract should have its own EIP-712 domain separator.
+//    This typically includes:
+//    - name: The name of the grant round contract (e.g., "SpecificGrantRound").
+//    - version: The version of the signing domain (e.g., "1").
+//    - chainId: The chainId of the network where the contract is deployed.
+//    - verifyingContract: The address of the `IGrantRound` contract itself.
+//
+// 2. Define a Typed Data Structure for Signup:
+//    The data signed by the user (e.g., `deposit.owner`) must include a nonce.
+//    Example structure (names can vary):
+//    /*
+//    struct GrantRoundSignupPayload {
+//        uint256 assets;        // The amount of tokens for signup
+//        address receiver;      // The address receiving voting power/shares
+//        uint256 nonce;         // The signer's current nonce for this action
+//    }
+//    */
+//
+// 3. Define the TYPEHASH for this Structure:
+//    This is `keccak256` of the EIP-712 struct definition string.
+//    Example:
+//    // bytes32 constant SIGNUP_PAYLOAD_TYPEHASH =
+//    //     keccak256("GrantRoundSignupPayload(uint256 assets,address receiver,uint256 nonce)");
+//
+// 4. Manage Nonces:
+//    The `IGrantRound` contract must maintain a nonce for each signer to prevent signature reuse.
+//    Example:
+//    // mapping(address => uint256) public userNonces;
+//    Upon successful processing of a `signup` call, the `IGrantRound` contract must:
+//    - Verify that the nonce in the signed payload matches `userNonces[signer]`.
+//    - Increment `userNonces[signer]`.
+//
+// 5. Signature Verification:
+//    The `signup` function will use `ecrecover` with the EIP-712 hash derived from
+//    its domain separator, the `SIGNUP_PAYLOAD_TYPEHASH`, and the specific
+//    `assets`, `receiver`, and expected `nonce` for the signer.
+//
+// The `bytes32 signature` parameter in `IGrantRound.signup` is intended to be the
+// EIP-712 signature (r, s, v components) of this structured data.
+// --- End EIP-712 Specification for IGrantRound ---
+
 interface IGrantRound {
     /// @notice Grants voting power to `receiver` by
     /// depositing exactly `assets` of underlying tokens.
