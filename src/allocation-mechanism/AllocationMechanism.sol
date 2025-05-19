@@ -1,40 +1,41 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity >=0.8.18;
 
-/**$$$$$$$$$$$$$$$$$$$$$$$$$$$&Mr/|1+~>>iiiiiiiiiii>~+{|tuMW$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-$$$$$$$$$$$$$$$$$$$$$$$$$B#j]->iiiiiiiiiiiiiiiiiiiiiiiiiiii>-?f*B$$$$$$$$$$$$$$$$$$$$$$$$$
-$$$$$$$$$$$$$$$$$$$$$@zj}~iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii~}fv@$$$$$$$$$$$$$$$$$$$$$
-$$$$$$$$$$$$$$$$$$@z(+iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii+)zB$$$$$$$$$$$$$$$$$$
-$$$$$$$$$$$$$$$$Mf~iiiiiiiiiiiiiiiiiii   iiiiiiiiiiiiiiiiiiiiiiiiiiiiii~t#@$$$$$$$$$$$$$$$
-$$$$$$$$$$$$$@u[iiiiiiiiiiiiiiiiiii           ii   iiiiiiiiiiiiiiiiiiiiiii?n@$$$$$$$$$$$$$
-$$$$$$$$$$$@z]iiiiiiiiiiiiiiiiii                     iiiiiiiiiiiiiiiiiiiiiii?u@$$$$$$$$$$$
-$$$$$$$$$$v]iiiiiiiiiiiiiiiii        .-'   `'.      iiiiiiiiiiiiiiiiiiiiiiiiii?u$$$$$$$$
-$$$$$$$$%)>iiiiiiiiiiiiiiiiii       /         \       iiiiiiiiiiiiiiiiiiiiiiiiii1%$$$$$$$$
-$$$$$$$c~iiiiiiiiiiiiiiiiiiiiii     |         ;       iiiiiiiiiiiiiiiiiiiiiiiii>)%$$$$$$$$
-$$$$$B/>iiiiiiiiiiiiiiiiiii         |         |           ___.--,  iiiiiiiiiiiiiii~c$$$$$$
-$$$$@)iiiiiiiiiiiiiii      _.._     |0) ~ (0) |    _.---'`__.-( (_. iiiiiiiiiiiiiii/>B$$$$
-$$$B|iiiiiiiiiiiii  __.--'`_.. '.__.\    '--. \_.-' ,.--'`     `""` iiiiiiiiiiiiiiii(@$$$$
-$$@)iiiiiiiiiii    ( ,.--'`   ',__ /` ;   `, '.__.'`    __        iiiiiiiiiiiiiiiiiii($$$$
-$$$)iiiiiiiiiiii   _`) )  .---.__.' / ;   |\   \__..--""  """--.,_   iiiiiiiiiiiiiiiii@$$$
-$$%iiiiiiiiii    `---'  ' ''-._.-'` ./  /\ '.  \ _.-~~~````~~~-._`-.__.'iiiiiiiiiiiii\$$$$
-$$@iiiiiiiiiiiiiiiiii   | |  .' _.-' |  |   \  \  '.               `~---`iiiiiiiiiiiiii$$$
-$${[iiiiiiiiiiiiiii      \ \/ .'     \  \    '. '-._)               iiiiiiiiiiiiiiiiii~$$$
-$$uiiiiiiiiiiiiiiiiiii    \/ /        \  \     `=.__`~-       iiiiiiiiiiiiiiiiiiiiiii$$$$$
-$$@iiiiiiiiiiiiiiiiii      / /\         `) )     / / `"".`\     iiiiiiiiiiiiiiiiiiiii|B$$$
-$$@\iiiiiiiiiiiiiiiii ,_.-'.'\ \        / /     ( (     / /     iiiiiiiiiiiiiiiiiiii(@$$$$
-$$$$$iiiiiiiiiiiiiii `--~`   ) )    .-'.'       '.'.  | (      iiiiiiiiiiiiiiiiiiii/>B$$$$
-$$$$@iiiiiiiiiiiiiiii       (/`    ( (`      i    ) )  '-;        iiiiiiiiiiiiiiii~c$$$$$$
-$$$$$B]iiiiiiiiiiiiiiii      `   i  '-;      ii   (-'          iiiiiiiiiiiiiiiiii>)%$$$$$$
-4$$$$$$$B)iiiiiiiiiiiii  iiii!i             iii           liiiiiiiiiiiiiiiiiiiii1%$$$$$$$$
-$$$$$$$$$$@u]iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii-x@$$$$$$$
-$$$$$$$$$$$@v?iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii-x$$$$$$$$$$$
-$$$$$$$$$$$$$$@n?iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii-rB$$$$$$$$$$$$
-$$$$$$$$$$$$$$$$$/~iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii<\*@$$$$$$$$$$$$$$$
-$$$$$$$$$$$$$$$$$$$Bc1~iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii~{v%$$$$$$$$$$$$$$$$$
-$$$$$$$$$$$$$$$$$$$$$$Bvf]<iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii<]tuB$$$$$$$$$$$$$$$$$$$$
-4$$$$$$$$$$$$$$$$$$$$$$$$$%zt-+>iiiiiiiiiiiiiiiiiiiiiiiiiiiii+_tc%$$$$$$$$$$$$$$$$$$$$$$$$
-$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$W#u/|{+~>iiiiiiiiiiii><+{|/n#W$$$$$$$$$$$$$$$$$$$$$$$$$$$$*/
-
+/**
+ * $$$$$$$$$$$$$$$$$$$$$$$$$$$&Mr/|1+~>>iiiiiiiiiii>~+{|tuMW$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+ * $$$$$$$$$$$$$$$$$$$$$$$$$B#j]->iiiiiiiiiiiiiiiiiiiiiiiiiiii>-?f*B$$$$$$$$$$$$$$$$$$$$$$$$$
+ * $$$$$$$$$$$$$$$$$$$$$@zj}~iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii~}fv@$$$$$$$$$$$$$$$$$$$$$
+ * $$$$$$$$$$$$$$$$$$@z(+iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii+)zB$$$$$$$$$$$$$$$$$$
+ * $$$$$$$$$$$$$$$$Mf~iiiiiiiiiiiiiiiiiii   iiiiiiiiiiiiiiiiiiiiiiiiiiiiii~t#@$$$$$$$$$$$$$$$
+ * $$$$$$$$$$$$$@u[iiiiiiiiiiiiiiiiiii           ii   iiiiiiiiiiiiiiiiiiiiiii?n@$$$$$$$$$$$$$
+ * $$$$$$$$$$$@z]iiiiiiiiiiiiiiiiii                     iiiiiiiiiiiiiiiiiiiiiii?u@$$$$$$$$$$$
+ * $$$$$$$$$$v]iiiiiiiiiiiiiiiii        .-'   `'.      iiiiiiiiiiiiiiiiiiiiiiiiii?u$$$$$$$$
+ * $$$$$$$$%)>iiiiiiiiiiiiiiiiii       /         \       iiiiiiiiiiiiiiiiiiiiiiiiii1%$$$$$$$$
+ * $$$$$$$c~iiiiiiiiiiiiiiiiiiiiii     |         ;       iiiiiiiiiiiiiiiiiiiiiiiii>)%$$$$$$$$
+ * $$$$$B/>iiiiiiiiiiiiiiiiiii         |         |           ___.--,  iiiiiiiiiiiiiii~c$$$$$$
+ * $$$$@)iiiiiiiiiiiiiii      _.._     |0) ~ (0) |    _.---'`__.-( (_. iiiiiiiiiiiiiii/>B$$$$
+ * $$$B|iiiiiiiiiiiii  __.--'`_.. '.__.\    '--. \_.-' ,.--'`     `""` iiiiiiiiiiiiiiii(@$$$$
+ * $$@)iiiiiiiiiii    ( ,.--'`   ',__ /` ;   `, '.__.'`    __        iiiiiiiiiiiiiiiiiii($$$$
+ * $$$)iiiiiiiiiiii   _`) )  .---.__.' / ;   |\   \__..--""  """--.,_   iiiiiiiiiiiiiiiii@$$$
+ * $$%iiiiiiiiii    `---'  ' ''-._.-'` ./  /\ '.  \ _.-~~~````~~~-._`-.__.'iiiiiiiiiiiii\$$$$
+ * $$@iiiiiiiiiiiiiiiiii   | |  .' _.-' |  |   \  \  '.               `~---`iiiiiiiiiiiiii$$$
+ * $${[iiiiiiiiiiiiiii      \ \/ .'     \  \    '. '-._)               iiiiiiiiiiiiiiiiii~$$$
+ * $$uiiiiiiiiiiiiiiiiiii    \/ /        \  \     `=.__`~-       iiiiiiiiiiiiiiiiiiiiiii$$$$$
+ * $$@iiiiiiiiiiiiiiiiii      / /\         `) )     / / `"".`\     iiiiiiiiiiiiiiiiiiiii|B$$$
+ * $$@\iiiiiiiiiiiiiiiii ,_.-'.'\ \        / /     ( (     / /     iiiiiiiiiiiiiiiiiiii(@$$$$
+ * $$$$$iiiiiiiiiiiiiii `--~`   ) )    .-'.'       '.'.  | (      iiiiiiiiiiiiiiiiiiii/>B$$$$
+ * $$$$@iiiiiiiiiiiiiiii       (/`    ( (`      i    ) )  '-;        iiiiiiiiiiiiiiii~c$$$$$$
+ * $$$$$B]iiiiiiiiiiiiiiii      `   i  '-;      ii   (-'          iiiiiiiiiiiiiiiiii>)%$$$$$$
+ * 4$$$$$$$B)iiiiiiiiiiiii  iiii!i             iii           liiiiiiiiiiiiiiiiiiiii1%$$$$$$$$
+ * $$$$$$$$$$@u]iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii-x@$$$$$$$
+ * $$$$$$$$$$$@v?iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii-x$$$$$$$$$$$
+ * $$$$$$$$$$$$$$@n?iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii-rB$$$$$$$$$$$$
+ * $$$$$$$$$$$$$$$$$/~iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii<\*@$$$$$$$$$$$$$$$
+ * $$$$$$$$$$$$$$$$$$$Bc1~iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii~{v%$$$$$$$$$$$$$$$$$
+ * $$$$$$$$$$$$$$$$$$$$$$Bvf]<iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii<]tuB$$$$$$$$$$$$$$$$$$$$
+ * 4$$$$$$$$$$$$$$$$$$$$$$$$$%zt-+>iiiiiiiiiiiiiiiiiiiiiiiiiiiii+_tc%$$$$$$$$$$$$$$$$$$$$$$$$
+ * $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$W#u/|{+~>iiiiiiiiiiii><+{|/n#W$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+ */
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -168,25 +169,21 @@ abstract contract DragonTokenizedStrategy {
         mapping(address => uint256) nonces; // Mapping of nonces used for permit functions.
         mapping(address => uint256) balances; // Mapping to track current balances for each account that holds shares.
         mapping(address => mapping(address => uint256)) allowances; // Mapping to track the allowances for the strategies shares.
-        
         // These are the corresponding ERC20 variables needed for the
         // strategies token that is issued and burned on each deposit or withdraw.
         ERC20 asset; // The ERC20 compliant underlying asset that will be used by the Strategy
         string name; // The name of the token for the strategy.
         uint256 totalSupply; // The total amount of shares currently issued.
         uint256 totalAssets; // We manually track `totalAssets` to prevent PPS manipulation through airdrops.
-
         // Variables for reporting.
         // We use uint96 for timestamps to fit in the same slot as an address.
         address keeper; // Address given permission to call {report} and {tend}.
         uint96 lastReport; // The last time a {report} was called.
-
         // Access management variables.
         address management; // Main address that can set all configurable variables.
         address pendingManagement; // Address that is pending to take over `management`.
         address emergencyAdmin; // Address to act in emergencies as well as `management`.
         address dragonRouter; // Router that receives minted shares from yield in specialized strategies
-
         // Strategy Status
         uint8 decimals; // The amount of decimals that `asset` and strategy use.
         uint8 entered; // To prevent reentrancy. Use uint8 for gas savings.
@@ -1075,7 +1072,8 @@ abstract contract DragonTokenizedStrategy {
         emit Transfer(from, to, amount);
     }
 
-    /** @dev Creates `amount` tokens and assigns them to `account`, increasing
+    /**
+     * @dev Creates `amount` tokens and assigns them to `account`, increasing
      * the total supply.
      *
      * Emits a {Transfer} event with `from` set to the zero address.
