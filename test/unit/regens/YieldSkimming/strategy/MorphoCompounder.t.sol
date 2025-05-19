@@ -15,8 +15,8 @@ import { YieldSkimmingTokenizedStrategy } from "src/regens/YieldSkimming/YieldSk
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
 /// @title MorphoCompounder Test
-/// @author Octant Community
-/// @notice Unit tests for the MorphoCompounder strategy using a mainnet fork
+/// @author Octant
+/// @notice Integration tests for the MorphoCompounder strategy using a mainnet fork
 contract MorphoCompounderTest is Test {
     using SafeERC20 for ERC20;
 
