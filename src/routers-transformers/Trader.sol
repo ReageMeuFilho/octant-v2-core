@@ -19,6 +19,8 @@ import { ISwapRouter } from "src/vendor/uniswap/ISwapRouter.sol";
 /// @title Octant Trader
 /// @notice Octant Trader is a contract that performs "DCA" in terms of sold token into another token. This contract performs trades in a random times, isolating the deployer from risks of insider trading. On very technical level, Trader deals with amounts and times, while Swapper and IUniV3Swap are dealing with actual conversion of currencies.
 /// @dev When dealing with ETH, conversion to and from WETH is dealt on the level of UniV3Swap contract.
+/// @dev Please note that this contract relies on enforced average time between blocks. If you are deploying to a chain with wildly variable block times, you will observe that selling before deadline could fail.
+/// @dev Please note that selling before deadline might fail because of slippage reasons. In such case consider updating contract configuration via `setSpending`.
 contract Trader is ITransformer, Ownable, Pausable {
     using SafeERC20 for IERC20;
     using FixedPointMathLib for uint256;
