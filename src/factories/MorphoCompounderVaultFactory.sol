@@ -33,7 +33,9 @@ contract MorphoCompounderVaultFactory {
      */
     mapping(address => StrategyInfo[]) public strategies;
 
-    event MorphoStrategyDeploy(address deployer, address donationAddress, address strategyAddress);
+    address public constant ysUSDC = 0x074134A2784F4F66b6ceD6f68849382990Ff3215;
+
+    event StrategyDeploy(address deployer, address donationAddress, address strategyAddress);
 
     /**
      * @notice Deploys a new MorphoCompounder strategy for the Yield Skimming Vault.
@@ -49,7 +51,6 @@ contract MorphoCompounderVaultFactory {
      * @return strategyAddress The address of the newly deployed strategy contract.
      */
     function createStrategy(
-        address _asset,
         string memory _name,
         address _management,
         address _keeper,
@@ -59,11 +60,11 @@ contract MorphoCompounderVaultFactory {
     ) external returns (address strategyAddress) {
         bytes memory bytecode = abi.encodePacked(
             type(MorphoCompounder).creationCode,
-            abi.encode(_asset, _name, _management, _keeper, _emergencyAdmin, _donationAddress)
+            abi.encode(ysUSDC, _name, _management, _keeper, _emergencyAdmin, _donationAddress)
         );
 
         strategyAddress = CREATE3.deployDeterministic(bytecode, _salt);
-        emit MorphoStrategyDeploy(msg.sender, _donationAddress, strategyAddress);
+        emit StrategyDeploy(msg.sender, _donationAddress, strategyAddress);
         StrategyInfo memory strategyInfo = StrategyInfo({
             deployerAddress: msg.sender,
             timestamp: block.timestamp,
