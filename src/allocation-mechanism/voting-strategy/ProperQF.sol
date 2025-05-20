@@ -5,6 +5,7 @@ import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 abstract contract ProperQF {
     using Math for uint256;
+
     struct Project {
         uint256 sumContributions; // Sum of contributions (Sum_j)
         uint256 sumSquareRoots; // Sum of square roots (S_j)
@@ -21,7 +22,12 @@ abstract contract ProperQF {
     uint256 public totalFunding; // Total funding across all projects
 
     /// @dev Event emitted when alpha value is updated
-    event AlphaUpdated(uint256 indexed oldNumerator, uint256 indexed oldDenominator, uint256 indexed newNumerator, uint256 newDenominator);
+    event AlphaUpdated(
+        uint256 indexed oldNumerator,
+        uint256 indexed oldDenominator,
+        uint256 indexed newNumerator,
+        uint256 newDenominator
+    );
 
     /**
      * @notice This function is used to process a vote and update the tally for the voting strategy
@@ -32,12 +38,12 @@ abstract contract ProperQF {
     function _processVote(uint256 projectId, uint256 contribution, uint256 voteWeight) internal virtual {
         require(contribution > 0, "Contribution must be positive");
         require(voteWeight > 0, "Vote weight must be positive");
-        
+
         // Validate square root relationship with safe multiplication
         uint256 voteWeightSquared = voteWeight * voteWeight;
         require(voteWeightSquared / voteWeight == voteWeight, "Vote weight overflow");
         require(voteWeightSquared <= contribution, "Invalid vote weight for contribution");
-        
+
         // Validate square root approximation within 10% tolerance
         uint256 actualSqrt = _sqrt(contribution);
         uint256 tolerance = actualSqrt / 10; // 10% tolerance
@@ -58,10 +64,10 @@ abstract contract ProperQF {
         // Update global sums with underflow protection
         require(totalQuadraticSum >= project.quadraticFunding, "Quadratic sum underflow");
         require(totalLinearSum >= project.linearFunding, "Linear sum underflow");
-        
+
         totalQuadraticSum = totalQuadraticSum - project.quadraticFunding + newQuadraticFunding;
         totalLinearSum = totalLinearSum - project.linearFunding + newSumContributions;
-        
+
         // Calculate total funding with alpha weighting
         totalFunding = _calculateWeightedTotalFunding();
 
@@ -71,7 +77,7 @@ abstract contract ProperQF {
         project.quadraticFunding = newQuadraticFunding;
         project.linearFunding = newSumContributions;
     }
-    
+
     /**
      * @dev Calculate weighted total funding using alpha parameter
      * @return The weighted total funding across all projects
