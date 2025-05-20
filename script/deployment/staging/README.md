@@ -15,8 +15,8 @@ The DeployProtocol script handles the sequential deployment of:
 
 ## Prerequisites
 
-1. Create your own Virtual TestNet in Tenderly (Mainnet, sync on) (https://docs.tenderly.co/virtual-testnets/quickstart)
-2. Create Tenderly Personal accessToken (https://docs.tenderly.co/account/projects/how-to-generate-api-access-token#personal-account-access-tokens)
+1. ~~Create your own Virtual TestNet in Tenderly (Mainnet, sync on) (https://docs.tenderly.co/virtual-testnets/quickstart)~~ (not needed, use the provided RPC URL to connect to shared Tenderly TestNet)
+2. Create Tenderly Personal accessToken (https://docs.tenderly.co/account/projects/how-to-generate-api-access-token#personal-account-access-tokens) (needed to verify contacts)
 3. Send some ETH (your own Mainnet TestNet RPC) to your deployer address (ex. MetaMask account) (https://docs.tenderly.co/virtual-testnets/unlimited-faucet)
 
 ## Environment Setup
@@ -41,12 +41,17 @@ yarn deploy:tenderly
 
 ### Manually
 
-1. First dry run the deployment:
+1. Load env variables
+   ```shell
+   source .env
+   ```
+
+2. First dry run the deployment:
    ```
    forge script script/deployment/staging/DeployProtocol.s.sol:DeployProtocol --slow --rpc-url $RPC_URL
    ```
 
-2. If the dry run succeeds, execute the actual deployment:
+3. If the dry run succeeds, execute the actual deployment:
    ```
    forge script script/deployment/staging/DeployProtocol.s.sol:DeployProtocol --slow --rpc-url $RPC_URL --broadcast --verify --verifier custom
    ```
