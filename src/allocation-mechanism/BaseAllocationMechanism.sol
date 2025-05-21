@@ -96,6 +96,7 @@ abstract contract BaseAllocationMechanism {
     /// @param _votingPeriod Blocks duration that voting remains open
     /// @param _quorumShares Minimum net votes for a proposal to pass
     /// @param _timelockDelay Seconds after queuing before redemption allowed
+    /// @param _startBlock Block number when voting mechanism starts
     constructor(
         IERC20 _asset,
         string memory _name,
@@ -103,13 +104,15 @@ abstract contract BaseAllocationMechanism {
         uint256 _votingDelay,
         uint256 _votingPeriod,
         uint256 _quorumShares,
-        uint256 _timelockDelay
+        uint256 _timelockDelay,
+        uint256 _startBlock
     ) {
         require(address(_asset) != address(0), "Invalid asset");
         require(_votingDelay > 0, "Invalid voting delay");
         require(_votingPeriod > 0, "Invalid voting period");
         require(_quorumShares > 0, "Invalid quorum");
         require(_timelockDelay > 0, "Invalid timelock");
+        require(_startBlock > 0, "Invalid start block");
 
         asset = _asset;
         name = _name;
@@ -118,6 +121,7 @@ abstract contract BaseAllocationMechanism {
         votingPeriod = _votingPeriod;
         quorumShares = _quorumShares;
         timelockDelay = _timelockDelay;
+        startBlock = _startBlock;
     }
 
     // ---------- Hooks (to implement) ----------
@@ -310,6 +314,7 @@ abstract contract BaseAllocationMechanism {
     function cancelProposal(uint256 pid) external {
         require(_validateProposalHook(pid), "Invalid proposal");
         Proposal storage p = proposals[pid];
+        require(msg.sender == p.proposer, "Not proposer");
         require(!p.canceled, "Already canceled");
         require(p.eta == 0, "Already queued");
 
