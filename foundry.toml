@@ -36,6 +36,6 @@ test = 'proof/kontrol'
 ast = true
 
 [rpc_endpoints]
-mainnet = "${ETHEREUM_NODE_MAINNET}"
+mainnet = "${TEST_RPC_URL}"
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
