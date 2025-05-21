@@ -40,6 +40,8 @@ error Staker__InvalidFeeCollector();
 error Staker__InvalidClaimFeeParameters(); // Added this error
 error Staker__Unauthorized(bytes32 context, address account);
 error Staker__InvalidAddress(); // For address(0) checks in Staker.sol
+error Staker__Unqualified(uint256 score); // For bumpEarningPower
+error Staker__InvalidTip(); // For bumpEarningPower
 
 // --- End expected errors ---
 
@@ -2695,6 +2697,73 @@ contract RegenIntegrationTest is Test {
         });
         vm.expectRevert(Staker__InvalidClaimFeeParameters.selector); // Now using the defined error
         regenStaker.setClaimFeeParameters(feeParams);
+        vm.stopPrank();
+    }
+
+    function test_RevertIf_BumpEarningPower_TipTooHigh() public {
+        address stakerUser = makeAddr("stakerForBumpTip");
+        address tipReceiver = makeAddr("tipReceiverForBumpTip");
+        uint256 stakeAmount = STAKE_AMOUNT;
+
+        // Whitelist stakerUser for staking and for initial earning power (so EP is stakeAmount)
+        address[] memory stakerArr = new address[](1);
+        stakerArr[0] = stakerUser;
+        stakerWhitelist.addToWhitelist(stakerArr);
+        earningPowerWhitelist.addToWhitelist(stakerArr);
+
+        // Staker stakes
+        stakeToken.mint(stakerUser, stakeAmount);
+        vm.startPrank(stakerUser);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = regenStaker.stake(stakeAmount, stakerUser);
+        vm.stopPrank();
+
+        // At this point, deposit.earningPower should be stakeAmount.
+        // To make bumpEarningPower find a *new* earning power that qualifies:
+        // We need earningPowerCalculator.getNewEarningPower to return (newPower, true) where newPower != currentPower.
+        // Our RegenEarningPowerCalculator returns (balance, isWhitelisted) if balance > 0.
+        // If current EP is stakeAmount, we need getNewEarningPower to calculate something different or for isQualified to be true.
+        // The Staker.sol getNewEarningPower takes (balance, owner, delegatee, currentEarningPower).
+        // The RegenEarningPowerCalculator.getNewEarningPower logic:
+        //   newPotentialScore = getEarningPower(balance, owner, delegatee);
+        //   isQualified = newPotentialScore > currentEarningPower ?
+        //                 (newPotentialScore - currentEarningPower) * BASIS_POINTS_GRANULARITY / currentEarningPower >= BPS_THRESHOLD_GAIN :
+        //                 (currentEarningPower - newPotentialScore) * BASIS_POINTS_GRANULARITY / currentEarningPower >= BPS_THRESHOLD_LOSS;
+        // For this test, we just need to ensure the preliminary checks in bumpEarningPower pass before the tip check.
+        // So, we need a scenario where a bump *would* be valid if the tip were okay.
+        // Easiest: modify the stake so currentEarningPower calc would change, or make user temporarily non-whitelisted for EP then re-whitelist for calculator.
+        // Let's try making earningPower 0 by removing from whitelist, then re-adding, so new EP will be stakeAmount.
+
+        // Make current earning power 0 for the deposit by removing from earningPowerWhitelist and bumping
+        earningPowerWhitelist.removeFromWhitelist(stakerArr);
+        // A bump is needed to update the deposit's stored earningPower to 0.
+        // We can call bumpEarningPower with a valid small tip (or 0 if allowed by maxBumpTip)
+        // or trigger it via another action like alterClaimer/alterDelegatee.
+        // Let's use alterClaimer as it also calls _checkpointReward which updates EP.
+        vm.startPrank(stakerUser);
+        regenStaker.alterClaimer(depositId, makeAddr("tempClaimer")); // This should update EP to 0
+        vm.stopPrank();
+        // (,,uint96 epAfterRemoval,,,) = regenStaker.deposits(depositId);
+        (, , uint96 epAfterRemoval, , , , ) = regenStaker.deposits(depositId); // Corrected for 7 fields
+        assertEq(epAfterRemoval, 0, "Earning power should be 0 after removal from whitelist and action");
+
+        // Now, re-whitelist so getNewEarningPower will return (stakeAmount, true)
+        earningPowerWhitelist.addToWhitelist(stakerArr);
+        // The calculator will now see stakeAmount as new EP, current is 0, so it's a qualified bump.
+
+        // Ensure some rewards are present so tip can be requested (even if it will revert for being too high)
+        // This is because bumpEarningPower checks `_unclaimedRewards < _requestedTip` for EP increase.
+        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        vm.startPrank(address(this));
+        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        vm.stopPrank();
+        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2); // Accrue some rewards
+
+        uint256 excessiveTip = regenStaker.maxBumpTip() + 1;
+
+        vm.startPrank(makeAddr("bumper")); // Any address can be a bumper
+        vm.expectRevert(Staker__InvalidTip.selector);
+        regenStaker.bumpEarningPower(depositId, tipReceiver, excessiveTip);
         vm.stopPrank();
     }
 }
