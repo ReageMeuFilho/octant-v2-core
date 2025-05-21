@@ -13,8 +13,6 @@ import { IUniswapV3Pool } from "../../../src/vendor/uniswap/IUniswapV3Pool.sol";
 
 contract TestTraderIntegrationETH2GLM is Test, TestPlus, DeployTrader {
     HelperConfig config;
-    uint256 fork;
-    string TEST_RPC_URL;
 
     function setUp() public {
         owner = makeAddr("owner");
@@ -22,9 +20,7 @@ contract TestTraderIntegrationETH2GLM is Test, TestPlus, DeployTrader {
         beneficiary = makeAddr("beneficiary");
         vm.label(beneficiary, "beneficiary");
 
-        TEST_RPC_URL = vm.envString("TEST_RPC_URL");
-        fork = vm.createFork(TEST_RPC_URL);
-        vm.selectFork(fork);
+        vm.createSelectFork({ urlOrAlias: "mainnet" });
 
         config = new HelperConfig(true);
 
@@ -188,7 +184,7 @@ contract TestTraderIntegrationETH2GLM is Test, TestPlus, DeployTrader {
 
         vm.startPrank(owner);
         trader.configurePeriod(block.number, 101);
-        trader.setSpending(1 ether, 1 ether, fakeBudget);
+        trader.setSpending(0.1 ether, 0.1 ether, fakeBudget);
         vm.stopPrank();
 
         uint256 oldBalance = swapper.balance;
@@ -292,8 +288,6 @@ contract TestTraderIntegrationETH2GLM is Test, TestPlus, DeployTrader {
 
 contract TestTraderIntegrationGLM2ETH is Test, TestPlus, DeployTrader {
     HelperConfig config;
-    uint256 fork;
-    string TEST_RPC_URL;
 
     function setUp() public {
         owner = makeAddr("owner");
@@ -301,9 +295,7 @@ contract TestTraderIntegrationGLM2ETH is Test, TestPlus, DeployTrader {
         beneficiary = makeAddr("beneficiary");
         vm.label(beneficiary, "beneficiary");
 
-        TEST_RPC_URL = vm.envString("TEST_RPC_URL");
-        fork = vm.createFork(TEST_RPC_URL);
-        vm.selectFork(fork);
+        vm.createSelectFork({ urlOrAlias: "mainnet" });
 
         config = new HelperConfig(true);
 
