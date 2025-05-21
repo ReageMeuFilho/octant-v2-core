@@ -13,23 +13,21 @@ contract SimpleVotingMechanism is BaseAllocationMechanism {
         uint256 _votingPeriod,
         uint256 _quorumShares,
         uint256 _timelockDelay
-    ) BaseAllocationMechanism(_asset, _name, _symbol, _votingDelay, _votingPeriod, _quorumShares, _timelockDelay) {
-        startBlock = block.number;
-    }
+    ) BaseAllocationMechanism(_asset, _name, _symbol, _votingDelay, _votingPeriod, _quorumShares, _timelockDelay) {}
 
-    function _beforeProposeHook(address proposer) internal override returns (bool) {
+    function _beforeProposeHook(address proposer) internal view override returns (bool) {
         return votingPower[proposer] > 0;
     }
 
-    function _validateProposalHook(uint256 pid) internal override returns (bool) {
+    function _validateProposalHook(uint256 pid) internal view override returns (bool) {
         return pid > 0 && pid <= _proposalIdCounter;
     }
 
-    function _beforeSignupHook(address) internal override returns (bool) {
+    function _beforeSignupHook(address) internal pure override returns (bool) {
         return true;
     }
 
-    function _getVotingPowerHook(address, uint256 deposit) internal override returns (uint256) {
+    function _getVotingPowerHook(address, uint256 deposit) internal pure override returns (uint256) {
         return deposit;
     }
 
@@ -50,18 +48,18 @@ contract SimpleVotingMechanism is BaseAllocationMechanism {
         return oldPower - weight;
     }
 
-    function _hasQuorumHook(uint256 pid) internal override returns (bool) {
+    function _hasQuorumHook(uint256 pid) internal view override returns (bool) {
         uint256 forVotes = proposalVotes[pid].sharesFor;
         uint256 againstVotes = proposalVotes[pid].sharesAgainst;
         uint256 net = forVotes > againstVotes ? forVotes - againstVotes : 0;
         return net >= quorumShares;
     }
 
-    function _beforeFinalizeVoteTallyHook() internal override returns (bool) {
+    function _beforeFinalizeVoteTallyHook() internal pure override returns (bool) {
         return true;
     }
 
-    function _convertVotesToShares(uint256 pid) internal override returns (uint256) {
+    function _convertVotesToShares(uint256 pid) internal view override returns (uint256) {
         uint256 forVotes = proposalVotes[pid].sharesFor;
         uint256 againstVotes = proposalVotes[pid].sharesAgainst;
         uint256 net = forVotes > againstVotes ? forVotes - againstVotes : 0;
@@ -73,6 +71,10 @@ contract SimpleVotingMechanism is BaseAllocationMechanism {
     }
 
     function _requestDistributionHook(address, uint256) internal pure override returns (bool) {
+        return true;
+    }
+
+    function _beforeQuorumUpdateHook(uint256) internal pure override returns (bool) {
         return true;
     }
 }
