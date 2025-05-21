@@ -29,10 +29,20 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF, Ownable,
         uint256 _votingPeriod,
         uint256 _quorumShares,
         uint256 _timelockDelay,
+        uint256 _startBlock,
         uint256 _alphaNumerator,
         uint256 _alphaDenominator
     )
-        BaseAllocationMechanism(_asset, _name, _symbol, _votingDelay, _votingPeriod, _quorumShares, _timelockDelay)
+        BaseAllocationMechanism(
+            _asset,
+            _name,
+            _symbol,
+            _votingDelay,
+            _votingPeriod,
+            _quorumShares,
+            _timelockDelay,
+            _startBlock
+        )
         Ownable(msg.sender)
     {
         require(_votingDelay > 0, "Voting delay must be positive");
