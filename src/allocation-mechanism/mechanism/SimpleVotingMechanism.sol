@@ -12,8 +12,20 @@ contract SimpleVotingMechanism is BaseAllocationMechanism {
         uint256 _votingDelay,
         uint256 _votingPeriod,
         uint256 _quorumShares,
-        uint256 _timelockDelay
-    ) BaseAllocationMechanism(_asset, _name, _symbol, _votingDelay, _votingPeriod, _quorumShares, _timelockDelay) {}
+        uint256 _timelockDelay,
+        uint256 _startBlock
+    )
+        BaseAllocationMechanism(
+            _asset,
+            _name,
+            _symbol,
+            _votingDelay,
+            _votingPeriod,
+            _quorumShares,
+            _timelockDelay,
+            _startBlock
+        )
+    {}
 
     function _beforeProposeHook(address proposer) internal view override returns (bool) {
         return votingPower[proposer] > 0;
