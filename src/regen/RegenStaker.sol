@@ -275,20 +275,18 @@ contract RegenStaker is
             deposit.owner,
             deposit.delegatee
         );
-        if (deposit.earningPower != newCalculatedEarningPower) {
-            // Only update if it actually changed
-            totalEarningPower = _calculateTotalEarningPower(
-                deposit.earningPower,
-                newCalculatedEarningPower,
-                totalEarningPower
-            );
-            depositorTotalEarningPower[deposit.owner] = _calculateTotalEarningPower(
-                deposit.earningPower,
-                newCalculatedEarningPower,
-                depositorTotalEarningPower[deposit.owner]
-            );
-            deposit.earningPower = newCalculatedEarningPower.toUint96();
-        }
+
+        totalEarningPower = _calculateTotalEarningPower(
+            deposit.earningPower,
+            newCalculatedEarningPower,
+            totalEarningPower
+        );
+        depositorTotalEarningPower[deposit.owner] = _calculateTotalEarningPower(
+            deposit.earningPower,
+            newCalculatedEarningPower,
+            depositorTotalEarningPower[deposit.owner]
+        );
+        deposit.earningPower = newCalculatedEarningPower.toUint96();
 
         // Emit Staker.RewardClaimed event for compatibility/observers, using net amount
         emit RewardClaimed(_depositId, msg.sender, amountContributedToGrant, deposit.earningPower);
