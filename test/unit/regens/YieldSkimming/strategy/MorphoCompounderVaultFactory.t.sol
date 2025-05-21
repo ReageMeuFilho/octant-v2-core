@@ -81,7 +81,6 @@ contract MorphoCompounderVaultFactoryTest is Test {
         emit MorphoStrategyDeploy(management, donationAddress, address(0)); // We can't predict the exact address
 
         address strategyAddress = factory.createStrategy(
-            YIELD_VAULT,
             vaultSharesName,
             management,
             keeper,
@@ -113,7 +112,6 @@ contract MorphoCompounderVaultFactoryTest is Test {
 
         vm.startPrank(management);
         address firstStrategyAddress = factory.createStrategy(
-            YIELD_VAULT,
             firstVaultName,
             management,
             keeper,
@@ -127,7 +125,6 @@ contract MorphoCompounderVaultFactoryTest is Test {
         bytes32 secondSalt = keccak256("SECOND_TEST_STRATEGY_SALT");
 
         address secondStrategyAddress = factory.createStrategy(
-            YIELD_VAULT,
             secondVaultName,
             management,
             keeper,
@@ -161,7 +158,6 @@ contract MorphoCompounderVaultFactoryTest is Test {
         // Create strategy for first user
         vm.startPrank(firstUser);
         address firstStrategyAddress = factory.createStrategy(
-            YIELD_VAULT,
             firstVaultName,
             firstUser,
             keeper,
@@ -177,7 +173,6 @@ contract MorphoCompounderVaultFactoryTest is Test {
 
         vm.startPrank(secondUser);
         address secondStrategyAddress = factory.createStrategy(
-            YIELD_VAULT,
             secondVaultName,
             secondUser,
             keeper,
@@ -208,7 +203,6 @@ contract MorphoCompounderVaultFactoryTest is Test {
         // Create a strategy
         vm.startPrank(management);
         address firstAddress = factory.createStrategy(
-            YIELD_VAULT,
             vaultSharesName,
             management,
             keeper,
@@ -224,7 +218,6 @@ contract MorphoCompounderVaultFactoryTest is Test {
         // Create a strategy with the same salt but from a different factory
         vm.startPrank(management);
         address secondAddress = newFactory.createStrategy(
-            YIELD_VAULT,
             vaultSharesName,
             management,
             keeper,
@@ -243,7 +236,6 @@ contract MorphoCompounderVaultFactoryTest is Test {
 
         vm.startPrank(management);
         address thirdAddress = factory.createStrategy(
-            YIELD_VAULT,
             vaultSharesName,
             management,
             keeper,
