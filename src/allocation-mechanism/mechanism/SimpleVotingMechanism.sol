@@ -73,8 +73,4 @@ contract SimpleVotingMechanism is BaseAllocationMechanism {
     function _requestDistributionHook(address, uint256) internal pure override returns (bool) {
         return true;
     }
-
-    function _beforeQuorumUpdateHook(uint256) internal pure override returns (bool) {
-        return true;
-    }
 }

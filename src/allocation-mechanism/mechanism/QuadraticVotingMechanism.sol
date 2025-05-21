@@ -147,11 +147,6 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF, Ownable,
         return true;
     }
 
-    /// @notice Only owner can update quorum
-    function _beforeQuorumUpdateHook(uint256) internal view override returns (bool) {
-        return msg.sender == owner();
-    }
-
     /// @notice Update alpha parameter (governance function)
     /// @param newNumerator New alpha numerator
     /// @param newDenominator New alpha denominator
