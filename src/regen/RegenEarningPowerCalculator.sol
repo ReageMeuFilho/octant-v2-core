@@ -60,7 +60,7 @@ contract RegenEarningPowerCalculator is IWhitelistedEarningPowerCalculator, Owna
         ) {
             qualifiesForBump = true;
         } else if (oldEarningPower > 0 && newCalculatedEarningPower > 0) {
-            if (newCalculatedEarningPower >= oldEarningPower * 2 || newCalculatedEarningPower * 2 <= oldEarningPower) {
+            if (newCalculatedEarningPower >= oldEarningPower * 2 || newCalculatedEarningPower <= oldEarningPower / 2) {
                 qualifiesForBump = true;
             }
         }
