@@ -35,7 +35,12 @@ contract MorphoCompounderVaultFactory {
 
     address public constant ysUSDC = 0x074134A2784F4F66b6ceD6f68849382990Ff3215;
 
-    event StrategyDeploy(address deployer, address donationAddress, address strategyAddress);
+    event StrategyDeploy(
+        address indexed deployer,
+        address indexed donationAddress,
+        address indexed strategyAddress,
+        string vaultTokenName
+    );
 
     /**
      * @notice Deploys a new MorphoCompounder strategy for the Yield Skimming Vault.
@@ -64,7 +69,7 @@ contract MorphoCompounderVaultFactory {
         );
 
         strategyAddress = CREATE3.deployDeterministic(bytecode, _salt);
-        emit StrategyDeploy(msg.sender, _donationAddress, strategyAddress);
+        emit StrategyDeploy(msg.sender, _donationAddress, strategyAddress, _name);
         StrategyInfo memory strategyInfo = StrategyInfo({
             deployerAddress: msg.sender,
             timestamp: block.timestamp,
