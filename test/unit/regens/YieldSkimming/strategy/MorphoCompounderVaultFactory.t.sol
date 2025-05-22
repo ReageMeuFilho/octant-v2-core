@@ -10,6 +10,7 @@ import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { YieldSkimmingTokenizedStrategy } from "src/regens/YieldSkimming/YieldSkimmingTokenizedStrategy.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
+import { CREATE3 } from "lib/solady/src/utils/CREATE3.sol";
 
 /// @title MorphoCompounderVaultFactory Test
 /// @author Octant
@@ -75,10 +76,17 @@ contract MorphoCompounderVaultFactoryTest is Test {
         string memory vaultSharesName = "MorphoCompounder Vault Shares";
         bytes32 strategySalt = keccak256("TEST_STRATEGY_SALT");
 
+        address expectedStrategyAddress = CREATE3.predictDeterministicAddress(strategySalt, address(factory));
+
         // Create a strategy and check events
         vm.startPrank(management);
         vm.expectEmit(true, true, true, false); // Check first 3 indexed params, ignore the non-indexed timestamp
-        emit MorphoStrategyDeploy(management, donationAddress, address(0)); // We can't predict the exact address
+        emit MorphoCompounderVaultFactory.StrategyDeploy(
+            management,
+            donationAddress,
+            expectedStrategyAddress,
+            vaultSharesName
+        ); // We can't predict the exact address
 
         address strategyAddress = factory.createStrategy(
             vaultSharesName,
@@ -248,6 +256,3 @@ contract MorphoCompounderVaultFactoryTest is Test {
         assertTrue(firstAddress != thirdAddress, "Addresses should be different with different salts");
     }
 }
-
-// Event to match the factory's event signature
-event MorphoStrategyDeploy(address deployer, address donationAddress, address strategyAddress);

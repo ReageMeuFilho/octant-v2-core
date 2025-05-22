@@ -116,7 +116,6 @@ contract MorphoCompounderTest is Test {
         // Deploy strategy using the factory's createStrategy method
         vm.startPrank(management);
         address strategyAddress = factory.createStrategy(
-            YIELD_VAULT,
             vaultSharesName,
             management,
             keeper,
