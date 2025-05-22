@@ -45,6 +45,8 @@ error Staker__InvalidTip(); // For bumpEarningPower
 
 // --- End expected errors ---
 
+// --- End expected errors ---
+
 contract RegenIntegrationTest is Test {
     RegenStaker regenStaker;
     RegenEarningPowerCalculator calculator;
@@ -2765,5 +2767,56 @@ contract RegenIntegrationTest is Test {
         vm.expectRevert(Staker__InvalidTip.selector);
         regenStaker.bumpEarningPower(depositId, tipReceiver, excessiveTip);
         vm.stopPrank();
+    }
+
+    function test_DepositorTotalStaked_IsAccessible() public {
+        address user = makeAddr("multiDepositsUser");
+        uint256 firstStakeAmount = 500 * 1e18;
+        uint256 secondStakeAmount = 300 * 1e18;
+        uint256 totalExpectedStake = firstStakeAmount + secondStakeAmount;
+
+        // Whitelist user
+        address[] memory userArr = new address[](1);
+        userArr[0] = user;
+        stakerWhitelist.addToWhitelist(userArr);
+        earningPowerWhitelist.addToWhitelist(userArr);
+
+        // Mint tokens for stakes
+        stakeToken.mint(user, totalExpectedStake);
+        vm.startPrank(user);
+        stakeToken.approve(address(regenStaker), totalExpectedStake);
+
+        // First stake
+        regenStaker.stake(firstStakeAmount, user);
+
+        // Check total staked after first deposit
+        uint256 totalStaked = regenStaker.depositorTotalStaked(user);
+        assertEq(
+            totalStaked,
+            firstStakeAmount,
+            "depositorTotalStaked should return correct amount after first deposit"
+        );
+
+        // Second stake
+        regenStaker.stake(secondStakeAmount, user);
+        vm.stopPrank();
+
+        // Check total staked after second deposit
+        totalStaked = regenStaker.depositorTotalStaked(user);
+        assertEq(
+            totalStaked,
+            totalExpectedStake,
+            "depositorTotalStaked should return combined amount after second deposit"
+        );
+
+        // Demonstrate checking minimum stake requirements
+        bool meetsMinimumStake = regenStaker.depositorTotalStaked(user) >= firstStakeAmount;
+        assertTrue(meetsMinimumStake, "User should meet minimum stake requirement");
+
+        meetsMinimumStake = regenStaker.depositorTotalStaked(user) >= totalExpectedStake;
+        assertTrue(meetsMinimumStake, "User should meet exact stake requirement");
+
+        meetsMinimumStake = regenStaker.depositorTotalStaked(user) >= totalExpectedStake + 1;
+        assertFalse(meetsMinimumStake, "User should not meet requirement higher than their stake");
     }
 }
