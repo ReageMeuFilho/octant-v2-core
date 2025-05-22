@@ -10,7 +10,6 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC20Staking } from "staker/interfaces/IERC20Staking.sol";
 import { IWhitelistedEarningPowerCalculator } from "../../src/regen/IWhitelistedEarningPowerCalculator.sol";
 import { Staker } from "staker/Staker.sol";
-// import { StakerOnBehalf } from "staker/extensions/StakerOnBehalf.sol"; // Ensure this is removed or commented
 import { MockERC20 } from "../mocks/MockERC20.sol";
 import { MockERC20Staking } from "../mocks/MockERC20Staking.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol"; // For Staker__Unauthorized if Ownable error is used
@@ -22,30 +21,6 @@ interface IGrantRound {
 
     function vote(uint256 projectId, uint256 votingPower) external;
 }
-
-// Helper contract for testing vote failures (Defined ONCE, after IGrantRound)
-contract RevertingGrantRound is IGrantRound {
-    function signUp(uint256, address, bytes32) external pure override returns (uint256) {
-        return 1; // Successful signup
-    }
-
-    function vote(uint256, uint256) external pure override {
-        revert("MockedVoteFailed");
-    }
-}
-
-// --- Expected errors from Staker.sol (for cleaner expectRevert) ---
-error Staker__InvalidFeeAmount();
-error Staker__InvalidFeeCollector();
-error Staker__InvalidClaimFeeParameters(); // Added this error
-error Staker__Unauthorized(bytes32 context, address account);
-error Staker__InvalidAddress(); // For address(0) checks in Staker.sol
-error Staker__Unqualified(uint256 score); // For bumpEarningPower
-error Staker__InvalidTip(); // For bumpEarningPower
-
-// --- End expected errors ---
-
-// --- End expected errors ---
 
 contract RegenIntegrationTest is Test {
     RegenStaker regenStaker;
@@ -63,13 +38,6 @@ contract RegenIntegrationTest is Test {
     uint256 private constant MIN_ASSERT_TOLERANCE = 1;
 
     // --- End Constants ---
-
-    // Helper function to extract claimer from deposit tuple
-    function _getClaimerFromDeposit(Staker.DepositIdentifier depositId) internal view returns (address) {
-        // solhint-disable-next-line no-empty-blocks
-        (, , , , address claimer, , ) = regenStaker.deposits(depositId);
-        return claimer;
-    }
 
     function setUp() public {
         // Deploy mock tokens
@@ -1393,7 +1361,7 @@ contract RegenIntegrationTest is Test {
         regenStaker.alterClaimer(depositId, designatedClaimer);
         vm.stopPrank(); // Stop owner's prank
 
-        address retrievedClaimer = _getClaimerFromDeposit(depositId);
+        (, , , , address retrievedClaimer, , ) = regenStaker.deposits(depositId);
         assertEq(retrievedClaimer, designatedClaimer, "Claimer not set correctly");
 
         // Admin notifies reward
@@ -2448,7 +2416,7 @@ contract RegenIntegrationTest is Test {
             feeAmount: SafeCast.toUint96(validFeeAmount),
             feeCollector: address(0) // Zero address for fee collector
         });
-        vm.expectRevert(Staker__InvalidClaimFeeParameters.selector); // Now using the defined error
+        vm.expectRevert(Staker.Staker__InvalidClaimFeeParameters.selector); // Now using the defined error
         regenStaker.setClaimFeeParameters(feeParams);
         vm.stopPrank();
     }
@@ -2595,7 +2563,7 @@ contract RegenIntegrationTest is Test {
         assertTrue(notAdmin != address(this), "notAdmin should not be the admin for this test");
 
         vm.startPrank(notAdmin);
-        vm.expectRevert(abi.encodeWithSelector(Staker__Unauthorized.selector, bytes32("not admin"), notAdmin));
+        vm.expectRevert(abi.encodeWithSelector(Staker.Staker__Unauthorized.selector, bytes32("not admin"), notAdmin));
         regenStaker.setRewardNotifier(newNotifier, true);
         vm.stopPrank();
 
@@ -2697,7 +2665,7 @@ contract RegenIntegrationTest is Test {
             feeAmount: SafeCast.toUint96(tooHighFee),
             feeCollector: feeCollector
         });
-        vm.expectRevert(Staker__InvalidClaimFeeParameters.selector); // Now using the defined error
+        vm.expectRevert(Staker.Staker__InvalidClaimFeeParameters.selector); // Now using the defined error
         regenStaker.setClaimFeeParameters(feeParams);
         vm.stopPrank();
     }
@@ -2764,7 +2732,7 @@ contract RegenIntegrationTest is Test {
         uint256 excessiveTip = regenStaker.maxBumpTip() + 1;
 
         vm.startPrank(makeAddr("bumper")); // Any address can be a bumper
-        vm.expectRevert(Staker__InvalidTip.selector);
+        vm.expectRevert(Staker.Staker__InvalidTip.selector);
         regenStaker.bumpEarningPower(depositId, tipReceiver, excessiveTip);
         vm.stopPrank();
     }
