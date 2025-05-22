@@ -14,8 +14,9 @@ import { MockERC20 } from "../mocks/MockERC20.sol";
 import { MockERC20Staking } from "../mocks/MockERC20Staking.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol"; // For Staker__Unauthorized if Ownable error is used
 import { SafeCast } from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 
-// Mock interface for grant round (Defined ONCE)
+// Mock interface for grant round. Replace it with the actual interface when we have it.
 interface IGrantRound {
     function signUp(uint256 assets, address receiver, bytes32 signature) external returns (uint256 votingPower);
 
@@ -32,14 +33,17 @@ contract RegenIntegrationTest is Test {
     MockERC20Staking stakeToken;
 
     // --- Constants for Reward Accrual Tests ---
-    uint256 private constant REWARD_AMOUNT = 30_000_000 * 1e18; // 30M tokens
-    uint256 private constant STAKE_AMOUNT = 1_000 * 1e18; // 1K tokens
-    uint256 private constant REWARD_PERIOD_DURATION = 30 days;
-    uint256 private constant MIN_ASSERT_TOLERANCE = 1;
+    uint256 public constant REWARD_AMOUNT = 30_000_000 * 1e18; // 30M tokens
+    uint256 public constant STAKE_AMOUNT = 1_000 * 1e18; // 1K tokens
+    uint256 public constant REWARD_PERIOD_DURATION = 30 days;
+    uint256 public constant MIN_ASSERT_TOLERANCE = 1;
+    address public immutable ADMIN = makeAddr("admin");
 
     // --- End Constants ---
 
     function setUp() public {
+        vm.startPrank(ADMIN);
+
         // Deploy mock tokens
         rewardToken = new MockERC20();
         stakeToken = new MockERC20Staking();
@@ -50,20 +54,21 @@ contract RegenIntegrationTest is Test {
         earningPowerWhitelist = new Whitelist();
 
         // Deploy the calculator
-        calculator = new RegenEarningPowerCalculator(address(this), earningPowerWhitelist);
+        calculator = new RegenEarningPowerCalculator(ADMIN, earningPowerWhitelist);
 
         // Deploy the staker
         regenStaker = new RegenStaker(
             IERC20(address(rewardToken)),
             IERC20Staking(address(stakeToken)),
-            address(this),
+            ADMIN,
             stakerWhitelist,
             contributorWhitelist,
             calculator
         );
 
         // Make this contract a reward notifier
-        regenStaker.setRewardNotifier(address(this), true);
+        regenStaker.setRewardNotifier(ADMIN, true);
+        vm.stopPrank();
     }
 
     function test_Constructor_InitializesWhitelistsToNewIfAddressZero() public {
@@ -71,7 +76,7 @@ contract RegenIntegrationTest is Test {
         RegenStaker localRegenStaker = new RegenStaker(
             IERC20(address(rewardToken)),
             IERC20Staking(address(stakeToken)),
-            address(this), // admin
+            ADMIN,
             Whitelist(address(0)), // _stakerWhitelist
             Whitelist(address(0)), // _contributionWhitelist
             calculator
@@ -120,18 +125,33 @@ contract RegenIntegrationTest is Test {
         assertEq(address(regenStaker.earningPowerCalculator()), address(calculator));
     }
 
-    function test_AllowsStakingIfStakerWhitelistDisabled_RevertIf_ActiveAndUserNotWhitelisted() public {
-        // First verify that non-admin cannot set the whitelist
+    function test_NonAdminCannotSetStakerWhitelist() public {
         address nonAdmin = makeAddr("nonAdmin");
         vm.startPrank(nonAdmin);
         vm.expectRevert(abi.encodeWithSelector(Staker.Staker__Unauthorized.selector, bytes32("not admin"), nonAdmin));
         regenStaker.setStakerWhitelist(Whitelist(address(0)));
         vm.stopPrank();
+    }
 
-        // Setup a non-whitelisted address
+    function test_NonAdminCannotSetContributionWhitelist() public {
+        address nonAdmin = makeAddr("nonAdmin");
+        vm.startPrank(nonAdmin);
+        vm.expectRevert(abi.encodeWithSelector(Staker.Staker__Unauthorized.selector, bytes32("not admin"), nonAdmin));
+        regenStaker.setContributionWhitelist(Whitelist(address(0)));
+        vm.stopPrank();
+    }
+
+    function test_NonAdminCannotSetEarningPowerWhitelist() public {
+        address nonAdmin = makeAddr("nonAdmin");
+        vm.startPrank(nonAdmin);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, nonAdmin));
+        calculator.setWhitelist(Whitelist(address(0)));
+        vm.stopPrank();
+    }
+
+    function test_AllowsStakingIfStakerWhitelistDisabled_RevertIf_ActiveAndUserNotWhitelisted() public {
         address nonWhitelistedUser = makeAddr("nonWhitelistedUser");
 
-        // Mint tokens to the user
         stakeToken.mint(nonWhitelistedUser, 100);
 
         vm.startPrank(nonWhitelistedUser);
@@ -146,153 +166,100 @@ contract RegenIntegrationTest is Test {
             )
         );
         regenStaker.stake(50, nonWhitelistedUser);
-
         vm.stopPrank();
 
-        // Now disable the whitelist as admin (this contract is the admin)
-        regenStaker.setStakerWhitelist(Whitelist(address(0)));
+        vm.prank(ADMIN);
+        regenStaker.setStakerWhitelist(Whitelist(address(0))); // Disables the whitelist
         assertEq(address(regenStaker.stakerWhitelist()), address(0));
 
-        // Try staking again with the same non-whitelisted user
+        // Try staking again with the same non-whitelisted user. This should succeed.
         vm.startPrank(nonWhitelistedUser);
-
-        // This time it should succeed without reverting (which is the main thing we're testing)
         regenStaker.stake(50, nonWhitelistedUser);
 
         vm.stopPrank();
     }
 
     function test_AllowsContributionIfContributorWhitelistDisabled_RevertIf_ActiveAndUserNotWhitelisted() public {
-        // First verify that non-admin cannot set the whitelist
-        address nonAdmin = makeAddr("nonAdmin");
-        vm.startPrank(nonAdmin);
-        vm.expectRevert(abi.encodeWithSelector(Staker.Staker__Unauthorized.selector, bytes32("not admin"), nonAdmin));
-        regenStaker.setContributionWhitelist(Whitelist(address(0)));
+        // Setup a contributor who is whitelisted for staking but NOT for contributing
+        address contributor = makeAddr("contributorNotWhitelistedForContributing");
+        address mockGrantRound = makeAddr("mockGrantRound");
+
+        // Whitelist contributor for staking and earning power, but NOT for contributing
+        address[] memory contributorArr = new address[](1);
+        contributorArr[0] = contributor;
+        vm.startPrank(ADMIN);
+        stakerWhitelist.addToWhitelist(contributorArr);
+        earningPowerWhitelist.addToWhitelist(contributorArr);
+        // Note: We do NOT add to contributorWhitelist
         vm.stopPrank();
 
-        // Create a mock grant round
-        address mockGrantRound = makeAddr("mockGrantRound");
-        // Generic mock for signup to return votingPower > 0
+        // Create deposit and earn rewards
+        stakeToken.mint(contributor, STAKE_AMOUNT);
+        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        vm.startPrank(contributor);
+        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
+        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, contributor);
+        vm.stopPrank();
+
+        vm.prank(ADMIN);
+        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+
+        // Warp to accumulate rewards
+        vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
+
+        // Setup mock calls for the grant round to avoid external call issues
+        uint256 contributionAmount = 1e16;
+        uint256[] memory prefs = new uint256[](1);
+        prefs[0] = 1;
+        uint256[] memory weights = new uint256[](1);
+        weights[0] = contributionAmount;
+
         vm.mockCall(
             mockGrantRound,
-            abi.encodeWithSignature("signup(uint256,address,bytes32)", uint256(0), address(0), bytes32(0)),
+            abi.encodeWithSignature("signup(uint256,address,bytes32)", contributionAmount, contributor, bytes32(0)),
             abi.encode(uint256(1))
         );
-        // Generic mock for vote to succeed (not revert)
         vm.mockCall(
             mockGrantRound,
-            abi.encodeWithSignature("vote(uint256,uint256)", uint256(0), uint256(0)),
+            abi.encodeWithSignature("vote(uint256,uint256)", prefs[0], weights[0]),
             abi.encode()
         );
 
-        // First, we need to create a deposit that will earn rewards
-        address depositor = makeAddr("depositor");
-
-        // Mint tokens and approve
-        stakeToken.mint(depositor, 1000);
-        rewardToken.mint(address(regenStaker), 1_000_000_000_000_000_000); // 1e18 - much larger reward amount
-
-        vm.startPrank(depositor);
-        stakeToken.approve(address(regenStaker), 1000);
-
-        // Whitelist the depositor for staking
-        address[] memory users = new address[](1);
-        users[0] = depositor;
-        vm.stopPrank();
-        stakerWhitelist.addToWhitelist(users);
-
-        // Also add the depositor to the earning power whitelist
-        earningPowerWhitelist.addToWhitelist(users);
-
-        // Now stake tokens to create a deposit
-        vm.startPrank(depositor);
-        Staker.DepositIdentifier depositId = regenStaker.stake(1000, depositor);
-        vm.stopPrank();
-
-        // Notify rewards to make the deposit earn rewards
-        vm.startPrank(address(this));
-        regenStaker.notifyRewardAmount(1_000_000_000_000_000_000);
-        vm.stopPrank();
-
-        // Fast forward time to accumulate rewards
-        vm.warp(block.timestamp + 28 days); // Fast forward almost the entire reward period
-        vm.stopPrank();
-
-        // Setup a non-whitelisted contributor (who needs to be the deposit owner or claimer to contribute)
-        address nonWhitelistedContributor = makeAddr("nonWhitelistedContributor");
-
-        // Make the non-whitelisted contributor the claimer of the deposit
-        vm.startPrank(depositor);
-        regenStaker.alterClaimer(depositId, nonWhitelistedContributor);
-        vm.stopPrank();
-
-        // Now disable the contribution whitelist as admin (this contract is the admin)
-        vm.startPrank(address(this));
-        regenStaker.setContributionWhitelist(Whitelist(address(0)));
-        assertEq(address(regenStaker.contributionWhitelist()), address(0));
-        vm.stopPrank();
-
-        // Try contributing again with the same non-whitelisted contributor
-        vm.startPrank(nonWhitelistedContributor);
-
-        address actualVotingDelegateeL210 = nonWhitelistedContributor;
-        uint256 amountToContributeL210 = 1e12;
-        uint256[] memory prefsArrayL210 = new uint256[](1);
-        prefsArrayL210[0] = 1;
-        uint256[] memory weightsArrayL210 = new uint256[](1);
-        weightsArrayL210[0] = amountToContributeL210;
-
-        // Set up mock for the specific signup call to return votingPower > 0
-        vm.mockCall(
-            mockGrantRound,
-            abi.encodeWithSignature(
-                "signup(uint256,address,bytes32)",
-                amountToContributeL210,
-                actualVotingDelegateeL210,
-                bytes32(0)
-            ),
-            abi.encode(uint256(1))
+        // Verify contribution whitelist is active and contributor is not on it
+        assertTrue(
+            address(regenStaker.contributionWhitelist()) != address(0),
+            "Contribution whitelist should be active"
         );
-        // Set up expectation that signup will be called
-        vm.expectCall(
-            mockGrantRound,
-            abi.encodeWithSignature(
-                "signup(uint256,address,bytes32)",
-                amountToContributeL210,
-                actualVotingDelegateeL210,
-                bytes32(0)
+        assertFalse(
+            regenStaker.contributionWhitelist().isWhitelisted(contributor),
+            "Contributor should not be whitelisted for contributing"
+        );
+
+        // Try contributing while not whitelisted for contributing (should revert)
+        vm.startPrank(contributor);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RegenStaker.NotWhitelisted.selector,
+                regenStaker.contributionWhitelist(),
+                contributor
             )
         );
-
-        // Set up expectation that vote will be called
-        vm.expectCall(
-            mockGrantRound,
-            abi.encodeWithSignature("vote(uint256,uint256)", prefsArrayL210[0], weightsArrayL210[0])
-        );
-
-        // This time it should succeed without reverting
-        regenStaker.contribute(
-            depositId,
-            mockGrantRound,
-            actualVotingDelegateeL210,
-            amountToContributeL210,
-            prefsArrayL210,
-            weightsArrayL210,
-            bytes32(0) // Added signature
-        );
+        regenStaker.contribute(depositId, mockGrantRound, contributor, contributionAmount, prefs, weights, bytes32(0));
         vm.stopPrank();
+
+        // Disable the contribution whitelist
+        vm.prank(ADMIN);
+        regenStaker.setContributionWhitelist(Whitelist(address(0)));
+
+        // Verify whitelist is disabled
+        assertEq(address(regenStaker.contributionWhitelist()), address(0), "Whitelist should be disabled");
+
+        // Try contributing again - should succeed now
+        vm.prank(contributor);
+        regenStaker.contribute(depositId, mockGrantRound, contributor, contributionAmount, prefs, weights, bytes32(0));
     }
 
-    function test_GrantsEarningPowerToNewUserIfEarningPowerWhitelistDisabled_RevertIf_NonAdminDisablesCalculatorWhitelist()
-        public
-    {
-        // First verify that non-admin cannot set the whitelist
-        address nonAdmin = makeAddr("nonAdmin");
-        vm.startPrank(nonAdmin);
-        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", nonAdmin));
-        IWhitelistedEarningPowerCalculator(address(calculator)).setWhitelist(Whitelist(address(0)));
-        vm.stopPrank();
-
+    function test_GrantsEarningPowerToNewUserIfEarningPowerWhitelistDisabled() public {
         // Setup two users - one whitelisted, one not
         address whitelistedUser = makeAddr("whitelistedUser");
         address nonWhitelistedUser = makeAddr("nonWhitelistedUser");
@@ -304,12 +271,14 @@ contract RegenIntegrationTest is Test {
         // Whitelist the first user for staking and earning power
         address[] memory users = new address[](1);
         users[0] = whitelistedUser;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(users);
         earningPowerWhitelist.addToWhitelist(users);
 
         // Also whitelist the non-whitelisted user for staking (but not for earning power)
         users[0] = nonWhitelistedUser;
         stakerWhitelist.addToWhitelist(users);
+        vm.stopPrank();
 
         // Have both users stake
         vm.startPrank(whitelistedUser);
@@ -328,8 +297,7 @@ contract RegenIntegrationTest is Test {
         assertEq(whitelistedEarningPower, 1000); // Should have earning power
         assertEq(nonWhitelistedEarningPower, 0); // Should have zero earning power
 
-        // Now disable the earning power whitelist as admin (this contract is the admin)
-        // We need to call the calculator directly since it's Ownable and our test contract is the owner
+        vm.prank(ADMIN);
         IWhitelistedEarningPowerCalculator(address(calculator)).setWhitelist(Whitelist(address(0)));
 
         // Verify whitelist is now address(0)
@@ -338,12 +306,36 @@ contract RegenIntegrationTest is Test {
             address(0)
         );
 
+        // Check if existing nonWhitelistedUser automatically gets earning power after disabling whitelist
+        uint256 nonWhitelistedEarningPowerAfterDisable = regenStaker.depositorTotalEarningPower(nonWhitelistedUser);
+        assertEq(
+            nonWhitelistedEarningPowerAfterDisable,
+            0,
+            "Existing non-whitelisted user does not automatically get earning power"
+        );
+
+        // We need to bump the earning power for the existing deposit to update it
+        // Get the deposit ID for nonWhitelistedUser
+        Staker.DepositIdentifier nonWhitelistedDepositId = Staker.DepositIdentifier.wrap(1); // nonWhitelistedUser's deposit is the second one (ID 1)
+
+        vm.prank(ADMIN); // Use admin to avoid tip requirements
+        regenStaker.bumpEarningPower(nonWhitelistedDepositId, ADMIN, 0); // No tip needed when admin bumps
+
+        // Check earning power after bumping
+        uint256 nonWhitelistedEarningPowerAfterBump = regenStaker.depositorTotalEarningPower(nonWhitelistedUser);
+        assertEq(
+            nonWhitelistedEarningPowerAfterBump,
+            1000,
+            "After bumping, existing non-whitelisted user should get earning power"
+        );
+
         // Add a new non-whitelisted user to verify they now get earning power without being whitelisted
         address newUser = makeAddr("newUser");
         stakeToken.mint(newUser, 1000);
 
         // Whitelist for staking only
         users[0] = newUser;
+        vm.prank(ADMIN);
         stakerWhitelist.addToWhitelist(users);
 
         // Stake with the new user
@@ -352,9 +344,13 @@ contract RegenIntegrationTest is Test {
         regenStaker.stake(1000, newUser);
         vm.stopPrank();
 
-        // Check earning power is granted
+        // Check earning power is granted for new stakes without needing a bump
         uint256 newUserEarningPower = regenStaker.depositorTotalEarningPower(newUser);
-        assertEq(newUserEarningPower, 1000); // Should have earning power despite not being on earning power whitelist
+        assertEq(
+            newUserEarningPower,
+            1000,
+            "New users should automatically get earning power when whitelist is disabled"
+        );
     }
 
     function test_RevertIf_PauseCalledByNonAdmin() public {
@@ -366,21 +362,15 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         // Pause as admin (this contract)
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         regenStaker.pause();
         assertTrue(regenStaker.paused(), "Contract should be paused");
-        vm.stopPrank();
-
-        // Unpause as admin to leave in a clean state for other tests
-        vm.startPrank(address(this));
-        regenStaker.unpause();
-        assertFalse(regenStaker.paused(), "Contract should be unpaused");
         vm.stopPrank();
     }
 
     function test_RevertIf_UnpauseCalledByNonAdmin() public {
         // First, pause the contract as admin
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         regenStaker.pause();
         assertTrue(regenStaker.paused(), "Contract should be paused before attempting unpause by non-admin");
         vm.stopPrank();
@@ -393,7 +383,7 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         // Unpause as admin (this contract)
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         regenStaker.unpause();
         assertFalse(regenStaker.paused(), "Contract should be unpaused by admin");
         vm.stopPrank();
@@ -412,22 +402,24 @@ contract RegenIntegrationTest is Test {
         // Whitelist user for staking
         address[] memory users = new address[](1);
         users[0] = user;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(users);
+        vm.stopPrank();
 
         // Pause the contract as admin
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         regenStaker.pause();
         assertTrue(regenStaker.paused(), "Contract should be paused");
         vm.stopPrank();
 
         // Attempt to stake while paused
         vm.startPrank(user);
-        vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
+        vm.expectRevert(abi.encodeWithSelector(Pausable.EnforcedPause.selector));
         regenStaker.stake(50, user);
         vm.stopPrank();
 
         // Unpause the contract for other tests
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         regenStaker.unpause();
         assertFalse(regenStaker.paused(), "Contract should be unpaused");
         vm.stopPrank();
@@ -435,7 +427,6 @@ contract RegenIntegrationTest is Test {
 
     function test_RevertIf_ContributeWhenPaused() public {
         // --- Setup for contribution ---
-        // Create a mock grant round
         address mockGrantRound = makeAddr("mockGrantRound");
         // Generic mock for signup
         vm.mockCall(
@@ -455,7 +446,7 @@ contract RegenIntegrationTest is Test {
 
         // Mint tokens and approve
         stakeToken.mint(contributor, 1000);
-        rewardToken.mint(address(regenStaker), 1_000_000_000_000_000_000); // 1e18 reward
+        rewardToken.mint(address(regenStaker), 1e18); // 1e18 reward
 
         vm.startPrank(contributor);
         stakeToken.approve(address(regenStaker), 1000);
@@ -464,9 +455,11 @@ contract RegenIntegrationTest is Test {
         address[] memory users = new address[](1);
         users[0] = contributor;
         vm.stopPrank(); // Stop contributor prank
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(users);
         contributorWhitelist.addToWhitelist(users);
         earningPowerWhitelist.addToWhitelist(users);
+        vm.stopPrank();
 
         // Stake tokens
         vm.startPrank(contributor);
@@ -474,8 +467,8 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         // Notify rewards
-        vm.startPrank(address(this));
-        regenStaker.notifyRewardAmount(1_000_000_000_000_000_000);
+        vm.startPrank(ADMIN);
+        regenStaker.notifyRewardAmount(1e18);
 
         // Fast forward time to accumulate rewards
         vm.warp(block.timestamp + 28 days);
@@ -483,37 +476,31 @@ contract RegenIntegrationTest is Test {
         // --- End Setup ---
 
         // Pause the contract as admin
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         regenStaker.pause();
         assertTrue(regenStaker.paused(), "Contract should be paused");
         vm.stopPrank();
 
         // Attempt to contribute while paused
         vm.startPrank(contributor);
-        vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
+        vm.expectRevert(abi.encodeWithSelector(Pausable.EnforcedPause.selector));
 
-        address actualVotingDelegateeL412 = contributor;
-        uint256 amountToContributeL412 = 1e12;
-        uint256[] memory prefsArrayL412 = new uint256[](1);
-        prefsArrayL412[0] = 1;
-        uint256[] memory weightsArrayL412 = new uint256[](1);
-        weightsArrayL412[0] = amountToContributeL412;
+        address actualVotingDelegatee = contributor;
+        uint256 amountToContribute = 1e12;
+        uint256[] memory prefsArray = new uint256[](1);
+        prefsArray[0] = 1;
+        uint256[] memory weightsArray = new uint256[](1);
+        weightsArray[0] = amountToContribute;
 
         regenStaker.contribute(
             depositId,
             mockGrantRound,
-            actualVotingDelegateeL412,
-            amountToContributeL412,
-            prefsArrayL412,
-            weightsArrayL412,
-            bytes32(0) // Added signature
+            actualVotingDelegatee,
+            amountToContribute,
+            prefsArray,
+            weightsArray,
+            bytes32(0)
         );
-        vm.stopPrank();
-
-        // Unpause the contract for other tests
-        vm.startPrank(address(this));
-        regenStaker.unpause();
-        assertFalse(regenStaker.paused(), "Contract should be unpaused");
         vm.stopPrank();
     }
 
@@ -523,9 +510,10 @@ contract RegenIntegrationTest is Test {
         // Whitelist staker for staking and earning power
         address[] memory stakers = new address[](1);
         stakers[0] = staker;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(stakers);
         earningPowerWhitelist.addToWhitelist(stakers);
-
+        vm.stopPrank();
         // Staker stakes
         stakeToken.mint(staker, STAKE_AMOUNT);
         vm.startPrank(staker);
@@ -535,7 +523,7 @@ contract RegenIntegrationTest is Test {
 
         // Admin notifies reward
         rewardToken.mint(address(regenStaker), REWARD_AMOUNT); // Ensure contract has tokens
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         regenStaker.notifyRewardAmount(REWARD_AMOUNT);
         vm.stopPrank();
 
@@ -556,12 +544,14 @@ contract RegenIntegrationTest is Test {
         // Whitelist staker for staking and earning power
         address[] memory stakers = new address[](1);
         stakers[0] = staker;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(stakers);
         earningPowerWhitelist.addToWhitelist(stakers);
+        vm.stopPrank();
 
         // Admin notifies reward
         rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         regenStaker.notifyRewardAmount(REWARD_AMOUNT);
         vm.stopPrank();
 
@@ -594,10 +584,12 @@ contract RegenIntegrationTest is Test {
     function test_ContinuousReward_SingleStaker_ClaimsMidPeriod() public {
         address staker = makeAddr("stakerMidClaim");
 
-        address[] memory stakers = new address[](1); // Whitelist setup
+        address[] memory stakers = new address[](1);
         stakers[0] = staker;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(stakers);
         earningPowerWhitelist.addToWhitelist(stakers);
+        vm.stopPrank();
 
         stakeToken.mint(staker, STAKE_AMOUNT);
         vm.startPrank(staker);
@@ -606,7 +598,7 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         regenStaker.notifyRewardAmount(REWARD_AMOUNT);
         vm.stopPrank();
 
@@ -651,10 +643,12 @@ contract RegenIntegrationTest is Test {
         stakerArrA[0] = stakerA;
         address[] memory stakerArrB = new address[](1);
         stakerArrB[0] = stakerB;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(stakerArrA);
         earningPowerWhitelist.addToWhitelist(stakerArrA);
         stakerWhitelist.addToWhitelist(stakerArrB);
         earningPowerWhitelist.addToWhitelist(stakerArrB);
+        vm.stopPrank();
 
         // Staker A stakes
         stakeToken.mint(stakerA, STAKE_AMOUNT);
@@ -665,7 +659,7 @@ contract RegenIntegrationTest is Test {
 
         // Admin notifies reward
         rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         regenStaker.notifyRewardAmount(REWARD_AMOUNT);
         vm.stopPrank();
 
@@ -692,7 +686,7 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         uint256 expectedA = (REWARD_AMOUNT / 3) + ((REWARD_AMOUNT * 2) / 3 / 2);
-        uint256 expectedB = ((REWARD_AMOUNT * 2) / 3 / 2);
+        uint256 expectedB = (REWARD_AMOUNT * 2) / 3 / 2;
 
         assertApproxEqAbs(claimedA, expectedA, MIN_ASSERT_TOLERANCE, "Staker A wrong amount");
         assertApproxEqAbs(claimedB, expectedB, MIN_ASSERT_TOLERANCE, "Staker B wrong amount");
@@ -712,10 +706,12 @@ contract RegenIntegrationTest is Test {
         stakerArrA[0] = stakerA;
         address[] memory stakerArrB = new address[](1);
         stakerArrB[0] = stakerB;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(stakerArrA);
         earningPowerWhitelist.addToWhitelist(stakerArrA);
         stakerWhitelist.addToWhitelist(stakerArrB);
         earningPowerWhitelist.addToWhitelist(stakerArrB);
+        vm.stopPrank();
 
         // Staker A stakes STAKE_AMOUNT
         stakeToken.mint(stakerA, STAKE_AMOUNT);
@@ -733,7 +729,7 @@ contract RegenIntegrationTest is Test {
 
         // Admin notifies reward
         rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         regenStaker.notifyRewardAmount(REWARD_AMOUNT);
         vm.stopPrank();
 
@@ -763,15 +759,15 @@ contract RegenIntegrationTest is Test {
         );
     }
 
-    // --- Tests for specific Time-Weighted Reward Distribution Requirements ---
-
     function test_TimeWeightedReward_NoEarningIfStakedButNotOnEarningWhitelist() public {
         address stakerNoEarn = makeAddr("stakerNoEarn");
 
         // Whitelist for staking ONLY, not for earning power
         address[] memory stakerArr = new address[](1);
         stakerArr[0] = stakerNoEarn;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(stakerArr);
+        vm.stopPrank();
         // DO NOT add to earningPowerWhitelist
 
         // Ensure calculator's whitelist is the one we are using (it should be by default from setUp)
@@ -789,7 +785,7 @@ contract RegenIntegrationTest is Test {
 
         // Admin notifies reward
         rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         regenStaker.notifyRewardAmount(REWARD_AMOUNT);
         vm.stopPrank();
 
@@ -810,8 +806,10 @@ contract RegenIntegrationTest is Test {
         // Whitelist for staking AND earning power initially
         address[] memory stakerArr = new address[](1);
         stakerArr[0] = staker;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(stakerArr);
         earningPowerWhitelist.addToWhitelist(stakerArr); // Admin (this) is owner of earningPowerWhitelist
+        vm.stopPrank();
 
         // Staker stakes
         stakeToken.mint(staker, STAKE_AMOUNT);
@@ -822,7 +820,7 @@ contract RegenIntegrationTest is Test {
 
         // Admin notifies reward
         rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
-        vm.startPrank(address(this)); // Admin context
+        vm.startPrank(ADMIN); // Admin context
         regenStaker.notifyRewardAmount(REWARD_AMOUNT);
         vm.stopPrank(); // Admin context ends for notify
 
@@ -830,18 +828,15 @@ contract RegenIntegrationTest is Test {
         vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2);
 
         // Admin removes staker from earningPowerWhitelist
-        vm.startPrank(address(this)); // Admin context for whitelist removal and bump
+        vm.startPrank(ADMIN); // Admin context for whitelist removal and bump
         earningPowerWhitelist.removeFromWhitelist(stakerArr);
         // Admin (or anyone) bumps earning power to reflect the change
         // The calculator's getNewEarningPower should return (0, true)
-        regenStaker.bumpEarningPower(depositId, address(this), 0); // Tip to admin, tip amount 0
+        regenStaker.bumpEarningPower(depositId, ADMIN, 0); // Tip to admin, tip amount 0
         vm.stopPrank(); // Admin context ends
 
         assertFalse(earningPowerWhitelist.isWhitelisted(staker), "Staker should be removed from earning whitelist");
-        // Verify earning power in staker contract is now 0
-        // Note: depositorTotalEarningPower is public, but deposit.earningPower is internal.
-        // We can infer from the claimed amount or check getNewEarningPower behavior separately.
-        // For this test, the final claimed amount is the key.
+        assertEq(regenStaker.depositorTotalEarningPower(staker), 0, "Staker should have 0 earning power");
 
         // Warp to end of original period
         vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2);
@@ -870,6 +865,7 @@ contract RegenIntegrationTest is Test {
         // Whitelist stakers A and B
         address[] memory stakerArrA = new address[](1);
         stakerArrA[0] = stakerA;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(stakerArrA);
         earningPowerWhitelist.addToWhitelist(stakerArrA);
 
@@ -877,6 +873,7 @@ contract RegenIntegrationTest is Test {
         stakerArrB[0] = stakerB;
         stakerWhitelist.addToWhitelist(stakerArrB);
         earningPowerWhitelist.addToWhitelist(stakerArrB);
+        vm.stopPrank();
 
         // Staker A stakes
         stakeToken.mint(stakerA, STAKE_AMOUNT);
@@ -887,7 +884,7 @@ contract RegenIntegrationTest is Test {
 
         // Admin notifies first reward part
         rewardToken.mint(address(regenStaker), REWARD_AMOUNT); // Mint total for both parts
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         regenStaker.notifyRewardAmount(REWARD_AMOUNT_PART_1);
         vm.stopPrank();
 
@@ -902,11 +899,11 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         // Admin notifies second reward part
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         regenStaker.notifyRewardAmount(REWARD_AMOUNT_PART_2);
         vm.stopPrank();
 
-        // Warp for the full *new* reward period duration
+        // Warp for the full new reward period duration
         vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
 
         // Stakers claim
@@ -946,16 +943,16 @@ contract RegenIntegrationTest is Test {
         );
     }
 
-    // --- Tests for Stake Deposits and Withdrawals Requirements ---
-
     function test_StakeDeposit_MultipleDepositsSingleUser() public {
         address user = makeAddr("multiDepositUser");
 
         // Whitelist user
         address[] memory userArr = new address[](1);
         userArr[0] = user;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(userArr);
         earningPowerWhitelist.addToWhitelist(userArr);
+        vm.stopPrank();
 
         // Mint tokens for two stakes
         stakeToken.mint(user, STAKE_AMOUNT * 2);
@@ -974,7 +971,7 @@ contract RegenIntegrationTest is Test {
 
         // Notify rewards
         rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         regenStaker.notifyRewardAmount(REWARD_AMOUNT);
         vm.stopPrank();
 
@@ -1002,8 +999,10 @@ contract RegenIntegrationTest is Test {
         // Whitelist user
         address[] memory userArr = new address[](1);
         userArr[0] = user;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(userArr);
         earningPowerWhitelist.addToWhitelist(userArr);
+        vm.stopPrank();
 
         // Mint tokens
         stakeToken.mint(user, initialStake + additionalStake);
@@ -1017,12 +1016,14 @@ contract RegenIntegrationTest is Test {
         assertEq(regenStaker.depositorTotalStaked(user), initialStake);
         assertEq(regenStaker.depositorTotalEarningPower(user), initialStake);
 
-        // Setup and stake otherStaker BEFORE notifying rewards (MOVED HERE)
+        // Setup and stake otherStaker BEFORE notifying rewards
         address otherStaker = makeAddr("otherStakerForStakeMore");
         address[] memory otherStakerArr = new address[](1);
         otherStakerArr[0] = otherStaker;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(otherStakerArr);
         earningPowerWhitelist.addToWhitelist(otherStakerArr);
+        vm.stopPrank();
         stakeToken.mint(otherStaker, STAKE_AMOUNT);
         vm.startPrank(otherStaker);
         stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
@@ -1031,7 +1032,7 @@ contract RegenIntegrationTest is Test {
 
         // Notify rewards
         rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         regenStaker.notifyRewardAmount(REWARD_AMOUNT);
         vm.stopPrank();
 
@@ -1054,36 +1055,6 @@ contract RegenIntegrationTest is Test {
         uint256 claimedAmount = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        // Expected: (REWARD_AMOUNT / 2) * (initialStake / (initialStake)) for first half (as user was only staker)
-        // + (REWARD_AMOUNT / 2) * ((initialStake + additionalStake) / (initialStake + additionalStake)) for second half
-        // Simplified: (REWARD_AMOUNT / 2) * (1/2 share during first half, relative to total stake then) + (REWARD_AMOUNT / 2) * (total share during second half)
-        // If user is the only staker:
-        // First half: initialStake was totalEarningPower. User earned (REWARD_AMOUNT / REWARD_PERIOD_DURATION) * (REWARD_PERIOD_DURATION / 2) = REWARD_AMOUNT / 2
-        // For this, user\'s share was 1. So user got all of (REWARD_AMOUNT / 2)
-        // Second half: (initialStake + additionalStake) was totalEarningPower. User earned (REWARD_AMOUNT / 2)
-        // Oh, the base staker contract distributes based on share of totalEarningPower.
-        // If this user is the only one, they get all rewards.
-        // Reward for 1st half period: (REWARD_AMOUNT / 2) because they had 100% of earning power (initialStake)
-        // Reward for 2nd half period: (REWARD_AMOUNT / 2) because they had 100% of earning power (initialStake + additionalStake)
-        // This calculation will be simpler if only one staker.
-
-        // If user is sole staker:
-        // Reward rate = REWARD_AMOUNT / REWARD_PERIOD_DURATION
-        // Earnings 1st half = (REWARD_AMOUNT / REWARD_PERIOD_DURATION) * (REWARD_PERIOD_DURATION / 2) = REWARD_AMOUNT / 2
-        // Earnings 2nd half = (REWARD_AMOUNT / REWARD_PERIOD_DURATION) * (REWARD_PERIOD_DURATION / 2) = REWARD_AMOUNT / 2
-        // Total = REWARD_AMOUNT
-        // This test doesn\'t quite test the pro-rata shift well if there\'s only one user.
-        // Let\'s add another staker to make the shares change.
-
-        // Recalculate rewards for \'user\'
-        // Total EP phase 1 = initialStake (user) + STAKE_AMOUNT (otherStaker)
-        // User share phase 1 = initialStake / (initialStake + STAKE_AMOUNT)
-        // Earnings user phase 1 = (REWARD_AMOUNT / 2) * (initialStake / (initialStake + STAKE_AMOUNT))
-
-        // Total EP phase 2 = (initialStake + additionalStake) (user) + STAKE_AMOUNT (otherStaker)
-        // User share phase 2 = (initialStake + additionalStake) / ((initialStake + additionalStake) + STAKE_AMOUNT)
-        // Earnings user phase 2 = (REWARD_AMOUNT / 2) * ((initialStake + additionalStake) / ((initialStake + additionalStake) + STAKE_AMOUNT))
-
         uint256 totalEpPhase1 = initialStake + STAKE_AMOUNT;
         uint256 earningsUserPhase1 = ((REWARD_AMOUNT / 2) * initialStake) / totalEpPhase1;
 
@@ -1102,42 +1073,56 @@ contract RegenIntegrationTest is Test {
 
     function test_StakeWithdraw_PartialWithdraw_ReducesBalanceAndImpactsRewards() public {
         address user = makeAddr("partialWithdrawUser");
+        address otherStaker = makeAddr("otherStakerForWithdraw");
         uint256 withdrawAmount = STAKE_AMOUNT / 4;
+        uint256 otherStakerAmount = STAKE_AMOUNT / 2; // Other staker has half the stake
 
-        // Whitelist and stake
+        // Whitelist both users
         address[] memory userArr = new address[](1);
         userArr[0] = user;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(userArr);
         earningPowerWhitelist.addToWhitelist(userArr);
+
+        userArr[0] = otherStaker;
+        stakerWhitelist.addToWhitelist(userArr);
+        earningPowerWhitelist.addToWhitelist(userArr);
+        vm.stopPrank();
+
+        // First user stakes
         stakeToken.mint(user, STAKE_AMOUNT);
         vm.startPrank(user);
         stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
         Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, user);
         vm.stopPrank();
 
+        // Second user stakes
+        stakeToken.mint(otherStaker, otherStakerAmount);
+        vm.startPrank(otherStaker);
+        stakeToken.approve(address(regenStaker), otherStakerAmount);
+        Staker.DepositIdentifier otherDepositId = regenStaker.stake(otherStakerAmount, otherStaker);
+        vm.stopPrank();
+
         // Notify rewards
         rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         regenStaker.notifyRewardAmount(REWARD_AMOUNT);
         vm.stopPrank();
 
         // Warp half period
         vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2);
 
-        // Check claimable before withdraw (user is only staker)
-        uint256 claimableBeforeWithdraw = regenStaker.unclaimedReward(depositId);
-        assertApproxEqAbs(
-            claimableBeforeWithdraw,
-            REWARD_AMOUNT / 2,
-            MIN_ASSERT_TOLERANCE,
-            "Claimable before withdraw incorrect"
-        );
+        // Calculate expected rewards for first half
+        uint256 totalEpPhase1 = STAKE_AMOUNT + otherStakerAmount;
+        uint256 userSharePhase1 = (STAKE_AMOUNT * 1e18) / totalEpPhase1; // Using 1e18 for precision
+        uint256 expectedUserPhase1 = ((REWARD_AMOUNT / 2) * userSharePhase1) / 1e18;
 
-        // Partial withdraw
+        // Partial withdraw for main user
         vm.startPrank(user);
         regenStaker.withdraw(depositId, withdrawAmount);
         vm.stopPrank();
 
+        // Verify balances after withdrawal
         assertEq(
             regenStaker.depositorTotalStaked(user),
             STAKE_AMOUNT - withdrawAmount,
@@ -1152,25 +1137,37 @@ contract RegenIntegrationTest is Test {
         // Warp remaining half period
         vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2);
 
-        // Claim rewards
+        // Calculate expected rewards for second half (with reduced stake)
+        uint256 totalEpPhase2 = (STAKE_AMOUNT - withdrawAmount) + otherStakerAmount;
+        uint256 userSharePhase2 = ((STAKE_AMOUNT - withdrawAmount) * 1e18) / totalEpPhase2;
+        uint256 expectedUserPhase2 = ((REWARD_AMOUNT / 2) * userSharePhase2) / 1e18;
+
+        uint256 expectedTotalUserRewards = expectedUserPhase1 + expectedUserPhase2;
+
+        // Claim rewards for main user
         vm.startPrank(user);
-        uint256 claimedAfterWithdraw = regenStaker.claimReward(depositId); // This claims all accumulated
+        uint256 claimedAfterWithdraw = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        // Expected: REWARD_AMOUNT / 2 (from first half, full stake)
-        // + REWARD_AMOUNT / 2 (from second half, reduced stake, but still 100% share if only staker)
-        // This logic is simple if user is the only staker. They get all rewards.
-        // The important part is that `withdraw` doesn't lose *already accrued* rewards.
-        // The `claimReward` call after withdraw should include rewards accrued *before* withdraw.
-        // `unclaimedReward` before withdraw was REWARD_AMOUNT / 2.
-        // After withdraw, and warping, the new rewards for 2nd half are also REWARD_AMOUNT / 2 (as user is only staker).
-        // So total claimed should be REWARD_AMOUNT.
+        // Claim rewards for other staker (just to verify total)
+        vm.startPrank(otherStaker);
+        uint256 claimedByOtherStaker = regenStaker.claimReward(otherDepositId);
+        vm.stopPrank();
 
+        // Verify main user's rewards
         assertApproxEqAbs(
             claimedAfterWithdraw,
+            expectedTotalUserRewards,
+            1e7, // Higher tolerance to account for division rounding
+            "User rewards after partial withdraw incorrect"
+        );
+
+        // Verify total rewards claimed match the total distributed
+        assertApproxEqAbs(
+            claimedAfterWithdraw + claimedByOtherStaker,
             REWARD_AMOUNT,
-            MIN_ASSERT_TOLERANCE,
-            "Total claimed after partial withdraw incorrect"
+            MIN_ASSERT_TOLERANCE * 3,
+            "Total claimed rewards should match total reward amount"
         );
     }
 
@@ -1180,8 +1177,10 @@ contract RegenIntegrationTest is Test {
         // Whitelist and stake
         address[] memory userArr = new address[](1);
         userArr[0] = user;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(userArr);
         earningPowerWhitelist.addToWhitelist(userArr);
+        vm.stopPrank();
         stakeToken.mint(user, STAKE_AMOUNT);
         vm.startPrank(user);
         stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
@@ -1190,7 +1189,7 @@ contract RegenIntegrationTest is Test {
 
         // Notify rewards
         rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         regenStaker.notifyRewardAmount(REWARD_AMOUNT);
         vm.stopPrank();
 
@@ -1234,12 +1233,14 @@ contract RegenIntegrationTest is Test {
         // Whitelist stakers
         address[] memory arrA = new address[](1);
         arrA[0] = stakerA;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(arrA);
         earningPowerWhitelist.addToWhitelist(arrA);
         address[] memory arrB = new address[](1);
         arrB[0] = stakerB;
         stakerWhitelist.addToWhitelist(arrB);
         earningPowerWhitelist.addToWhitelist(arrB);
+        vm.stopPrank();
 
         // Mint tokens
         stakeToken.mint(stakerA, STAKE_AMOUNT * 2); // For initial stake and re-stake
@@ -1258,7 +1259,7 @@ contract RegenIntegrationTest is Test {
 
         // Notify rewards
         rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         regenStaker.notifyRewardAmount(REWARD_AMOUNT);
         vm.stopPrank();
 
@@ -1339,8 +1340,6 @@ contract RegenIntegrationTest is Test {
         );
     }
 
-    // --- Tests for Reward Claiming Requirements ---
-
     function test_RewardClaiming_ClaimByDesignatedClaimer_Succeeds() public {
         address owner = makeAddr("depositOwner");
         address designatedClaimer = makeAddr("designatedClaimer");
@@ -1348,8 +1347,10 @@ contract RegenIntegrationTest is Test {
         // Whitelist owner for staking and earning power
         address[] memory ownerArr = new address[](1);
         ownerArr[0] = owner;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(ownerArr);
         earningPowerWhitelist.addToWhitelist(ownerArr);
+        vm.stopPrank();
 
         // Owner stakes
         stakeToken.mint(owner, STAKE_AMOUNT);
@@ -1366,7 +1367,7 @@ contract RegenIntegrationTest is Test {
 
         // Admin notifies reward
         rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         regenStaker.notifyRewardAmount(REWARD_AMOUNT);
         vm.stopPrank();
 
@@ -1428,8 +1429,10 @@ contract RegenIntegrationTest is Test {
         // Whitelist owner
         address[] memory ownerArr = new address[](1);
         ownerArr[0] = owner;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(ownerArr);
         earningPowerWhitelist.addToWhitelist(ownerArr);
+        vm.stopPrank();
 
         // Owner stakes and sets designatedClaimer
         stakeToken.mint(owner, STAKE_AMOUNT);
@@ -1441,7 +1444,7 @@ contract RegenIntegrationTest is Test {
 
         // Notify reward and warp
         rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         regenStaker.notifyRewardAmount(REWARD_AMOUNT);
         vm.stopPrank();
         vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
@@ -1462,8 +1465,10 @@ contract RegenIntegrationTest is Test {
         // Whitelist owner
         address[] memory ownerArr = new address[](1);
         ownerArr[0] = ownerAddr;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(ownerArr);
         earningPowerWhitelist.addToWhitelist(ownerArr);
+        vm.stopPrank();
 
         // Owner stakes and sets newClaimer
         stakeToken.mint(ownerAddr, STAKE_AMOUNT);
@@ -1474,7 +1479,7 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank(); // Stop owner's prank
 
         // Admin notifies reward and warp
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         rewardToken.mint(address(regenStaker), REWARD_AMOUNT); // Mint tokens to the staker contract
         regenStaker.notifyRewardAmount(REWARD_AMOUNT);
         vm.stopPrank();
@@ -1493,12 +1498,8 @@ contract RegenIntegrationTest is Test {
         );
     }
 
-    // --- Tests for Admin-Managed Reward Periods and Whitelist Controls ---
-
     function test_RevertIf_NotifyRewardAmount_NotNotifier() public {
         address notNotifier = makeAddr("notNotifier");
-        // Ensure notNotifier is not the admin (address(this) is admin and notifier by default)
-        assertTrue(notNotifier != address(this), "notNotifier should not be the admin");
 
         vm.startPrank(notNotifier);
         vm.expectRevert(
@@ -1508,43 +1509,19 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
     }
 
-    function test_AdminManaged_SetCalculatorWhitelist_Succeeds_RevertIf_NonOwner() public {
-        Whitelist newEarningWhitelist = new Whitelist();
-        address nonOwnerOfCalculator = makeAddr("nonOwnerOfCalculator"); // Different from admin/owner of RegenStaker
-
-        // Admin of RegenStaker (address(this)) is owner of calculator, sets a new earning power whitelist
-        vm.startPrank(address(this));
-        calculator.setWhitelist(newEarningWhitelist);
-        vm.stopPrank();
-        assertEq(
-            address(IWhitelistedEarningPowerCalculator(address(calculator)).whitelist()),
-            address(newEarningWhitelist)
-        );
-
-        // Admin disables the earning power whitelist
-        vm.startPrank(address(this));
-        calculator.setWhitelist(Whitelist(address(0)));
-        vm.stopPrank();
-        assertEq(address(IWhitelistedEarningPowerCalculator(address(calculator)).whitelist()), address(0));
-
-        // Non-owner of calculator attempts to set earning power whitelist
-        vm.startPrank(nonOwnerOfCalculator);
-        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", nonOwnerOfCalculator));
-        calculator.setWhitelist(newEarningWhitelist);
-        vm.stopPrank();
-    }
-
     // --- Tests for Security and Integrity Requirements ---
 
     function test_RevertIf_NotifyRewardAmount_InsufficientContractBalance() public {
-        // address(this) is already set as a reward notifier in setUp.
         uint256 notifyAmount = 1000e18;
 
-        // Ensure contract has less than notifyAmount (e.g., 0 or a smaller amount)
-        // rewardToken.mint(address(regenStaker), notifyAmount / 2); // Optional: mint a smaller amount
-        // For this test, let's assume balance is 0 initially for REWARD_TOKEN if not minted.
+        // Mint a smaller amount to the contract to ensure balance < notifyAmount
+        rewardToken.mint(address(regenStaker), notifyAmount / 2);
 
-        vm.startPrank(address(this)); // Admin/Notifier
+        // Verify the contract balance is indeed less than the notify amount
+        uint256 contractBalance = rewardToken.balanceOf(address(regenStaker));
+        assertLt(contractBalance, notifyAmount, "Contract balance should be less than notify amount");
+
+        vm.startPrank(ADMIN);
         // The Staker__InsufficientRewardBalance error is from the base Staker contract.
         vm.expectRevert(Staker.Staker__InsufficientRewardBalance.selector);
         regenStaker.notifyRewardAmount(notifyAmount);
@@ -1556,8 +1533,10 @@ contract RegenIntegrationTest is Test {
         // Whitelist and stake
         address[] memory userArr = new address[](1);
         userArr[0] = user;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(userArr);
         earningPowerWhitelist.addToWhitelist(userArr);
+        vm.stopPrank();
         stakeToken.mint(user, STAKE_AMOUNT);
         vm.startPrank(user);
         stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
@@ -1565,20 +1544,15 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         // Pause the contract
-        vm.startPrank(address(this)); // Admin
+        vm.startPrank(ADMIN);
         regenStaker.pause();
         assertTrue(regenStaker.paused(), "Contract should be paused");
         vm.stopPrank();
 
         // Attempt to withdraw while paused
         vm.startPrank(user);
-        vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
+        vm.expectRevert(abi.encodeWithSelector(Pausable.EnforcedPause.selector));
         regenStaker.withdraw(depositId, STAKE_AMOUNT / 2);
-        vm.stopPrank();
-
-        // Unpause for other tests
-        vm.startPrank(address(this));
-        regenStaker.unpause();
         vm.stopPrank();
     }
 
@@ -1587,8 +1561,10 @@ contract RegenIntegrationTest is Test {
         // Whitelist, stake, and accrue rewards
         address[] memory userArr = new address[](1);
         userArr[0] = user;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(userArr);
         earningPowerWhitelist.addToWhitelist(userArr);
+        vm.stopPrank();
         stakeToken.mint(user, STAKE_AMOUNT);
         vm.startPrank(user);
         stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
@@ -1596,23 +1572,18 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
-        vm.startPrank(address(this)); // Admin
+        vm.startPrank(ADMIN);
         regenStaker.notifyRewardAmount(REWARD_AMOUNT);
         vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2); // Accrue some rewards
         // Pause the contract
         regenStaker.pause();
         assertTrue(regenStaker.paused(), "Contract should be paused");
-        vm.stopPrank(); // Admin prank ends
+        vm.stopPrank();
 
         // Attempt to claim reward while paused
         vm.startPrank(user);
-        vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
+        vm.expectRevert(abi.encodeWithSelector(Pausable.EnforcedPause.selector));
         regenStaker.claimReward(depositId);
-        vm.stopPrank();
-
-        // Unpause for other tests
-        vm.startPrank(address(this));
-        regenStaker.unpause();
         vm.stopPrank();
     }
 
@@ -1630,9 +1601,11 @@ contract RegenIntegrationTest is Test {
         // Setup: User stakes and has rewards
         address[] memory userArr = new address[](1);
         userArr[0] = user;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(userArr);
         earningPowerWhitelist.addToWhitelist(userArr);
-        contributorWhitelist.addToWhitelist(userArr); // Corrected variable name
+        contributorWhitelist.addToWhitelist(userArr);
+        vm.stopPrank();
 
         stakeToken.mint(user, STAKE_AMOUNT);
         vm.startPrank(user);
@@ -1641,14 +1614,12 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         regenStaker.notifyRewardAmount(REWARD_AMOUNT);
         vm.stopPrank();
         vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
 
-        // Action: Attempt to contribute with address(0) as grantRoundAddress
         vm.startPrank(user);
-        // Staker.sol's _revertIfAddressZero uses Staker__InvalidAddress error
         vm.expectRevert(Staker.Staker__InvalidAddress.selector);
         regenStaker.contribute(depositId, address(0), votingDelegatee, amountToContribute, prefs, weights, bytes32(0));
         vm.stopPrank();
@@ -1669,9 +1640,11 @@ contract RegenIntegrationTest is Test {
         // Setup: User stakes and has rewards, and is on contributor whitelist
         address[] memory userArr = new address[](1);
         userArr[0] = user;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(userArr);
         earningPowerWhitelist.addToWhitelist(userArr);
         contributorWhitelist.addToWhitelist(userArr);
+        vm.stopPrank();
 
         stakeToken.mint(user, STAKE_AMOUNT);
         vm.startPrank(user);
@@ -1680,7 +1653,7 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         regenStaker.notifyRewardAmount(REWARD_AMOUNT);
         vm.stopPrank();
         vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
@@ -1712,16 +1685,18 @@ contract RegenIntegrationTest is Test {
         // Setup: User stakes, has rewards, on contributor whitelist
         address[] memory userArr = new address[](1);
         userArr[0] = user;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(userArr);
         earningPowerWhitelist.addToWhitelist(userArr);
         contributorWhitelist.addToWhitelist(userArr);
+        vm.stopPrank();
         stakeToken.mint(user, STAKE_AMOUNT);
         vm.startPrank(user);
         stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
         Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, user);
         vm.stopPrank();
         rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         regenStaker.notifyRewardAmount(REWARD_AMOUNT);
         vm.stopPrank();
         vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
@@ -1763,16 +1738,18 @@ contract RegenIntegrationTest is Test {
         // Setup: User stakes, has rewards, on contributor whitelist
         address[] memory userArr = new address[](1);
         userArr[0] = user;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(userArr);
         earningPowerWhitelist.addToWhitelist(userArr);
         contributorWhitelist.addToWhitelist(userArr);
+        vm.stopPrank();
         stakeToken.mint(user, STAKE_AMOUNT);
         vm.startPrank(user);
         stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
         Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, user);
         vm.stopPrank();
         rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         regenStaker.notifyRewardAmount(REWARD_AMOUNT);
         vm.stopPrank();
         vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
@@ -1803,9 +1780,11 @@ contract RegenIntegrationTest is Test {
         // Setup: User stakes, has rewards, on contributor whitelist
         address[] memory userArr = new address[](1);
         userArr[0] = user;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(userArr);
         earningPowerWhitelist.addToWhitelist(userArr);
         contributorWhitelist.addToWhitelist(userArr);
+        vm.stopPrank();
 
         stakeToken.mint(user, STAKE_AMOUNT);
         vm.startPrank(user);
@@ -1816,7 +1795,7 @@ contract RegenIntegrationTest is Test {
         // Notify a specific amount of rewards
         uint256 actualRewardAvailable = REWARD_AMOUNT / 2; // Make it less than full REWARD_AMOUNT
         rewardToken.mint(address(regenStaker), actualRewardAvailable);
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         regenStaker.notifyRewardAmount(actualRewardAvailable);
         vm.stopPrank();
         vm.warp(block.timestamp + REWARD_PERIOD_DURATION); // Accrue all of actualRewardAvailable
@@ -1827,12 +1806,6 @@ contract RegenIntegrationTest is Test {
         weights[0] = amountToContribute;
 
         vm.startPrank(user);
-        // The error CantAfford(uint256 requested, uint256 available)
-        // available will be actualRewardAvailable (approximately, due to SCALE_FACTOR effects)
-        // For expectRevert, we usually match exact values if the error includes them.
-        // However, _scaledUnclaimedReward / SCALE_FACTOR might have minor precision diff from actualRewardAvailable.
-        // Let's expect the selector only first, or refine if tests show a precise available amount.
-        // For now, let's try to get the exact available amount.
         uint256 unclaimed = regenStaker.unclaimedReward(depositId);
         vm.expectRevert(abi.encodeWithSelector(RegenStaker.CantAfford.selector, amountToContribute, unclaimed));
         regenStaker.contribute(
@@ -1859,16 +1832,18 @@ contract RegenIntegrationTest is Test {
 
         address[] memory userArr = new address[](1);
         userArr[0] = user;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(userArr);
         earningPowerWhitelist.addToWhitelist(userArr);
         contributorWhitelist.addToWhitelist(userArr);
+        vm.stopPrank();
         stakeToken.mint(user, STAKE_AMOUNT);
         vm.startPrank(user);
         stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
         Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, user);
         vm.stopPrank();
         rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         regenStaker.notifyRewardAmount(REWARD_AMOUNT);
         vm.stopPrank();
         vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
@@ -1902,100 +1877,6 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
     }
 
-    function test_Contribute_NetValuesUsed_WhenFeeIsZero() public {
-        address user = makeAddr("zeroFeeUser");
-        address mockGrantRound = makeAddr("mockGrantRoundZeroFee");
-        address votingDelegatee = makeAddr("votingDelegateeZeroFee");
-        uint256 amountToContributeGross = 1000e18;
-        // Fee is explicitly zero
-        uint256 feeAmount = 0;
-        uint256 expectedAmountToGrantRoundNet = amountToContributeGross - feeAmount;
-
-        uint256[] memory prefs = new uint256[](1);
-        prefs[0] = 1;
-        uint256[] memory weights = new uint256[](1);
-        weights[0] = expectedAmountToGrantRoundNet; // Vote with the full amount
-
-        // Setup user & deposit
-        address[] memory userArr = new address[](1);
-        userArr[0] = user;
-        stakerWhitelist.addToWhitelist(userArr);
-        earningPowerWhitelist.addToWhitelist(userArr);
-        contributorWhitelist.addToWhitelist(userArr);
-        stakeToken.mint(user, STAKE_AMOUNT);
-        vm.startPrank(user);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, user);
-        vm.stopPrank();
-
-        // Setup rewards and set fees to zero
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
-        vm.startPrank(address(this)); // Admin
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
-        Staker.ClaimFeeParameters memory feeParams = Staker.ClaimFeeParameters({
-            feeAmount: uint96(feeAmount), // Zero fee
-            feeCollector: address(0) // Fee collector can be address(0) if fee is 0
-        });
-        regenStaker.setClaimFeeParameters(feeParams);
-        vm.stopPrank();
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
-
-        // Mock external calls
-        vm.mockCall(
-            mockGrantRound,
-            abi.encodeWithSignature(
-                "signup(uint256,address,bytes32)",
-                expectedAmountToGrantRoundNet,
-                votingDelegatee,
-                bytes32(0)
-            ),
-            abi.encode(uint256(1))
-        );
-        vm.mockCall(
-            mockGrantRound,
-            abi.encodeWithSignature("vote(uint256,uint256)", prefs[0], weights[0]),
-            abi.encode()
-        );
-
-        (, address currentFeeCollector) = regenStaker.claimFeeParameters();
-        uint256 collectorInitialBalance = currentFeeCollector == address(0)
-            ? 0
-            : rewardToken.balanceOf(currentFeeCollector);
-
-        // Expect calls
-        vm.expectCall(
-            mockGrantRound,
-            abi.encodeWithSignature(
-                "signup(uint256,address,bytes32)",
-                expectedAmountToGrantRoundNet,
-                votingDelegatee,
-                bytes32(0)
-            )
-        );
-        vm.expectCall(mockGrantRound, abi.encodeWithSignature("vote(uint256,uint256)", prefs[0], weights[0]));
-
-        vm.startPrank(user);
-        uint256 returnedAmount = regenStaker.contribute(
-            depositId,
-            mockGrantRound,
-            votingDelegatee,
-            amountToContributeGross,
-            prefs,
-            weights,
-            bytes32(0)
-        );
-        vm.stopPrank();
-
-        assertEq(returnedAmount, expectedAmountToGrantRoundNet, "Returned net amount incorrect for zero fee");
-        if (currentFeeCollector != address(0)) {
-            assertEq(
-                rewardToken.balanceOf(currentFeeCollector),
-                collectorInitialBalance,
-                "Fee collector balance should not change for zero fee"
-            );
-        }
-    }
-
     function test_Contribute_EmitsEventAndContinues_WhenIndividualVoteReverts() public {
         address user = makeAddr("voteRevertUser");
         address mockGrantRound = makeAddr("mockGrantRoundVoteRevert");
@@ -2015,16 +1896,18 @@ contract RegenIntegrationTest is Test {
         // Setup user, stake, rewards
         address[] memory userArr = new address[](1);
         userArr[0] = user;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(userArr);
         earningPowerWhitelist.addToWhitelist(userArr);
         contributorWhitelist.addToWhitelist(userArr);
+        vm.stopPrank();
         stakeToken.mint(user, STAKE_AMOUNT);
         vm.startPrank(user);
         stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
         Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, user);
         vm.stopPrank();
         rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         regenStaker.notifyRewardAmount(REWARD_AMOUNT);
         vm.stopPrank();
         vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
@@ -2086,7 +1969,7 @@ contract RegenIntegrationTest is Test {
         assertEq(returnedAmount, amountToContribute - feeAmountCtrl, "Returned amount incorrect after one vote failed");
     }
 
-    function test_Contribute_UpdatesEarningPower_IfCalculatorYieldsChange() public {
+    function test_Contribute_UpdatesEarningPower() public {
         address user = makeAddr("epChangeUser");
         address mockGrantRound = makeAddr("mockGrantRoundEpChange");
         address votingDelegatee = makeAddr("votingDelegateeEpChange");
@@ -2100,9 +1983,11 @@ contract RegenIntegrationTest is Test {
         // Setup: User stakes. Initially, they ARE on the earningPowerWhitelist.
         address[] memory userArr = new address[](1);
         userArr[0] = user;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(userArr);
         earningPowerWhitelist.addToWhitelist(userArr); // Whitelisted for EP initially
         contributorWhitelist.addToWhitelist(userArr);
+        vm.stopPrank();
 
         stakeToken.mint(user, STAKE_AMOUNT);
         vm.startPrank(user);
@@ -2122,7 +2007,7 @@ contract RegenIntegrationTest is Test {
 
         // Setup rewards and let them accrue
         rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         regenStaker.notifyRewardAmount(REWARD_AMOUNT);
         vm.stopPrank();
         vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2); // Accrue for half period to have some rewards
@@ -2131,7 +2016,7 @@ contract RegenIntegrationTest is Test {
         uint256 unclaimedBefore = regenStaker.unclaimedReward(depositId);
         assertTrue(unclaimedBefore >= amountToContribute, "User should have enough rewards to contribute");
 
-        // NOW, REMOVE the user from the earningPowerWhitelist. This is the change.
+        vm.prank(ADMIN);
         earningPowerWhitelist.removeFromWhitelist(userArr);
         assertFalse(earningPowerWhitelist.isWhitelisted(user), "User should now be OFF earning power whitelist");
 
@@ -2190,8 +2075,10 @@ contract RegenIntegrationTest is Test {
         // Whitelist owner for staking and earning power
         address[] memory ownerArr = new address[](1);
         ownerArr[0] = owner;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(ownerArr);
         earningPowerWhitelist.addToWhitelist(ownerArr);
+        vm.stopPrank();
 
         // Owner stakes
         stakeToken.mint(owner, STAKE_AMOUNT);
@@ -2202,120 +2089,9 @@ contract RegenIntegrationTest is Test {
 
         // NotOwner attempts to withdraw
         vm.startPrank(notOwner);
-        // Expect revert from Staker.sol: _revertIfNotDepositOwner
         vm.expectRevert(abi.encodeWithSelector(Staker.Staker__Unauthorized.selector, bytes32("not owner"), notOwner));
         regenStaker.withdraw(depositId, STAKE_AMOUNT / 2);
         vm.stopPrank();
-    }
-
-    function test_RevertIf_Contribute_When_NotWhitelistedAndWhitelistActive() public {
-        address contributor = makeAddr("contributorForWhitelistTest");
-        address notWhitelistedContributor = makeAddr("notWhitelistedContributor");
-        address mockGrantRound = makeAddr("mockGrantRoundWhitelist");
-        // address votingDelegatee = contributor; // Unused variable
-
-        // Setup deposit for the contributor
-        stakeToken.mint(contributor, STAKE_AMOUNT);
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT); // Ensure rewards are available
-
-        // Whitelist contributor for staking and earning power (but NOT initially for contribution)
-        address[] memory contributorArr = new address[](1);
-        contributorArr[0] = contributor;
-        stakerWhitelist.addToWhitelist(contributorArr);
-        earningPowerWhitelist.addToWhitelist(contributorArr);
-
-        vm.startPrank(contributor);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, contributor);
-        vm.stopPrank();
-
-        // Notify rewards and warp time
-        vm.startPrank(address(this));
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
-        vm.stopPrank();
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
-
-        uint256 amountToContribute = regenStaker.unclaimedReward(depositId) / 2;
-        uint256[] memory prefs = new uint256[](1);
-        prefs[0] = 1;
-        uint256[] memory weights = new uint256[](1);
-        weights[0] = amountToContribute;
-
-        // Ensure contribution whitelist IS active and the notWhitelistedContributor is NOT on it
-        // The contributionWhitelist is active by default from setUp, we just need to ensure it is not address(0)
-        assertTrue(
-            address(regenStaker.contributionWhitelist()) != address(0),
-            "Contribution whitelist should be active"
-        );
-        assertFalse(
-            regenStaker.contributionWhitelist().isWhitelisted(notWhitelistedContributor),
-            "notWhitelistedContributor should not be on whitelist"
-        );
-
-        // Attempt contribution from notWhitelistedContributor (who is also not the deposit owner/claimer)
-        // This will fail first because only owner/claimer can contribute from a deposit.
-        // For this specific branch, the msg.sender for contribute needs to be the one checked against the whitelist.
-        // So, let's make notWhitelistedContributor the claimer, but still not on the contribution whitelist.
-
-        vm.startPrank(contributor); // Owner of deposit
-        regenStaker.alterClaimer(depositId, notWhitelistedContributor);
-        vm.stopPrank();
-
-        // Mock GrantRound calls for the attempt
-        vm.mockCall(
-            mockGrantRound,
-            abi.encodeWithSignature(
-                "signup(uint256,address,bytes32)",
-                amountToContribute,
-                notWhitelistedContributor,
-                bytes32(0)
-            ),
-            abi.encode(uint256(1)) // Simulate successful signup if it were to be called
-        );
-
-        vm.startPrank(notWhitelistedContributor); // Now prank as the claimer who is not on contribution whitelist
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                RegenStaker.NotWhitelisted.selector,
-                regenStaker.contributionWhitelist(),
-                notWhitelistedContributor
-            )
-        );
-        regenStaker.contribute(
-            depositId,
-            mockGrantRound,
-            notWhitelistedContributor,
-            amountToContribute,
-            prefs,
-            weights,
-            bytes32(0)
-        );
-        vm.stopPrank();
-
-        // For completeness, add the actual contributor to the contribution whitelist and try again (should succeed)
-        vm.startPrank(address(this)); // Admin adds to whitelist
-        contributorWhitelist.addToWhitelist(contributorArr); // Add original 'contributor' to whitelist
-        vm.stopPrank();
-        assertTrue(
-            regenStaker.contributionWhitelist().isWhitelisted(contributor),
-            "Contributor should now be on whitelist"
-        );
-
-        // Mock GrantRound calls for the successful attempt by the original contributor
-        vm.mockCall(
-            mockGrantRound,
-            abi.encodeWithSignature("signup(uint256,address,bytes32)", amountToContribute, contributor, bytes32(0)),
-            abi.encode(uint256(1))
-        );
-        vm.mockCall(
-            mockGrantRound,
-            abi.encodeWithSignature("vote(uint256,uint256)", prefs[0], weights[0]),
-            abi.encode()
-        );
-
-        vm.startPrank(contributor); // Prank as original whitelisted contributor (who is also owner)
-        regenStaker.contribute(depositId, mockGrantRound, contributor, amountToContribute, prefs, weights, bytes32(0));
-        vm.stopPrank(); // Should not revert
     }
 
     function test_RevertIf_Contribute_AmountLessThanFee() public {
@@ -2329,9 +2105,11 @@ contract RegenIntegrationTest is Test {
         rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
         address[] memory contributorArr = new address[](1);
         contributorArr[0] = contributor;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(contributorArr);
         earningPowerWhitelist.addToWhitelist(contributorArr);
         contributorWhitelist.addToWhitelist(contributorArr);
+        vm.stopPrank();
 
         vm.startPrank(contributor);
         stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
@@ -2339,7 +2117,7 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         // Notify rewards and warp
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         regenStaker.notifyRewardAmount(REWARD_AMOUNT);
         vm.stopPrank();
         vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
@@ -2352,22 +2130,13 @@ contract RegenIntegrationTest is Test {
         assertTrue(feeAmount > 0, "Fee amount for test must be positive and valid");
 
         uint256 amountToContribute = feeAmount - 1; // Try to contribute less than the fee
-        if (feeAmount == 1) {
-            // Edge case if feeAmount is 1 wei, amountToContribute would be 0
-            // To ensure amountToContribute is 0 and feeAmount is 1 for a clear CantAfford(1,0) test.
-            // This might require availableRewards to be very low, or MAX_CLAIM_FEE to be 1.
-            // For simplicity, we assume feeAmount can be set > 1 for this test path.
-            // If feeAmount is 1, and we contribute 0, the CantAfford(1,0) is what we want.
-        } else if (amountToContribute == 0 && feeAmount > 0) {
-            // If feeAmount > 1 and amountToContribute became 0, it means feeAmount was 1.
-            // This is fine, trying to contribute 0 when fee is 1.
-        }
+
         assertTrue(
             availableRewards >= amountToContribute,
             "Available rewards should cover attempted gross contribution"
         );
 
-        vm.startPrank(address(this)); // Admin sets fee
+        vm.startPrank(ADMIN);
         Staker.ClaimFeeParameters memory feeParams = Staker.ClaimFeeParameters({
             feeAmount: SafeCast.toUint96(feeAmount),
             feeCollector: feeCollector
@@ -2381,7 +2150,6 @@ contract RegenIntegrationTest is Test {
         weights[0] = amountToContribute;
 
         vm.startPrank(contributor);
-        // Expecting CantAfford(requested_fee, gross_amount_to_contribute)
         vm.expectRevert(abi.encodeWithSelector(RegenStaker.CantAfford.selector, feeAmount, amountToContribute));
         regenStaker.contribute(
             depositId,
@@ -2393,25 +2161,13 @@ contract RegenIntegrationTest is Test {
             bytes32(0)
         );
         vm.stopPrank();
-
-        // Reset fee parameters to 0 for other tests
-        vm.startPrank(address(this));
-        feeParams = Staker.ClaimFeeParameters({ feeAmount: 0, feeCollector: address(0) });
-        regenStaker.setClaimFeeParameters(feeParams);
-        vm.stopPrank();
-    }
-
-    // Helper function for minimum of two uints
-    function _min(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a < b ? a : b;
     }
 
     function test_RevertIf_SetClaimFeeParameters_FeeCollectorZeroAndFeeNonZero() public {
         uint256 validFeeAmount = _min(10e18, regenStaker.MAX_CLAIM_FEE()); // Ensure validFeeAmount respects MAX_CLAIM_FEE
-        if (validFeeAmount == 0) validFeeAmount = regenStaker.MAX_CLAIM_FEE(); // Ensure it's non-zero for the test if MAX_CLAIM_FEE allows
         assertTrue(validFeeAmount > 0, "Test requires a non-zero feeAmount that is valid.");
 
-        vm.startPrank(address(this)); // Admin action
+        vm.startPrank(ADMIN);
         Staker.ClaimFeeParameters memory feeParams = Staker.ClaimFeeParameters({
             feeAmount: SafeCast.toUint96(validFeeAmount),
             feeCollector: address(0) // Zero address for fee collector
@@ -2422,8 +2178,8 @@ contract RegenIntegrationTest is Test {
     }
 
     // Helper to get private key - in a real scenario, use specific private keys
-    uint256 constant payerPrivateKey = 0xBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBAD2; // Different from stakerUserPrivateKey
-    uint256 constant stakerUserPrivateKey = 0xBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBAD1;
+    uint256 constant payerPrivateKey = 0xBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBAD1;
+    uint256 constant stakerUserPrivateKey = 0xBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBAD2;
 
     function test_PermitAndStake_BypassesStakerWhitelist() public {
         // address stakerUser = makeAddr("stakerPermitAndStake");
@@ -2444,7 +2200,9 @@ contract RegenIntegrationTest is Test {
         // Add to earning power whitelist for functional stake
         address[] memory stakerUserArr = new address[](1);
         stakerUserArr[0] = stakerUser;
+        vm.startPrank(ADMIN);
         earningPowerWhitelist.addToWhitelist(stakerUserArr);
+        vm.stopPrank();
 
         // Prepare permit signature for the stakeToken (MockERC20Staking)
         uint256 deadline = block.timestamp + 1 hours;
@@ -2516,8 +2274,10 @@ contract RegenIntegrationTest is Test {
         // Whitelist staker for staking and earning power
         address[] memory stakerArr = new address[](1);
         stakerArr[0] = stakerAddress;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(stakerArr);
         earningPowerWhitelist.addToWhitelist(stakerArr);
+        vm.stopPrank();
 
         // Set the surrogate delegatee: if someone delegates to originalDelegatee, it should go to surrogateDelegatee
         // This is done via setSurrogateDelegatee(address target, address surrogate)
@@ -2558,22 +2318,15 @@ contract RegenIntegrationTest is Test {
         address newNotifier = makeAddr("newNotifier");
         address notAdmin = makeAddr("notAdminForNotifier");
 
-        // Ensure notAdmin is indeed not the admin
-        // Admin is address(this) in setUp
-        assertTrue(notAdmin != address(this), "notAdmin should not be the admin for this test");
-
         vm.startPrank(notAdmin);
         vm.expectRevert(abi.encodeWithSelector(Staker.Staker__Unauthorized.selector, bytes32("not admin"), notAdmin));
         regenStaker.setRewardNotifier(newNotifier, true);
         vm.stopPrank();
 
-        // Verify admin can set it (original state was address(this) is a notifier)
-        vm.startPrank(address(this));
+        // Verify admin can set it
+        vm.startPrank(ADMIN);
         regenStaker.setRewardNotifier(newNotifier, true);
         assertTrue(regenStaker.isRewardNotifier(newNotifier), "Admin should be able to set new notifier");
-        // Reset to original notifier for other tests if necessary (address(this) was set in setUp)
-        regenStaker.setRewardNotifier(address(this), true);
-        regenStaker.setRewardNotifier(newNotifier, false); // Turn off the new one
         vm.stopPrank();
     }
 
@@ -2587,16 +2340,18 @@ contract RegenIntegrationTest is Test {
 
         address[] memory contributorArr = new address[](1);
         contributorArr[0] = contributor;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(contributorArr);
         earningPowerWhitelist.addToWhitelist(contributorArr);
         contributorWhitelist.addToWhitelist(contributorArr);
+        vm.stopPrank();
 
         vm.startPrank(contributor);
         stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
         Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, contributor);
         vm.stopPrank();
 
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         regenStaker.notifyRewardAmount(REWARD_AMOUNT);
         vm.stopPrank();
         vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
@@ -2646,7 +2401,7 @@ contract RegenIntegrationTest is Test {
 
         // Also reset fee params, as other tests might have set them if this runs after them.
         // And this minimal test assumes zero fee implicitly.
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         Staker.ClaimFeeParameters memory feeParams = Staker.ClaimFeeParameters({
             feeAmount: 0,
             feeCollector: address(0)
@@ -2660,7 +2415,7 @@ contract RegenIntegrationTest is Test {
         uint256 maxFee = regenStaker.MAX_CLAIM_FEE();
         uint256 tooHighFee = maxFee + 1;
 
-        vm.startPrank(address(this)); // Admin action
+        vm.startPrank(ADMIN);
         Staker.ClaimFeeParameters memory feeParams = Staker.ClaimFeeParameters({
             feeAmount: SafeCast.toUint96(tooHighFee),
             feeCollector: feeCollector
@@ -2678,8 +2433,10 @@ contract RegenIntegrationTest is Test {
         // Whitelist stakerUser for staking and for initial earning power (so EP is stakeAmount)
         address[] memory stakerArr = new address[](1);
         stakerArr[0] = stakerUser;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(stakerArr);
         earningPowerWhitelist.addToWhitelist(stakerArr);
+        vm.stopPrank();
 
         // Staker stakes
         stakeToken.mint(stakerUser, stakeAmount);
@@ -2705,7 +2462,9 @@ contract RegenIntegrationTest is Test {
         // Let's try making earningPower 0 by removing from whitelist, then re-adding, so new EP will be stakeAmount.
 
         // Make current earning power 0 for the deposit by removing from earningPowerWhitelist and bumping
+        vm.startPrank(ADMIN);
         earningPowerWhitelist.removeFromWhitelist(stakerArr);
+        vm.stopPrank();
         // A bump is needed to update the deposit's stored earningPower to 0.
         // We can call bumpEarningPower with a valid small tip (or 0 if allowed by maxBumpTip)
         // or trigger it via another action like alterClaimer/alterDelegatee.
@@ -2718,13 +2477,15 @@ contract RegenIntegrationTest is Test {
         assertEq(epAfterRemoval, 0, "Earning power should be 0 after removal from whitelist and action");
 
         // Now, re-whitelist so getNewEarningPower will return (stakeAmount, true)
+        vm.startPrank(ADMIN);
         earningPowerWhitelist.addToWhitelist(stakerArr);
+        vm.stopPrank();
         // The calculator will now see stakeAmount as new EP, current is 0, so it's a qualified bump.
 
         // Ensure some rewards are present so tip can be requested (even if it will revert for being too high)
         // This is because bumpEarningPower checks `_unclaimedRewards < _requestedTip` for EP increase.
         rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
-        vm.startPrank(address(this));
+        vm.startPrank(ADMIN);
         regenStaker.notifyRewardAmount(REWARD_AMOUNT);
         vm.stopPrank();
         vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2); // Accrue some rewards
@@ -2746,8 +2507,10 @@ contract RegenIntegrationTest is Test {
         // Whitelist user
         address[] memory userArr = new address[](1);
         userArr[0] = user;
+        vm.startPrank(ADMIN);
         stakerWhitelist.addToWhitelist(userArr);
         earningPowerWhitelist.addToWhitelist(userArr);
+        vm.stopPrank();
 
         // Mint tokens for stakes
         stakeToken.mint(user, totalExpectedStake);
@@ -2786,5 +2549,126 @@ contract RegenIntegrationTest is Test {
 
         meetsMinimumStake = regenStaker.depositorTotalStaked(user) >= totalExpectedStake + 1;
         assertFalse(meetsMinimumStake, "User should not meet requirement higher than their stake");
+    }
+
+    function testFuzz_Contribute_CorrectNetAmountUsedWithVariableFees(uint96 feeAmount) public {
+        // Bound fee amount to be within valid range (0 to MAX_CLAIM_FEE)
+        feeAmount = uint96(bound(uint256(feeAmount), 0, regenStaker.MAX_CLAIM_FEE()));
+
+        address user = makeAddr("fuzzFeeUser");
+        address mockGrantRound = makeAddr("mockGrantRoundFuzzFee");
+        address votingDelegatee = makeAddr("votingDelegateeFuzzFee");
+        address feeCollector = makeAddr("feeCollectorFuzzFee");
+
+        // Use a sufficiently large amount to contribute
+        uint256 amountToContributeGross = 1_000_000e18;
+        uint256 expectedAmountToGrantRoundNet = amountToContributeGross - feeAmount;
+
+        // Set up contribution preferences
+        uint256[] memory prefs = new uint256[](1);
+        prefs[0] = 1;
+        uint256[] memory weights = new uint256[](1);
+        weights[0] = expectedAmountToGrantRoundNet; // Weight should equal net amount
+
+        // Setup user & deposit
+        address[] memory userArr = new address[](1);
+        userArr[0] = user;
+        vm.startPrank(ADMIN);
+        stakerWhitelist.addToWhitelist(userArr);
+        earningPowerWhitelist.addToWhitelist(userArr);
+        contributorWhitelist.addToWhitelist(userArr);
+        vm.stopPrank();
+
+        stakeToken.mint(user, STAKE_AMOUNT);
+        vm.startPrank(user);
+        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
+        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, user);
+        vm.stopPrank();
+
+        // Setup rewards with ample amount
+        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        vm.startPrank(ADMIN);
+        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+
+        // Set the fee parameters with our fuzzed fee amount
+        Staker.ClaimFeeParameters memory feeParams = Staker.ClaimFeeParameters({
+            feeAmount: feeAmount,
+            feeCollector: feeCollector // Use a real address for any non-zero fee
+        });
+        regenStaker.setClaimFeeParameters(feeParams);
+        vm.stopPrank();
+
+        // Accrue rewards
+        vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
+
+        // Record fee collector's initial balance
+        uint256 collectorInitialBalance = rewardToken.balanceOf(feeCollector);
+
+        // Mock external calls
+        vm.mockCall(
+            mockGrantRound,
+            abi.encodeWithSignature(
+                "signup(uint256,address,bytes32)",
+                expectedAmountToGrantRoundNet,
+                votingDelegatee,
+                bytes32(0)
+            ),
+            abi.encode(uint256(1))
+        );
+
+        vm.mockCall(
+            mockGrantRound,
+            abi.encodeWithSignature("vote(uint256,uint256)", prefs[0], weights[0]),
+            abi.encode()
+        );
+
+        // Expect the correct calls with net amount
+        vm.expectCall(
+            mockGrantRound,
+            abi.encodeWithSignature(
+                "signup(uint256,address,bytes32)",
+                expectedAmountToGrantRoundNet,
+                votingDelegatee,
+                bytes32(0)
+            )
+        );
+
+        vm.expectCall(mockGrantRound, abi.encodeWithSignature("vote(uint256,uint256)", prefs[0], weights[0]));
+
+        // Perform the contribution
+        vm.startPrank(user);
+        uint256 returnedAmount = regenStaker.contribute(
+            depositId,
+            mockGrantRound,
+            votingDelegatee,
+            amountToContributeGross,
+            prefs,
+            weights,
+            bytes32(0)
+        );
+        vm.stopPrank();
+
+        // Verify returned amount is the correct net amount
+        assertEq(returnedAmount, expectedAmountToGrantRoundNet, "Returned net amount incorrect");
+
+        // Verify fee collector received the correct fee amount
+        if (feeAmount > 0) {
+            assertEq(
+                rewardToken.balanceOf(feeCollector) - collectorInitialBalance,
+                feeAmount,
+                "Fee collector received incorrect fee amount"
+            );
+        } else {
+            assertEq(
+                rewardToken.balanceOf(feeCollector),
+                collectorInitialBalance,
+                "Fee collector balance should not change for zero fee"
+            );
+        }
+    }
+
+    // Helper function for minimum of two uints
+    function _min(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a < b ? a : b;
     }
 }

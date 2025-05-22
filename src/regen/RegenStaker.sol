@@ -172,6 +172,18 @@ contract RegenStaker is
         _depositId = _stake(msg.sender, amount, delegatee, msg.sender);
     }
 
+    // @inheritdoc Staker
+    function stakeMore(DepositIdentifier _depositId, uint256 _amount) external override {
+        Deposit storage deposit = deposits[_depositId];
+        require(
+            stakerWhitelist == IWhitelist(address(0)) || stakerWhitelist.isWhitelisted(deposit.owner),
+            NotWhitelisted(stakerWhitelist, deposit.owner)
+        );
+
+        _revertIfNotDepositOwner(deposit, msg.sender);
+        _stakeMore(deposit, _depositId, _amount);
+    }
+
     /// @notice Sets the whitelist for the staker. If the whitelist is not set, the staking will be open to all users.
     /// @param _stakerWhitelist The whitelist to set.
     function setStakerWhitelist(Whitelist _stakerWhitelist) external {
@@ -200,7 +212,7 @@ contract RegenStaker is
         _unpause();
     }
 
-    /// @notice Withdraw staked tokens from an existing deposit.
+    // @inheritdoc Staker
     function withdraw(
         Staker.DepositIdentifier _depositId,
         uint256 _amount
