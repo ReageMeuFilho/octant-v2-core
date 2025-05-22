@@ -1,22 +1,22 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Test} from "forge-std/Test.sol";
-import {HarnessProperQF} from "../harness/HarnessProperQF.sol";
-import {ProperQF} from "src/allocation-mechanism/voting-strategy/ProperQF.sol";
-import {console2 as console} from "forge-std/console2.sol";
+import { Test } from "forge-std/Test.sol";
+import { HarnessProperQF } from "../harness/HarnessProperQF.sol";
+import { ProperQF } from "src/allocation-mechanism/voting-strategy/ProperQF.sol";
+import { console2 as console } from "forge-std/console2.sol";
 
 contract ProperQFTest is Test {
     HarnessProperQF public qf;
-    
+
     // Capture AlphaUpdated event
     event AlphaUpdated(uint256 oldNumerator, uint256 oldDenominator, uint256 newNumerator, uint256 newDenominator);
-    
+
     function setUp() public {
         qf = new HarnessProperQF();
     }
 
-    function test_sqrt() view public{
+    function test_sqrt() public view {
         assertEq(qf.exposed_sqrt(0), 0, "sqrt(0) should be 0");
         assertEq(qf.exposed_sqrt(1), 1, "sqrt(1) should be 1");
         assertEq(qf.exposed_sqrt(4), 2, "sqrt(4) should be 2");
@@ -25,12 +25,12 @@ contract ProperQFTest is Test {
         assertEq(qf.exposed_sqrt(100), 10, "sqrt(100) should be 10");
     }
 
-    function testFuzz_sqrt(uint256 x) view public{
+    function testFuzz_sqrt(uint256 x) public view {
         // Bound input to prevent overflow
         x = bound(x, 0, type(uint128).max);
-        
+
         uint256 result = qf.exposed_sqrt(x);
-        
+
         // Check that result^2 <= x < (result+1)^2
         if (x > 0) {
             assertTrue(result * result <= x);
@@ -38,7 +38,7 @@ contract ProperQFTest is Test {
         }
     }
 
-    function test_initial_state() view public{
+    function test_initial_state() public view {
         (uint256 sumC, uint256 sumSR, uint256 quadF, uint256 linearF) = qf.getTally(1);
         assertEq(sumC, 0, "Initial sumContributions should be 0");
         assertEq(sumSR, 0, "Initial sumSquareRoots should be 0");
@@ -56,10 +56,10 @@ contract ProperQFTest is Test {
         qf.exposed_processVote(projectId, contribution, qf.exposed_sqrt(contribution));
 
         (uint256 sumC, uint256 sumSR, uint256 quadF, uint256 linearF) = qf.getTally(projectId);
-        
+
         uint256 expectedSqrt = qf.exposed_sqrt(contribution);
         uint256 expectedQuad = (expectedSqrt * expectedSqrt);
-        uint256 expectedLinear = ( contribution);
+        uint256 expectedLinear = (contribution);
 
         assertEq(sumC, contribution, "sumContributions incorrect");
         assertEq(sumSR, expectedSqrt, "sumSquareRoots incorrect");
@@ -78,24 +78,20 @@ contract ProperQFTest is Test {
         qf.exposed_processVote(projectId, contribution1, qf.exposed_sqrt(contribution1));
         qf.exposed_processVote(projectId, contribution2, qf.exposed_sqrt(contribution2));
 
-        (uint256 sumC, uint256 sumSR,,) = qf.getTally(projectId);
-        
+        (uint256 sumC, uint256 sumSR, , ) = qf.getTally(projectId);
+
         assertEq(sumC, contribution1 + contribution2, "sumContributions incorrect");
-        assertEq(
-            sumSR, 
-            qf.exposed_sqrt(contribution1) + qf.exposed_sqrt(contribution2), 
-            "sumSquareRoots incorrect"
-        );
+        assertEq(sumSR, qf.exposed_sqrt(contribution1) + qf.exposed_sqrt(contribution2), "sumSquareRoots incorrect");
     }
 
     function testFuzz_process_vote(uint256 contribution) public {
         // Bound contribution to prevent overflow
         contribution = bound(contribution, 1, type(uint128).max);
-        
+
         uint256 projectId = 1;
         qf.exposed_processVote(projectId, contribution, qf.exposed_sqrt(contribution));
-        
-        (uint256 sumC, uint256 sumSR,,) = qf.getTally(projectId);
+
+        (uint256 sumC, uint256 sumSR, , ) = qf.getTally(projectId);
         assertEq(sumC, contribution, "sumContributions incorrect");
         assertEq(sumSR, qf.exposed_sqrt(contribution), "sumSquareRoots incorrect");
     }
@@ -144,17 +140,17 @@ contract ProperQFTest is Test {
 
     function test_setAlphaDecimal_success() public {
         // Set alpha to 0.75 using decimal format
-        qf.exposed_setAlphaDecimal(75 * 10**16); // 0.75e18
-        
+        qf.exposed_setAlphaDecimal(75 * 10 ** 16); // 0.75e18
+
         (uint256 numerator, uint256 denominator) = qf.getAlpha();
-        assertEq(numerator, 75 * 10**16, "Alpha numerator should be 0.75e18");
-        assertEq(denominator, 10**18, "Alpha denominator should be 1e18");
+        assertEq(numerator, 75 * 10 ** 16, "Alpha numerator should be 0.75e18");
+        assertEq(denominator, 10 ** 18, "Alpha denominator should be 1e18");
     }
 
     function test_setAlphaPercentage_success() public {
         // Set alpha to 80% using percentage format
         qf.exposed_setAlphaPercentage(80);
-        
+
         (uint256 numerator, uint256 denominator) = qf.getAlpha();
         assertEq(numerator, 80, "Alpha numerator should be 80");
         assertEq(denominator, 100, "Alpha denominator should be 100");
@@ -163,7 +159,7 @@ contract ProperQFTest is Test {
     function test_setAlphaDecimal_over_one_reverts() public {
         // Try to set alpha to 1.1 using decimal format
         vm.expectRevert("Alpha must be <= 1");
-        qf.exposed_setAlphaDecimal(11 * 10**17); // 1.1e18
+        qf.exposed_setAlphaDecimal(11 * 10 ** 17); // 1.1e18
     }
 
     function test_multiple_projects_votes() public {
@@ -186,7 +182,7 @@ contract ProperQFTest is Test {
         {
             (uint256 sumC1, uint256 sumSR1, uint256 quadF1, uint256 linearF1) = qf.getTally(project1);
             uint256 expectedQuad1 = qf.exposed_sqrt(contribution1) ** 2;
-            
+
             assertEq(sumC1, contribution1, "Project 1 sumContributions incorrect");
             assertEq(sumSR1, qf.exposed_sqrt(contribution1), "Project 1 sumSquareRoots incorrect");
             assertEq(quadF1, expectedQuad1, "Project 1 quadraticFunding incorrect");
@@ -197,7 +193,7 @@ contract ProperQFTest is Test {
         {
             (uint256 sumC2, uint256 sumSR2, uint256 quadF2, uint256 linearF2) = qf.getTally(project2);
             uint256 expectedQuad2 = qf.exposed_sqrt(contribution2) ** 2;
-            
+
             assertEq(sumC2, contribution2, "Project 2 sumContributions incorrect");
             assertEq(sumSR2, qf.exposed_sqrt(contribution2), "Project 2 sumSquareRoots incorrect");
             assertEq(quadF2, expectedQuad2, "Project 2 quadraticFunding incorrect");
@@ -208,7 +204,7 @@ contract ProperQFTest is Test {
         {
             (uint256 sumC3, uint256 sumSR3, uint256 quadF3, uint256 linearF3) = qf.getTally(project3);
             uint256 expectedQuad3 = qf.exposed_sqrt(contribution3) ** 2;
-            
+
             assertEq(sumC3, contribution3, "Project 3 sumContributions incorrect");
             assertEq(sumSR3, qf.exposed_sqrt(contribution3), "Project 3 sumSquareRoots incorrect");
             assertEq(quadF3, expectedQuad3, "Project 3 quadraticFunding incorrect");
@@ -216,20 +212,15 @@ contract ProperQFTest is Test {
         }
 
         // Check global totals
-        uint256 expectedTotalQuadratic = 
-            qf.exposed_sqrt(contribution1) ** 2 +
+        uint256 expectedTotalQuadratic = qf.exposed_sqrt(contribution1) ** 2 +
             qf.exposed_sqrt(contribution2) ** 2 +
             qf.exposed_sqrt(contribution3) ** 2;
-        
+
         uint256 expectedTotalLinear = contribution1 + contribution2 + contribution3;
-        
+
         assertEq(qf.totalQuadraticSum(), expectedTotalQuadratic, "Total quadratic sum incorrect");
         assertEq(qf.totalLinearSum(), expectedTotalLinear, "Total linear sum incorrect");
-        assertEq(
-            qf.totalFunding(), 
-            expectedTotalQuadratic + expectedTotalLinear, 
-            "Total funding incorrect"
-        );
+        assertEq(qf.totalFunding(), expectedTotalQuadratic + expectedTotalLinear, "Total funding incorrect");
     }
 
     function test_multiple_votes_multiple_projects() public {
@@ -264,7 +255,7 @@ contract ProperQFTest is Test {
             uint256 expectedSumC1 = contribution1A + contribution1B;
             uint256 expectedSumSR1 = qf.exposed_sqrt(contribution1A) + qf.exposed_sqrt(contribution1B);
             uint256 expectedQuad1 = expectedSumSR1 * expectedSumSR1;
-            
+
             assertEq(sumC1, expectedSumC1, "Project 1 sumContributions incorrect");
             assertEq(sumSR1, expectedSumSR1, "Project 1 sumSquareRoots incorrect");
             assertEq(quadF1, expectedQuad1, "Project 1 quadraticFunding incorrect");
@@ -277,7 +268,7 @@ contract ProperQFTest is Test {
             uint256 expectedSumC2 = contribution2A + contribution2B;
             uint256 expectedSumSR2 = qf.exposed_sqrt(contribution2A) + qf.exposed_sqrt(contribution2B);
             uint256 expectedQuad2 = expectedSumSR2 * expectedSumSR2;
-            
+
             assertEq(sumC2, expectedSumC2, "Project 2 sumContributions incorrect");
             assertEq(sumSR2, expectedSumSR2, "Project 2 sumSquareRoots incorrect");
             assertEq(quadF2, expectedQuad2, "Project 2 quadraticFunding incorrect");
@@ -290,7 +281,7 @@ contract ProperQFTest is Test {
             uint256 expectedSumC3 = contribution3A + contribution3B;
             uint256 expectedSumSR3 = qf.exposed_sqrt(contribution3A) + qf.exposed_sqrt(contribution3B);
             uint256 expectedQuad3 = expectedSumSR3 * expectedSumSR3;
-            
+
             assertEq(sumC3, expectedSumC3, "Project 3 sumContributions incorrect");
             assertEq(sumSR3, expectedSumSR3, "Project 3 sumSquareRoots incorrect");
             assertEq(quadF3, expectedQuad3, "Project 3 quadraticFunding incorrect");
@@ -298,23 +289,17 @@ contract ProperQFTest is Test {
         }
 
         // Check global totals
-        uint256 expectedTotalQuadratic = 
-            (qf.exposed_sqrt(contribution1A) + qf.exposed_sqrt(contribution1B)) ** 2 +
+        uint256 expectedTotalQuadratic = (qf.exposed_sqrt(contribution1A) + qf.exposed_sqrt(contribution1B)) ** 2 +
             (qf.exposed_sqrt(contribution2A) + qf.exposed_sqrt(contribution2B)) ** 2 +
             (qf.exposed_sqrt(contribution3A) + qf.exposed_sqrt(contribution3B)) ** 2;
-        
-        uint256 expectedTotalLinear = 
-            (contribution1A + contribution1B) +
+
+        uint256 expectedTotalLinear = (contribution1A + contribution1B) +
             (contribution2A + contribution2B) +
             (contribution3A + contribution3B);
-        
+
         assertEq(qf.totalQuadraticSum(), expectedTotalQuadratic, "Total quadratic sum incorrect");
         assertEq(qf.totalLinearSum(), expectedTotalLinear, "Total linear sum incorrect");
-        assertEq(
-            qf.totalFunding(), 
-            expectedTotalQuadratic + expectedTotalLinear, 
-            "Total funding incorrect"
-        );
+        assertEq(qf.totalFunding(), expectedTotalQuadratic + expectedTotalLinear, "Total funding incorrect");
 
         // Verify quadratic effect
         // The quadratic funding amount should be greater than the sum of individual quadratic amounts
@@ -334,7 +319,7 @@ contract ProperQFTest is Test {
 
         // Warm up the storage slots to get consistent gas measurements
         qf.exposed_processVote(2, 1e18, 1e9);
-        vm.roll(block.number + 1);  // Move to next block to reset gas calculations
+        vm.roll(block.number + 1); // Move to next block to reset gas calculations
 
         // Measure gas for processing a single vote
         uint256 gasStart = gasleft();
@@ -345,7 +330,7 @@ contract ProperQFTest is Test {
         console.log("Gas used for processing single vote with warm totals but cold project:", gasUsed);
 
         // Optional: Add assertions to ensure the vote was processed correctly
-        (uint256 sumC, uint256 sumSR,,) = qf.getTally(projectId);
+        (uint256 sumC, uint256 sumSR, , ) = qf.getTally(projectId);
         assertEq(sumC, contribution, "Contribution not recorded correctly");
         assertEq(sumSR, voteWeight, "Vote weight not recorded correctly");
     }
@@ -373,7 +358,7 @@ contract ProperQFTest is Test {
 
         // Warm up storage
         qf.exposed_processVote(projectId, 1e18, 1e9);
-        vm.roll(block.number + 1);  // Move to next block to reset gas calculations
+        vm.roll(block.number + 1); // Move to next block to reset gas calculations
 
         // Measure gas for processing a vote with warm storage
         uint256 gasStart = gasleft();
@@ -395,35 +380,35 @@ contract ProperQFTest is Test {
         uint256 projectId = 1;
         uint256 contribution = 100e18;
         uint256 sqrtContribution = qf.exposed_sqrt(contribution);
-        
+
         qf.exposed_processVote(projectId, contribution, sqrtContribution);
-        
+
         // Test with default alpha (1.0)
         {
             (uint256 sumC, uint256 sumSR, uint256 quadraticFunding, uint256 linearFunding) = qf.getTally(projectId);
-            
+
             // Check correct values returned with default alpha (10000/10000 = 1.0)
             assertEq(sumC, contribution);
             assertEq(sumSR, sqrtContribution);
             assertEq(quadraticFunding, sqrtContribution * sqrtContribution);
             assertEq(linearFunding, contribution);
         }
-        
+
         // Change alpha to 0.6 (60/100)
         qf.exposed_setAlpha(60, 100);
-        
+
         // Test with alpha of 0.6
         {
             (uint256 sumC, uint256 sumSR, uint256 quadraticFunding, uint256 linearFunding) = qf.getTally(projectId);
-            
+
             // Check correct values returned with alpha = 0.6
             assertEq(sumC, contribution);
             assertEq(sumSR, sqrtContribution);
-            
+
             // quadraticFunding should be 60% of the square
             uint256 expectedQuadratic = (sqrtContribution * sqrtContribution * 60) / 100;
             assertEq(quadraticFunding, expectedQuadratic);
-            
+
             // linearFunding stays the same
             assertEq(linearFunding, contribution);
         }
@@ -434,11 +419,11 @@ contract ProperQFTest is Test {
         (uint256 numerator, uint256 denominator) = qf.getAlpha();
         assertEq(numerator, 10000, "Default alpha numerator should be 10000");
         assertEq(denominator, 10000, "Default alpha denominator should be 10000");
-        
+
         // Set a new alpha and check that getAlpha returns the new values
         qf.exposed_setAlpha(3, 5);
         (numerator, denominator) = qf.getAlpha();
         assertEq(numerator, 3, "Alpha numerator should be updated to 3");
         assertEq(denominator, 5, "Alpha denominator should be updated to 5");
     }
-} 
+}

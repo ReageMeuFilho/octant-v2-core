@@ -22,12 +22,7 @@ abstract contract ProperQF {
     uint256 public totalFunding; // Total funding across all projects
 
     /// @dev Event emitted when alpha value is updated
-    event AlphaUpdated(
-        uint256 indexed oldNumerator,
-        uint256 indexed oldDenominator,
-        uint256 indexed newNumerator,
-        uint256 newDenominator
-    );
+    event AlphaUpdated(uint256 oldNumerator, uint256 oldDenominator, uint256 newNumerator, uint256 newDenominator);
 
     /**
      * @notice This function is used to process a vote and update the tally for the voting strategy
@@ -37,12 +32,15 @@ abstract contract ProperQF {
      */
     function _processVote(uint256 projectId, uint256 contribution, uint256 voteWeight) internal virtual {
         require(contribution > 0, "Contribution must be positive");
-        require(voteWeight > 0, "Vote weight must be positive");
+        require(voteWeight > 0, "Square root of contribution must be positive");
 
         // Validate square root relationship with safe multiplication
         uint256 voteWeightSquared = voteWeight * voteWeight;
         require(voteWeightSquared / voteWeight == voteWeight, "Vote weight overflow");
-        require(voteWeightSquared <= contribution, "Invalid vote weight for contribution");
+        require(
+            voteWeightSquared <= contribution,
+            "Square root of contribution must be less than or equal to contribution"
+        );
 
         // Validate square root approximation within 10% tolerance
         uint256 actualSqrt = _sqrt(contribution);
@@ -84,7 +82,7 @@ abstract contract ProperQF {
      */
     function _calculateWeightedTotalFunding() internal view returns (uint256) {
         uint256 weightedQuadratic = Math.mulDiv(totalQuadraticSum, alphaNumerator, alphaDenominator);
-        uint256 weightedLinear = Math.mulDiv(totalLinearSum, alphaDenominator - alphaNumerator, alphaDenominator);
+        uint256 weightedLinear = totalLinearSum; // Linear funding is always the raw contribution sum
         return weightedQuadratic + weightedLinear;
     }
 
@@ -109,8 +107,8 @@ abstract contract ProperQF {
      * @param projectId The ID of the project to tally
      * @return sumContributions The total sum of all contributions for the project
      * @return sumSquareRoots The sum of square roots of all contributions
-     * @return quadraticFunding The quadratic funding component (α * S_j^2)
-     * @return linearFunding The linear funding component ((1-α) * Sum_j)
+     * @return quadraticFunding The raw quadratic funding component (S_j^2)
+     * @return linearFunding The raw linear funding component (Sum_j)
      */
     function getTally(
         uint256 projectId
@@ -126,8 +124,8 @@ abstract contract ProperQF {
         return (
             project.sumContributions, // Total contributions
             project.sumSquareRoots, // Sum of square roots
-            Math.mulDiv(project.quadraticFunding, alphaNumerator, alphaDenominator), // Quadratic funding term
-            Math.mulDiv(project.linearFunding, alphaDenominator - alphaNumerator, alphaDenominator) // Linear funding term
+            Math.mulDiv(project.quadraticFunding, alphaNumerator, alphaDenominator), // Alpha-weighted quadratic funding
+            project.sumContributions // Raw linear funding (Sum_j)
         );
     }
 

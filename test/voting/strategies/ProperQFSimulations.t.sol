@@ -153,10 +153,10 @@ contract ProperQFSimulationTest is Test {
         (uint256 initialNum, uint256 initialDenom) = qf.getAlpha();
         assertEq(initialNum, 10000);
         assertEq(initialDenom, 10000);
-        
+
         // Set alpha to 0.6 (6000/10000)
         qf.exposed_setAlpha(6000, 10000);
-        
+
         // Verify new alpha
         (uint256 newNum, uint256 newDenom) = qf.getAlpha();
         assertEq(newNum, 6000);
@@ -168,26 +168,22 @@ contract ProperQFSimulationTest is Test {
         uint256 projectId = 1;
         uint256 contribution = 100e18;
         uint256 voteWeight = 10e9;
-        
+
         // Process a vote with initial alpha (1.0)
         qf.exposed_processVote(projectId, contribution, voteWeight);
-        
+
         // Get initial funding distribution
-        (,, uint256 initialQuadratic, uint256 initialLinear) = qf.getTally(projectId);
-        
+        (, , uint256 initialQuadratic, uint256 initialLinear) = qf.getTally(projectId);
+
         // Set alpha to 0.6
         qf.exposed_setAlpha(6000, 10000);
-        
+
         // Get new funding distribution
-        (,, uint256 newQuadratic, uint256 newLinear) = qf.getTally(projectId);
-        
+        (, , uint256 newQuadratic, uint256 newLinear) = qf.getTally(projectId);
+
         // Verify that quadratic portion is 60% of what it was
-        assertEq(
-            newQuadratic,
-            (initialQuadratic * 6000) / 10000,
-            "Quadratic funding should be 60% of original"
-        );
-        
+        assertEq(newQuadratic, (initialQuadratic * 6000) / 10000, "Quadratic funding should be 60% of original");
+
         // Linear portion should remain unchanged
         assertEq(newLinear, initialLinear, "Linear funding should remain unchanged");
     }
@@ -196,11 +192,11 @@ contract ProperQFSimulationTest is Test {
         // Should revert when denominator is 0
         vm.expectRevert("Denominator must be positive");
         qf.exposed_setAlpha(1, 0);
-        
+
         // Should revert when alpha > 1
         vm.expectRevert("Alpha must be <= 1");
         qf.exposed_setAlpha(11, 10);
-        
+
         // Edge cases should work
         qf.exposed_setAlpha(0, 1); // alpha = 0
         qf.exposed_setAlpha(1, 1); // alpha = 1
@@ -209,22 +205,18 @@ contract ProperQFSimulationTest is Test {
     function test_set_alpha_precision() public {
         // Test with high precision values
         qf.exposed_setAlpha(12345, 100000); // alpha = 0.12345
-        
+
         uint256 projectId = 1;
         uint256 contribution = 100e18;
         uint256 voteWeight = 10e9;
-        
+
         qf.exposed_processVote(projectId, contribution, voteWeight);
-        
-        (,, uint256 quadraticFunding,) = qf.getTally(projectId);
-        
+
+        (, , uint256 quadraticFunding, ) = qf.getTally(projectId);
+
         // Verify precise calculation
         uint256 expectedQuadratic = (voteWeight * voteWeight * 12345) / 100000;
-        assertEq(
-            quadraticFunding,
-            expectedQuadratic,
-            "Quadratic funding should be precisely calculated"
-        );
+        assertEq(quadraticFunding, expectedQuadratic, "Quadratic funding should be precisely calculated");
     }
     function test_simulation_totals_match() public {
         /// @notice Test to verify that project-wise sums match contract-wide totals
@@ -254,21 +246,9 @@ contract ProperQFSimulationTest is Test {
         uint256 actualTotalFunding = qf.totalFunding();
 
         // Verify totals match
-        assertEq(
-            actualQuadraticSum,
-            expectedQuadraticSum,
-            "Total quadratic sum mismatch"
-        );
-        assertEq(
-            actualLinearSum,
-            expectedLinearSum,
-            "Total linear sum mismatch"
-        );
-        assertEq(
-            actualTotalFunding,
-            expectedTotalFunding,
-            "Total funding mismatch"
-        );
+        assertEq(actualQuadraticSum, expectedQuadraticSum, "Total quadratic sum mismatch");
+        assertEq(actualLinearSum, expectedLinearSum, "Total linear sum mismatch");
+        assertEq(actualTotalFunding, expectedTotalFunding, "Total funding mismatch");
     }
 
     function test_simulation_totals_accumulate_correctly() public {
@@ -278,18 +258,18 @@ contract ProperQFSimulationTest is Test {
         uint256 baseContribution = 100e18;
 
         VoterProfile[] memory voters = generateSimpleVoterProfiles(numVoters, numProjects, baseContribution, 0);
-        
+
         // Track running totals per project
         uint256[] memory projectQuadraticSums = new uint256[](numProjects);
         uint256[] memory projectLinearSums = new uint256[](numProjects);
-        
+
         // Process votes one by one and check totals after each vote
         for (uint256 i = 0; i < voters.length; i++) {
             for (uint256 j = 0; j < numProjects; j++) {
                 uint256 contribution = voters[i].contributions[j];
                 if (contribution > 0) {
                     uint256 sqrtContribution = qf.exposed_sqrt(contribution);
-                    
+
                     // Update running totals for this project
                     projectQuadraticSums[j] += sqrtContribution;
                     projectLinearSums[j] += contribution;
@@ -301,30 +281,19 @@ contract ProperQFSimulationTest is Test {
                     uint256 expectedQuadraticSum = 0;
                     uint256 expectedLinearSum = 0;
                     uint256 expectedTotalFunding = 0;
-                    
+
                     for (uint256 k = 0; k < numProjects; k++) {
                         expectedQuadraticSum += projectQuadraticSums[k] * projectQuadraticSums[k];
                         expectedLinearSum += projectLinearSums[k];
-                        expectedTotalFunding += projectLinearSums[k] + 
+                        expectedTotalFunding +=
+                            projectLinearSums[k] +
                             (projectQuadraticSums[k] * projectQuadraticSums[k]);
                     }
 
                     // Verify running totals match contract state
-                    assertEq(
-                        qf.totalQuadraticSum(),
-                        expectedQuadraticSum,
-                        "Running quadratic sum mismatch"
-                    );
-                    assertEq(
-                        qf.totalLinearSum(),
-                        expectedLinearSum,
-                        "Running linear sum mismatch"
-                    );
-                    assertEq(
-                        qf.totalFunding(),
-                        expectedTotalFunding,
-                        "Running total funding mismatch"
-                    );
+                    assertEq(qf.totalQuadraticSum(), expectedQuadraticSum, "Running quadratic sum mismatch");
+                    assertEq(qf.totalLinearSum(), expectedLinearSum, "Running linear sum mismatch");
+                    assertEq(qf.totalFunding(), expectedTotalFunding, "Running total funding mismatch");
                 }
             }
         }
@@ -372,12 +341,7 @@ contract ProperQFSimulationTest is Test {
         uint256 baseContribution = 100e18;
 
         // Generate uniform contributions
-        VoterProfile[] memory voters = generateSimpleVoterProfiles(
-            numVoters,
-            numProjects,
-            baseContribution,
-            0
-        );
+        VoterProfile[] memory voters = generateSimpleVoterProfiles(numVoters, numProjects, baseContribution, 0);
 
         uint256[4][] memory results = simulateVotingRound(voters, numProjects);
 
@@ -387,29 +351,13 @@ contract ProperQFSimulationTest is Test {
         uint256 expectedQuadraticPerProject = expectedSqrtSumPerProject * expectedSqrtSumPerProject;
 
         for (uint256 i = 0; i < numProjects; i++) {
-            assertEq(
-                results[i][0],
-                expectedContributionPerProject,
-                "Uniform contributions mismatch"
-            );
-            assertEq(
-                results[i][2],
-                expectedQuadraticPerProject,
-                "Uniform quadratic funding mismatch"
-            );
+            assertEq(results[i][0], expectedContributionPerProject, "Uniform contributions mismatch");
+            assertEq(results[i][2], expectedQuadraticPerProject, "Uniform quadratic funding mismatch");
         }
 
         // Verify global totals
-        assertEq(
-            qf.totalQuadraticSum(),
-            expectedQuadraticPerProject * numProjects,
-            "Total quadratic sum mismatch"
-        );
-        assertEq(
-            qf.totalLinearSum(),
-            expectedContributionPerProject * numProjects,
-            "Total linear sum mismatch"
-        );
+        assertEq(qf.totalQuadraticSum(), expectedQuadraticPerProject * numProjects, "Total quadratic sum mismatch");
+        assertEq(qf.totalLinearSum(), expectedContributionPerProject * numProjects, "Total linear sum mismatch");
     }
 
     /// @notice Test using simple voter profiles with increasing contributions per project
@@ -419,12 +367,7 @@ contract ProperQFSimulationTest is Test {
         uint256 baseContribution = 100e18;
 
         // Generate increasing contributions per project
-        VoterProfile[] memory voters = generateSimpleVoterProfiles(
-            numVoters,
-            numProjects,
-            baseContribution,
-            0
-        );
+        VoterProfile[] memory voters = generateSimpleVoterProfiles(numVoters, numProjects, baseContribution, 0);
 
         uint256[4][] memory results = simulateVotingRound(voters, numProjects);
 
@@ -434,11 +377,7 @@ contract ProperQFSimulationTest is Test {
         uint256 expectedQuadraticPerProject = expectedSqrtSumPerProject * expectedSqrtSumPerProject;
 
         for (uint256 i = 0; i < numProjects; i++) {
-            assertEq(
-                results[i][0],
-                expectedContributionPerProject,
-                " contributions per project mismatch"
-            );
+            assertEq(results[i][0], expectedContributionPerProject, " contributions per project mismatch");
             assertEq(
                 results[i][2],
                 expectedQuadraticPerProject,
@@ -447,16 +386,8 @@ contract ProperQFSimulationTest is Test {
         }
 
         // Verify global totals
-        assertEq(
-            qf.totalQuadraticSum(),
-            expectedQuadraticPerProject * numProjects,
-            "Total quadratic sum mismatch"
-        );
-        assertEq(
-            qf.totalLinearSum(),
-            expectedContributionPerProject * numProjects,
-            "Total linear sum mismatch"
-        );
+        assertEq(qf.totalQuadraticSum(), expectedQuadraticPerProject * numProjects, "Total quadratic sum mismatch");
+        assertEq(qf.totalLinearSum(), expectedContributionPerProject * numProjects, "Total linear sum mismatch");
     }
 
     function test_simulation_totals_print() public {
@@ -466,16 +397,16 @@ contract ProperQFSimulationTest is Test {
         uint256 baseContribution = 100e18;
 
         VoterProfile[] memory voters = generateSimpleVoterProfiles(numVoters, numProjects, baseContribution, 0);
-        
+
         // Track running totals per project
         uint256[] memory projectQuadraticSums = new uint256[](numProjects);
         uint256[] memory projectLinearSums = new uint256[](numProjects);
-        
+
         console.log("\n=== Initial State ===");
         console.log("Base contribution per vote:", baseContribution / 1e18, "tokens");
         console.log("Number of voters:", numVoters);
         console.log("Number of projects:", numProjects);
-        
+
         // Process votes one by one and check totals after each vote
         for (uint256 i = 0; i < voters.length; i++) {
             console.log("\n--- Processing Voter", i + 1, "---");
@@ -483,7 +414,7 @@ contract ProperQFSimulationTest is Test {
                 uint256 contribution = voters[i].contributions[j];
                 if (contribution > 0) {
                     uint256 sqrtContribution = qf.exposed_sqrt(contribution);
-                    
+
                     // Update running totals for this project
                     projectQuadraticSums[j] += sqrtContribution;
                     projectLinearSums[j] += contribution;
@@ -491,13 +422,9 @@ contract ProperQFSimulationTest is Test {
                     // Process the vote
                     qf.exposed_processVote(j + 1, contribution, sqrtContribution);
 
-                    console.log(
-                        "Project", j + 1);
-                    console.log(
-                        "- Vote:", contribution / 1e18);
-                    console.log(
-                        "- Sqrt:", sqrtContribution / 1e9
-                    );
+                    console.log("Project", j + 1);
+                    console.log("- Vote:", contribution / 1e18);
+                    console.log("- Sqrt:", sqrtContribution / 1e9);
                 }
             }
         }
@@ -505,12 +432,8 @@ contract ProperQFSimulationTest is Test {
         console.log("\n=== Final Totals ===");
         // Print per-project totals
         for (uint256 i = 0; i < numProjects; i++) {
-            (
-                uint256 sumContributions,
-                uint256 sumSquareRoots,
-                uint256 quadraticFunding,
-                uint256 linearFunding
-            ) = qf.getTally(i + 1);
+            (uint256 sumContributions, uint256 sumSquareRoots, uint256 quadraticFunding, uint256 linearFunding) = qf
+                .getTally(i + 1);
 
             console.log("\nProject", i + 1, "Stats:");
             console.log("Total Contributions:", sumContributions / 1e18);

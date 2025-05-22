@@ -46,4 +46,3 @@ contract HarnessProperQF is ProperQF {
         ProperQF._setAlpha(newNumerator, newDenominator);
     }
 }
-
