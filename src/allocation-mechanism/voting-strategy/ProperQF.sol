@@ -1,10 +1,21 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 abstract contract ProperQF {
     using Math for uint256;
+
+    // Custom Errors
+    error ContributionMustBePositive();
+    error VoteWeightMustBePositive();
+    error VoteWeightOverflow();
+    error SquareRootTooLarge();
+    error VoteWeightOutsideTolerance();
+    error QuadraticSumUnderflow();
+    error LinearSumUnderflow();
+    error DenominatorMustBePositive();
+    error AlphaMustBeLessOrEqualToOne();
 
     struct Project {
         uint256 sumContributions; // Sum of contributions (Sum_j)
@@ -31,24 +42,20 @@ abstract contract ProperQF {
      * @param contribution The new contribution to add.
      */
     function _processVote(uint256 projectId, uint256 contribution, uint256 voteWeight) internal virtual {
-        require(contribution > 0, "Contribution must be positive");
-        require(voteWeight > 0, "Square root of contribution must be positive");
+        if (contribution == 0) revert ContributionMustBePositive();
+        if (voteWeight == 0) revert VoteWeightMustBePositive();
 
         // Validate square root relationship with safe multiplication
         uint256 voteWeightSquared = voteWeight * voteWeight;
-        require(voteWeightSquared / voteWeight == voteWeight, "Vote weight overflow");
-        require(
-            voteWeightSquared <= contribution,
-            "Square root of contribution must be less than or equal to contribution"
-        );
+        if (voteWeightSquared / voteWeight != voteWeight) revert VoteWeightOverflow();
+        if (voteWeightSquared > contribution) revert SquareRootTooLarge();
 
         // Validate square root approximation within 10% tolerance
         uint256 actualSqrt = _sqrt(contribution);
         uint256 tolerance = actualSqrt / 10; // 10% tolerance
-        require(
-            voteWeight >= actualSqrt - tolerance && voteWeight <= actualSqrt + tolerance,
-            "Vote weight outside 10% tolerance of square root"
-        );
+        if (voteWeight < actualSqrt - tolerance || voteWeight > actualSqrt + tolerance) {
+            revert VoteWeightOutsideTolerance();
+        }
 
         Project storage project = projects[projectId];
 
@@ -60,8 +67,8 @@ abstract contract ProperQF {
         uint256 newQuadraticFunding = (newSumSquareRoots * newSumSquareRoots);
 
         // Update global sums with underflow protection
-        require(totalQuadraticSum >= project.quadraticFunding, "Quadratic sum underflow");
-        require(totalLinearSum >= project.linearFunding, "Linear sum underflow");
+        if (totalQuadraticSum < project.quadraticFunding) revert QuadraticSumUnderflow();
+        if (totalLinearSum < project.linearFunding) revert LinearSumUnderflow();
 
         totalQuadraticSum = totalQuadraticSum - project.quadraticFunding + newQuadraticFunding;
         totalLinearSum = totalLinearSum - project.linearFunding + newSumContributions;
@@ -110,9 +117,7 @@ abstract contract ProperQF {
      * @return quadraticFunding The raw quadratic funding component (S_j^2)
      * @return linearFunding The raw linear funding component (Sum_j)
      */
-    function getTally(
-        uint256 projectId
-    )
+    function getTally(uint256 projectId)
         public
         view
         returns (uint256 sumContributions, uint256 sumSquareRoots, uint256 quadraticFunding, uint256 linearFunding)
@@ -137,8 +142,8 @@ abstract contract ProperQF {
      */
     function _setAlpha(uint256 newNumerator, uint256 newDenominator) internal {
         // Input validation
-        require(newDenominator > 0, "Denominator must be positive");
-        require(newNumerator <= newDenominator, "Alpha must be <= 1");
+        if (newDenominator == 0) revert DenominatorMustBePositive();
+        if (newNumerator > newDenominator) revert AlphaMustBeLessOrEqualToOne();
 
         // Store old values for event emission
         uint256 oldNumerator = alphaNumerator;

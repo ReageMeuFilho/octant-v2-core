@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import { Test } from "forge-std/Test.sol";
-import { SimpleVotingMechanism } from "src/allocation-mechanism/mechanism/SimpleVotingMechanism.sol";
-import { BaseAllocationMechanism } from "src/allocation-mechanism/BaseAllocationMechanism.sol";
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Test} from "forge-std/Test.sol";
+import {SimpleVotingMechanism} from "src/allocation-mechanism/mechanism/SimpleVotingMechanism.sol";
+import {BaseAllocationMechanism} from "src/allocation-mechanism/BaseAllocationMechanism.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract MockERC20 is ERC20 {
     constructor(string memory name, string memory symbol) ERC20(name, symbol) {
@@ -37,14 +37,7 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(admin);
         token = new MockERC20("Test Token", "TEST");
         voting = new SimpleVotingMechanism(
-            IERC20(address(token)),
-            "Voting Shares",
-            "VOTE",
-            votingDelay,
-            votingPeriod,
-            quorumShares,
-            timelockDelay,
-            1
+            IERC20(address(token)), "Voting Shares", "VOTE", votingDelay, votingPeriod, quorumShares, timelockDelay, 1
         );
 
         // Fund test users
@@ -90,7 +83,7 @@ contract SimpleVotingMechanismTest is Test {
         vm.roll(block.number + votingDelay + votingPeriod + 1);
 
         vm.prank(user1);
-        vm.expectRevert("Voting ended");
+        vm.expectRevert(BaseAllocationMechanism.VotingEnded.selector);
         voting.signup(100);
     }
 
@@ -99,7 +92,7 @@ contract SimpleVotingMechanismTest is Test {
         token.approve(address(voting), 100);
         voting.signup(100);
 
-        vm.expectRevert("Already registered");
+        vm.expectRevert(BaseAllocationMechanism.AlreadyRegistered.selector);
         voting.signup(100);
         vm.stopPrank();
     }
@@ -111,19 +104,19 @@ contract SimpleVotingMechanismTest is Test {
         token.approve(address(voting), 100);
         voting.signup(100);
 
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
         assertEq(pid, 1);
-        (, , address proposer, address recipient, , ) = voting.proposals(pid);
+        (,, address proposer, address recipient,,,) = voting.proposals(pid);
         assertEq(proposer, user1);
         assertEq(recipient, recipient1);
     }
 
     function testProposalCreationByUnregisteredUser() public {
         vm.prank(user1);
-        vm.expectRevert("Propose not allowed");
-        voting.propose(recipient1);
+        vm.expectRevert(BaseAllocationMechanism.ProposeNotAllowed.selector);
+        voting.propose(recipient1, "Test proposal");
     }
 
     function testProposalWithUsedRecipient() public {
@@ -131,15 +124,15 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 100);
         voting.signup(100);
-        voting.propose(recipient1);
+        voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
         vm.startPrank(user2);
         token.approve(address(voting), 100);
         voting.signup(100);
 
-        vm.expectRevert("Recipient used");
-        voting.propose(recipient1);
+        vm.expectRevert(BaseAllocationMechanism.RecipientUsed.selector);
+        voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
     }
 
@@ -149,7 +142,7 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 200);
         voting.signup(200);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
         vm.startPrank(user2);
@@ -168,7 +161,7 @@ contract SimpleVotingMechanismTest is Test {
         voting.castVote(pid, BaseAllocationMechanism.VoteType.Against, 200);
 
         // Check vote counts
-        (uint256 sharesFor, uint256 sharesAgainst, uint256 sharesAbstain) = voting.proposalVotes(pid);
+        (uint256 sharesFor, uint256 sharesAgainst, uint256 sharesAbstain) = voting.getVoteTally(pid);
         assertEq(sharesFor, 150);
         assertEq(sharesAgainst, 200);
         assertEq(sharesAbstain, 0);
@@ -183,9 +176,9 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 100);
         voting.signup(100);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
 
-        vm.expectRevert("Voting closed");
+        vm.expectRevert(BaseAllocationMechanism.VotingClosed.selector);
         voting.castVote(pid, BaseAllocationMechanism.VoteType.For, 50);
         vm.stopPrank();
     }
@@ -195,14 +188,14 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 100);
         voting.signup(100);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
         // Move past voting period
         vm.roll(block.number + votingDelay + votingPeriod + 1);
 
         vm.prank(user1);
-        vm.expectRevert("Voting closed");
+        vm.expectRevert(BaseAllocationMechanism.VotingClosed.selector);
         voting.castVote(pid, BaseAllocationMechanism.VoteType.For, 50);
     }
 
@@ -211,7 +204,7 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 100);
         voting.signup(100);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
         // Move to voting period
@@ -220,7 +213,7 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         voting.castVote(pid, BaseAllocationMechanism.VoteType.For, 50);
 
-        vm.expectRevert("Already voted");
+        vm.expectRevert(BaseAllocationMechanism.AlreadyVoted.selector);
         voting.castVote(pid, BaseAllocationMechanism.VoteType.For, 50);
         vm.stopPrank();
     }
@@ -231,7 +224,7 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 100);
         voting.signup(100);
-        voting.propose(recipient1);
+        voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
         // Move past voting period
@@ -248,11 +241,11 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 100);
         voting.signup(100);
-        voting.propose(recipient1);
+        voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
         vm.prank(admin);
-        vm.expectRevert("Voting not ended");
+        vm.expectRevert(BaseAllocationMechanism.VotingNotEnded.selector);
         voting.finalizeVoteTally();
     }
 
@@ -262,7 +255,7 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 200);
         voting.signup(200);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
         // Move to voting period
@@ -282,7 +275,7 @@ contract SimpleVotingMechanismTest is Test {
         voting.queueProposal(pid);
 
         // Check proposal is queued
-        (uint256 sharesRequested, uint256 eta, , , , ) = voting.proposals(pid);
+        (uint256 sharesRequested, uint256 eta,,,,,) = voting.proposals(pid);
         assertEq(sharesRequested, 0);
         assertTrue(eta > 0);
         assertEq(voting.proposalShares(pid), 150);
@@ -293,7 +286,7 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 200);
         voting.signup(200);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
         // Move to voting period and vote
@@ -306,7 +299,7 @@ contract SimpleVotingMechanismTest is Test {
 
         // Try to queue without finalizing
         vm.prank(admin);
-        vm.expectRevert("Tally not finalized");
+        vm.expectRevert(BaseAllocationMechanism.TallyNotFinalized.selector);
         voting.queueProposal(pid);
     }
 
@@ -315,7 +308,7 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 200);
         voting.signup(200);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
         // Move to voting period and vote against
@@ -330,7 +323,7 @@ contract SimpleVotingMechanismTest is Test {
 
         // Try to queue
         vm.prank(admin);
-        vm.expectRevert("No quorum");
+        vm.expectRevert(BaseAllocationMechanism.NoQuorum.selector);
         voting.queueProposal(pid);
     }
 
@@ -340,7 +333,7 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 200);
         voting.signup(200);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
         vm.startPrank(user2);
@@ -374,7 +367,7 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 200);
         voting.signup(200);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
         vm.startPrank(user2);
@@ -398,7 +391,7 @@ contract SimpleVotingMechanismTest is Test {
 
         // Try to queue proposal - should fail with 0 net votes
         vm.prank(admin);
-        vm.expectRevert("No quorum");
+        vm.expectRevert(BaseAllocationMechanism.NoQuorum.selector);
         voting.queueProposal(pid);
     }
 
@@ -409,7 +402,7 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 200);
         voting.signup(200);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
         // Move to voting period
@@ -420,7 +413,7 @@ contract SimpleVotingMechanismTest is Test {
         voting.castVote(pid, BaseAllocationMechanism.VoteType.Abstain, 100);
 
         // Check vote counts
-        (uint256 sharesFor, uint256 sharesAgainst, uint256 sharesAbstain) = voting.proposalVotes(pid);
+        (uint256 sharesFor, uint256 sharesAgainst, uint256 sharesAbstain) = voting.getVoteTally(pid);
         assertEq(sharesFor, 0);
         assertEq(sharesAgainst, 0);
         assertEq(sharesAbstain, 100);
@@ -434,7 +427,7 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 200);
         voting.signup(200);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
         // Move to voting period and vote
@@ -449,7 +442,7 @@ contract SimpleVotingMechanismTest is Test {
         voting.queueProposal(pid);
 
         // Try to queue again
-        vm.expectRevert("Already queued");
+        vm.expectRevert(BaseAllocationMechanism.AlreadyQueued.selector);
         voting.queueProposal(pid);
         vm.stopPrank();
     }
@@ -461,75 +454,40 @@ contract SimpleVotingMechanismTest is Test {
         voting.signup(100);
 
         // Try to propose with zero address
-        vm.expectRevert("Invalid recipient");
-        voting.propose(address(0));
+        vm.expectRevert(BaseAllocationMechanism.InvalidRecipient.selector);
+        voting.propose(address(0), "Test proposal");
         vm.stopPrank();
     }
 
     function testConstructorWithInvalidInputs() public {
         // Test with zero address for asset
-        vm.expectRevert("Invalid asset");
+        vm.expectRevert(BaseAllocationMechanism.ZeroAssetAddress.selector);
         new SimpleVotingMechanism(
-            IERC20(address(0)),
-            "Voting Shares",
-            "VOTE",
-            votingDelay,
-            votingPeriod,
-            quorumShares,
-            timelockDelay,
-            1
+            IERC20(address(0)), "Voting Shares", "VOTE", votingDelay, votingPeriod, quorumShares, timelockDelay, 1
         );
 
         // Test with zero voting delay
-        vm.expectRevert("Invalid voting delay");
+        vm.expectRevert(BaseAllocationMechanism.ZeroVotingDelay.selector);
         new SimpleVotingMechanism(
-            IERC20(address(token)),
-            "Voting Shares",
-            "VOTE",
-            0,
-            votingPeriod,
-            quorumShares,
-            timelockDelay,
-            1
+            IERC20(address(token)), "Voting Shares", "VOTE", 0, votingPeriod, quorumShares, timelockDelay, 1
         );
 
         // Test with zero voting period
-        vm.expectRevert("Invalid voting period");
+        vm.expectRevert(BaseAllocationMechanism.ZeroVotingPeriod.selector);
         new SimpleVotingMechanism(
-            IERC20(address(token)),
-            "Voting Shares",
-            "VOTE",
-            votingDelay,
-            0,
-            quorumShares,
-            timelockDelay,
-            1
+            IERC20(address(token)), "Voting Shares", "VOTE", votingDelay, 0, quorumShares, timelockDelay, 1
         );
 
         // Test with zero quorum
-        vm.expectRevert("Invalid quorum");
+        vm.expectRevert(BaseAllocationMechanism.ZeroQuorumShares.selector);
         new SimpleVotingMechanism(
-            IERC20(address(token)),
-            "Voting Shares",
-            "VOTE",
-            votingDelay,
-            votingPeriod,
-            0,
-            timelockDelay,
-            1
+            IERC20(address(token)), "Voting Shares", "VOTE", votingDelay, votingPeriod, 0, timelockDelay, 1
         );
 
         // Test with zero timelock delay
-        vm.expectRevert("Invalid timelock");
+        vm.expectRevert(BaseAllocationMechanism.ZeroTimelockDelay.selector);
         new SimpleVotingMechanism(
-            IERC20(address(token)),
-            "Voting Shares",
-            "VOTE",
-            votingDelay,
-            votingPeriod,
-            quorumShares,
-            0,
-            1
+            IERC20(address(token)), "Voting Shares", "VOTE", votingDelay, votingPeriod, quorumShares, 0, 1
         );
     }
 
@@ -538,7 +496,7 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 200);
         voting.signup(200);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
         // Move to voting period and vote
@@ -563,7 +521,7 @@ contract SimpleVotingMechanismTest is Test {
         assertEq(redeemableTime, timestampBefore + timelockDelay);
 
         // Check proposal eta
-        (, uint256 eta, , , , ) = voting.proposals(pid);
+        (, uint256 eta,,,,,) = voting.proposals(pid);
         assertEq(eta, redeemableTime);
     }
 
@@ -572,7 +530,7 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 100);
         voting.signup(100);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
         // Move to voting period
@@ -580,12 +538,12 @@ contract SimpleVotingMechanismTest is Test {
 
         // Try to vote with zero weight
         vm.prank(user1);
-        vm.expectRevert("Invalid weight");
+        vm.expectRevert(BaseAllocationMechanism.InvalidWeight.selector);
         voting.castVote(pid, BaseAllocationMechanism.VoteType.For, 0);
 
         // Try to vote with weight > voting power
         vm.prank(user1);
-        vm.expectRevert("Invalid weight");
+        vm.expectRevert(BaseAllocationMechanism.InvalidWeight.selector);
         voting.castVote(pid, BaseAllocationMechanism.VoteType.For, 101);
     }
 
@@ -599,7 +557,7 @@ contract SimpleVotingMechanismTest is Test {
 
         // Try to vote on non-existent proposal
         vm.prank(user1);
-        vm.expectRevert("Invalid proposal");
+        vm.expectRevert(BaseAllocationMechanism.InvalidProposal.selector);
         voting.castVote(999, BaseAllocationMechanism.VoteType.For, 50);
     }
 
@@ -611,7 +569,7 @@ contract SimpleVotingMechanismTest is Test {
 
         // Try to queue non-existent proposal
         vm.prank(admin);
-        vm.expectRevert("Invalid proposal");
+        vm.expectRevert(BaseAllocationMechanism.InvalidProposal.selector);
         voting.queueProposal(999);
     }
 
@@ -622,17 +580,17 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 100);
         voting.signup(100);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
         // Initial state: Pending/Active (before voting period starts)
-        assertEq(uint(voting.state(pid)), uint(BaseAllocationMechanism.ProposalState.Active));
+        assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Active));
 
         // Move to voting period
         vm.roll(block.number + votingDelay + 1);
 
         // State during voting: Active
-        assertEq(uint(voting.state(pid)), uint(BaseAllocationMechanism.ProposalState.Active));
+        assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Active));
 
         // Vote to pass quorum
         vm.prank(user1);
@@ -644,17 +602,17 @@ contract SimpleVotingMechanismTest is Test {
         voting.finalizeVoteTally();
 
         // State after voting but before queuing: Should be Pending
-        assertEq(uint(voting.state(pid)), uint(BaseAllocationMechanism.ProposalState.Pending));
+        assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Pending));
 
         // Queue the proposal
         vm.prank(admin);
         voting.queueProposal(pid);
 
         // State after queuing: Succeeded (since claimed is set to true immediately)
-        assertEq(uint(voting.state(pid)), uint(BaseAllocationMechanism.ProposalState.Succeeded));
+        assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Succeeded));
 
         // Check proposal is marked as claimed
-        (, , , , bool claimed, ) = voting.proposals(pid);
+        (,,,, , bool claimed, ) = voting.proposals(pid);
         assertTrue(claimed);
     }
 
@@ -663,7 +621,7 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 100);
         voting.signup(100);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
         // No votes cast = no quorum
@@ -672,7 +630,7 @@ contract SimpleVotingMechanismTest is Test {
         vm.roll(block.number + votingDelay + votingPeriod + 1);
 
         // State should be Defeated (no quorum)
-        assertEq(uint(voting.state(pid)), uint(BaseAllocationMechanism.ProposalState.Defeated));
+        assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Defeated));
     }
 
     function testProposalStateCanceled() public {
@@ -680,14 +638,14 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 100);
         voting.signup(100);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
 
         // Cancel the proposal
         voting.cancelProposal(pid);
         vm.stopPrank();
 
         // State should be Canceled
-        assertEq(uint(voting.state(pid)), uint(BaseAllocationMechanism.ProposalState.Canceled));
+        assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Canceled));
     }
 
     function testProposalCancellation() public {
@@ -695,13 +653,13 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 100);
         voting.signup(100);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
 
         // Cancel the proposal
         voting.cancelProposal(pid);
 
         // Check that it's marked as canceled
-        (, , , , bool claimed, bool canceled) = voting.proposals(pid);
+        (,,,, , bool claimed, bool canceled) = voting.proposals(pid);
         assertTrue(canceled);
         assertFalse(claimed);
         vm.stopPrank();
@@ -720,7 +678,7 @@ contract SimpleVotingMechanismTest is Test {
 
         // Try to queue canceled proposal
         vm.prank(admin);
-        vm.expectRevert("Canceled");
+        vm.expectRevert(BaseAllocationMechanism.ProposalCanceledError.selector);
         voting.queueProposal(pid);
     }
 
@@ -729,7 +687,7 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 200);
         voting.signup(200);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
         // Move to voting period and vote
@@ -746,7 +704,7 @@ contract SimpleVotingMechanismTest is Test {
 
         // Try to cancel after queuing
         vm.prank(user1);
-        vm.expectRevert("Already queued");
+        vm.expectRevert(BaseAllocationMechanism.AlreadyQueued.selector);
         voting.cancelProposal(pid);
     }
 
@@ -755,12 +713,12 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 100);
         voting.signup(100);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
         // Try to cancel from non-proposer
         vm.prank(user2);
-        vm.expectRevert("Not proposer");
+        vm.expectRevert(BaseAllocationMechanism.NotProposer.selector);
         voting.cancelProposal(pid);
     }
 
@@ -772,7 +730,7 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 200);
         voting.signup(200);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
         // Move to voting period and vote
@@ -794,7 +752,7 @@ contract SimpleVotingMechanismTest is Test {
         assertEq(redeemableTime, timestampBefore + timelockDelay);
 
         // Check that eta matches redeemableAfter
-        (, uint256 eta, , , , ) = voting.proposals(pid);
+        (, uint256 eta,,,,,) = voting.proposals(pid);
         assertEq(eta, redeemableTime);
     }
 
@@ -803,7 +761,7 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 200);
         voting.signup(200);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
         // Move to voting period and vote
@@ -819,11 +777,11 @@ contract SimpleVotingMechanismTest is Test {
         vm.stopPrank();
 
         // Check that the proposal is marked as claimed
-        (, , , , bool claimed, ) = voting.proposals(pid);
+        (,,,, , bool claimed, ) = voting.proposals(pid);
         assertTrue(claimed);
 
         // Check the proposal state is Succeeded
-        assertEq(uint(voting.state(pid)), uint(BaseAllocationMechanism.ProposalState.Succeeded));
+        assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Succeeded));
     }
 
     // 10. Additional Revert Case Tests for Branch Coverage
@@ -841,14 +799,14 @@ contract SimpleVotingMechanismTest is Test {
     function testProposeWhenNotRegistered() public {
         // Testing the _beforeProposeHook fails when user has no voting power
         vm.prank(user1);
-        vm.expectRevert("Propose not allowed");
-        voting.propose(recipient1);
+        vm.expectRevert(BaseAllocationMechanism.ProposeNotAllowed.selector);
+        voting.propose(recipient1, "Test proposal");
     }
 
     // Tests for finalizeVoteTally() function reverts
     function testFinalizeVoteTallyBeforeVotingEnds() public {
         vm.prank(admin);
-        vm.expectRevert("Voting not ended");
+        vm.expectRevert(BaseAllocationMechanism.VotingNotEnded.selector);
         voting.finalizeVoteTally();
     }
 
@@ -866,7 +824,7 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 100);
         voting.signup(100);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
         // Move past voting period (but don't finalize)
@@ -874,7 +832,7 @@ contract SimpleVotingMechanismTest is Test {
 
         // Try to queue without finalizing
         vm.prank(admin);
-        vm.expectRevert("Tally not finalized");
+        vm.expectRevert(BaseAllocationMechanism.TallyNotFinalized.selector);
         voting.queueProposal(pid);
     }
 
@@ -883,7 +841,7 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 100);
         voting.signup(100);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
 
         // Cancel the proposal
         voting.cancelProposal(pid);
@@ -896,7 +854,7 @@ contract SimpleVotingMechanismTest is Test {
 
         // Try to queue canceled proposal
         vm.prank(admin);
-        vm.expectRevert("Canceled");
+        vm.expectRevert(BaseAllocationMechanism.ProposalCanceledError.selector);
         voting.queueProposal(pid);
     }
 
@@ -905,7 +863,7 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 100);
         voting.signup(100);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
         // Move past voting period and finalize (with 0 votes)
@@ -915,7 +873,7 @@ contract SimpleVotingMechanismTest is Test {
 
         // Try to queue with 0 net votes
         vm.prank(admin);
-        vm.expectRevert("No quorum");
+        vm.expectRevert(BaseAllocationMechanism.NoQuorum.selector);
         voting.queueProposal(pid);
     }
 
@@ -924,7 +882,7 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 200);
         voting.signup(200);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
         vm.startPrank(user2);
@@ -949,7 +907,7 @@ contract SimpleVotingMechanismTest is Test {
 
         // Try to queue with equal votes
         vm.prank(admin);
-        vm.expectRevert("No quorum");
+        vm.expectRevert(BaseAllocationMechanism.NoQuorum.selector);
         voting.queueProposal(pid);
     }
 
@@ -966,7 +924,7 @@ contract SimpleVotingMechanismTest is Test {
 
         // Try to vote on non-existent proposal
         vm.prank(user1);
-        vm.expectRevert("Invalid proposal");
+        vm.expectRevert(BaseAllocationMechanism.InvalidProposal.selector);
         voting.castVote(999, BaseAllocationMechanism.VoteType.For, 50);
     }
 
@@ -975,10 +933,10 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 100);
         voting.signup(100);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
 
         // Try to vote immediately (before voting period)
-        vm.expectRevert("Voting closed");
+        vm.expectRevert(BaseAllocationMechanism.VotingClosed.selector);
         voting.castVote(pid, BaseAllocationMechanism.VoteType.For, 50);
         vm.stopPrank();
     }
@@ -988,7 +946,7 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 100);
         voting.signup(100);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
         // Move to voting period
@@ -996,7 +954,7 @@ contract SimpleVotingMechanismTest is Test {
 
         // Try to vote with zero weight
         vm.prank(user1);
-        vm.expectRevert("Invalid weight");
+        vm.expectRevert(BaseAllocationMechanism.InvalidWeight.selector);
         voting.castVote(pid, BaseAllocationMechanism.VoteType.For, 0);
     }
 
@@ -1005,7 +963,7 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 100);
         voting.signup(100);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
         // Move to voting period
@@ -1013,7 +971,7 @@ contract SimpleVotingMechanismTest is Test {
 
         // Try to vote with more than voting power
         vm.prank(user1);
-        vm.expectRevert("Invalid weight");
+        vm.expectRevert(BaseAllocationMechanism.InvalidWeight.selector);
         voting.castVote(pid, BaseAllocationMechanism.VoteType.For, 101);
     }
 
@@ -1028,7 +986,7 @@ contract SimpleVotingMechanismTest is Test {
 
     // Tests for state() function reverts
     function testStateForInvalidProposal() public {
-        vm.expectRevert("Invalid proposal");
+        vm.expectRevert(BaseAllocationMechanism.InvalidProposal.selector);
         voting.state(999);
     }
 
@@ -1038,12 +996,12 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 100);
         voting.signup(100);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
         // Try to cancel from different address
         vm.prank(user2);
-        vm.expectRevert("Not proposer");
+        vm.expectRevert(BaseAllocationMechanism.NotProposer.selector);
         voting.cancelProposal(pid);
     }
 
@@ -1052,13 +1010,13 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 100);
         voting.signup(100);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
 
         // Cancel the proposal
         voting.cancelProposal(pid);
 
         // Try to cancel again
-        vm.expectRevert("Already canceled");
+        vm.expectRevert(BaseAllocationMechanism.AlreadyCanceled.selector);
         voting.cancelProposal(pid);
         vm.stopPrank();
     }
@@ -1068,68 +1026,33 @@ contract SimpleVotingMechanismTest is Test {
         MockERC20 testToken = new MockERC20("Test Token", "TEST");
 
         // Test with zero address for asset
-        vm.expectRevert("Invalid asset");
+        vm.expectRevert(BaseAllocationMechanism.ZeroAssetAddress.selector);
         new SimpleVotingMechanism(
-            IERC20(address(0)),
-            "Voting Shares",
-            "VOTE",
-            votingDelay,
-            votingPeriod,
-            quorumShares,
-            timelockDelay,
-            1
+            IERC20(address(0)), "Voting Shares", "VOTE", votingDelay, votingPeriod, quorumShares, timelockDelay, 1
         );
 
         // Test with zero voting delay
-        vm.expectRevert("Invalid voting delay");
+        vm.expectRevert(BaseAllocationMechanism.ZeroVotingDelay.selector);
         new SimpleVotingMechanism(
-            IERC20(address(testToken)),
-            "Voting Shares",
-            "VOTE",
-            0,
-            votingPeriod,
-            quorumShares,
-            timelockDelay,
-            1
+            IERC20(address(testToken)), "Voting Shares", "VOTE", 0, votingPeriod, quorumShares, timelockDelay, 1
         );
 
         // Test with zero voting period
-        vm.expectRevert("Invalid voting period");
+        vm.expectRevert(BaseAllocationMechanism.ZeroVotingPeriod.selector);
         new SimpleVotingMechanism(
-            IERC20(address(testToken)),
-            "Voting Shares",
-            "VOTE",
-            votingDelay,
-            0,
-            quorumShares,
-            timelockDelay,
-            1
+            IERC20(address(testToken)), "Voting Shares", "VOTE", votingDelay, 0, quorumShares, timelockDelay, 1
         );
 
         // Test with zero quorum
-        vm.expectRevert("Invalid quorum");
+        vm.expectRevert(BaseAllocationMechanism.ZeroQuorumShares.selector);
         new SimpleVotingMechanism(
-            IERC20(address(testToken)),
-            "Voting Shares",
-            "VOTE",
-            votingDelay,
-            votingPeriod,
-            0,
-            timelockDelay,
-            1
+            IERC20(address(testToken)), "Voting Shares", "VOTE", votingDelay, votingPeriod, 0, timelockDelay, 1
         );
 
         // Test with zero timelock delay
-        vm.expectRevert("Invalid timelock");
+        vm.expectRevert(BaseAllocationMechanism.ZeroTimelockDelay.selector);
         new SimpleVotingMechanism(
-            IERC20(address(testToken)),
-            "Voting Shares",
-            "VOTE",
-            votingDelay,
-            votingPeriod,
-            quorumShares,
-            0,
-            1
+            IERC20(address(testToken)), "Voting Shares", "VOTE", votingDelay, votingPeriod, quorumShares, 0, 1
         );
     }
 
@@ -1138,25 +1061,18 @@ contract SimpleVotingMechanismTest is Test {
     function testStatePendingBeforeVotingDelay() public {
         // Set up a new voting contract so we can control the startBlock more precisely
         SimpleVotingMechanism newVoting = new SimpleVotingMechanism(
-            IERC20(address(token)),
-            "Voting Shares",
-            "VOTE",
-            votingDelay,
-            votingPeriod,
-            quorumShares,
-            timelockDelay,
-            1
+            IERC20(address(token)), "Voting Shares", "VOTE", votingDelay, votingPeriod, quorumShares, timelockDelay, 1
         );
 
         // In setup, we can register and create a proposal
         vm.startPrank(user1);
         token.approve(address(newVoting), 100);
         newVoting.signup(100);
-        uint256 pid = newVoting.propose(recipient1);
+        uint256 pid = newVoting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
         // Before voting delay, the state should be Active
-        assertEq(uint(newVoting.state(pid)), uint(BaseAllocationMechanism.ProposalState.Active));
+        assertEq(uint256(newVoting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Active));
     }
 
     function testStateActiveBeforeVotingEnd() public {
@@ -1164,14 +1080,14 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 100);
         voting.signup(100);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
         // Set block number to middle of voting period
         vm.roll(block.number + votingDelay + votingPeriod / 2);
 
         // During voting period, state should be Active
-        assertEq(uint(voting.state(pid)), uint(BaseAllocationMechanism.ProposalState.Active));
+        assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Active));
     }
 
     function testStateDefeatedWithoutQuorum() public {
@@ -1179,14 +1095,14 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 100);
         voting.signup(100);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
         // Move past voting period without any votes
         vm.roll(block.number + votingDelay + votingPeriod + 1);
 
         // With no votes, there's no quorum, so state should be Defeated
-        assertEq(uint(voting.state(pid)), uint(BaseAllocationMechanism.ProposalState.Defeated));
+        assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Defeated));
     }
 
     function testStatePendingAfterVotingBeforeQueue() public {
@@ -1194,7 +1110,7 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 200);
         voting.signup(200);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
         // Move to voting period
@@ -1208,7 +1124,7 @@ contract SimpleVotingMechanismTest is Test {
         vm.roll(block.number + votingPeriod);
 
         // After voting with quorum met but before queuing, state should be Pending
-        assertEq(uint(voting.state(pid)), uint(BaseAllocationMechanism.ProposalState.Pending));
+        assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Pending));
     }
 
     function testStateQueuedThenExpired() public {
@@ -1216,7 +1132,7 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         token.approve(address(voting), 200);
         voting.signup(200);
-        uint256 pid = voting.propose(recipient1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
         // Move to voting period and vote

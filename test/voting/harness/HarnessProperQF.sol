@@ -4,6 +4,10 @@ pragma solidity ^0.8.0;
 import { ProperQF } from "src/allocation-mechanism/voting-strategy/ProperQF.sol";
 
 contract HarnessProperQF is ProperQF {
+    // Custom Errors
+    error AlphaMustBeLEQOne();
+    error PercentageMustBeLEQ100();
+    
     // Expose internal functions for testing
     function exposed_sqrt(uint256 x) public pure returns (uint256) {
         return ProperQF._sqrt(x);
@@ -28,7 +32,7 @@ contract HarnessProperQF is ProperQF {
      * @dev Converts the decimal input to the internal fraction representation
      */
     function exposed_setAlphaDecimal(uint256 alphaAsDecimal) public {
-        require(alphaAsDecimal <= 1e18, "Alpha must be <= 1");
+        if (alphaAsDecimal > 1e18) revert AlphaMustBeLEQOne();
         uint256 newNumerator = alphaAsDecimal;
         uint256 newDenominator = 1e18;
         ProperQF._setAlpha(newNumerator, newDenominator);
@@ -40,7 +44,7 @@ contract HarnessProperQF is ProperQF {
      * @dev Converts the percentage input to the internal fraction representation
      */
     function exposed_setAlphaPercentage(uint256 percentage) public {
-        require(percentage <= 100, "Percentage must be <= 100");
+        if (percentage > 100) revert PercentageMustBeLEQ100();
         uint256 newNumerator = percentage;
         uint256 newDenominator = 100;
         ProperQF._setAlpha(newNumerator, newDenominator);

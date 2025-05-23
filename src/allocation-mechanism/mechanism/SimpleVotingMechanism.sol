@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import { BaseAllocationMechanism } from "../BaseAllocationMechanism.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {BaseAllocationMechanism} from "../BaseAllocationMechanism.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract SimpleVotingMechanism is BaseAllocationMechanism {
     constructor(
@@ -43,13 +43,11 @@ contract SimpleVotingMechanism is BaseAllocationMechanism {
         return deposit;
     }
 
-    function _processVoteHook(
-        uint256 pid,
-        address,
-        VoteType choice,
-        uint256 weight,
-        uint256 oldPower
-    ) internal override returns (uint256) {
+    function _processVoteHook(uint256 pid, address, VoteType choice, uint256 weight, uint256 oldPower)
+        internal
+        override
+        returns (uint256)
+    {
         if (choice == VoteType.For) {
             proposalVotes[pid].sharesFor += weight;
         } else if (choice == VoteType.Against) {

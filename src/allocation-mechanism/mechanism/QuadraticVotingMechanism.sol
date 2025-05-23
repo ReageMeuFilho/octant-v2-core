@@ -1,18 +1,27 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import { BaseAllocationMechanism } from "../BaseAllocationMechanism.sol";
-import { ProperQF } from "../voting-strategy/ProperQF.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
-import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
-import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {BaseAllocationMechanism} from "../BaseAllocationMechanism.sol";
+import {ProperQF} from "../voting-strategy/ProperQF.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title Quadratic Voting Mechanism
 /// @notice Implements quadratic funding for proposal allocation using the ProperQF strategy
 /// @dev Combines BaseAllocationMechanism governance with ProperQF quadratic funding algorithm
-contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF, Ownable, Pausable, ReentrancyGuard {
+contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
+    // Custom Errors
+    error VotingDelayMustBePositive();
+    error VotingPeriodMustBePositive();
+    error QuorumMustBePositive();
+    error TimelockDelayMustBePositive();
+    error AlphaMustBeLEQOne();
+    error AlphaDenominatorMustBePositive();
+    error ZeroAddressCannotPropose();
+    error OnlyForVotesSupported();
+    error VoteWeightTooLarge();
+    error InsufficientVotingPowerForQuadraticCost();
+    error TotalVotingPowerOverflow();
     using Math for uint256;
 
     /// @notice Total voting power distributed across all proposals
@@ -43,14 +52,13 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF, Ownable,
             _timelockDelay,
             _startBlock
         )
-        Ownable(msg.sender)
     {
-        require(_votingDelay > 0, "Voting delay must be positive");
-        require(_votingPeriod > 0, "Voting period must be positive");
-        require(_quorumShares > 0, "Quorum must be positive");
-        require(_timelockDelay > 0, "Timelock delay must be positive");
-        require(_alphaNumerator <= _alphaDenominator, "Alpha must be <= 1");
-        require(_alphaDenominator > 0, "Alpha denominator must be positive");
+        if (_votingDelay == 0) revert VotingDelayMustBePositive();
+        if (_votingPeriod == 0) revert VotingPeriodMustBePositive();
+        if (_quorumShares == 0) revert QuorumMustBePositive();
+        if (_timelockDelay == 0) revert TimelockDelayMustBePositive();
+        if (_alphaNumerator > _alphaDenominator) revert AlphaMustBeLEQOne();
+        if (_alphaDenominator == 0) revert AlphaDenominatorMustBePositive();
 
         // startBlock is already defined in BaseAllocationMechanism
         _setAlpha(_alphaNumerator, _alphaDenominator);
@@ -58,7 +66,7 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF, Ownable,
 
     /// @notice Only registered users with voting power can propose
     function _beforeProposeHook(address proposer) internal view override whenNotPaused returns (bool) {
-        require(proposer != address(0), "Zero address cannot propose");
+        if (proposer == address(0)) revert ZeroAddressCannotPropose();
         return votingPower[proposer] > 0;
     }
 
@@ -79,28 +87,26 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF, Ownable,
 
     /// @notice Process vote using quadratic funding algorithm
     /// @dev The cost of voting is quadratic: to cast `weight` votes, you pay `weight^2` voting power
-    function _processVoteHook(
-        uint256 pid,
-        address,
-        VoteType choice,
-        uint256 weight,
-        uint256 oldPower
-    ) internal override returns (uint256) {
-        require(choice == VoteType.For, "Only For votes supported in QF");
+    function _processVoteHook(uint256 pid, address, VoteType choice, uint256 weight, uint256 oldPower)
+        internal
+        override
+        returns (uint256)
+    {
+        if (choice != VoteType.For) revert OnlyForVotesSupported();
 
         // Validate weight to prevent overflow in quadratic cost calculation
-        require(weight <= type(uint128).max, "Vote weight too large");
+        if (weight > type(uint128).max) revert VoteWeightTooLarge();
 
         // Quadratic cost: to vote with weight W, you pay W^2 voting power
         uint256 quadraticCost = weight * weight;
-        require(quadraticCost <= oldPower, "Insufficient voting power for quadratic cost");
+        if (quadraticCost > oldPower) revert InsufficientVotingPowerForQuadraticCost();
 
         // Use ProperQF's vote processing: contribution = quadratic cost, voteWeight = actual vote weight
         _processVote(pid, quadraticCost, weight);
 
         // Track total voting power used with overflow protection
         uint256 newTotalVotingPower = totalVotingPower + weight;
-        require(newTotalVotingPower >= totalVotingPower, "Total voting power overflow");
+        if (newTotalVotingPower < totalVotingPower) revert TotalVotingPowerOverflow();
         totalVotingPower = newTotalVotingPower;
 
         // Return remaining voting power after quadratic cost
@@ -110,11 +116,11 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF, Ownable,
     /// @notice Check quorum based on quadratic funding threshold
     function _hasQuorumHook(uint256 pid) internal view override returns (bool) {
         // Get the project's funding metrics
-        (, , uint256 quadraticFunding, uint256 linearFunding) = getTally(pid);
+        (,, uint256 quadraticFunding, uint256 linearFunding) = getTally(pid);
 
         // Calculate total funding for this project using alpha weighting
-        uint256 projectTotalFunding = Math.mulDiv(quadraticFunding, alphaNumerator, alphaDenominator) +
-            Math.mulDiv(linearFunding, (alphaDenominator - alphaNumerator), alphaDenominator);
+        uint256 projectTotalFunding = Math.mulDiv(quadraticFunding, alphaNumerator, alphaDenominator)
+            + Math.mulDiv(linearFunding, (alphaDenominator - alphaNumerator), alphaDenominator);
 
         // Project meets quorum if it has minimum funding threshold
         return projectTotalFunding >= quorumShares;
@@ -125,15 +131,15 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF, Ownable,
         if (totalFunding == 0) return 0;
 
         // Get project funding metrics
-        (, , uint256 quadraticFunding, uint256 linearFunding) = getTally(pid);
+        (,, uint256 quadraticFunding, uint256 linearFunding) = getTally(pid);
 
         // Calculate project's weighted funding
-        uint256 projectWeightedFunding = Math.mulDiv(quadraticFunding, alphaNumerator, alphaDenominator) +
-            Math.mulDiv(linearFunding, (alphaDenominator - alphaNumerator), alphaDenominator);
+        uint256 projectWeightedFunding = Math.mulDiv(quadraticFunding, alphaNumerator, alphaDenominator)
+            + Math.mulDiv(linearFunding, (alphaDenominator - alphaNumerator), alphaDenominator);
 
         // Calculate total weighted funding across all projects
-        uint256 totalWeightedFunding = Math.mulDiv(totalQuadraticSum, alphaNumerator, alphaDenominator) +
-            Math.mulDiv(totalLinearSum, (alphaDenominator - alphaNumerator), alphaDenominator);
+        uint256 totalWeightedFunding = Math.mulDiv(totalQuadraticSum, alphaNumerator, alphaDenominator)
+            + Math.mulDiv(totalLinearSum, (alphaDenominator - alphaNumerator), alphaDenominator);
 
         // Return proportional shares (scaled by total voting power for meaningful allocation)
         if (totalWeightedFunding == 0 || totalVotingPower == 0) return 0;
@@ -148,7 +154,7 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF, Ownable,
     /// @notice Get recipient address for proposal
     function _getRecipientAddressHook(uint256 pid) internal view override returns (address) {
         address recipient = proposals[pid].recipient;
-        require(recipient != address(0), "Invalid recipient address");
+        if (recipient == address(0)) revert InvalidRecipientAddress();
         return recipient;
     }
 
@@ -165,15 +171,6 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF, Ownable,
         emit AlphaParameterUpdated(newNumerator, newDenominator);
     }
 
-    /// @notice Pause the contract in case of emergency
-    function pause() external onlyOwner {
-        _pause();
-    }
-
-    /// @notice Unpause the contract
-    function unpause() external onlyOwner {
-        _unpause();
-    }
 
     /// @notice Get project funding breakdown for a proposal
     /// @param pid Proposal ID
@@ -181,14 +178,12 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF, Ownable,
     /// @return sumSquareRoots Sum of square roots for quadratic calculation
     /// @return quadraticFunding Quadratic funding component
     /// @return linearFunding Linear funding component
-    function getProposalFunding(
-        uint256 pid
-    )
+    function getProposalFunding(uint256 pid)
         external
         view
         returns (uint256 sumContributions, uint256 sumSquareRoots, uint256 quadraticFunding, uint256 linearFunding)
     {
-        require(_validateProposalHook(pid), "Invalid proposal");
+        if (!_validateProposalHook(pid)) revert InvalidProposal();
         return getTally(pid);
     }
 }

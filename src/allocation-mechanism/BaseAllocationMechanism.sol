@@ -1,12 +1,60 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title Abstract Allocation Mechanism for ERC4626 Vault-Based Voting
 /// @notice Provides the core structure for on-chain voting mechanisms that mint ERC4626 shares to proposal recipients based on vote tallies.
 /// @dev Use by inheriting and implementing the five key hooks and the conversion hook `_convertVotesToShares`.
-abstract contract BaseAllocationMechanism {
+abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable {
+    // Custom Errors
+    error ZeroAssetAddress();
+    error ZeroVotingDelay();
+    error ZeroVotingPeriod();
+    error ZeroQuorumShares();
+    error ZeroTimelockDelay();
+    error ZeroStartBlock();
+    error EmptyName();
+    error EmptySymbol();
+    error RegistrationBlocked();
+    error VotingEnded();
+    error AlreadyRegistered();
+    error DepositTooLarge();
+    error VotingPowerTooLarge();
+    error ProposeNotAllowed();
+    error InvalidRecipient();
+    error RecipientUsed();
+    error EmptyDescription();
+    error DescriptionTooLong();
+    error MaxProposalsReached();
+    error VotingNotEnded();
+    error TallyAlreadyFinalized();
+    error FinalizationBlocked();
+    error TallyNotFinalized();
+    error InvalidProposal();
+    error ProposalCanceledError();
+    error NoQuorum();
+    error AlreadyQueued();
+    error NoAllocation();
+    error VotingClosed();
+    error AlreadyVoted();
+    error InvalidWeight();
+    error WeightTooLarge();
+    error PowerIncreased();
+    error NotProposer();
+    error AlreadyCanceled();
+    error InvalidRecipientAddress();
+    using SafeERC20 for IERC20;
+    using Math for uint256;
+
+    /// @notice Maximum safe value for mathematical operations
+    uint256 public constant MAX_SAFE_VALUE = type(uint128).max;
+    
     /// @notice start block to start counting the voting delay before votingPeriod
     uint256 public immutable startBlock;
     /// @notice Blocks between consecutive proposals by same proposer
@@ -46,6 +94,7 @@ abstract contract BaseAllocationMechanism {
         uint256 eta;
         address proposer;
         address recipient;
+        string description;
         bool claimed;
         bool canceled;
     }
@@ -81,13 +130,15 @@ abstract contract BaseAllocationMechanism {
     /// @notice Emitted when a user completes registration
     event UserRegistered(address indexed user, uint256 votingPower);
     /// @notice Emitted when a new proposal is created
-    event ProposalCreated(uint256 indexed pid, address indexed proposer, address recipient);
+    event ProposalCreated(uint256 indexed pid, address indexed proposer, address indexed recipient, string description);
     /// @notice Emitted when a vote is cast
-    event VotesCast(address indexed voter, uint256 indexed pid, VoteType choice, uint256 weight);
+    event VotesCast(address indexed voter, uint256 indexed pid, VoteType indexed choice, uint256 weight);
     /// @notice Emitted when vote tally is finalized
     event VoteTallyFinalized();
     /// @notice Emitted when a proposal is queued and shares minted
     event ProposalQueued(uint256 indexed pid, uint256 eta, uint256 shareAmount);
+    /// @notice Emitted when a proposal is canceled
+    event ProposalCanceled(uint256 indexed pid, address indexed proposer);
 
     /// @param _asset Underlying ERC20 token used for vault
     /// @param _name ERC20 name for vault share token
@@ -106,13 +157,15 @@ abstract contract BaseAllocationMechanism {
         uint256 _quorumShares,
         uint256 _timelockDelay,
         uint256 _startBlock
-    ) {
-        require(address(_asset) != address(0), "Invalid asset");
-        require(_votingDelay > 0, "Invalid voting delay");
-        require(_votingPeriod > 0, "Invalid voting period");
-        require(_quorumShares > 0, "Invalid quorum");
-        require(_timelockDelay > 0, "Invalid timelock");
-        require(_startBlock > 0, "Invalid start block");
+    ) Ownable(msg.sender) {
+        if (address(_asset) == address(0)) revert ZeroAssetAddress();
+        if (_votingDelay == 0) revert ZeroVotingDelay();
+        if (_votingPeriod == 0) revert ZeroVotingPeriod();
+        if (_quorumShares == 0) revert ZeroQuorumShares();
+        if (_timelockDelay == 0) revert ZeroTimelockDelay();
+        if (_startBlock == 0) revert ZeroStartBlock();
+        if (bytes(_name).length == 0) revert EmptyName();
+        if (bytes(_symbol).length == 0) revert EmptySymbol();
 
         asset = _asset;
         name = _name;
@@ -154,13 +207,10 @@ abstract contract BaseAllocationMechanism {
     /// @param weight Voting power weight to apply
     /// @param oldPower Voting power before vote
     /// @return newPower Voting power after vote (must be <= oldPower)
-    function _processVoteHook(
-        uint256 pid,
-        address voter,
-        VoteType choice,
-        uint256 weight,
-        uint256 oldPower
-    ) internal virtual returns (uint256 newPower);
+    function _processVoteHook(uint256 pid, address voter, VoteType choice, uint256 weight, uint256 oldPower)
+        internal
+        virtual
+        returns (uint256 newPower);
 
     /// @notice Check if proposal met quorum requirement.
     /// @param pid Proposal ID
@@ -191,13 +241,15 @@ abstract contract BaseAllocationMechanism {
 
     /// @notice Register to gain voting power by depositing underlying tokens.
     /// @param deposit Amount of underlying to deposit (may be zero).
-    function signup(uint256 deposit) external {
+    function signup(uint256 deposit) external nonReentrant whenNotPaused {
         address user = msg.sender;
-        require(_beforeSignupHook(user), "Registration blocked");
-        require(block.number < startBlock + votingDelay + votingPeriod, "Voting ended");
-        require(votingPower[user] == 0, "Already registered");
-        if (deposit > 0) asset.transferFrom(user, address(this), deposit);
+        if (!_beforeSignupHook(user)) revert RegistrationBlocked();
+        if (block.number >= startBlock + votingDelay + votingPeriod) revert VotingEnded();
+        if (votingPower[user] != 0) revert AlreadyRegistered();
+        if (deposit > MAX_SAFE_VALUE) revert DepositTooLarge();
+        if (deposit > 0) asset.safeTransferFrom(user, address(this), deposit);
         uint256 newPower = _getVotingPowerHook(user, deposit);
+        if (newPower > MAX_SAFE_VALUE) revert VotingPowerTooLarge();
         votingPower[user] = newPower;
         emit UserRegistered(user, newPower);
     }
@@ -206,29 +258,34 @@ abstract contract BaseAllocationMechanism {
 
     /// @notice Create a new proposal targeting `recipient`.
     /// @param recipient Address to receive allocated vault shares upon queue.
+    /// @param description Description or rationale for the proposal
     /// @return pid Unique identifier for the new proposal.
-    function propose(address recipient) external returns (uint256 pid) {
+    function propose(address recipient, string calldata description) external whenNotPaused returns (uint256 pid) {
         address proposer = msg.sender;
-        require(_beforeProposeHook(proposer), "Propose not allowed");
-        require(recipient != address(0), "Invalid recipient");
-        require(!_recipientUsed[recipient], "Recipient used");
+        if (!_beforeProposeHook(proposer)) revert ProposeNotAllowed();
+        if (recipient == address(0)) revert InvalidRecipient();
+        if (_recipientUsed[recipient]) revert RecipientUsed();
+        if (bytes(description).length == 0) revert EmptyDescription();
+        if (bytes(description).length > 1000) revert DescriptionTooLong();
 
+        if (_proposalIdCounter >= type(uint256).max) revert MaxProposalsReached();
         _proposalIdCounter++;
         pid = _proposalIdCounter;
 
-        proposals[pid] = Proposal(0, 0, proposer, recipient, false, false);
+        proposals[pid] = Proposal(0, 0, proposer, recipient, description, false, false);
         _recipientUsed[recipient] = true;
 
-        emit ProposalCreated(pid, proposer, recipient);
+        emit ProposalCreated(pid, proposer, recipient, description);
     }
 
     // ---------- Vote Tally Finalization ----------
 
     /// @notice Finalize vote tally once voting period (from first proposal) has ended.
     /// @dev **SECURITY CRITICAL**: ensure this can only be called once and only after voting ends.
-    function finalizeVoteTally() external {
-        require(block.number >= startBlock + votingDelay + votingPeriod, "Voting not ended");
-        require(_beforeFinalizeVoteTallyHook(), "Finalization blocked");
+    function finalizeVoteTally() external onlyOwner {
+        if (block.number < startBlock + votingDelay + votingPeriod) revert VotingNotEnded();
+        if (tallyFinalized) revert TallyAlreadyFinalized();
+        if (!_beforeFinalizeVoteTallyHook()) revert FinalizationBlocked();
         tallyFinalized = true;
         emit VoteTallyFinalized();
     }
@@ -238,17 +295,16 @@ abstract contract BaseAllocationMechanism {
     /// @notice Queue proposal and mint vault shares based on vote tallies.
     /// @dev Calls `_convertVotesToShares(pid)` to determine mint amount.
     /// @param pid Proposal ID to queue.
-    function queueProposal(uint256 pid) external {
-        require(tallyFinalized, "Tally not finalized");
-        require(_validateProposalHook(pid), "Invalid proposal");
+    function queueProposal(uint256 pid) external onlyOwner {
+        if (!tallyFinalized) revert TallyNotFinalized();
+        if (!_validateProposalHook(pid)) revert InvalidProposal();
         Proposal storage p = proposals[pid];
-        require(!p.canceled, "Canceled");
-        require(tallyFinalized, "Voting not ended");
-        require(_hasQuorumHook(pid), "No quorum");
-        require(p.eta == 0, "Already queued");
+        if (p.canceled) revert ProposalCanceledError();
+        if (!_hasQuorumHook(pid)) revert NoQuorum();
+        if (p.eta != 0) revert AlreadyQueued();
 
         uint256 sharesToMint = _convertVotesToShares(pid);
-        require(sharesToMint > 0, "No allocation");
+        if (sharesToMint == 0) revert NoAllocation();
         proposalShares[pid] = sharesToMint;
 
         _requestDistributionHook(_getRecipientAddressHook(pid), sharesToMint);
@@ -267,19 +323,19 @@ abstract contract BaseAllocationMechanism {
     /// @param pid Proposal ID
     /// @param choice VoteType (Against, For, Abstain)
     /// @param weight Amount of voting power to apply
-    function castVote(uint256 pid, VoteType choice, uint256 weight) external {
-        require(_validateProposalHook(pid), "Invalid proposal");
-        require(
-            block.number >= startBlock + votingDelay && block.number <= startBlock + votingDelay + votingPeriod,
-            "Voting closed"
-        );
-        require(!hasVoted[pid][msg.sender], "Already voted");
+    function castVote(uint256 pid, VoteType choice, uint256 weight) external nonReentrant whenNotPaused {
+        if (!_validateProposalHook(pid)) revert InvalidProposal();
+        if (
+            block.number < startBlock + votingDelay || block.number > startBlock + votingDelay + votingPeriod
+        ) revert VotingClosed();
+        if (hasVoted[pid][msg.sender]) revert AlreadyVoted();
 
         uint256 oldPower = votingPower[msg.sender];
-        require(weight > 0 && weight <= oldPower, "Invalid weight");
+        if (weight == 0 || weight > oldPower) revert InvalidWeight();
+        if (weight > MAX_SAFE_VALUE) revert WeightTooLarge();
 
         uint256 newPower = _processVoteHook(pid, msg.sender, choice, weight, oldPower);
-        require(newPower <= oldPower, "Power increased");
+        if (newPower > oldPower) revert PowerIncreased();
 
         votingPower[msg.sender] = newPower;
         hasVoted[pid][msg.sender] = true;
@@ -305,19 +361,62 @@ abstract contract BaseAllocationMechanism {
     /// @param pid Proposal ID
     /// @return Current state of the proposal
     function state(uint256 pid) external view returns (ProposalState) {
-        require(_validateProposalHook(pid), "Invalid proposal");
+        if (!_validateProposalHook(pid)) revert InvalidProposal();
         return _state(pid);
     }
 
     /// @notice Cancel a proposal
     /// @param pid Proposal ID to cancel
     function cancelProposal(uint256 pid) external {
-        require(_validateProposalHook(pid), "Invalid proposal");
+        if (!_validateProposalHook(pid)) revert InvalidProposal();
         Proposal storage p = proposals[pid];
-        require(msg.sender == p.proposer, "Not proposer");
-        require(!p.canceled, "Already canceled");
-        require(p.eta == 0, "Already queued");
+        if (msg.sender != p.proposer) revert NotProposer();
+        if (p.canceled) revert AlreadyCanceled();
+        if (p.eta != 0) revert AlreadyQueued();
 
         p.canceled = true;
+        emit ProposalCanceled(pid, p.proposer);
+    }
+
+    /// @notice Get current vote tallies for a proposal
+    /// @param pid Proposal ID
+    /// @return sharesFor Number of shares voted for
+    /// @return sharesAgainst Number of shares voted against
+    /// @return sharesAbstain Number of shares abstained
+    function getVoteTally(uint256 pid)
+        external
+        view
+        returns (uint256 sharesFor, uint256 sharesAgainst, uint256 sharesAbstain)
+    {
+        if (!_validateProposalHook(pid)) revert InvalidProposal();
+        ProposalVote storage votes = proposalVotes[pid];
+        return (votes.sharesFor, votes.sharesAgainst, votes.sharesAbstain);
+    }
+
+    /// @notice Get remaining voting power for an address
+    /// @param voter Address to check voting power for
+    /// @return Remaining voting power
+    function getRemainingVotingPower(address voter) external view returns (uint256) {
+        return votingPower[voter];
+    }
+
+    /// @notice Get total number of proposals created
+    /// @return Total proposal count
+    function getProposalCount() external view returns (uint256) {
+        return _proposalIdCounter;
+    }
+
+    // ---------- Emergency Functions ----------
+
+    /// @notice Emergency pause all operations
+    /// @dev Only owner can pause the contract. Prevents all user interactions until unpaused.
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /// @notice Resume operations after pause
+    /// @dev Only owner can unpause the contract. Restores normal operation after emergency pause.
+    function unpause() external onlyOwner {
+        _unpause();
     }
 }
