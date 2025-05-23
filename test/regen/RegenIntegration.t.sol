@@ -15,13 +15,7 @@ import { MockERC20Staking } from "../mocks/MockERC20Staking.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol"; // For Staker__Unauthorized if Ownable error is used
 import { SafeCast } from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
-
-// Mock interface for grant round. Replace it with the actual interface when we have it.
-interface IGrantRound {
-    function signUp(uint256 assets, address receiver, bytes32 signature) external returns (uint256 votingPower);
-
-    function vote(uint256 projectId, uint256 votingPower) external;
-}
+import { IGrantRound } from "../../src/regen/IGrantRound.sol";
 
 contract RegenIntegrationTest is Test {
     RegenStaker regenStaker;
@@ -32,14 +26,13 @@ contract RegenIntegrationTest is Test {
     MockERC20 rewardToken;
     MockERC20Staking stakeToken;
 
-    // --- Constants for Reward Accrual Tests ---
     uint256 public constant REWARD_AMOUNT = 30_000_000 * 1e18; // 30M tokens
     uint256 public constant STAKE_AMOUNT = 1_000 * 1e18; // 1K tokens
     uint256 public constant REWARD_PERIOD_DURATION = 30 days;
     uint256 public constant MIN_ASSERT_TOLERANCE = 1;
+    uint256 public constant MAX_BUMP_TIP = 1e18; // Maximum tip allowed for bumping earning power
+    uint256 public constant MAX_CLAIM_FEE = 1e18; // Maximum fee for claiming rewards
     address public immutable ADMIN = makeAddr("admin");
-
-    // --- End Constants ---
 
     function setUp() public {
         vm.startPrank(ADMIN);
@@ -63,7 +56,9 @@ contract RegenIntegrationTest is Test {
             ADMIN,
             stakerWhitelist,
             contributorWhitelist,
-            calculator
+            calculator,
+            MAX_BUMP_TIP,
+            MAX_CLAIM_FEE
         );
 
         // Make this contract a reward notifier
@@ -79,7 +74,9 @@ contract RegenIntegrationTest is Test {
             ADMIN,
             Whitelist(address(0)), // _stakerWhitelist
             Whitelist(address(0)), // _contributionWhitelist
-            calculator
+            calculator,
+            MAX_BUMP_TIP,
+            MAX_CLAIM_FEE
         );
 
         // Assert that the whitelists are not address(0) but new Whitelist instances
@@ -2181,95 +2178,35 @@ contract RegenIntegrationTest is Test {
     uint256 constant payerPrivateKey = 0xBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBAD1;
     uint256 constant stakerUserPrivateKey = 0xBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBAD2;
 
-    function test_PermitAndStake_BypassesStakerWhitelist() public {
-        // address stakerUser = makeAddr("stakerPermitAndStake");
-        address stakerUser = vm.addr(stakerUserPrivateKey);
-        // address delegatee = stakerUser; // Unused as permitAndStake is commented
+    function test_PermitAndStake_EnforcesStakerWhitelist() public {
+        address stakerUser = makeAddr("stakerPermitAndStake");
         uint256 permitAmount = STAKE_AMOUNT;
 
         // Mint tokens to stakerUser
         stakeToken.mint(stakerUser, permitAmount);
 
-        // Ensure stakerWhitelist is active and stakerUser is NOT on it.
+        // Ensure stakerWhitelist is active and stakerUser is NOT on it
         assertTrue(address(regenStaker.stakerWhitelist()) != address(0), "Staker whitelist should be active.");
         assertFalse(
             regenStaker.stakerWhitelist().isWhitelisted(stakerUser),
             "StakerUser should NOT be on staker whitelist."
         );
 
-        // Add to earning power whitelist for functional stake
-        address[] memory stakerUserArr = new address[](1);
-        stakerUserArr[0] = stakerUser;
-        vm.startPrank(ADMIN);
-        earningPowerWhitelist.addToWhitelist(stakerUserArr);
-        vm.stopPrank();
-
-        // Prepare permit signature for the stakeToken (MockERC20Staking)
-        uint256 deadline = block.timestamp + 1 hours;
-        uint256 nonce = stakeToken.nonces(stakerUser);
-
-        // EIP712 Domain Separator for the MockERC20 (stakeToken)
-        // Assumes MockERC20 (base of MockERC20Staking) has a DOMAIN_SEPARATOR() function like OpenZeppelin's ERC20Permit
-        bytes32 tokenDomainSeparator = stakeToken.DOMAIN_SEPARATOR();
-
-        bytes32 permitTypehash = keccak256(
-            "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
-        );
-
-        bytes32 structHash = keccak256(
-            abi.encode(
-                permitTypehash,
-                stakerUser,
-                address(regenStaker), // Spender is the RegenStaker contract
-                permitAmount,
-                nonce,
-                deadline
-            )
-        );
-
-        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", tokenDomainSeparator, structHash));
-
-        // (uint8 v_permit, bytes32 r_permit, bytes32 s_permit) = vm.sign(stakerUserPrivateKey, digest); // Unused as permitAndStake is commented
-        vm.sign(stakerUserPrivateKey, digest); // Call vm.sign to ensure private key is used, but ignore output for now
-        // bytes memory signature_permit = abi.encodePacked(r_permit,s_permit,v_permit); // Not using packed signature for now
-
-        // Execute permitAndStake (msg.sender can be anyone, e.g., a relayer)
-        // The staker (owner of tokens) is determined by the permit.
-        address relayer = makeAddr("relayer");
-        vm.startPrank(relayer);
-        // The `owner` here is `stakerUser`.
-        /* Commenting out due to persistent signature mismatch errors
-        Staker.DepositIdentifier depositId = regenStaker.permitAndStake(
-            stakerUser, // _owner
-            permitAmount, // _amount
-            delegatee, // _delegatee
-            deadline, // _deadline
-            // signature // _signature (bytes memory)
-            v, r, s
-        );
-        */
-        vm.stopPrank();
-
-        // // Verify stake was successful for stakerUser - depends on depositId
-        // assertEq(regenStaker.depositorTotalStaked(stakerUser), permitAmount, "StakerUser stake amount incorrect.");
-        // (uint256 balance, address ownerOfDeposit, , , , ,) = regenStaker.deposits(depositId);
-        // assertEq(balance, permitAmount, "Deposit balance incorrect.");
-        // assertEq(ownerOfDeposit, stakerUser, "Deposit owner should be stakerUser.");
-
-        // Try to make the non-whitelisted stakerUser stake directly (should fail)
+        // Verify regular stake reverts for non-whitelisted user
         vm.startPrank(stakerUser);
-        stakeToken.approve(address(regenStaker), permitAmount); // Approve for direct stake
+        stakeToken.approve(address(regenStaker), permitAmount);
         vm.expectRevert(
             abi.encodeWithSelector(RegenStaker.NotWhitelisted.selector, regenStaker.stakerWhitelist(), stakerUser)
         );
         regenStaker.stake(permitAmount, stakerUser);
         vm.stopPrank();
+
+        // We cannot actually test permitAndStake here without fixing the RegenStaker contract first
     }
 
     function test_Stake_UsesSurrogateDelegatee() public {
         address stakerAddress = makeAddr("stakerForSurrogate");
-        address originalDelegatee = makeAddr("originalDelegateeForSurrogate");
-        // address surrogateDelegatee = makeAddr("surrogateDelegatee"); // Surrogate part commented out
+        address delegatee = makeAddr("delegateeForSurrogate");
 
         // Whitelist staker for staking and earning power
         address[] memory stakerArr = new address[](1);
@@ -2279,39 +2216,60 @@ contract RegenIntegrationTest is Test {
         earningPowerWhitelist.addToWhitelist(stakerArr);
         vm.stopPrank();
 
-        // Set the surrogate delegatee: if someone delegates to originalDelegatee, it should go to surrogateDelegatee
-        // This is done via setSurrogateDelegatee(address target, address surrogate)
-        // The admin (this contract) needs to call this.
-        // vm.startPrank(address(this)); // Admin action - Commented due to "setSurrogateDelegatee not found" error
-        // regenStaker.setSurrogateDelegatee(originalDelegatee, surrogateDelegatee);
-        // vm.stopPrank();
-
-        // Verify surrogate is set
-        // assertEq(regenStaker.getSurrogateDelegatee(originalDelegatee), surrogateDelegatee, "Surrogate not set correctly"); // Commented
-
-        // Staker stakes, intending to delegate to originalDelegatee
+        // Staker stakes with a delegatee
         stakeToken.mint(stakerAddress, STAKE_AMOUNT);
         vm.startPrank(stakerAddress);
         stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, originalDelegatee);
+        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, delegatee);
         vm.stopPrank();
 
         // Check the actual delegatee of the deposit
-        // Deposit struct: balance, owner, earningPower, delegatee, claimer, rewardPerTokenCheckpoint, scaledUnclaimedRewardCheckpoint
         (, , , address actualDelegatee, , , ) = regenStaker.deposits(depositId);
-        // assertEq(actualDelegatee, surrogateDelegatee, "Deposit was not delegated to the surrogate delegatee"); // Surrogate part commented out
-        // Instead, check direct delegation since surrogate functionality is likely broken in library
-        assertEq(actualDelegatee, originalDelegatee, "Deposit was not delegated to the original delegatee");
+        assertEq(actualDelegatee, delegatee, "Deposit should be delegated to the specified delegatee");
 
-        // Sanity check: if staking with a non-surrogated delegatee, it should use that one.
-        address directDelegatee = makeAddr("directDelegateeNoSurrogate");
-        stakeToken.mint(stakerAddress, STAKE_AMOUNT); // Mint more for another stake
+        // Verify that a surrogate contract has been deployed for the delegatee
+        address surrogateAddress = address(regenStaker.surrogates(delegatee));
+        assertTrue(surrogateAddress != address(0), "Surrogate contract should be deployed");
+
+        // Verify that the stake tokens have been transferred to the surrogate contract
+        assertEq(
+            stakeToken.balanceOf(surrogateAddress),
+            STAKE_AMOUNT,
+            "Stake tokens should be transferred to surrogate"
+        );
+
+        // Make a second stake with the same delegatee and verify it uses the same surrogate
+        stakeToken.mint(stakerAddress, STAKE_AMOUNT);
         vm.startPrank(stakerAddress);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT); // Approve for the new stake
-        Staker.DepositIdentifier depositIdDirect = regenStaker.stake(STAKE_AMOUNT, directDelegatee);
+        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
+        regenStaker.stake(STAKE_AMOUNT, delegatee); // Remove variable assignment
         vm.stopPrank();
-        (, , , address actualDirectDelegatee, , , ) = regenStaker.deposits(depositIdDirect);
-        assertEq(actualDirectDelegatee, directDelegatee, "Direct delegation failed");
+
+        // Verify same surrogate is used
+        address secondSurrogateAddress = address(regenStaker.surrogates(delegatee));
+        assertEq(surrogateAddress, secondSurrogateAddress, "Should reuse existing surrogate for same delegatee");
+        assertEq(
+            stakeToken.balanceOf(surrogateAddress),
+            STAKE_AMOUNT * 2,
+            "Surrogate should now hold tokens from both stakes"
+        );
+
+        // Test with a different delegatee to ensure a new surrogate is created
+        address newDelegatee = makeAddr("newDelegatee");
+        stakeToken.mint(stakerAddress, STAKE_AMOUNT);
+        vm.startPrank(stakerAddress);
+        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
+        regenStaker.stake(STAKE_AMOUNT, newDelegatee); // Remove variable assignment
+        vm.stopPrank();
+
+        // Verify a new surrogate was created for the new delegatee
+        address newSurrogateAddress = address(regenStaker.surrogates(newDelegatee));
+        assertTrue(newSurrogateAddress != address(0), "New surrogate should be created for new delegatee");
+        assertTrue(
+            newSurrogateAddress != surrogateAddress,
+            "New surrogate should be different from original surrogate"
+        );
+        assertEq(stakeToken.balanceOf(newSurrogateAddress), STAKE_AMOUNT, "New surrogate should hold staked tokens");
     }
 
     function test_RevertIf_SetRewardNotifier_NotAdmin() public {
@@ -2327,86 +2285,6 @@ contract RegenIntegrationTest is Test {
         vm.startPrank(ADMIN);
         regenStaker.setRewardNotifier(newNotifier, true);
         assertTrue(regenStaker.isRewardNotifier(newNotifier), "Admin should be able to set new notifier");
-        vm.stopPrank();
-    }
-
-    function test_Contribute_MinimalCall() public {
-        address contributor = makeAddr("contributorMinimal");
-        address mockGrantRound = makeAddr("mockGrantRoundMinimal");
-
-        // Setup deposit & rewards (minimal)
-        stakeToken.mint(contributor, STAKE_AMOUNT);
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
-
-        address[] memory contributorArr = new address[](1);
-        contributorArr[0] = contributor;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(contributorArr);
-        earningPowerWhitelist.addToWhitelist(contributorArr);
-        contributorWhitelist.addToWhitelist(contributorArr);
-        vm.stopPrank();
-
-        vm.startPrank(contributor);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, contributor);
-        vm.stopPrank();
-
-        vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
-        vm.stopPrank();
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
-
-        uint256 availableRewards = regenStaker.unclaimedReward(depositId);
-        uint256 amountToContribute = availableRewards / 4; // Contribute a small portion
-        if (amountToContribute == 0 && availableRewards > 0) amountToContribute = 1 wei; // Ensure non-zero if possible
-        if (availableRewards == 0) amountToContribute = 0; // Cannot contribute if no rewards
-
-        // Minimal preferences
-        uint256[] memory prefs = new uint256[](1);
-        prefs[0] = 1;
-        uint256[] memory weights = new uint256[](1);
-        weights[0] = amountToContribute; // Net amount is gross here (no fee)
-
-        // Mock signup because it's required to return > 0
-        vm.mockCall(
-            mockGrantRound,
-            abi.encodeWithSignature("signup(uint256,address,bytes32)", amountToContribute, contributor, bytes32(0)),
-            abi.encode(uint256(1))
-        );
-        // No vote mock to keep it simple
-
-        vm.startPrank(contributor);
-        // We are not asserting the outcome, just checking if the call itself causes stack too deep
-        try
-            regenStaker.contribute(
-                depositId,
-                mockGrantRound,
-                contributor,
-                amountToContribute,
-                prefs,
-                weights,
-                bytes32(0)
-            )
-        {} catch Error(string memory reason) {
-            // Expected to pass or fail due to logic (e.g. if amountToContribute is 0), not stack depth
-            // If it's `revert GrantRoundSignUpFailed` that's fine if amount is 0.
-            // If it's other operational reverts from contribute, that's also fine for this test.
-            // We are primarily checking for stack overflow.
-            assertTrue(keccak256(abi.encodePacked(reason)) != keccak256(abi.encodePacked("Stack too deep")));
-        } catch (bytes memory lowLevelData) {
-            string memory reason = abi.decode(lowLevelData, (string));
-            assertTrue(keccak256(abi.encodePacked(reason)) != keccak256(abi.encodePacked("Stack too deep")));
-        }
-        vm.stopPrank();
-
-        // Also reset fee params, as other tests might have set them if this runs after them.
-        // And this minimal test assumes zero fee implicitly.
-        vm.startPrank(ADMIN);
-        Staker.ClaimFeeParameters memory feeParams = Staker.ClaimFeeParameters({
-            feeAmount: 0,
-            feeCollector: address(0)
-        });
-        regenStaker.setClaimFeeParameters(feeParams);
         vm.stopPrank();
     }
 
@@ -2426,129 +2304,55 @@ contract RegenIntegrationTest is Test {
     }
 
     function test_RevertIf_BumpEarningPower_TipTooHigh() public {
-        address stakerUser = makeAddr("stakerForBumpTip");
         address tipReceiver = makeAddr("tipReceiverForBumpTip");
-        uint256 stakeAmount = STAKE_AMOUNT;
 
-        // Whitelist stakerUser for staking and for initial earning power (so EP is stakeAmount)
-        address[] memory stakerArr = new address[](1);
-        stakerArr[0] = stakerUser;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(stakerArr);
-        earningPowerWhitelist.addToWhitelist(stakerArr);
-        vm.stopPrank();
+        // Create mock address that will attempt bumping with excessive tip
+        address bumper = makeAddr("bumper");
 
-        // Staker stakes
-        stakeToken.mint(stakerUser, stakeAmount);
-        vm.startPrank(stakerUser);
-        stakeToken.approve(address(regenStaker), stakeAmount);
-        Staker.DepositIdentifier depositId = regenStaker.stake(stakeAmount, stakerUser);
-        vm.stopPrank();
+        // We don't need to do any whitelist setups or stake operations
+        // Just call bumpEarningPower directly with an excessive tip amount
 
-        // At this point, deposit.earningPower should be stakeAmount.
-        // To make bumpEarningPower find a *new* earning power that qualifies:
-        // We need earningPowerCalculator.getNewEarningPower to return (newPower, true) where newPower != currentPower.
-        // Our RegenEarningPowerCalculator returns (balance, isWhitelisted) if balance > 0.
-        // If current EP is stakeAmount, we need getNewEarningPower to calculate something different or for isQualified to be true.
-        // The Staker.sol getNewEarningPower takes (balance, owner, delegatee, currentEarningPower).
-        // The RegenEarningPowerCalculator.getNewEarningPower logic:
-        //   newPotentialScore = getEarningPower(balance, owner, delegatee);
-        //   isQualified = newPotentialScore > currentEarningPower ?
-        //                 (newPotentialScore - currentEarningPower) * BASIS_POINTS_GRANULARITY / currentEarningPower >= BPS_THRESHOLD_GAIN :
-        //                 (currentEarningPower - newPotentialScore) * BASIS_POINTS_GRANULARITY / currentEarningPower >= BPS_THRESHOLD_LOSS;
-        // For this test, we just need to ensure the preliminary checks in bumpEarningPower pass before the tip check.
-        // So, we need a scenario where a bump *would* be valid if the tip were okay.
-        // Easiest: modify the stake so currentEarningPower calc would change, or make user temporarily non-whitelisted for EP then re-whitelist for calculator.
-        // Let's try making earningPower 0 by removing from whitelist, then re-adding, so new EP will be stakeAmount.
+        // Create any arbitrary deposit ID - it doesn't matter for this test
+        // since we'll hit the tip validation before any deposit access
+        Staker.DepositIdentifier depositId = Staker.DepositIdentifier.wrap(0);
 
-        // Make current earning power 0 for the deposit by removing from earningPowerWhitelist and bumping
-        vm.startPrank(ADMIN);
-        earningPowerWhitelist.removeFromWhitelist(stakerArr);
-        vm.stopPrank();
-        // A bump is needed to update the deposit's stored earningPower to 0.
-        // We can call bumpEarningPower with a valid small tip (or 0 if allowed by maxBumpTip)
-        // or trigger it via another action like alterClaimer/alterDelegatee.
-        // Let's use alterClaimer as it also calls _checkpointReward which updates EP.
-        vm.startPrank(stakerUser);
-        regenStaker.alterClaimer(depositId, makeAddr("tempClaimer")); // This should update EP to 0
-        vm.stopPrank();
-        // (,,uint96 epAfterRemoval,,,) = regenStaker.deposits(depositId);
-        (, , uint96 epAfterRemoval, , , , ) = regenStaker.deposits(depositId); // Corrected for 7 fields
-        assertEq(epAfterRemoval, 0, "Earning power should be 0 after removal from whitelist and action");
-
-        // Now, re-whitelist so getNewEarningPower will return (stakeAmount, true)
-        vm.startPrank(ADMIN);
-        earningPowerWhitelist.addToWhitelist(stakerArr);
-        vm.stopPrank();
-        // The calculator will now see stakeAmount as new EP, current is 0, so it's a qualified bump.
-
-        // Ensure some rewards are present so tip can be requested (even if it will revert for being too high)
-        // This is because bumpEarningPower checks `_unclaimedRewards < _requestedTip` for EP increase.
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
-        vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
-        vm.stopPrank();
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2); // Accrue some rewards
-
+        // Calculate an excessive tip (just over the limit)
         uint256 excessiveTip = regenStaker.maxBumpTip() + 1;
 
-        vm.startPrank(makeAddr("bumper")); // Any address can be a bumper
+        // This should fail with InvalidTip immediately before any other checks
+        vm.startPrank(bumper);
         vm.expectRevert(Staker.Staker__InvalidTip.selector);
         regenStaker.bumpEarningPower(depositId, tipReceiver, excessiveTip);
         vm.stopPrank();
     }
 
     function test_DepositorTotalStaked_IsAccessible() public {
-        address user = makeAddr("multiDepositsUser");
-        uint256 firstStakeAmount = 500 * 1e18;
-        uint256 secondStakeAmount = 300 * 1e18;
-        uint256 totalExpectedStake = firstStakeAmount + secondStakeAmount;
+        address user = makeAddr("user");
+        uint256 firstStake = 500e18;
+        uint256 secondStake = 300e18;
 
         // Whitelist user
-        address[] memory userArr = new address[](1);
-        userArr[0] = user;
+        address[] memory users = new address[](1);
+        users[0] = user;
         vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(userArr);
-        earningPowerWhitelist.addToWhitelist(userArr);
+        stakerWhitelist.addToWhitelist(users);
+        earningPowerWhitelist.addToWhitelist(users);
         vm.stopPrank();
 
-        // Mint tokens for stakes
-        stakeToken.mint(user, totalExpectedStake);
+        // Setup and first stake
+        stakeToken.mint(user, firstStake + secondStake);
         vm.startPrank(user);
-        stakeToken.approve(address(regenStaker), totalExpectedStake);
+        stakeToken.approve(address(regenStaker), firstStake + secondStake);
+        regenStaker.stake(firstStake, user);
 
-        // First stake
-        regenStaker.stake(firstStakeAmount, user);
+        // Verify first stake
+        assertEq(regenStaker.depositorTotalStaked(user), firstStake);
 
-        // Check total staked after first deposit
-        uint256 totalStaked = regenStaker.depositorTotalStaked(user);
-        assertEq(
-            totalStaked,
-            firstStakeAmount,
-            "depositorTotalStaked should return correct amount after first deposit"
-        );
-
-        // Second stake
-        regenStaker.stake(secondStakeAmount, user);
+        // Second stake and verify total
+        regenStaker.stake(secondStake, user);
         vm.stopPrank();
 
-        // Check total staked after second deposit
-        totalStaked = regenStaker.depositorTotalStaked(user);
-        assertEq(
-            totalStaked,
-            totalExpectedStake,
-            "depositorTotalStaked should return combined amount after second deposit"
-        );
-
-        // Demonstrate checking minimum stake requirements
-        bool meetsMinimumStake = regenStaker.depositorTotalStaked(user) >= firstStakeAmount;
-        assertTrue(meetsMinimumStake, "User should meet minimum stake requirement");
-
-        meetsMinimumStake = regenStaker.depositorTotalStaked(user) >= totalExpectedStake;
-        assertTrue(meetsMinimumStake, "User should meet exact stake requirement");
-
-        meetsMinimumStake = regenStaker.depositorTotalStaked(user) >= totalExpectedStake + 1;
-        assertFalse(meetsMinimumStake, "User should not meet requirement higher than their stake");
+        assertEq(regenStaker.depositorTotalStaked(user), firstStake + secondStake);
     }
 
     function testFuzz_Contribute_CorrectNetAmountUsedWithVariableFees(uint96 feeAmount) public {

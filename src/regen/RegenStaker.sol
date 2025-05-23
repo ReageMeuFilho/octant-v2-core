@@ -26,6 +26,7 @@ import { IEarningPowerCalculator } from "staker/interfaces/IEarningPowerCalculat
 import { Whitelist } from "./whitelist/Whitelist.sol";
 import { IWhitelist } from "./whitelist/IWhitelist.sol";
 import { IWhitelistedEarningPowerCalculator } from "./IWhitelistedEarningPowerCalculator.sol";
+import { IGrantRound } from "./IGrantRound.sol";
 
 // --- EIP-712 Specification for IGrantRound Implementations ---
 // To ensure security against replay attacks for the `signup` method,
@@ -73,26 +74,6 @@ import { IWhitelistedEarningPowerCalculator } from "./IWhitelistedEarningPowerCa
 // EIP-712 signature (r, s, v components) of this structured data.
 // --- End EIP-712 Specification for IGrantRound ---
 
-interface IGrantRound {
-    /// @notice Grants voting power to `receiver` by
-    /// depositing exactly `assets` of underlying tokens.
-    /// @param assets The amount of underlying to deposit in.
-    /// @param receiver The address to receive the `shares`.
-    /// @param signature The signature of the user.
-    /// @return votingPower The actual amount of votingPower issued.
-    function signup(uint256 assets, address receiver, bytes32 signature) external returns (uint256 votingPower);
-
-    /// @notice Process a vote for a project with a contribution amount and vote weight
-    /// @dev This function validates and processes votes according to the implemented formula
-    /// @dev Must check if the user can vote in _processVote
-    /// @dev Must check if the project is whitelisted in _processVote
-    /// @dev Must update the project tally in _processVote
-    /// Only keepers can call this function to prevent spam and ensure proper vote processing.
-    /// @param projectId The ID of the project being voted for
-    /// @param votingPower the votingPower msg.sender will assign to projectId, must be checked in _processVote by strategist
-    function vote(uint256 projectId, uint256 votingPower) external;
-}
-
 /// @title RegenStaker
 /// @author [Golem Foundation](https://golem.foundation)
 /// @notice This contract is an extended version of the Staker contract by [ScopeLift](https://scopelift.co).
@@ -129,21 +110,24 @@ contract RegenStaker is
     error PreferencesAndPreferenceWeightsMustHaveTheSameLength();
     error InvalidNumberOfPreferences(uint256 actual, uint256 min, uint256 max); // Changed uint to uint256 for consistency
 
+    modifier onlyWhitelistedIfWhitelistIsSet(IWhitelist _whitelist) {
+        if (_whitelist != IWhitelist(address(0)) && !_whitelist.isWhitelisted(msg.sender)) {
+            revert NotWhitelisted(_whitelist, msg.sender);
+        }
+        _;
+    }
+
     constructor(
         IERC20 _rewardsToken,
         IERC20Staking _stakeToken,
         address _admin,
         IWhitelist _stakerWhitelist,
         IWhitelist _contributionWhitelist,
-        IEarningPowerCalculator _earningPowerCalculator
+        IEarningPowerCalculator _earningPowerCalculator,
+        uint256 _maxBumpTip,
+        uint256 _maxClaimFee
     )
-        Staker(
-            _rewardsToken,
-            _stakeToken,
-            _earningPowerCalculator,
-            1e18, // maxBumpTip
-            _admin
-        )
+        Staker(_rewardsToken, _stakeToken, _earningPowerCalculator, _maxBumpTip, _admin)
         StakerPermitAndStake(_stakeToken)
         StakerDelegateSurrogateVotes(_stakeToken)
         EIP712("RegenStaker", "1")
@@ -153,32 +137,47 @@ contract RegenStaker is
             ? new Whitelist()
             : _contributionWhitelist;
 
-        MAX_CLAIM_FEE = 1e18;
+        MAX_CLAIM_FEE = _maxClaimFee;
         _setClaimFeeParameters(ClaimFeeParameters({ feeAmount: 0, feeCollector: address(0) }));
     }
 
-    /// @notice Stakes a given amount of stake token and delegates voting power to a specific delegatee.
-    /// @param amount The amount of stake token to stake.
-    /// @param delegatee The address of the delegatee to delegate voting power to.
-    /// @return _depositId The deposit identifier for the staked amount.
+    /// @inheritdoc Staker
     function stake(
         uint256 amount,
         address delegatee
-    ) external override(Staker) whenNotPaused nonReentrant returns (DepositIdentifier _depositId) {
-        require(
-            stakerWhitelist == IWhitelist(address(0)) || stakerWhitelist.isWhitelisted(msg.sender),
-            NotWhitelisted(stakerWhitelist, msg.sender)
-        );
+    )
+        external
+        override(Staker)
+        whenNotPaused
+        nonReentrant
+        onlyWhitelistedIfWhitelistIsSet(stakerWhitelist)
+        returns (DepositIdentifier _depositId)
+    {
         _depositId = _stake(msg.sender, amount, delegatee, msg.sender);
     }
 
+    /// @inheritdoc Staker
+    function stake(
+        uint256 amount,
+        address delegatee,
+        address claimer
+    )
+        external
+        override(Staker)
+        whenNotPaused
+        nonReentrant
+        onlyWhitelistedIfWhitelistIsSet(stakerWhitelist)
+        returns (DepositIdentifier _depositId)
+    {
+        _depositId = _stake(msg.sender, amount, delegatee, claimer);
+    }
+
     // @inheritdoc Staker
-    function stakeMore(DepositIdentifier _depositId, uint256 _amount) external override {
+    function stakeMore(
+        DepositIdentifier _depositId,
+        uint256 _amount
+    ) external override onlyWhitelistedIfWhitelistIsSet(stakerWhitelist) {
         Deposit storage deposit = deposits[_depositId];
-        require(
-            stakerWhitelist == IWhitelist(address(0)) || stakerWhitelist.isWhitelisted(deposit.owner),
-            NotWhitelisted(stakerWhitelist, deposit.owner)
-        );
 
         _revertIfNotDepositOwner(deposit, msg.sender);
         _stakeMore(deposit, _depositId, _amount);
@@ -222,7 +221,7 @@ contract RegenStaker is
         _withdraw(deposit, _depositId, _amount);
     }
 
-    /// @notice Claim reward tokens earned by a given deposit.
+    /// @inheritdoc Staker
     function claimReward(
         Staker.DepositIdentifier _depositId
     ) external override whenNotPaused nonReentrant returns (uint256) {
@@ -249,12 +248,15 @@ contract RegenStaker is
         uint256[] memory _preferences,
         uint256[] memory _preferenceWeights,
         bytes32 _signature
-    ) public whenNotPaused nonReentrant returns (uint256 amountContributedToGrant) {
+    )
+        public
+        whenNotPaused
+        nonReentrant
+        onlyWhitelistedIfWhitelistIsSet(contributionWhitelist)
+        returns (uint256 amountContributedToGrant)
+    {
         _revertIfAddressZero(_grantRoundAddress);
-        require(
-            contributionWhitelist == IWhitelist(address(0)) || contributionWhitelist.isWhitelisted(msg.sender),
-            NotWhitelisted(contributionWhitelist, msg.sender)
-        );
+
         require(
             _preferences.length == _preferenceWeights.length,
             PreferencesAndPreferenceWeightsMustHaveTheSameLength()
