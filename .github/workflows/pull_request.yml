@@ -235,7 +235,7 @@ jobs:
           
           # Run coverage
           echo "Running coverage with --ir-minimum, this may take a while..."
-          if forge coverage --report summary --ir-minimum > full_coverage.txt 2>coverage_error.txt; then
+          if forge coverage --report summary --no-match-test "Skip" --ir-minimum > full_coverage.txt 2>coverage_error.txt; then
             echo "Coverage completed successfully"
             
             # Process each src/ line and add emoji indicators

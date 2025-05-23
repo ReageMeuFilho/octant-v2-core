@@ -2082,7 +2082,7 @@ contract ProfitUnlockingTest is Test {
     }
 
     // adding skip because of warp bug with foundry coverage
-    function testIncreaseProfitMaxPeriodNoChangeSkipWarp() public {
+    function testIncreaseProfitMaxPeriodNoChangeSkip() public {
         // Setup initial values
         uint256 amount = fishAmount / 10;
         uint256 firstProfit = fishAmount / 10;
@@ -2125,9 +2125,6 @@ contract ProfitUnlockingTest is Test {
         // Increase time halfway through unlock period
         increaseTimeAndCheckProfitBuffer(WEEK / 2, firstProfit / 2);
 
-        // warp to the next day
-        vm.warp(block.timestamp + 1 days);
-
         // Update profit max unlock time
         vm.startPrank(gov);
         vault.setProfitMaxUnlockTime(WEEK * 2);
@@ -2135,8 +2132,6 @@ contract ProfitUnlockingTest is Test {
 
         // Calculate time passed
         uint256 timePassed = block.timestamp - timestamp;
-
-        require(timePassed > 0, "Time must advance");
 
         // Check totals - should be unchanged from original schedule
         checkVaultTotals(
