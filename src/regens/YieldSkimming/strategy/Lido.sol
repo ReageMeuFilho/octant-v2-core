@@ -58,6 +58,16 @@ contract Lido is BaseHealthCheck {
         _lastReportedExchangeRate = _getCurrentExchangeRate();
     }
 
+    /**
+     * @notice Update the profit limit ratio
+     * @param _newProfitLimitRatio The new profit limit ratio
+     */
+    function updateProfitLimitRatio(uint256 _newProfitLimitRatio) external onlyManagement {
+        require(_profitLimitRatio > 0, "!zero profit");
+        require(_profitLimitRatio <= type(uint16).max, "!too high");
+        _profitLimitRatio = uint16(_newProfitLimitRatio);
+    }
+
     /// @notice Sweep of non-asset ERC20 tokens to governance (onlyGovernance)
     /// @param _token The ERC20 token to sweep
     function sweep(address _token) external onlyGovernance {
@@ -90,6 +100,14 @@ contract Lido is BaseHealthCheck {
     }
 
     /**
+     * @notice Get the current profit limit ratio
+     * @return The profit limit ratio
+     */
+    function getProfitLimitRatio() public view returns (uint16) {
+        return _profitLimitRatio;
+    }
+
+    /**
      * @notice Deposits available funds into the yield vault
      * @param _amount Amount to deploy
      */
@@ -115,8 +133,9 @@ contract Lido is BaseHealthCheck {
         uint256 currentTotalAssets = TokenizedStrategy.totalAssets();
 
         if (_profit > 0) {
+            uint256 previousTotalAssets = currentTotalAssets - _profit;
             require(
-                (_profit <= (currentTotalAssets * uint256(_profitLimitRatio)) / MAX_BPS),
+                _profit <= (previousTotalAssets * _profitLimitRatio) / MAX_BPS,
                 "healthCheck: profit limit exceeded"
             );
         }
@@ -134,7 +153,7 @@ contract Lido is BaseHealthCheck {
      * @notice Captures yield by calculating the increase in value based on exchange rate changes
      * @return _totalAssets The current total assets of the strategy
      */
-    function _harvestAndReport() internal override returns (uint256 _totalAssets) {
+    function _harvestAndReport() internal override returns (uint256) {
         uint256 currentExchangeRate = _getCurrentExchangeRate();
 
         // Get the current balance of assets in the strategy
