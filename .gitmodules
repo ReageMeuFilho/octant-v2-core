@@ -28,3 +28,6 @@
 [submodule "lib/kontrol-cheatcodes"]
 	path = lib/kontrol-cheatcodes
 	url = https://github.com/runtimeverification/kontrol-cheatcodes
+[submodule "lib/staker"]
+	path = lib/staker
+	url = https://github.com/withtally/staker
