@@ -36,11 +36,11 @@ pragma solidity >=0.8.18;
  * 4$$$$$$$$$$$$$$$$$$$$$$$$$%zt-+>iiiiiiiiiiiiiiiiiiiiiiiiiiiii+_tc%$$$$$$$$$$$$$$$$$$$$$$$$
  * $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$W#u/|{+~>iiiiiiiiiiii><+{|/n#W$$$$$$$$$$$$$$$$$$$$$$$$$$$$
  */
-import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import { IBaseStrategy } from "../regens/interfaces/IBaseStrategy.sol";
+import {IBaseStrategy} from "../regens/interfaces/IBaseStrategy.sol";
 
 /**
  * @title Tokenized Strategy (Octant V2 Fork)
@@ -137,11 +137,7 @@ abstract contract DragonTokenizedStrategy {
      * and transferred those `assets` to `receiver`.
      */
     event Withdraw(
-        address indexed caller,
-        address indexed receiver,
-        address indexed owner,
-        uint256 assets,
-        uint256 shares
+        address indexed caller, address indexed receiver, address indexed owner, uint256 assets, uint256 shares
     );
 
     /*//////////////////////////////////////////////////////////////
@@ -439,12 +435,11 @@ abstract contract DragonTokenizedStrategy {
      * @param maxLoss The amount of acceptable loss in Basis points.
      * @return . The actual amount of underlying withdrawn.
      */
-    function redeem(
-        uint256 shares,
-        address receiver,
-        address owner,
-        uint256 maxLoss
-    ) public nonReentrant returns (uint256) {
+    function redeem(uint256 shares, address receiver, address owner, uint256 maxLoss)
+        public
+        nonReentrant
+        returns (uint256)
+    {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
         require(shares <= _maxRedeem(S, owner), "ERC4626: redeem more than max");
@@ -541,7 +536,7 @@ abstract contract DragonTokenizedStrategy {
      * @dev Accepts a `maxLoss` variable in order to match the multi
      * strategy vaults ABI.
      */
-    function maxRedeem(address owner, uint256 /*maxLoss*/) external view returns (uint256) {
+    function maxRedeem(address owner, uint256 /*maxLoss*/ ) external view returns (uint256) {
         return _maxRedeem(_strategyStorage(), owner);
     }
 
@@ -560,11 +555,11 @@ abstract contract DragonTokenizedStrategy {
     }
 
     /// @dev Internal implementation of {convertToShares}.
-    function _convertToShares(
-        StrategyData storage S,
-        uint256 assets,
-        Math.Rounding _rounding
-    ) internal view returns (uint256) {
+    function _convertToShares(StrategyData storage S, uint256 assets, Math.Rounding _rounding)
+        internal
+        view
+        returns (uint256)
+    {
         // Saves an extra SLOAD if values are non-zero.
         uint256 totalSupply_ = _totalSupply(S);
         // If supply is 0, PPS = 1.
@@ -578,11 +573,11 @@ abstract contract DragonTokenizedStrategy {
     }
 
     /// @dev Internal implementation of {convertToAssets}.
-    function _convertToAssets(
-        StrategyData storage S,
-        uint256 shares,
-        Math.Rounding _rounding
-    ) internal view returns (uint256) {
+    function _convertToAssets(StrategyData storage S, uint256 shares, Math.Rounding _rounding)
+        internal
+        view
+        returns (uint256)
+    {
         // Saves an extra SLOAD if totalSupply() is non-zero.
         uint256 supply = _totalSupply(S);
 
@@ -1192,15 +1187,9 @@ abstract contract DragonTokenizedStrategy {
      * https://eips.ethereum.org/EIPS/eip-2612#specification[relevant EIP
      * section].
      */
-    function permit(
-        address owner,
-        address spender,
-        uint256 value,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) external {
+    function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s)
+        external
+    {
         require(deadline >= block.timestamp, "ERC20: PERMIT_DEADLINE_EXPIRED");
 
         // Unchecked because the only math done is incrementing
@@ -1243,15 +1232,14 @@ abstract contract DragonTokenizedStrategy {
      * @return . The domain separator that will be used for any {permit} calls.
      */
     function DOMAIN_SEPARATOR() public view returns (bytes32) {
-        return
-            keccak256(
-                abi.encode(
-                    keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                    keccak256("Yearn Vault"),
-                    keccak256(bytes(API_VERSION)),
-                    block.chainid,
-                    address(this)
-                )
-            );
+        return keccak256(
+            abi.encode(
+                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak256("Yearn Vault"),
+                keccak256(bytes(API_VERSION)),
+                block.chainid,
+                address(this)
+            )
+        );
     }
 }

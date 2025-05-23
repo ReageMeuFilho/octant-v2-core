@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { Test } from "forge-std/Test.sol";
-import { HarnessProperQF } from "../harness/HarnessProperQF.sol";
-import { ProperQF } from "src/allocation-mechanism/voting-strategy/ProperQF.sol";
-import { console2 as console } from "forge-std/console2.sol";
+import {Test} from "forge-std/Test.sol";
+import {HarnessProperQF} from "../harness/HarnessProperQF.sol";
+import {ProperQF} from "src/allocation-mechanism/voting-strategy/ProperQF.sol";
+import {console2 as console} from "forge-std/console2.sol";
 
 contract ProperQFTest is Test {
     HarnessProperQF public qf;
@@ -78,7 +78,7 @@ contract ProperQFTest is Test {
         qf.exposed_processVote(projectId, contribution1, qf.exposed_sqrt(contribution1));
         qf.exposed_processVote(projectId, contribution2, qf.exposed_sqrt(contribution2));
 
-        (uint256 sumC, uint256 sumSR, , ) = qf.getTally(projectId);
+        (uint256 sumC, uint256 sumSR,,) = qf.getTally(projectId);
 
         assertEq(sumC, contribution1 + contribution2, "sumContributions incorrect");
         assertEq(sumSR, qf.exposed_sqrt(contribution1) + qf.exposed_sqrt(contribution2), "sumSquareRoots incorrect");
@@ -91,37 +91,37 @@ contract ProperQFTest is Test {
         uint256 projectId = 1;
         qf.exposed_processVote(projectId, contribution, qf.exposed_sqrt(contribution));
 
-        (uint256 sumC, uint256 sumSR, , ) = qf.getTally(projectId);
+        (uint256 sumC, uint256 sumSR,,) = qf.getTally(projectId);
         assertEq(sumC, contribution, "sumContributions incorrect");
         assertEq(sumSR, qf.exposed_sqrt(contribution), "sumSquareRoots incorrect");
     }
 
     function test_zero_contribution_reverts() public {
-        vm.expectRevert("Contribution must be positive");
+        vm.expectRevert(ProperQF.ContributionMustBePositive.selector);
         qf.exposed_processVote(1, 0, 0);
     }
 
     function test_zero_voteWeight_reverts() public {
-        vm.expectRevert("Square root of contribution must be positive");
+        vm.expectRevert(ProperQF.VoteWeightMustBePositive.selector);
         qf.exposed_processVote(1, 100, 0);
     }
 
     function test_voteWeight_too_large_reverts() public {
         // Set voteWeight to 11 when contribution is 100
         // 11^2 = 121 which is > 100
-        vm.expectRevert("Square root of contribution must be less than or equal to contribution");
+        vm.expectRevert(ProperQF.SquareRootTooLarge.selector);
         qf.exposed_processVote(1, 100, 11);
     }
 
     function test_setAlpha_zero_denominator_reverts() public {
         // Try to set alpha with zero denominator
-        vm.expectRevert("Denominator must be positive");
+        vm.expectRevert(ProperQF.DenominatorMustBePositive.selector);
         qf.exposed_setAlpha(1, 0);
     }
 
     function test_setAlpha_numerator_greater_than_denominator_reverts() public {
         // Try to set alpha with numerator > denominator (alpha > 1)
-        vm.expectRevert("Alpha must be <= 1");
+        vm.expectRevert(ProperQF.AlphaMustBeLessOrEqualToOne.selector);
         qf.exposed_setAlpha(11, 10);
     }
 
@@ -158,7 +158,7 @@ contract ProperQFTest is Test {
 
     function test_setAlphaDecimal_over_one_reverts() public {
         // Try to set alpha to 1.1 using decimal format
-        vm.expectRevert("Alpha must be <= 1");
+        vm.expectRevert(HarnessProperQF.AlphaMustBeLEQOne.selector);
         qf.exposed_setAlphaDecimal(11 * 10 ** 17); // 1.1e18
     }
 
@@ -212,9 +212,8 @@ contract ProperQFTest is Test {
         }
 
         // Check global totals
-        uint256 expectedTotalQuadratic = qf.exposed_sqrt(contribution1) ** 2 +
-            qf.exposed_sqrt(contribution2) ** 2 +
-            qf.exposed_sqrt(contribution3) ** 2;
+        uint256 expectedTotalQuadratic = qf.exposed_sqrt(contribution1) ** 2 + qf.exposed_sqrt(contribution2) ** 2
+            + qf.exposed_sqrt(contribution3) ** 2;
 
         uint256 expectedTotalLinear = contribution1 + contribution2 + contribution3;
 
@@ -289,13 +288,12 @@ contract ProperQFTest is Test {
         }
 
         // Check global totals
-        uint256 expectedTotalQuadratic = (qf.exposed_sqrt(contribution1A) + qf.exposed_sqrt(contribution1B)) ** 2 +
-            (qf.exposed_sqrt(contribution2A) + qf.exposed_sqrt(contribution2B)) ** 2 +
-            (qf.exposed_sqrt(contribution3A) + qf.exposed_sqrt(contribution3B)) ** 2;
+        uint256 expectedTotalQuadratic = (qf.exposed_sqrt(contribution1A) + qf.exposed_sqrt(contribution1B)) ** 2
+            + (qf.exposed_sqrt(contribution2A) + qf.exposed_sqrt(contribution2B)) ** 2
+            + (qf.exposed_sqrt(contribution3A) + qf.exposed_sqrt(contribution3B)) ** 2;
 
-        uint256 expectedTotalLinear = (contribution1A + contribution1B) +
-            (contribution2A + contribution2B) +
-            (contribution3A + contribution3B);
+        uint256 expectedTotalLinear =
+            (contribution1A + contribution1B) + (contribution2A + contribution2B) + (contribution3A + contribution3B);
 
         assertEq(qf.totalQuadraticSum(), expectedTotalQuadratic, "Total quadratic sum incorrect");
         assertEq(qf.totalLinearSum(), expectedTotalLinear, "Total linear sum incorrect");
@@ -330,7 +328,7 @@ contract ProperQFTest is Test {
         console.log("Gas used for processing single vote with warm totals but cold project:", gasUsed);
 
         // Optional: Add assertions to ensure the vote was processed correctly
-        (uint256 sumC, uint256 sumSR, , ) = qf.getTally(projectId);
+        (uint256 sumC, uint256 sumSR,,) = qf.getTally(projectId);
         assertEq(sumC, contribution, "Contribution not recorded correctly");
         assertEq(sumSR, voteWeight, "Vote weight not recorded correctly");
     }
@@ -371,7 +369,7 @@ contract ProperQFTest is Test {
 
     function test_setAlphaPercentage_over_hundred_reverts() public {
         // Try to set alpha to 101% using percentage format
-        vm.expectRevert("Percentage must be <= 100");
+        vm.expectRevert(HarnessProperQF.PercentageMustBeLEQ100.selector);
         qf.exposed_setAlphaPercentage(101);
     }
 
