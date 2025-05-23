@@ -54,20 +54,10 @@ contract RegenEarningPowerCalculator is IWhitelistedEarningPowerCalculator, Owna
             newCalculatedEarningPower = Math.min(stakedAmount, uint256(type(uint96).max));
         }
 
-        if (
-            (oldEarningPower > 0 && newCalculatedEarningPower == 0) ||
-            (oldEarningPower == 0 && newCalculatedEarningPower > 0)
-        ) {
-            qualifiesForBump = true;
-        } else if (oldEarningPower > 0 && newCalculatedEarningPower > 0) {
-            if (newCalculatedEarningPower >= oldEarningPower * 2 || newCalculatedEarningPower <= oldEarningPower / 2) {
-                qualifiesForBump = true;
-            }
-        }
-        // else qualifiesForBump remains false (default)
+        qualifiesForBump = newCalculatedEarningPower != oldEarningPower;
     }
 
-    // @notice Sets the whitelist for the earning power calculator
+    // @notice Sets the whitelist for the earning power calculator. Setting the whitelist to address(0) will allow all addresses to be eligible for earning power.
     // @param _whitelist The whitelist to set
     function setWhitelist(IWhitelist _whitelist) public override onlyOwner {
         whitelist = _whitelist;

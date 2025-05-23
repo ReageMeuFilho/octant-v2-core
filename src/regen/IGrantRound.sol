@@ -7,7 +7,7 @@ interface IGrantRound {
     /// @param assets The amount of underlying to deposit in.
     /// @param receiver The address to receive the `shares`.
     /// @param signature The signature of the user.
-    /// @return votingPower The actual amount of votingPower issued.
+    /// @return votingPower The actual amount of votingPower issued. In case of a failure, votingPower will be 0.
     function signup(uint256 assets, address receiver, bytes32 signature) external returns (uint256 votingPower);
 
     /// @notice Process a vote for a project with a contribution amount and vote weight

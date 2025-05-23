@@ -93,15 +93,13 @@ contract RegenStaker is
     uint256 public constant MIN_PREFERENCES = 1;
     uint256 public constant MAX_PREFERENCES = 16;
 
-    event StakerWhitelistSet(IWhitelist whitelist);
-    event ContributionWhitelistSet(IWhitelist whitelist);
-    event GrantRoundVoteFailed(address grantRound, address contributor, uint256 projectId, uint256 votingPower);
+    event StakerWhitelistSet(IWhitelist indexed whitelist);
+    event ContributionWhitelistSet(IWhitelist indexed whitelist);
     event RewardContributed(
-        DepositIdentifier depositId,
-        address contributor,
-        address grantRound,
-        uint256 amount,
-        uint256 preference
+        DepositIdentifier indexed depositId,
+        address indexed contributor,
+        address indexed grantRound,
+        uint256 amount
     );
 
     error NotWhitelisted(IWhitelist whitelist, address user);
@@ -117,6 +115,15 @@ contract RegenStaker is
         _;
     }
 
+    // @notice Constructor for the RegenStaker contract.
+    // @param _rewardsToken The token that will be used to reward contributors.
+    // @param _stakeToken The token that will be used to stake.
+    // @param _admin The address of the admin. TRUSTED.
+    // @param _stakerWhitelist The whitelist for stakers. If passed as address(0), a new Whitelist contract will be deployed.
+    // @param _contributionWhitelist The whitelist for contributors. If passed as address(0), a new Whitelist contract will be deployed.
+    // @param _earningPowerCalculator The earning power calculator.
+    // @param _maxBumpTip The maximum bump tip.
+    // @param _maxClaimFee The maximum claim fee. You can set fees between 0 and _maxClaimFee. _maxClaimFee cannot be changed after deployment.
     constructor(
         IERC20 _rewardsToken,
         IERC20Staking _stakeToken,
@@ -176,7 +183,7 @@ contract RegenStaker is
     function stakeMore(
         DepositIdentifier _depositId,
         uint256 _amount
-    ) external override onlyWhitelistedIfWhitelistIsSet(stakerWhitelist) {
+    ) external override whenNotPaused nonReentrant onlyWhitelistedIfWhitelistIsSet(stakerWhitelist) {
         Deposit storage deposit = deposits[_depositId];
 
         _revertIfNotDepositOwner(deposit, msg.sender);
@@ -237,16 +244,12 @@ contract RegenStaker is
     /// @param _grantRoundAddress The address of the grant round.
     /// @param _votingDelegatee The address of the delegatee to delegate voting power to.
     /// @param _amount The amount of reward tokens to contribute.
-    /// @param _preferences The preferences for the contribution.
-    /// @param _preferenceWeights The preference weights for the contribution.
     /// @param _signature The signature for the IGrantRound.signup call.
     function contribute(
         DepositIdentifier _depositId,
         address _grantRoundAddress,
         address _votingDelegatee,
         uint256 _amount,
-        uint256[] memory _preferences,
-        uint256[] memory _preferenceWeights,
         bytes32 _signature
     )
         public
@@ -257,15 +260,6 @@ contract RegenStaker is
     {
         _revertIfAddressZero(_grantRoundAddress);
 
-        require(
-            _preferences.length == _preferenceWeights.length,
-            PreferencesAndPreferenceWeightsMustHaveTheSameLength()
-        );
-        require(
-            _preferences.length >= MIN_PREFERENCES && _preferences.length <= MAX_PREFERENCES,
-            InvalidNumberOfPreferences(_preferences.length, MIN_PREFERENCES, MAX_PREFERENCES)
-        );
-
         Deposit storage deposit = deposits[_depositId];
 
         _checkpointGlobalReward();
@@ -274,10 +268,13 @@ contract RegenStaker is
         uint256 unclaimedAmount = deposit.scaledUnclaimedRewardCheckpoint / SCALE_FACTOR;
         require(_amount <= unclaimedAmount, CantAfford(_amount, unclaimedAmount));
 
-        // Account for claim fees
         uint256 fee = claimFeeParameters.feeAmount;
-        require(_amount >= fee, CantAfford(fee, _amount));
-        amountContributedToGrant = _amount - fee;
+        if (fee == 0) {
+            amountContributedToGrant = _amount;
+        } else {
+            require(_amount >= fee, CantAfford(fee, _amount));
+            amountContributedToGrant = _amount - fee;
+        }
 
         // Update deposit's reward checkpoint by the gross amount used
         uint256 scaledAmountConsumed = _amount * SCALE_FACTOR;
@@ -317,20 +314,7 @@ contract RegenStaker is
             GrantRoundSignUpFailed(_grantRoundAddress, msg.sender, amountContributedToGrant, _votingDelegatee)
         );
 
-        emit RewardContributed(
-            _depositId,
-            msg.sender,
-            _grantRoundAddress,
-            amountContributedToGrant, // Log the net amount contributed to grant
-            _preferences.length > 0 ? _preferences[0] : type(uint256).max
-        );
-
-        for (uint256 i = 0; i < _preferences.length; i++) {
-            // Note: _preferenceWeights are used here. Ensure they relate to amountContributedToGrant if intended.
-            try IGrantRound(_grantRoundAddress).vote(_preferences[i], _preferenceWeights[i]) {} catch {
-                emit GrantRoundVoteFailed(_grantRoundAddress, msg.sender, _preferences[i], _preferenceWeights[i]);
-            }
-        }
+        emit RewardContributed(_depositId, msg.sender, _grantRoundAddress, amountContributedToGrant);
 
         return amountContributedToGrant;
     }

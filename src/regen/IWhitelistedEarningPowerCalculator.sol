@@ -13,7 +13,7 @@ import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol
 /// @author [Golem Foundation](https://golem.foundation)
 /// @notice This interface extends the IEarningPowerCalculator interface by adding a whitelist.
 interface IWhitelistedEarningPowerCalculator is IEarningPowerCalculator, IERC165 {
-    event WhitelistSet(IWhitelist whitelist);
+    event WhitelistSet(IWhitelist indexed whitelist);
 
     /// @notice Sets the whitelist for the earning power calculator
     /// @param _whitelist The whitelist to set

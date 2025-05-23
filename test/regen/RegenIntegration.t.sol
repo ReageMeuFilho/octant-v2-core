@@ -241,7 +241,7 @@ contract RegenIntegrationTest is Test {
                 contributor
             )
         );
-        regenStaker.contribute(depositId, mockGrantRound, contributor, contributionAmount, prefs, weights, bytes32(0));
+        regenStaker.contribute(depositId, mockGrantRound, contributor, contributionAmount, bytes32(0));
         vm.stopPrank();
 
         // Disable the contribution whitelist
@@ -253,7 +253,7 @@ contract RegenIntegrationTest is Test {
 
         // Try contributing again - should succeed now
         vm.prank(contributor);
-        regenStaker.contribute(depositId, mockGrantRound, contributor, contributionAmount, prefs, weights, bytes32(0));
+        regenStaker.contribute(depositId, mockGrantRound, contributor, contributionAmount, bytes32(0));
     }
 
     function test_GrantsEarningPowerToNewUserIfEarningPowerWhitelistDisabled() public {
@@ -468,7 +468,7 @@ contract RegenIntegrationTest is Test {
         regenStaker.notifyRewardAmount(1e18);
 
         // Fast forward time to accumulate rewards
-        vm.warp(block.timestamp + 28 days);
+        vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
         vm.stopPrank(); // Stop admin prank after notify/warp
         // --- End Setup ---
 
@@ -489,15 +489,7 @@ contract RegenIntegrationTest is Test {
         uint256[] memory weightsArray = new uint256[](1);
         weightsArray[0] = amountToContribute;
 
-        regenStaker.contribute(
-            depositId,
-            mockGrantRound,
-            actualVotingDelegatee,
-            amountToContribute,
-            prefsArray,
-            weightsArray,
-            bytes32(0)
-        );
+        regenStaker.contribute(depositId, mockGrantRound, actualVotingDelegatee, amountToContribute, bytes32(0));
         vm.stopPrank();
     }
 
@@ -636,15 +628,12 @@ contract RegenIntegrationTest is Test {
         address stakerA = makeAddr("stakerA_Staggered");
         address stakerB = makeAddr("stakerB_Staggered");
 
-        address[] memory stakerArrA = new address[](1);
-        stakerArrA[0] = stakerA;
-        address[] memory stakerArrB = new address[](1);
-        stakerArrB[0] = stakerB;
+        address[] memory stakers = new address[](2);
+        stakers[0] = stakerA;
+        stakers[1] = stakerB;
         vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(stakerArrA);
-        earningPowerWhitelist.addToWhitelist(stakerArrA);
-        stakerWhitelist.addToWhitelist(stakerArrB);
-        earningPowerWhitelist.addToWhitelist(stakerArrB);
+        stakerWhitelist.addToWhitelist(stakers);
+        earningPowerWhitelist.addToWhitelist(stakers);
         vm.stopPrank();
 
         // Staker A stakes
@@ -699,15 +688,12 @@ contract RegenIntegrationTest is Test {
         address stakerA = makeAddr("stakerA_DiffAmt");
         address stakerB = makeAddr("stakerB_DiffAmt");
 
-        address[] memory stakerArrA = new address[](1);
-        stakerArrA[0] = stakerA;
-        address[] memory stakerArrB = new address[](1);
-        stakerArrB[0] = stakerB;
+        address[] memory stakers = new address[](2);
+        stakers[0] = stakerA;
+        stakers[1] = stakerB;
         vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(stakerArrA);
-        earningPowerWhitelist.addToWhitelist(stakerArrA);
-        stakerWhitelist.addToWhitelist(stakerArrB);
-        earningPowerWhitelist.addToWhitelist(stakerArrB);
+        stakerWhitelist.addToWhitelist(stakers);
+        earningPowerWhitelist.addToWhitelist(stakers);
         vm.stopPrank();
 
         // Staker A stakes STAKE_AMOUNT
@@ -1618,150 +1604,7 @@ contract RegenIntegrationTest is Test {
 
         vm.startPrank(user);
         vm.expectRevert(Staker.Staker__InvalidAddress.selector);
-        regenStaker.contribute(depositId, address(0), votingDelegatee, amountToContribute, prefs, weights, bytes32(0));
-        vm.stopPrank();
-    }
-
-    function test_RevertIf_Contribute_MismatchedPreferencesAndWeightsLength() public {
-        address user = makeAddr("mismatchUser");
-        address mockGrantRound = makeAddr("mockGrantRoundMismatch");
-        address votingDelegatee = makeAddr("votingDelegateeMismatch");
-        uint256 amountToContribute = 100e18;
-
-        uint256[] memory prefs = new uint256[](1);
-        prefs[0] = 1;
-        uint256[] memory weights = new uint256[](2); // Different length
-        weights[0] = amountToContribute / 2;
-        weights[1] = amountToContribute / 2;
-
-        // Setup: User stakes and has rewards, and is on contributor whitelist
-        address[] memory userArr = new address[](1);
-        userArr[0] = user;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(userArr);
-        earningPowerWhitelist.addToWhitelist(userArr);
-        contributorWhitelist.addToWhitelist(userArr);
-        vm.stopPrank();
-
-        stakeToken.mint(user, STAKE_AMOUNT);
-        vm.startPrank(user);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, user);
-        vm.stopPrank();
-
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
-        vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
-        vm.stopPrank();
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
-
-        // Action: Attempt to contribute with mismatched array lengths
-        vm.startPrank(user);
-        vm.expectRevert(RegenStaker.PreferencesAndPreferenceWeightsMustHaveTheSameLength.selector);
-        regenStaker.contribute(
-            depositId,
-            mockGrantRound,
-            votingDelegatee,
-            amountToContribute,
-            prefs,
-            weights,
-            bytes32(0)
-        );
-        vm.stopPrank();
-    }
-
-    function test_RevertIf_Contribute_TooFewPreferences() public {
-        address user = makeAddr("tooFewPrefsUser");
-        address mockGrantRound = makeAddr("mockGrantRoundTooFew");
-        address votingDelegatee = makeAddr("votingDelegateeTooFew");
-        uint256 amountToContribute = 100e18;
-
-        uint256[] memory prefs = new uint256[](0); // Empty, less than MIN_PREFERENCES (1)
-        uint256[] memory weights = new uint256[](0);
-
-        // Setup: User stakes, has rewards, on contributor whitelist
-        address[] memory userArr = new address[](1);
-        userArr[0] = user;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(userArr);
-        earningPowerWhitelist.addToWhitelist(userArr);
-        contributorWhitelist.addToWhitelist(userArr);
-        vm.stopPrank();
-        stakeToken.mint(user, STAKE_AMOUNT);
-        vm.startPrank(user);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, user);
-        vm.stopPrank();
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
-        vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
-        vm.stopPrank();
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
-
-        uint256 minP = regenStaker.MIN_PREFERENCES();
-        uint256 maxP = regenStaker.MAX_PREFERENCES();
-
-        vm.startPrank(user);
-        vm.expectRevert(abi.encodeWithSelector(RegenStaker.InvalidNumberOfPreferences.selector, 0, minP, maxP));
-        regenStaker.contribute(
-            depositId,
-            mockGrantRound,
-            votingDelegatee,
-            amountToContribute,
-            prefs,
-            weights,
-            bytes32(0)
-        );
-        vm.stopPrank();
-    }
-
-    function test_RevertIf_Contribute_TooManyPreferences() public {
-        address user = makeAddr("tooManyPrefsUser");
-        address mockGrantRound = makeAddr("mockGrantRoundTooMany");
-        address votingDelegatee = makeAddr("votingDelegateeTooMany");
-        uint256 amountToContribute = 100e18;
-
-        uint256 minP = regenStaker.MIN_PREFERENCES();
-        uint256 maxP = regenStaker.MAX_PREFERENCES();
-        uint256 count = maxP + 1;
-
-        uint256[] memory prefs = new uint256[](count);
-        uint256[] memory weights = new uint256[](count);
-        for (uint i = 0; i < count; i++) {
-            prefs[i] = i + 1;
-            weights[i] = amountToContribute / count; // Dummy weights
-        }
-
-        // Setup: User stakes, has rewards, on contributor whitelist
-        address[] memory userArr = new address[](1);
-        userArr[0] = user;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(userArr);
-        earningPowerWhitelist.addToWhitelist(userArr);
-        contributorWhitelist.addToWhitelist(userArr);
-        vm.stopPrank();
-        stakeToken.mint(user, STAKE_AMOUNT);
-        vm.startPrank(user);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, user);
-        vm.stopPrank();
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
-        vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
-        vm.stopPrank();
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
-
-        vm.startPrank(user);
-        vm.expectRevert(abi.encodeWithSelector(RegenStaker.InvalidNumberOfPreferences.selector, count, minP, maxP));
-        regenStaker.contribute(
-            depositId,
-            mockGrantRound,
-            votingDelegatee,
-            amountToContribute,
-            prefs,
-            weights,
-            bytes32(0)
-        );
+        regenStaker.contribute(depositId, address(0), votingDelegatee, amountToContribute, bytes32(0));
         vm.stopPrank();
     }
 
@@ -1805,15 +1648,7 @@ contract RegenIntegrationTest is Test {
         vm.startPrank(user);
         uint256 unclaimed = regenStaker.unclaimedReward(depositId);
         vm.expectRevert(abi.encodeWithSelector(RegenStaker.CantAfford.selector, amountToContribute, unclaimed));
-        regenStaker.contribute(
-            depositId,
-            mockGrantRound,
-            votingDelegatee,
-            amountToContribute,
-            prefs,
-            weights,
-            bytes32(0)
-        );
+        regenStaker.contribute(depositId, mockGrantRound, votingDelegatee, amountToContribute, bytes32(0));
         vm.stopPrank();
     }
 
@@ -1862,108 +1697,8 @@ contract RegenIntegrationTest is Test {
                 votingDelegatee
             )
         );
-        regenStaker.contribute(
-            depositId,
-            mockGrantRound,
-            votingDelegatee,
-            amountToContribute,
-            prefs,
-            weights,
-            bytes32(0)
-        );
+        regenStaker.contribute(depositId, mockGrantRound, votingDelegatee, amountToContribute, bytes32(0));
         vm.stopPrank();
-    }
-
-    function test_Contribute_EmitsEventAndContinues_WhenIndividualVoteReverts() public {
-        address user = makeAddr("voteRevertUser");
-        address mockGrantRound = makeAddr("mockGrantRoundVoteRevert");
-        address votingDelegatee = makeAddr("votingDelegateeVoteRevert");
-        uint256 amountToContribute = 1000e18;
-
-        uint256[] memory prefs = new uint256[](3); // Three preferences
-        prefs[0] = 1; // Will succeed
-        prefs[1] = 2; // This one will revert
-        prefs[2] = 3; // Will succeed
-
-        uint256[] memory weights = new uint256[](3);
-        weights[0] = amountToContribute / 3;
-        weights[1] = amountToContribute / 3;
-        weights[2] = amountToContribute / 3;
-
-        // Setup user, stake, rewards
-        address[] memory userArr = new address[](1);
-        userArr[0] = user;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(userArr);
-        earningPowerWhitelist.addToWhitelist(userArr);
-        contributorWhitelist.addToWhitelist(userArr);
-        vm.stopPrank();
-        stakeToken.mint(user, STAKE_AMOUNT);
-        vm.startPrank(user);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, user);
-        vm.stopPrank();
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
-        vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
-        vm.stopPrank();
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
-
-        // Mock signup to succeed
-        vm.mockCall(
-            mockGrantRound,
-            abi.encodeWithSignature("signup(uint256,address,bytes32)", amountToContribute, votingDelegatee, bytes32(0)),
-            abi.encode(uint256(1))
-        );
-
-        // Mock first vote to succeed
-        vm.mockCall(
-            mockGrantRound,
-            abi.encodeWithSignature("vote(uint256,uint256)", prefs[0], weights[0]),
-            abi.encode()
-        );
-        // Mock second vote to REVERT
-        vm.mockCallRevert(
-            mockGrantRound,
-            abi.encodeWithSignature("vote(uint256,uint256)", prefs[1], weights[1]),
-            abi.encodeWithSignature("MockedVoteFailed()") // Or any other revert data
-        );
-        // Mock third vote to succeed
-        vm.mockCall(
-            mockGrantRound,
-            abi.encodeWithSignature("vote(uint256,uint256)", prefs[2], weights[2]),
-            abi.encode()
-        );
-
-        vm.startPrank(user);
-        // Expect the event for the failed vote
-        vm.expectEmit(true, true, true, true, address(regenStaker));
-        emit RegenStaker.GrantRoundVoteFailed(mockGrantRound, user, prefs[1], weights[1]);
-
-        // Expect calls to signup and all three votes (even though one reverts)
-        vm.expectCall(
-            mockGrantRound,
-            abi.encodeWithSignature("signup(uint256,address,bytes32)", amountToContribute, votingDelegatee, bytes32(0))
-        );
-        vm.expectCall(mockGrantRound, abi.encodeWithSignature("vote(uint256,uint256)", prefs[0], weights[0]));
-        vm.expectCall(mockGrantRound, abi.encodeWithSignature("vote(uint256,uint256)", prefs[1], weights[1])); // This call is made, then reverts
-        vm.expectCall(mockGrantRound, abi.encodeWithSignature("vote(uint256,uint256)", prefs[2], weights[2]));
-
-        uint256 returnedAmount = regenStaker.contribute(
-            depositId,
-            mockGrantRound,
-            votingDelegatee,
-            amountToContribute,
-            prefs,
-            weights,
-            bytes32(0)
-        );
-        vm.stopPrank();
-
-        // Check that the net amount contributed is still the full amount (minus fees, if any, but fee is 0 here by default)
-        // The key is that the overall transaction doesn't revert due to one failed vote.
-        (uint96 feeAmountCtrl, ) = regenStaker.claimFeeParameters();
-        assertEq(returnedAmount, amountToContribute - feeAmountCtrl, "Returned amount incorrect after one vote failed");
     }
 
     function test_Contribute_UpdatesEarningPower() public {
@@ -2035,15 +1770,7 @@ contract RegenIntegrationTest is Test {
         // uint256 userTotalEpBefore = regenStaker.depositorTotalEarningPower(user); // Removed this variable
 
         vm.startPrank(user);
-        regenStaker.contribute(
-            depositId,
-            mockGrantRound,
-            votingDelegatee,
-            amountToContribute,
-            prefs,
-            weights,
-            bytes32(0)
-        );
+        regenStaker.contribute(depositId, mockGrantRound, votingDelegatee, amountToContribute, bytes32(0));
         vm.stopPrank();
 
         // Verify deposit's earning power was updated to expectedNewEP (0)
@@ -2148,15 +1875,7 @@ contract RegenIntegrationTest is Test {
 
         vm.startPrank(contributor);
         vm.expectRevert(abi.encodeWithSelector(RegenStaker.CantAfford.selector, feeAmount, amountToContribute));
-        regenStaker.contribute(
-            depositId,
-            mockGrantRound,
-            votingDelegatee,
-            amountToContribute,
-            prefs,
-            weights,
-            bytes32(0)
-        );
+        regenStaker.contribute(depositId, mockGrantRound, votingDelegatee, amountToContribute, bytes32(0));
         vm.stopPrank();
     }
 
@@ -2200,8 +1919,6 @@ contract RegenIntegrationTest is Test {
         );
         regenStaker.stake(permitAmount, stakerUser);
         vm.stopPrank();
-
-        // We cannot actually test permitAndStake here without fixing the RegenStaker contract first
     }
 
     function test_Stake_UsesSurrogateDelegatee() public {
@@ -2420,25 +2137,6 @@ contract RegenIntegrationTest is Test {
             abi.encode(uint256(1))
         );
 
-        vm.mockCall(
-            mockGrantRound,
-            abi.encodeWithSignature("vote(uint256,uint256)", prefs[0], weights[0]),
-            abi.encode()
-        );
-
-        // Expect the correct calls with net amount
-        vm.expectCall(
-            mockGrantRound,
-            abi.encodeWithSignature(
-                "signup(uint256,address,bytes32)",
-                expectedAmountToGrantRoundNet,
-                votingDelegatee,
-                bytes32(0)
-            )
-        );
-
-        vm.expectCall(mockGrantRound, abi.encodeWithSignature("vote(uint256,uint256)", prefs[0], weights[0]));
-
         // Perform the contribution
         vm.startPrank(user);
         uint256 returnedAmount = regenStaker.contribute(
@@ -2446,8 +2144,6 @@ contract RegenIntegrationTest is Test {
             mockGrantRound,
             votingDelegatee,
             amountToContributeGross,
-            prefs,
-            weights,
             bytes32(0)
         );
         vm.stopPrank();

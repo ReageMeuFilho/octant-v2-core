@@ -66,9 +66,8 @@ contract WhitelistTest is Test {
         address[] memory accounts = new address[](0);
 
         vm.prank(owner);
-        whitelist.addToWhitelist(accounts); // Should not revert
-
-        assertFalse(whitelist.isWhitelisted(user1), "No user should be whitelisted after adding empty list");
+        vm.expectRevert();
+        whitelist.addToWhitelist(accounts);
     }
 
     function test_AddToWhitelist_AddAddressZero() public {
@@ -76,8 +75,14 @@ contract WhitelistTest is Test {
         accounts[0] = address(0);
 
         vm.prank(owner);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Whitelist.IllegalWhitelistOperation.selector,
+                address(0),
+                "Address zero not allowed."
+            )
+        );
         whitelist.addToWhitelist(accounts);
-        assertTrue(whitelist.isWhitelisted(address(0)), "Address(0) should be whitelisteable");
     }
 
     function test_AddToWhitelist_AlreadyWhitelisted() public {
@@ -88,8 +93,10 @@ contract WhitelistTest is Test {
         whitelist.addToWhitelist(accounts); // Add once
         assertTrue(whitelist.isWhitelisted(user1));
 
+        vm.expectRevert(
+            abi.encodeWithSelector(Whitelist.IllegalWhitelistOperation.selector, user1, "Address already whitelisted.")
+        );
         whitelist.addToWhitelist(accounts); // Add again
-        assertTrue(whitelist.isWhitelisted(user1), "User1 should remain whitelisted after adding again");
         vm.stopPrank();
     }
 
@@ -149,23 +156,23 @@ contract WhitelistTest is Test {
         assertTrue(whitelist.isWhitelisted(user1));
 
         address[] memory removeAccounts = new address[](0);
-        whitelist.removeFromWhitelist(removeAccounts); // Should not revert
-
-        assertTrue(whitelist.isWhitelisted(user1), "User1 should still be whitelisted after removing empty list");
+        vm.expectRevert();
+        whitelist.removeFromWhitelist(removeAccounts);
         vm.stopPrank();
     }
 
     function test_RemoveFromWhitelist_AddressZero() public {
-        address[] memory addAccounts = new address[](1);
-        addAccounts[0] = address(0);
         vm.startPrank(owner);
-        whitelist.addToWhitelist(addAccounts);
-        assertTrue(whitelist.isWhitelisted(address(0)), "Address(0) should be whitelisted");
-
         address[] memory removeAccounts = new address[](1);
         removeAccounts[0] = address(0);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Whitelist.IllegalWhitelistOperation.selector,
+                address(0),
+                "Address zero not allowed."
+            )
+        );
         whitelist.removeFromWhitelist(removeAccounts);
-        assertFalse(whitelist.isWhitelisted(address(0)), "Address(0) should be removable");
         vm.stopPrank();
     }
 
@@ -174,7 +181,10 @@ contract WhitelistTest is Test {
         accounts[0] = user1; // user1 is not whitelisted yet
 
         vm.prank(owner);
-        whitelist.removeFromWhitelist(accounts); // Should not revert
+        vm.expectRevert(
+            abi.encodeWithSelector(Whitelist.IllegalWhitelistOperation.selector, user1, "Address not whitelisted.")
+        );
+        whitelist.removeFromWhitelist(accounts);
 
         assertFalse(whitelist.isWhitelisted(user1), "User1 should remain not whitelisted");
     }

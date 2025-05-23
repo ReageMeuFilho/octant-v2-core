@@ -38,16 +38,11 @@ contract RegenEarningPowerCalculatorTest is Test {
     }
 
     function test_Constructor_EmitsWhitelistSet() public {
-        Whitelist localTestWhitelist = new Whitelist(); // Create a local whitelist for this test
+        Whitelist localTestWhitelist = new Whitelist();
 
-        vm.expectEmit(true, true, false, false); // Check 1st indexed arg (previousOwner), 2nd indexed arg (newOwner), no 3rd indexed arg, no data args.
-        emit Ownable.OwnershipTransferred(address(0), owner); // Provides expected values for previousOwner and newOwner.
+        vm.expectEmit();
+        emit IWhitelistedEarningPowerCalculator.WhitelistSet(localTestWhitelist);
 
-        vm.expectEmit(false, false, false, true); // No indexed event arguments to check, check data argument.
-        emit IWhitelistedEarningPowerCalculator.WhitelistSet(localTestWhitelist); // Provides expected value for the `whitelist` data argument.
-
-        // Action: Deploy a new calculator using the local whitelist.
-        // This call will emit the two events above.
         vm.prank(owner);
         new RegenEarningPowerCalculator(owner, localTestWhitelist);
     }
@@ -172,14 +167,6 @@ contract RegenEarningPowerCalculatorTest is Test {
         _checkNewEarningPower(40e18, staker1, 100e18, 40e18, true, "StakeSignificantlyDecreased_Whitelisted");
     }
 
-    function test_GetNewEarningPower_SmallChange_NoBump_Whitelisted() public {
-        address[] memory users = new address[](1);
-        users[0] = staker1;
-        whitelist.addToWhitelist(users);
-        _checkNewEarningPower(110e18, staker1, 100e18, 110e18, false, "SmallIncrease_NoBump_Whitelisted");
-        _checkNewEarningPower(90e18, staker1, 100e18, 90e18, false, "SmallDecrease_NoBump_Whitelisted");
-    }
-
     function test_GetNewEarningPower_NoChange_NoBump_Whitelisted() public {
         address[] memory users = new address[](1);
         users[0] = staker1;
@@ -212,7 +199,7 @@ contract RegenEarningPowerCalculatorTest is Test {
     function test_GetNewEarningPower_WhitelistDisabled_SmallChangeNoBump() public {
         vm.prank(owner);
         calculator.setWhitelist(IWhitelist(address(0)));
-        _checkNewEarningPower(110e18, staker1, 100e18, 110e18, false, "WhitelistDisabled_SmallChangeNoBump");
+        _checkNewEarningPower(110e18, staker1, 100e18, 110e18, true, "WhitelistDisabled_SmallChangeNoBump");
     }
 
     function test_GetNewEarningPower_CappedAtUint96Max_BecomesEligible() public {
@@ -285,13 +272,13 @@ contract RegenEarningPowerCalculatorTest is Test {
     }
 
     function test_SetWhitelist_AsOwner() public {
+        vm.startPrank(owner);
         Whitelist newWhitelist = new Whitelist();
-        vm.prank(owner);
 
-        vm.expectEmit(false, false, false, true, address(calculator));
-        emit IWhitelistedEarningPowerCalculator.WhitelistSet(newWhitelist); // Event from IWhitelistedEarningPowerCalculator
+        vm.expectEmit();
+        emit IWhitelistedEarningPowerCalculator.WhitelistSet(newWhitelist);
         calculator.setWhitelist(newWhitelist);
-
+        vm.stopPrank();
         assertEq(address(calculator.whitelist()), address(newWhitelist), "Whitelist should be updated");
     }
 
@@ -306,7 +293,7 @@ contract RegenEarningPowerCalculatorTest is Test {
     function test_SetWhitelist_ToAddressZero_DisablesIt() public {
         vm.prank(owner);
 
-        vm.expectEmit(false, false, false, true, address(calculator));
+        vm.expectEmit();
         emit IWhitelistedEarningPowerCalculator.WhitelistSet(IWhitelist(address(0)));
         calculator.setWhitelist(IWhitelist(address(0)));
 
