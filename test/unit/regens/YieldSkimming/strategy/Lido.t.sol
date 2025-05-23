@@ -10,6 +10,7 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 import { ITokenizedStrategy } from "src/regens/interfaces/ITokenizedStrategy.sol";
 import { YieldSkimmingTokenizedStrategy } from "src/regens/YieldSkimming/YieldSkimmingTokenizedStrategy.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
+import { IBaseStrategy } from "src/interfaces/IBaseStrategy.sol";
 
 /// @title Lido Test
 /// @author Octant
@@ -540,5 +541,123 @@ contract LidoTest is Test {
         // Verify exchange rate was updated
         uint256 updatedExchangeRate = strategy.getLastReportedExchangeRate();
         assertEq(updatedExchangeRate, newExchangeRate, "Exchange rate should be updated after harvest");
+    }
+    /// @notice Test getting the last reported exchange rate
+    function testGetLastReportedExchangeRate() public view {
+        uint256 rate = strategy.getLastReportedExchangeRate();
+        assertGt(rate, 0, "Exchange rate should be initialized and greater than zero");
+    }
+
+    /// @notice Test balance of asset and shares
+    function testBalanceOfAssetAndShares() public {
+        uint256 depositAmount = 100e18;
+        vm.startPrank(user);
+        vault.deposit(depositAmount, user);
+        vm.stopPrank();
+
+        uint256 assetBalance = strategy.balanceOfAsset();
+        uint256 sharesBalance = strategy.balanceOfShares();
+
+        assertEq(assetBalance, sharesBalance, "Asset and shares balance should match for this strategy");
+        assertGt(assetBalance, 0, "Asset balance should be greater than zero after deposit");
+    }
+
+    /// @notice Test sweep function for unauthorized access
+    function testSweepUnauthorized() public {
+        MockERC20 mockToken = new MockERC20();
+        mockToken.mint(address(strategy), 1000e18);
+
+        // Try to sweep as a non-governance address
+        vm.startPrank(user);
+        vm.expectRevert();
+        strategy.sweep(address(mockToken));
+        vm.stopPrank();
+    }
+
+    /// @notice Test onlyGovernance modifier
+    function testOnlyGovernanceModifier() public {
+        // Try to call sweep as a non-governance address
+        MockERC20 mockToken = new MockERC20();
+        mockToken.mint(address(strategy), 1000e18);
+
+        vm.startPrank(user);
+        vm.expectRevert();
+        strategy.sweep(address(mockToken));
+        vm.stopPrank();
+    }
+
+    /// @notice Test health check for profit limit exceeded
+    function testHealthCheckProfitLimitExceeded() public {
+        uint256 depositAmount = 1000e18;
+        vm.startPrank(user);
+        vault.deposit(depositAmount, user);
+        vm.stopPrank();
+
+        // First report: sets doHealthCheck = true, does NOT check
+        vm.startPrank(keeper);
+        vault.report();
+        vm.stopPrank();
+
+        // Mock a 10x exchange rate
+        uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
+        uint256 newExchangeRate = (initialExchangeRate * 7) / 3; // 233%
+        vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(newExchangeRate));
+
+        // Second report: should revert
+        vm.startPrank(keeper);
+        vm.expectRevert("healthCheck: profit limit exceeded");
+        vault.report();
+        vm.stopPrank();
+
+        vm.clearMockedCalls();
+    }
+
+    // testHealthCheckProfitLimitExceeded when doHealthCheck is false
+    function testHealthCheckProfitLimitExceededWhenDoHealthCheckIsFalse() public {
+        vm.startPrank(management);
+        strategy.setDoHealthCheck(false);
+        vm.stopPrank();
+
+        // check the do health check
+        assertEq(strategy.doHealthCheck(), false);
+
+        // old exchange rate
+        uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
+
+        // make a 10 time profit (should revert when doHealthCheck is true but not when it is false)
+        vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode((initialExchangeRate * 10)));
+
+        // report
+        vm.startPrank(keeper);
+        vault.report();
+        vm.stopPrank();
+
+        // check the do health check
+        assertEq(strategy.doHealthCheck(), true);
+    }
+
+    // test change profit limit ratio
+    function testChangeProfitLimitRatio() public {
+        vm.startPrank(management);
+        strategy.updateProfitLimitRatio(5000);
+        vm.stopPrank();
+
+        // check the profit limit ratio
+        assertEq(strategy.getProfitLimitRatio(), 5000);
+    }
+
+    function testSetDoHealthCheckToFalse() public {
+        vm.startPrank(management);
+        strategy.setDoHealthCheck(false);
+        vm.stopPrank();
+
+        // check the do health check
+        assertEq(strategy.doHealthCheck(), false);
+    }
+
+    // tendTrigger always returns false
+    function testTendTriggerAlwaysFalse() public view {
+        (bool trigger, ) = IBaseStrategy(address(strategy)).tendTrigger();
+        assertEq(trigger, false, "Tend trigger should always be false");
     }
 }
