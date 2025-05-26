@@ -179,8 +179,8 @@ contract TestTraderIntegrationETH2GLM is Test, TestPlus, DeployTrader {
 
     function test_convert_eth_to_glm() external {
         // effectively disable upper bound check and randomness check
-        uint256 fakeBudget = 1 ether;
-        vm.deal(address(trader), 2 ether);
+        uint256 fakeBudget = 0.1 ether;
+        vm.deal(address(trader), 0.2 ether);
 
         vm.startPrank(owner);
         trader.configurePeriod(block.number, 101);
@@ -190,7 +190,7 @@ contract TestTraderIntegrationETH2GLM is Test, TestPlus, DeployTrader {
         uint256 oldBalance = swapper.balance;
         forwardBlocks(100);
         trader.convert(block.number - 2);
-        assertEq(trader.spent(), 1 ether);
+        assertEq(trader.spent(), 0.1 ether);
         assertGt(swapper.balance, oldBalance);
 
         uint256 oldGlmBalance = IERC20(quoteAddress).balanceOf(beneficiary);
