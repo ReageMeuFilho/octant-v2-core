@@ -31,3 +31,7 @@
 [submodule "lib/staker"]
 	path = lib/staker
 	url = https://github.com/withtally/staker
+[submodule "lib/tokenized-strategy"]
+	path = lib/tokenized-strategy
+	url = https://github.com/yearn/tokenized-strategy
+	branch = v3.0.3
