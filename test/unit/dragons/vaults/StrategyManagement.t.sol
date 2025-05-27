@@ -8,8 +8,8 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IVault } from "src/interfaces/IVault.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MockYieldStrategy } from "test/mocks/MockYieldStrategy.sol";
-import { Constants } from "./utils/constants.sol";
-import { Checks } from "./utils/checks.sol";
+import { Constants } from "test/unit/dragons/vaults/utils/constants.sol";
+import { Checks } from "test/unit/dragons/vaults/utils/checks.sol";
 
 contract StrategyManagementTest is Test {
     Vault vaultImplementation;
