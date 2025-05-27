@@ -13,8 +13,6 @@ import { IUniswapV3Pool } from "../../../src/vendor/uniswap/IUniswapV3Pool.sol";
 
 contract TestTraderIntegrationETH2GLM is Test, TestPlus, DeployTrader {
     HelperConfig config;
-    uint256 fork;
-    string TEST_RPC_URL;
 
     function setUp() public {
         owner = makeAddr("owner");
@@ -22,9 +20,7 @@ contract TestTraderIntegrationETH2GLM is Test, TestPlus, DeployTrader {
         beneficiary = makeAddr("beneficiary");
         vm.label(beneficiary, "beneficiary");
 
-        TEST_RPC_URL = vm.envString("TEST_RPC_URL");
-        fork = vm.createFork(TEST_RPC_URL);
-        vm.selectFork(fork);
+        vm.createSelectFork({ urlOrAlias: "mainnet" });
 
         config = new HelperConfig(true);
 
@@ -184,18 +180,18 @@ contract TestTraderIntegrationETH2GLM is Test, TestPlus, DeployTrader {
     /* Commented out because it's not working on CI
     function test_convert_eth_to_glm() external {
         // effectively disable upper bound check and randomness check
-        uint256 fakeBudget = 1 ether;
-        vm.deal(address(trader), 2 ether);
+        uint256 fakeBudget = 0.1 ether;
+        vm.deal(address(trader), 0.2 ether);
 
         vm.startPrank(owner);
         trader.configurePeriod(block.number, 101);
-        trader.setSpending(1 ether, 1 ether, fakeBudget);
+        trader.setSpending(0.1 ether, 0.1 ether, fakeBudget);
         vm.stopPrank();
 
         uint256 oldBalance = swapper.balance;
         forwardBlocks(100);
         trader.convert(block.number - 2);
-        assertEq(trader.spent(), 1 ether);
+        assertEq(trader.spent(), 0.1 ether);
         assertGt(swapper.balance, oldBalance);
 
         uint256 oldGlmBalance = IERC20(quoteAddress).balanceOf(beneficiary);
@@ -293,8 +289,6 @@ contract TestTraderIntegrationETH2GLM is Test, TestPlus, DeployTrader {
 
 contract TestTraderIntegrationGLM2ETH is Test, TestPlus, DeployTrader {
     HelperConfig config;
-    uint256 fork;
-    string TEST_RPC_URL;
 
     function setUp() public {
         owner = makeAddr("owner");
@@ -302,9 +296,7 @@ contract TestTraderIntegrationGLM2ETH is Test, TestPlus, DeployTrader {
         beneficiary = makeAddr("beneficiary");
         vm.label(beneficiary, "beneficiary");
 
-        TEST_RPC_URL = vm.envString("TEST_RPC_URL");
-        fork = vm.createFork(TEST_RPC_URL);
-        vm.selectFork(fork);
+        vm.createSelectFork({ urlOrAlias: "mainnet" });
 
         config = new HelperConfig(true);
 
