@@ -29,7 +29,7 @@ contract RegenIntegrationTest is Test {
     uint256 public constant REWARD_AMOUNT = 30_000_000 * 1e18; // 30M tokens
     uint256 public constant STAKE_AMOUNT = 1_000 * 1e18; // 1K tokens
     uint256 public constant REWARD_PERIOD_DURATION = 30 days;
-    uint256 public constant MIN_ASSERT_TOLERANCE = 1;
+    uint256 public constant MIN_ASSERT_TOLERANCE = 1; // 1e-20 is the smallest relative error that can be detected. https://book.getfoundry.sh/reference/ds-test?highlight=approx#assertapproxeqrel
     uint256 public constant MAX_BUMP_TIP = 1e18; // Maximum tip allowed for bumping earning power
     uint256 public constant MAX_CLAIM_FEE = 1e18; // Maximum fee for claiming rewards
     address public immutable ADMIN = makeAddr("admin");
@@ -524,7 +524,7 @@ contract RegenIntegrationTest is Test {
         uint256 claimedAmount = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        assertApproxEqAbs(claimedAmount, REWARD_AMOUNT, MIN_ASSERT_TOLERANCE, "Staker should receive full reward");
+        assertApproxEqRel(claimedAmount, REWARD_AMOUNT, MIN_ASSERT_TOLERANCE, "Staker should receive full reward");
     }
 
     function test_ContinuousReward_SingleStaker_JoinsLate() public {
@@ -562,7 +562,7 @@ contract RegenIntegrationTest is Test {
         uint256 claimedAmount = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedAmount,
             REWARD_AMOUNT / 2,
             MIN_ASSERT_TOLERANCE,
@@ -597,7 +597,7 @@ contract RegenIntegrationTest is Test {
         uint256 claimedAmount1 = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedAmount1,
             REWARD_AMOUNT / 2,
             MIN_ASSERT_TOLERANCE,
@@ -610,16 +610,16 @@ contract RegenIntegrationTest is Test {
         uint256 claimedAmount2 = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedAmount2,
             REWARD_AMOUNT / 2,
             MIN_ASSERT_TOLERANCE,
             "Second claim should be remaining half"
         );
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedAmount1 + claimedAmount2,
             REWARD_AMOUNT,
-            MIN_ASSERT_TOLERANCE * 2,
+            MIN_ASSERT_TOLERANCE,
             "Total claimed should be full reward"
         );
     }
@@ -674,9 +674,9 @@ contract RegenIntegrationTest is Test {
         uint256 expectedA = (REWARD_AMOUNT / 3) + ((REWARD_AMOUNT * 2) / 3 / 2);
         uint256 expectedB = (REWARD_AMOUNT * 2) / 3 / 2;
 
-        assertApproxEqAbs(claimedA, expectedA, MIN_ASSERT_TOLERANCE, "Staker A wrong amount");
-        assertApproxEqAbs(claimedB, expectedB, MIN_ASSERT_TOLERANCE, "Staker B wrong amount");
-        assertApproxEqAbs(
+        assertApproxEqRel(claimedA, expectedA, MIN_ASSERT_TOLERANCE, "Staker A wrong amount");
+        assertApproxEqRel(claimedB, expectedB, MIN_ASSERT_TOLERANCE, "Staker B wrong amount");
+        assertApproxEqRel(
             claimedA + claimedB,
             REWARD_AMOUNT,
             MIN_ASSERT_TOLERANCE * 2,
@@ -732,12 +732,12 @@ contract RegenIntegrationTest is Test {
         uint256 expectedA = REWARD_AMOUNT / 3;
         uint256 expectedB = (REWARD_AMOUNT * 2) / 3;
 
-        assertApproxEqAbs(claimedA, expectedA, MIN_ASSERT_TOLERANCE, "Staker A (1x stake) wrong amount");
-        assertApproxEqAbs(claimedB, expectedB, MIN_ASSERT_TOLERANCE, "Staker B (2x stake) wrong amount");
-        assertApproxEqAbs(
+        assertApproxEqRel(claimedA, expectedA, MIN_ASSERT_TOLERANCE, "Staker A (1x stake) wrong amount");
+        assertApproxEqRel(claimedB, expectedB, MIN_ASSERT_TOLERANCE, "Staker B (2x stake) wrong amount");
+        assertApproxEqRel(
             claimedA + claimedB,
             REWARD_AMOUNT,
-            MIN_ASSERT_TOLERANCE * 2,
+            MIN_ASSERT_TOLERANCE,
             "Total claimed wrong for different amounts"
         );
     }
@@ -830,7 +830,7 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         // Expected: rewards for the first half of the period only
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedAmount,
             REWARD_AMOUNT / 2,
             MIN_ASSERT_TOLERANCE,
@@ -906,22 +906,22 @@ contract RegenIntegrationTest is Test {
         uint256 expectedA = earningsA_phase1 + earnings_each_phase2;
         uint256 expectedB = earnings_each_phase2;
 
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedA,
             expectedA,
             MIN_ASSERT_TOLERANCE,
             "Staker A claimed amount incorrect after multiple notifications"
         );
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedB,
             expectedB,
             MIN_ASSERT_TOLERANCE,
             "Staker B claimed amount incorrect after multiple notifications"
         );
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedA + claimedB,
             REWARD_AMOUNT, // Total original reward
-            MIN_ASSERT_TOLERANCE * 2,
+            MIN_ASSERT_TOLERANCE,
             "Total claimed does not match total rewards notified"
         );
     }
@@ -969,9 +969,9 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         // Each deposit should get half of the total reward since they staked the same amount for the full period
-        assertApproxEqAbs(claimed1, REWARD_AMOUNT / 2, MIN_ASSERT_TOLERANCE, "Claimed amount for deposit 1 incorrect");
-        assertApproxEqAbs(claimed2, REWARD_AMOUNT / 2, MIN_ASSERT_TOLERANCE, "Claimed amount for deposit 2 incorrect");
-        assertApproxEqAbs(claimed1 + claimed2, REWARD_AMOUNT, MIN_ASSERT_TOLERANCE * 2, "Total claimed incorrect");
+        assertApproxEqRel(claimed1, REWARD_AMOUNT / 2, MIN_ASSERT_TOLERANCE, "Claimed amount for deposit 1 incorrect");
+        assertApproxEqRel(claimed2, REWARD_AMOUNT / 2, MIN_ASSERT_TOLERANCE, "Claimed amount for deposit 2 incorrect");
+        assertApproxEqRel(claimed1 + claimed2, REWARD_AMOUNT, MIN_ASSERT_TOLERANCE, "Total claimed incorrect");
     }
 
     function test_StakeDeposit_StakeMore_UpdatesBalanceAndRewards() public {
@@ -1046,10 +1046,10 @@ contract RegenIntegrationTest is Test {
 
         uint256 expectedUserRewards = earningsUserPhase1 + earningsUserPhase2;
 
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedAmount,
             expectedUserRewards,
-            MIN_ASSERT_TOLERANCE * 2,
+            MIN_ASSERT_TOLERANCE,
             "Claimed amount after stakeMore incorrect"
         );
     }
@@ -1138,7 +1138,7 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         // Verify main user's rewards
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedAfterWithdraw,
             expectedTotalUserRewards,
             1e7, // Higher tolerance to account for division rounding
@@ -1146,10 +1146,10 @@ contract RegenIntegrationTest is Test {
         );
 
         // Verify total rewards claimed match the total distributed
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedAfterWithdraw + claimedByOtherStaker,
             REWARD_AMOUNT,
-            MIN_ASSERT_TOLERANCE * 3,
+            MIN_ASSERT_TOLERANCE,
             "Total claimed rewards should match total reward amount"
         );
     }
@@ -1192,7 +1192,7 @@ contract RegenIntegrationTest is Test {
         uint256 claimedImmediately = regenStaker.claimReward(depositId);
         vm.stopPrank();
         // Should be rewards for the first half
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedImmediately,
             REWARD_AMOUNT / 2,
             MIN_ASSERT_TOLERANCE,
@@ -1281,7 +1281,7 @@ contract RegenIntegrationTest is Test {
         // Phase 1 (0 to T1 = 1/3 duration): Staker A and B both staked STAKE_AMOUNT. Total EP = 2 * STAKE_AMOUNT. Each gets 1/2.
         // Reward for phase 1 = REWARD_AMOUNT / 3
         uint256 expected_claimedA_period1 = (REWARD_AMOUNT / 3) / 2;
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedA_period1,
             expected_claimedA_period1,
             MIN_ASSERT_TOLERANCE,
@@ -1295,7 +1295,7 @@ contract RegenIntegrationTest is Test {
         // Phase 3 (T2 to T_end = 1/3 duration): Staker A and B both staked STAKE_AMOUNT. Total EP = 2 * STAKE_AMOUNT. Each gets 1/2.
         // Reward for phase 3 = REWARD_AMOUNT / 3
         uint256 expected_claimedA_period2 = (REWARD_AMOUNT / 3) / 2;
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedA_period2,
             expected_claimedA_period2,
             MIN_ASSERT_TOLERANCE,
@@ -1307,18 +1307,18 @@ contract RegenIntegrationTest is Test {
         // Phase2_B_share = REWARD_AMOUNT / 3 (all of it)
         // Phase3_B_share = (REWARD_AMOUNT / 3) / 2
         uint256 expected_claimedB_total = (REWARD_AMOUNT / 3) / 2 + (REWARD_AMOUNT / 3) + (REWARD_AMOUNT / 3) / 2;
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedB_total,
             expected_claimedB_total,
-            MIN_ASSERT_TOLERANCE * 2,
+            MIN_ASSERT_TOLERANCE,
             "Staker B total claim incorrect"
         ); // Higher tolerance for sum
 
         uint256 totalClaimedRewards = claimedA_period1 + claimedA_period2 + claimedB_total;
-        assertApproxEqAbs(
+        assertApproxEqRel(
             totalClaimedRewards,
             REWARD_AMOUNT,
-            MIN_ASSERT_TOLERANCE * 3,
+            MIN_ASSERT_TOLERANCE,
             "Overall total rewards claimed mismatch"
         );
     }
@@ -1363,7 +1363,7 @@ contract RegenIntegrationTest is Test {
         uint256 claimedAmount1 = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedAmount1,
             REWARD_AMOUNT / 2,
             MIN_ASSERT_TOLERANCE,
@@ -1384,7 +1384,7 @@ contract RegenIntegrationTest is Test {
         uint256 claimedAmount2 = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedAmount2,
             REWARD_AMOUNT / 2,
             MIN_ASSERT_TOLERANCE,
@@ -1396,10 +1396,10 @@ contract RegenIntegrationTest is Test {
             "Claimer did not receive tokens for second claim"
         );
 
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedAmount1 + claimedAmount2,
             REWARD_AMOUNT,
-            MIN_ASSERT_TOLERANCE * 2,
+            MIN_ASSERT_TOLERANCE,
             "Total claimed by claimer incorrect"
         );
     }
@@ -1473,7 +1473,7 @@ contract RegenIntegrationTest is Test {
         uint256 claimedByOwner = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedByOwner,
             REWARD_AMOUNT,
             MIN_ASSERT_TOLERANCE,
