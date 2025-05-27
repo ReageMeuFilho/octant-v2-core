@@ -108,9 +108,9 @@ contract SimpleVotingMechanismTest is Test {
         vm.stopPrank();
 
         assertEq(pid, 1);
-        (,, address proposer, address recipient,,,) = voting.proposals(pid);
-        assertEq(proposer, user1);
-        assertEq(recipient, recipient1);
+        BaseAllocationMechanism.Proposal memory proposal = voting.proposals(pid);
+        assertEq(proposal.proposer, user1);
+        assertEq(proposal.recipient, recipient1);
     }
 
     function testProposalCreationByUnregisteredUser() public {
@@ -275,9 +275,9 @@ contract SimpleVotingMechanismTest is Test {
         voting.queueProposal(pid);
 
         // Check proposal is queued
-        (uint256 sharesRequested, uint256 eta,,,,,) = voting.proposals(pid);
-        assertEq(sharesRequested, 0);
-        assertTrue(eta > 0);
+        BaseAllocationMechanism.Proposal memory proposal = voting.proposals(pid);
+        assertEq(proposal.sharesRequested, 0);
+        assertTrue(proposal.eta > 0);
         assertEq(voting.proposalShares(pid), 150);
     }
 
@@ -521,8 +521,8 @@ contract SimpleVotingMechanismTest is Test {
         assertEq(redeemableTime, timestampBefore + timelockDelay);
 
         // Check proposal eta
-        (, uint256 eta,,,,,) = voting.proposals(pid);
-        assertEq(eta, redeemableTime);
+        BaseAllocationMechanism.Proposal memory proposal = voting.proposals(pid);
+        assertEq(proposal.eta, redeemableTime);
     }
 
     function testInvalidVoteWeight() public {
@@ -612,8 +612,8 @@ contract SimpleVotingMechanismTest is Test {
         assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Succeeded));
 
         // Check proposal is marked as claimed
-        (,,,, , bool claimed, ) = voting.proposals(pid);
-        assertTrue(claimed);
+        BaseAllocationMechanism.Proposal memory proposal = voting.proposals(pid);
+        assertTrue(proposal.claimed);
     }
 
     function testProposalStateDefeated() public {
@@ -659,9 +659,9 @@ contract SimpleVotingMechanismTest is Test {
         voting.cancelProposal(pid);
 
         // Check that it's marked as canceled
-        (,,,, , bool claimed, bool canceled) = voting.proposals(pid);
-        assertTrue(canceled);
-        assertFalse(claimed);
+        BaseAllocationMechanism.Proposal memory proposal = voting.proposals(pid);
+        assertTrue(proposal.canceled);
+        assertFalse(proposal.claimed);
         vm.stopPrank();
 
         // Move to voting period
@@ -752,8 +752,8 @@ contract SimpleVotingMechanismTest is Test {
         assertEq(redeemableTime, timestampBefore + timelockDelay);
 
         // Check that eta matches redeemableAfter
-        (, uint256 eta,,,,,) = voting.proposals(pid);
-        assertEq(eta, redeemableTime);
+        BaseAllocationMechanism.Proposal memory proposal = voting.proposals(pid);
+        assertEq(proposal.eta, redeemableTime);
     }
 
     function testProposalAlreadyClaimedWhenQueued() public {
@@ -777,8 +777,8 @@ contract SimpleVotingMechanismTest is Test {
         vm.stopPrank();
 
         // Check that the proposal is marked as claimed
-        (,,,, , bool claimed, ) = voting.proposals(pid);
-        assertTrue(claimed);
+        BaseAllocationMechanism.Proposal memory proposal = voting.proposals(pid);
+        assertTrue(proposal.claimed);
 
         // Check the proposal state is Succeeded
         assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Succeeded));

@@ -55,6 +55,14 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
     /// @notice Maximum safe value for mathematical operations
     uint256 public constant MAX_SAFE_VALUE = type(uint128).max;
     
+    /// @notice Grace period after timelock expiry for state computation
+    uint256 public constant GRACE_PERIOD = 14 days;
+
+    /// @notice EIP-712 storage slot for the main storage struct
+    /// @dev keccak256("BaseAllocationMechanism.storage") - 1
+    bytes32 private constant STORAGE_SLOT = 0x82b56d4e0bf4db9b38e3ed3de5b78a9e6c07e0e7b2a5f4a5e7e4b8d8a5c8a8b0;
+
+    /// @notice Immutable configuration parameters
     /// @notice start block to start counting the voting delay before votingPeriod
     uint256 public immutable startBlock;
     /// @notice Blocks between consecutive proposals by same proposer
@@ -65,11 +73,28 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
     uint256 public immutable timelockDelay;
     /// @notice Minimum net votes required to queue a proposal
     uint256 public immutable quorumShares;
-    /// @notice Grace period after timelock expiry for state computation
-    uint256 public constant GRACE_PERIOD = 14 days;
+    /// @notice ERC20 asset used for the vault
+    IERC20 public immutable asset;
 
-    /// @notice Becomes true once `finalizeVoteTally` is called post-voting
-    bool public tallyFinalized;
+    /// @notice Main storage struct containing all mutable state
+    struct BaseAllocationStorage {
+        // Basic token information
+        string name;
+        string symbol;
+        
+        // Voting state
+        bool tallyFinalized;
+        uint256 proposalIdCounter;
+        
+        // Mappings
+        mapping(uint256 => Proposal) proposals;
+        mapping(uint256 => ProposalVote) proposalVotes;
+        mapping(address => bool) recipientUsed;
+        mapping(uint256 => mapping(address => bool)) hasVoted;
+        mapping(address => uint256) votingPower;
+        mapping(address => uint256) redeemableAfter;
+        mapping(uint256 => uint256) proposalShares;
+    }
 
     /// @notice Vote types: Against, For, Abstain
     enum VoteType {
@@ -106,26 +131,59 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
         uint256 sharesAbstain;
     }
 
-    /// @notice ERC20 asset used for the vault
-    IERC20 public immutable asset;
-    string public name;
-    string public symbol;
-    /// @dev Mapping of proposal ID to Proposal data
-    mapping(uint256 => Proposal) public proposals;
-    /// @dev Mapping of proposal ID to ProposalVote data
-    mapping(uint256 => ProposalVote) public proposalVotes;
-    /// @dev Counter for generating unique proposal IDs
-    uint256 internal _proposalIdCounter;
-    /// @dev Tracks addresses already used as recipients to avoid duplicates
-    mapping(address => bool) private _recipientUsed;
-    /// @dev Tracks which addresses have voted on which proposals
-    mapping(uint256 => mapping(address => bool)) public hasVoted;
-    /// @dev Voting power of each address
-    mapping(address => uint256) public votingPower;
-    /// @dev Earliest timestamp at which shares can be redeemed for each recipient
-    mapping(address => uint256) public redeemableAfter;
-    /// @dev Shares allocated to each proposal, for record-keeping
-    mapping(uint256 => uint256) public proposalShares;
+    /// @notice Get the storage struct from the predefined slot
+    /// @return s The storage struct containing all mutable state
+    function _getStorage() internal pure returns (BaseAllocationStorage storage s) {
+        bytes32 slot = STORAGE_SLOT;
+        assembly {
+            s.slot := slot
+        }
+    }
+
+    /// @notice Public getter for name (delegating to storage)
+    function name() public view returns (string memory) {
+        return _getStorage().name;
+    }
+
+    /// @notice Public getter for symbol (delegating to storage)
+    function symbol() public view returns (string memory) {
+        return _getStorage().symbol;
+    }
+
+    /// @notice Public getter for tallyFinalized (delegating to storage)
+    function tallyFinalized() public view returns (bool) {
+        return _getStorage().tallyFinalized;
+    }
+
+    /// @notice Public getter for proposals mapping (delegating to storage)
+    function proposals(uint256 pid) public view returns (Proposal memory) {
+        return _getStorage().proposals[pid];
+    }
+
+    /// @notice Public getter for proposalVotes mapping (delegating to storage)
+    function proposalVotes(uint256 pid) public view returns (ProposalVote memory) {
+        return _getStorage().proposalVotes[pid];
+    }
+
+    /// @notice Public getter for hasVoted mapping (delegating to storage)
+    function hasVoted(uint256 pid, address voter) public view returns (bool) {
+        return _getStorage().hasVoted[pid][voter];
+    }
+
+    /// @notice Public getter for votingPower mapping (delegating to storage)
+    function votingPower(address user) public view returns (uint256) {
+        return _getStorage().votingPower[user];
+    }
+
+    /// @notice Public getter for redeemableAfter mapping (delegating to storage)
+    function redeemableAfter(address recipient) public view returns (uint256) {
+        return _getStorage().redeemableAfter[recipient];
+    }
+
+    /// @notice Public getter for proposalShares mapping (delegating to storage)
+    function proposalShares(uint256 pid) public view returns (uint256) {
+        return _getStorage().proposalShares[pid];
+    }
 
     /// @notice Emitted when a user completes registration
     event UserRegistered(address indexed user, uint256 votingPower);
@@ -167,14 +225,18 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
         if (bytes(_name).length == 0) revert EmptyName();
         if (bytes(_symbol).length == 0) revert EmptySymbol();
 
+        // Set immutable values
         asset = _asset;
-        name = _name;
-        symbol = _symbol;
         votingDelay = _votingDelay;
         votingPeriod = _votingPeriod;
         quorumShares = _quorumShares;
         timelockDelay = _timelockDelay;
         startBlock = _startBlock;
+        
+        // Initialize storage struct
+        BaseAllocationStorage storage s = _getStorage();
+        s.name = _name;
+        s.symbol = _symbol;
     }
 
     // ---------- Hooks (to implement) ----------
@@ -245,12 +307,13 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
         address user = msg.sender;
         if (!_beforeSignupHook(user)) revert RegistrationBlocked();
         if (block.number >= startBlock + votingDelay + votingPeriod) revert VotingEnded();
-        if (votingPower[user] != 0) revert AlreadyRegistered();
+        BaseAllocationStorage storage s = _getStorage();
+        if (s.votingPower[user] != 0) revert AlreadyRegistered();
         if (deposit > MAX_SAFE_VALUE) revert DepositTooLarge();
         if (deposit > 0) asset.safeTransferFrom(user, address(this), deposit);
         uint256 newPower = _getVotingPowerHook(user, deposit);
         if (newPower > MAX_SAFE_VALUE) revert VotingPowerTooLarge();
-        votingPower[user] = newPower;
+        s.votingPower[user] = newPower;
         emit UserRegistered(user, newPower);
     }
 
@@ -264,16 +327,17 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
         address proposer = msg.sender;
         if (!_beforeProposeHook(proposer)) revert ProposeNotAllowed();
         if (recipient == address(0)) revert InvalidRecipient();
-        if (_recipientUsed[recipient]) revert RecipientUsed();
+        BaseAllocationStorage storage s = _getStorage();
+        if (s.recipientUsed[recipient]) revert RecipientUsed();
         if (bytes(description).length == 0) revert EmptyDescription();
         if (bytes(description).length > 1000) revert DescriptionTooLong();
 
-        if (_proposalIdCounter >= type(uint256).max) revert MaxProposalsReached();
-        _proposalIdCounter++;
-        pid = _proposalIdCounter;
+        if (s.proposalIdCounter >= type(uint256).max) revert MaxProposalsReached();
+        s.proposalIdCounter++;
+        pid = s.proposalIdCounter;
 
-        proposals[pid] = Proposal(0, 0, proposer, recipient, description, false, false);
-        _recipientUsed[recipient] = true;
+        s.proposals[pid] = Proposal(0, 0, proposer, recipient, description, false, false);
+        s.recipientUsed[recipient] = true;
 
         emit ProposalCreated(pid, proposer, recipient, description);
     }
@@ -284,9 +348,10 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
     /// @dev **SECURITY CRITICAL**: ensure this can only be called once and only after voting ends.
     function finalizeVoteTally() external onlyOwner {
         if (block.number < startBlock + votingDelay + votingPeriod) revert VotingNotEnded();
-        if (tallyFinalized) revert TallyAlreadyFinalized();
+        BaseAllocationStorage storage s = _getStorage();
+        if (s.tallyFinalized) revert TallyAlreadyFinalized();
         if (!_beforeFinalizeVoteTallyHook()) revert FinalizationBlocked();
-        tallyFinalized = true;
+        s.tallyFinalized = true;
         emit VoteTallyFinalized();
     }
 
@@ -296,16 +361,17 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
     /// @dev Calls `_convertVotesToShares(pid)` to determine mint amount.
     /// @param pid Proposal ID to queue.
     function queueProposal(uint256 pid) external onlyOwner {
-        if (!tallyFinalized) revert TallyNotFinalized();
+        BaseAllocationStorage storage s = _getStorage();
+        if (!s.tallyFinalized) revert TallyNotFinalized();
         if (!_validateProposalHook(pid)) revert InvalidProposal();
-        Proposal storage p = proposals[pid];
+        Proposal storage p = s.proposals[pid];
         if (p.canceled) revert ProposalCanceledError();
         if (!_hasQuorumHook(pid)) revert NoQuorum();
         if (p.eta != 0) revert AlreadyQueued();
 
         uint256 sharesToMint = _convertVotesToShares(pid);
         if (sharesToMint == 0) revert NoAllocation();
-        proposalShares[pid] = sharesToMint;
+        s.proposalShares[pid] = sharesToMint;
 
         _requestDistributionHook(_getRecipientAddressHook(pid), sharesToMint);
         //_mint(p.recipient, sharesToMint);
@@ -313,7 +379,7 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
         uint256 eta = block.timestamp + timelockDelay;
         p.eta = eta;
         p.claimed = true;
-        redeemableAfter[p.recipient] = eta;
+        s.redeemableAfter[p.recipient] = eta;
         emit ProposalQueued(pid, eta, sharesToMint);
     }
 
@@ -328,17 +394,18 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
         if (
             block.number < startBlock + votingDelay || block.number > startBlock + votingDelay + votingPeriod
         ) revert VotingClosed();
-        if (hasVoted[pid][msg.sender]) revert AlreadyVoted();
+        BaseAllocationStorage storage s = _getStorage();
+        if (s.hasVoted[pid][msg.sender]) revert AlreadyVoted();
 
-        uint256 oldPower = votingPower[msg.sender];
+        uint256 oldPower = s.votingPower[msg.sender];
         if (weight == 0 || weight > oldPower) revert InvalidWeight();
         if (weight > MAX_SAFE_VALUE) revert WeightTooLarge();
 
         uint256 newPower = _processVoteHook(pid, msg.sender, choice, weight, oldPower);
         if (newPower > oldPower) revert PowerIncreased();
 
-        votingPower[msg.sender] = newPower;
-        hasVoted[pid][msg.sender] = true;
+        s.votingPower[msg.sender] = newPower;
+        s.hasVoted[pid][msg.sender] = true;
         emit VotesCast(msg.sender, pid, choice, weight);
     }
 
@@ -346,7 +413,8 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
 
     /// @dev Internal state computation for a proposal
     function _state(uint256 pid) internal view returns (ProposalState) {
-        Proposal storage p = proposals[pid];
+        BaseAllocationStorage storage s = _getStorage();
+        Proposal storage p = s.proposals[pid];
         if (p.canceled) return ProposalState.Canceled;
         if (block.number < startBlock) return ProposalState.Pending;
         if (block.number <= startBlock + votingDelay + votingPeriod) return ProposalState.Active;
@@ -368,8 +436,9 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
     /// @notice Cancel a proposal
     /// @param pid Proposal ID to cancel
     function cancelProposal(uint256 pid) external {
+        BaseAllocationStorage storage s = _getStorage();
         if (!_validateProposalHook(pid)) revert InvalidProposal();
-        Proposal storage p = proposals[pid];
+        Proposal storage p = s.proposals[pid];
         if (msg.sender != p.proposer) revert NotProposer();
         if (p.canceled) revert AlreadyCanceled();
         if (p.eta != 0) revert AlreadyQueued();
@@ -388,8 +457,9 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
         view
         returns (uint256 sharesFor, uint256 sharesAgainst, uint256 sharesAbstain)
     {
+        BaseAllocationStorage storage s = _getStorage();
         if (!_validateProposalHook(pid)) revert InvalidProposal();
-        ProposalVote storage votes = proposalVotes[pid];
+        ProposalVote storage votes = s.proposalVotes[pid];
         return (votes.sharesFor, votes.sharesAgainst, votes.sharesAbstain);
     }
 
@@ -397,13 +467,15 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
     /// @param voter Address to check voting power for
     /// @return Remaining voting power
     function getRemainingVotingPower(address voter) external view returns (uint256) {
-        return votingPower[voter];
+        BaseAllocationStorage storage s = _getStorage();
+        return s.votingPower[voter];
     }
 
     /// @notice Get total number of proposals created
     /// @return Total proposal count
     function getProposalCount() external view returns (uint256) {
-        return _proposalIdCounter;
+        BaseAllocationStorage storage s = _getStorage();
+        return s.proposalIdCounter;
     }
 
     // ---------- Emergency Functions ----------
