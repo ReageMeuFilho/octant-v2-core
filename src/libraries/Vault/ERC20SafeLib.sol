@@ -16,7 +16,7 @@ library ERC20SafeLib {
      * @param spender The address to approve spending for
      * @param amount The amount to approve
      */
-    function safeApprove(address token, address spender, uint256 amount) internal {
+    function safeApprove(address token, address spender, uint256 amount) external {
         (bool success, bytes memory data) = token.call(
             abi.encodeWithSelector(IERC20.approve.selector, spender, amount)
         );
@@ -32,7 +32,7 @@ library ERC20SafeLib {
      * @param receiver The address to transfer to
      * @param amount The amount to transfer
      */
-    function safeTransferFrom(address token, address sender, address receiver, uint256 amount) internal {
+    function safeTransferFrom(address token, address sender, address receiver, uint256 amount) external {
         (bool success, bytes memory data) = token.call(
             abi.encodeWithSelector(IERC20.transferFrom.selector, sender, receiver, amount)
         );
@@ -47,7 +47,7 @@ library ERC20SafeLib {
      * @param receiver The address to transfer to
      * @param amount The amount to transfer
      */
-    function safeTransfer(address token, address receiver, uint256 amount) internal {
+    function safeTransfer(address token, address receiver, uint256 amount) external {
         (bool success, bytes memory data) = token.call(
             abi.encodeWithSelector(IERC20.transfer.selector, receiver, amount)
         );
