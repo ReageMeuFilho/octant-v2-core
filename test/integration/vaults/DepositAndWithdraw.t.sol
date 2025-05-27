@@ -2,10 +2,10 @@
 pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
-import { Vault } from "../../../src/dragons/vaults/Vault.sol";
-import { MockERC20 } from "../../mocks/MockERC20.sol";
-import { IVault } from "../../../src/interfaces/IVault.sol";
-import { VaultFactory } from "../../../src/dragons/vaults/VaultFactory.sol";
+import { Vault } from "src/dragons/vaults/Vault.sol";
+import { MockERC20 } from "test/mocks/MockERC20.sol";
+import { IVault } from "src/interfaces/IVault.sol";
+import { VaultFactory } from "src/dragons/vaults/VaultFactory.sol";
 
 contract DepositAndWithdrawTest is Test {
     Vault vaultImplementation;

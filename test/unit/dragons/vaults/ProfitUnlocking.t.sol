@@ -2,16 +2,16 @@
 pragma solidity ^0.8.25;
 
 import "forge-std/Test.sol";
-import { Vault } from "../../../src/dragons/vaults/Vault.sol";
-import { VaultFactory } from "../../../src/dragons/vaults/VaultFactory.sol";
-import { IVault } from "../../../src/interfaces/IVault.sol";
-import { MockERC20 } from "../../mocks/MockERC20.sol";
-import { MockYieldStrategy } from "../../mocks/MockYieldStrategy.sol";
-import { MockAccountant } from "../../mocks/MockAccountant.sol";
+import { Vault } from "src/dragons/vaults/Vault.sol";
+import { VaultFactory } from "src/dragons/vaults/VaultFactory.sol";
+import { IVault } from "src/interfaces/IVault.sol";
+import { MockERC20 } from "test/mocks/MockERC20.sol";
+import { MockYieldStrategy } from "test/mocks/MockYieldStrategy.sol";
+import { MockAccountant } from "test/mocks/MockAccountant.sol";
 
-import { IFactory } from "../../../src/interfaces/IFactory.sol";
+import { IFactory } from "src/interfaces/IFactory.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
-import { MockFlexibleAccountant } from "../../mocks/MockFlexibleAccountant.sol";
+import { MockFlexibleAccountant } from "test/mocks/MockFlexibleAccountant.sol";
 
 contract ProfitUnlockingTest is Test {
     Vault vaultImplementation;

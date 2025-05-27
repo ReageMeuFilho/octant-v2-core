@@ -2,9 +2,9 @@
 pragma solidity ^0.8.25;
 
 import "forge-std/Test.sol";
-import { VaultFactory } from "../../../src/dragons/vaults/VaultFactory.sol";
-import { Vault } from "../../../src/dragons/vaults/Vault.sol";
-import { MockERC20 } from "../../mocks/MockERC20.sol";
+import { VaultFactory } from "src/dragons/vaults/VaultFactory.sol";
+import { Vault } from "src/dragons/vaults/Vault.sol";
+import { MockERC20 } from "test/mocks/MockERC20.sol";
 
 contract ProtocolFeesTest is Test {
     VaultFactory vaultFactory;

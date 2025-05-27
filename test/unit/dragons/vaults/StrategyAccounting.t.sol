@@ -2,18 +2,18 @@
 pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
-import { Vault } from "../../../src/dragons/vaults/Vault.sol";
-import { VaultFactory } from "../../../src/dragons/vaults/VaultFactory.sol";
+import { Vault } from "src/dragons/vaults/Vault.sol";
+import { VaultFactory } from "src/dragons/vaults/VaultFactory.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IVault } from "../../../src/interfaces/IVault.sol";
-import { IAccountant } from "../../../src/interfaces/IAccountant.sol";
-import { MockERC20 } from "../../mocks/MockERC20.sol";
-import { MockYieldStrategy } from "../../mocks/MockYieldStrategy.sol";
-import { MockAccountant } from "../../mocks/MockAccountant.sol";
+import { IVault } from "src/interfaces/IVault.sol";
+import { IAccountant } from "src/interfaces/IAccountant.sol";
+import { MockERC20 } from "test/mocks/MockERC20.sol";
+import { MockYieldStrategy } from "test/mocks/MockYieldStrategy.sol";
+import { MockAccountant } from "test/mocks/MockAccountant.sol";
 import { Constants } from "./utils/constants.sol";
-import { MockFlexibleAccountant } from "../../mocks/MockFlexibleAccountant.sol";
-import { MockFaultyAccountant } from "../../mocks/MockFaultyAccountant.sol";
-import { MockLossyStrategy } from "../../mocks/MockLossyStrategy.sol";
+import { MockFlexibleAccountant } from "test/mocks/MockFlexibleAccountant.sol";
+import { MockFaultyAccountant } from "test/mocks/MockFaultyAccountant.sol";
+import { MockLossyStrategy } from "test/mocks/MockLossyStrategy.sol";
 
 contract StrategyAccountingTest is Test {
     Vault vaultImplementation;

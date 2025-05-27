@@ -2,13 +2,13 @@
 pragma solidity ^0.8.25;
 
 import "forge-std/Test.sol";
-import { LockedVault } from "../../../src/dragons/vaults/LockedVault.sol";
-import { MockERC20 } from "../../mocks/MockERC20.sol";
-import { MockYieldStrategy } from "../../mocks/MockYieldStrategy.sol";
-import { IVault } from "../../../src/interfaces/IVault.sol";
-import { ILockedVault } from "../../../src/interfaces/ILockedVault.sol";
-import { VaultFactory } from "../../../src/dragons/vaults/VaultFactory.sol";
-import { MockAccountant } from "../../mocks/MockAccountant.sol";
+import { LockedVault } from "src/dragons/vaults/LockedVault.sol";
+import { MockERC20 } from "test/mocks/MockERC20.sol";
+import { MockYieldStrategy } from "test/mocks/MockYieldStrategy.sol";
+import { IVault } from "src/interfaces/IVault.sol";
+import { ILockedVault } from "src/interfaces/ILockedVault.sol";
+import { VaultFactory } from "src/dragons/vaults/VaultFactory.sol";
+import { MockAccountant } from "test/mocks/MockAccountant.sol";
 
 contract ProfitableStrategyFlowLockedTest is Test {
     // Define structs to avoid stack too deep error

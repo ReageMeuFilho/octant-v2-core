@@ -9,7 +9,7 @@ import { MockERC20 } from "test/mocks/MockERC20.sol";
 import "../../../script/deploy/DeployTrader.sol";
 import { HelperConfig } from "../../../script/helpers/HelperConfig.s.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IUniswapV3Pool } from "../../../src/vendor/uniswap/IUniswapV3Pool.sol";
+import { IUniswapV3Pool } from "src/vendor/uniswap/IUniswapV3Pool.sol";
 
 contract TestTraderIntegrationETH2GLM is Test, TestPlus, DeployTrader {
     HelperConfig config;

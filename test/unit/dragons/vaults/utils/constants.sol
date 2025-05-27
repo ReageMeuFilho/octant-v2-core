@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.25;
 
-import { IVault } from "../../../../src/interfaces/IVault.sol";
+import { IVault } from "src/interfaces/IVault.sol";
 
 /**
  * @title Vault System Constants

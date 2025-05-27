@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import { Whitelist } from "../../../src/regen/whitelist/Whitelist.sol";
+import { Whitelist } from "src/regen/whitelist/Whitelist.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol"; // For OwnableUnauthorizedAccount error
 
 contract WhitelistTest is Test {

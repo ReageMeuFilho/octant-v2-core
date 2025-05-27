@@ -2,7 +2,7 @@
 pragma solidity ^0.8.25;
 
 import "forge-std/Test.sol";
-import "../../../src/dragons/vaults/VaultFactory.sol";
+import "src/dragons/vaults/VaultFactory.sol";
 
 contract OwnershipTest is Test {
     VaultFactory vaultFactory;

@@ -2,12 +2,12 @@
 pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
-import { Vault } from "../../../src/dragons/vaults/Vault.sol";
-import { VaultFactory } from "../../../src/dragons/vaults/VaultFactory.sol";
+import { Vault } from "src/dragons/vaults/Vault.sol";
+import { VaultFactory } from "src/dragons/vaults/VaultFactory.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IVault } from "../../../src/interfaces/IVault.sol";
-import { MockERC20 } from "../../mocks/MockERC20.sol";
-import { MockYieldStrategy } from "../../mocks/MockYieldStrategy.sol";
+import { IVault } from "src/interfaces/IVault.sol";
+import { MockERC20 } from "test/mocks/MockERC20.sol";
+import { MockYieldStrategy } from "test/mocks/MockYieldStrategy.sol";
 import { Constants } from "./utils/constants.sol";
 
 contract AutoAllocateTest is Test {

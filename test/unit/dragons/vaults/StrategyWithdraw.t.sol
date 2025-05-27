@@ -2,13 +2,13 @@
 pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
-import { Vault } from "../../../src/dragons/vaults/Vault.sol";
-import { IVault } from "../../../src/interfaces/IVault.sol";
-import { MockERC20 } from "../../mocks/MockERC20.sol";
-import { MockYieldStrategy } from "../../mocks/MockYieldStrategy.sol";
-import { MockLockedStrategy } from "../../mocks/MockLockedStrategy.sol";
-import { MockLossyStrategy } from "../../mocks/MockLossyStrategy.sol";
-import { VaultFactory } from "../../../src/dragons/vaults/VaultFactory.sol";
+import { Vault } from "src/dragons/vaults/Vault.sol";
+import { IVault } from "src/interfaces/IVault.sol";
+import { MockERC20 } from "test/mocks/MockERC20.sol";
+import { MockYieldStrategy } from "test/mocks/MockYieldStrategy.sol";
+import { MockLockedStrategy } from "test/mocks/MockLockedStrategy.sol";
+import { MockLossyStrategy } from "test/mocks/MockLossyStrategy.sol";
+import { VaultFactory } from "src/dragons/vaults/VaultFactory.sol";
 
 contract StrategyWithdrawTest is Test {
     uint256 constant DAY = 86400;

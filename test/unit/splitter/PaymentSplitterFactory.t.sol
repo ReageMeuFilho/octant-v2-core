@@ -5,7 +5,7 @@ import { Test } from "forge-std/Test.sol";
 import { PaymentSplitterFactory } from "src/dragons/splitter/PaymentSplitterFactory.sol";
 import { PaymentSplitter } from "src/dragons/splitter/PaymentSplitter.sol";
 import { ERC20, IERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import { MockERC20 } from "../../mocks/MockERC20.sol";
+import { MockERC20 } from "test/mocks/MockERC20.sol";
 
 contract PaymentSplitterFactoryTest is Test {
     PaymentSplitterFactory public factory;

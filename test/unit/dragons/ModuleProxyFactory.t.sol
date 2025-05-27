@@ -7,10 +7,10 @@ import { IModuleProxyFactory } from "src/interfaces/IModuleProxyFactory.sol";
 import { DragonRouter } from "src/dragons/DragonRouter.sol";
 import { ISplitChecker } from "src/interfaces/ISplitChecker.sol";
 import { ISafe } from "src/interfaces/Safe.sol";
-import { MockModule } from "../../mocks/MockModule.sol";
-import { MockSafe } from "../../mocks/MockSafe.sol";
-import { MockLinearAllowance } from "../../mocks/MockLinearAllowance.sol";
-import { MockSafeDragonRouter } from "../../mocks/MockSafeDragonRouter.sol";
+import { MockModule } from "test/mocks/MockModule.sol";
+import { MockSafe } from "test/mocks/MockSafe.sol";
+import { MockLinearAllowance } from "test/mocks/MockLinearAllowance.sol";
+import { MockSafeDragonRouter } from "test/mocks/MockSafeDragonRouter.sol";
 import { MultiSendCallOnly } from "src/libraries/Safe/MultiSendCallOnly.sol";
 import { SplitChecker } from "src/dragons/SplitChecker.sol";
 

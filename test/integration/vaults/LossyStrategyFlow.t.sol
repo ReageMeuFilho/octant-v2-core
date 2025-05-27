@@ -2,11 +2,11 @@
 pragma solidity ^0.8.25;
 
 import "forge-std/Test.sol";
-import { Vault } from "../../../src/dragons/vaults/Vault.sol";
-import { MockERC20 } from "../../mocks/MockERC20.sol";
-import { MockLossyStrategy } from "../../mocks/MockLossyStrategy.sol";
-import { IVault } from "../../../src/interfaces/IVault.sol";
-import { VaultFactory } from "../../../src/dragons/vaults/VaultFactory.sol";
+import { Vault } from "src/dragons/vaults/Vault.sol";
+import { MockERC20 } from "test/mocks/MockERC20.sol";
+import { MockLossyStrategy } from "test/mocks/MockLossyStrategy.sol";
+import { IVault } from "src/interfaces/IVault.sol";
+import { VaultFactory } from "src/dragons/vaults/VaultFactory.sol";
 
 contract LossyStrategyFlowTest is Test {
     Vault public vault;
