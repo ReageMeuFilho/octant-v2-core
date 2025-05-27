@@ -77,6 +77,7 @@ import { IGrantRound } from "src/regen/IGrantRound.sol";
 /// @title RegenStaker
 /// @author [Golem Foundation](https://golem.foundation)
 /// @notice This contract is an extended version of the Staker contract by [ScopeLift](https://scopelift.co).
+/// @notice As defined by Staker, REWARD_DURATION is constant and set to 30 days.
 contract RegenStaker is
     Staker,
     StakerDelegateSurrogateVotes,
