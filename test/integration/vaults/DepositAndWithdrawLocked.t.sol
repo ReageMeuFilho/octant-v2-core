@@ -140,6 +140,13 @@ contract DepositAndWithdrawLockedTest is Test {
         assertEq(vault.pricePerShare(), 10 ** asset.decimals(), "Price per share should be 1:1");
 
         // Withdraw remaining half
+        // initiate rage quit
+        initiateAndCompleteRageQuit(fish);
+
+        // warp to unlock time
+        vm.warp(block.timestamp + vault.rageQuitCooldownPeriod() + 1);
+
+        // withdraw
         vm.prank(fish);
         vault.withdraw(halfAmount, fish, fish, 0, new address[](0));
 

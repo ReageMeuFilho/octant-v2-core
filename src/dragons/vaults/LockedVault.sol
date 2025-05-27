@@ -84,6 +84,7 @@ contract LockedVault is Vault, ILockedVault {
         address[] calldata strategiesArray
     ) public override(IVault, Vault) nonReentrant returns (uint256) {
         _checkUnlocked(owner);
+        voluntaryLockups[owner].lockupTime = 0;
         uint256 shares = _convertToShares(assets, Rounding.ROUND_UP);
         _redeem(msg.sender, receiver, owner, assets, shares, maxLoss, strategiesArray);
         return shares;
@@ -100,6 +101,7 @@ contract LockedVault is Vault, ILockedVault {
         address[] calldata strategiesArray
     ) public override(IVault, Vault) nonReentrant returns (uint256) {
         _checkUnlocked(owner);
+        voluntaryLockups[owner].lockupTime = 0;
         uint256 assets = _convertToAssets(shares, Rounding.ROUND_DOWN);
         // Always return the actual amount of assets withdrawn.
         return _redeem(msg.sender, receiver, owner, assets, shares, maxLoss, strategiesArray);

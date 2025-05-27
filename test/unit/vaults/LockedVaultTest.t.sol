@@ -168,7 +168,7 @@ contract LockedVaultTest is Test {
         vault.redeem(fishAmount, fish, fish, 0, new address[](0));
     }
 
-    function testWithdrawAndRedeemAfterUnlock() public {
+    function testWithdrawAfterUnlock() public {
         // Deposit first
         userDeposit(fish, fishAmount);
 
@@ -181,13 +181,32 @@ contract LockedVaultTest is Test {
 
         // Should be able to withdraw now
         vm.startPrank(fish);
-        uint256 withdrawnAmount = vault.withdraw(fishAmount / 2, fish, fish, 0, new address[](0));
-        assertEq(withdrawnAmount, fishAmount / 2, "Should withdraw correct amount");
+        uint256 withdrawnAmount = vault.withdraw(fishAmount, fish, fish, 0, new address[](0));
+        assertEq(withdrawnAmount, fishAmount, "Should withdraw correct amount");
 
-        // Should be able to redeem now
-        uint256 redeemedAmount = vault.redeem(fishAmount / 2, fish, fish, 0, new address[](0));
-        assertEq(redeemedAmount, fishAmount / 2, "Should redeem correct amount");
-        vm.stopPrank();
+        // Verify balances
+        assertEq(vault.balanceOf(fish), 0, "Fish should have no remaining shares");
+        assertEq(asset.balanceOf(fish), fishAmount, "Fish should have received all assets back");
+    }
+
+    function testRedeemAfterUnlock() public {
+        // Deposit first
+        userDeposit(fish, fishAmount);
+
+        // Initiate rage quit
+        vm.prank(fish);
+        vault.initiateRageQuit();
+
+        // Fast forward past unlock time
+        vm.warp(block.timestamp + vault.rageQuitCooldownPeriod() + 1);
+
+        // redeem
+        uint256 shares = vault.balanceOf(fish);
+
+        // Should be able to withdraw now
+        vm.startPrank(fish);
+        uint256 redeemedAmount = vault.redeem(shares, fish, fish, 0, new address[](0));
+        assertEq(redeemedAmount, fishAmount, "Should redeem correct amount");
 
         // Verify balances
         assertEq(vault.balanceOf(fish), 0, "Fish should have no remaining shares");
@@ -230,5 +249,55 @@ contract LockedVaultTest is Test {
         // Original unlock time should not change despite re-deposit
         (, uint256 currentUnlockTime) = vault.voluntaryLockups(fish);
         assertEq(currentUnlockTime, originalUnlockTime, "Unlock time should not change on re-deposit");
+    }
+
+    function testCannotWithdrawAgainAfterFirstWithdrawalWithoutNewRageQuit() public {
+        // Deposit first
+        userDeposit(fish, fishAmount);
+
+        // Initiate rage quit
+        vm.prank(fish);
+        vault.initiateRageQuit();
+
+        // Fast forward past unlock time
+        vm.warp(block.timestamp + vault.rageQuitCooldownPeriod() + 1);
+
+        // First withdrawal should succeed
+        vm.startPrank(fish);
+        uint256 withdrawnAmount = vault.withdraw(fishAmount / 2, fish, fish, 0, new address[](0));
+        assertEq(withdrawnAmount, fishAmount / 2, "Should withdraw correct amount");
+
+        // Try to withdraw again without initiating new rage quit (should fail)
+        vm.expectRevert(ILockedVault.SharesStillLocked.selector);
+        vault.withdraw(fishAmount / 2, fish, fish, 0, new address[](0));
+        vm.stopPrank();
+    }
+
+    function testCanWithdrawAgainAfterNewRageQuit() public {
+        // Deposit first
+        userDeposit(fish, fishAmount);
+
+        // First rage quit
+        vm.prank(fish);
+        vault.initiateRageQuit();
+
+        // Fast forward past unlock time
+        vm.warp(block.timestamp + vault.rageQuitCooldownPeriod() + 1);
+
+        // First withdrawal
+        vm.startPrank(fish);
+        uint256 withdrawnAmount = vault.withdraw(fishAmount / 2, fish, fish, 0, new address[](0));
+        assertEq(withdrawnAmount, fishAmount / 2, "Should withdraw correct amount");
+
+        // Initiate new rage quit
+        vault.initiateRageQuit();
+
+        // Fast forward past new unlock time
+        vm.warp(block.timestamp + vault.rageQuitCooldownPeriod() + 1);
+
+        // Should be able to withdraw again after new rage quit
+        withdrawnAmount = vault.withdraw(fishAmount / 2, fish, fish, 0, new address[](0));
+        assertEq(withdrawnAmount, fishAmount / 2, "Should withdraw correct amount");
+        vm.stopPrank();
     }
 }
