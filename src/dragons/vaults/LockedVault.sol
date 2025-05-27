@@ -8,6 +8,37 @@ import { ILockedVault } from "src/interfaces/ILockedVault.sol";
  * @title LockedVault
  * @notice Vault with modified unlocking mechanism similar to DragonTokenizedStrategy
  * that consults strategies for minimum unlock times during rage quit
+ *
+ * @dev Important Behavior Notes:
+ *
+ * 1. Rage Quit Scope:
+ *    - When a rage quit is initiated, it applies to ALL shares owned by the user at the time of initiation
+ *    - Any new deposits made AFTER initiating rage quit will also be included in the unlock
+ *    - The unlock applies to the user's total share balance, not individual deposits
+ *
+ * 2. One-Time Withdrawal Window:
+ *    - A rage quit process grants exactly ONE opportunity to withdraw/redeem shares
+ *    - This window opens after the cooldown period and remains open until the first withdrawal/redeem
+ *    - After the first withdrawal/redeem (even partial), the window closes
+ *    - Any remaining shares will require a new rage quit process to be unlocked
+ *
+ * 3. Partial Withdrawals:
+ *    - Users can withdraw/redeem any amount up to their total balance during the unlock window
+ *    - If a user only withdraws/redeems a portion of their shares:
+ *      * The remaining shares become locked again
+ *      * A new rage quit process must be initiated to unlock the remaining shares
+ *      * The new rage quit will have its own cooldown period
+ *
+ * 4. Example Scenarios:
+ *    a) User has 100 shares, initiates rage quit, waits cooldown:
+ *       - Can withdraw/redeem any amount (1-100) in one transaction
+ *       - After first withdrawal/redeem, remaining shares are locked
+ *       - New rage quit needed for remaining shares
+ *
+ *    b) User has 100 shares, initiates rage quit, deposits 50 more during cooldown:
+ *       - Can withdraw/redeem up to 150 shares after cooldown
+ *       - Same one-time window rules apply to total balance
+ *
  */
 contract LockedVault is Vault, ILockedVault {
     // Mapping of user address to their lockup info
