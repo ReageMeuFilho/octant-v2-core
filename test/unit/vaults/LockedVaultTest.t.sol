@@ -300,4 +300,58 @@ contract LockedVaultTest is Test {
         assertEq(withdrawnAmount, fishAmount / 2, "Should withdraw correct amount");
         vm.stopPrank();
     }
+
+    function testCannotRedeemAgainAfterFirstRedeemWithoutNewRageQuit() public {
+        // Deposit first
+        userDeposit(fish, fishAmount);
+
+        // Initiate rage quit
+        vm.prank(fish);
+        vault.initiateRageQuit();
+
+        // Fast forward past unlock time
+        vm.warp(block.timestamp + vault.rageQuitCooldownPeriod() + 1);
+
+        // First redeem should succeed
+        vm.startPrank(fish);
+        uint256 sharesToRedeem = vault.previewWithdraw(fishAmount / 2); // Get shares needed for half amount
+        uint256 withdrawnAmount = vault.redeem(sharesToRedeem, fish, fish, 0, new address[](0));
+        assertEq(withdrawnAmount, fishAmount / 2, "Should redeem correct amount");
+
+        // Try to redeem again without initiating new rage quit (should fail)
+        uint256 remainingShares = vault.previewWithdraw(fishAmount / 2);
+        vm.expectRevert(ILockedVault.SharesStillLocked.selector);
+        vault.redeem(remainingShares, fish, fish, 0, new address[](0));
+        vm.stopPrank();
+    }
+
+    function testCanRedeemAgainAfterNewRageQuit() public {
+        // Deposit first
+        userDeposit(fish, fishAmount);
+
+        // First rage quit
+        vm.prank(fish);
+        vault.initiateRageQuit();
+
+        // Fast forward past unlock time
+        vm.warp(block.timestamp + vault.rageQuitCooldownPeriod() + 1);
+
+        // First redeem
+        vm.startPrank(fish);
+        uint256 sharesToRedeem = vault.previewWithdraw(fishAmount / 2); // Get shares needed for half amount
+        uint256 withdrawnAmount = vault.redeem(sharesToRedeem, fish, fish, 0, new address[](0));
+        assertEq(withdrawnAmount, fishAmount / 2, "Should redeem correct amount");
+
+        // Initiate new rage quit
+        vault.initiateRageQuit();
+
+        // Fast forward past new unlock time
+        vm.warp(block.timestamp + vault.rageQuitCooldownPeriod() + 1);
+
+        // Should be able to redeem again after new rage quit
+        uint256 remainingShares = vault.previewWithdraw(fishAmount / 2);
+        withdrawnAmount = vault.redeem(remainingShares, fish, fish, 0, new address[](0));
+        assertEq(withdrawnAmount, fishAmount / 2, "Should redeem correct amount");
+        vm.stopPrank();
+    }
 }
