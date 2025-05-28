@@ -29,7 +29,7 @@ contract PaymentSplitterFactoryTest is Test {
         vm.deal(address(this), INITIAL_ETH_AMOUNT);
 
         // Create mock ERC20 token for testing
-        token = new MockERC20();
+        token = new MockERC20(18);
         token.mint(address(this), INITIAL_TOKEN_AMOUNT);
         token.mint(alice, INITIAL_TOKEN_AMOUNT);
 

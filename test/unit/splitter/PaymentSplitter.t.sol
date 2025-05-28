@@ -47,7 +47,7 @@ contract PaymentSplitterTest is Test {
         shares[2] = 20;
 
         // Create mock ERC20 token for testing
-        token = new MockERC20();
+        token = new MockERC20(18);
         token.mint(address(this), INITIAL_TOKEN_AMOUNT);
 
         // payment splitter factory

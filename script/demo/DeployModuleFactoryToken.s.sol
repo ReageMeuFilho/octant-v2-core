@@ -27,7 +27,7 @@ contract DeployModuleFactoryTestToken is Script {
 
         MockVaultModule dragonVaultModule = new MockVaultModule();
 
-        MockERC20 testERC20 = new MockERC20();
+        MockERC20 testERC20 = new MockERC20(18);
 
         vm.stopBroadcast();
 

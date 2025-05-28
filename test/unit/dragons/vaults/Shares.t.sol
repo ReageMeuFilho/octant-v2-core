@@ -42,7 +42,7 @@ contract VaultSharesTest is Test {
         reportingManager = makeAddr("reportingManager");
         debtPurchaser = makeAddr("debtPurchaser");
         fishAmount = 1e18;
-        asset = new MockERC20();
+        asset = new MockERC20(18);
 
         // Give fish some tokens
         asset.mint(fish, fishAmount);

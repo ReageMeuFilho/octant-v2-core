@@ -24,7 +24,7 @@ contract VaultRolesTest is Test {
         fish = makeAddr("fish");
         strategist = makeAddr("strategist");
         bunny = makeAddr("bunny");
-        asset = new MockERC20();
+        asset = new MockERC20(18);
 
         // Create and initialize the vault
         vaultImplementation = new MultistrategyVault();

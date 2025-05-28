@@ -27,8 +27,8 @@ contract StrategyManagementTest is Test {
         user = makeAddr("user");
         userAmount = 1e18;
 
-        asset = new MockERC20();
-        mockToken = new MockERC20(); // Different asset for tests
+        asset = new MockERC20(18);
+        mockToken = new MockERC20(18); // Different asset for tests
 
         vaultImplementation = new MultistrategyVault();
         vaultFactory = new MultistrategyVaultFactory("Test Vault", address(vaultImplementation), gov);

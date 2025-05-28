@@ -23,7 +23,7 @@ contract EmergencyShutdownTest is Test {
         gov = address(this);
         panda = address(0x123);
 
-        asset = new MockERC20();
+        asset = new MockERC20(18);
 
         vaultImplementation = new MultistrategyVault();
         vaultFactory = new MultistrategyVaultFactory("Test Vault", address(vaultImplementation), gov);

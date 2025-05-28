@@ -23,7 +23,7 @@ contract BuyDebtTest is Test {
         gov = address(this);
         fish = address(0x123);
 
-        asset = new MockERC20();
+        asset = new MockERC20(18);
 
         // Create and initialize the vault
         vaultImplementation = new MultistrategyVault();

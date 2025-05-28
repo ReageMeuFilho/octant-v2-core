@@ -21,7 +21,7 @@ contract LinearAllowanceExecutorTest is Test {
         executor = new LinearAllowanceExecutor();
         allowanceModule = new LinearAllowanceSingletonForGnosisSafeWrapper();
         mockSafe = new MockSafe();
-        mockToken = new MockERC20();
+        mockToken = new MockERC20(18);
 
         // Enable module on mock Safe
         mockSafe.enableModule(address(allowanceModule));

@@ -31,7 +31,7 @@ contract DepositAndWithdrawTest is Test {
         woofy = address(0x6);
 
         // Setup asset
-        asset = new MockERC20();
+        asset = new MockERC20(18);
         asset.mint(fish, fishAmount);
 
         vaultImplementation = new MultistrategyVault();

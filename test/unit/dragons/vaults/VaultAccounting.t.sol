@@ -8,6 +8,7 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { console } from "forge-std/console.sol";
+
 contract VaultAccountingTest is Test {
     MultistrategyVault vaultImplementation;
     MultistrategyVault vault;
@@ -20,7 +21,7 @@ contract VaultAccountingTest is Test {
     function setUp() public {
         gov = address(this);
         depositLimitManager = makeAddr("depositLimitManager");
-        asset = new MockERC20();
+        asset = new MockERC20(18);
 
         // Create and initialize the vault
         vaultImplementation = new MultistrategyVault();

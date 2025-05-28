@@ -8,8 +8,15 @@ import { IERC20Delegates } from "staker/interfaces/IERC20Delegates.sol";
 
 contract MockERC20Staking is ERC20, IERC20Staking {
     mapping(address => address) private _delegates;
+    uint8 private _decimals;
 
-    constructor() ERC20("Mock Staking Token", "MST") {}
+    constructor(uint8 decimals_) ERC20("Mock Staking Token", "MST") {
+        _decimals = decimals_;
+    }
+
+    function decimals() public view virtual override returns (uint8) {
+        return _decimals;
+    }
 
     function mint(address to, uint256 amount) public {
         _mint(to, amount);
