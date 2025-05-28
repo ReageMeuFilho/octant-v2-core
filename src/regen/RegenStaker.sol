@@ -80,6 +80,7 @@ import { IGrantRound } from "./IGrantRound.sol";
 /// @author [Golem Foundation](https://golem.foundation)
 /// @notice This contract is an extended version of the Staker contract by [ScopeLift](https://scopelift.co).
 /// @notice As defined by Staker, REWARD_DURATION is constant and set to 30 days.
+/// @notice You can tax the rewards with a claim fee. If you don't want rewards to be taxable, set MAX_CLAIM_FEE to 0.
 contract RegenStaker is
     Staker,
     StakerDelegateSurrogateVotes,
