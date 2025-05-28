@@ -61,7 +61,7 @@ contract BaseTest is Test, TestPlus {
             dragonRouterImplementation
         );
 
-        token = new MockERC20();
+        token = new MockERC20(18);
     }
 
     /// @notice Helper function to setup test environment with a Safe and Module

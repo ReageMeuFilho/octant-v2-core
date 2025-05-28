@@ -35,7 +35,7 @@ contract RoleBasedAccessTest is Test {
 
     function setUp() public {
         // Setup asset
-        asset = new MockERC20();
+        asset = new MockERC20(18);
         asset.mint(gov, 1_000_000e18);
 
         // deploy vault implementation
@@ -448,6 +448,7 @@ contract RoleBasedAccessTest is Test {
 
         assertEq(bunnyRoles, expectedRoles, "Bunny should have both EMERGENCY_MANAGER and DEBT_MANAGER roles");
     }
+
     // REPORTING_MANAGER TESTS
 
     function testProcessReportNoReportingManagerReverts() public {

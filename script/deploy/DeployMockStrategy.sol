@@ -32,7 +32,7 @@ contract DeployMockStrategy is DeployModuleProxyFactory {
         vm.startBroadcast(deployerPrivateKey);
 
         // Deploy test token
-        token = new MockERC20();
+        token = new MockERC20(18);
 
         // Deploy implementation
         mockStrategySingleton = new MockStrategy();

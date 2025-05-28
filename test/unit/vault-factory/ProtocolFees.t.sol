@@ -17,7 +17,7 @@ contract ProtocolFeesTest is Test {
     function setUp() public {
         gov = address(0x1);
         bunny = address(0x3);
-        asset = address(new MockERC20());
+        asset = address(new MockERC20(18));
         vaultOriginal = address(new Vault());
 
         vm.startPrank(gov);

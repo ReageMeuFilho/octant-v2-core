@@ -318,7 +318,7 @@ contract TestTraderIntegrationGLM2ETH is Test, TestPlus, DeployTrader {
     }
 
     function test_transform_wrong_base() external {
-        MockERC20 otherToken = new MockERC20();
+        MockERC20 otherToken = new MockERC20(18);
         otherToken.mint(address(trader), 100 ether);
 
         // check if trader will reject base token different than configured
@@ -327,7 +327,7 @@ contract TestTraderIntegrationGLM2ETH is Test, TestPlus, DeployTrader {
     }
 
     function test_transform_wrong_quote() external {
-        MockERC20 otherToken = new MockERC20();
+        MockERC20 otherToken = new MockERC20(18);
 
         // check if trader will reject unexpected ETH
         vm.expectRevert(Trader.Trader__ImpossibleConfiguration.selector);

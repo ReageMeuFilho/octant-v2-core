@@ -31,7 +31,7 @@ contract VaultFactoryTest is Test {
         fish = address(0x3);
 
         // Setup contracts
-        asset = new MockERC20();
+        asset = new MockERC20(18);
 
         // Deploy a vault implementation
         // Note: In a real test, you'd deploy the actual vault implementation
