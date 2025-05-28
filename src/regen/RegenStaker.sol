@@ -81,6 +81,8 @@ import { IGrantRound } from "src/regen/IGrantRound.sol";
 /// @notice This contract is an extended version of the Staker contract by [ScopeLift](https://scopelift.co).
 /// @notice As defined by Staker, REWARD_DURATION is constant and set to 30 days.
 /// @notice You can tax the rewards with a claim fee. If you don't want rewards to be taxable, set MAX_CLAIM_FEE to 0.
+/// @notice Earning power needs to be updated after deposit amount changes. Some changes are automatically triggering the update.
+/// @notice Earning power is updated via bumpEarningPower externally. This action is incentivized with a tip. Use maxBumpTip to set the maximum tip.
 contract RegenStaker is
     Staker,
     StakerDelegateSurrogateVotes,
