@@ -2,22 +2,22 @@
 pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
-import { Vault } from "src/dragons/vaults/Vault.sol";
-import { VaultFactory } from "src/dragons/vaults/VaultFactory.sol";
+import { MultistrategyVault } from "src/core/MultistrategyVault.sol";
+import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IVault } from "src/interfaces/IVault.sol";
+import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MockYieldStrategy } from "test/mocks/MockYieldStrategy.sol";
 import { Constants } from "test/unit/dragons/vaults/utils/constants.sol";
 import { Checks } from "test/unit/dragons/vaults/utils/checks.sol";
 
 contract StrategyManagementTest is Test {
-    Vault vaultImplementation;
-    Vault vault;
+    MultistrategyVault vaultImplementation;
+    MultistrategyVault vault;
     MockERC20 asset;
     MockERC20 mockToken;
     MockYieldStrategy strategy;
-    VaultFactory vaultFactory;
+    MultistrategyVaultFactory vaultFactory;
     address gov;
     address user;
     uint256 userAmount;
@@ -30,20 +30,20 @@ contract StrategyManagementTest is Test {
         asset = new MockERC20();
         mockToken = new MockERC20(); // Different asset for tests
 
-        vaultImplementation = new Vault();
-        vaultFactory = new VaultFactory("Test Vault", address(vaultImplementation), gov);
+        vaultImplementation = new MultistrategyVault();
+        vaultFactory = new MultistrategyVaultFactory("Test Vault", address(vaultImplementation), gov);
 
         // Create and initialize the vault
-        vault = Vault(vaultFactory.deployNewVault(address(asset), "Test Vault", "tvTEST", gov, 7 days));
+        vault = MultistrategyVault(vaultFactory.deployNewVault(address(asset), "Test Vault", "tvTEST", gov, 7 days));
 
         // Set up roles for governance
-        vault.addRole(gov, IVault.Roles.ADD_STRATEGY_MANAGER);
-        vault.addRole(gov, IVault.Roles.REVOKE_STRATEGY_MANAGER);
-        vault.addRole(gov, IVault.Roles.FORCE_REVOKE_MANAGER);
-        vault.addRole(gov, IVault.Roles.DEBT_MANAGER);
-        vault.addRole(gov, IVault.Roles.REPORTING_MANAGER);
-        vault.addRole(gov, IVault.Roles.DEPOSIT_LIMIT_MANAGER);
-        vault.addRole(gov, IVault.Roles.MAX_DEBT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.ADD_STRATEGY_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.REVOKE_STRATEGY_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.FORCE_REVOKE_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEBT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.REPORTING_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEPOSIT_LIMIT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.MAX_DEBT_MANAGER);
 
         vault.setDepositLimit(type(uint256).max, true);
         // Create initial strategy
@@ -83,10 +83,10 @@ contract StrategyManagementTest is Test {
 
         uint256 snapshot = block.timestamp;
         vm.expectEmit(true, true, true, true);
-        emit IVault.StrategyChanged(address(newStrategy), Constants.STRATEGY_CHANGE_ADDED);
+        emit IMultistrategyVault.StrategyChanged(address(newStrategy), Constants.STRATEGY_CHANGE_ADDED);
         vault.addStrategy(address(newStrategy), false);
 
-        IVault.StrategyParams memory strategyParams = vault.strategies(address(newStrategy));
+        IMultistrategyVault.StrategyParams memory strategyParams = vault.strategies(address(newStrategy));
         assertEq(strategyParams.activation, snapshot);
         assertEq(strategyParams.currentDebt, 0);
         assertEq(strategyParams.maxDebt, 0);
@@ -94,12 +94,12 @@ contract StrategyManagementTest is Test {
     }
 
     function testAddStrategyWithZeroAddressFails() public {
-        vm.expectRevert(IVault.StrategyCannotBeZeroAddress.selector);
+        vm.expectRevert(IMultistrategyVault.StrategyCannotBeZeroAddress.selector);
         vault.addStrategy(Constants.ZERO_ADDRESS, false);
     }
 
     function testAddStrategyWithActivationFails() public {
-        vm.expectRevert(IVault.StrategyAlreadyActive.selector);
+        vm.expectRevert(IMultistrategyVault.StrategyAlreadyActive.selector);
         vault.addStrategy(address(strategy), false);
     }
 
@@ -107,7 +107,7 @@ contract StrategyManagementTest is Test {
         // Create strategy with the other vault's asset
         MockYieldStrategy mockTokenStrategy = createStrategy(address(mockToken));
 
-        vm.expectRevert(IVault.InvalidAsset.selector);
+        vm.expectRevert(IMultistrategyVault.InvalidAsset.selector);
         vault.addStrategy(address(mockTokenStrategy), false);
     }
 
@@ -117,10 +117,10 @@ contract StrategyManagementTest is Test {
 
         uint256 snapshot = block.timestamp;
         vm.expectEmit(true, true, true, true);
-        emit IVault.StrategyChanged(address(genericStrategy), Constants.STRATEGY_CHANGE_ADDED);
+        emit IMultistrategyVault.StrategyChanged(address(genericStrategy), Constants.STRATEGY_CHANGE_ADDED);
         vault.addStrategy(address(genericStrategy), false);
 
-        IVault.StrategyParams memory strategyParams = vault.strategies(address(genericStrategy));
+        IMultistrategyVault.StrategyParams memory strategyParams = vault.strategies(address(genericStrategy));
         assertEq(strategyParams.activation, snapshot);
         assertEq(strategyParams.currentDebt, 0);
         assertEq(strategyParams.maxDebt, 0);
@@ -129,7 +129,7 @@ contract StrategyManagementTest is Test {
 
     function testRevokeStrategyWithExistingStrategy() public {
         vm.expectEmit(true, true, true, true);
-        emit IVault.StrategyChanged(address(strategy), Constants.STRATEGY_CHANGE_REVOKED);
+        emit IMultistrategyVault.StrategyChanged(address(strategy), Constants.STRATEGY_CHANGE_REVOKED);
         vault.revokeStrategy(address(strategy));
 
         Checks.checkRevokedStrategy(vault, address(strategy));
@@ -144,20 +144,20 @@ contract StrategyManagementTest is Test {
 
         addDebtToStrategy(strategy, newDebt);
 
-        vm.expectRevert(IVault.StrategyHasDebt.selector);
+        vm.expectRevert(IMultistrategyVault.StrategyHasDebt.selector);
         vault.revokeStrategy(address(strategy));
     }
 
     function testRevokeStrategyWithInactiveStrategyFails() public {
         MockYieldStrategy inactiveStrategy = createStrategy(address(asset));
 
-        vm.expectRevert(IVault.StrategyNotActive.selector);
+        vm.expectRevert(IMultistrategyVault.StrategyNotActive.selector);
         vault.revokeStrategy(address(inactiveStrategy));
     }
 
     function testForceRevokeStrategyWithExistingStrategy() public {
         vm.expectEmit(true, true, true, true);
-        emit IVault.StrategyChanged(address(strategy), Constants.STRATEGY_CHANGE_REVOKED);
+        emit IMultistrategyVault.StrategyChanged(address(strategy), Constants.STRATEGY_CHANGE_REVOKED);
         vault.forceRevokeStrategy(address(strategy));
 
         Checks.checkRevokedStrategy(vault, address(strategy));
@@ -179,7 +179,7 @@ contract StrategyManagementTest is Test {
 
         // Now when we force revoke, it will emit the loss event
         vm.expectEmit(true, true, true, true);
-        emit IVault.StrategyReported(address(strategy), 0, vaultBalance, 0, 0, 0, 0);
+        emit IMultistrategyVault.StrategyReported(address(strategy), 0, vaultBalance, 0, 0, 0, 0);
 
         vault.forceRevokeStrategy(address(strategy));
 
@@ -192,7 +192,7 @@ contract StrategyManagementTest is Test {
     function testForceRevokeStrategyWithInactiveStrategyFails() public {
         MockYieldStrategy inactiveStrategy = createStrategy(address(asset));
 
-        vm.expectRevert(IVault.StrategyNotActive.selector);
+        vm.expectRevert(IMultistrategyVault.StrategyNotActive.selector);
         vault.forceRevokeStrategy(address(inactiveStrategy));
     }
 }

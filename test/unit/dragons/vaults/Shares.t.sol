@@ -2,22 +2,22 @@
 pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
-import { Vault } from "src/dragons/vaults/Vault.sol";
+import { MultistrategyVault } from "src/core/MultistrategyVault.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IVault } from "src/interfaces/IVault.sol";
+import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MockYieldStrategy } from "test/mocks/MockYieldStrategy.sol";
 import { Constants } from "test/unit/dragons/vaults/utils/constants.sol";
 import { IERC4626Payable } from "src/interfaces/IERC4626Payable.sol";
 import { Checks } from "test/unit/dragons/vaults/utils/checks.sol";
-import { VaultFactory } from "src/dragons/vaults/VaultFactory.sol";
+import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
 
 contract VaultSharesTest is Test {
-    Vault vaultImplementation;
-    Vault vault;
+    MultistrategyVault vaultImplementation;
+    MultistrategyVault vault;
     MockERC20 asset;
     MockYieldStrategy strategy;
-    VaultFactory vaultFactory;
+    MultistrategyVaultFactory vaultFactory;
 
     address gov;
     address fish;
@@ -47,25 +47,27 @@ contract VaultSharesTest is Test {
         // Give fish some tokens
         asset.mint(fish, fishAmount);
 
-        vaultImplementation = new Vault();
-        vaultFactory = new VaultFactory("Test Vault", address(vaultImplementation), gov);
+        vaultImplementation = new MultistrategyVault();
+        vaultFactory = new MultistrategyVaultFactory("Test Vault", address(vaultImplementation), gov);
     }
 
-    function createVault(uint256 depositLimit) internal returns (Vault) {
-        Vault newVault = Vault(vaultFactory.deployNewVault(address(asset), "Test Vault", "tvTEST", gov, WEEK));
+    function createVault(uint256 depositLimit) internal returns (MultistrategyVault) {
+        MultistrategyVault newVault = MultistrategyVault(
+            vaultFactory.deployNewVault(address(asset), "Test Vault", "tvTEST", gov, WEEK)
+        );
 
         // Set up roles for governance
-        newVault.addRole(gov, IVault.Roles.DEPOSIT_LIMIT_MANAGER);
+        newVault.addRole(gov, IMultistrategyVault.Roles.DEPOSIT_LIMIT_MANAGER);
         // report manager
-        newVault.addRole(reportingManager, IVault.Roles.REPORTING_MANAGER);
+        newVault.addRole(reportingManager, IMultistrategyVault.Roles.REPORTING_MANAGER);
         // strategy manager
-        newVault.addRole(gov, IVault.Roles.ADD_STRATEGY_MANAGER);
+        newVault.addRole(gov, IMultistrategyVault.Roles.ADD_STRATEGY_MANAGER);
         // MAX_DEBT_MANAGER
-        newVault.addRole(gov, IVault.Roles.MAX_DEBT_MANAGER);
+        newVault.addRole(gov, IMultistrategyVault.Roles.MAX_DEBT_MANAGER);
         // DEBT_MANAGER
-        newVault.addRole(gov, IVault.Roles.DEBT_MANAGER);
+        newVault.addRole(gov, IMultistrategyVault.Roles.DEBT_MANAGER);
         // DEBT_PURCHASER
-        newVault.addRole(debtPurchaser, IVault.Roles.DEBT_PURCHASER);
+        newVault.addRole(debtPurchaser, IMultistrategyVault.Roles.DEBT_PURCHASER);
 
         if (depositLimit > 0) {
             newVault.setDepositLimit(depositLimit, true);
@@ -74,8 +76,8 @@ contract VaultSharesTest is Test {
         return newVault;
     }
 
-    function initialSetUp(uint256 amount) internal returns (Vault, MockYieldStrategy) {
-        Vault newVault = createVault(amount);
+    function initialSetUp(uint256 amount) internal returns (MultistrategyVault, MockYieldStrategy) {
+        MultistrategyVault newVault = createVault(amount);
 
         // Create and initialize the strategy
         MockYieldStrategy newStrategy = new MockYieldStrategy(address(asset), address(newVault));
@@ -98,7 +100,11 @@ contract VaultSharesTest is Test {
         return (newVault, newStrategy);
     }
 
-    function createProfit(MockYieldStrategy strat, Vault v, uint256 profitAmount) internal returns (uint256) {
+    function createProfit(
+        MockYieldStrategy strat,
+        MultistrategyVault v,
+        uint256 profitAmount
+    ) internal returns (uint256) {
         // We create a virtual profit
         uint256 initialDebt = v.strategies(address(strat)).currentDebt;
 
@@ -126,10 +132,10 @@ contract VaultSharesTest is Test {
         vm.startPrank(fish);
         asset.approve(address(vault), amount);
 
-        vm.expectRevert(IVault.ExceedDepositLimit.selector);
+        vm.expectRevert(IMultistrategyVault.ExceedDepositLimit.selector);
         vault.deposit(amount, address(vault));
 
-        vm.expectRevert(IVault.ExceedDepositLimit.selector);
+        vm.expectRevert(IMultistrategyVault.ExceedDepositLimit.selector);
         vault.deposit(amount, Constants.ZERO_ADDRESS);
 
         vm.stopPrank();
@@ -140,7 +146,7 @@ contract VaultSharesTest is Test {
         uint256 amount = 0;
 
         vm.startPrank(fish);
-        vm.expectRevert(IVault.CannotDepositZero.selector);
+        vm.expectRevert(IMultistrategyVault.CannotDepositZero.selector);
         vault.deposit(amount, fish);
         vm.stopPrank();
     }
@@ -173,7 +179,7 @@ contract VaultSharesTest is Test {
         vm.startPrank(fish);
         asset.approve(address(vault), amount);
 
-        vm.expectRevert(IVault.ExceedDepositLimit.selector);
+        vm.expectRevert(IMultistrategyVault.ExceedDepositLimit.selector);
         vault.deposit(amount, fish);
 
         vm.stopPrank();
@@ -187,7 +193,7 @@ contract VaultSharesTest is Test {
         vm.startPrank(fish);
         asset.approve(address(vault), amount);
 
-        vm.expectRevert(IVault.ExceedDepositLimit.selector);
+        vm.expectRevert(IMultistrategyVault.ExceedDepositLimit.selector);
         vault.deposit(Constants.MAX_INT, fish);
 
         vm.stopPrank();
@@ -227,10 +233,10 @@ contract VaultSharesTest is Test {
         vm.startPrank(fish);
         asset.approve(address(vault), shares);
 
-        vm.expectRevert(IVault.ExceedDepositLimit.selector);
+        vm.expectRevert(IMultistrategyVault.ExceedDepositLimit.selector);
         vault.mint(shares, address(vault));
 
-        vm.expectRevert(IVault.ExceedDepositLimit.selector);
+        vm.expectRevert(IMultistrategyVault.ExceedDepositLimit.selector);
         vault.mint(shares, Constants.ZERO_ADDRESS);
 
         vm.stopPrank();
@@ -241,7 +247,7 @@ contract VaultSharesTest is Test {
         uint256 shares = 0;
 
         vm.startPrank(fish);
-        vm.expectRevert(IVault.CannotDepositZero.selector);
+        vm.expectRevert(IMultistrategyVault.CannotDepositZero.selector);
         vault.mint(shares, fish);
         vm.stopPrank();
     }
@@ -273,7 +279,7 @@ contract VaultSharesTest is Test {
         vm.startPrank(fish);
         asset.approve(address(vault), amount);
 
-        vm.expectRevert(IVault.ExceedDepositLimit.selector);
+        vm.expectRevert(IMultistrategyVault.ExceedDepositLimit.selector);
         vault.mint(shares, fish);
 
         vm.stopPrank();
@@ -332,7 +338,7 @@ contract VaultSharesTest is Test {
         asset.approve(address(vault), amount);
         vault.deposit(amount, fish);
 
-        vm.expectRevert(IVault.InsufficientSharesToRedeem.selector);
+        vm.expectRevert(IMultistrategyVault.InsufficientSharesToRedeem.selector);
         vault.withdraw(shares, fish, fish, 0, new address[](0));
         vm.stopPrank();
     }
@@ -342,7 +348,7 @@ contract VaultSharesTest is Test {
         uint256 shares = 0;
 
         vm.startPrank(fish);
-        vm.expectRevert(IVault.NoSharesToRedeem.selector);
+        vm.expectRevert(IMultistrategyVault.NoSharesToRedeem.selector);
         vault.withdraw(shares, fish, fish, 0, new address[](0));
         vm.stopPrank();
     }
@@ -422,7 +428,7 @@ contract VaultSharesTest is Test {
 
         // Withdraw as bunny to fish
         vm.startPrank(bunny);
-        vm.expectRevert(IVault.InsufficientAllowance.selector);
+        vm.expectRevert(IMultistrategyVault.InsufficientAllowance.selector);
         vault.withdraw(shares, fish, fish, 0, new address[](0));
         vm.stopPrank();
     }
@@ -433,7 +439,7 @@ contract VaultSharesTest is Test {
         uint256 depositLimit = 0;
 
         vm.expectEmit(true, true, true, true);
-        emit IVault.UpdateDepositLimit(depositLimit);
+        emit IMultistrategyVault.UpdateDepositLimit(depositLimit);
         vault.setDepositLimit(depositLimit, true);
 
         assertEq(vault.depositLimit(), depositLimit);
@@ -444,7 +450,7 @@ contract VaultSharesTest is Test {
         uint256 depositLimit = 1e18;
 
         vm.expectEmit(true, true, true, true);
-        emit IVault.UpdateDepositLimit(depositLimit);
+        emit IMultistrategyVault.UpdateDepositLimit(depositLimit);
         vault.setDepositLimit(depositLimit, true);
 
         assertEq(vault.depositLimit(), depositLimit);
@@ -455,7 +461,7 @@ contract VaultSharesTest is Test {
         uint256 depositLimit = type(uint256).max;
 
         vm.expectEmit(true, true, true, true);
-        emit IVault.UpdateDepositLimit(depositLimit);
+        emit IMultistrategyVault.UpdateDepositLimit(depositLimit);
         vault.setDepositLimit(depositLimit, true);
 
         assertEq(vault.depositLimit(), depositLimit);
@@ -577,7 +583,7 @@ contract VaultSharesTest is Test {
         // Try to deposit (should revert)
         vm.startPrank(fish);
         asset.approve(address(vault), amount);
-        vm.expectRevert(IVault.CannotMintZero.selector);
+        vm.expectRevert(IMultistrategyVault.CannotMintZero.selector);
         vault.deposit(amount, fish);
         vm.stopPrank();
 
@@ -613,7 +619,7 @@ contract VaultSharesTest is Test {
         // Try to mint (should revert)
         vm.startPrank(fish);
         asset.approve(address(vault), amount);
-        vm.expectRevert(IVault.CannotDepositZero.selector);
+        vm.expectRevert(IMultistrategyVault.CannotDepositZero.selector);
         vault.mint(amount, fish);
         vm.stopPrank();
 

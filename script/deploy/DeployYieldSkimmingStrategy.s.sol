@@ -3,7 +3,7 @@ pragma solidity >=0.8.25;
 
 import { Script } from "forge-std/Script.sol";
 import { console } from "forge-std/console.sol";
-import { YieldSkimmingTokenizedStrategy } from "src/regens/YieldSkimming/YieldSkimmingTokenizedStrategy.sol";
+import { YieldSkimmingTokenizedStrategy } from "src/strategies/yieldSkimming/YieldSkimmingTokenizedStrategy.sol";
 
 /**
  * @title DeployYieldSkimmingStrategy

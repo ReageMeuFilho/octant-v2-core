@@ -2,22 +2,22 @@
 pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
-import { LockedVault } from "src/dragons/vaults/LockedVault.sol";
-import { VaultFactory } from "src/dragons/vaults/VaultFactory.sol";
+import { MultistrategyLockedVault } from "src/core/MultistrategyLockedVault.sol";
+import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IVault } from "src/interfaces/IVault.sol";
-import { ILockedVault } from "src/interfaces/ILockedVault.sol";
+import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
+import { IMultistrategyLockedVault } from "src/interfaces/IMultistrategyLockedVault.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MockYieldStrategy } from "test/mocks/MockYieldStrategy.sol";
 import { MockFactory } from "test/mocks/MockFactory.sol";
 
 contract LockedVaultTest is Test {
-    LockedVault vaultImplementation;
-    LockedVault vault;
+    MultistrategyLockedVault vaultImplementation;
+    MultistrategyLockedVault vault;
     MockERC20 public asset;
     MockYieldStrategy public strategy;
     MockFactory public factory;
-    VaultFactory vaultFactory;
+    MultistrategyVaultFactory vaultFactory;
 
     address public gov = address(0x1);
     address public fish = address(0x2);
@@ -41,9 +41,9 @@ contract LockedVaultTest is Test {
 
         // Deploy vault
         vm.startPrank(address(factory));
-        vaultImplementation = new LockedVault();
-        vaultFactory = new VaultFactory("Locked Test Vault", address(vaultImplementation), gov);
-        vault = LockedVault(
+        vaultImplementation = new MultistrategyLockedVault();
+        vaultFactory = new MultistrategyVaultFactory("Locked Test Vault", address(vaultImplementation), gov);
+        vault = MultistrategyLockedVault(
             vaultFactory.deployNewVault(address(asset), "Locked Test Vault", "vLTST", gov, defaultProfitMaxUnlockTime)
         );
 
@@ -54,10 +54,10 @@ contract LockedVaultTest is Test {
 
         vm.startPrank(gov);
         // Add roles to gov
-        vault.addRole(gov, IVault.Roles.ADD_STRATEGY_MANAGER);
-        vault.addRole(gov, IVault.Roles.DEBT_MANAGER);
-        vault.addRole(gov, IVault.Roles.MAX_DEBT_MANAGER);
-        vault.addRole(gov, IVault.Roles.DEPOSIT_LIMIT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.ADD_STRATEGY_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEBT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.MAX_DEBT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEPOSIT_LIMIT_MANAGER);
 
         // Set max deposit limit
         vault.setDepositLimit(MAX_INT, false);
@@ -78,11 +78,11 @@ contract LockedVaultTest is Test {
         assertEq(vault.rageQuitCooldownPeriod(), 3 days, "Rage quit cooldown period should be updated");
 
         // Should revert when setting below minimum
-        vm.expectRevert(ILockedVault.InvalidRageQuitCooldownPeriod.selector);
+        vm.expectRevert(IMultistrategyLockedVault.InvalidRageQuitCooldownPeriod.selector);
         vault.setRageQuitCooldownPeriod(12 hours);
 
         // Should revert when setting above maximum
-        vm.expectRevert(ILockedVault.InvalidRageQuitCooldownPeriod.selector);
+        vm.expectRevert(IMultistrategyLockedVault.InvalidRageQuitCooldownPeriod.selector);
         vault.setRageQuitCooldownPeriod(366 days);
         vm.stopPrank();
     }
@@ -107,7 +107,7 @@ contract LockedVaultTest is Test {
 
     function testCannotInitiateRageQuitWithoutShares() public {
         vm.prank(fish);
-        vm.expectRevert(ILockedVault.NoSharesToRageQuit.selector);
+        vm.expectRevert(IMultistrategyLockedVault.NoSharesToRageQuit.selector);
         vault.initiateRageQuit();
     }
 
@@ -145,7 +145,7 @@ contract LockedVaultTest is Test {
 
         // Should revert when trying to initiate again
         vm.prank(fish);
-        vm.expectRevert(ILockedVault.RageQuitAlreadyInitiated.selector);
+        vm.expectRevert(IMultistrategyLockedVault.RageQuitAlreadyInitiated.selector);
         vault.initiateRageQuit();
     }
 
@@ -159,12 +159,12 @@ contract LockedVaultTest is Test {
 
         // Try to withdraw during lock period (should fail)
         vm.prank(fish);
-        vm.expectRevert(ILockedVault.SharesStillLocked.selector);
+        vm.expectRevert(IMultistrategyLockedVault.SharesStillLocked.selector);
         vault.withdraw(fishAmount, fish, fish, 0, new address[](0));
 
         // Try to redeem during lock period (should fail)
         vm.prank(fish);
-        vm.expectRevert(ILockedVault.SharesStillLocked.selector);
+        vm.expectRevert(IMultistrategyLockedVault.SharesStillLocked.selector);
         vault.redeem(fishAmount, fish, fish, 0, new address[](0));
     }
 
@@ -218,7 +218,7 @@ contract LockedVaultTest is Test {
         userDeposit(fish, fishAmount);
 
         // Should be able to withdraw immediately (no lockup initiated)
-        vm.expectRevert(ILockedVault.SharesStillLocked.selector);
+        vm.expectRevert(IMultistrategyLockedVault.SharesStillLocked.selector);
         vm.prank(fish);
         vault.withdraw(fishAmount, fish, fish, 0, new address[](0));
     }
@@ -268,7 +268,7 @@ contract LockedVaultTest is Test {
         assertEq(withdrawnAmount, fishAmount / 2, "Should withdraw correct amount");
 
         // Try to withdraw again without initiating new rage quit (should fail)
-        vm.expectRevert(ILockedVault.SharesStillLocked.selector);
+        vm.expectRevert(IMultistrategyLockedVault.SharesStillLocked.selector);
         vault.withdraw(fishAmount / 2, fish, fish, 0, new address[](0));
         vm.stopPrank();
     }
@@ -320,7 +320,7 @@ contract LockedVaultTest is Test {
 
         // Try to redeem again without initiating new rage quit (should fail)
         uint256 remainingShares = vault.previewWithdraw(fishAmount / 2);
-        vm.expectRevert(ILockedVault.SharesStillLocked.selector);
+        vm.expectRevert(IMultistrategyLockedVault.SharesStillLocked.selector);
         vault.redeem(remainingShares, fish, fish, 0, new address[](0));
         vm.stopPrank();
     }

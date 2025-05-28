@@ -2,19 +2,19 @@
 pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
-import { Vault } from "src/dragons/vaults/Vault.sol";
-import { VaultFactory } from "src/dragons/vaults/VaultFactory.sol";
+import { MultistrategyVault } from "src/core/MultistrategyVault.sol";
+import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IVault } from "src/interfaces/IVault.sol";
+import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MockYieldStrategy } from "test/mocks/MockYieldStrategy.sol";
 
 contract BuyDebtTest is Test {
-    Vault vaultImplementation;
-    Vault vault;
+    MultistrategyVault vaultImplementation;
+    MultistrategyVault vault;
     MockERC20 asset;
     MockYieldStrategy strategy;
-    VaultFactory vaultFactory;
+    MultistrategyVaultFactory vaultFactory;
     address gov;
     address fish;
     uint256 fishAmount = 1e18;
@@ -26,20 +26,20 @@ contract BuyDebtTest is Test {
         asset = new MockERC20();
 
         // Create and initialize the vault
-        vaultImplementation = new Vault();
-        vaultFactory = new VaultFactory("Test Vault", address(vaultImplementation), gov);
-        vault = Vault(vaultFactory.deployNewVault(address(asset), "Test Vault", "tvTEST", gov, 7 days));
+        vaultImplementation = new MultistrategyVault();
+        vaultFactory = new MultistrategyVaultFactory("Test Vault", address(vaultImplementation), gov);
+        vault = MultistrategyVault(vaultFactory.deployNewVault(address(asset), "Test Vault", "tvTEST", gov, 7 days));
 
         // Set up strategy
         strategy = new MockYieldStrategy(address(asset), address(vault));
 
         // Set roles - equivalent to the fixture in the Python test
-        vault.addRole(gov, IVault.Roles.ADD_STRATEGY_MANAGER);
-        vault.addRole(gov, IVault.Roles.REVOKE_STRATEGY_MANAGER);
-        vault.addRole(gov, IVault.Roles.DEBT_MANAGER);
-        vault.addRole(gov, IVault.Roles.MAX_DEBT_MANAGER);
-        vault.addRole(gov, IVault.Roles.DEBT_PURCHASER);
-        vault.addRole(gov, IVault.Roles.DEPOSIT_LIMIT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.ADD_STRATEGY_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.REVOKE_STRATEGY_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEBT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.MAX_DEBT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEBT_PURCHASER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEPOSIT_LIMIT_MANAGER);
 
         // set max deposit limit
         vault.setDepositLimit(type(uint256).max, false);
@@ -57,7 +57,7 @@ contract BuyDebtTest is Test {
         asset.approve(address(vault), fishAmount);
 
         // Try to buy debt - should revert because strategy not active
-        vm.expectRevert(IVault.InactiveStrategy.selector);
+        vm.expectRevert(IMultistrategyVault.InactiveStrategy.selector);
         vault.buyDebt(address(inactiveStrategy), fishAmount);
     }
 
@@ -73,7 +73,7 @@ contract BuyDebtTest is Test {
         asset.approve(address(vault), fishAmount);
 
         // Try to buy debt - should revert because strategy has no debt
-        vm.expectRevert(IVault.NothingToBuy.selector);
+        vm.expectRevert(IMultistrategyVault.NothingToBuy.selector);
         vault.buyDebt(address(strategy), fishAmount);
     }
 
@@ -92,7 +92,7 @@ contract BuyDebtTest is Test {
         asset.approve(address(vault), fishAmount);
 
         // Try to buy 0 debt - should revert
-        vm.expectRevert(IVault.NothingToBuyWith.selector);
+        vm.expectRevert(IMultistrategyVault.NothingToBuyWith.selector);
         vault.buyDebt(address(strategy), 0);
     }
 
@@ -115,7 +115,7 @@ contract BuyDebtTest is Test {
 
         // Try to buy more debt than available
         vm.expectEmit(true, true, false, true);
-        emit IVault.DebtPurchased(address(strategy), fishAmount);
+        emit IMultistrategyVault.DebtPurchased(address(strategy), fishAmount);
         vault.buyDebt(address(strategy), fishAmount * 2);
 
         // Check results
@@ -123,7 +123,7 @@ contract BuyDebtTest is Test {
         assertEq(vault.totalDebt(), 0);
         assertEq(vault.pricePerShare(), 10 ** asset.decimals());
 
-        IVault.StrategyParams memory params = vault.strategies(address(strategy));
+        IMultistrategyVault.StrategyParams memory params = vault.strategies(address(strategy));
         assertEq(params.currentDebt, 0);
 
         // Check gov balance and shares
@@ -150,11 +150,11 @@ contract BuyDebtTest is Test {
 
         // Expect DebtUpdated event first
         vm.expectEmit(true, true, true, true);
-        emit IVault.DebtUpdated(address(strategy), fishAmount, 0);
+        emit IMultistrategyVault.DebtUpdated(address(strategy), fishAmount, 0);
 
         // Then expect DebtPurchased event
         vm.expectEmit(true, true, true, true);
-        emit IVault.DebtPurchased(address(strategy), fishAmount);
+        emit IMultistrategyVault.DebtPurchased(address(strategy), fishAmount);
 
         vault.buyDebt(address(strategy), fishAmount);
 
@@ -163,7 +163,7 @@ contract BuyDebtTest is Test {
         assertEq(vault.totalDebt(), 0);
         assertEq(vault.pricePerShare(), 10 ** asset.decimals());
 
-        IVault.StrategyParams memory params = vault.strategies(address(strategy));
+        IMultistrategyVault.StrategyParams memory params = vault.strategies(address(strategy));
         assertEq(params.currentDebt, 0);
 
         // Check gov balance and shares
@@ -193,7 +193,7 @@ contract BuyDebtTest is Test {
 
         // Buy half debt
         vm.expectEmit(true, true, false, true);
-        emit IVault.DebtPurchased(address(strategy), toBuy);
+        emit IMultistrategyVault.DebtPurchased(address(strategy), toBuy);
         vault.buyDebt(address(strategy), toBuy);
 
         // Check results
@@ -201,7 +201,7 @@ contract BuyDebtTest is Test {
         assertEq(vault.totalDebt(), fishAmount - toBuy);
         assertEq(vault.pricePerShare(), 10 ** asset.decimals());
 
-        IVault.StrategyParams memory params = vault.strategies(address(strategy));
+        IMultistrategyVault.StrategyParams memory params = vault.strategies(address(strategy));
         assertEq(params.currentDebt, fishAmount - toBuy);
 
         // Check gov balance and shares

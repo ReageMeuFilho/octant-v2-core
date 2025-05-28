@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.25;
 
-import { IVault } from "src/interfaces/IVault.sol";
+import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
 
 /**
  * @title Vault Checks
@@ -12,7 +12,7 @@ library Checks {
      * @notice Check that a vault is empty (no assets, no shares)
      * @param vault The vault to check
      */
-    function checkVaultEmpty(IVault vault) internal view {
+    function checkVaultEmpty(IMultistrategyVault vault) internal view {
         require(vault.totalAssets() == 0, "Vault has assets");
         require(vault.totalSupply() == 0, "Vault has supply");
         require(vault.totalIdle() == 0, "Vault has idle assets");
@@ -24,9 +24,9 @@ library Checks {
      * @param vault The vault containing the strategy
      * @param strategy The strategy address to check
      */
-    function checkRevokedStrategy(IVault vault, address strategy) internal view {
+    function checkRevokedStrategy(IMultistrategyVault vault, address strategy) internal view {
         // Get the strategy parameters
-        IVault.StrategyParams memory strategyParams = vault.strategies(strategy);
+        IMultistrategyVault.StrategyParams memory strategyParams = vault.strategies(strategy);
 
         require(strategyParams.activation == 0, "Strategy is still activated");
         require(strategyParams.lastReport == 0, "Strategy still has last report");

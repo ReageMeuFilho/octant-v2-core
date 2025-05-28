@@ -23,10 +23,10 @@ import { StakerOnBehalf } from "staker/extensions/StakerOnBehalf.sol";
 import { IEarningPowerCalculator } from "staker/interfaces/IEarningPowerCalculator.sol";
 
 // Local Imports
-import { Whitelist } from "./whitelist/Whitelist.sol";
-import { IWhitelist } from "./whitelist/IWhitelist.sol";
-import { IWhitelistedEarningPowerCalculator } from "./IWhitelistedEarningPowerCalculator.sol";
-import { IGrantRound } from "./IGrantRound.sol";
+import { Whitelist } from "src/utils/Whitelist.sol";
+import { IWhitelist } from "src/utils/IWhitelist.sol";
+import { IWhitelistedEarningPowerCalculator } from "src/regen/IWhitelistedEarningPowerCalculator.sol";
+import { IGrantRound } from "src/regen/IGrantRound.sol";
 
 // --- EIP-712 Specification for IGrantRound Implementations ---
 // To ensure security against replay attacks for the `signup` method,

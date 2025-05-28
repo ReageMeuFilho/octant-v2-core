@@ -2,18 +2,18 @@
 pragma solidity ^0.8.25;
 
 import "forge-std/Test.sol";
-import { Vault } from "src/dragons/vaults/Vault.sol";
+import { MultistrategyVault } from "src/core/MultistrategyVault.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MockLossyStrategy } from "test/mocks/MockLossyStrategy.sol";
-import { IVault } from "src/interfaces/IVault.sol";
-import { VaultFactory } from "src/dragons/vaults/VaultFactory.sol";
+import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
+import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
 
 contract LossyStrategyFlowTest is Test {
-    Vault public vault;
+    MultistrategyVault public vault;
     MockERC20 public asset;
     MockLossyStrategy public strategy;
-    VaultFactory public vaultFactory;
-    Vault public vaultImplementation;
+    MultistrategyVaultFactory public vaultFactory;
+    MultistrategyVault public vaultImplementation;
 
     address gov;
     address fish;
@@ -34,8 +34,8 @@ contract LossyStrategyFlowTest is Test {
         asset.mint(gov, 1_000_000e18);
         asset.mint(fish, fishAmount);
 
-        vaultImplementation = new Vault();
-        vaultFactory = new VaultFactory("Test Factory", address(vaultImplementation), gov);
+        vaultImplementation = new MultistrategyVault();
+        vaultFactory = new MultistrategyVaultFactory("Test Factory", address(vaultImplementation), gov);
 
         // Create vault
         _createVault();
@@ -160,7 +160,7 @@ contract LossyStrategyFlowTest is Test {
 
         // User2 withdraws
         vm.startPrank(user2);
-        vm.expectRevert(IVault.InsufficientSharesToRedeem.selector);
+        vm.expectRevert(IMultistrategyVault.InsufficientSharesToRedeem.selector);
         vault.withdraw(depositAmount, user2, user2, 0, new address[](0));
 
         vault.redeem(vault.balanceOf(user2), user2, user2, 0, new address[](0));
@@ -179,19 +179,19 @@ contract LossyStrategyFlowTest is Test {
 
     function _createVault() internal {
         vm.startPrank(gov);
-        vault = Vault(vaultFactory.deployNewVault(address(asset), "Test Vault", "vTST", gov, 7 days));
+        vault = MultistrategyVault(vaultFactory.deployNewVault(address(asset), "Test Vault", "vTST", gov, 7 days));
 
         // Add roles to gov
-        vault.addRole(gov, IVault.Roles.ADD_STRATEGY_MANAGER);
-        vault.addRole(gov, IVault.Roles.REVOKE_STRATEGY_MANAGER);
-        vault.addRole(gov, IVault.Roles.FORCE_REVOKE_MANAGER);
-        vault.addRole(gov, IVault.Roles.DEBT_MANAGER);
-        vault.addRole(gov, IVault.Roles.ACCOUNTANT_MANAGER);
-        vault.addRole(gov, IVault.Roles.REPORTING_MANAGER);
-        vault.addRole(gov, IVault.Roles.DEPOSIT_LIMIT_MANAGER);
-        vault.addRole(gov, IVault.Roles.WITHDRAW_LIMIT_MANAGER);
-        vault.addRole(gov, IVault.Roles.MAX_DEBT_MANAGER);
-        vault.addRole(gov, IVault.Roles.MINIMUM_IDLE_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.ADD_STRATEGY_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.REVOKE_STRATEGY_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.FORCE_REVOKE_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEBT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.ACCOUNTANT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.REPORTING_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEPOSIT_LIMIT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.WITHDRAW_LIMIT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.MAX_DEBT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.MINIMUM_IDLE_MANAGER);
 
         strategy = _createLossyStrategy();
 

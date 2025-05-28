@@ -2,9 +2,9 @@
 pragma solidity >=0.8.25;
 
 import { CREATE3 } from "@solady/utils/CREATE3.sol";
-import { Lido } from "src/regens/YieldSkimming/strategy/Lido.sol";
+import { LidoStrategy } from "src/strategies/YieldSkimming/LidoStrategy.sol";
 
-contract LidoVaultFactory {
+contract LidoStrategyVaultFactory {
     /**
      * @dev Struct to store information about a strategy.
      * @param deployerAddress The address of the deployer who created the strategy.
@@ -64,7 +64,7 @@ contract LidoVaultFactory {
         bytes32 _salt
     ) external returns (address strategyAddress) {
         bytes memory bytecode = abi.encodePacked(
-            type(Lido).creationCode,
+            type(LidoStrategy).creationCode,
             abi.encode(WSTETH, _name, _management, _keeper, _emergencyAdmin, _donationAddress)
         );
 

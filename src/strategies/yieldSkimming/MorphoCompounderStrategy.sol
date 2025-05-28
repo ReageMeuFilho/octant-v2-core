@@ -1,23 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.25;
 
-import { BaseHealthCheck } from "../../periphery/BaseHealthCheck.sol";
+import { BaseHealthCheck } from "src/strategies/periphery/BaseHealthCheck.sol";
 
 import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-
-interface IWstETH {
-    function stEthPerToken() external view returns (uint256);
-}
+import { WadRayMath } from "src/libraries/Maths/WadRay.sol";
 
 /**
- * @title Lido
- * @notice A strategy that manages deposits in a Lido yield source and captures yield
+ * @title MorphoCompounder
+ * @notice A strategy that manages deposits in a Morpho yield source and captures yield
  * @dev This strategy tracks the value of deposits and captures yield as the price per share increases
  */
-contract Lido is BaseHealthCheck {
+contract MorphoCompounderStrategy is BaseHealthCheck {
+    using WadRayMath for uint256;
     using SafeERC20 for IERC20;
 
     /// @dev The exchange rate at the last harvest, scaled by 1e18
@@ -92,19 +90,19 @@ contract Lido is BaseHealthCheck {
     }
 
     /**
-     * @notice Returns the last reported exchange rate
-     * @return The last reported exchange rate
-     */
-    function getLastReportedExchangeRate() public view returns (uint256) {
-        return _lastReportedExchangeRate;
-    }
-
-    /**
      * @notice Get the current profit limit ratio
      * @return The profit limit ratio
      */
     function getProfitLimitRatio() public view returns (uint16) {
         return _profitLimitRatio;
+    }
+
+    /**
+     * @notice Returns the last reported exchange rate
+     * @return The last reported exchange rate
+     */
+    function getLastReportedExchangeRate() public view returns (uint256) {
+        return _lastReportedExchangeRate;
     }
 
     /**
@@ -132,13 +130,8 @@ contract Lido is BaseHealthCheck {
         // Get the current total assets from the implementation.
         uint256 currentTotalAssets = TokenizedStrategy.totalAssets();
 
-        if (_profit > 0) {
-            uint256 previousTotalAssets = currentTotalAssets - _profit;
-            require(
-                _profit <= (previousTotalAssets * _profitLimitRatio) / MAX_BPS,
-                "healthCheck: profit limit exceeded"
-            );
-        }
+        uint256 previousTotalAssets = currentTotalAssets - _profit;
+        require(_profit <= (previousTotalAssets * _profitLimitRatio) / MAX_BPS, "healthCheck: profit limit exceeded");
     }
 
     /**
@@ -186,7 +179,7 @@ contract Lido is BaseHealthCheck {
      */
     function _getCurrentExchangeRate() internal view virtual returns (uint256) {
         // Call the pricePerShare function on the yield vault
-        return IWstETH(address(asset)).stEthPerToken();
+        return ITokenizedStrategy(address(asset)).pricePerShare();
     }
 
     /**

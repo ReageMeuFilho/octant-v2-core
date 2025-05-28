@@ -2,15 +2,16 @@
 pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
-import { Vault } from "src/dragons/vaults/Vault.sol";
-import { VaultFactory } from "src/dragons/vaults/VaultFactory.sol";
+import { MultistrategyVault } from "src/core/MultistrategyVault.sol";
+import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IVault } from "src/interfaces/IVault.sol";
+import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { console } from "forge-std/console.sol";
 contract VaultAccountingTest is Test {
-    Vault vaultImplementation;
-    Vault vault;
+    MultistrategyVault vaultImplementation;
+    MultistrategyVault vault;
+    MultistrategyVaultFactory vaultFactory;
     MockERC20 asset;
     address gov;
     address depositLimitManager;
@@ -22,17 +23,17 @@ contract VaultAccountingTest is Test {
         asset = new MockERC20();
 
         // Create and initialize the vault
-        vaultImplementation = new Vault();
-        VaultFactory vaultFactory = new VaultFactory("Test Vault", address(vaultImplementation), gov);
-        vault = Vault(vaultFactory.deployNewVault(address(asset), "Test Vault", "tvTEST", gov, 7 days));
+        vaultImplementation = new MultistrategyVault();
+        vaultFactory = new MultistrategyVaultFactory("Test Vault", address(vaultImplementation), gov);
+        vault = MultistrategyVault(vaultFactory.deployNewVault(address(asset), "Test Vault", "tvTEST", gov, 7 days));
 
         vm.startPrank(gov);
         // Set up roles for governance using direct values matching the Vyper implementation
         // Vyper Roles is a bit flag enum where each role is a power of 2
-        vault.addRole(gov, IVault.Roles.REPORTING_MANAGER);
-        vault.addRole(gov, IVault.Roles.DEBT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.REPORTING_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEBT_MANAGER);
         // set deposit limit manager
-        vault.addRole(depositLimitManager, IVault.Roles.DEPOSIT_LIMIT_MANAGER);
+        vault.addRole(depositLimitManager, IMultistrategyVault.Roles.DEPOSIT_LIMIT_MANAGER);
         vm.stopPrank();
         // set deposit limit
         vm.prank(depositLimitManager);

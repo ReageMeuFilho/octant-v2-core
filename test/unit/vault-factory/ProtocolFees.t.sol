@@ -2,12 +2,12 @@
 pragma solidity ^0.8.25;
 
 import "forge-std/Test.sol";
-import { VaultFactory } from "src/dragons/vaults/VaultFactory.sol";
-import { Vault } from "src/dragons/vaults/Vault.sol";
+import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
+import { MultistrategyVault } from "src/core/MultistrategyVault.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 
 contract ProtocolFeesTest is Test {
-    VaultFactory vaultFactory;
+    MultistrategyVaultFactory vaultFactory;
     address gov;
     address bunny;
     address asset;
@@ -18,10 +18,10 @@ contract ProtocolFeesTest is Test {
         gov = address(0x1);
         bunny = address(0x3);
         asset = address(new MockERC20());
-        vaultOriginal = address(new Vault());
+        vaultOriginal = address(new MultistrategyVault());
 
         vm.startPrank(gov);
-        vaultFactory = new VaultFactory("Test Factory", vaultOriginal, gov);
+        vaultFactory = new MultistrategyVaultFactory("Test Factory", vaultOriginal, gov);
         vm.stopPrank();
     }
 

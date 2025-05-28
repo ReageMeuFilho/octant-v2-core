@@ -6,7 +6,7 @@ pragma solidity ^0.8.25;
  * @author yearn.finance
  * @notice Interface for Yearn Vault Factory that can deploy ERC4626 compliant vaults
  */
-interface IVaultFactory {
+interface IMultistrategyVaultFactory {
     // Events
     event NewVault(address indexed vault_address, address indexed asset);
     event UpdateProtocolFeeBps(uint16 old_fee_bps, uint16 new_fee_bps);

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import { PaymentSplitter } from "./PaymentSplitter.sol";
+import { PaymentSplitter } from "src/core/PaymentSplitter.sol";
 import { Clones } from "@openzeppelin/contracts/proxy/Clones.sol";
 
 /**

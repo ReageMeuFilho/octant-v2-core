@@ -2,20 +2,20 @@
 pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
-import { Vault } from "src/dragons/vaults/Vault.sol";
-import { VaultFactory } from "src/dragons/vaults/VaultFactory.sol";
+import { MultistrategyVault } from "src/core/MultistrategyVault.sol";
+import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IVault } from "src/interfaces/IVault.sol";
+import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MockYieldStrategy } from "test/mocks/MockYieldStrategy.sol";
 import { Constants } from "test/unit/dragons/vaults/utils/constants.sol";
 
 contract AutoAllocateTest is Test {
-    Vault vaultImplementation;
-    Vault vault;
+    MultistrategyVault vaultImplementation;
+    MultistrategyVault vault;
     MockERC20 asset;
     MockYieldStrategy strategy;
-    VaultFactory vaultFactory;
+    MultistrategyVaultFactory vaultFactory;
     address gov;
     address fish;
     uint256 fishAmount;
@@ -27,18 +27,18 @@ contract AutoAllocateTest is Test {
         asset = new MockERC20();
 
         // Create and initialize the vault
-        vaultImplementation = new Vault();
-        vaultFactory = new VaultFactory("Test Vault", address(vaultImplementation), gov);
-        vault = Vault(vaultFactory.deployNewVault(address(asset), "Test Vault", "tvTEST", gov, 7 days));
+        vaultImplementation = new MultistrategyVault();
+        vaultFactory = new MultistrategyVaultFactory("Test Vault", address(vaultImplementation), gov);
+        vault = MultistrategyVault(vaultFactory.deployNewVault(address(asset), "Test Vault", "tvTEST", gov, 7 days));
 
         // Set up roles for governance
-        vault.addRole(gov, IVault.Roles.REPORTING_MANAGER);
-        vault.addRole(gov, IVault.Roles.DEBT_MANAGER);
-        vault.addRole(gov, IVault.Roles.MAX_DEBT_MANAGER);
-        vault.addRole(gov, IVault.Roles.ADD_STRATEGY_MANAGER);
-        vault.addRole(gov, IVault.Roles.QUEUE_MANAGER);
-        vault.addRole(gov, IVault.Roles.MINIMUM_IDLE_MANAGER);
-        vault.addRole(gov, IVault.Roles.DEPOSIT_LIMIT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.REPORTING_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEBT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.MAX_DEBT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.ADD_STRATEGY_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.QUEUE_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.MINIMUM_IDLE_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEPOSIT_LIMIT_MANAGER);
 
         // Set deposit limit
         vm.prank(gov);
@@ -166,7 +166,7 @@ contract AutoAllocateTest is Test {
         vm.startPrank(fish);
         asset.approve(address(vault), assets);
         vm.expectEmit(true, true, true, true);
-        emit IVault.DebtUpdated(address(strategy), 0, maxDebt);
+        emit IMultistrategyVault.DebtUpdated(address(strategy), 0, maxDebt);
         vault.deposit(assets, fish);
         vm.stopPrank();
 
@@ -211,7 +211,7 @@ contract AutoAllocateTest is Test {
         vm.startPrank(fish);
         asset.approve(address(vault), assets);
         vm.expectEmit(true, true, true, true);
-        emit IVault.DebtUpdated(address(strategy), 0, maxDeposit);
+        emit IMultistrategyVault.DebtUpdated(address(strategy), 0, maxDeposit);
         vault.deposit(assets, fish);
         vm.stopPrank();
 
@@ -299,7 +299,7 @@ contract AutoAllocateTest is Test {
         vm.startPrank(fish);
         asset.approve(address(vault), assets);
         vm.expectEmit(true, true, true, true);
-        emit IVault.DebtUpdated(address(strategy), 0, assets - minIdle);
+        emit IMultistrategyVault.DebtUpdated(address(strategy), 0, assets - minIdle);
         vault.deposit(assets, fish);
         vm.stopPrank();
 
@@ -387,7 +387,7 @@ contract AutoAllocateTest is Test {
         vm.startPrank(fish);
         asset.approve(address(vault), assets);
         vm.expectEmit(true, true, true, true);
-        emit IVault.DebtUpdated(address(strategy), 0, maxDebt);
+        emit IMultistrategyVault.DebtUpdated(address(strategy), 0, maxDebt);
         vault.deposit(assets, fish);
         vm.stopPrank();
 

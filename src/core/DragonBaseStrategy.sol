@@ -4,7 +4,7 @@ pragma solidity >=0.8.25;
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 // TokenizedStrategy interface used for internal view delegateCalls.
-import { ITokenizedStrategy } from "./interfaces/ITokenizedStrategy.sol";
+import { ITokenizedStrategy } from "src/regens/interfaces/ITokenizedStrategy.sol";
 
 /**
  * @title YearnV3 Base Strategy

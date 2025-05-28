@@ -2,10 +2,10 @@
 pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
-import { Vault } from "src/dragons/vaults/Vault.sol";
-import { VaultFactory } from "src/dragons/vaults/VaultFactory.sol";
+import { MultistrategyVault } from "src/core/MultistrategyVault.sol";
+import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IVault } from "src/interfaces/IVault.sol";
+import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
 import { IAccountant } from "src/interfaces/IAccountant.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MockYieldStrategy } from "test/mocks/MockYieldStrategy.sol";
@@ -16,11 +16,11 @@ import { MockFaultyAccountant } from "test/mocks/MockFaultyAccountant.sol";
 import { MockLossyStrategy } from "test/mocks/MockLossyStrategy.sol";
 
 contract StrategyAccountingTest is Test {
-    Vault vaultImplementation;
-    Vault vault;
+    MultistrategyVault vaultImplementation;
+    MultistrategyVault vault;
     MockERC20 asset;
     MockYieldStrategy strategy;
-    VaultFactory vaultFactory;
+    MultistrategyVaultFactory vaultFactory;
 
     address gov;
     uint256 constant YEAR = 31_556_952;
@@ -43,21 +43,21 @@ contract StrategyAccountingTest is Test {
         gov = address(this);
         asset = new MockERC20();
 
-        vaultImplementation = new Vault();
-        vaultFactory = new VaultFactory("Test Vault", address(vaultImplementation), gov);
+        vaultImplementation = new MultistrategyVault();
+        vaultFactory = new MultistrategyVaultFactory("Test Vault", address(vaultImplementation), gov);
 
         // Create and initialize the vault
-        vault = Vault(vaultFactory.deployNewVault(address(asset), "Test Vault", "tvTEST", gov, 7 days));
+        vault = MultistrategyVault(vaultFactory.deployNewVault(address(asset), "Test Vault", "tvTEST", gov, 7 days));
 
         // Set roles for governance - this matches the set_role fixture
-        vault.addRole(gov, IVault.Roles.EMERGENCY_MANAGER);
-        vault.addRole(gov, IVault.Roles.ADD_STRATEGY_MANAGER);
-        vault.addRole(gov, IVault.Roles.REVOKE_STRATEGY_MANAGER);
-        vault.addRole(gov, IVault.Roles.DEBT_MANAGER);
-        vault.addRole(gov, IVault.Roles.DEPOSIT_LIMIT_MANAGER);
-        vault.addRole(gov, IVault.Roles.MAX_DEBT_MANAGER);
-        vault.addRole(gov, IVault.Roles.ACCOUNTANT_MANAGER);
-        vault.addRole(gov, IVault.Roles.REPORTING_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.EMERGENCY_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.ADD_STRATEGY_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.REVOKE_STRATEGY_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEBT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEPOSIT_LIMIT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.MAX_DEBT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.ACCOUNTANT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.REPORTING_MANAGER);
 
         // increase max deposit limit
         vault.setDepositLimit(type(uint256).max, true);
@@ -109,7 +109,7 @@ contract StrategyAccountingTest is Test {
         MockYieldStrategy inactiveStrategy = new MockYieldStrategy(address(asset), address(vault));
 
         // Expect the process report to revert
-        vm.expectRevert(IVault.InactiveStrategy.selector);
+        vm.expectRevert(IMultistrategyVault.InactiveStrategy.selector);
         vault.processReport(address(inactiveStrategy));
     }
 
@@ -128,13 +128,13 @@ contract StrategyAccountingTest is Test {
         strategy.report();
 
         // Get initial debt
-        IVault.StrategyParams memory strategyParams = vault.strategies(address(strategy));
+        IMultistrategyVault.StrategyParams memory strategyParams = vault.strategies(address(strategy));
         uint256 initialDebt = strategyParams.currentDebt;
 
         // Process report
         uint256 snapshotTimestamp = block.timestamp;
         vm.expectEmit(true, true, true, true);
-        emit IVault.StrategyReported(address(strategy), gain, 0, initialDebt + gain, 0, 0, 0);
+        emit IMultistrategyVault.StrategyReported(address(strategy), gain, 0, initialDebt + gain, 0, 0, 0);
         vault.processReport(address(strategy));
 
         // Check updated strategy params
@@ -173,13 +173,13 @@ contract StrategyAccountingTest is Test {
         setFeesForStrategy(accountant, address(strategy), managementFee, performanceFee, refundRatio);
 
         // Get initial debt
-        IVault.StrategyParams memory strategyParams = vault.strategies(address(strategy));
+        IMultistrategyVault.StrategyParams memory strategyParams = vault.strategies(address(strategy));
         uint256 initialDebt = strategyParams.currentDebt;
 
         // Process report
         uint256 snapshotTimestamp = block.timestamp;
         vm.expectEmit(true, true, true, true);
-        emit IVault.StrategyReported(address(strategy), gain, 0, initialDebt + gain, 0, totalFee, 0);
+        emit IMultistrategyVault.StrategyReported(address(strategy), gain, 0, initialDebt + gain, 0, totalFee, 0);
         vault.processReport(address(strategy));
 
         // Check updated strategy params
@@ -213,13 +213,13 @@ contract StrategyAccountingTest is Test {
         strategy.report();
 
         // Get initial debt
-        IVault.StrategyParams memory strategyParams = vault.strategies(address(strategy));
+        IMultistrategyVault.StrategyParams memory strategyParams = vault.strategies(address(strategy));
         uint256 initialDebt = strategyParams.currentDebt;
 
         // Process report
         uint256 snapshotTimestamp = block.timestamp;
         vm.expectEmit(true, true, true, true);
-        emit IVault.StrategyReported(address(strategy), gain, 0, initialDebt + gain, 0, 0, 0);
+        emit IMultistrategyVault.StrategyReported(address(strategy), gain, 0, initialDebt + gain, 0, 0, 0);
         vault.processReport(address(strategy));
 
         // Check updated strategy params
@@ -243,13 +243,13 @@ contract StrategyAccountingTest is Test {
         strategy.report();
 
         // Get initial debt
-        IVault.StrategyParams memory strategyParams = vault.strategies(address(strategy));
+        IMultistrategyVault.StrategyParams memory strategyParams = vault.strategies(address(strategy));
         uint256 initialDebt = strategyParams.currentDebt;
 
         // Process report
         uint256 snapshotTimestamp = block.timestamp;
         vm.expectEmit(true, true, true, true);
-        emit IVault.StrategyReported(address(strategy), 0, loss, initialDebt - loss, 0, 0, 0);
+        emit IMultistrategyVault.StrategyReported(address(strategy), 0, loss, initialDebt - loss, 0, 0, 0);
         vault.processReport(address(strategy));
 
         // Check updated strategy params
@@ -286,7 +286,7 @@ contract StrategyAccountingTest is Test {
         strategy.report();
 
         // Get initial values
-        IVault.StrategyParams memory strategyParams = vault.strategies(address(strategy));
+        IMultistrategyVault.StrategyParams memory strategyParams = vault.strategies(address(strategy));
         uint256 initialDebt = strategyParams.currentDebt;
         uint256 ppsBeforeLoss = vault.pricePerShare();
         uint256 assetsBeforeLoss = vault.totalAssets();
@@ -294,7 +294,7 @@ contract StrategyAccountingTest is Test {
 
         // Process report
         vm.expectEmit(true, true, true, true);
-        emit IVault.StrategyReported(address(strategy), 0, loss, initialDebt - loss, 0, 0, loss);
+        emit IMultistrategyVault.StrategyReported(address(strategy), 0, loss, initialDebt - loss, 0, 0, loss);
         vault.processReport(address(strategy));
 
         // Due to refunds, these values should remain unchanged
@@ -338,7 +338,7 @@ contract StrategyAccountingTest is Test {
         lossyStrategy.report();
 
         // Get initial values
-        IVault.StrategyParams memory strategyParams = vault.strategies(address(lossyStrategy));
+        IMultistrategyVault.StrategyParams memory strategyParams = vault.strategies(address(lossyStrategy));
         uint256 initialDebt = strategyParams.currentDebt;
         uint256 ppsBeforeLoss = vault.pricePerShare();
         uint256 assetsBeforeLoss = vault.totalAssets();
@@ -346,7 +346,15 @@ contract StrategyAccountingTest is Test {
 
         // Process report
         vm.expectEmit(true, true, true, true);
-        emit IVault.StrategyReported(address(lossyStrategy), 0, loss, initialDebt - loss, 0, 0, actualRefund);
+        emit IMultistrategyVault.StrategyReported(
+            address(lossyStrategy),
+            0,
+            loss,
+            initialDebt - loss,
+            0,
+            0,
+            actualRefund
+        );
         vault.processReport(address(lossyStrategy));
 
         // Check the vault state after partial refund
@@ -396,7 +404,7 @@ contract StrategyAccountingTest is Test {
         lossyStrategy.report();
 
         // Get initial values
-        IVault.StrategyParams memory strategyParams = vault.strategies(address(lossyStrategy));
+        IMultistrategyVault.StrategyParams memory strategyParams = vault.strategies(address(lossyStrategy));
         uint256 initialDebt = strategyParams.currentDebt;
         uint256 ppsBeforeLoss = vault.pricePerShare();
         uint256 assetsBeforeLoss = vault.totalAssets();
@@ -404,7 +412,15 @@ contract StrategyAccountingTest is Test {
 
         // Process report
         vm.expectEmit(true, true, true, true);
-        emit IVault.StrategyReported(address(lossyStrategy), 0, loss, initialDebt - loss, 0, 0, actualRefund);
+        emit IMultistrategyVault.StrategyReported(
+            address(lossyStrategy),
+            0,
+            loss,
+            initialDebt - loss,
+            0,
+            0,
+            actualRefund
+        );
         vault.processReport(address(lossyStrategy));
 
         // Check the vault state after partial refund due to limited allowance
@@ -459,7 +475,7 @@ contract StrategyAccountingTest is Test {
 
         // Process report on vault itself
         vm.expectEmit(true, true, true, true);
-        emit IVault.StrategyReported(address(vault), gain, 0, vaultBalance + gain + refund, 0, 0, refund);
+        emit IMultistrategyVault.StrategyReported(address(vault), gain, 0, vaultBalance + gain + refund, 0, 0, refund);
         vault.processReport(address(vault));
 
         // Verify the vault state after processing
@@ -515,7 +531,15 @@ contract StrategyAccountingTest is Test {
 
         // Process report on vault itself
         vm.expectEmit(true, true, true, true);
-        emit IVault.StrategyReported(address(vault), vars.gain, vars.loss, expectedCurrentDebt, 0, 0, vars.refund);
+        emit IMultistrategyVault.StrategyReported(
+            address(vault),
+            vars.gain,
+            vars.loss,
+            expectedCurrentDebt,
+            0,
+            0,
+            vars.refund
+        );
         vault.processReport(address(vault));
 
         // Price per share should decrease after loss

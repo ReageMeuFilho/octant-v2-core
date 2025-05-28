@@ -3,46 +3,51 @@ pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
-import { Lido } from "src/regens/YieldSkimming/strategy/Lido.sol";
-import { LidoVaultFactory } from "src/factories/LidoVaultFactory.sol";
+import { MorphoCompounderStrategy } from "src/strategies/YieldSkimming/MorphoCompounderStrategy.sol";
+import { BaseHealthCheck } from "src/strategies/periphery/BaseHealthCheck.sol";
+import { UniswapV3Swapper } from "src/strategies/periphery/UniswapV3Swapper.sol";
+import { MorphoCompounderStrategyVaultFactory } from "src/factories/MorphoCompounderStrategyVaultFactory.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { ITokenizedStrategy } from "src/regens/interfaces/ITokenizedStrategy.sol";
-import { YieldSkimmingTokenizedStrategy } from "src/regens/YieldSkimming/YieldSkimmingTokenizedStrategy.sol";
+import { IVault } from "src/interfaces/IVault.sol";
+import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
+import { YieldSkimmingTokenizedStrategy } from "src/strategies/yieldSkimming/YieldSkimmingTokenizedStrategy.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
-import { IBaseStrategy } from "src/interfaces/IBaseStrategy.sol";
+import { MorphoCompounderWrapper } from "test/wrappers/MorphoCompounderWrapper.sol";
 
-/// @title Lido Test
+/// @title MorphoCompounder Test
 /// @author Octant
-/// @notice Integration tests for the Lido strategy using a mainnet fork
-contract LidoTest is Test {
+/// @notice Integration tests for the MorphoCompounder strategy using a mainnet fork
+contract MorphoCompounderStrategyTest is Test {
     using SafeERC20 for ERC20;
 
     // Strategy instance
-    Lido public strategy;
+    MorphoCompounderStrategy public strategy;
     ITokenizedStrategy public vault;
+    MorphoCompounderWrapper public wrapper;
 
     // Factory for creating strategies
     YieldSkimmingTokenizedStrategy tokenizedStrategy;
-    LidoVaultFactory public factory;
+    MorphoCompounderStrategyVaultFactory public factory;
 
     // Strategy parameters
     address public management;
     address public keeper;
     address public emergencyAdmin;
     address public donationAddress;
-    string public vaultSharesName = "Lido Vault Shares";
+    string public vaultSharesName = "MorphoCompounder Vault Shares";
     bytes32 public strategySalt = keccak256("TEST_STRATEGY_SALT");
 
     // Test user
     address public user = address(0x1234);
 
     // Mainnet addresses
-    address public constant WSTETH = 0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0;
+    address public constant YIELD_VAULT = 0x074134A2784F4F66b6ceD6f68849382990Ff3215;
     address public constant TOKENIZED_STRATEGY_ADDRESS = 0x8cf7246a74704bBE59c9dF614ccB5e3d9717d8Ac;
+    address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
 
     // Test constants
-    uint256 public constant INITIAL_DEPOSIT = 100000e18; // WSTETH has 18 decimals
+    uint256 public constant INITIAL_DEPOSIT = 100000e18; // YIELD_VAULT has 18 decimals
     uint256 public mainnetFork;
     uint256 public mainnetForkBlock = 22508883 - 6500 * 90; // latest alchemy block - 90 days
 
@@ -108,7 +113,17 @@ contract LidoTest is Test {
         donationAddress = address(0x4);
 
         // Deploy factory
-        factory = new LidoVaultFactory();
+        factory = new MorphoCompounderStrategyVaultFactory();
+
+        // Deploy wrapper
+        wrapper = new MorphoCompounderWrapper(
+            YIELD_VAULT,
+            vaultSharesName,
+            management,
+            keeper,
+            emergencyAdmin,
+            donationAddress
+        );
 
         // Deploy strategy using the factory's createStrategy method
         vm.startPrank(management);
@@ -123,32 +138,33 @@ contract LidoTest is Test {
         vm.stopPrank();
 
         // Cast the deployed address to our strategy type
-        strategy = Lido(strategyAddress);
+        strategy = MorphoCompounderStrategy(strategyAddress);
         vault = ITokenizedStrategy(address(strategy));
 
         // Label addresses for better trace outputs
-        vm.label(address(strategy), "Lido");
+        vm.label(address(strategy), "MorphoCompounder");
         vm.label(address(factory), "YieldSkimmingVaultFactory");
-        vm.label(WSTETH, "Lido Yield Vault");
+        vm.label(YIELD_VAULT, "Morpho Yield Vault");
         vm.label(TOKENIZED_STRATEGY_ADDRESS, "TokenizedStrategy");
         vm.label(management, "Management");
         vm.label(keeper, "Keeper");
         vm.label(emergencyAdmin, "Emergency Admin");
         vm.label(donationAddress, "Donation Address");
         vm.label(user, "Test User");
+        vm.label(WETH, "WETH");
 
-        // Airdrop WSTETH tokens to test user
-        airdrop(ERC20(WSTETH), user, INITIAL_DEPOSIT);
+        // Airdrop YIELD_VAULT tokens to test user
+        airdrop(ERC20(YIELD_VAULT), user, INITIAL_DEPOSIT);
 
         // Approve strategy to spend user's tokens
         vm.startPrank(user);
-        ERC20(WSTETH).approve(address(strategy), type(uint256).max);
+        ERC20(YIELD_VAULT).approve(address(strategy), type(uint256).max);
         vm.stopPrank();
     }
 
     /// @notice Test that the strategy is properly initialized
-    function testInitializationLido() public view {
-        assertEq(IERC4626(address(strategy)).asset(), WSTETH, "Yield vault address incorrect");
+    function testInitializationMorpho() public view {
+        assertEq(IERC4626(address(strategy)).asset(), YIELD_VAULT, "Yield vault address incorrect");
         assertEq(vault.management(), management, "Management address incorrect");
         assertEq(vault.keeper(), keeper, "Keeper address incorrect");
         assertEq(vault.emergencyAdmin(), emergencyAdmin, "Emergency admin incorrect");
@@ -156,22 +172,22 @@ contract LidoTest is Test {
     }
 
     /// @notice Test depositing assets into the strategy
-    function testDepositLido() public {
-        uint256 depositAmount = 100e18; // 100 WSTETH
+    function testDepositMorpho() public {
+        uint256 depositAmount = 100e18; // 100 YIELD_VAULT
 
         // Initial balances
-        uint256 initialUserBalance = ERC20(WSTETH).balanceOf(user);
+        uint256 initialUserBalance = ERC20(YIELD_VAULT).balanceOf(user);
 
         // Deposit assets
         vm.startPrank(user);
         // approve the strategy to spend the user's tokens
-        ERC20(WSTETH).approve(address(strategy), depositAmount);
+        ERC20(YIELD_VAULT).approve(address(strategy), depositAmount);
         uint256 sharesReceived = vault.deposit(depositAmount, user);
         vm.stopPrank();
 
         // Verify balances after deposit
         assertEq(
-            ERC20(WSTETH).balanceOf(user),
+            ERC20(YIELD_VAULT).balanceOf(user),
             initialUserBalance - depositAmount,
             "User balance not reduced correctly"
         );
@@ -182,14 +198,14 @@ contract LidoTest is Test {
 
     /// @notice Test withdrawing assets from the strategy
     function testWithdraw() public {
-        uint256 depositAmount = 100e18; // 100 WSTETH
+        uint256 depositAmount = 100e18; // 100 YIELD_VAULT
 
         // Deposit first
         vm.startPrank(user);
         vault.deposit(depositAmount, user);
 
         // Initial balances before withdrawal
-        uint256 initialUserBalance = ERC20(WSTETH).balanceOf(user);
+        uint256 initialUserBalance = ERC20(YIELD_VAULT).balanceOf(user);
         uint256 initialShareBalance = vault.balanceOf(user);
 
         // Withdraw half of the deposit
@@ -200,7 +216,7 @@ contract LidoTest is Test {
 
         // Verify balances after withdrawal
         assertEq(
-            ERC20(WSTETH).balanceOf(user),
+            ERC20(YIELD_VAULT).balanceOf(user),
             initialUserBalance + withdrawAmount,
             "User didn't receive correct assets"
         );
@@ -209,8 +225,8 @@ contract LidoTest is Test {
     }
 
     /// @notice Test the harvesting functionality using explicit profit simulation
-    function testHarvestWithProfitLido() public {
-        uint256 depositAmount = 100e18; // 100 WSTETH
+    function testHarvestWithProfitMorpho() public {
+        uint256 depositAmount = 100e18; // 100 YIELD_VAULT
 
         // Deposit first
         vm.startPrank(user);
@@ -224,8 +240,8 @@ contract LidoTest is Test {
         // Simulate exchange rate increase (10% increase)
         uint256 newExchangeRate = (initialExchangeRate * 11) / 10;
 
-        // the actual yield vault's stEthPerToken
-        vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(newExchangeRate));
+        // the actual yield vault's pricePerShare
+        vm.mockCall(YIELD_VAULT, abi.encodeWithSignature("pricePerShare()"), abi.encode(newExchangeRate));
 
         uint256 donationAddressBalanceBefore = ERC20(address(strategy)).balanceOf(donationAddress);
 
@@ -271,7 +287,7 @@ contract LidoTest is Test {
         );
         // should have received yield vault shares
         assertGt(
-            ERC20(WSTETH).balanceOf(donationAddress),
+            ERC20(YIELD_VAULT).balanceOf(donationAddress),
             0,
             "Donation address should have received yield vault shares"
         );
@@ -292,14 +308,14 @@ contract LidoTest is Test {
     }
 
     /// @notice Test multiple users with fair profit distribution
-    function testMultipleUserProfitDistributionLido() public {
+    function testMultipleUserProfitDistributionMorpho() public {
         TestState memory state;
 
         // First user deposits
         state.user1 = user; // Reuse existing test user
         state.user2 = address(0x5678);
-        state.depositAmount1 = 1000e18; // 1000 WSTETH
-        state.depositAmount2 = 2000e18; // 2000 WSTETH
+        state.depositAmount1 = 1000e18; // 1000 YIELD_VAULT
+        state.depositAmount2 = 2000e18; // 2000 YIELD_VAULT
 
         // Get initial exchange rate
         state.initialExchangeRate = strategy.getLastReportedExchangeRate();
@@ -314,8 +330,8 @@ contract LidoTest is Test {
         // Check donation address balance before harvest
         state.donationBalanceBefore1 = ERC20(address(strategy)).balanceOf(donationAddress);
 
-        // Mock the yield vault's stEthPerToken instead of strategy's internal method
-        vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(state.newExchangeRate1));
+        // Mock the yield vault's pricePerShare instead of strategy's internal method
+        vm.mockCall(YIELD_VAULT, abi.encodeWithSignature("pricePerShare()"), abi.encode(state.newExchangeRate1));
 
         // Harvest to realize profit
         vm.startPrank(keeper);
@@ -334,11 +350,11 @@ contract LidoTest is Test {
 
         // Second user deposits after profit
         vm.startPrank(address(this));
-        airdrop(ERC20(WSTETH), state.user2, state.depositAmount2);
+        airdrop(ERC20(YIELD_VAULT), state.user2, state.depositAmount2);
         vm.stopPrank();
 
         vm.startPrank(state.user2);
-        ERC20(WSTETH).approve(address(strategy), type(uint256).max);
+        ERC20(YIELD_VAULT).approve(address(strategy), type(uint256).max);
         vault.deposit(state.depositAmount2, state.user2);
         vm.stopPrank();
 
@@ -351,8 +367,8 @@ contract LidoTest is Test {
         // Check donation address balance before second harvest
         state.donationBalanceBefore2 = ERC20(address(strategy)).balanceOf(donationAddress);
 
-        // Mock the yield vault's stEthPerToken
-        vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(state.newExchangeRate2));
+        // Mock the yield vault's pricePerShare
+        vm.mockCall(YIELD_VAULT, abi.encodeWithSignature("pricePerShare()"), abi.encode(state.newExchangeRate2));
 
         // Harvest again
         vm.startPrank(keeper);
@@ -406,8 +422,8 @@ contract LidoTest is Test {
     }
 
     /// @notice Test the harvesting functionality
-    function testHarvestLido() public {
-        uint256 depositAmount = 100e18; // 100 WSTETH
+    function testHarvestMorpho() public {
+        uint256 depositAmount = 100e18; // 100 YIELD_VAULT
 
         // Deposit first
         vm.startPrank(user);
@@ -427,8 +443,8 @@ contract LidoTest is Test {
         uint256 newExchangeRate = strategy.getLastReportedExchangeRate();
         uint256 newTotalAssets = vault.totalAssets();
 
-        // mock stEthPerToken to be 1.1x the initial exchange rate
-        vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode((newExchangeRate * 11) / 10));
+        // mock pricePerShare to be 1.1x the initial exchange rate
+        vm.mockCall(YIELD_VAULT, abi.encodeWithSignature("pricePerShare()"), abi.encode((newExchangeRate * 11) / 10));
 
         // Verify exchange rate is updated
         assertEq(newExchangeRate, initialExchangeRate, "Exchange rate should be updated after harvest");
@@ -500,13 +516,13 @@ contract LidoTest is Test {
         // Try to sweep the asset token, which should revert
         vm.startPrank(strategy.GOV());
         vm.expectRevert("!asset");
-        strategy.sweep(WSTETH);
+        strategy.sweep(YIELD_VAULT);
         vm.stopPrank();
     }
 
     /// @notice Test exchange rate tracking and yield calculation
     function testExchangeRateTracking() public {
-        uint256 depositAmount = 1000e18; // 1000 WSTETH
+        uint256 depositAmount = 1000e18; // 1000 YIELD_VAULT
 
         // Deposit first
         vm.startPrank(user);
@@ -524,7 +540,7 @@ contract LidoTest is Test {
         uint256 newExchangeRate = (initialExchangeRate * 105) / 100;
 
         // Mock the getCurrentExchangeRate function
-        vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(newExchangeRate));
+        vm.mockCall(YIELD_VAULT, abi.encodeWithSignature("pricePerShare()"), abi.encode(newExchangeRate));
 
         // Report to capture yield
         vm.startPrank(keeper);
@@ -542,6 +558,7 @@ contract LidoTest is Test {
         uint256 updatedExchangeRate = strategy.getLastReportedExchangeRate();
         assertEq(updatedExchangeRate, newExchangeRate, "Exchange rate should be updated after harvest");
     }
+
     /// @notice Test getting the last reported exchange rate
     function testGetLastReportedExchangeRate() public view {
         uint256 rate = strategy.getLastReportedExchangeRate();
@@ -601,7 +618,7 @@ contract LidoTest is Test {
         // Mock a 10x exchange rate
         uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
         uint256 newExchangeRate = (initialExchangeRate * 7) / 3; // 233%
-        vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(newExchangeRate));
+        vm.mockCall(YIELD_VAULT, abi.encodeWithSignature("pricePerShare()"), abi.encode(newExchangeRate));
 
         // Second report: should revert
         vm.startPrank(keeper);
@@ -625,7 +642,7 @@ contract LidoTest is Test {
         uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
 
         // make a 10 time profit (should revert when doHealthCheck is true but not when it is false)
-        vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode((initialExchangeRate * 10)));
+        vm.mockCall(YIELD_VAULT, abi.encodeWithSignature("pricePerShare()"), abi.encode((initialExchangeRate * 10)));
 
         // report
         vm.startPrank(keeper);
@@ -655,9 +672,9 @@ contract LidoTest is Test {
         assertEq(strategy.doHealthCheck(), false);
     }
 
-    // tendTrigger always returns false
+    /// @notice Test _tendTrigger always returns false
     function testTendTriggerAlwaysFalse() public view {
-        (bool trigger, ) = IBaseStrategy(address(strategy)).tendTrigger();
+        bool trigger = wrapper.exposeTendTrigger();
         assertEq(trigger, false, "Tend trigger should always be false");
     }
 }

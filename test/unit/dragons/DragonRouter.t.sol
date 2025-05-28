@@ -30,7 +30,7 @@ import { MockStrategy } from "test/mocks/MockStrategy.sol";
 import { ISplitChecker } from "src/interfaces/ISplitChecker.sol";
 import { AccessControl } from "lib/openzeppelin-contracts/contracts/access/AccessControl.sol";
 import { DragonTokenizedStrategy } from "src/dragons/vaults/DragonTokenizedStrategy.sol";
-import { DragonTokenizedStrategy } from "src/dragons/vaults/DragonTokenizedStrategy.sol";
+
 import { MockStrategy } from "test/mocks/MockStrategy.sol";
 import { MockYieldSource } from "test/mocks/MockYieldSource.sol";
 import { BaseTest } from "./Base.t.sol";

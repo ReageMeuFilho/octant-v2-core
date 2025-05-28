@@ -2,21 +2,21 @@
 pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
-import { Vault } from "src/dragons/vaults/Vault.sol";
-import { VaultFactory } from "src/dragons/vaults/VaultFactory.sol";
+import { MultistrategyVault } from "src/core/MultistrategyVault.sol";
+import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IVault } from "src/interfaces/IVault.sol";
+import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MockYieldStrategy } from "test/mocks/MockYieldStrategy.sol";
 import { MockFlexibleAccountant } from "test/mocks/MockFlexibleAccountant.sol";
 
 contract ProtocolFeesTest is Test {
-    Vault vaultImplementation;
-    Vault vault;
+    MultistrategyVault vaultImplementation;
+    MultistrategyVault vault;
     MockERC20 public asset;
     MockYieldStrategy public strategy;
     MockFlexibleAccountant public accountant;
-    VaultFactory vaultFactory;
+    MultistrategyVaultFactory vaultFactory;
 
     address public gov = address(0x1);
     address public fish = address(0x2);
@@ -34,33 +34,33 @@ contract ProtocolFeesTest is Test {
         asset.mint(gov, 1_000_000e18);
         asset.mint(fish, fishAmount);
 
-        vaultImplementation = new Vault();
+        vaultImplementation = new MultistrategyVault();
 
         // Deploy factory
         vm.prank(gov);
-        vaultFactory = new VaultFactory("Test Vault", address(vaultImplementation), gov);
+        vaultFactory = new MultistrategyVaultFactory("Test Vault", address(vaultImplementation), gov);
 
         // Deploy accountant
         accountant = new MockFlexibleAccountant(address(asset));
     }
 
-    function createVault() internal returns (Vault) {
+    function createVault() internal returns (MultistrategyVault) {
         vm.startPrank(address(vaultFactory));
-        vault = Vault(vaultFactory.deployNewVault(address(asset), "Test Vault", "vTST", gov, 7 days));
+        vault = MultistrategyVault(vaultFactory.deployNewVault(address(asset), "Test Vault", "vTST", gov, 7 days));
         vm.stopPrank();
 
         vm.startPrank(gov);
         // Add roles to gov
-        vault.addRole(gov, IVault.Roles.ADD_STRATEGY_MANAGER);
-        vault.addRole(gov, IVault.Roles.REVOKE_STRATEGY_MANAGER);
-        vault.addRole(gov, IVault.Roles.FORCE_REVOKE_MANAGER);
-        vault.addRole(gov, IVault.Roles.DEBT_MANAGER);
-        vault.addRole(gov, IVault.Roles.ACCOUNTANT_MANAGER);
-        vault.addRole(gov, IVault.Roles.REPORTING_MANAGER);
-        vault.addRole(gov, IVault.Roles.DEPOSIT_LIMIT_MANAGER);
-        vault.addRole(gov, IVault.Roles.WITHDRAW_LIMIT_MANAGER);
-        vault.addRole(gov, IVault.Roles.MAX_DEBT_MANAGER);
-        vault.addRole(gov, IVault.Roles.MINIMUM_IDLE_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.ADD_STRATEGY_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.REVOKE_STRATEGY_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.FORCE_REVOKE_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEBT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.ACCOUNTANT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.REPORTING_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEPOSIT_LIMIT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.WITHDRAW_LIMIT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.MAX_DEBT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.MINIMUM_IDLE_MANAGER);
 
         // Set deposit limit to max
         vault.setDepositLimit(type(uint256).max, true);
@@ -69,25 +69,25 @@ contract ProtocolFeesTest is Test {
         return vault;
     }
 
-    function createStrategy(Vault _vault) internal returns (MockYieldStrategy) {
+    function createStrategy(MultistrategyVault _vault) internal returns (MockYieldStrategy) {
         return new MockYieldStrategy(address(asset), address(_vault));
     }
 
-    function userDeposit(address user, Vault _vault, uint256 amount) internal {
+    function userDeposit(address user, MultistrategyVault _vault, uint256 amount) internal {
         vm.startPrank(user);
         asset.approve(address(_vault), amount);
         _vault.deposit(amount, user);
         vm.stopPrank();
     }
 
-    function addStrategyToVault(Vault _vault, address strategyAddress) internal {
+    function addStrategyToVault(MultistrategyVault _vault, address strategyAddress) internal {
         vm.prank(gov);
         _vault.addStrategy(strategyAddress, true);
         vm.prank(gov);
         _vault.updateMaxDebtForStrategy(strategyAddress, type(uint256).max);
     }
 
-    function addDebtToStrategy(Vault _vault, address strategyAddress, uint256 amount) internal {
+    function addDebtToStrategy(MultistrategyVault _vault, address strategyAddress, uint256 amount) internal {
         vm.prank(gov);
         _vault.updateDebt(strategyAddress, amount, 0);
     }
@@ -104,8 +104,8 @@ contract ProtocolFeesTest is Test {
         uint256 managementFee,
         uint256 performanceFee,
         uint256 refundRatio
-    ) internal returns (Vault, MockYieldStrategy, MockFlexibleAccountant) {
-        Vault _vault = createVault();
+    ) internal returns (MultistrategyVault, MockYieldStrategy, MockFlexibleAccountant) {
+        MultistrategyVault _vault = createVault();
         MockYieldStrategy _strategy = createStrategy(_vault);
         MockFlexibleAccountant _accountant = new MockFlexibleAccountant(address(asset));
 

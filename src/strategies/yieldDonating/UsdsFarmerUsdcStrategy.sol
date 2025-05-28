@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { BaseHealthCheck } from "../../periphery/BaseHealthCheck.sol";
+import { BaseHealthCheck } from "src/strategies/periphery/BaseHealthCheck.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { UniswapV3Swapper } from "../../periphery/UniswapV3Swapper.sol";
-import { IVault } from "../../interfaces/IVault.sol";
-import { IPSM, IExchange } from "../../interfaces/IPSM.sol";
+import { UniswapV3Swapper } from "src/strategies/periphery/UniswapV3Swapper.sol";
+import { IVault } from "src/interfaces/IVault.sol";
+import { IPSM, IExchange } from "src/interfaces/IPSM.sol";
 
 /// @title yearn-v3-USDS-Farmer-USDC
 /// @author mil0x
 /// @notice yearn v3 Strategy that trades USDC to USDS to farm 4626 vault.
-contract USDSFarmerUSDC is BaseHealthCheck, UniswapV3Swapper {
+contract USDSFarmerUSDCStrategy is BaseHealthCheck, UniswapV3Swapper {
     using SafeERC20 for ERC20;
 
     ///@notice Limit for deposits into the strategy to stop strategy TVL to ever grow too large in comparison to the PSM liquidity. In 1e6.

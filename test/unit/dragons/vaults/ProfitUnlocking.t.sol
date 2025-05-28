@@ -2,9 +2,9 @@
 pragma solidity ^0.8.25;
 
 import "forge-std/Test.sol";
-import { Vault } from "src/dragons/vaults/Vault.sol";
-import { VaultFactory } from "src/dragons/vaults/VaultFactory.sol";
-import { IVault } from "src/interfaces/IVault.sol";
+import { MultistrategyVault } from "src/core/MultistrategyVault.sol";
+import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
+import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MockYieldStrategy } from "test/mocks/MockYieldStrategy.sol";
 import { MockAccountant } from "test/mocks/MockAccountant.sol";
@@ -14,13 +14,13 @@ import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import { MockFlexibleAccountant } from "test/mocks/MockFlexibleAccountant.sol";
 
 contract ProfitUnlockingTest is Test {
-    Vault vaultImplementation;
-    Vault vault;
+    MultistrategyVault vaultImplementation;
+    MultistrategyVault vault;
     MockERC20 asset;
     MockYieldStrategy strategy;
     MockAccountant accountant;
     MockFlexibleAccountant flexibleAccountant;
-    VaultFactory vaultFactory;
+    MultistrategyVaultFactory vaultFactory;
 
     address gov = address(0x1);
     address fish = address(0x2);
@@ -68,20 +68,20 @@ contract ProfitUnlockingTest is Test {
 
         // Deploy vault
         vm.startPrank(address(gov));
-        vaultImplementation = new Vault();
-        vaultFactory = new VaultFactory("Test Vault", address(vaultImplementation), gov);
-        vault = Vault(vaultFactory.deployNewVault(address(asset), "Test Vault", "vTST", gov, 7 days));
+        vaultImplementation = new MultistrategyVault();
+        vaultFactory = new MultistrategyVaultFactory("Test Vault", address(vaultImplementation), gov);
+        vault = MultistrategyVault(vaultFactory.deployNewVault(address(asset), "Test Vault", "vTST", gov, 7 days));
         vm.stopPrank();
 
         vm.startPrank(gov);
         // Add roles to gov
-        vault.addRole(gov, IVault.Roles.ADD_STRATEGY_MANAGER);
-        vault.addRole(gov, IVault.Roles.DEBT_MANAGER);
-        vault.addRole(gov, IVault.Roles.ACCOUNTANT_MANAGER);
-        vault.addRole(gov, IVault.Roles.REPORTING_MANAGER);
-        vault.addRole(gov, IVault.Roles.DEPOSIT_LIMIT_MANAGER);
-        vault.addRole(gov, IVault.Roles.MAX_DEBT_MANAGER);
-        vault.addRole(gov, IVault.Roles.PROFIT_UNLOCK_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.ADD_STRATEGY_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEBT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.ACCOUNTANT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.REPORTING_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEPOSIT_LIMIT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.MAX_DEBT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.PROFIT_UNLOCK_MANAGER);
 
         // Setup strategy
         strategy = new MockYieldStrategy(address(asset), address(vault));
@@ -1198,7 +1198,7 @@ contract ProfitUnlockingTest is Test {
 
         // Try to update strategy debt to 0 - should revert
         vm.prank(gov);
-        vm.expectRevert(IVault.NewDebtEqualsCurrentDebt.selector);
+        vm.expectRevert(IMultistrategyVault.NewDebtEqualsCurrentDebt.selector);
         vault.updateDebt(address(strategy), 0, 0);
 
         // Verify strategy debt is already 0

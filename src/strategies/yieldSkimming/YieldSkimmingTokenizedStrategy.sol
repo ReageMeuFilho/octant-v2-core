@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.25;
 
-import { IBaseStrategy } from "../interfaces/IBaseStrategy.sol";
-import { ITokenizedStrategy } from "../interfaces/ITokenizedStrategy.sol";
-import { DragonTokenizedStrategy, Math } from "../DragonTokenizedStrategy.sol";
+import { IBaseStrategy } from "src/interfaces/IBaseStrategy.sol";
+import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
+import { DragonTokenizedStrategy, Math } from "src/core/DragonTokenizedStrategy.sol";
 
 /**
  * @title YieldSkimmingTokenizedStrategy

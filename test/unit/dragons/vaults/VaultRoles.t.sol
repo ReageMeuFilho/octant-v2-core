@@ -2,18 +2,18 @@
 pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
-import { Vault } from "src/dragons/vaults/Vault.sol";
-import { VaultFactory } from "src/dragons/vaults/VaultFactory.sol";
+import { MultistrategyVault } from "src/core/MultistrategyVault.sol";
+import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IVault } from "src/interfaces/IVault.sol";
+import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { Constants } from "./utils/constants.sol";
 
 contract VaultRolesTest is Test {
-    Vault vaultImplementation;
-    Vault vault;
+    MultistrategyVault vaultImplementation;
+    MultistrategyVault vault;
     MockERC20 public asset;
-    VaultFactory vaultFactory;
+    MultistrategyVaultFactory vaultFactory;
     address public gov;
     address public fish;
     address public strategist;
@@ -27,19 +27,19 @@ contract VaultRolesTest is Test {
         asset = new MockERC20();
 
         // Create and initialize the vault
-        vaultImplementation = new Vault();
-        vaultFactory = new VaultFactory("Test Vault", address(vaultImplementation), gov);
-        vault = Vault(vaultFactory.deployNewVault(address(asset), "Test Vault", "tvTEST", gov, 7 days));
+        vaultImplementation = new MultistrategyVault();
+        vaultFactory = new MultistrategyVaultFactory("Test Vault", address(vaultImplementation), gov);
+        vault = MultistrategyVault(vaultFactory.deployNewVault(address(asset), "Test Vault", "tvTEST", gov, 7 days));
     }
 
     function testSetRole() public {
         // Gov can set role
-        vault.setRole(fish, uint256(IVault.Roles.DEBT_MANAGER));
+        vault.setRole(fish, uint256(IMultistrategyVault.Roles.DEBT_MANAGER));
 
         // Fish tries to set role (should fail)
         vm.prank(fish);
-        vm.expectRevert(IVault.NotAllowed.selector);
-        vault.setRole(fish, uint256(IVault.Roles.DEBT_MANAGER));
+        vm.expectRevert(IMultistrategyVault.NotAllowed.selector);
+        vault.setRole(fish, uint256(IMultistrategyVault.Roles.DEBT_MANAGER));
     }
 
     function testTransfersRoleManager() public {
@@ -70,7 +70,7 @@ contract VaultRolesTest is Test {
         assertEq(vault.futureRoleManager(), strategist);
 
         // Gov tries to accept (should fail)
-        vm.expectRevert(IVault.NotFutureRoleManager.selector);
+        vm.expectRevert(IMultistrategyVault.NotFutureRoleManager.selector);
         vault.acceptRoleManager();
 
         // State should remain unchanged
@@ -85,7 +85,7 @@ contract VaultRolesTest is Test {
 
         // Strategist tries to transfer role (should fail)
         vm.prank(strategist);
-        vm.expectRevert(IVault.NotAllowed.selector);
+        vm.expectRevert(IMultistrategyVault.NotAllowed.selector);
         vault.transferRoleManager(strategist);
 
         // State should remain unchanged
@@ -110,7 +110,7 @@ contract VaultRolesTest is Test {
 
         // Strategist tries to accept (should fail)
         vm.prank(strategist);
-        vm.expectRevert(IVault.NotFutureRoleManager.selector);
+        vm.expectRevert(IMultistrategyVault.NotFutureRoleManager.selector);
         vault.acceptRoleManager();
 
         // Bunny accepts the role

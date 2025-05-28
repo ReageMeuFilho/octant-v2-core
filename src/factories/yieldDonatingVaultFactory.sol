@@ -2,7 +2,7 @@
 pragma solidity >=0.8.25;
 
 import { CREATE3 } from "@solady/utils/CREATE3.sol";
-import { SkyCompounder } from "src/regens/yieldDonating/strategy/SkyCompounder.sol";
+import { SkyCompounderStrategy } from "src/strategies/yieldDonating/SkyCompounderStrategy.sol";
 
 contract YieldDonatingVaultFactory {
     /**
@@ -60,7 +60,7 @@ contract YieldDonatingVaultFactory {
         bytes32 _salt
     ) external returns (address strategyAddress) {
         bytes memory bytecode = abi.encodePacked(
-            type(SkyCompounder).creationCode,
+            type(SkyCompounderStrategy).creationCode,
             abi.encode(usdsRewardAddress, _name, _management, _keeper, _emergencyAdmin, _donationAddress)
         );
 

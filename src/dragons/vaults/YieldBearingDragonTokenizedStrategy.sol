@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.25;
 
-import { DragonTokenizedStrategy } from "./DragonTokenizedStrategy.sol";
+import { DragonTokenizedStrategy } from "src/dragons/vaults/DragonTokenizedStrategy.sol";
 import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { IBaseStrategy } from "src/interfaces/IBaseStrategy.sol";
