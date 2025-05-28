@@ -7,6 +7,7 @@ pragma solidity ^0.8.0;
 
 // OpenZeppelin Imports
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
@@ -188,6 +189,94 @@ contract RegenStaker is
         Deposit storage deposit = deposits[_depositId];
 
         _revertIfNotDepositOwner(deposit, msg.sender);
+        _stakeMore(deposit, _depositId, _amount);
+    }
+
+    /// @inheritdoc StakerOnBehalf
+    function stakeOnBehalf(
+        uint256 _amount,
+        address _delegatee,
+        address _claimer,
+        address _depositor,
+        uint256 _deadline,
+        bytes memory _signature
+    ) external override whenNotPaused nonReentrant returns (DepositIdentifier _depositId) {
+        _revertIfPastDeadline(_deadline);
+        _revertIfSignatureIsNotValidNow(
+            _depositor,
+            _hashTypedDataV4(
+                keccak256(
+                    abi.encode(
+                        STAKE_TYPEHASH,
+                        _amount,
+                        _delegatee,
+                        _claimer,
+                        _depositor,
+                        _useNonce(_depositor),
+                        _deadline
+                    )
+                )
+            ),
+            _signature
+        );
+        _depositId = _stake(_depositor, _amount, _delegatee, _claimer);
+    }
+
+    /// @inheritdoc StakerOnBehalf
+    function stakeMoreOnBehalf(
+        DepositIdentifier _depositId,
+        uint256 _amount,
+        address _depositor,
+        uint256 _deadline,
+        bytes memory _signature
+    ) external override whenNotPaused nonReentrant {
+        Deposit storage deposit = deposits[_depositId];
+        _revertIfNotDepositOwner(deposit, _depositor);
+        _revertIfPastDeadline(_deadline);
+        _revertIfSignatureIsNotValidNow(
+            _depositor,
+            _hashTypedDataV4(
+                keccak256(
+                    abi.encode(STAKE_MORE_TYPEHASH, _depositId, _amount, _depositor, _useNonce(_depositor), _deadline)
+                )
+            ),
+            _signature
+        );
+
+        _stakeMore(deposit, _depositId, _amount);
+    }
+
+    /// @inheritdoc StakerPermitAndStake
+    function permitAndStake(
+        uint256 _amount,
+        address _delegatee,
+        address _claimer,
+        uint256 _deadline,
+        uint8 _v,
+        bytes32 _r,
+        bytes32 _s
+    ) external override whenNotPaused nonReentrant returns (DepositIdentifier _depositId) {
+        try
+            IERC20Permit(address(STAKE_TOKEN)).permit(msg.sender, address(this), _amount, _deadline, _v, _r, _s)
+        {} catch {}
+        _depositId = _stake(msg.sender, _amount, _delegatee, _claimer);
+    }
+
+    /// @inheritdoc StakerPermitAndStake
+    function permitAndStakeMore(
+        DepositIdentifier _depositId,
+        uint256 _amount,
+        uint256 _deadline,
+        uint8 _v,
+        bytes32 _r,
+        bytes32 _s
+    ) external override whenNotPaused nonReentrant {
+        Deposit storage deposit = deposits[_depositId];
+        _revertIfNotDepositOwner(deposit, msg.sender);
+
+        try
+            IERC20Permit(address(STAKE_TOKEN)).permit(msg.sender, address(this), _amount, _deadline, _v, _r, _s)
+        {} catch {}
         _stakeMore(deposit, _depositId, _amount);
     }
 
