@@ -28,11 +28,11 @@ contract SimpleVotingMechanism is BaseAllocationMechanism {
     {}
 
     function _beforeProposeHook(address proposer) internal view override returns (bool) {
-        return votingPower[proposer] > 0;
+        return _getStorage().votingPower[proposer] > 0;
     }
 
     function _validateProposalHook(uint256 pid) internal view override returns (bool) {
-        return pid > 0 && pid <= _proposalIdCounter;
+        return pid > 0 && pid <= _getStorage().proposalIdCounter;
     }
 
     function _beforeSignupHook(address) internal pure override returns (bool) {
@@ -48,19 +48,21 @@ contract SimpleVotingMechanism is BaseAllocationMechanism {
         override
         returns (uint256)
     {
+        BaseAllocationStorage storage s = _getStorage();
         if (choice == VoteType.For) {
-            proposalVotes[pid].sharesFor += weight;
+            s.proposalVotes[pid].sharesFor += weight;
         } else if (choice == VoteType.Against) {
-            proposalVotes[pid].sharesAgainst += weight;
+            s.proposalVotes[pid].sharesAgainst += weight;
         } else {
-            proposalVotes[pid].sharesAbstain += weight;
+            s.proposalVotes[pid].sharesAbstain += weight;
         }
         return oldPower - weight;
     }
 
     function _hasQuorumHook(uint256 pid) internal view override returns (bool) {
-        uint256 forVotes = proposalVotes[pid].sharesFor;
-        uint256 againstVotes = proposalVotes[pid].sharesAgainst;
+        BaseAllocationStorage storage s = _getStorage();
+        uint256 forVotes = s.proposalVotes[pid].sharesFor;
+        uint256 againstVotes = s.proposalVotes[pid].sharesAgainst;
         uint256 net = forVotes > againstVotes ? forVotes - againstVotes : 0;
         return net >= quorumShares;
     }
@@ -70,14 +72,15 @@ contract SimpleVotingMechanism is BaseAllocationMechanism {
     }
 
     function _convertVotesToShares(uint256 pid) internal view override returns (uint256) {
-        uint256 forVotes = proposalVotes[pid].sharesFor;
-        uint256 againstVotes = proposalVotes[pid].sharesAgainst;
+        BaseAllocationStorage storage s = _getStorage();
+        uint256 forVotes = s.proposalVotes[pid].sharesFor;
+        uint256 againstVotes = s.proposalVotes[pid].sharesAgainst;
         uint256 net = forVotes > againstVotes ? forVotes - againstVotes : 0;
         return net;
     }
 
     function _getRecipientAddressHook(uint256 pid) internal view override returns (address) {
-        return proposals[pid].recipient;
+        return _getStorage().proposals[pid].recipient;
     }
 
     function _requestDistributionHook(address, uint256) internal pure override returns (bool) {
