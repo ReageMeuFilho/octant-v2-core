@@ -11,7 +11,6 @@ import { MockYieldStrategy } from "test/mocks/MockYieldStrategy.sol";
 import { MockLockedStrategy } from "test/mocks/MockLockedStrategy.sol";
 import { MockLossyStrategy } from "test/mocks/MockLossyStrategy.sol";
 import { MockFaultyStrategy } from "test/mocks/MockFaultyStrategy.sol";
-import { MockFaultyStrategy } from "test/mocks/MockFaultyStrategy.sol";
 
 contract DebtManagementTest is Test {
     Vault vaultImplementation;
