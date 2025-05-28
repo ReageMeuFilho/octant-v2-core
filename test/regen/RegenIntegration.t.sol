@@ -68,6 +68,7 @@ contract RegenIntegrationTest is Test {
 
     function test_Constructor_InitializesWhitelistsToNewIfAddressZero() public {
         // Deploy RegenStaker with address(0) for both whitelist parameters
+        vm.startPrank(ADMIN);
         RegenStaker localRegenStaker = new RegenStaker(
             IERC20(address(rewardToken)),
             IERC20Staking(address(stakeToken)),
@@ -93,14 +94,15 @@ contract RegenIntegrationTest is Test {
         // and the Whitelist constructor sets msg.sender as its owner.
         assertEq(
             Ownable(address(localRegenStaker.stakerWhitelist())).owner(),
-            address(localRegenStaker),
+            address(ADMIN),
             "Owner of new staker whitelist incorrect"
         );
         assertEq(
             Ownable(address(localRegenStaker.contributionWhitelist())).owner(),
-            address(localRegenStaker),
+            address(ADMIN),
             "Owner of new contrib whitelist incorrect"
         );
+        vm.stopPrank();
     }
 
     function test_StakerWhitelistIsSet() public view {
