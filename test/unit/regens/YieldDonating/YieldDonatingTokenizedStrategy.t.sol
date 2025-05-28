@@ -112,8 +112,11 @@ contract YieldDonatingTokenizedStrategyTest is Test {
         
         // Try to deploy again with the same salt (should revert)
         vm.startPrank(deployerAddress);
-        vm.expectRevert(); // Should revert with "Failed to deploy" or similar
-        new YieldDonatingTokenizedStrategy{salt: deploymentSalt}();
+        try new YieldDonatingTokenizedStrategy{salt: deploymentSalt}() returns (YieldDonatingTokenizedStrategy) {
+           fail();
+        } catch {
+            console.log("Create Collision: Cannot deploy with the same salt");
+        }
         vm.stopPrank();
         
         // Check what happens with a different salt

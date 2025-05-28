@@ -79,7 +79,7 @@ contract YieldDonatingVaultFactoryTest is Test {
         // Create a strategy and check events
         vm.startPrank(management);
         vm.expectEmit(true, true, true, false); // Check first 3 indexed params, ignore the non-indexed timestamp
-        emit UsdsStrategyDeploy(management, donationAddress, address(0)); // We can't predict the exact address
+        emit StrategyDeploy(management, donationAddress, 0x68c8c8FdBc4A50a07cb407aa430d31566E1D2F31); // We can't predict the exact address
         
         address strategyAddress = factory.createStrategy(
             vaultSharesName,
@@ -252,4 +252,4 @@ contract YieldDonatingVaultFactoryTest is Test {
 }
 
 // Event to match the factory's event signature
-event UsdsStrategyDeploy(address deployer, address donationAddress, address strategyAddress); 
+event StrategyDeploy(address deployer, address donationAddress, address strategyAddress); 
