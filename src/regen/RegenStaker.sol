@@ -14,6 +14,7 @@ import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 import { EIP712 } from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import { SafeCast } from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
 // Staker Library Imports
 import { IERC20Staking } from "staker/interfaces/IERC20Staking.sol";
@@ -141,10 +142,19 @@ contract RegenStaker is
         StakerDelegateSurrogateVotes(_stakeToken)
         EIP712("RegenStaker", "1")
     {
-        stakerWhitelist = address(_stakerWhitelist) == address(0) ? new Whitelist() : _stakerWhitelist;
-        contributionWhitelist = address(_contributionWhitelist) == address(0)
-            ? new Whitelist()
-            : _contributionWhitelist;
+        if (address(_stakerWhitelist) == address(0)) {
+            stakerWhitelist = new Whitelist();
+            Ownable(address(stakerWhitelist)).transferOwnership(_admin);
+        } else {
+            stakerWhitelist = _stakerWhitelist;
+        }
+
+        if (address(_contributionWhitelist) == address(0)) {
+            contributionWhitelist = new Whitelist();
+            Ownable(address(contributionWhitelist)).transferOwnership(_admin);
+        } else {
+            contributionWhitelist = _contributionWhitelist;
+        }
 
         MAX_CLAIM_FEE = _maxClaimFee;
         _setClaimFeeParameters(ClaimFeeParameters({ feeAmount: 0, feeCollector: address(0) }));
