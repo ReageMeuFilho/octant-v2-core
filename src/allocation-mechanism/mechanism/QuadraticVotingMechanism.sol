@@ -67,12 +67,12 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
     /// @notice Only registered users with voting power can propose
     function _beforeProposeHook(address proposer) internal view override whenNotPaused returns (bool) {
         if (proposer == address(0)) revert ZeroAddressCannotPropose();
-        return votingPower[proposer] > 0;
+        return _getStorage().votingPower[proposer] > 0;
     }
 
     /// @notice Validate proposal ID exists
     function _validateProposalHook(uint256 pid) internal view override returns (bool) {
-        return pid > 0 && pid <= _proposalIdCounter;
+        return pid > 0 && pid <= _getStorage().proposalIdCounter;
     }
 
     /// @notice Allow all users to register (can be restricted in derived contracts)
@@ -119,8 +119,8 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
         (,, uint256 quadraticFunding, uint256 linearFunding) = getTally(pid);
 
         // Calculate total funding for this project using alpha weighting
-        uint256 projectTotalFunding = Math.mulDiv(quadraticFunding, alphaNumerator, alphaDenominator)
-            + Math.mulDiv(linearFunding, (alphaDenominator - alphaNumerator), alphaDenominator);
+        uint256 projectTotalFunding = (quadraticFunding * alphaNumerator()) / alphaDenominator()
+            + (linearFunding * (alphaDenominator() - alphaNumerator())) / alphaDenominator();
 
         // Project meets quorum if it has minimum funding threshold
         return projectTotalFunding >= quorumShares;
@@ -128,22 +128,22 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
 
     /// @notice Convert quadratic funding to shares proportional to total funding
     function _convertVotesToShares(uint256 pid) internal view override returns (uint256) {
-        if (totalFunding == 0) return 0;
+        if (totalFunding() == 0) return 0;
 
         // Get project funding metrics
         (,, uint256 quadraticFunding, uint256 linearFunding) = getTally(pid);
 
         // Calculate project's weighted funding
-        uint256 projectWeightedFunding = Math.mulDiv(quadraticFunding, alphaNumerator, alphaDenominator)
-            + Math.mulDiv(linearFunding, (alphaDenominator - alphaNumerator), alphaDenominator);
+        uint256 projectWeightedFunding = (quadraticFunding * alphaNumerator()) / alphaDenominator()
+            + (linearFunding * (alphaDenominator() - alphaNumerator())) / alphaDenominator();
 
         // Calculate total weighted funding across all projects
-        uint256 totalWeightedFunding = Math.mulDiv(totalQuadraticSum, alphaNumerator, alphaDenominator)
-            + Math.mulDiv(totalLinearSum, (alphaDenominator - alphaNumerator), alphaDenominator);
+        uint256 totalWeightedFunding = (totalQuadraticSum() * alphaNumerator()) / alphaDenominator()
+            + (totalLinearSum() * (alphaDenominator() - alphaNumerator())) / alphaDenominator();
 
         // Return proportional shares (scaled by total voting power for meaningful allocation)
         if (totalWeightedFunding == 0 || totalVotingPower == 0) return 0;
-        return Math.mulDiv(projectWeightedFunding, totalVotingPower, totalWeightedFunding);
+        return (projectWeightedFunding * totalVotingPower) / totalWeightedFunding;
     }
 
     /// @notice Allow finalization once voting period ends
@@ -153,7 +153,7 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
 
     /// @notice Get recipient address for proposal
     function _getRecipientAddressHook(uint256 pid) internal view override returns (address) {
-        address recipient = proposals[pid].recipient;
+        address recipient = _getStorage().proposals[pid].recipient;
         if (recipient == address(0)) revert InvalidRecipientAddress();
         return recipient;
     }

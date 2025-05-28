@@ -17,6 +17,10 @@ abstract contract ProperQF {
     error DenominatorMustBePositive();
     error AlphaMustBeLessOrEqualToOne();
 
+    /// @notice EIP-712 storage slot for the ProperQF storage struct
+    /// @dev keccak256("ProperQF.storage") - 1
+    bytes32 private constant STORAGE_SLOT = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef;
+
     struct Project {
         uint256 sumContributions; // Sum of contributions (Sum_j)
         uint256 sumSquareRoots; // Sum of square roots (S_j)
@@ -24,16 +28,64 @@ abstract contract ProperQF {
         uint256 linearFunding; // Linear term (F_linear_j)
     }
 
-    mapping(uint256 => Project) public projects; // Mapping of project IDs to project data
-    uint256 public alphaNumerator = 10000; // Numerator for alpha (e.g., 6 for 0.6)
-    uint256 public alphaDenominator = 10000; // Denominator for alpha (e.g., 10 for 0.6)
-
-    uint256 public totalQuadraticSum; // Sum of all quadratic terms across projects
-    uint256 public totalLinearSum; // Sum of all linear terms across projects
-    uint256 public totalFunding; // Total funding across all projects
+    /// @notice Main storage struct containing all mutable state for ProperQF
+    struct ProperQFStorage {
+        mapping(uint256 => Project) projects; // Mapping of project IDs to project data
+        uint256 alphaNumerator; // Numerator for alpha (e.g., 6 for 0.6)
+        uint256 alphaDenominator; // Denominator for alpha (e.g., 10 for 0.6)
+        uint256 totalQuadraticSum; // Sum of all quadratic terms across projects
+        uint256 totalLinearSum; // Sum of all linear terms across projects
+        uint256 totalFunding; // Total funding across all projects
+    }
 
     /// @dev Event emitted when alpha value is updated
     event AlphaUpdated(uint256 oldNumerator, uint256 oldDenominator, uint256 newNumerator, uint256 newDenominator);
+
+    /// @notice Constructor initializes default alpha values in storage
+    constructor() {
+        ProperQFStorage storage s = _getProperQFStorage();
+        s.alphaNumerator = 10000; // Default alpha = 1.0 (10000/10000)
+        s.alphaDenominator = 10000;
+    }
+
+    /// @notice Get the storage struct from the predefined slot
+    /// @return s The storage struct containing all mutable state for ProperQF
+    function _getProperQFStorage() internal pure returns (ProperQFStorage storage s) {
+        bytes32 slot = STORAGE_SLOT;
+        assembly {
+            s.slot := slot
+        }
+    }
+
+    /// @notice Public getter for projects mapping (delegating to storage)
+    function projects(uint256 projectId) public view returns (Project memory) {
+        return _getProperQFStorage().projects[projectId];
+    }
+
+    /// @notice Public getter for alphaNumerator (delegating to storage)
+    function alphaNumerator() public view returns (uint256) {
+        return _getProperQFStorage().alphaNumerator;
+    }
+
+    /// @notice Public getter for alphaDenominator (delegating to storage)
+    function alphaDenominator() public view returns (uint256) {
+        return _getProperQFStorage().alphaDenominator;
+    }
+
+    /// @notice Public getter for totalQuadraticSum (delegating to storage)
+    function totalQuadraticSum() public view returns (uint256) {
+        return _getProperQFStorage().totalQuadraticSum;
+    }
+
+    /// @notice Public getter for totalLinearSum (delegating to storage)
+    function totalLinearSum() public view returns (uint256) {
+        return _getProperQFStorage().totalLinearSum;
+    }
+
+    /// @notice Public getter for totalFunding (delegating to storage)
+    function totalFunding() public view returns (uint256) {
+        return _getProperQFStorage().totalFunding;
+    }
 
     /**
      * @notice This function is used to process a vote and update the tally for the voting strategy
@@ -57,7 +109,8 @@ abstract contract ProperQF {
             revert VoteWeightOutsideTolerance();
         }
 
-        Project storage project = projects[projectId];
+        ProperQFStorage storage s = _getProperQFStorage();
+        Project storage project = s.projects[projectId];
 
         // Update project sums
         uint256 newSumSquareRoots = project.sumSquareRoots + voteWeight;
@@ -67,14 +120,14 @@ abstract contract ProperQF {
         uint256 newQuadraticFunding = (newSumSquareRoots * newSumSquareRoots);
 
         // Update global sums with underflow protection
-        if (totalQuadraticSum < project.quadraticFunding) revert QuadraticSumUnderflow();
-        if (totalLinearSum < project.linearFunding) revert LinearSumUnderflow();
+        if (s.totalQuadraticSum < project.quadraticFunding) revert QuadraticSumUnderflow();
+        if (s.totalLinearSum < project.linearFunding) revert LinearSumUnderflow();
 
-        totalQuadraticSum = totalQuadraticSum - project.quadraticFunding + newQuadraticFunding;
-        totalLinearSum = totalLinearSum - project.linearFunding + newSumContributions;
+        s.totalQuadraticSum = s.totalQuadraticSum - project.quadraticFunding + newQuadraticFunding;
+        s.totalLinearSum = s.totalLinearSum - project.linearFunding + newSumContributions;
 
         // Calculate total funding with alpha weighting
-        totalFunding = _calculateWeightedTotalFunding();
+        s.totalFunding = _calculateWeightedTotalFunding();
 
         // Update project state
         project.sumSquareRoots = newSumSquareRoots;
@@ -88,8 +141,9 @@ abstract contract ProperQF {
      * @return The weighted total funding across all projects
      */
     function _calculateWeightedTotalFunding() internal view returns (uint256) {
-        uint256 weightedQuadratic = Math.mulDiv(totalQuadraticSum, alphaNumerator, alphaDenominator);
-        uint256 weightedLinear = totalLinearSum; // Linear funding is always the raw contribution sum
+        ProperQFStorage storage s = _getProperQFStorage();
+        uint256 weightedQuadratic = (s.totalQuadraticSum * s.alphaNumerator) / s.alphaDenominator;
+        uint256 weightedLinear = s.totalLinearSum; // Linear funding is always the raw contribution sum
         return weightedQuadratic + weightedLinear;
     }
 
@@ -123,13 +177,14 @@ abstract contract ProperQF {
         returns (uint256 sumContributions, uint256 sumSquareRoots, uint256 quadraticFunding, uint256 linearFunding)
     {
         // Retrieve the project data from storage
-        Project storage project = projects[projectId];
+        ProperQFStorage storage s = _getProperQFStorage();
+        Project storage project = s.projects[projectId];
 
         // Return all relevant metrics for the project
         return (
             project.sumContributions, // Total contributions
             project.sumSquareRoots, // Sum of square roots
-            Math.mulDiv(project.quadraticFunding, alphaNumerator, alphaDenominator), // Alpha-weighted quadratic funding
+            (project.quadraticFunding * s.alphaNumerator) / s.alphaDenominator, // Alpha-weighted quadratic funding
             project.sumContributions // Raw linear funding (Sum_j)
         );
     }
@@ -145,13 +200,15 @@ abstract contract ProperQF {
         if (newDenominator == 0) revert DenominatorMustBePositive();
         if (newNumerator > newDenominator) revert AlphaMustBeLessOrEqualToOne();
 
+        ProperQFStorage storage s = _getProperQFStorage();
+        
         // Store old values for event emission
-        uint256 oldNumerator = alphaNumerator;
-        uint256 oldDenominator = alphaDenominator;
+        uint256 oldNumerator = s.alphaNumerator;
+        uint256 oldDenominator = s.alphaDenominator;
 
         // Update state
-        alphaNumerator = newNumerator;
-        alphaDenominator = newDenominator;
+        s.alphaNumerator = newNumerator;
+        s.alphaDenominator = newDenominator;
 
         // Emit event
         emit AlphaUpdated(oldNumerator, oldDenominator, newNumerator, newDenominator);
@@ -162,6 +219,7 @@ abstract contract ProperQF {
      * @return The current alpha ratio components
      */
     function getAlpha() public view returns (uint256, uint256) {
-        return (alphaNumerator, alphaDenominator);
+        ProperQFStorage storage s = _getProperQFStorage();
+        return (s.alphaNumerator, s.alphaDenominator);
     }
 }
