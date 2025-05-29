@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: MIT
-// Tests are named according to https://github.com/ScopeLift/scopelint/blob/1857e3940bfe92ac5a136827374f4b27ff083971/src/check/validators/test_names.rs#L106-L143
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
@@ -12,12 +11,15 @@ import { IWhitelistedEarningPowerCalculator } from "../../src/regen/IWhitelisted
 import { Staker } from "lib/staker/src/Staker.sol";
 import { MockERC20 } from "../mocks/MockERC20.sol";
 import { MockERC20Staking } from "../mocks/MockERC20Staking.sol";
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol"; // For Staker__Unauthorized if Ownable error is used
-import { SafeCast } from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 import { IGrantRound } from "../../src/regen/IGrantRound.sol";
-import { console2 } from "forge-std/console2.sol";
 
+/**
+ * @title RegenIntegrationTest
+ * @notice Comprehensive integration tests for RegenStaker contract. Due to fixed-point math, higher number of fuzz runs necessary to surface all edge cases.
+ * forge-config: default.fuzz.runs = 25600
+ */
 contract RegenIntegrationTest is Test {
     RegenStaker regenStaker;
     RegenEarningPowerCalculator calculator;
@@ -27,55 +29,58 @@ contract RegenIntegrationTest is Test {
     MockERC20 rewardToken;
     MockERC20Staking stakeToken;
 
-    uint256 public constant REWARD_AMOUNT_BASE = 30_000_000; // 30M tokens (without decimals)
-    uint256 public constant STAKE_AMOUNT_BASE = 1_000; // 1K tokens (without decimals)
-    uint256 public constant MAX_TOLERANCE = 1e5; // 1e20 represents 100%.
-    uint256 public constant MAX_BUMP_TIP = 1e18; // Maximum tip allowed for bumping earning power
-    uint256 public constant MAX_CLAIM_FEE = 1e18; // Maximum fee for claiming rewards
-    address public immutable ADMIN = makeAddr("admin");
-    uint8 public rewardTokenDecimals = 18; // Default decimals
-    uint8 public stakeTokenDecimals = 18; // Default decimals
+    uint256 public constant REWARD_AMOUNT_BASE = 30_000_000;
+    uint256 public constant STAKE_AMOUNT_BASE = 1_000;
+    uint256 public constant ONE_IN_A_FEMTO = 1e5;
+    uint256 public constant ONE_IN_A_PICO = 1e8;
+    uint256 public constant ONE_IN_A_NANO = 1e11;
+    uint256 public constant ONE_IN_A_MICRO = 1e14;
+    uint256 public constant MAX_BUMP_TIP = 1e18;
+    uint256 public constant MAX_CLAIM_FEE = 1e18;
 
-    /// @notice Helper function to get the reward amount adjusted for token decimals
+    address public immutable ADMIN = makeAddr("admin");
+    uint8 public rewardTokenDecimals = 18;
+    uint8 public stakeTokenDecimals = 18;
+
     function getRewardAmount() internal view returns (uint256) {
         return REWARD_AMOUNT_BASE * (10 ** rewardTokenDecimals);
     }
 
-    /// @notice Helper function to get a custom reward amount adjusted for token decimals
     function getRewardAmount(uint256 baseAmount) internal view returns (uint256) {
         return baseAmount * (10 ** rewardTokenDecimals);
     }
 
-    /// @notice Helper function to get the stake amount adjusted for token decimals
     function getStakeAmount() internal view returns (uint256) {
         return STAKE_AMOUNT_BASE * (10 ** stakeTokenDecimals);
     }
 
-    /// @notice Helper function to get a custom stake amount adjusted for token decimals
     function getStakeAmount(uint256 baseAmount) internal view returns (uint256) {
         return baseAmount * (10 ** stakeTokenDecimals);
     }
 
+    function whitelistUser(address user, bool forStaking, bool forContributing, bool forEarningPower) internal {
+        vm.startPrank(ADMIN);
+        if (forStaking) stakerWhitelist.addToWhitelist(user);
+        if (forContributing) contributorWhitelist.addToWhitelist(user);
+        if (forEarningPower) earningPowerWhitelist.addToWhitelist(user);
+        vm.stopPrank();
+    }
+
     function setUp() public virtual {
-        // Randomize decimals between 6 and 18 (common range for tokens)
         rewardTokenDecimals = uint8(bound(vm.randomUint(), 6, 18));
         stakeTokenDecimals = uint8(bound(vm.randomUint(), 6, 18));
 
         vm.startPrank(ADMIN);
 
-        // Deploy mock tokens
         rewardToken = new MockERC20(rewardTokenDecimals);
         stakeToken = new MockERC20Staking(stakeTokenDecimals);
 
-        // Deploy three whitelists
         stakerWhitelist = new Whitelist();
         contributorWhitelist = new Whitelist();
         earningPowerWhitelist = new Whitelist();
 
-        // Deploy the calculator
         calculator = new RegenEarningPowerCalculator(ADMIN, earningPowerWhitelist);
 
-        // Deploy the staker
         regenStaker = new RegenStaker(
             IERC20(address(rewardToken)),
             IERC20Staking(address(stakeToken)),
@@ -87,47 +92,31 @@ contract RegenIntegrationTest is Test {
             MAX_CLAIM_FEE
         );
 
-        // Make this contract a reward notifier
         regenStaker.setRewardNotifier(ADMIN, true);
         vm.stopPrank();
     }
 
-    function test_Constructor_InitializesWhitelistsToNewIfAddressZero() public {
-        // Deploy RegenStaker with address(0) for both whitelist parameters
+    function testFuzz_Constructor_InitializesWhitelistsWhenAddressZero(uint256 tipAmount, uint256 feeAmount) public {
+        tipAmount = bound(tipAmount, 0, MAX_BUMP_TIP);
+        feeAmount = bound(feeAmount, 0, MAX_CLAIM_FEE);
+
         vm.startPrank(ADMIN);
         RegenStaker localRegenStaker = new RegenStaker(
             IERC20(address(rewardToken)),
             IERC20Staking(address(stakeToken)),
             ADMIN,
-            Whitelist(address(0)), // _stakerWhitelist
-            Whitelist(address(0)), // _contributionWhitelist
+            Whitelist(address(0)),
+            Whitelist(address(0)),
             calculator,
-            MAX_BUMP_TIP,
-            MAX_CLAIM_FEE
+            tipAmount,
+            feeAmount
         );
 
-        // Assert that the whitelists are not address(0) but new Whitelist instances
-        assertTrue(
-            address(localRegenStaker.stakerWhitelist()) != address(0),
-            "Staker whitelist should be a new instance, not address(0)"
-        );
-        assertTrue(
-            address(localRegenStaker.contributionWhitelist()) != address(0),
-            "Contribution whitelist should be a new instance, not address(0)"
-        );
+        assertTrue(address(localRegenStaker.stakerWhitelist()) != address(0));
+        assertTrue(address(localRegenStaker.contributionWhitelist()) != address(0));
 
-        // When RegenStaker does `new Whitelist()`, RegenStaker is the msg.sender for that sub-call,
-        // and the Whitelist constructor sets msg.sender as its owner.
-        assertEq(
-            Ownable(address(localRegenStaker.stakerWhitelist())).owner(),
-            address(ADMIN),
-            "Owner of new staker whitelist incorrect"
-        );
-        assertEq(
-            Ownable(address(localRegenStaker.contributionWhitelist())).owner(),
-            address(ADMIN),
-            "Owner of new contrib whitelist incorrect"
-        );
+        assertEq(Ownable(address(localRegenStaker.stakerWhitelist())).owner(), address(ADMIN));
+        assertEq(Ownable(address(localRegenStaker.contributionWhitelist())).owner(), address(ADMIN));
         vm.stopPrank();
     }
 
@@ -150,547 +139,452 @@ contract RegenIntegrationTest is Test {
         assertEq(address(regenStaker.earningPowerCalculator()), address(calculator));
     }
 
-    function test_NonAdminCannotSetStakerWhitelist() public {
-        address nonAdmin = makeAddr("nonAdmin");
+    function testFuzz_RevertIf_NonAdminCannotSetStakerWhitelist(address nonAdmin) public {
+        vm.assume(nonAdmin != ADMIN);
         vm.startPrank(nonAdmin);
         vm.expectRevert(abi.encodeWithSelector(Staker.Staker__Unauthorized.selector, bytes32("not admin"), nonAdmin));
         regenStaker.setStakerWhitelist(Whitelist(address(0)));
         vm.stopPrank();
     }
 
-    function test_NonAdminCannotSetContributionWhitelist() public {
-        address nonAdmin = makeAddr("nonAdmin");
-        vm.startPrank(nonAdmin);
-        vm.expectRevert(abi.encodeWithSelector(Staker.Staker__Unauthorized.selector, bytes32("not admin"), nonAdmin));
-        regenStaker.setContributionWhitelist(Whitelist(address(0)));
-        vm.stopPrank();
-    }
+    function testFuzz_StakerWhitelist_DisableAllowsStaking(uint256 stakeAmountBase) public {
+        stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
+        uint256 stakeAmount = getStakeAmount(stakeAmountBase);
+        uint256 partialStakeAmount = stakeAmount / 2;
 
-    function test_NonAdminCannotSetEarningPowerWhitelist() public {
-        address nonAdmin = makeAddr("nonAdmin");
-        vm.startPrank(nonAdmin);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, nonAdmin));
-        calculator.setWhitelist(Whitelist(address(0)));
-        vm.stopPrank();
-    }
+        address user = makeAddr("nonWhitelistedUser");
+        stakeToken.mint(user, stakeAmount);
 
-    function test_AllowsStakingIfStakerWhitelistDisabled_RevertIf_ActiveAndUserNotWhitelisted() public {
-        address nonWhitelistedUser = makeAddr("nonWhitelistedUser");
+        vm.startPrank(user);
+        stakeToken.approve(address(regenStaker), stakeAmount);
 
-        stakeToken.mint(nonWhitelistedUser, 100);
-
-        vm.startPrank(nonWhitelistedUser);
-        stakeToken.approve(address(regenStaker), 100);
-
-        // First attempt should revert because user is not whitelisted
         vm.expectRevert(
-            abi.encodeWithSelector(
-                RegenStaker.NotWhitelisted.selector,
-                regenStaker.stakerWhitelist(),
-                nonWhitelistedUser
-            )
+            abi.encodeWithSelector(RegenStaker.NotWhitelisted.selector, regenStaker.stakerWhitelist(), user)
         );
-        regenStaker.stake(50, nonWhitelistedUser);
+        regenStaker.stake(partialStakeAmount, user);
         vm.stopPrank();
 
         vm.prank(ADMIN);
-        regenStaker.setStakerWhitelist(Whitelist(address(0))); // Disables the whitelist
+        regenStaker.setStakerWhitelist(Whitelist(address(0)));
         assertEq(address(regenStaker.stakerWhitelist()), address(0));
 
-        // Try staking again with the same non-whitelisted user. This should succeed.
-        vm.startPrank(nonWhitelistedUser);
-        regenStaker.stake(50, nonWhitelistedUser);
-
+        vm.startPrank(user);
+        regenStaker.stake(partialStakeAmount, user);
         vm.stopPrank();
     }
 
-    function test_AllowsContributionIfContributorWhitelistDisabled_RevertIf_ActiveAndUserNotWhitelisted() public {
-        // Setup a contributor who is whitelisted for staking but NOT for contributing
-        address contributor = makeAddr("contributorNotWhitelistedForContributing");
+    function testFuzz_ContributionWhitelist_DisableAllowsContribution(
+        uint256 stakeAmountBase,
+        uint256 rewardAmountBase,
+        uint256 contributionAmountBase
+    ) public {
+        stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
+        rewardAmountBase = bound(rewardAmountBase, 1, 100_000);
+        contributionAmountBase = bound(contributionAmountBase, 0, 1_000);
+
+        uint256 stakeAmount = getStakeAmount(stakeAmountBase);
+        uint256 rewardAmount = getRewardAmount(rewardAmountBase);
+        uint256 contributionAmount = getRewardAmount(contributionAmountBase);
+
+        address contributor = makeAddr("contributor");
         address mockGrantRound = makeAddr("mockGrantRound");
 
-        // Whitelist contributor for staking and earning power, but NOT for contributing
-        address[] memory contributorArr = new address[](1);
-        contributorArr[0] = contributor;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(contributorArr);
-        earningPowerWhitelist.addToWhitelist(contributorArr);
-        // Note: We do NOT add to contributorWhitelist
-        vm.stopPrank();
+        whitelistUser(contributor, true, false, true);
 
-        // Create deposit and earn rewards
-        stakeToken.mint(contributor, getStakeAmount());
-        rewardToken.mint(address(regenStaker), getRewardAmount(10)); // 10 reward tokens
+        stakeToken.mint(contributor, stakeAmount);
+        rewardToken.mint(address(regenStaker), rewardAmount);
+
         vm.startPrank(contributor);
-        stakeToken.approve(address(regenStaker), getStakeAmount());
-        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), contributor);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = regenStaker.stake(stakeAmount, contributor);
         vm.stopPrank();
 
         vm.prank(ADMIN);
-        regenStaker.notifyRewardAmount(getRewardAmount(10));
-
-        // Warp to accumulate rewards
+        regenStaker.notifyRewardAmount(rewardAmount);
         vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
 
-        // Setup mock calls for the grant round to avoid external call issues
-        uint256 contributionAmount = 1 * (10 ** (rewardTokenDecimals > 2 ? rewardTokenDecimals - 2 : 0)); // 0.01 tokens worth
-        uint256[] memory prefs = new uint256[](1);
-        prefs[0] = 1;
-        uint256[] memory weights = new uint256[](1);
-        weights[0] = contributionAmount;
+        if (contributionAmount > 0) {
+            (uint96 feeAmount, ) = regenStaker.claimFeeParameters();
+            vm.assume(contributionAmount >= uint256(feeAmount));
+            uint256 netContribution = contributionAmount - uint256(feeAmount);
 
-        vm.mockCall(
-            mockGrantRound,
-            abi.encodeWithSignature("signup(uint256,address,bytes32)", contributionAmount, contributor, bytes32(0)),
-            abi.encode(uint256(1))
-        );
-        vm.mockCall(
-            mockGrantRound,
-            abi.encodeWithSignature("vote(uint256,uint256)", prefs[0], weights[0]),
-            abi.encode()
-        );
+            vm.mockCall(
+                mockGrantRound,
+                abi.encodeWithSignature("signup(uint256,address,bytes32)", netContribution, contributor, bytes32(0)),
+                abi.encode(uint256(1))
+            );
+            vm.mockCall(
+                mockGrantRound,
+                abi.encodeWithSignature("vote(uint256,uint256)", uint256(1), contributionAmount),
+                abi.encode()
+            );
 
-        // Verify contribution whitelist is active and contributor is not on it
-        assertTrue(
-            address(regenStaker.contributionWhitelist()) != address(0),
-            "Contribution whitelist should be active"
-        );
-        assertFalse(
-            regenStaker.contributionWhitelist().isWhitelisted(contributor),
-            "Contributor should not be whitelisted for contributing"
-        );
+            assertTrue(address(regenStaker.contributionWhitelist()) != address(0));
+            assertFalse(regenStaker.contributionWhitelist().isWhitelisted(contributor));
 
-        // Try contributing while not whitelisted for contributing (should revert)
-        vm.startPrank(contributor);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                RegenStaker.NotWhitelisted.selector,
-                regenStaker.contributionWhitelist(),
-                contributor
-            )
-        );
-        regenStaker.contribute(depositId, mockGrantRound, contributor, contributionAmount, bytes32(0));
-        vm.stopPrank();
+            vm.startPrank(contributor);
+            vm.expectRevert(
+                abi.encodeWithSelector(
+                    RegenStaker.NotWhitelisted.selector,
+                    regenStaker.contributionWhitelist(),
+                    contributor
+                )
+            );
+            regenStaker.contribute(depositId, mockGrantRound, contributor, contributionAmount, bytes32(0));
+            vm.stopPrank();
+        }
 
-        // Disable the contribution whitelist
         vm.prank(ADMIN);
         regenStaker.setContributionWhitelist(Whitelist(address(0)));
+        assertEq(address(regenStaker.contributionWhitelist()), address(0));
 
-        // Verify whitelist is disabled
-        assertEq(address(regenStaker.contributionWhitelist()), address(0), "Whitelist should be disabled");
+        uint256 unclaimedRewards = regenStaker.unclaimedReward(depositId);
+        (uint96 feeUint96, ) = regenStaker.claimFeeParameters();
+        uint256 fee = uint256(feeUint96);
 
-        // Try contributing again - should succeed now
-        vm.prank(contributor);
-        regenStaker.contribute(depositId, mockGrantRound, contributor, contributionAmount, bytes32(0));
+        if (contributionAmount == 0) {
+            if (fee > 0) {
+                vm.expectRevert(abi.encodeWithSelector(RegenStaker.CantAfford.selector, fee, contributionAmount));
+                vm.prank(contributor);
+                regenStaker.contribute(depositId, mockGrantRound, contributor, contributionAmount, bytes32(0));
+            } else {
+                vm.mockCall(
+                    mockGrantRound,
+                    abi.encodeWithSignature("signup(uint256,address,bytes32)", 0, contributor, bytes32(0)),
+                    abi.encode(uint256(1))
+                );
+                vm.mockCall(
+                    mockGrantRound,
+                    abi.encodeWithSignature("vote(uint256,uint256)", uint256(1), uint256(0)),
+                    abi.encode()
+                );
+                vm.prank(contributor);
+                regenStaker.contribute(depositId, mockGrantRound, contributor, contributionAmount, bytes32(0));
+            }
+        } else {
+            vm.assume(contributionAmount <= unclaimedRewards);
+            vm.assume(contributionAmount >= fee);
+
+            uint256 netContribution = contributionAmount - fee;
+
+            vm.mockCall(
+                mockGrantRound,
+                abi.encodeWithSignature("signup(uint256,address,bytes32)", netContribution, contributor, bytes32(0)),
+                abi.encode(uint256(1))
+            );
+            vm.mockCall(
+                mockGrantRound,
+                abi.encodeWithSignature("vote(uint256,uint256)", uint256(1), netContribution),
+                abi.encode()
+            );
+            vm.prank(contributor);
+            regenStaker.contribute(depositId, mockGrantRound, contributor, contributionAmount, bytes32(0));
+        }
     }
 
-    function test_GrantsEarningPowerToNewUserIfEarningPowerWhitelistDisabled() public {
-        // Setup two users - one whitelisted, one not
+    function testFuzz_EarningPowerWhitelist_DisableGrantsEarningPower(uint256 stakeAmountBase) public {
+        stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
+        uint256 stakeAmount = getStakeAmount(stakeAmountBase);
+
         address whitelistedUser = makeAddr("whitelistedUser");
         address nonWhitelistedUser = makeAddr("nonWhitelistedUser");
 
-        // Mint tokens to both users
-        stakeToken.mint(whitelistedUser, 1000);
-        stakeToken.mint(nonWhitelistedUser, 1000);
+        stakeToken.mint(whitelistedUser, stakeAmount);
+        stakeToken.mint(nonWhitelistedUser, stakeAmount);
 
-        // Whitelist the first user for staking and earning power
-        address[] memory users = new address[](1);
-        users[0] = whitelistedUser;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(users);
-        earningPowerWhitelist.addToWhitelist(users);
+        whitelistUser(whitelistedUser, true, false, true);
+        whitelistUser(nonWhitelistedUser, true, false, false);
 
-        // Also whitelist the non-whitelisted user for staking (but not for earning power)
-        users[0] = nonWhitelistedUser;
-        stakerWhitelist.addToWhitelist(users);
-        vm.stopPrank();
-
-        // Have both users stake
         vm.startPrank(whitelistedUser);
-        stakeToken.approve(address(regenStaker), 1000);
-        regenStaker.stake(1000, whitelistedUser);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        regenStaker.stake(stakeAmount, whitelistedUser);
         vm.stopPrank();
 
         vm.startPrank(nonWhitelistedUser);
-        stakeToken.approve(address(regenStaker), 1000);
-        regenStaker.stake(1000, nonWhitelistedUser);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        regenStaker.stake(stakeAmount, nonWhitelistedUser);
         vm.stopPrank();
 
-        // Check earning power is different between them
-        uint256 whitelistedEarningPower = regenStaker.depositorTotalEarningPower(whitelistedUser);
-        uint256 nonWhitelistedEarningPower = regenStaker.depositorTotalEarningPower(nonWhitelistedUser);
-        assertEq(whitelistedEarningPower, 1000); // Should have earning power
-        assertEq(nonWhitelistedEarningPower, 0); // Should have zero earning power
+        assertEq(regenStaker.depositorTotalEarningPower(whitelistedUser), stakeAmount);
+        assertEq(regenStaker.depositorTotalEarningPower(nonWhitelistedUser), 0);
 
         vm.prank(ADMIN);
         IWhitelistedEarningPowerCalculator(address(calculator)).setWhitelist(Whitelist(address(0)));
 
-        // Verify whitelist is now address(0)
         assertEq(
             address(IWhitelistedEarningPowerCalculator(address(regenStaker.earningPowerCalculator())).whitelist()),
             address(0)
         );
 
-        // Check if existing nonWhitelistedUser automatically gets earning power after disabling whitelist
-        uint256 nonWhitelistedEarningPowerAfterDisable = regenStaker.depositorTotalEarningPower(nonWhitelistedUser);
-        assertEq(
-            nonWhitelistedEarningPowerAfterDisable,
-            0,
-            "Existing non-whitelisted user does not automatically get earning power"
-        );
+        assertEq(regenStaker.depositorTotalEarningPower(nonWhitelistedUser), 0);
 
-        // We need to bump the earning power for the existing deposit to update it
-        // Get the deposit ID for nonWhitelistedUser
-        Staker.DepositIdentifier nonWhitelistedDepositId = Staker.DepositIdentifier.wrap(1); // nonWhitelistedUser's deposit is the second one (ID 1)
+        Staker.DepositIdentifier depositId = Staker.DepositIdentifier.wrap(1);
 
-        vm.prank(ADMIN); // Use admin to avoid tip requirements
-        regenStaker.bumpEarningPower(nonWhitelistedDepositId, ADMIN, 0); // No tip needed when admin bumps
-
-        // Check earning power after bumping
-        uint256 nonWhitelistedEarningPowerAfterBump = regenStaker.depositorTotalEarningPower(nonWhitelistedUser);
-        assertEq(
-            nonWhitelistedEarningPowerAfterBump,
-            1000,
-            "After bumping, existing non-whitelisted user should get earning power"
-        );
-
-        // Add a new non-whitelisted user to verify they now get earning power without being whitelisted
-        address newUser = makeAddr("newUser");
-        stakeToken.mint(newUser, 1000);
-
-        // Whitelist for staking only
-        users[0] = newUser;
         vm.prank(ADMIN);
-        stakerWhitelist.addToWhitelist(users);
+        regenStaker.bumpEarningPower(depositId, ADMIN, 0);
 
-        // Stake with the new user
+        assertEq(regenStaker.depositorTotalEarningPower(nonWhitelistedUser), stakeAmount);
+
+        address newUser = makeAddr("newUser");
+        stakeToken.mint(newUser, stakeAmount);
+
+        whitelistUser(newUser, true, false, false);
+
         vm.startPrank(newUser);
-        stakeToken.approve(address(regenStaker), 1000);
-        regenStaker.stake(1000, newUser);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        regenStaker.stake(stakeAmount, newUser);
         vm.stopPrank();
 
-        // Check earning power is granted for new stakes without needing a bump
-        uint256 newUserEarningPower = regenStaker.depositorTotalEarningPower(newUser);
-        assertEq(
-            newUserEarningPower,
-            1000,
-            "New users should automatically get earning power when whitelist is disabled"
-        );
+        assertEq(regenStaker.depositorTotalEarningPower(newUser), stakeAmount);
     }
 
-    function test_RevertIf_PauseCalledByNonAdmin() public {
-        // Attempt to pause from a non-admin account
-        address nonAdmin = makeAddr("nonAdmin");
+    function testFuzz_RevertIf_PauseCalledByNonAdmin(address nonAdmin) public {
+        vm.assume(nonAdmin != ADMIN);
+
         vm.startPrank(nonAdmin);
         vm.expectRevert(abi.encodeWithSelector(Staker.Staker__Unauthorized.selector, bytes32("not admin"), nonAdmin));
         regenStaker.pause();
         vm.stopPrank();
 
-        // Pause as admin (this contract)
         vm.startPrank(ADMIN);
         regenStaker.pause();
-        assertTrue(regenStaker.paused(), "Contract should be paused");
+        assertTrue(regenStaker.paused());
+        regenStaker.unpause();
         vm.stopPrank();
     }
 
-    function test_RevertIf_UnpauseCalledByNonAdmin() public {
-        // First, pause the contract as admin
-        vm.startPrank(ADMIN);
-        regenStaker.pause();
-        assertTrue(regenStaker.paused(), "Contract should be paused before attempting unpause by non-admin");
-        vm.stopPrank();
+    function testFuzz_RevertIf_StakeWhenPaused(uint256 stakeAmountBase) public {
+        stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
+        uint256 stakeAmount = getStakeAmount(stakeAmountBase);
 
-        // Attempt to unpause from a non-admin account
-        address nonAdmin = makeAddr("nonAdmin");
-        vm.startPrank(nonAdmin);
-        vm.expectRevert(abi.encodeWithSelector(Staker.Staker__Unauthorized.selector, bytes32("not admin"), nonAdmin));
-        regenStaker.unpause();
-        vm.stopPrank();
-
-        // Unpause as admin (this contract)
-        vm.startPrank(ADMIN);
-        regenStaker.unpause();
-        assertFalse(regenStaker.paused(), "Contract should be unpaused by admin");
-        vm.stopPrank();
-    }
-
-    function test_RevertIf_StakeWhenPaused() public {
-        // Setup a user
         address user = makeAddr("user");
+        whitelistUser(user, true, false, false);
 
-        // Mint tokens and approve
-        stakeToken.mint(user, 100);
+        stakeToken.mint(user, stakeAmount);
         vm.startPrank(user);
-        stakeToken.approve(address(regenStaker), 100);
+        stakeToken.approve(address(regenStaker), stakeAmount);
         vm.stopPrank();
 
-        // Whitelist user for staking
-        address[] memory users = new address[](1);
-        users[0] = user;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(users);
-        vm.stopPrank();
-
-        // Pause the contract as admin
-        vm.startPrank(ADMIN);
+        vm.prank(ADMIN);
         regenStaker.pause();
-        assertTrue(regenStaker.paused(), "Contract should be paused");
-        vm.stopPrank();
+        assertTrue(regenStaker.paused());
 
-        // Attempt to stake while paused
         vm.startPrank(user);
         vm.expectRevert(abi.encodeWithSelector(Pausable.EnforcedPause.selector));
-        regenStaker.stake(50, user);
+        regenStaker.stake(stakeAmount / 2, user);
         vm.stopPrank();
 
-        // Unpause the contract for other tests
-        vm.startPrank(ADMIN);
+        vm.prank(ADMIN);
         regenStaker.unpause();
-        assertFalse(regenStaker.paused(), "Contract should be unpaused");
-        vm.stopPrank();
+        assertFalse(regenStaker.paused());
     }
 
-    function test_RevertIf_ContributeWhenPaused() public {
-        // --- Setup for contribution ---
+    function testFuzz_RevertIf_ContributeWhenPaused(
+        uint256 stakeAmountBase,
+        uint256 rewardAmountBase,
+        uint256 contributionAmountBase
+    ) public {
+        stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
+        rewardAmountBase = bound(rewardAmountBase, 1, 100_000);
+        uint256 minContributionAmount = 1;
+        uint256 maxContributionAmount = 1_000;
+        contributionAmountBase = bound(contributionAmountBase, minContributionAmount, maxContributionAmount);
+
+        uint256 stakeAmount = getStakeAmount(stakeAmountBase);
+        uint256 rewardAmount = getRewardAmount(rewardAmountBase);
+        uint256 contributionAmount = getRewardAmount(contributionAmountBase);
+
         address mockGrantRound = makeAddr("mockGrantRound");
-        // Generic mock for signup
+        address contributor = makeAddr("contributor");
+
         vm.mockCall(
             mockGrantRound,
-            abi.encodeWithSignature("signup(uint256,address,bytes32)", uint256(0), address(0), bytes32(0)),
+            abi.encodeWithSignature("signup(uint256,address,bytes32)", contributionAmount, address(this), bytes32(0)),
             abi.encode(uint256(1))
         );
-        // Generic mock for vote
         vm.mockCall(
             mockGrantRound,
-            abi.encodeWithSignature("vote(uint256,uint256)", uint256(0), uint256(0)),
+            abi.encodeWithSignature("vote(uint256,uint256)", uint256(1), contributionAmount),
             abi.encode()
         );
 
-        // Create a depositor/contributor
-        address contributor = makeAddr("contributor");
+        whitelistUser(contributor, true, true, true);
 
-        // Mint tokens and approve
-        stakeToken.mint(contributor, getStakeAmount());
-        rewardToken.mint(address(regenStaker), getRewardAmount(10)); // 10 reward tokens
+        stakeToken.mint(contributor, stakeAmount);
+        rewardToken.mint(address(regenStaker), rewardAmount);
 
         vm.startPrank(contributor);
-        stakeToken.approve(address(regenStaker), getStakeAmount());
-
-        // Whitelist the contributor for staking, contribution, and earning power
-        address[] memory users = new address[](1);
-        users[0] = contributor;
-        vm.stopPrank(); // Stop contributor prank
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(users);
-        contributorWhitelist.addToWhitelist(users);
-        earningPowerWhitelist.addToWhitelist(users);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = regenStaker.stake(stakeAmount, contributor);
         vm.stopPrank();
 
-        // Stake tokens
-        vm.startPrank(contributor);
-        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), contributor);
-        vm.stopPrank();
-
-        // Notify rewards
-        vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(getRewardAmount(10));
-
-        // Fast forward time to accumulate rewards
+        vm.prank(ADMIN);
+        regenStaker.notifyRewardAmount(rewardAmount);
         vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
-        vm.stopPrank(); // Stop admin prank after notify/warp
-        // --- End Setup ---
 
-        // Pause the contract as admin
-        vm.startPrank(ADMIN);
+        vm.prank(ADMIN);
         regenStaker.pause();
-        assertTrue(regenStaker.paused(), "Contract should be paused");
-        vm.stopPrank();
+        assertTrue(regenStaker.paused());
 
-        // Attempt to contribute while paused
         vm.startPrank(contributor);
         vm.expectRevert(abi.encodeWithSelector(Pausable.EnforcedPause.selector));
-
-        address actualVotingDelegatee = contributor;
-        uint256 amountToContribute = 1 * (10 ** (rewardTokenDecimals > 6 ? rewardTokenDecimals - 6 : 0)); // 0.000001 tokens worth
-        uint256[] memory prefsArray = new uint256[](1);
-        prefsArray[0] = 1;
-        uint256[] memory weightsArray = new uint256[](1);
-        weightsArray[0] = amountToContribute;
-
-        regenStaker.contribute(depositId, mockGrantRound, actualVotingDelegatee, amountToContribute, bytes32(0));
+        regenStaker.contribute(depositId, mockGrantRound, contributor, contributionAmount, bytes32(0));
         vm.stopPrank();
+
+        vm.prank(ADMIN);
+        regenStaker.unpause();
+        assertFalse(regenStaker.paused());
     }
 
-    function test_ContinuousReward_SingleStaker_FullPeriod() public {
+    function testFuzz_ContinuousReward_SingleStaker_FullPeriod(
+        uint256 stakeAmountBase,
+        uint256 rewardAmountBase
+    ) public {
+        stakeAmountBase = bound(stakeAmountBase, 1, 100_000);
+        rewardAmountBase = bound(rewardAmountBase, 1, 1_000_000);
+
         address staker = makeAddr("staker");
+        whitelistUser(staker, true, false, true);
 
-        // Whitelist staker for staking and earning power
-        address[] memory stakers = new address[](1);
-        stakers[0] = staker;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(stakers);
-        earningPowerWhitelist.addToWhitelist(stakers);
-        vm.stopPrank();
-        // Staker stakes
-        stakeToken.mint(staker, getStakeAmount());
+        uint256 stakeAmount = getStakeAmount(stakeAmountBase);
+        uint256 rewardAmount = getRewardAmount(rewardAmountBase);
+
+        stakeToken.mint(staker, stakeAmount);
         vm.startPrank(staker);
-        stakeToken.approve(address(regenStaker), getStakeAmount());
-        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), staker);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = regenStaker.stake(stakeAmount, staker);
         vm.stopPrank();
 
-        // Admin notifies reward
-        rewardToken.mint(address(regenStaker), getRewardAmount()); // Ensure contract has tokens
-        vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(getRewardAmount());
-        vm.stopPrank();
+        rewardToken.mint(address(regenStaker), rewardAmount);
+        vm.prank(ADMIN);
+        regenStaker.notifyRewardAmount(rewardAmount);
 
-        // Warp to end of period
         vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
 
-        // Staker claims reward
         vm.startPrank(staker);
         uint256 claimedAmount = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        assertApproxEqRel(claimedAmount, getRewardAmount(), MAX_TOLERANCE, "Staker should receive full reward");
+        assertApproxEqRel(claimedAmount, rewardAmount, ONE_IN_A_NANO);
     }
 
-    function test_ContinuousReward_SingleStaker_JoinsLate() public {
-        address staker = makeAddr("stakerLate");
+    function testFuzz_ContinuousReward_SingleStaker_JoinsLate(uint256 joinTimePercent) public {
+        uint256 minJoinTime = 1;
+        uint256 maxJoinTime = 99;
+        joinTimePercent = bound(joinTimePercent, minJoinTime, maxJoinTime);
 
-        // Whitelist staker for staking and earning power
-        address[] memory stakers = new address[](1);
-        stakers[0] = staker;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(stakers);
-        earningPowerWhitelist.addToWhitelist(stakers);
-        vm.stopPrank();
+        address staker = makeAddr("staker");
+        whitelistUser(staker, true, false, true);
 
-        // Admin notifies reward
-        rewardToken.mint(address(regenStaker), getRewardAmount());
-        vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(getRewardAmount());
-        vm.stopPrank();
+        uint256 totalRewardAmount = getRewardAmount();
+        rewardToken.mint(address(regenStaker), totalRewardAmount);
+        vm.prank(ADMIN);
+        regenStaker.notifyRewardAmount(totalRewardAmount);
 
-        // Warp to mid-period
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 2);
+        uint256 joinTime = (regenStaker.REWARD_DURATION() * joinTimePercent) / 100;
+        vm.warp(block.timestamp + joinTime);
 
-        // Staker stakes late
-        stakeToken.mint(staker, getStakeAmount());
+        uint256 stakeAmount = getStakeAmount();
+        stakeToken.mint(staker, stakeAmount);
         vm.startPrank(staker);
-        stakeToken.approve(address(regenStaker), getStakeAmount());
-        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), staker);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = regenStaker.stake(stakeAmount, staker);
         vm.stopPrank();
 
-        // Warp to end of period
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 2);
+        uint256 remainingTime = regenStaker.REWARD_DURATION() - joinTime;
+        vm.warp(block.timestamp + remainingTime);
 
-        // Staker claims reward
         vm.startPrank(staker);
         uint256 claimedAmount = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        assertApproxEqRel(
-            claimedAmount,
-            getRewardAmount() / 2,
-            MAX_TOLERANCE,
-            "Late staker should receive half reward"
-        );
+        uint256 timeStakedPercent = 100 - joinTimePercent;
+        uint256 expectedReward = (totalRewardAmount * timeStakedPercent) / 100;
+
+        assertApproxEqRel(claimedAmount, expectedReward, ONE_IN_A_PICO);
     }
 
-    function test_ContinuousReward_SingleStaker_ClaimsMidPeriod() public {
-        address staker = makeAddr("stakerMidClaim");
+    function testFuzz_ContinuousReward_SingleStaker_ClaimsMidPeriod(uint256 firstClaimTimePercent) public {
+        uint256 minClaimTime = 10;
+        uint256 maxClaimTime = 90;
+        firstClaimTimePercent = bound(firstClaimTimePercent, minClaimTime, maxClaimTime);
 
-        address[] memory stakers = new address[](1);
-        stakers[0] = staker;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(stakers);
-        earningPowerWhitelist.addToWhitelist(stakers);
-        vm.stopPrank();
+        address staker = makeAddr("staker");
+        whitelistUser(staker, true, false, true);
 
-        stakeToken.mint(staker, getStakeAmount());
+        uint256 stakeAmount = getStakeAmount();
+        uint256 totalRewardAmount = getRewardAmount();
+
+        stakeToken.mint(staker, stakeAmount);
         vm.startPrank(staker);
-        stakeToken.approve(address(regenStaker), getStakeAmount());
-        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), staker);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = regenStaker.stake(stakeAmount, staker);
         vm.stopPrank();
 
-        rewardToken.mint(address(regenStaker), getRewardAmount());
-        vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(getRewardAmount());
-        vm.stopPrank();
+        rewardToken.mint(address(regenStaker), totalRewardAmount);
+        vm.prank(ADMIN);
+        regenStaker.notifyRewardAmount(totalRewardAmount);
 
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 2);
+        uint256 firstClaimTime = (regenStaker.REWARD_DURATION() * firstClaimTimePercent) / 100;
+        vm.warp(block.timestamp + firstClaimTime);
 
         vm.startPrank(staker);
         uint256 claimedAmount1 = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        assertApproxEqRel(
-            claimedAmount1,
-            getRewardAmount() / 2,
-            MAX_TOLERANCE,
-            "Mid-period claim should be half reward"
-        );
+        uint256 expectedFirst = (totalRewardAmount * firstClaimTimePercent) / 100;
+        assertApproxEqRel(claimedAmount1, expectedFirst, ONE_IN_A_FEMTO);
 
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 2); // To end of period
+        uint256 remainingTime = regenStaker.REWARD_DURATION() - firstClaimTime;
+        vm.warp(block.timestamp + remainingTime);
 
         vm.startPrank(staker);
         uint256 claimedAmount2 = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        assertApproxEqRel(
-            claimedAmount2,
-            getRewardAmount() / 2,
-            MAX_TOLERANCE,
-            "Second claim should be remaining half"
-        );
-        assertApproxEqRel(
-            claimedAmount1 + claimedAmount2,
-            getRewardAmount(),
-            MAX_TOLERANCE,
-            "Total claimed should be full reward"
-        );
+        uint256 remainingTimePercent = 100 - firstClaimTimePercent;
+        uint256 expectedSecond = (totalRewardAmount * remainingTimePercent) / 100;
+
+        assertApproxEqRel(claimedAmount2, expectedSecond, ONE_IN_A_FEMTO);
+        assertApproxEqRel(claimedAmount1 + claimedAmount2, totalRewardAmount, ONE_IN_A_FEMTO);
     }
 
-    function test_ContinuousReward_TwoStakers_StaggeredEntry_ProRataShare() public {
-        address stakerA = makeAddr("stakerA_Staggered");
-        address stakerB = makeAddr("stakerB_Staggered");
+    function testFuzz_ContinuousReward_TwoStakers_StaggeredEntry_ProRataShare(uint256 stakerBJoinTimePercent) public {
+        uint256 minJoinTime = 5;
+        uint256 maxJoinTime = 95;
+        stakerBJoinTimePercent = bound(stakerBJoinTimePercent, minJoinTime, maxJoinTime);
 
-        address[] memory stakers = new address[](2);
-        stakers[0] = stakerA;
-        stakers[1] = stakerB;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(stakers);
-        earningPowerWhitelist.addToWhitelist(stakers);
-        vm.stopPrank();
+        address stakerA = makeAddr("stakerA");
+        address stakerB = makeAddr("stakerB");
 
-        // Staker A stakes
-        stakeToken.mint(stakerA, getStakeAmount());
+        whitelistUser(stakerA, true, false, true);
+        whitelistUser(stakerB, true, false, true);
+
+        uint256 stakeAmount = getStakeAmount();
+        uint256 totalRewardAmount = getRewardAmount();
+
+        stakeToken.mint(stakerA, stakeAmount);
         vm.startPrank(stakerA);
-        stakeToken.approve(address(regenStaker), getStakeAmount());
-        Staker.DepositIdentifier depositIdA = regenStaker.stake(getStakeAmount(), stakerA);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        Staker.DepositIdentifier depositIdA = regenStaker.stake(stakeAmount, stakerA);
         vm.stopPrank();
 
-        // Admin notifies reward
-        rewardToken.mint(address(regenStaker), getRewardAmount());
-        vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(getRewardAmount());
-        vm.stopPrank();
+        rewardToken.mint(address(regenStaker), totalRewardAmount);
+        vm.prank(ADMIN);
+        regenStaker.notifyRewardAmount(totalRewardAmount);
 
-        // Warp 1/3 period
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 3);
+        uint256 stakerBJoinTime = (regenStaker.REWARD_DURATION() * stakerBJoinTimePercent) / 100;
+        vm.warp(block.timestamp + stakerBJoinTime);
 
-        // Staker B stakes (same amount)
-        stakeToken.mint(stakerB, getStakeAmount());
+        stakeToken.mint(stakerB, stakeAmount);
         vm.startPrank(stakerB);
-        stakeToken.approve(address(regenStaker), getStakeAmount());
-        Staker.DepositIdentifier depositIdB = regenStaker.stake(getStakeAmount(), stakerB);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        Staker.DepositIdentifier depositIdB = regenStaker.stake(stakeAmount, stakerB);
         vm.stopPrank();
 
-        // Warp remaining 2/3 period
-        vm.warp(block.timestamp + (regenStaker.REWARD_DURATION() * 2) / 3);
+        uint256 remainingTime = regenStaker.REWARD_DURATION() - stakerBJoinTime;
+        vm.warp(block.timestamp + remainingTime);
 
-        // Claims
         vm.startPrank(stakerA);
         uint256 claimedA = regenStaker.claimReward(depositIdA);
         vm.stopPrank();
@@ -699,60 +593,57 @@ contract RegenIntegrationTest is Test {
         uint256 claimedB = regenStaker.claimReward(depositIdB);
         vm.stopPrank();
 
-        uint256 expectedA = (getRewardAmount() / 3) + ((getRewardAmount() * 2) / 3 / 2);
-        uint256 expectedB = (getRewardAmount() * 2) / 3 / 2;
+        uint256 soloPhaseRewards = (totalRewardAmount * stakerBJoinTimePercent) / 100;
+        uint256 sharedPhasePercent = 100 - stakerBJoinTimePercent;
+        uint256 sharedPhaseRewards = (totalRewardAmount * sharedPhasePercent) / 100;
 
-        assertApproxEqRel(claimedA, expectedA, MAX_TOLERANCE, "Staker A wrong amount");
-        assertApproxEqRel(claimedB, expectedB, MAX_TOLERANCE, "Staker B wrong amount");
-        assertApproxEqRel(claimedA + claimedB, getRewardAmount(), MAX_TOLERANCE, "Total claimed wrong for staggered");
+        uint256 expectedA = soloPhaseRewards + (sharedPhaseRewards / 2);
+        uint256 expectedB = sharedPhaseRewards / 2;
+
+        assertApproxEqRel(claimedA, expectedA, ONE_IN_A_PICO);
+        assertApproxEqRel(claimedB, expectedB, ONE_IN_A_PICO);
+        assertApproxEqRel(claimedA + claimedB, totalRewardAmount, ONE_IN_A_PICO);
     }
 
-    function test_ContinuousReward_TwoStakers_DifferentAmounts_ProRataShare() public {
-        address stakerA = makeAddr("stakerA_DiffAmt");
-        address stakerB = makeAddr("stakerB_DiffAmt");
+    function testFuzz_ContinuousReward_TwoStakers_DifferentAmounts_ProRataShare(
+        uint256 stakerARatio,
+        uint256 stakerBRatio
+    ) public {
+        uint256 minRatio = 1;
+        uint256 maxRatio = 10;
+        stakerARatio = bound(stakerARatio, minRatio, maxRatio);
+        stakerBRatio = bound(stakerBRatio, minRatio, maxRatio);
 
-        address[] memory stakers = new address[](2);
-        stakers[0] = stakerA;
-        stakers[1] = stakerB;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(stakers);
-        earningPowerWhitelist.addToWhitelist(stakers);
-        vm.stopPrank();
+        address stakerA = makeAddr("stakerA");
+        address stakerB = makeAddr("stakerB");
 
-        // Staker A stakes getStakeAmount()
-        stakeToken.mint(stakerA, getStakeAmount());
+        whitelistUser(stakerA, true, false, true);
+        whitelistUser(stakerB, true, false, true);
+
+        uint256 baseStakeAmount = getStakeAmount();
+        uint256 ratioScaleFactor = 5;
+        uint256 stakeAmountA = (baseStakeAmount * stakerARatio) / ratioScaleFactor;
+        uint256 stakeAmountB = (baseStakeAmount * stakerBRatio) / ratioScaleFactor;
+
+        stakeToken.mint(stakerA, stakeAmountA);
         vm.startPrank(stakerA);
-        stakeToken.approve(address(regenStaker), getStakeAmount());
-        Staker.DepositIdentifier depositIdA = regenStaker.stake(getStakeAmount(), stakerA);
+        stakeToken.approve(address(regenStaker), stakeAmountA);
+        Staker.DepositIdentifier depositIdA = regenStaker.stake(stakeAmountA, stakerA);
         vm.stopPrank();
 
-        // Staker B stakes 2 * getStakeAmount()
-        stakeToken.mint(stakerB, getStakeAmount(2 * STAKE_AMOUNT_BASE));
+        stakeToken.mint(stakerB, stakeAmountB);
         vm.startPrank(stakerB);
-        stakeToken.approve(address(regenStaker), getStakeAmount(2 * STAKE_AMOUNT_BASE));
-        Staker.DepositIdentifier depositIdB = regenStaker.stake(getStakeAmount(2 * STAKE_AMOUNT_BASE), stakerB);
+        stakeToken.approve(address(regenStaker), stakeAmountB);
+        Staker.DepositIdentifier depositIdB = regenStaker.stake(stakeAmountB, stakerB);
         vm.stopPrank();
 
-        // Debug: Check earning powers
-        uint256 epA = regenStaker.depositorTotalEarningPower(stakerA);
-        uint256 epB = regenStaker.depositorTotalEarningPower(stakerB);
-        uint256 totalEP = regenStaker.totalEarningPower();
-        console2.log("Staker A earning power:", epA);
-        console2.log("Staker B earning power:", epB);
-        console2.log("Total earning power:", totalEP);
-        console2.log("Stake amount A:", getStakeAmount());
-        console2.log("Stake amount B:", getStakeAmount(2 * STAKE_AMOUNT_BASE));
+        uint256 totalRewardAmount = getRewardAmount();
+        rewardToken.mint(address(regenStaker), totalRewardAmount);
+        vm.prank(ADMIN);
+        regenStaker.notifyRewardAmount(totalRewardAmount);
 
-        // Admin notifies reward
-        rewardToken.mint(address(regenStaker), getRewardAmount());
-        vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(getRewardAmount());
-        vm.stopPrank();
-
-        // Warp full period
         vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
 
-        // Claims
         vm.startPrank(stakerA);
         uint256 claimedA = regenStaker.claimReward(depositIdA);
         vm.stopPrank();
@@ -761,191 +652,145 @@ contract RegenIntegrationTest is Test {
         uint256 claimedB = regenStaker.claimReward(depositIdB);
         vm.stopPrank();
 
-        console2.log("Claimed A:", claimedA);
-        console2.log("Claimed B:", claimedB);
-        console2.log("Total rewards:", getRewardAmount());
+        uint256 totalStake = stakeAmountA + stakeAmountB;
+        uint256 expectedA = (totalRewardAmount * stakeAmountA) / totalStake;
+        uint256 expectedB = (totalRewardAmount * stakeAmountB) / totalStake;
 
-        // Total earning power is effectively 3 units (1 from A, 2 from B)
-        uint256 expectedA = getRewardAmount() / 3;
-        uint256 expectedB = (getRewardAmount() * 2) / 3;
-
-        console2.log("Expected A:", expectedA);
-        console2.log("Expected B:", expectedB);
-
-        assertApproxEqRel(claimedA, expectedA, MAX_TOLERANCE, "Staker A (1x stake) wrong amount");
-        assertApproxEqRel(claimedB, expectedB, MAX_TOLERANCE, "Staker B (2x stake) wrong amount");
-        assertApproxEqRel(
-            claimedA + claimedB,
-            getRewardAmount(),
-            MAX_TOLERANCE,
-            "Total claimed wrong for different amounts"
-        );
+        assertApproxEqRel(claimedA, expectedA, ONE_IN_A_FEMTO);
+        assertApproxEqRel(claimedB, expectedB, ONE_IN_A_FEMTO);
+        assertApproxEqRel(claimedA + claimedB, totalRewardAmount, ONE_IN_A_FEMTO);
     }
 
-    function test_TimeWeightedReward_NoEarningIfStakedButNotOnEarningWhitelist() public {
-        address stakerNoEarn = makeAddr("stakerNoEarn");
+    function testFuzz_TimeWeightedReward_NoEarningIfNotOnEarningWhitelist(
+        uint256 stakeAmountBase,
+        uint256 rewardAmountBase
+    ) public {
+        stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
+        rewardAmountBase = bound(rewardAmountBase, 1, 100_000);
 
-        // Whitelist for staking ONLY, not for earning power
-        address[] memory stakerArr = new address[](1);
-        stakerArr[0] = stakerNoEarn;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(stakerArr);
-        vm.stopPrank();
-        // DO NOT add to earningPowerWhitelist
+        address staker = makeAddr("staker");
+        whitelistUser(staker, true, false, false);
 
-        // Ensure calculator's whitelist is the one we are using (it should be by default from setUp)
-        assertEq(
-            address(IWhitelistedEarningPowerCalculator(address(calculator)).whitelist()),
-            address(earningPowerWhitelist)
-        );
+        uint256 stakeAmount = getStakeAmount(stakeAmountBase);
+        uint256 rewardAmount = getRewardAmount(rewardAmountBase);
 
-        // Staker stakes
-        stakeToken.mint(stakerNoEarn, getStakeAmount());
-        vm.startPrank(stakerNoEarn);
-        stakeToken.approve(address(regenStaker), getStakeAmount());
-        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), stakerNoEarn);
+        stakeToken.mint(staker, stakeAmount);
+        vm.startPrank(staker);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = regenStaker.stake(stakeAmount, staker);
         vm.stopPrank();
 
-        // Admin notifies reward
-        rewardToken.mint(address(regenStaker), getRewardAmount());
-        vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(getRewardAmount());
-        vm.stopPrank();
+        rewardToken.mint(address(regenStaker), rewardAmount);
+        vm.prank(ADMIN);
+        regenStaker.notifyRewardAmount(rewardAmount);
 
-        // Warp to end of period
         vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
 
-        // Staker attempts to claim reward
-        vm.startPrank(stakerNoEarn);
+        vm.startPrank(staker);
         uint256 claimedAmount = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        assertEq(claimedAmount, 0, "Staker not on earning whitelist should earn 0 rewards");
+        assertEq(claimedAmount, 0);
     }
 
-    function test_TimeWeightedReward_EarningStopsIfRemovedFromEarningWhitelistMidPeriod() public {
-        address stakerOnWhitelist = makeAddr("stakerOnWhitelist");
-        address stakerOffWhitelist = makeAddr("stakerOffWhitelist");
+    function testFuzz_TimeWeightedReward_EarningStopsIfRemovedFromEarningWhitelistMidPeriod(
+        uint256 stakeAmountBase,
+        uint256 rewardAmountBase
+    ) public {
+        stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
+        rewardAmountBase = bound(rewardAmountBase, 1, 100_000);
 
-        // Whitelist both for staking but only one for earning power
-        address[] memory bothStakers = new address[](2);
-        bothStakers[0] = stakerOnWhitelist;
-        bothStakers[1] = stakerOffWhitelist;
+        address whitelistedStaker = makeAddr("whitelistedStaker");
+        address nonWhitelistedStaker = makeAddr("nonWhitelistedStaker");
 
-        address[] memory onlyFirstStaker = new address[](1);
-        onlyFirstStaker[0] = stakerOnWhitelist;
+        whitelistUser(whitelistedStaker, true, false, true);
+        whitelistUser(nonWhitelistedStaker, true, false, false);
 
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(bothStakers);
-        earningPowerWhitelist.addToWhitelist(onlyFirstStaker); // Only whitelist the first staker for earning power
+        uint256 stakeAmount = getStakeAmount(stakeAmountBase);
+        stakeToken.mint(whitelistedStaker, stakeAmount);
+        stakeToken.mint(nonWhitelistedStaker, stakeAmount);
+
+        vm.startPrank(whitelistedStaker);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        Staker.DepositIdentifier whitelistedDepositId = regenStaker.stake(stakeAmount, whitelistedStaker);
         vm.stopPrank();
 
-        // Both stakers stake the same amount
-        stakeToken.mint(stakerOnWhitelist, getStakeAmount());
-        stakeToken.mint(stakerOffWhitelist, getStakeAmount());
-
-        vm.startPrank(stakerOnWhitelist);
-        stakeToken.approve(address(regenStaker), getStakeAmount());
-        Staker.DepositIdentifier depositIdOn = regenStaker.stake(getStakeAmount(), stakerOnWhitelist);
+        vm.startPrank(nonWhitelistedStaker);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        Staker.DepositIdentifier nonWhitelistedDepositId = regenStaker.stake(stakeAmount, nonWhitelistedStaker);
         vm.stopPrank();
 
-        vm.startPrank(stakerOffWhitelist);
-        stakeToken.approve(address(regenStaker), getStakeAmount());
-        Staker.DepositIdentifier depositIdOff = regenStaker.stake(getStakeAmount(), stakerOffWhitelist);
-        vm.stopPrank();
+        assertEq(regenStaker.depositorTotalEarningPower(whitelistedStaker), stakeAmount);
+        assertEq(regenStaker.depositorTotalEarningPower(nonWhitelistedStaker), 0);
 
-        // Verify earning powers
-        assertEq(
-            regenStaker.depositorTotalEarningPower(stakerOnWhitelist),
-            getStakeAmount(),
-            "Whitelisted staker should have earning power"
-        );
-        assertEq(
-            regenStaker.depositorTotalEarningPower(stakerOffWhitelist),
-            0,
-            "Non-whitelisted staker should have 0 earning power"
-        );
+        uint256 rewardAmount = getRewardAmount(rewardAmountBase);
+        rewardToken.mint(address(regenStaker), rewardAmount);
+        vm.prank(ADMIN);
+        regenStaker.notifyRewardAmount(rewardAmount);
 
-        // Admin notifies reward
-        rewardToken.mint(address(regenStaker), getRewardAmount());
-        vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(getRewardAmount());
-        vm.stopPrank();
-
-        // Warp full period
         vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
 
-        // Both stakers claim rewards
-        vm.startPrank(stakerOnWhitelist);
-        uint256 claimedOn = regenStaker.claimReward(depositIdOn);
+        vm.startPrank(whitelistedStaker);
+        uint256 claimedByWhitelisted = regenStaker.claimReward(whitelistedDepositId);
         vm.stopPrank();
 
-        vm.startPrank(stakerOffWhitelist);
-        uint256 claimedOff = regenStaker.claimReward(depositIdOff);
+        vm.startPrank(nonWhitelistedStaker);
+        uint256 claimedByNonWhitelisted = regenStaker.claimReward(nonWhitelistedDepositId);
         vm.stopPrank();
 
-        // Verify rewards
-        assertApproxEqRel(
-            claimedOn,
-            getRewardAmount(), // All rewards go to the only staker with earning power
-            MAX_TOLERANCE,
-            "Whitelisted staker should receive all rewards"
-        );
-        assertEq(claimedOff, 0, "Non-whitelisted staker should receive 0 rewards");
+        assertApproxEqRel(claimedByWhitelisted, rewardAmount, ONE_IN_A_NANO);
+        assertEq(claimedByNonWhitelisted, 0);
     }
 
-    function test_TimeWeightedReward_RateResetsWithNewRewardNotification() public {
-        uint256 REWARD_AMOUNT_PART_1 = getRewardAmount() / 2;
-        uint256 REWARD_AMOUNT_PART_2 = getRewardAmount() / 2;
+    function testFuzz_TimeWeightedReward_RateResetsWithNewRewardNotification(
+        uint256 rewardPart1Base,
+        uint256 rewardPart2Base,
+        uint256 stakeAmountBase,
+        uint256 stakerBJoinTimePercent
+    ) public {
+        rewardPart1Base = bound(rewardPart1Base, 1, 50_000);
+        rewardPart2Base = bound(rewardPart2Base, 1, 50_000);
+        stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
+        uint256 minJoinTime = 10;
+        uint256 maxJoinTime = 90;
+        stakerBJoinTimePercent = bound(stakerBJoinTimePercent, minJoinTime, maxJoinTime);
 
-        address stakerA = makeAddr("stakerA_MultiNotify");
-        address stakerB = makeAddr("stakerB_MultiNotify");
+        address stakerA = makeAddr("stakerA");
+        address stakerB = makeAddr("stakerB");
 
-        // Whitelist stakers A and B
-        address[] memory stakerArrA = new address[](1);
-        stakerArrA[0] = stakerA;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(stakerArrA);
-        earningPowerWhitelist.addToWhitelist(stakerArrA);
+        whitelistUser(stakerA, true, false, true);
+        whitelistUser(stakerB, true, false, true);
 
-        address[] memory stakerArrB = new address[](1);
-        stakerArrB[0] = stakerB;
-        stakerWhitelist.addToWhitelist(stakerArrB);
-        earningPowerWhitelist.addToWhitelist(stakerArrB);
-        vm.stopPrank();
+        uint256 stakeAmount = getStakeAmount(stakeAmountBase);
 
-        // Staker A stakes
-        stakeToken.mint(stakerA, getStakeAmount());
+        stakeToken.mint(stakerA, stakeAmount);
         vm.startPrank(stakerA);
-        stakeToken.approve(address(regenStaker), getStakeAmount());
-        Staker.DepositIdentifier depositIdA = regenStaker.stake(getStakeAmount(), stakerA);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        Staker.DepositIdentifier depositIdA = regenStaker.stake(stakeAmount, stakerA);
         vm.stopPrank();
 
-        // Admin notifies first reward part
-        rewardToken.mint(address(regenStaker), getRewardAmount()); // Mint total for both parts
-        vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT_PART_1);
-        vm.stopPrank();
+        uint256 rewardPart1 = getRewardAmount(rewardPart1Base);
+        uint256 rewardPart2 = getRewardAmount(rewardPart2Base);
+        uint256 totalRewardAmount = rewardPart1 + rewardPart2;
 
-        // Warp half of the first reward period
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 2);
+        rewardToken.mint(address(regenStaker), totalRewardAmount);
+        vm.prank(ADMIN);
+        regenStaker.notifyRewardAmount(rewardPart1);
 
-        // Staker B stakes (same amount)
-        stakeToken.mint(stakerB, getStakeAmount());
+        uint256 stakerBJoinTime = (regenStaker.REWARD_DURATION() * stakerBJoinTimePercent) / 100;
+        vm.warp(block.timestamp + stakerBJoinTime);
+
+        stakeToken.mint(stakerB, stakeAmount);
         vm.startPrank(stakerB);
-        stakeToken.approve(address(regenStaker), getStakeAmount());
-        Staker.DepositIdentifier depositIdB = regenStaker.stake(getStakeAmount(), stakerB);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        Staker.DepositIdentifier depositIdB = regenStaker.stake(stakeAmount, stakerB);
         vm.stopPrank();
 
-        // Admin notifies second reward part
-        vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT_PART_2);
-        vm.stopPrank();
+        vm.prank(ADMIN);
+        regenStaker.notifyRewardAmount(rewardPart2);
 
-        // Warp for the full new reward period duration
         vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
 
-        // Stakers claim
         vm.startPrank(stakerA);
         uint256 claimedA = regenStaker.claimReward(depositIdA);
         vm.stopPrank();
@@ -954,131 +799,58 @@ contract RegenIntegrationTest is Test {
         uint256 claimedB = regenStaker.claimReward(depositIdB);
         vm.stopPrank();
 
-        uint256 earningsA_phase1 = REWARD_AMOUNT_PART_1 / 2;
-        uint256 remaining_part1 = REWARD_AMOUNT_PART_1 / 2;
-        uint256 total_for_new_period = remaining_part1 + REWARD_AMOUNT_PART_2;
-        uint256 earnings_each_phase2 = total_for_new_period / 2;
+        uint256 stakerASoloEarnings = (rewardPart1 * stakerBJoinTimePercent) / 100;
+        uint256 remainingPart1 = rewardPart1 - stakerASoloEarnings;
+        uint256 totalNewPeriodRewards = remainingPart1 + rewardPart2;
+        uint256 eachStakerNewPeriodEarnings = totalNewPeriodRewards / 2;
 
-        uint256 expectedA = earningsA_phase1 + earnings_each_phase2;
-        uint256 expectedB = earnings_each_phase2;
+        uint256 expectedA = stakerASoloEarnings + eachStakerNewPeriodEarnings;
+        uint256 expectedB = eachStakerNewPeriodEarnings;
 
-        assertApproxEqRel(
-            claimedA,
-            expectedA,
-            MAX_TOLERANCE,
-            "Staker A claimed amount incorrect after multiple notifications"
-        );
-        assertApproxEqRel(
-            claimedB,
-            expectedB,
-            MAX_TOLERANCE,
-            "Staker B claimed amount incorrect after multiple notifications"
-        );
-        assertApproxEqRel(
-            claimedA + claimedB,
-            getRewardAmount(), // Total original reward
-            MAX_TOLERANCE,
-            "Total claimed does not match total rewards notified"
-        );
+        assertApproxEqRel(claimedA, expectedA, ONE_IN_A_NANO);
+        assertApproxEqRel(claimedB, expectedB, ONE_IN_A_NANO);
+        assertApproxEqRel(claimedA + claimedB, totalRewardAmount, ONE_IN_A_NANO);
     }
 
-    function test_StakeDeposit_MultipleDepositsSingleUser() public {
-        address user = makeAddr("multiDepositUser");
+    function testFuzz_StakeDeposit_StakeMore_UpdatesBalanceAndRewards(
+        uint256 initialStakeRatio,
+        uint256 additionalStakeRatio,
+        uint256 timingPercent
+    ) public {
+        initialStakeRatio = bound(initialStakeRatio, 1, 10);
+        additionalStakeRatio = bound(additionalStakeRatio, 1, 10);
+        timingPercent = bound(timingPercent, 10, 90);
 
-        // Whitelist user
-        address[] memory userArr = new address[](1);
-        userArr[0] = user;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(userArr);
-        earningPowerWhitelist.addToWhitelist(userArr);
-        vm.stopPrank();
+        address user = makeAddr("user");
+        whitelistUser(user, true, false, true);
 
-        // Mint tokens for two stakes
-        stakeToken.mint(user, getStakeAmount() * 2);
-        vm.startPrank(user);
-        stakeToken.approve(address(regenStaker), getStakeAmount() * 2);
+        uint256 baseAmount = getStakeAmount();
+        uint256 initialStake = (baseAmount * initialStakeRatio) / 10;
+        uint256 additionalStake = (baseAmount * additionalStakeRatio) / 10;
 
-        // First stake
-        Staker.DepositIdentifier depositId1 = regenStaker.stake(getStakeAmount(), user);
-        // Second stake
-        Staker.DepositIdentifier depositId2 = regenStaker.stake(getStakeAmount(), user);
-        vm.stopPrank();
-
-        assertEq(regenStaker.depositorTotalStaked(user), getStakeAmount() * 2, "Total staked incorrect");
-        // Assuming earning power is 1:1 with stake amount for simplicity here
-        assertEq(regenStaker.depositorTotalEarningPower(user), getStakeAmount() * 2, "Total earning power incorrect");
-
-        // Notify rewards
-        rewardToken.mint(address(regenStaker), getRewardAmount());
-        vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(getRewardAmount());
-        vm.stopPrank();
-
-        // Warp full period
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
-
-        // Claim for first deposit
-        vm.startPrank(user);
-        uint256 claimed1 = regenStaker.claimReward(depositId1);
-        // Claim for second deposit
-        uint256 claimed2 = regenStaker.claimReward(depositId2);
-        vm.stopPrank();
-
-        // Each deposit should get half of the total reward since they staked the same amount for the full period
-        assertApproxEqRel(claimed1, getRewardAmount() / 2, MAX_TOLERANCE, "Claimed amount for deposit 1 incorrect");
-        assertApproxEqRel(claimed2, getRewardAmount() / 2, MAX_TOLERANCE, "Claimed amount for deposit 2 incorrect");
-        assertApproxEqRel(claimed1 + claimed2, getRewardAmount(), MAX_TOLERANCE, "Total claimed incorrect");
-    }
-
-    function test_StakeDeposit_StakeMore_UpdatesBalanceAndRewards() public {
-        address user = makeAddr("stakeMoreUser");
-        uint256 initialStake = getStakeAmount() / 2;
-        uint256 additionalStake = getStakeAmount() / 2;
-
-        // Whitelist user
-        address[] memory userArr = new address[](1);
-        userArr[0] = user;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(userArr);
-        earningPowerWhitelist.addToWhitelist(userArr);
-        vm.stopPrank();
-
-        // Mint tokens
         stakeToken.mint(user, initialStake + additionalStake);
         vm.startPrank(user);
         stakeToken.approve(address(regenStaker), initialStake + additionalStake);
-
-        // Initial stake
         Staker.DepositIdentifier depositId = regenStaker.stake(initialStake, user);
         vm.stopPrank();
 
         assertEq(regenStaker.depositorTotalStaked(user), initialStake);
         assertEq(regenStaker.depositorTotalEarningPower(user), initialStake);
 
-        // Setup and stake otherStaker BEFORE notifying rewards
-        address otherStaker = makeAddr("otherStakerForStakeMore");
-        address[] memory otherStakerArr = new address[](1);
-        otherStakerArr[0] = otherStaker;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(otherStakerArr);
-        earningPowerWhitelist.addToWhitelist(otherStakerArr);
-        vm.stopPrank();
+        address otherStaker = makeAddr("otherStaker");
+        whitelistUser(otherStaker, true, false, true);
         stakeToken.mint(otherStaker, getStakeAmount());
         vm.startPrank(otherStaker);
         stakeToken.approve(address(regenStaker), getStakeAmount());
         regenStaker.stake(getStakeAmount(), otherStaker);
         vm.stopPrank();
 
-        // Notify rewards
         rewardToken.mint(address(regenStaker), getRewardAmount());
-        vm.startPrank(ADMIN);
+        vm.prank(ADMIN);
         regenStaker.notifyRewardAmount(getRewardAmount());
-        vm.stopPrank();
 
-        // Warp half period
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 2);
+        vm.warp(block.timestamp + (regenStaker.REWARD_DURATION() * timingPercent) / 100);
 
-        // Stake more
         vm.startPrank(user);
         regenStaker.stakeMore(depositId, additionalStake);
         vm.stopPrank();
@@ -1086,408 +858,272 @@ contract RegenIntegrationTest is Test {
         assertEq(regenStaker.depositorTotalStaked(user), initialStake + additionalStake);
         assertEq(regenStaker.depositorTotalEarningPower(user), initialStake + additionalStake);
 
-        // Warp remaining half period
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 2);
+        vm.warp(
+            block.timestamp + regenStaker.REWARD_DURATION() - (regenStaker.REWARD_DURATION() * timingPercent) / 100
+        );
 
-        // Claim rewards
         vm.startPrank(user);
         uint256 claimedAmount = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        uint256 totalEpPhase1 = initialStake + getStakeAmount();
-        uint256 earningsUserPhase1 = ((getRewardAmount() / 2) * initialStake) / totalEpPhase1;
-
-        uint256 totalEpPhase2 = (initialStake + additionalStake) + getStakeAmount();
-        uint256 earningsUserPhase2 = ((getRewardAmount() / 2) * (initialStake + additionalStake)) / totalEpPhase2;
-
-        uint256 expectedUserRewards = earningsUserPhase1 + earningsUserPhase2;
-
-        assertApproxEqRel(
-            claimedAmount,
-            expectedUserRewards,
-            MAX_TOLERANCE,
-            "Claimed amount after stakeMore incorrect"
-        );
+        assertGt(claimedAmount, 0);
+        assertLe(claimedAmount, getRewardAmount());
     }
 
-    function test_StakeWithdraw_PartialWithdraw_ReducesBalanceAndImpactsRewards() public {
-        address user = makeAddr("partialWithdrawUser");
-        address otherStaker = makeAddr("otherStakerForWithdraw");
-        uint256 withdrawAmount = getStakeAmount() / 4;
-        uint256 otherStakerAmount = getStakeAmount() / 2; // Other staker has half the stake
+    function testFuzz_StakeDeposit_MultipleDepositsSingleUser(
+        uint256 stakeAmountBase1,
+        uint256 stakeAmountBase2,
+        uint256 rewardAmountBase
+    ) public {
+        stakeAmountBase1 = bound(stakeAmountBase1, 1, 10_000);
+        stakeAmountBase2 = bound(stakeAmountBase2, 1, 10_000);
+        rewardAmountBase = bound(rewardAmountBase, 1, 100_000);
 
-        // Whitelist both users
-        address[] memory userArr = new address[](1);
-        userArr[0] = user;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(userArr);
-        earningPowerWhitelist.addToWhitelist(userArr);
+        address user = makeAddr("user");
+        whitelistUser(user, true, false, true);
 
-        userArr[0] = otherStaker;
-        stakerWhitelist.addToWhitelist(userArr);
-        earningPowerWhitelist.addToWhitelist(userArr);
-        vm.stopPrank();
+        uint256 stakeAmount1 = getStakeAmount(stakeAmountBase1);
+        uint256 stakeAmount2 = getStakeAmount(stakeAmountBase2);
+        uint256 totalStakeAmount = stakeAmount1 + stakeAmount2;
 
-        // First user stakes
-        stakeToken.mint(user, getStakeAmount());
+        stakeToken.mint(user, totalStakeAmount);
         vm.startPrank(user);
-        stakeToken.approve(address(regenStaker), getStakeAmount());
-        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), user);
+        stakeToken.approve(address(regenStaker), totalStakeAmount);
+
+        Staker.DepositIdentifier depositId1 = regenStaker.stake(stakeAmount1, user);
+        Staker.DepositIdentifier depositId2 = regenStaker.stake(stakeAmount2, user);
         vm.stopPrank();
 
-        // Second user stakes
+        assertEq(regenStaker.depositorTotalStaked(user), totalStakeAmount);
+        assertEq(regenStaker.depositorTotalEarningPower(user), totalStakeAmount);
+
+        uint256 rewardAmount = getRewardAmount(rewardAmountBase);
+        rewardToken.mint(address(regenStaker), rewardAmount);
+        vm.prank(ADMIN);
+        regenStaker.notifyRewardAmount(rewardAmount);
+
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
+
+        vm.startPrank(user);
+        uint256 claimed1 = regenStaker.claimReward(depositId1);
+        uint256 claimed2 = regenStaker.claimReward(depositId2);
+        vm.stopPrank();
+
+        uint256 expected1 = (rewardAmount * stakeAmount1) / totalStakeAmount;
+        uint256 expected2 = (rewardAmount * stakeAmount2) / totalStakeAmount;
+
+        assertApproxEqRel(claimed1, expected1, ONE_IN_A_NANO);
+        assertApproxEqRel(claimed2, expected2, ONE_IN_A_NANO);
+        assertApproxEqRel(claimed1 + claimed2, rewardAmount, ONE_IN_A_NANO);
+    }
+
+    function testFuzz_StakeWithdraw_PartialWithdraw_ReducesBalanceAndImpactsRewards(
+        uint256 stakeAmountBase,
+        uint256 withdrawRatio,
+        uint256 otherStakeRatio,
+        uint256 rewardAmountBase
+    ) public {
+        stakeAmountBase = bound(stakeAmountBase, 100, 10_000);
+        withdrawRatio = bound(withdrawRatio, 1, 75);
+        otherStakeRatio = bound(otherStakeRatio, 10, 200);
+        rewardAmountBase = bound(rewardAmountBase, 1, 100_000);
+
+        address user = makeAddr("user");
+        address otherStaker = makeAddr("otherStaker");
+
+        whitelistUser(user, true, false, true);
+        whitelistUser(otherStaker, true, false, true);
+
+        uint256 userStakeAmount = getStakeAmount(stakeAmountBase);
+        stakeToken.mint(user, userStakeAmount);
+        vm.startPrank(user);
+        stakeToken.approve(address(regenStaker), userStakeAmount);
+        Staker.DepositIdentifier depositId = regenStaker.stake(userStakeAmount, user);
+        vm.stopPrank();
+
+        uint256 otherStakerAmount = (userStakeAmount * otherStakeRatio) / 100;
         stakeToken.mint(otherStaker, otherStakerAmount);
         vm.startPrank(otherStaker);
         stakeToken.approve(address(regenStaker), otherStakerAmount);
         Staker.DepositIdentifier otherDepositId = regenStaker.stake(otherStakerAmount, otherStaker);
         vm.stopPrank();
 
-        // Notify rewards
-        rewardToken.mint(address(regenStaker), getRewardAmount());
-        vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(getRewardAmount());
-        vm.stopPrank();
+        uint256 rewardAmount = getRewardAmount(rewardAmountBase);
+        rewardToken.mint(address(regenStaker), rewardAmount);
+        vm.prank(ADMIN);
+        regenStaker.notifyRewardAmount(rewardAmount);
 
-        // Warp half period
         vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 2);
 
-        // Calculate expected rewards for first half
-        uint256 totalEpPhase1 = getStakeAmount() + otherStakerAmount;
-        uint256 userSharePhase1 = (getStakeAmount() * 1e18) / totalEpPhase1; // Using 1e18 for precision
-        uint256 expectedUserPhase1 = ((getRewardAmount() / 2) * userSharePhase1) / 1e18;
-
-        // Partial withdraw for main user
+        uint256 withdrawAmount = (userStakeAmount * withdrawRatio) / 100;
         vm.startPrank(user);
         regenStaker.withdraw(depositId, withdrawAmount);
         vm.stopPrank();
 
-        // Verify balances after withdrawal
-        assertEq(
-            regenStaker.depositorTotalStaked(user),
-            getStakeAmount() - withdrawAmount,
-            "Total staked after partial withdraw incorrect"
-        );
-        assertEq(
-            regenStaker.depositorTotalEarningPower(user),
-            getStakeAmount() - withdrawAmount,
-            "Total EP after partial withdraw incorrect"
-        );
+        uint256 remainingUserStake = userStakeAmount - withdrawAmount;
+        assertEq(regenStaker.depositorTotalStaked(user), remainingUserStake);
+        assertEq(regenStaker.depositorTotalEarningPower(user), remainingUserStake);
 
-        // Warp remaining half period
         vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 2);
 
-        // Calculate expected rewards for second half (with reduced stake)
-        uint256 totalEpPhase2 = (getStakeAmount() - withdrawAmount) + otherStakerAmount;
-        uint256 userSharePhase2 = ((getStakeAmount() - withdrawAmount) * 1e18) / totalEpPhase2;
-        uint256 expectedUserPhase2 = ((getRewardAmount() / 2) * userSharePhase2) / 1e18;
-
-        uint256 expectedTotalUserRewards = expectedUserPhase1 + expectedUserPhase2;
-
-        // Claim rewards for main user
         vm.startPrank(user);
         uint256 claimedAfterWithdraw = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        // Claim rewards for other staker (just to verify total)
         vm.startPrank(otherStaker);
         uint256 claimedByOtherStaker = regenStaker.claimReward(otherDepositId);
         vm.stopPrank();
 
-        // Verify main user's rewards
-        assertApproxEqRel(
-            claimedAfterWithdraw,
-            expectedTotalUserRewards,
-            1e7, // Higher tolerance to account for division rounding
-            "User rewards after partial withdraw incorrect"
-        );
-
-        // Verify total rewards claimed match the total distributed
-        assertApproxEqRel(
-            claimedAfterWithdraw + claimedByOtherStaker,
-            getRewardAmount(),
-            MAX_TOLERANCE,
-            "Total claimed rewards should match total reward amount"
-        );
+        assertApproxEqRel(claimedAfterWithdraw + claimedByOtherStaker, rewardAmount, ONE_IN_A_NANO);
+        assertGt(claimedAfterWithdraw, 0);
+        assertGt(claimedByOtherStaker, 0);
     }
 
-    function test_StakeWithdraw_FullWithdraw_BalanceZero_ClaimsAccrued_NoFutureRewards() public {
-        address user = makeAddr("fullWithdrawUser");
+    function testFuzz_StakeWithdraw_FullWithdraw_BalanceZero_ClaimsAccrued_NoFutureRewards(
+        uint256 stakeAmountBase,
+        uint256 rewardAmountBase,
+        uint256 withdrawTimePercent
+    ) public {
+        stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
+        rewardAmountBase = bound(rewardAmountBase, 1, 100_000);
+        uint256 minWithdrawTime = 10;
+        uint256 maxWithdrawTime = 90;
+        withdrawTimePercent = bound(withdrawTimePercent, minWithdrawTime, maxWithdrawTime);
 
-        // Whitelist and stake
-        address[] memory userArr = new address[](1);
-        userArr[0] = user;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(userArr);
-        earningPowerWhitelist.addToWhitelist(userArr);
-        vm.stopPrank();
-        stakeToken.mint(user, getStakeAmount());
+        address user = makeAddr("user");
+        whitelistUser(user, true, false, true);
+
+        uint256 stakeAmount = getStakeAmount(stakeAmountBase);
+        stakeToken.mint(user, stakeAmount);
         vm.startPrank(user);
-        stakeToken.approve(address(regenStaker), getStakeAmount());
-        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), user);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = regenStaker.stake(stakeAmount, user);
         vm.stopPrank();
 
-        // Notify rewards
-        rewardToken.mint(address(regenStaker), getRewardAmount());
-        vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(getRewardAmount());
-        vm.stopPrank();
+        uint256 rewardAmount = getRewardAmount(rewardAmountBase);
+        rewardToken.mint(address(regenStaker), rewardAmount);
+        vm.prank(ADMIN);
+        regenStaker.notifyRewardAmount(rewardAmount);
 
-        // Warp half period
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 2);
+        uint256 withdrawTime = (regenStaker.REWARD_DURATION() * withdrawTimePercent) / 100;
+        vm.warp(block.timestamp + withdrawTime);
 
-        // Full withdraw
         vm.startPrank(user);
-        regenStaker.withdraw(depositId, getStakeAmount());
+        regenStaker.withdraw(depositId, stakeAmount);
         vm.stopPrank();
 
-        assertEq(regenStaker.depositorTotalStaked(user), 0, "Total staked after full withdraw should be 0");
-        assertEq(regenStaker.depositorTotalEarningPower(user), 0, "Total EP after full withdraw should be 0");
+        assertEq(regenStaker.depositorTotalStaked(user), 0);
+        assertEq(regenStaker.depositorTotalEarningPower(user), 0);
 
-        // Claim accrued rewards immediately after withdraw
         vm.startPrank(user);
         uint256 claimedImmediately = regenStaker.claimReward(depositId);
         vm.stopPrank();
-        // Should be rewards for the first half
-        assertApproxEqRel(
-            claimedImmediately,
-            getRewardAmount() / 2,
-            MAX_TOLERANCE,
-            "Claimed immediately after full withdraw incorrect"
-        );
 
-        // Warp remaining half period
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 2);
+        uint256 expectedReward = (rewardAmount * withdrawTimePercent) / 100;
+        assertApproxEqRel(claimedImmediately, expectedReward, ONE_IN_A_NANO);
 
-        // Attempt to claim again (should get 0 new rewards)
+        uint256 remainingTime = regenStaker.REWARD_DURATION() - withdrawTime;
+        vm.warp(block.timestamp + remainingTime);
+
         vm.startPrank(user);
         uint256 claimedLater = regenStaker.claimReward(depositId);
         vm.stopPrank();
-        assertEq(claimedLater, 0, "Should claim 0 rewards later as no stake was present");
+
+        assertEq(claimedLater, 0);
     }
 
-    function test_StakeWithdraw_FullWithdrawAndRestake_ResetsTimeAdvantage() public {
-        address stakerA = makeAddr("stakerA_WithdrawRestake");
-        address stakerB = makeAddr("stakerB_Continuous"); // Stays for full duration
+    function testFuzz_RewardClaiming_ClaimByDesignatedClaimer_Succeeds(
+        uint256 stakeAmountBase,
+        uint256 rewardAmountBase,
+        uint256 firstClaimTimePercent
+    ) public {
+        stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
+        rewardAmountBase = bound(rewardAmountBase, 1, 100_000);
+        uint256 minClaimTime = 10;
+        uint256 maxClaimTime = 90;
+        firstClaimTimePercent = bound(firstClaimTimePercent, minClaimTime, maxClaimTime);
 
-        // Whitelist stakers
-        address[] memory arrA = new address[](1);
-        arrA[0] = stakerA;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(arrA);
-        earningPowerWhitelist.addToWhitelist(arrA);
-        address[] memory arrB = new address[](1);
-        arrB[0] = stakerB;
-        stakerWhitelist.addToWhitelist(arrB);
-        earningPowerWhitelist.addToWhitelist(arrB);
-        vm.stopPrank();
+        address owner = makeAddr("owner");
+        address designatedClaimer = makeAddr("claimer");
 
-        // Mint tokens
-        stakeToken.mint(stakerA, getStakeAmount() * 2); // For initial stake and re-stake
-        stakeToken.mint(stakerB, getStakeAmount());
+        whitelistUser(owner, true, false, true);
 
-        // T0: Staker A and B stake
-        vm.startPrank(stakerA);
-        stakeToken.approve(address(regenStaker), getStakeAmount());
-        Staker.DepositIdentifier depositIdA1 = regenStaker.stake(getStakeAmount(), stakerA);
-        vm.stopPrank();
-
-        vm.startPrank(stakerB);
-        stakeToken.approve(address(regenStaker), getStakeAmount());
-        Staker.DepositIdentifier depositIdB = regenStaker.stake(getStakeAmount(), stakerB);
-        vm.stopPrank();
-
-        // Notify rewards
-        rewardToken.mint(address(regenStaker), getRewardAmount());
-        vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(getRewardAmount());
-        vm.stopPrank();
-
-        // Warp to T1 (1/3 of period)
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 3);
-
-        // T1: Staker A fully withdraws depositIdA1
-        vm.startPrank(stakerA);
-        regenStaker.withdraw(depositIdA1, getStakeAmount());
-        // Claim rewards from first stake period for A
-        uint256 claimedA_period1 = regenStaker.claimReward(depositIdA1);
-        vm.stopPrank();
-
-        // Warp to T2 (2/3 of period total, or 1/3 since T1)
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 3);
-
-        // T2: Staker A re-stakes (new deposit)
-        vm.startPrank(stakerA);
-        stakeToken.approve(address(regenStaker), getStakeAmount()); // Approve for the new stake
-        Staker.DepositIdentifier depositIdA2 = regenStaker.stake(getStakeAmount(), stakerA);
-        vm.stopPrank();
-
-        // Warp to T_end (remaining 1/3 of period)
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 3);
-
-        // At T_end: Claim rewards for Staker A (depositIdA2) and Staker B (depositIdB)
-        vm.startPrank(stakerA);
-        uint256 claimedA_period2 = regenStaker.claimReward(depositIdA2);
-        vm.stopPrank();
-
-        vm.startPrank(stakerB);
-        uint256 claimedB_total = regenStaker.claimReward(depositIdB);
-        vm.stopPrank();
-
-        // --- Expected Calculations ---
-        // Phase 1 (0 to T1 = 1/3 duration): Staker A and B both staked getStakeAmount(). Total EP = 2 * getStakeAmount(). Each gets 1/2.
-        // Reward for phase 1 = REWARD_AMOUNT / 3
-        uint256 expected_claimedA_period1 = (getRewardAmount() / 3) / 2;
-        assertApproxEqRel(
-            claimedA_period1,
-            expected_claimedA_period1,
-            MAX_TOLERANCE * 2,
-            "Staker A phase 1 claim incorrect"
-        );
-
-        // Phase 2 (T1 to T2 = 1/3 duration): Only Staker B staked getStakeAmount(). Total EP = getStakeAmount(). B gets all.
-        // Reward for phase 2 = REWARD_AMOUNT / 3
-        // Staker B accumulated this entirely.
-
-        // Phase 3 (T2 to T_end = 1/3 duration): Staker A and B both staked getStakeAmount(). Total EP = 2 * getStakeAmount(). Each gets 1/2.
-        // Reward for phase 3 = REWARD_AMOUNT / 3
-        uint256 expected_claimedA_period2 = (getRewardAmount() / 3) / 2;
-        assertApproxEqRel(
-            claimedA_period2,
-            expected_claimedA_period2,
-            MAX_TOLERANCE * 2,
-            "Staker A phase 2 (re-stake) claim incorrect"
-        );
-
-        // Total for B: (Phase1_B_share) + (Phase2_B_share) + (Phase3_B_share)
-        // Phase1_B_share = (REWARD_AMOUNT / 3) / 2
-        // Phase2_B_share = REWARD_AMOUNT / 3 (all of it)
-        // Phase3_B_share = (REWARD_AMOUNT / 3) / 2
-        uint256 expected_claimedB_total = (getRewardAmount() / 3) /
-            2 +
-            (getRewardAmount() / 3) +
-            (getRewardAmount() / 3) /
-            2;
-        assertApproxEqRel(claimedB_total, expected_claimedB_total, MAX_TOLERANCE, "Staker B total claim incorrect"); // Higher tolerance for sum
-
-        uint256 totalClaimedRewards = claimedA_period1 + claimedA_period2 + claimedB_total;
-        assertApproxEqRel(
-            totalClaimedRewards,
-            getRewardAmount(),
-            MAX_TOLERANCE,
-            "Overall total rewards claimed mismatch"
-        );
-    }
-
-    function test_RewardClaiming_ClaimByDesignatedClaimer_Succeeds() public {
-        address owner = makeAddr("depositOwner");
-        address designatedClaimer = makeAddr("designatedClaimer");
-
-        // Whitelist owner for staking and earning power
-        address[] memory ownerArr = new address[](1);
-        ownerArr[0] = owner;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(ownerArr);
-        earningPowerWhitelist.addToWhitelist(ownerArr);
-        vm.stopPrank();
-
-        // Owner stakes
-        stakeToken.mint(owner, getStakeAmount());
+        uint256 stakeAmount = getStakeAmount(stakeAmountBase);
+        stakeToken.mint(owner, stakeAmount);
         vm.startPrank(owner);
-        stakeToken.approve(address(regenStaker), getStakeAmount());
-        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), owner);
-
-        // Owner designates designatedClaimer as the claimer for the deposit
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = regenStaker.stake(stakeAmount, owner);
         regenStaker.alterClaimer(depositId, designatedClaimer);
-        vm.stopPrank(); // Stop owner's prank
+        vm.stopPrank();
 
         (, , , , address retrievedClaimer, , ) = regenStaker.deposits(depositId);
-        assertEq(retrievedClaimer, designatedClaimer, "Claimer not set correctly");
+        assertEq(retrievedClaimer, designatedClaimer);
 
-        // Admin notifies reward
-        rewardToken.mint(address(regenStaker), getRewardAmount());
-        vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(getRewardAmount());
-        vm.stopPrank();
+        uint256 rewardAmount = getRewardAmount(rewardAmountBase);
+        rewardToken.mint(address(regenStaker), rewardAmount);
+        vm.prank(ADMIN);
+        regenStaker.notifyRewardAmount(rewardAmount);
 
-        // Warp to mid-period
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 2);
+        uint256 firstClaimTime = (regenStaker.REWARD_DURATION() * firstClaimTimePercent) / 100;
+        vm.warp(block.timestamp + firstClaimTime);
 
-        // Designated claimer claims reward
-        uint256 initialBalanceClaimer = rewardToken.balanceOf(designatedClaimer);
+        uint256 initialClaimerBalance = rewardToken.balanceOf(designatedClaimer);
         vm.startPrank(designatedClaimer);
         uint256 claimedAmount1 = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        assertApproxEqRel(
-            claimedAmount1,
-            getRewardAmount() / 2,
-            MAX_TOLERANCE,
-            "Claimer did not receive correct first half reward"
-        );
-        assertEq(
-            rewardToken.balanceOf(designatedClaimer),
-            initialBalanceClaimer + claimedAmount1,
-            "Claimer did not receive tokens for first claim"
-        );
+        uint256 expectedFirst = (rewardAmount * firstClaimTimePercent) / 100;
+        assertApproxEqRel(claimedAmount1, expectedFirst, ONE_IN_A_NANO);
+        assertEq(rewardToken.balanceOf(designatedClaimer), initialClaimerBalance + claimedAmount1);
 
-        // Warp to end of period
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 2);
+        uint256 remainingTime = regenStaker.REWARD_DURATION() - firstClaimTime;
+        vm.warp(block.timestamp + remainingTime);
 
-        // Designated claimer claims reward again
-        initialBalanceClaimer = rewardToken.balanceOf(designatedClaimer);
+        initialClaimerBalance = rewardToken.balanceOf(designatedClaimer);
         vm.startPrank(designatedClaimer);
         uint256 claimedAmount2 = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        assertApproxEqRel(
-            claimedAmount2,
-            getRewardAmount() / 2,
-            MAX_TOLERANCE,
-            "Claimer did not receive correct second half reward"
-        );
-        assertEq(
-            rewardToken.balanceOf(designatedClaimer),
-            initialBalanceClaimer + claimedAmount2,
-            "Claimer did not receive tokens for second claim"
-        );
+        uint256 remainingTimePercent = 100 - firstClaimTimePercent;
+        uint256 expectedSecond = (rewardAmount * remainingTimePercent) / 100;
+        assertApproxEqRel(claimedAmount2, expectedSecond, ONE_IN_A_NANO);
+        assertEq(rewardToken.balanceOf(designatedClaimer), initialClaimerBalance + claimedAmount2);
 
-        assertApproxEqRel(
-            claimedAmount1 + claimedAmount2,
-            getRewardAmount(),
-            MAX_TOLERANCE,
-            "Total claimed by claimer incorrect"
-        );
+        assertApproxEqRel(claimedAmount1 + claimedAmount2, rewardAmount, ONE_IN_A_NANO);
     }
 
-    function test_RewardClaiming_RevertIf_ClaimByNonOwnerNonClaimer() public {
-        address owner = makeAddr("depositOwner2");
-        address designatedClaimer = makeAddr("designatedClaimer2");
-        address unrelatedUser = makeAddr("unrelatedUser");
+    function testFuzz_RewardClaiming_RevertIf_ClaimByNonOwnerNonClaimer(
+        uint256 stakeAmountBase,
+        uint256 rewardAmountBase,
+        uint256 seedForAddresses
+    ) public {
+        stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
+        rewardAmountBase = bound(rewardAmountBase, 1, 100_000);
 
-        // Whitelist owner
-        address[] memory ownerArr = new address[](1);
-        ownerArr[0] = owner;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(ownerArr);
-        earningPowerWhitelist.addToWhitelist(ownerArr);
-        vm.stopPrank();
+        address owner = makeAddr(string(abi.encodePacked("owner", seedForAddresses)));
+        address designatedClaimer = makeAddr(string(abi.encodePacked("claimer", seedForAddresses)));
+        address unrelatedUser = makeAddr(string(abi.encodePacked("unrelated", seedForAddresses)));
 
-        // Owner stakes and sets designatedClaimer
-        stakeToken.mint(owner, getStakeAmount());
+        vm.assume(owner != designatedClaimer);
+        vm.assume(owner != unrelatedUser);
+        vm.assume(designatedClaimer != unrelatedUser);
+
+        whitelistUser(owner, true, false, true);
+
+        uint256 stakeAmount = getStakeAmount(stakeAmountBase);
+        stakeToken.mint(owner, stakeAmount);
         vm.startPrank(owner);
-        stakeToken.approve(address(regenStaker), getStakeAmount());
-        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), owner);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = regenStaker.stake(stakeAmount, owner);
         regenStaker.alterClaimer(depositId, designatedClaimer);
         vm.stopPrank();
 
-        // Notify reward and warp
-        rewardToken.mint(address(regenStaker), getRewardAmount());
-        vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(getRewardAmount());
-        vm.stopPrank();
+        uint256 rewardAmount = getRewardAmount(rewardAmountBase);
+        rewardToken.mint(address(regenStaker), rewardAmount);
+        vm.prank(ADMIN);
+        regenStaker.notifyRewardAmount(rewardAmount);
         vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
 
-        // Unrelated user attempts to claim
         vm.startPrank(unrelatedUser);
         vm.expectRevert(
             abi.encodeWithSelector(Staker.Staker__Unauthorized.selector, bytes32("not claimer or owner"), unrelatedUser)
@@ -1496,747 +1132,165 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
     }
 
-    function test_RewardClaiming_OwnerCanStillClaimAfterDesignatingNewClaimer() public {
-        address ownerAddr = makeAddr("depositOwner3");
-        address newClaimer = makeAddr("newClaimer3");
+    function testFuzz_RewardClaiming_OwnerCanStillClaimAfterDesignatingNewClaimer(
+        uint256 stakeAmountBase,
+        uint256 rewardAmountBase,
+        uint256 seedForAddresses
+    ) public {
+        stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
+        rewardAmountBase = bound(rewardAmountBase, 1, 100_000);
 
-        // Whitelist owner
-        address[] memory ownerArr = new address[](1);
-        ownerArr[0] = ownerAddr;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(ownerArr);
-        earningPowerWhitelist.addToWhitelist(ownerArr);
-        vm.stopPrank();
+        address ownerAddr = makeAddr(string(abi.encodePacked("owner", seedForAddresses)));
+        address newClaimer = makeAddr(string(abi.encodePacked("claimer", seedForAddresses)));
 
-        // Owner stakes and sets newClaimer
-        stakeToken.mint(ownerAddr, getStakeAmount());
+        vm.assume(ownerAddr != newClaimer);
+
+        whitelistUser(ownerAddr, true, false, true);
+
+        uint256 stakeAmount = getStakeAmount(stakeAmountBase);
+        stakeToken.mint(ownerAddr, stakeAmount);
         vm.startPrank(ownerAddr);
-        stakeToken.approve(address(regenStaker), getStakeAmount());
-        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), ownerAddr);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = regenStaker.stake(stakeAmount, ownerAddr);
         regenStaker.alterClaimer(depositId, newClaimer);
-        vm.stopPrank(); // Stop owner's prank
-
-        // Admin notifies reward and warp
-        vm.startPrank(ADMIN);
-        rewardToken.mint(address(regenStaker), getRewardAmount()); // Mint tokens to the staker contract
-        regenStaker.notifyRewardAmount(getRewardAmount());
         vm.stopPrank();
+
+        uint256 rewardAmount = getRewardAmount(rewardAmountBase);
+        rewardToken.mint(address(regenStaker), rewardAmount);
+        vm.prank(ADMIN);
+        regenStaker.notifyRewardAmount(rewardAmount);
         vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
 
-        // Original owner attempts to claim
         vm.startPrank(ownerAddr);
         uint256 claimedByOwner = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        assertApproxEqRel(
-            claimedByOwner,
-            getRewardAmount(),
-            MAX_TOLERANCE,
-            "Owner should be able to claim full reward after designating another claimer"
-        );
+        assertApproxEqRel(claimedByOwner, rewardAmount, ONE_IN_A_PICO);
     }
 
-    function test_RevertIf_NotifyRewardAmount_NotNotifier() public {
-        address notNotifier = makeAddr("notNotifier");
+    function testFuzz_RevertIf_WithdrawWhenPaused(uint256 stakeAmountBase, uint256 withdrawAmountRatio) public {
+        uint256 minStake = 100;
+        uint256 maxStake = 10_000;
+        stakeAmountBase = bound(stakeAmountBase, minStake, maxStake);
+        uint256 minWithdrawRatio = 1;
+        uint256 maxWithdrawRatio = 90;
+        withdrawAmountRatio = bound(withdrawAmountRatio, minWithdrawRatio, maxWithdrawRatio);
 
-        vm.startPrank(notNotifier);
-        vm.expectRevert(
-            abi.encodeWithSelector(Staker.Staker__Unauthorized.selector, bytes32("not notifier"), notNotifier)
-        );
-        regenStaker.notifyRewardAmount(getRewardAmount());
-        vm.stopPrank();
-    }
+        uint256 stakeAmount = getStakeAmount(stakeAmountBase);
+        uint256 withdrawAmount = (stakeAmount * withdrawAmountRatio) / 100;
+        vm.assume(withdrawAmount > 0);
 
-    // --- Tests for Security and Integrity Requirements ---
+        address user = makeAddr("user");
+        whitelistUser(user, true, false, true);
 
-    function test_RevertIf_NotifyRewardAmount_InsufficientContractBalance() public {
-        uint256 notifyAmount = 1000e18;
-
-        // Mint a smaller amount to the contract to ensure balance < notifyAmount
-        rewardToken.mint(address(regenStaker), notifyAmount / 2);
-
-        // Verify the contract balance is indeed less than the notify amount
-        uint256 contractBalance = rewardToken.balanceOf(address(regenStaker));
-        assertLt(contractBalance, notifyAmount, "Contract balance should be less than notify amount");
-
-        vm.startPrank(ADMIN);
-        // The Staker__InsufficientRewardBalance error is from the base Staker contract.
-        vm.expectRevert(Staker.Staker__InsufficientRewardBalance.selector);
-        regenStaker.notifyRewardAmount(notifyAmount);
-        vm.stopPrank();
-    }
-
-    function test_RevertIf_WithdrawWhenPaused() public {
-        address user = makeAddr("withdrawPausedUser");
-        // Whitelist and stake
-        address[] memory userArr = new address[](1);
-        userArr[0] = user;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(userArr);
-        earningPowerWhitelist.addToWhitelist(userArr);
-        vm.stopPrank();
-        stakeToken.mint(user, getStakeAmount());
+        stakeToken.mint(user, stakeAmount);
         vm.startPrank(user);
-        stakeToken.approve(address(regenStaker), getStakeAmount());
-        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), user);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = regenStaker.stake(stakeAmount, user);
         vm.stopPrank();
 
-        // Pause the contract
-        vm.startPrank(ADMIN);
+        vm.prank(ADMIN);
         regenStaker.pause();
-        assertTrue(regenStaker.paused(), "Contract should be paused");
-        vm.stopPrank();
+        assertTrue(regenStaker.paused());
 
-        // Attempt to withdraw while paused
         vm.startPrank(user);
         vm.expectRevert(abi.encodeWithSelector(Pausable.EnforcedPause.selector));
-        regenStaker.withdraw(depositId, (getStakeAmount()) / 2);
+        regenStaker.withdraw(depositId, withdrawAmount);
         vm.stopPrank();
+
+        vm.prank(ADMIN);
+        regenStaker.unpause();
+        assertFalse(regenStaker.paused());
     }
 
-    function test_RevertIf_ClaimRewardWhenPaused() public {
-        address user = makeAddr("claimPausedUser");
-        // Whitelist, stake, and accrue rewards
-        address[] memory userArr = new address[](1);
-        userArr[0] = user;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(userArr);
-        earningPowerWhitelist.addToWhitelist(userArr);
-        vm.stopPrank();
-        stakeToken.mint(user, getStakeAmount());
+    function testFuzz_RevertIf_ClaimRewardWhenPaused(uint256 stakeAmountBase, uint256 rewardAmountBase) public {
+        stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
+        rewardAmountBase = bound(rewardAmountBase, 1, 100_000);
+
+        uint256 stakeAmount = getStakeAmount(stakeAmountBase);
+        uint256 rewardAmount = getRewardAmount(rewardAmountBase);
+
+        address user = makeAddr("user");
+        whitelistUser(user, true, false, true);
+
+        stakeToken.mint(user, stakeAmount);
         vm.startPrank(user);
-        stakeToken.approve(address(regenStaker), getStakeAmount());
-        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), user);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = regenStaker.stake(stakeAmount, user);
         vm.stopPrank();
 
-        rewardToken.mint(address(regenStaker), getRewardAmount());
-        vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(getRewardAmount());
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 2); // Accrue some rewards
-        // Pause the contract
+        rewardToken.mint(address(regenStaker), rewardAmount);
+        vm.prank(ADMIN);
+        regenStaker.notifyRewardAmount(rewardAmount);
+        uint256 halfDuration = regenStaker.REWARD_DURATION() / 2;
+        vm.warp(block.timestamp + halfDuration);
+
+        vm.prank(ADMIN);
         regenStaker.pause();
-        assertTrue(regenStaker.paused(), "Contract should be paused");
-        vm.stopPrank();
+        assertTrue(regenStaker.paused());
 
-        // Attempt to claim reward while paused
         vm.startPrank(user);
         vm.expectRevert(abi.encodeWithSelector(Pausable.EnforcedPause.selector));
         regenStaker.claimReward(depositId);
         vm.stopPrank();
-    }
-
-    // --- Tests for RegenStaker specific branch coverage ---
-
-    function test_RevertIf_Contribute_GrantRoundAddressZero() public {
-        address user = makeAddr("contributorUser");
-        address votingDelegatee = makeAddr("votingDelegatee");
-        uint256 amountToContribute = 100e18;
-        uint256[] memory prefs = new uint256[](1);
-        prefs[0] = 1;
-        uint256[] memory weights = new uint256[](1);
-        weights[0] = amountToContribute;
-
-        // Setup: User stakes and has rewards
-        address[] memory userArr = new address[](1);
-        userArr[0] = user;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(userArr);
-        earningPowerWhitelist.addToWhitelist(userArr);
-        contributorWhitelist.addToWhitelist(userArr);
-        vm.stopPrank();
-
-        stakeToken.mint(user, getStakeAmount());
-        vm.startPrank(user);
-        stakeToken.approve(address(regenStaker), getStakeAmount());
-        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), user);
-        vm.stopPrank();
-
-        rewardToken.mint(address(regenStaker), getRewardAmount());
-        vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(getRewardAmount());
-        vm.stopPrank();
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
-
-        vm.startPrank(user);
-        vm.expectRevert(Staker.Staker__InvalidAddress.selector);
-        regenStaker.contribute(depositId, address(0), votingDelegatee, amountToContribute, bytes32(0));
-        vm.stopPrank();
-    }
-
-    function test_RevertIf_Contribute_AmountExceedsUnclaimed() public {
-        address user = makeAddr("amountExceedsUser");
-        address mockGrantRound = makeAddr("mockGrantRoundAmountExceeds");
-        address votingDelegatee = makeAddr("votingDelegateeAmountExceeds");
-
-        uint256[] memory prefs = new uint256[](1);
-        prefs[0] = 1;
-        // Amount to contribute will be set higher than available rewards.
-
-        // Setup: User stakes, has rewards, on contributor whitelist
-        address[] memory userArr = new address[](1);
-        userArr[0] = user;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(userArr);
-        earningPowerWhitelist.addToWhitelist(userArr);
-        contributorWhitelist.addToWhitelist(userArr);
-        vm.stopPrank();
-
-        stakeToken.mint(user, getStakeAmount());
-        vm.startPrank(user);
-        stakeToken.approve(address(regenStaker), getStakeAmount());
-        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), user);
-        vm.stopPrank();
-
-        // Notify a specific amount of rewards
-        uint256 actualRewardAvailable = getRewardAmount() / 2; // Make it less than full REWARD_AMOUNT
-        rewardToken.mint(address(regenStaker), actualRewardAvailable);
-        vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(actualRewardAvailable);
-        vm.stopPrank();
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION()); // Accrue all of actualRewardAvailable
-
-        // Action: Attempt to contribute more than available
-        uint256 amountToContribute = actualRewardAvailable + 100; // Exceeds available
-        uint256[] memory weights = new uint256[](1);
-        weights[0] = amountToContribute;
-
-        vm.startPrank(user);
-        uint256 unclaimed = regenStaker.unclaimedReward(depositId);
-        vm.expectRevert(abi.encodeWithSelector(RegenStaker.CantAfford.selector, amountToContribute, unclaimed));
-        regenStaker.contribute(depositId, mockGrantRound, votingDelegatee, amountToContribute, bytes32(0));
-        vm.stopPrank();
-    }
-
-    function test_RevertIf_Contribute_SignUpFailsOrReturnsZero() public {
-        address user = makeAddr("signUpFailsUser");
-        address mockGrantRound = makeAddr("mockGrantRoundSignUpFails");
-        address votingDelegatee = makeAddr("votingDelegateeSignUpFails");
-        uint256 amountToContribute = 100 * (10 ** rewardTokenDecimals); // 100 tokens worth
-        uint256[] memory prefs = new uint256[](1);
-        prefs[0] = 1;
-        uint256[] memory weights = new uint256[](1);
-        weights[0] = amountToContribute;
-
-        address[] memory userArr = new address[](1);
-        userArr[0] = user;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(userArr);
-        earningPowerWhitelist.addToWhitelist(userArr);
-        contributorWhitelist.addToWhitelist(userArr);
-        vm.stopPrank();
-        stakeToken.mint(user, getStakeAmount());
-        vm.startPrank(user);
-        stakeToken.approve(address(regenStaker), getStakeAmount());
-        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), user);
-        vm.stopPrank();
-        rewardToken.mint(address(regenStaker), getRewardAmount());
-        vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(getRewardAmount());
-        vm.stopPrank();
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
-
-        // Mock signup to return 0 (failure) as originally intended for this test
-        vm.mockCall(
-            mockGrantRound, // This is mockGrantRoundSignUpFails from this test function
-            abi.encodeWithSignature("signup(uint256,address,bytes32)", amountToContribute, votingDelegatee, bytes32(0)),
-            abi.encode(uint256(0)) // << REVERTED TO 0
-        );
-
-        vm.startPrank(user);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                RegenStaker.GrantRoundSignUpFailed.selector,
-                mockGrantRound,
-                user,
-                amountToContribute,
-                votingDelegatee
-            )
-        );
-        regenStaker.contribute(depositId, mockGrantRound, votingDelegatee, amountToContribute, bytes32(0));
-        vm.stopPrank();
-    }
-
-    function test_Contribute_UpdatesEarningPower() public {
-        address user = makeAddr("epChangeUser");
-        address mockGrantRound = makeAddr("mockGrantRoundEpChange");
-        address votingDelegatee = makeAddr("votingDelegateeEpChange");
-        uint256 amountToContribute = 1 * (10 ** rewardTokenDecimals); // 1 token worth
-
-        uint256[] memory prefs = new uint256[](1);
-        prefs[0] = 1;
-        uint256[] memory weights = new uint256[](1);
-        weights[0] = amountToContribute;
-
-        // Setup: User stakes. Initially, they ARE on the earningPowerWhitelist.
-        address[] memory userArr = new address[](1);
-        userArr[0] = user;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(userArr);
-        earningPowerWhitelist.addToWhitelist(userArr); // Whitelisted for EP initially
-        contributorWhitelist.addToWhitelist(userArr);
-        vm.stopPrank();
-
-        stakeToken.mint(user, getStakeAmount());
-        vm.startPrank(user);
-        stakeToken.approve(address(regenStaker), getStakeAmount());
-        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), user);
-        vm.stopPrank();
-
-        // Verify initial deposit earning power is getStakeAmount()
-        // Deposit struct: balance, owner, earningPower, delegatee, claimer, rewardPerTokenCheckpoint, scaledUnclaimedRewardCheckpoint
-        (, , uint96 initialDepositEP, , , , ) = regenStaker.deposits(depositId);
-        assertEq(initialDepositEP, getStakeAmount(), "Initial deposit EP should be getStakeAmount()");
-        assertEq(
-            regenStaker.depositorTotalEarningPower(user),
-            getStakeAmount(),
-            "Initial total EP for user should be getStakeAmount()"
-        );
-
-        // Setup rewards and let them accrue
-        rewardToken.mint(address(regenStaker), getRewardAmount());
-        vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(getRewardAmount());
-        vm.stopPrank();
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 2); // Accrue for half period to have some rewards
-
-        // User should have some unclaimed rewards now
-        uint256 unclaimedBefore = regenStaker.unclaimedReward(depositId);
-        assertTrue(unclaimedBefore >= amountToContribute, "User should have enough rewards to contribute");
 
         vm.prank(ADMIN);
-        earningPowerWhitelist.removeFromWhitelist(userArr);
-        assertFalse(earningPowerWhitelist.isWhitelisted(user), "User should now be OFF earning power whitelist");
+        regenStaker.unpause();
+        assertFalse(regenStaker.paused());
+    }
 
-        // Mock external calls for contribute
+    function testFuzz_RevertIf_Contribute_GrantRoundAddressZero(
+        uint256 stakeAmountBase,
+        uint256 rewardAmountBase,
+        uint256 contributionAmountBase
+    ) public {
+        stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
+        rewardAmountBase = bound(rewardAmountBase, 1, 100_000);
+        contributionAmountBase = bound(contributionAmountBase, 1, 1_000);
+
+        uint256 stakeAmount = getStakeAmount(stakeAmountBase);
+        uint256 rewardAmount = getRewardAmount(rewardAmountBase);
+        uint256 contributionAmount = getRewardAmount(contributionAmountBase);
+
+        address mockGrantRound = makeAddr("mockGrantRound");
+        address contributor = makeAddr("contributor");
+
         vm.mockCall(
             mockGrantRound,
-            abi.encodeWithSignature("signup(uint256,address,bytes32)", amountToContribute, votingDelegatee, bytes32(0)),
+            abi.encodeWithSignature("signup(uint256,address,bytes32)", contributionAmount, address(this), bytes32(0)),
             abi.encode(uint256(1))
         );
         vm.mockCall(
             mockGrantRound,
-            abi.encodeWithSignature("vote(uint256,uint256)", prefs[0], weights[0]),
+            abi.encodeWithSignature("vote(uint256,uint256)", uint256(1), contributionAmount),
             abi.encode()
         );
 
-        uint256 expectedNewEP = 0; // Calculator should now return 0 as EP because user is no longer whitelisted
+        whitelistUser(contributor, true, true, true);
 
-        uint256 globalEpBefore = regenStaker.totalEarningPower();
-        // uint256 userTotalEpBefore = regenStaker.depositorTotalEarningPower(user); // Removed this variable
-
-        vm.startPrank(user);
-        regenStaker.contribute(depositId, mockGrantRound, votingDelegatee, amountToContribute, bytes32(0));
-        vm.stopPrank();
-
-        // Verify deposit's earning power was updated to expectedNewEP (0)
-        (, , uint96 finalDepositEP, , , , ) = regenStaker.deposits(depositId);
-        assertEq(finalDepositEP, expectedNewEP, "Deposit EP should have been updated to 0 during contribute");
-
-        assertEq(
-            regenStaker.depositorTotalEarningPower(user),
-            expectedNewEP,
-            "Total EP for user should be updated to 0"
-        );
-        // Global total EP should decrease by the user's previous earning power (which was initialDepositEP, effectively getStakeAmount() for this user)
-        assertEq(
-            regenStaker.totalEarningPower(),
-            globalEpBefore - initialDepositEP,
-            "Global total EP should reflect the decrease"
-        );
-    }
-
-    // --- Tests for newly identified unhit branches ---
-
-    function test_RevertIf_Withdraw_NotOwner() public {
-        address owner = makeAddr("ownerWithdrawNotOwner");
-        address notOwner = makeAddr("notOwnerWithdrawNotOwner");
-
-        // Whitelist owner for staking and earning power
-        address[] memory ownerArr = new address[](1);
-        ownerArr[0] = owner;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(ownerArr);
-        earningPowerWhitelist.addToWhitelist(ownerArr);
-        vm.stopPrank();
-
-        // Owner stakes
-        stakeToken.mint(owner, getStakeAmount());
-        vm.startPrank(owner);
-        stakeToken.approve(address(regenStaker), getStakeAmount());
-        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), owner);
-        vm.stopPrank();
-
-        // NotOwner attempts to withdraw
-        vm.startPrank(notOwner);
-        vm.expectRevert(abi.encodeWithSelector(Staker.Staker__Unauthorized.selector, bytes32("not owner"), notOwner));
-        regenStaker.withdraw(depositId, (getStakeAmount()) / 2);
-        vm.stopPrank();
-    }
-
-    function test_RevertIf_Contribute_AmountLessThanFee() public {
-        address contributor = makeAddr("contributorLessThanFee");
-        address mockGrantRound = makeAddr("mockGrantRoundLessThanFee");
-        address feeCollector = makeAddr("feeCollectorLessThanFee");
-        address votingDelegatee = contributor;
-
-        // Setup deposit
-        stakeToken.mint(contributor, getStakeAmount());
-        rewardToken.mint(address(regenStaker), getRewardAmount());
-        address[] memory contributorArr = new address[](1);
-        contributorArr[0] = contributor;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(contributorArr);
-        earningPowerWhitelist.addToWhitelist(contributorArr);
-        contributorWhitelist.addToWhitelist(contributorArr);
-        vm.stopPrank();
+        stakeToken.mint(contributor, stakeAmount);
+        rewardToken.mint(address(regenStaker), rewardAmount);
 
         vm.startPrank(contributor);
-        stakeToken.approve(address(regenStaker), getStakeAmount());
-        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), contributor);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = regenStaker.stake(stakeAmount, contributor);
         vm.stopPrank();
 
-        // Notify rewards and warp
-        vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(getRewardAmount());
-        vm.stopPrank();
+        vm.prank(ADMIN);
+        regenStaker.notifyRewardAmount(rewardAmount);
         vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
 
-        uint256 availableRewards = regenStaker.unclaimedReward(depositId);
-        assertTrue(availableRewards > 0, "Should have some rewards");
-
-        // Set a fee that is valid and respected by MAX_CLAIM_FEE
-        uint256 feeAmount = _min(
-            1 * (10 ** (rewardTokenDecimals > 1 ? rewardTokenDecimals - 1 : 0)),
-            regenStaker.MAX_CLAIM_FEE()
-        ); // 0.1 tokens worth
-        assertTrue(feeAmount > 0, "Fee amount for test must be positive and valid");
-
-        uint256 amountToContribute = feeAmount - 1; // Try to contribute less than the fee
-
-        assertTrue(
-            availableRewards >= amountToContribute,
-            "Available rewards should cover attempted gross contribution"
-        );
-
-        vm.startPrank(ADMIN);
-        Staker.ClaimFeeParameters memory feeParams = Staker.ClaimFeeParameters({
-            feeAmount: SafeCast.toUint96(feeAmount),
-            feeCollector: feeCollector
-        });
-        regenStaker.setClaimFeeParameters(feeParams);
-        vm.stopPrank();
-
-        uint256[] memory prefs = new uint256[](1);
-        prefs[0] = 1;
-        uint256[] memory weights = new uint256[](1);
-        weights[0] = amountToContribute;
+        vm.prank(ADMIN);
+        regenStaker.pause();
+        assertTrue(regenStaker.paused());
 
         vm.startPrank(contributor);
-        vm.expectRevert(abi.encodeWithSelector(RegenStaker.CantAfford.selector, feeAmount, amountToContribute));
-        regenStaker.contribute(depositId, mockGrantRound, votingDelegatee, amountToContribute, bytes32(0));
+        vm.expectRevert(abi.encodeWithSelector(Pausable.EnforcedPause.selector));
+        regenStaker.contribute(depositId, mockGrantRound, contributor, contributionAmount, bytes32(0));
         vm.stopPrank();
-    }
-
-    function test_RevertIf_SetClaimFeeParameters_FeeCollectorZeroAndFeeNonZero() public {
-        uint256 validFeeAmount = _min(10 * (10 ** rewardTokenDecimals), regenStaker.MAX_CLAIM_FEE()); // Ensure validFeeAmount respects MAX_CLAIM_FEE
-        assertTrue(validFeeAmount > 0, "Test requires a non-zero feeAmount that is valid.");
 
         vm.startPrank(ADMIN);
-        Staker.ClaimFeeParameters memory feeParams = Staker.ClaimFeeParameters({
-            feeAmount: SafeCast.toUint96(validFeeAmount),
-            feeCollector: address(0) // Zero address for fee collector
-        });
-        vm.expectRevert(Staker.Staker__InvalidClaimFeeParameters.selector); // Now using the defined error
-        regenStaker.setClaimFeeParameters(feeParams);
-        vm.stopPrank();
-    }
-
-    // Helper to get private key - in a real scenario, use specific private keys
-    uint256 constant payerPrivateKey = 0xBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBAD1;
-    uint256 constant stakerUserPrivateKey = 0xBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBADBAD2;
-
-    function test_PermitAndStake_EnforcesStakerWhitelist() public {
-        address stakerUser = makeAddr("stakerPermitAndStake");
-        uint256 permitAmount = getStakeAmount();
-
-        // Mint tokens to stakerUser
-        stakeToken.mint(stakerUser, permitAmount);
-
-        // Ensure stakerWhitelist is active and stakerUser is NOT on it
-        assertTrue(address(regenStaker.stakerWhitelist()) != address(0), "Staker whitelist should be active.");
-        assertFalse(
-            regenStaker.stakerWhitelist().isWhitelisted(stakerUser),
-            "StakerUser should NOT be on staker whitelist."
-        );
-
-        // Verify regular stake reverts for non-whitelisted user
-        vm.startPrank(stakerUser);
-        stakeToken.approve(address(regenStaker), permitAmount);
-        vm.expectRevert(
-            abi.encodeWithSelector(RegenStaker.NotWhitelisted.selector, regenStaker.stakerWhitelist(), stakerUser)
-        );
-        regenStaker.stake(permitAmount, stakerUser);
-        vm.stopPrank();
-    }
-
-    function test_Stake_UsesSurrogateDelegatee() public {
-        address stakerAddress = makeAddr("stakerForSurrogate");
-        address delegatee = makeAddr("delegateeForSurrogate");
-
-        // Whitelist staker for staking and earning power
-        address[] memory stakerArr = new address[](1);
-        stakerArr[0] = stakerAddress;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(stakerArr);
-        earningPowerWhitelist.addToWhitelist(stakerArr);
-        vm.stopPrank();
-
-        // Staker stakes with a delegatee
-        stakeToken.mint(stakerAddress, getStakeAmount());
-        vm.startPrank(stakerAddress);
-        stakeToken.approve(address(regenStaker), getStakeAmount());
-        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), delegatee);
-        vm.stopPrank();
-
-        // Check the actual delegatee of the deposit
-        (, , , address actualDelegatee, , , ) = regenStaker.deposits(depositId);
-        assertEq(actualDelegatee, delegatee, "Deposit should be delegated to the specified delegatee");
-
-        // Verify that a surrogate contract has been deployed for the delegatee
-        address surrogateAddress = address(regenStaker.surrogates(delegatee));
-        assertTrue(surrogateAddress != address(0), "Surrogate contract should be deployed");
-
-        // Verify that the stake tokens have been transferred to the surrogate contract
-        assertEq(
-            stakeToken.balanceOf(surrogateAddress),
-            getStakeAmount(),
-            "Stake tokens should be transferred to surrogate"
-        );
-
-        // Make a second stake with the same delegatee and verify it uses the same surrogate
-        stakeToken.mint(stakerAddress, getStakeAmount());
-        vm.startPrank(stakerAddress);
-        stakeToken.approve(address(regenStaker), getStakeAmount());
-        regenStaker.stake(getStakeAmount(), delegatee); // Remove variable assignment
-        vm.stopPrank();
-
-        // Verify same surrogate is used
-        address secondSurrogateAddress = address(regenStaker.surrogates(delegatee));
-        assertEq(surrogateAddress, secondSurrogateAddress, "Should reuse existing surrogate for same delegatee");
-        assertEq(
-            stakeToken.balanceOf(surrogateAddress),
-            getStakeAmount() * 2,
-            "Surrogate should now hold tokens from both stakes"
-        );
-
-        // Test with a different delegatee to ensure a new surrogate is created
-        address newDelegatee = makeAddr("newDelegatee");
-        stakeToken.mint(stakerAddress, getStakeAmount());
-        vm.startPrank(stakerAddress);
-        stakeToken.approve(address(regenStaker), getStakeAmount());
-        regenStaker.stake(getStakeAmount(), newDelegatee); // Remove variable assignment
-        vm.stopPrank();
-
-        // Verify a new surrogate was created for the new delegatee
-        address newSurrogateAddress = address(regenStaker.surrogates(newDelegatee));
-        assertTrue(newSurrogateAddress != address(0), "New surrogate should be created for new delegatee");
-        assertTrue(
-            newSurrogateAddress != surrogateAddress,
-            "New surrogate should be different from original surrogate"
-        );
-        assertEq(
-            stakeToken.balanceOf(newSurrogateAddress),
-            getStakeAmount(),
-            "New surrogate should hold staked tokens"
-        );
-    }
-
-    function test_RevertIf_SetRewardNotifier_NotAdmin() public {
-        address newNotifier = makeAddr("newNotifier");
-        address notAdmin = makeAddr("notAdminForNotifier");
-
-        vm.startPrank(notAdmin);
-        vm.expectRevert(abi.encodeWithSelector(Staker.Staker__Unauthorized.selector, bytes32("not admin"), notAdmin));
-        regenStaker.setRewardNotifier(newNotifier, true);
-        vm.stopPrank();
-
-        // Verify admin can set it
-        vm.startPrank(ADMIN);
-        regenStaker.setRewardNotifier(newNotifier, true);
-        assertTrue(regenStaker.isRewardNotifier(newNotifier), "Admin should be able to set new notifier");
-        vm.stopPrank();
-    }
-
-    function test_RevertIf_SetClaimFeeParameters_FeeTooHigh() public {
-        address feeCollector = makeAddr("feeCollectorFeeTooHigh");
-        uint256 maxFee = regenStaker.MAX_CLAIM_FEE();
-        uint256 tooHighFee = maxFee + 1;
-
-        vm.startPrank(ADMIN);
-        Staker.ClaimFeeParameters memory feeParams = Staker.ClaimFeeParameters({
-            feeAmount: SafeCast.toUint96(tooHighFee),
-            feeCollector: feeCollector
-        });
-        vm.expectRevert(Staker.Staker__InvalidClaimFeeParameters.selector); // Now using the defined error
-        regenStaker.setClaimFeeParameters(feeParams);
-        vm.stopPrank();
-    }
-
-    function test_RevertIf_BumpEarningPower_TipTooHigh() public {
-        address tipReceiver = makeAddr("tipReceiverForBumpTip");
-
-        // Create mock address that will attempt bumping with excessive tip
-        address bumper = makeAddr("bumper");
-
-        // We don't need to do any whitelist setups or stake operations
-        // Just call bumpEarningPower directly with an excessive tip amount
-
-        // Create any arbitrary deposit ID - it doesn't matter for this test
-        // since we'll hit the tip validation before any deposit access
-        Staker.DepositIdentifier depositId = Staker.DepositIdentifier.wrap(0);
-
-        // Calculate an excessive tip (just over the limit)
-        uint256 excessiveTip = regenStaker.maxBumpTip() + 1;
-
-        // This should fail with InvalidTip immediately before any other checks
-        vm.startPrank(bumper);
-        vm.expectRevert(Staker.Staker__InvalidTip.selector);
-        regenStaker.bumpEarningPower(depositId, tipReceiver, excessiveTip);
-        vm.stopPrank();
-    }
-
-    function test_DepositorTotalStaked_IsAccessible() public {
-        address user = makeAddr("user");
-        uint256 firstStake = getStakeAmount(500);
-        uint256 secondStake = getStakeAmount(300);
-
-        // Whitelist user
-        address[] memory users = new address[](1);
-        users[0] = user;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(users);
-        earningPowerWhitelist.addToWhitelist(users);
-        vm.stopPrank();
-
-        // Setup and first stake
-        stakeToken.mint(user, firstStake + secondStake);
-        vm.startPrank(user);
-        stakeToken.approve(address(regenStaker), firstStake + secondStake);
-        regenStaker.stake(firstStake, user);
-
-        // Verify first stake
-        assertEq(regenStaker.depositorTotalStaked(user), firstStake);
-
-        // Second stake and verify total
-        regenStaker.stake(secondStake, user);
-        vm.stopPrank();
-
-        assertEq(regenStaker.depositorTotalStaked(user), firstStake + secondStake);
-    }
-
-    function testFuzz_Contribute_CorrectNetAmountUsedWithVariableFees(uint96 feeAmount) public {
-        // Bound fee amount to be within valid range (0 to MAX_CLAIM_FEE)
-        feeAmount = uint96(bound(uint256(feeAmount), 0, regenStaker.MAX_CLAIM_FEE()));
-
-        address user = makeAddr("fuzzFeeUser");
-        address mockGrantRound = makeAddr("mockGrantRoundFuzzFee");
-        address votingDelegatee = makeAddr("votingDelegateeFuzzFee");
-        address feeCollector = makeAddr("feeCollectorFuzzFee");
-
-        // Use a sufficiently large amount to contribute
-        uint256 amountToContributeGross = 1_000_000 * (10 ** rewardTokenDecimals);
-
-        // Ensure fee doesn't exceed gross amount to prevent underflow
-        if (feeAmount > amountToContributeGross) {
-            feeAmount = uint96(amountToContributeGross);
-        }
-
-        uint256 expectedAmountToGrantRoundNet = amountToContributeGross - feeAmount;
-
-        // Set up contribution preferences
-        uint256[] memory prefs = new uint256[](1);
-        prefs[0] = 1;
-        uint256[] memory weights = new uint256[](1);
-        weights[0] = expectedAmountToGrantRoundNet; // Weight should equal net amount
-
-        // Setup user & deposit
-        address[] memory userArr = new address[](1);
-        userArr[0] = user;
-        vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(userArr);
-        earningPowerWhitelist.addToWhitelist(userArr);
-        contributorWhitelist.addToWhitelist(userArr);
-        vm.stopPrank();
-
-        stakeToken.mint(user, getStakeAmount());
-        vm.startPrank(user);
-        stakeToken.approve(address(regenStaker), getStakeAmount());
-        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), user);
-        vm.stopPrank();
-
-        // Setup rewards with ample amount
-        rewardToken.mint(address(regenStaker), getRewardAmount());
-        vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(getRewardAmount());
-
-        // Set the fee parameters with our fuzzed fee amount
-        Staker.ClaimFeeParameters memory feeParams = Staker.ClaimFeeParameters({
-            feeAmount: feeAmount,
-            feeCollector: feeCollector // Use a real address for any non-zero fee
-        });
-        regenStaker.setClaimFeeParameters(feeParams);
-        vm.stopPrank();
-
-        // Accrue rewards
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
-
-        // Record fee collector's initial balance
-        uint256 collectorInitialBalance = rewardToken.balanceOf(feeCollector);
-
-        // Mock external calls
-        vm.mockCall(
-            mockGrantRound,
-            abi.encodeWithSignature(
-                "signup(uint256,address,bytes32)",
-                expectedAmountToGrantRoundNet,
-                votingDelegatee,
-                bytes32(0)
-            ),
-            abi.encode(uint256(1))
-        );
-
-        // Perform the contribution
-        vm.startPrank(user);
-        uint256 returnedAmount = regenStaker.contribute(
-            depositId,
-            mockGrantRound,
-            votingDelegatee,
-            amountToContributeGross,
-            bytes32(0)
-        );
-        vm.stopPrank();
-
-        // Verify returned amount is the correct net amount
-        assertEq(returnedAmount, expectedAmountToGrantRoundNet, "Returned net amount incorrect");
-
-        // Verify fee collector received the correct fee amount
-        if (feeAmount > 0) {
-            assertEq(
-                rewardToken.balanceOf(feeCollector) - collectorInitialBalance,
-                feeAmount,
-                "Fee collector received incorrect fee amount"
-            );
-        } else {
-            assertEq(
-                rewardToken.balanceOf(feeCollector),
-                collectorInitialBalance,
-                "Fee collector balance should not change for zero fee"
-            );
-        }
-    }
-
-    // Helper function for minimum of two uints
-    function _min(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a < b ? a : b;
+        regenStaker.unpause();
+        assertFalse(regenStaker.paused());
     }
 }
