@@ -4,11 +4,11 @@ pragma solidity ^0.8.0;
 import { Test } from "forge-std/Test.sol";
 import { console } from "forge-std/console.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
-import { MorphoCompounder } from "src/regens/YieldSkimming/strategy/MorphoCompounder.sol";
-import { MorphoCompounderVaultFactory } from "src/factories/MorphoCompounderVaultFactory.sol";
+import { MorphoCompounderStrategy } from "src/strategies/YieldSkimming/MorphoCompounderStrategy.sol";
+import { MorphoCompounderStrategyVaultFactory } from "src/factories/MorphoCompounderStrategyVaultFactory.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { YieldSkimmingTokenizedStrategy } from "src/regens/YieldSkimming/YieldSkimmingTokenizedStrategy.sol";
+import { YieldSkimmingTokenizedStrategy } from "src/strategies/yieldSkimming/YieldSkimmingTokenizedStrategy.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import { CREATE3 } from "lib/solady/src/utils/CREATE3.sol";
 
@@ -20,7 +20,7 @@ contract MorphoCompounderVaultFactoryTest is Test {
 
     // Factory for creating strategies
     YieldSkimmingTokenizedStrategy public tokenizedStrategy;
-    MorphoCompounderVaultFactory public factory;
+    MorphoCompounderStrategyVaultFactory public factory;
 
     // Strategy parameters
     address public management;
@@ -59,7 +59,7 @@ contract MorphoCompounderVaultFactoryTest is Test {
         donationAddress = address(0x4);
 
         // Deploy factory
-        factory = new MorphoCompounderVaultFactory();
+        factory = new MorphoCompounderStrategyVaultFactory();
 
         // Label addresses for better trace outputs
         vm.label(address(factory), "MorphoCompounderVaultFactory");
@@ -81,7 +81,7 @@ contract MorphoCompounderVaultFactoryTest is Test {
         // Create a strategy and check events
         vm.startPrank(management);
         vm.expectEmit(true, true, true, false); // Check first 3 indexed params, ignore the non-indexed timestamp
-        emit MorphoCompounderVaultFactory.StrategyDeploy(
+        emit MorphoCompounderStrategyVaultFactory.StrategyDeploy(
             management,
             donationAddress,
             expectedStrategyAddress,
@@ -108,7 +108,7 @@ contract MorphoCompounderVaultFactoryTest is Test {
         assertTrue(timestamp > 0, "Timestamp should be set");
 
         // Verify strategy was initialized correctly
-        MorphoCompounder strategy = MorphoCompounder(strategyAddress);
+        MorphoCompounderStrategy strategy = MorphoCompounderStrategy(strategyAddress);
         assertEq(IERC4626(address(strategy)).asset(), YIELD_VAULT, "Yield vault address incorrect");
     }
 
@@ -221,7 +221,7 @@ contract MorphoCompounderVaultFactoryTest is Test {
         vm.stopPrank();
 
         // Create a new factory
-        MorphoCompounderVaultFactory newFactory = new MorphoCompounderVaultFactory();
+        MorphoCompounderStrategyVaultFactory newFactory = new MorphoCompounderStrategyVaultFactory();
 
         // Create a strategy with the same salt but from a different factory
         vm.startPrank(management);

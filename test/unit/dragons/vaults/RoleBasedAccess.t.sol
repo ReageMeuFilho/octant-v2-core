@@ -2,24 +2,24 @@
 pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
-import { Vault } from "src/dragons/vaults/Vault.sol";
+import { MultistrategyVault } from "src/core/MultistrategyVault.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IVault } from "src/interfaces/IVault.sol";
+import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MockYieldStrategy } from "test/mocks/MockYieldStrategy.sol";
-import { VaultFactory } from "src/dragons/vaults/VaultFactory.sol";
+import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
 
 import { MockAccountant } from "test/mocks/MockAccountant.sol";
 import { MockFlexibleAccountant } from "test/mocks/MockFlexibleAccountant.sol";
 
 contract RoleBasedAccessTest is Test {
-    Vault vaultImplementation;
-    Vault vault;
+    MultistrategyVault vaultImplementation;
+    MultistrategyVault vault;
     MockERC20 public asset;
     MockYieldStrategy public strategy;
     MockAccountant public accountant;
     MockFlexibleAccountant public flexibleAccountant;
-    VaultFactory vaultFactory;
+    MultistrategyVaultFactory vaultFactory;
 
     address public gov = address(0x1);
     address public bunny = address(0x4); // Added bunny address for role testing
@@ -39,31 +39,31 @@ contract RoleBasedAccessTest is Test {
         asset.mint(gov, 1_000_000e18);
 
         // deploy vault implementation
-        vaultImplementation = new Vault();
+        vaultImplementation = new MultistrategyVault();
 
         // deploy factory
         vm.prank(gov);
-        vaultFactory = new VaultFactory("Test Vault", address(vaultImplementation), gov);
+        vaultFactory = new MultistrategyVaultFactory("Test Vault", address(vaultImplementation), gov);
 
         flexibleAccountant = new MockFlexibleAccountant(address(asset));
 
         // Deploy vault
         vm.startPrank(address(vaultFactory));
-        vault = Vault(vaultFactory.deployNewVault(address(asset), "Test Vault", "vTST", gov, 7 days));
+        vault = MultistrategyVault(vaultFactory.deployNewVault(address(asset), "Test Vault", "vTST", gov, 7 days));
         vm.stopPrank();
 
         vm.startPrank(gov);
         // Gov has all needed roles by default for setup
-        vault.addRole(gov, IVault.Roles.ADD_STRATEGY_MANAGER);
-        vault.addRole(gov, IVault.Roles.REVOKE_STRATEGY_MANAGER);
-        vault.addRole(gov, IVault.Roles.FORCE_REVOKE_MANAGER);
-        vault.addRole(gov, IVault.Roles.DEBT_MANAGER);
-        vault.addRole(gov, IVault.Roles.ACCOUNTANT_MANAGER);
-        vault.addRole(gov, IVault.Roles.REPORTING_MANAGER);
-        vault.addRole(gov, IVault.Roles.DEPOSIT_LIMIT_MANAGER);
-        vault.addRole(gov, IVault.Roles.WITHDRAW_LIMIT_MANAGER);
-        vault.addRole(gov, IVault.Roles.MAX_DEBT_MANAGER);
-        vault.addRole(gov, IVault.Roles.MINIMUM_IDLE_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.ADD_STRATEGY_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.REVOKE_STRATEGY_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.FORCE_REVOKE_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEBT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.ACCOUNTANT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.REPORTING_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEPOSIT_LIMIT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.WITHDRAW_LIMIT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.MAX_DEBT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.MINIMUM_IDLE_MANAGER);
 
         // Setup default strategy
         strategy = new MockYieldStrategy(address(asset), address(vault));
@@ -85,14 +85,14 @@ contract RoleBasedAccessTest is Test {
     function testAddStrategyNoAddStrategyManagerReverts() public {
         address newStrategy = createStrategy();
         vm.prank(bunny);
-        vm.expectRevert(IVault.NotAllowed.selector);
+        vm.expectRevert(IMultistrategyVault.NotAllowed.selector);
         vault.addStrategy(newStrategy, true);
     }
 
     function testAddStrategyAddStrategyManager() public {
         // Give bunny the ADD_STRATEGY_MANAGER role
         vm.prank(gov);
-        vault.addRole(bunny, IVault.Roles.ADD_STRATEGY_MANAGER);
+        vault.addRole(bunny, IMultistrategyVault.Roles.ADD_STRATEGY_MANAGER);
 
         // Use bunny to add a strategy
         address newStrategy = createStrategy();
@@ -100,47 +100,47 @@ contract RoleBasedAccessTest is Test {
         vault.addStrategy(newStrategy, true);
 
         // Verify strategy is active
-        Vault.StrategyParams memory params = vault.strategies(newStrategy);
+        IMultistrategyVault.StrategyParams memory params = vault.strategies(newStrategy);
         assertGt(params.activation, 0, "Strategy should be active");
     }
 
     function testRevokeStrategyNoRevokeStrategyManagerReverts() public {
         vm.prank(bunny);
-        vm.expectRevert(IVault.NotAllowed.selector);
+        vm.expectRevert(IMultistrategyVault.NotAllowed.selector);
         vault.revokeStrategy(address(strategy));
     }
 
     function testRevokeStrategyRevokeStrategyManager() public {
         // Give bunny the REVOKE_STRATEGY_MANAGER role
         vm.prank(gov);
-        vault.addRole(bunny, IVault.Roles.REVOKE_STRATEGY_MANAGER);
+        vault.addRole(bunny, IMultistrategyVault.Roles.REVOKE_STRATEGY_MANAGER);
 
         // Use bunny to revoke a strategy
         vm.prank(bunny);
         vault.revokeStrategy(address(strategy));
 
         // Verify strategy is inactive
-        Vault.StrategyParams memory params = vault.strategies(address(strategy));
+        IMultistrategyVault.StrategyParams memory params = vault.strategies(address(strategy));
         assertEq(params.activation, 0, "Strategy should be inactive");
     }
 
     function testForceRevokeStrategyNoRevokeStrategyManagerReverts() public {
         vm.prank(bunny);
-        vm.expectRevert(IVault.NotAllowed.selector);
+        vm.expectRevert(IMultistrategyVault.NotAllowed.selector);
         vault.forceRevokeStrategy(address(strategy));
     }
 
     function testForceRevokeStrategyRevokeStrategyManager() public {
         // Give bunny the FORCE_REVOKE_MANAGER role
         vm.prank(gov);
-        vault.addRole(bunny, IVault.Roles.FORCE_REVOKE_MANAGER);
+        vault.addRole(bunny, IMultistrategyVault.Roles.FORCE_REVOKE_MANAGER);
 
         // Use bunny to force revoke a strategy
         vm.prank(bunny);
         vault.forceRevokeStrategy(address(strategy));
 
         // Verify strategy is inactive
-        Vault.StrategyParams memory params = vault.strategies(address(strategy));
+        IMultistrategyVault.StrategyParams memory params = vault.strategies(address(strategy));
         assertEq(params.activation, 0, "Strategy should be inactive");
     }
 
@@ -149,14 +149,14 @@ contract RoleBasedAccessTest is Test {
     function testSetMinimumTotalIdleNoMinIdleManagerReverts() public {
         uint256 minimumTotalIdle = 1;
         vm.prank(bunny);
-        vm.expectRevert(IVault.NotAllowed.selector);
+        vm.expectRevert(IMultistrategyVault.NotAllowed.selector);
         vault.setMinimumTotalIdle(minimumTotalIdle);
     }
 
     function testSetMinimumTotalIdleMinIdleManager() public {
         // Give bunny the MINIMUM_IDLE_MANAGER role
         vm.prank(gov);
-        vault.addRole(bunny, IVault.Roles.MINIMUM_IDLE_MANAGER);
+        vault.addRole(bunny, IMultistrategyVault.Roles.MINIMUM_IDLE_MANAGER);
 
         // Verify initial value
         assertEq(vault.minimumTotalIdle(), 0, "Initial minimum total idle should be 0");
@@ -175,14 +175,14 @@ contract RoleBasedAccessTest is Test {
         uint256 maxDebtForStrategy = 1;
 
         vm.prank(bunny);
-        vm.expectRevert(IVault.NotAllowed.selector);
+        vm.expectRevert(IMultistrategyVault.NotAllowed.selector);
         vault.updateMaxDebtForStrategy(address(strategy), maxDebtForStrategy);
     }
 
     function testUpdateMaxDebtMaxDebtManager() public {
         // Give bunny the MAX_DEBT_MANAGER role
         vm.prank(gov);
-        vault.addRole(bunny, IVault.Roles.MAX_DEBT_MANAGER);
+        vault.addRole(bunny, IMultistrategyVault.Roles.MAX_DEBT_MANAGER);
 
         // Verify initial value
         assertEq(vault.strategies(address(strategy)).maxDebt, 0, "Initial max debt should be 0");
@@ -201,14 +201,14 @@ contract RoleBasedAccessTest is Test {
     function testSetDepositLimitNoDepositLimitManagerReverts() public {
         uint256 depositLimit = 1;
         vm.prank(bunny);
-        vm.expectRevert(IVault.NotAllowed.selector);
+        vm.expectRevert(IMultistrategyVault.NotAllowed.selector);
         vault.setDepositLimit(depositLimit, false);
     }
 
     function testSetDepositLimitDepositLimitManager() public {
         // Give bunny the DEPOSIT_LIMIT_MANAGER role
         vm.prank(gov);
-        vault.addRole(bunny, IVault.Roles.DEPOSIT_LIMIT_MANAGER);
+        vault.addRole(bunny, IMultistrategyVault.Roles.DEPOSIT_LIMIT_MANAGER);
 
         // Get initial deposit limit
         uint256 initialDepositLimit = vault.depositLimit();
@@ -226,7 +226,7 @@ contract RoleBasedAccessTest is Test {
     function testSetDepositLimitWithLimitModuleReverts() public {
         // Give bunny the DEPOSIT_LIMIT_MANAGER role
         vm.prank(gov);
-        vault.addRole(bunny, IVault.Roles.DEPOSIT_LIMIT_MANAGER);
+        vault.addRole(bunny, IMultistrategyVault.Roles.DEPOSIT_LIMIT_MANAGER);
 
         uint256 depositLimit = 1;
 
@@ -236,14 +236,14 @@ contract RoleBasedAccessTest is Test {
 
         // Try to set deposit limit without override
         vm.prank(bunny);
-        vm.expectRevert(IVault.UsingModule.selector);
+        vm.expectRevert(IMultistrategyVault.UsingModule.selector);
         vault.setDepositLimit(depositLimit, false);
     }
 
     function testSetDepositLimitWithLimitModuleOverride() public {
         // Give bunny the DEPOSIT_LIMIT_MANAGER role
         vm.prank(gov);
-        vault.addRole(bunny, IVault.Roles.DEPOSIT_LIMIT_MANAGER);
+        vault.addRole(bunny, IMultistrategyVault.Roles.DEPOSIT_LIMIT_MANAGER);
 
         uint256 depositLimit = 1;
 
@@ -265,14 +265,14 @@ contract RoleBasedAccessTest is Test {
 
     function testSetDepositLimitModuleNoDepositLimitManagerReverts() public {
         vm.prank(bunny);
-        vm.expectRevert(IVault.NotAllowed.selector);
+        vm.expectRevert(IMultistrategyVault.NotAllowed.selector);
         vault.setDepositLimitModule(bunny, false);
     }
 
     function testSetDepositLimitModuleDepositLimitManager() public {
         // Give bunny the DEPOSIT_LIMIT_MANAGER role
         vm.prank(gov);
-        vault.addRole(bunny, IVault.Roles.DEPOSIT_LIMIT_MANAGER);
+        vault.addRole(bunny, IMultistrategyVault.Roles.DEPOSIT_LIMIT_MANAGER);
 
         // Verify initial state
         assertEq(vault.depositLimitModule(), ZERO_ADDRESS, "Initial deposit limit module should be zero address");
@@ -288,7 +288,7 @@ contract RoleBasedAccessTest is Test {
     function testSetDepositLimitModuleWithLimitReverts() public {
         // Give bunny the DEPOSIT_LIMIT_MANAGER role
         vm.prank(gov);
-        vault.addRole(bunny, IVault.Roles.DEPOSIT_LIMIT_MANAGER);
+        vault.addRole(bunny, IMultistrategyVault.Roles.DEPOSIT_LIMIT_MANAGER);
 
         // Set deposit limit
         vm.prank(gov);
@@ -296,14 +296,14 @@ contract RoleBasedAccessTest is Test {
 
         // Try to set deposit limit module without override
         vm.prank(gov);
-        vm.expectRevert(IVault.UsingDepositLimit.selector);
+        vm.expectRevert(IMultistrategyVault.UsingDepositLimit.selector);
         vault.setDepositLimitModule(bunny, false);
     }
 
     function testSetDepositLimitModuleWithLimitOverride() public {
         // Give bunny the DEPOSIT_LIMIT_MANAGER role
         vm.prank(gov);
-        vault.addRole(bunny, IVault.Roles.DEPOSIT_LIMIT_MANAGER);
+        vault.addRole(bunny, IMultistrategyVault.Roles.DEPOSIT_LIMIT_MANAGER);
 
         // Set deposit limit
         vm.prank(gov);
@@ -320,14 +320,14 @@ contract RoleBasedAccessTest is Test {
 
     function testSetWithdrawLimitModuleNoWithdrawLimitManagerReverts() public {
         vm.prank(bunny);
-        vm.expectRevert(IVault.NotAllowed.selector);
+        vm.expectRevert(IMultistrategyVault.NotAllowed.selector);
         vault.setWithdrawLimitModule(bunny);
     }
 
     function testSetWithdrawLimitModuleWithdrawLimitManager() public {
         // Give bunny the WITHDRAW_LIMIT_MANAGER role
         vm.prank(gov);
-        vault.addRole(bunny, IVault.Roles.WITHDRAW_LIMIT_MANAGER);
+        vault.addRole(bunny, IMultistrategyVault.Roles.WITHDRAW_LIMIT_MANAGER);
 
         // Verify initial state
         assertEq(vault.withdrawLimitModule(), ZERO_ADDRESS, "Initial withdraw limit module should be zero address");
@@ -344,7 +344,7 @@ contract RoleBasedAccessTest is Test {
 
     function testBuyDebtNoDebtPurchaserReverts() public {
         vm.prank(bunny);
-        vm.expectRevert(IVault.NotAllowed.selector);
+        vm.expectRevert(IMultistrategyVault.NotAllowed.selector);
         vault.buyDebt(address(strategy), 0);
     }
 
@@ -353,7 +353,7 @@ contract RoleBasedAccessTest is Test {
 
         // Give bunny the DEBT_PURCHASER role
         vm.prank(gov);
-        vault.addRole(bunny, IVault.Roles.DEBT_PURCHASER);
+        vault.addRole(bunny, IMultistrategyVault.Roles.DEBT_PURCHASER);
 
         // Deposit into vault
         asset.mint(gov, amount);
@@ -380,7 +380,7 @@ contract RoleBasedAccessTest is Test {
         vault.buyDebt(address(strategy), amount);
 
         // Verify strategy debt is now 0
-        Vault.StrategyParams memory params = vault.strategies(address(strategy));
+        IMultistrategyVault.StrategyParams memory params = vault.strategies(address(strategy));
         assertEq(params.currentDebt, 0, "Strategy debt should be 0 after purchase");
     }
 
@@ -388,14 +388,14 @@ contract RoleBasedAccessTest is Test {
 
     function testUpdateDebtNoDebtManagerReverts() public {
         vm.prank(bunny);
-        vm.expectRevert(IVault.NotAllowed.selector);
+        vm.expectRevert(IMultistrategyVault.NotAllowed.selector);
         vault.updateDebt(address(strategy), 1e18, 0);
     }
 
     function testUpdateDebtDebtManager() public {
         // Give bunny the DEBT_MANAGER role
         vm.prank(gov);
-        vault.addRole(bunny, IVault.Roles.DEBT_MANAGER);
+        vault.addRole(bunny, IMultistrategyVault.Roles.DEBT_MANAGER);
 
         // Provide vault with funds
         asset.mint(gov, 1e18);
@@ -414,7 +414,7 @@ contract RoleBasedAccessTest is Test {
         vault.updateDebt(address(strategy), maxDebtForStrategy, 0);
 
         // Verify strategy debt
-        Vault.StrategyParams memory params = vault.strategies(address(strategy));
+        IMultistrategyVault.StrategyParams memory params = vault.strategies(address(strategy));
         assertEq(params.currentDebt, maxDebtForStrategy, "Strategy debt should be updated");
     }
 
@@ -422,14 +422,14 @@ contract RoleBasedAccessTest is Test {
 
     function testShutdownVaultNoEmergencyManagerReverts() public {
         vm.prank(bunny);
-        vm.expectRevert(IVault.NotAllowed.selector);
+        vm.expectRevert(IMultistrategyVault.NotAllowed.selector);
         vault.shutdownVault();
     }
 
     function testShutdownVaultEmergencyManager() public {
         // Give bunny the EMERGENCY_MANAGER role
         vm.prank(gov);
-        vault.addRole(bunny, IVault.Roles.EMERGENCY_MANAGER);
+        vault.addRole(bunny, IMultistrategyVault.Roles.EMERGENCY_MANAGER);
 
         // Verify initial state
         assertFalse(vault.isShutdown(), "Vault should not be shutdown initially");
@@ -444,7 +444,7 @@ contract RoleBasedAccessTest is Test {
         uint256 bunnyRoles = vault.roles(bunny);
 
         // The expected value is 8256 = EMERGENCY_MANAGER (8192) | DEBT_MANAGER (64)
-        uint256 expectedRoles = initialRoles | (1 << uint256(IVault.Roles.DEBT_MANAGER));
+        uint256 expectedRoles = initialRoles | (1 << uint256(IMultistrategyVault.Roles.DEBT_MANAGER));
 
         assertEq(bunnyRoles, expectedRoles, "Bunny should have both EMERGENCY_MANAGER and DEBT_MANAGER roles");
     }
@@ -452,14 +452,14 @@ contract RoleBasedAccessTest is Test {
 
     function testProcessReportNoReportingManagerReverts() public {
         vm.prank(bunny);
-        vm.expectRevert(IVault.NotAllowed.selector);
+        vm.expectRevert(IMultistrategyVault.NotAllowed.selector);
         vault.processReport(address(strategy));
     }
 
     function testProcessReportReportingManager() public {
         // Give bunny the REPORTING_MANAGER role
         vm.prank(gov);
-        vault.addRole(bunny, IVault.Roles.REPORTING_MANAGER);
+        vault.addRole(bunny, IMultistrategyVault.Roles.REPORTING_MANAGER);
 
         // Deposit into vault
         asset.mint(gov, 1e18);
@@ -490,14 +490,14 @@ contract RoleBasedAccessTest is Test {
 
     function testSetAccountantNoAccountantManagerReverts() public {
         vm.prank(bunny);
-        vm.expectRevert(IVault.NotAllowed.selector);
+        vm.expectRevert(IMultistrategyVault.NotAllowed.selector);
         vault.setAccountant(bunny);
     }
 
     function testSetAccountantAccountantManager() public {
         // Give bunny the ACCOUNTANT_MANAGER role
         vm.prank(gov);
-        vault.addRole(bunny, IVault.Roles.ACCOUNTANT_MANAGER);
+        vault.addRole(bunny, IMultistrategyVault.Roles.ACCOUNTANT_MANAGER);
 
         // Verify initial state
         assertNotEq(vault.accountant(), bunny, "Accountant should not be bunny initially");
@@ -514,20 +514,20 @@ contract RoleBasedAccessTest is Test {
 
     function testSetDefaultQueueNoQueueManagerReverts() public {
         vm.prank(bunny);
-        vm.expectRevert(IVault.NotAllowed.selector);
+        vm.expectRevert(IMultistrategyVault.NotAllowed.selector);
         vault.setDefaultQueue(new address[](0));
     }
 
     function testUseDefaultQueueNoQueueManagerReverts() public {
         vm.prank(bunny);
-        vm.expectRevert(IVault.NotAllowed.selector);
+        vm.expectRevert(IMultistrategyVault.NotAllowed.selector);
         vault.setUseDefaultQueue(true);
     }
 
     function testSetDefaultQueueQueueManager() public {
         // Give bunny the QUEUE_MANAGER role
         vm.prank(gov);
-        vault.addRole(bunny, IVault.Roles.QUEUE_MANAGER);
+        vault.addRole(bunny, IMultistrategyVault.Roles.QUEUE_MANAGER);
 
         // Get initial queue
         address[] memory initialQueue = vault.defaultQueue();
@@ -545,7 +545,7 @@ contract RoleBasedAccessTest is Test {
     function testSetUseDefaultQueueQueueManager() public {
         // Give bunny the QUEUE_MANAGER role
         vm.prank(gov);
-        vault.addRole(bunny, IVault.Roles.QUEUE_MANAGER);
+        vault.addRole(bunny, IMultistrategyVault.Roles.QUEUE_MANAGER);
 
         // Verify initial state
         assertFalse(vault.useDefaultQueue(), "Use default queue should be false initially");
@@ -562,14 +562,14 @@ contract RoleBasedAccessTest is Test {
 
     function testSetProfitUnlockNoProfitUnlockManagerReverts() public {
         vm.prank(bunny);
-        vm.expectRevert(IVault.NotAllowed.selector);
+        vm.expectRevert(IMultistrategyVault.NotAllowed.selector);
         vault.setProfitMaxUnlockTime(WEEK / 2);
     }
 
     function testSetProfitUnlockProfitUnlockManager() public {
         // Give bunny the PROFIT_UNLOCK_MANAGER role
         vm.prank(gov);
-        vault.addRole(bunny, IVault.Roles.PROFIT_UNLOCK_MANAGER);
+        vault.addRole(bunny, IMultistrategyVault.Roles.PROFIT_UNLOCK_MANAGER);
 
         // Set profit unlock time
         uint256 time = WEEK / 2;
@@ -585,14 +585,14 @@ contract RoleBasedAccessTest is Test {
     function testSetProfitUnlockTooHighReverts() public {
         // Give bunny the PROFIT_UNLOCK_MANAGER role
         vm.prank(gov);
-        vault.addRole(bunny, IVault.Roles.PROFIT_UNLOCK_MANAGER);
+        vault.addRole(bunny, IMultistrategyVault.Roles.PROFIT_UNLOCK_MANAGER);
 
         // Try to set too high unlock time
         uint256 time = 1e20;
         uint256 currentTime = vault.profitMaxUnlockTime();
 
         vm.prank(bunny);
-        vm.expectRevert(IVault.ProfitUnlockTimeTooLong.selector);
+        vm.expectRevert(IMultistrategyVault.ProfitUnlockTimeTooLong.selector);
         vault.setProfitMaxUnlockTime(time);
 
         // Verify unchanged
@@ -607,33 +607,33 @@ contract RoleBasedAccessTest is Test {
 
         // Add first role
         vm.prank(gov);
-        vault.addRole(bunny, IVault.Roles.PROFIT_UNLOCK_MANAGER);
+        vault.addRole(bunny, IMultistrategyVault.Roles.PROFIT_UNLOCK_MANAGER);
 
         // Verify role
         assertEq(
             vault.roles(bunny),
-            1 << uint256(IVault.Roles.PROFIT_UNLOCK_MANAGER),
+            1 << uint256(IMultistrategyVault.Roles.PROFIT_UNLOCK_MANAGER),
             "Should have PROFIT_UNLOCK_MANAGER role"
         );
 
         // Add second role
         vm.prank(gov);
-        vault.addRole(bunny, IVault.Roles.FORCE_REVOKE_MANAGER);
+        vault.addRole(bunny, IMultistrategyVault.Roles.FORCE_REVOKE_MANAGER);
 
         // Verify combined roles
-        uint256 expectedRoles = (1 << uint256(IVault.Roles.PROFIT_UNLOCK_MANAGER)) |
-            (1 << uint256(IVault.Roles.FORCE_REVOKE_MANAGER));
+        uint256 expectedRoles = (1 << uint256(IMultistrategyVault.Roles.PROFIT_UNLOCK_MANAGER)) |
+            (1 << uint256(IMultistrategyVault.Roles.FORCE_REVOKE_MANAGER));
         assertEq(vault.roles(bunny), expectedRoles, "Should have both roles");
 
         // Add third role
         vm.prank(gov);
-        vault.addRole(bunny, IVault.Roles.REPORTING_MANAGER);
+        vault.addRole(bunny, IMultistrategyVault.Roles.REPORTING_MANAGER);
 
         // Verify all roles
         expectedRoles =
-            (1 << uint256(IVault.Roles.PROFIT_UNLOCK_MANAGER)) |
-            (1 << uint256(IVault.Roles.FORCE_REVOKE_MANAGER)) |
-            (1 << uint256(IVault.Roles.REPORTING_MANAGER));
+            (1 << uint256(IMultistrategyVault.Roles.PROFIT_UNLOCK_MANAGER)) |
+            (1 << uint256(IMultistrategyVault.Roles.FORCE_REVOKE_MANAGER)) |
+            (1 << uint256(IMultistrategyVault.Roles.REPORTING_MANAGER));
         assertEq(vault.roles(bunny), expectedRoles, "Should have all three roles");
     }
 
@@ -642,9 +642,9 @@ contract RoleBasedAccessTest is Test {
         assertEq(vault.roles(bunny), 0, "Initial roles should be 0");
 
         // Set multiple roles using proper bit shifting
-        uint256 profitUnlockManagerBit = 1 << uint256(IVault.Roles.PROFIT_UNLOCK_MANAGER);
-        uint256 forceRevokeManagerBit = 1 << uint256(IVault.Roles.FORCE_REVOKE_MANAGER);
-        uint256 reportingManagerBit = 1 << uint256(IVault.Roles.REPORTING_MANAGER);
+        uint256 profitUnlockManagerBit = 1 << uint256(IMultistrategyVault.Roles.PROFIT_UNLOCK_MANAGER);
+        uint256 forceRevokeManagerBit = 1 << uint256(IMultistrategyVault.Roles.FORCE_REVOKE_MANAGER);
+        uint256 reportingManagerBit = 1 << uint256(IMultistrategyVault.Roles.REPORTING_MANAGER);
 
         uint256 combinedRoles = profitUnlockManagerBit | forceRevokeManagerBit | reportingManagerBit;
 
@@ -656,7 +656,7 @@ contract RoleBasedAccessTest is Test {
 
         // Remove first role
         vm.prank(gov);
-        vault.removeRole(bunny, IVault.Roles.FORCE_REVOKE_MANAGER);
+        vault.removeRole(bunny, IMultistrategyVault.Roles.FORCE_REVOKE_MANAGER);
 
         // Verify remaining roles
         uint256 expectedRoles = profitUnlockManagerBit | reportingManagerBit;
@@ -664,7 +664,7 @@ contract RoleBasedAccessTest is Test {
 
         // Remove second role
         vm.prank(gov);
-        vault.removeRole(bunny, IVault.Roles.REPORTING_MANAGER);
+        vault.removeRole(bunny, IMultistrategyVault.Roles.REPORTING_MANAGER);
 
         // Verify remaining role
         expectedRoles = profitUnlockManagerBit;
@@ -672,7 +672,7 @@ contract RoleBasedAccessTest is Test {
 
         // Remove last role
         vm.prank(gov);
-        vault.removeRole(bunny, IVault.Roles.PROFIT_UNLOCK_MANAGER);
+        vault.removeRole(bunny, IMultistrategyVault.Roles.PROFIT_UNLOCK_MANAGER);
 
         // Verify no roles left
         assertEq(vault.roles(bunny), 0, "Should have no roles left");
@@ -684,13 +684,13 @@ contract RoleBasedAccessTest is Test {
 
         // Verify gov already has MINIMUM_IDLE_MANAGER role
         assertTrue(
-            (initialRoles & uint256(IVault.Roles.MINIMUM_IDLE_MANAGER)) != 0,
+            (initialRoles & uint256(IMultistrategyVault.Roles.MINIMUM_IDLE_MANAGER)) != 0,
             "Gov should already have MINIMUM_IDLE_MANAGER role"
         );
 
         // Try to add a role gov already has
         vm.prank(gov);
-        vault.addRole(gov, IVault.Roles.MINIMUM_IDLE_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.MINIMUM_IDLE_MANAGER);
 
         // Verify roles unchanged
         assertEq(vault.roles(gov), initialRoles, "Roles should be unchanged");
@@ -708,7 +708,7 @@ contract RoleBasedAccessTest is Test {
 
         // Try to remove a role bunny doesn't have
         vm.prank(gov);
-        vault.removeRole(bunny, IVault.Roles.ADD_STRATEGY_MANAGER);
+        vault.removeRole(bunny, IMultistrategyVault.Roles.ADD_STRATEGY_MANAGER);
 
         // Verify roles unchanged
         assertEq(vault.roles(bunny), 0, "Roles should still be 0");
@@ -716,7 +716,7 @@ contract RoleBasedAccessTest is Test {
         // Verify bunny can't add a strategy
         address newStrategy = createStrategy();
         vm.prank(bunny);
-        vm.expectRevert(IVault.NotAllowed.selector);
+        vm.expectRevert(IMultistrategyVault.NotAllowed.selector);
         vault.addStrategy(newStrategy, true);
     }
 
@@ -727,7 +727,7 @@ contract RoleBasedAccessTest is Test {
 
         // Verify bunny can't set name
         vm.prank(bunny);
-        vm.expectRevert(IVault.NotAllowed.selector);
+        vm.expectRevert(IMultistrategyVault.NotAllowed.selector);
         vault.setName(newName);
 
         // Give bunny ALL roles
@@ -736,7 +736,7 @@ contract RoleBasedAccessTest is Test {
 
         // Verify bunny still can't set name (only roleManager can)
         vm.prank(bunny);
-        vm.expectRevert(IVault.NotAllowed.selector);
+        vm.expectRevert(IMultistrategyVault.NotAllowed.selector);
         vault.setName(newName);
 
         // Verify name unchanged
@@ -758,7 +758,7 @@ contract RoleBasedAccessTest is Test {
 
         // Verify bunny can't set symbol
         vm.prank(bunny);
-        vm.expectRevert(IVault.NotAllowed.selector);
+        vm.expectRevert(IMultistrategyVault.NotAllowed.selector);
         vault.setSymbol(newSymbol);
 
         // Give bunny ALL roles
@@ -767,7 +767,7 @@ contract RoleBasedAccessTest is Test {
 
         // Verify bunny still can't set symbol (only roleManager can)
         vm.prank(bunny);
-        vm.expectRevert(IVault.NotAllowed.selector);
+        vm.expectRevert(IMultistrategyVault.NotAllowed.selector);
         vault.setSymbol(newSymbol);
 
         // Verify symbol unchanged
@@ -782,7 +782,7 @@ contract RoleBasedAccessTest is Test {
         assertNotEq(vault.symbol(), initialSymbol, "Symbol should be different from initial");
     }
 
-    function uint256ToRole(uint256 roleBitmask) internal pure returns (IVault.Roles) {
+    function uint256ToRole(uint256 roleBitmask) internal pure returns (IMultistrategyVault.Roles) {
         require(roleBitmask > 0 && (roleBitmask & (roleBitmask - 1)) == 0, "Must be a power of 2");
 
         uint256 position = 0;
@@ -791,27 +791,27 @@ contract RoleBasedAccessTest is Test {
             position++;
         }
 
-        return IVault.Roles(position);
+        return IMultistrategyVault.Roles(position);
     }
 
     function setAllRoles(address account) internal {
         vm.startPrank(gov);
         // Define the roles we want to set
         uint256[] memory roleBitmasks = new uint256[](14);
-        roleBitmasks[0] = uint256(1 << uint256(IVault.Roles.ADD_STRATEGY_MANAGER));
-        roleBitmasks[1] = uint256(1 << uint256(IVault.Roles.REVOKE_STRATEGY_MANAGER));
-        roleBitmasks[2] = uint256(1 << uint256(IVault.Roles.FORCE_REVOKE_MANAGER));
-        roleBitmasks[3] = uint256(1 << uint256(IVault.Roles.DEBT_MANAGER));
-        roleBitmasks[4] = uint256(1 << uint256(IVault.Roles.ACCOUNTANT_MANAGER));
-        roleBitmasks[5] = uint256(1 << uint256(IVault.Roles.REPORTING_MANAGER));
-        roleBitmasks[6] = uint256(1 << uint256(IVault.Roles.DEPOSIT_LIMIT_MANAGER));
-        roleBitmasks[7] = uint256(1 << uint256(IVault.Roles.WITHDRAW_LIMIT_MANAGER));
-        roleBitmasks[8] = uint256(1 << uint256(IVault.Roles.MAX_DEBT_MANAGER));
-        roleBitmasks[9] = uint256(1 << uint256(IVault.Roles.MINIMUM_IDLE_MANAGER));
-        roleBitmasks[10] = uint256(1 << uint256(IVault.Roles.DEBT_PURCHASER));
-        roleBitmasks[11] = uint256(1 << uint256(IVault.Roles.QUEUE_MANAGER));
-        roleBitmasks[12] = uint256(1 << uint256(IVault.Roles.EMERGENCY_MANAGER));
-        roleBitmasks[13] = uint256(1 << uint256(IVault.Roles.PROFIT_UNLOCK_MANAGER));
+        roleBitmasks[0] = uint256(1 << uint256(IMultistrategyVault.Roles.ADD_STRATEGY_MANAGER));
+        roleBitmasks[1] = uint256(1 << uint256(IMultistrategyVault.Roles.REVOKE_STRATEGY_MANAGER));
+        roleBitmasks[2] = uint256(1 << uint256(IMultistrategyVault.Roles.FORCE_REVOKE_MANAGER));
+        roleBitmasks[3] = uint256(1 << uint256(IMultistrategyVault.Roles.DEBT_MANAGER));
+        roleBitmasks[4] = uint256(1 << uint256(IMultistrategyVault.Roles.ACCOUNTANT_MANAGER));
+        roleBitmasks[5] = uint256(1 << uint256(IMultistrategyVault.Roles.REPORTING_MANAGER));
+        roleBitmasks[6] = uint256(1 << uint256(IMultistrategyVault.Roles.DEPOSIT_LIMIT_MANAGER));
+        roleBitmasks[7] = uint256(1 << uint256(IMultistrategyVault.Roles.WITHDRAW_LIMIT_MANAGER));
+        roleBitmasks[8] = uint256(1 << uint256(IMultistrategyVault.Roles.MAX_DEBT_MANAGER));
+        roleBitmasks[9] = uint256(1 << uint256(IMultistrategyVault.Roles.MINIMUM_IDLE_MANAGER));
+        roleBitmasks[10] = uint256(1 << uint256(IMultistrategyVault.Roles.DEBT_PURCHASER));
+        roleBitmasks[11] = uint256(1 << uint256(IMultistrategyVault.Roles.QUEUE_MANAGER));
+        roleBitmasks[12] = uint256(1 << uint256(IMultistrategyVault.Roles.EMERGENCY_MANAGER));
+        roleBitmasks[13] = uint256(1 << uint256(IMultistrategyVault.Roles.PROFIT_UNLOCK_MANAGER));
 
         // Set each role individually
         for (uint256 i = 0; i < roleBitmasks.length; i++) {

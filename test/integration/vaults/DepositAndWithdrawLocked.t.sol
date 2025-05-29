@@ -2,16 +2,16 @@
 pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
-import { LockedVault } from "src/dragons/vaults/LockedVault.sol";
+import { MultistrategyLockedVault } from "src/core/MultistrategyLockedVault.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
-import { IVault } from "src/interfaces/IVault.sol";
-import { ILockedVault } from "src/interfaces/ILockedVault.sol";
-import { VaultFactory } from "src/dragons/vaults/VaultFactory.sol";
+import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
+import { IMultistrategyLockedVault } from "src/interfaces/IMultistrategyLockedVault.sol";
+import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
 
 contract DepositAndWithdrawLockedTest is Test {
-    LockedVault vaultImplementation;
-    VaultFactory vaultFactory;
-    LockedVault vault;
+    MultistrategyLockedVault vaultImplementation;
+    MultistrategyVaultFactory vaultFactory;
+    MultistrategyLockedVault vault;
     MockERC20 asset;
     address gov;
     address fish;
@@ -36,11 +36,11 @@ contract DepositAndWithdrawLockedTest is Test {
         asset = new MockERC20();
         asset.mint(fish, fishAmount);
 
-        vaultImplementation = new LockedVault();
+        vaultImplementation = new MultistrategyLockedVault();
 
         // prank as gov
         vm.prank(gov);
-        vaultFactory = new VaultFactory("Locked Test Factory", address(vaultImplementation), gov);
+        vaultFactory = new MultistrategyVaultFactory("Locked Test Factory", address(vaultImplementation), gov);
 
         // Create vault
         _createVault();
@@ -49,18 +49,20 @@ contract DepositAndWithdrawLockedTest is Test {
     function _createVault() internal {
         vm.startPrank(gov);
 
-        vault = LockedVault(vaultFactory.deployNewVault(address(asset), "Locked Test Vault", "vLTST", gov, 7 days));
+        vault = MultistrategyLockedVault(
+            vaultFactory.deployNewVault(address(asset), "Locked Test Vault", "vLTST", gov, 7 days)
+        );
 
         // Add roles to gov
-        vault.addRole(gov, IVault.Roles.DEPOSIT_LIMIT_MANAGER);
-        vault.addRole(gov, IVault.Roles.WITHDRAW_LIMIT_MANAGER);
-        vault.addRole(gov, IVault.Roles.DEBT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEPOSIT_LIMIT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.WITHDRAW_LIMIT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEBT_MANAGER);
 
         vault.setDepositLimit(type(uint256).max, true);
         vm.stopPrank();
     }
 
-    function checkVaultEmpty(LockedVault _vault) internal view {
+    function checkVaultEmpty(MultistrategyLockedVault _vault) internal view {
         assertEq(_vault.totalSupply(), 0, "Total supply should be 0");
         assertEq(_vault.totalAssets(), 0, "Total assets should be 0");
         assertEq(_vault.totalIdle(), 0, "Total idle should be 0");
@@ -99,7 +101,7 @@ contract DepositAndWithdrawLockedTest is Test {
 
         // Try to deposit more than limit
         vm.startPrank(fish);
-        vm.expectRevert(IVault.ExceedDepositLimit.selector);
+        vm.expectRevert(IMultistrategyVault.ExceedDepositLimit.selector);
         vault.deposit(amount, fish);
 
         // Deposit another quarter

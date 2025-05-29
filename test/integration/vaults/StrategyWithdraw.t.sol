@@ -2,22 +2,22 @@
 pragma solidity ^0.8.25;
 
 import "forge-std/Test.sol";
-import { Vault } from "src/dragons/vaults/Vault.sol";
+import { MultistrategyVault } from "src/core/MultistrategyVault.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MockYieldStrategy } from "test/mocks/MockYieldStrategy.sol";
 import { MockLockedStrategy } from "test/mocks/MockLockedStrategy.sol";
-import { IVault } from "src/interfaces/IVault.sol";
-import { VaultFactory } from "src/dragons/vaults/VaultFactory.sol";
+import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
+import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
 
 contract MultipleStrategyWithdrawFlowTest is Test {
     uint256 constant DAY = 1 days;
 
-    Vault public vault;
+    MultistrategyVault public vault;
     MockERC20 public asset;
     MockYieldStrategy public liquidStrategy;
     MockLockedStrategy public lockedStrategy;
-    VaultFactory public vaultFactory;
-    Vault public vaultImplementation;
+    MultistrategyVaultFactory public vaultFactory;
+    MultistrategyVault public vaultImplementation;
 
     address public gov;
     address public fish;
@@ -42,8 +42,8 @@ contract MultipleStrategyWithdrawFlowTest is Test {
         asset.mint(fish, fishAmount);
         asset.mint(whale, whaleAmount);
 
-        vaultImplementation = new Vault();
-        vaultFactory = new VaultFactory("Test Factory", address(vaultImplementation), gov);
+        vaultImplementation = new MultistrategyVault();
+        vaultFactory = new MultistrategyVaultFactory("Test Factory", address(vaultImplementation), gov);
     }
 
     function testMultipleStrategyWithdrawFlow() public {
@@ -65,9 +65,9 @@ contract MultipleStrategyWithdrawFlowTest is Test {
 
         // Set up strategies
         vm.startPrank(gov);
-        vault.addRole(gov, IVault.Roles.ADD_STRATEGY_MANAGER);
-        vault.addRole(gov, IVault.Roles.DEBT_MANAGER);
-        vault.addRole(gov, IVault.Roles.MAX_DEBT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.ADD_STRATEGY_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEBT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.MAX_DEBT_MANAGER);
 
         vault.addStrategy(address(liquidStrategy), true);
         vault.addStrategy(address(lockedStrategy), true);
@@ -179,7 +179,7 @@ contract MultipleStrategyWithdrawFlowTest is Test {
         liquidStrategyOnly[0] = address(liquidStrategy);
 
         vm.prank(whale);
-        vm.expectRevert(IVault.InsufficientAssetsInVault.selector);
+        vm.expectRevert(IMultistrategyVault.InsufficientAssetsInVault.selector);
         vault.withdraw(whaleBalance, whale, whale, 0, liquidStrategyOnly);
 
         // Withdraw remaining balance using both strategies
@@ -224,10 +224,10 @@ contract MultipleStrategyWithdrawFlowTest is Test {
 
     function _createVault() internal {
         vm.startPrank(gov);
-        vault = Vault(vaultFactory.deployNewVault(address(asset), "Test Vault", "vTST", gov, 7 days));
+        vault = MultistrategyVault(vaultFactory.deployNewVault(address(asset), "Test Vault", "vTST", gov, 7 days));
 
         // Set deposit limit to max
-        vault.addRole(gov, IVault.Roles.DEPOSIT_LIMIT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEPOSIT_LIMIT_MANAGER);
         vault.setDepositLimit(type(uint256).max, true);
         vm.stopPrank();
     }

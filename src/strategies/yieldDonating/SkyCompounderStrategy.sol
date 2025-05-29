@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { BaseHealthCheck } from "../../periphery/BaseHealthCheck.sol";
+import { BaseHealthCheck } from "src/strategies/periphery/BaseHealthCheck.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import { IUniswapV2Router02 } from "@tokenized-strategy-periphery/interfaces/Uniswap/V2/IUniswapV2Router02.sol";
-import { UniswapV3Swapper } from "../../periphery/UniswapV3Swapper.sol";
-import { IStaking } from "../../interfaces/ISky.sol";
+import { UniswapV3Swapper } from "src/strategies/periphery/UniswapV3Swapper.sol";
+import { IStaking } from "src/interfaces/ISky.sol";
+
 /// @title yearn-v3-SkyCompounder
 /// @author mil0x
 /// @notice yearn v3 Strategy that autocompounds staking rewards.
-contract SkyCompounder is BaseHealthCheck, UniswapV3Swapper {
+contract SkyCompounderStrategy is BaseHealthCheck, UniswapV3Swapper {
     using SafeERC20 for ERC20;
 
     ///@notice Represents if we should claim rewards. Default to true.

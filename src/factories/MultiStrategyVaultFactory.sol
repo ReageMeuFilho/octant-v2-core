@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.25;
 
-import { IVaultFactory } from "../../interfaces/IVaultFactory.sol";
-import { IVault } from "../../interfaces/IVault.sol";
+import { IMultistrategyVaultFactory } from "src/interfaces/IMultistrategyVaultFactory.sol";
+import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
 /**
  * @title Yearn Vault Factory
  * @author yearn.finance
@@ -33,7 +33,7 @@ import { IVault } from "../../interfaces/IVault.sol";
  *    fee recipient.
  */
 
-contract VaultFactory is IVaultFactory {
+contract MultistrategyVaultFactory is IMultistrategyVaultFactory {
     // Constants
     string public constant override API_VERSION = "3.0.4";
     uint16 public constant override MAX_FEE_BPS = 5_000; // 50%
@@ -73,7 +73,7 @@ contract VaultFactory is IVaultFactory {
         bytes32 salt = keccak256(abi.encode(msg.sender, asset, _name, symbol));
         address vaultAddress = _createClone(VAULT_ORIGINAL, salt);
 
-        IVault(vaultAddress).initialize(asset, _name, symbol, roleManager, profitMaxUnlockTime);
+        IMultistrategyVault(vaultAddress).initialize(asset, _name, symbol, roleManager, profitMaxUnlockTime);
 
         emit NewVault(vaultAddress, asset);
         return vaultAddress;

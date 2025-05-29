@@ -4,18 +4,18 @@ pragma solidity >=0.8.25;
 import "forge-std/console.sol";
 import { Setup } from "./Setup.sol";
 import { IERC20Permit } from "src/vendor/shamirlabs/IERC20Permit.sol";
-import { Vault } from "src/dragons/vaults/Vault.sol";
-import { VaultFactory } from "src/dragons/vaults/VaultFactory.sol";
-import { IVault } from "src/interfaces/IVault.sol";
+import { MultistrategyVault } from "src/core/MultistrategyVault.sol";
+import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
+import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
 
 contract PermitTest is Setup {
     uint256 constant AMOUNT = 10 ** 18;
     uint256 constant PRIVATE_KEY = 0xabcd; // Known private key for tests
 
-    Vault public vault;
-    Vault public vaultImplementation;
+    MultistrategyVault public vault;
+    MultistrategyVault public vaultImplementation;
     address public bunny;
-    VaultFactory public vaultFactory;
+    MultistrategyVaultFactory public vaultFactory;
 
     function setUp() public override {
         super.setUp();
@@ -24,12 +24,12 @@ contract PermitTest is Setup {
         bunny = address(0x1234);
 
         // Deploy vault implementation
-        vaultImplementation = new Vault();
+        vaultImplementation = new MultistrategyVault();
 
-        vaultFactory = new VaultFactory("Test Vault", address(vaultImplementation), management);
+        vaultFactory = new MultistrategyVaultFactory("Test Vault", address(vaultImplementation), management);
 
         // Create a vault using the asset from Setup
-        vault = Vault(vaultFactory.deployNewVault(address(asset), "Test Vault", "tVAULT", bunny, 10 days));
+        vault = MultistrategyVault(vaultFactory.deployNewVault(address(asset), "Test Vault", "tVAULT", bunny, 10 days));
 
         // Label addresses for easier debugging
         vm.label(bunny, "bunny");
@@ -85,7 +85,7 @@ contract PermitTest is Setup {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(PRIVATE_KEY, digest);
 
         // Try to use the signature for AMOUNT instead
-        vm.expectRevert(IVault.InvalidSignature.selector);
+        vm.expectRevert(IMultistrategyVault.InvalidSignature.selector);
         vm.prank(bunny);
         vault.permit(owner, bunny, AMOUNT, deadline, v, r, s);
     }
@@ -101,7 +101,7 @@ contract PermitTest is Setup {
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(PRIVATE_KEY, digest);
 
-        vm.expectRevert(IVault.PermitExpired.selector);
+        vm.expectRevert(IMultistrategyVault.PermitExpired.selector);
         vm.prank(bunny);
         vault.permit(owner, bunny, AMOUNT, deadline, v, r, s);
     }
@@ -114,7 +114,7 @@ contract PermitTest is Setup {
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(PRIVATE_KEY, digest);
 
-        vm.expectRevert(IVault.InvalidOwner.selector);
+        vm.expectRevert(IMultistrategyVault.InvalidOwner.selector);
         vm.prank(bunny);
         vault.permit(
             address(0), // Use zero address instead of the real owner
@@ -142,6 +142,6 @@ contract PermitTest is Setup {
 
         bytes32 structHash = keccak256(abi.encode(PERMIT_TYPEHASH, owner, spender, value, nonce, deadline));
 
-        return keccak256(abi.encodePacked("\x19\x01", Vault(token).DOMAIN_SEPARATOR(), structHash));
+        return keccak256(abi.encodePacked("\x19\x01", IMultistrategyVault(token).DOMAIN_SEPARATOR(), structHash));
     }
 }

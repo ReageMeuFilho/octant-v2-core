@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.25;
-import { DragonTokenizedStrategy, Math } from "../DragonTokenizedStrategy.sol";
-import { IBaseStrategy } from "../interfaces/IBaseStrategy.sol";
+import { DragonTokenizedStrategy, Math } from "src/core/DragonTokenizedStrategy.sol";
+import { IBaseStrategy } from "src/interfaces/IBaseStrategy.sol";
 /**
  * @title YieldDonatingTokenizedStrategy
  * @author octant.finance
@@ -26,7 +26,10 @@ contract YieldDonatingTokenizedStrategy is DragonTokenizedStrategy {
         override(DragonTokenizedStrategy)
         nonReentrant
         onlyKeepers
-        returns (uint256 profit, uint256 loss) // TODO: check if this is of in the multistrategy vaults or if we need to pass it the fee amounts as zero anyway
+        returns (
+            uint256 profit,
+            uint256 loss // TODO: check if this is of in the multistrategy vaults or if we need to pass it the fee amounts as zero anyway
+        )
     {
         // Cache storage pointer since its used repeatedly.
         StrategyData storage S = super._strategyStorage();

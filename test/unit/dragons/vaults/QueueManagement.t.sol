@@ -2,23 +2,24 @@
 pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
-import { Vault } from "src/dragons/vaults/Vault.sol";
+import { MultistrategyVault } from "src/core/MultistrategyVault.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IVault } from "src/interfaces/IVault.sol";
+import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MockYieldStrategy } from "test/mocks/MockYieldStrategy.sol";
 import { MockFactory } from "test/mocks/MockFactory.sol";
 import { MockAccountant } from "test/mocks/MockAccountant.sol";
 import { MockFlexibleAccountant } from "test/mocks/MockFlexibleAccountant.sol";
-import { VaultFactory } from "src/dragons/vaults/VaultFactory.sol";
+import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
+
 contract QueueManagementTest is Test {
-    Vault vaultImplementation;
-    Vault vault;
+    MultistrategyVault vaultImplementation;
+    MultistrategyVault vault;
     MockERC20 public asset;
     MockYieldStrategy public strategy;
     MockAccountant public accountant;
     MockFlexibleAccountant public flexibleAccountant;
-    VaultFactory vaultFactory;
+    MultistrategyVaultFactory vaultFactory;
     MockFactory public factory;
     address public gov = address(0x1);
     address public fish = address(0x2);
@@ -44,21 +45,21 @@ contract QueueManagementTest is Test {
 
         // Deploy vault
         vm.startPrank(address(factory));
-        vaultImplementation = new Vault();
-        vaultFactory = new VaultFactory("Test Vault", address(vaultImplementation), gov);
-        vault = Vault(vaultFactory.deployNewVault(address(asset), "Test Vault", "vTST", gov, 7 days));
+        vaultImplementation = new MultistrategyVault();
+        vaultFactory = new MultistrategyVaultFactory("Test Vault", address(vaultImplementation), gov);
+        vault = MultistrategyVault(vaultFactory.deployNewVault(address(asset), "Test Vault", "vTST", gov, 7 days));
         vm.stopPrank();
 
         vm.startPrank(gov);
         // Add roles to gov
-        vault.addRole(gov, IVault.Roles.ADD_STRATEGY_MANAGER);
-        vault.addRole(gov, IVault.Roles.REVOKE_STRATEGY_MANAGER);
-        vault.addRole(gov, IVault.Roles.DEBT_MANAGER);
-        vault.addRole(gov, IVault.Roles.ACCOUNTANT_MANAGER);
-        vault.addRole(gov, IVault.Roles.REPORTING_MANAGER);
-        vault.addRole(gov, IVault.Roles.DEPOSIT_LIMIT_MANAGER);
-        vault.addRole(gov, IVault.Roles.MAX_DEBT_MANAGER);
-        vault.addRole(gov, IVault.Roles.QUEUE_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.ADD_STRATEGY_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.REVOKE_STRATEGY_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEBT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.ACCOUNTANT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.REPORTING_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEPOSIT_LIMIT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.MAX_DEBT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.QUEUE_MANAGER);
 
         // Setup default strategy
         strategy = new MockYieldStrategy(address(asset), address(vault));
@@ -107,7 +108,7 @@ contract QueueManagementTest is Test {
         vault.setDefaultQueue(strategies);
 
         vm.prank(fish);
-        vm.expectRevert(IVault.InsufficientAssetsInVault.selector);
+        vm.expectRevert(IMultistrategyVault.InsufficientAssetsInVault.selector);
         vault.withdraw(shares, fish, fish, 0, new address[](0));
     }
 
@@ -149,7 +150,7 @@ contract QueueManagementTest is Test {
         addDebtToStrategy(strategyAddress, amount, 0);
 
         vm.prank(fish);
-        vm.expectRevert(IVault.InactiveStrategy.selector);
+        vm.expectRevert(IMultistrategyVault.InactiveStrategy.selector);
         vault.withdraw(shares, fish, fish, 0, strategies);
     }
 
@@ -187,7 +188,7 @@ contract QueueManagementTest is Test {
         addDebtToStrategy(strategyAddress, amount, 0);
 
         vm.prank(fish);
-        vm.expectRevert(IVault.InactiveStrategy.selector);
+        vm.expectRevert(IMultistrategyVault.InactiveStrategy.selector);
         vault.withdraw(shares, fish, fish, 0, strategies);
     }
 
@@ -235,7 +236,7 @@ contract QueueManagementTest is Test {
         assertEq(queue.length, 0, "Queue should still be empty");
 
         // Check strategy is still active
-        Vault.StrategyParams memory params = vault.strategies(strategyOne);
+        IMultistrategyVault.StrategyParams memory params = vault.strategies(strategyOne);
         assertGt(params.activation, 0, "Strategy should be active");
 
         // Add second strategy without adding to queue
@@ -278,7 +279,7 @@ contract QueueManagementTest is Test {
         vault.addStrategy(eleventhStrategy, true);
 
         // Check 11th strategy is active but not in queue
-        Vault.StrategyParams memory params = vault.strategies(eleventhStrategy);
+        IMultistrategyVault.StrategyParams memory params = vault.strategies(eleventhStrategy);
         assertGt(params.activation, 0, "Strategy should be active");
 
         // Check queue remains unchanged
@@ -316,7 +317,7 @@ contract QueueManagementTest is Test {
         vault.revokeStrategy(strategyOne);
 
         // Check strategy is no longer active and queue is empty
-        Vault.StrategyParams memory params = vault.strategies(strategyOne);
+        IMultistrategyVault.StrategyParams memory params = vault.strategies(strategyOne);
         assertEq(params.activation, 0, "Strategy should not be active");
 
         queue = vault.defaultQueue();
@@ -330,7 +331,7 @@ contract QueueManagementTest is Test {
         vault.addStrategy(strategyOne, false);
 
         // Check strategy is active but not in queue
-        Vault.StrategyParams memory params = vault.strategies(strategyOne);
+        IMultistrategyVault.StrategyParams memory params = vault.strategies(strategyOne);
         assertGt(params.activation, 0, "Strategy should be active");
 
         address[] memory queue = vault.defaultQueue();
@@ -369,7 +370,7 @@ contract QueueManagementTest is Test {
         vault.revokeStrategy(strategyOne);
 
         // Check first strategy is no longer active and only second strategy remains in queue
-        Vault.StrategyParams memory params = vault.strategies(strategyOne);
+        IMultistrategyVault.StrategyParams memory params = vault.strategies(strategyOne);
         assertEq(params.activation, 0, "First strategy should not be active");
 
         queue = vault.defaultQueue();
@@ -398,7 +399,7 @@ contract QueueManagementTest is Test {
         vault.addStrategy(eleventhStrategy, true);
 
         // Check 11th strategy is active
-        Vault.StrategyParams memory params = vault.strategies(eleventhStrategy);
+        IMultistrategyVault.StrategyParams memory params = vault.strategies(eleventhStrategy);
         assertGt(params.activation, 0, "Strategy should be active");
 
         // Revoke the 11th strategy
@@ -464,7 +465,7 @@ contract QueueManagementTest is Test {
 
         // Should revert with "inactive strategy"
         vm.prank(gov);
-        vm.expectRevert(IVault.InactiveStrategy.selector);
+        vm.expectRevert(IMultistrategyVault.InactiveStrategy.selector);
         vault.setDefaultQueue(newQueue);
     }
 

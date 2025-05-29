@@ -6,7 +6,7 @@
 pragma solidity ^0.8.0;
 
 import { IEarningPowerCalculator } from "staker/interfaces/IEarningPowerCalculator.sol";
-import { IWhitelist } from "./whitelist/IWhitelist.sol";
+import { IWhitelist } from "src/utils/IWhitelist.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 /// @title IWhitelistedEarningPowerCalculator

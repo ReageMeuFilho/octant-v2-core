@@ -4,21 +4,19 @@ pragma solidity ^0.8.25;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import { IVault } from "../../interfaces/IVault.sol";
-import { IAccountant } from "../../interfaces/IAccountant.sol";
-import { IDepositLimitModule } from "../../interfaces/IDepositLimitModule.sol";
-import { IWithdrawLimitModule } from "../../interfaces/IWithdrawLimitModule.sol";
-import { IVaultFactory } from "../../interfaces/IVaultFactory.sol";
-import { IERC4626Payable } from "../../interfaces/IERC4626Payable.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
-import { StrategyManagementLib } from "../../libraries/Vault/StrategyManagementLib.sol";
-import { DebtManagementLib } from "../../libraries/Vault/DebtManagementLib.sol";
-import { ERC20SafeLib } from "../../libraries/Vault/ERC20SafeLib.sol";
+import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
+import { IDepositLimitModule } from "src/interfaces/IDepositLimitModule.sol";
+import { IWithdrawLimitModule } from "src/interfaces/IWithdrawLimitModule.sol";
+import { IERC4626Payable } from "src/interfaces/IERC4626Payable.sol";
+import { StrategyManagementLib } from "src/libraries/Vault/StrategyManagementLib.sol";
+import { DebtManagementLib } from "src/libraries/Vault/DebtManagementLib.sol";
+import { ERC20SafeLib } from "src/libraries/Vault/ERC20SafeLib.sol";
 
 /**
  * @notice
- *   This Vault is based on the original VaultV3.vy Vyper implementation
+ *   This MultistrategyVault is based on the original VaultV3.vy Vyper implementation
  *   that has been ported to Solidity. It is designed as a non-opinionated system
  *   to distribute funds of depositors for a specific `asset` into different
  *   opportunities (aka Strategies) and manage accounting in a robust way.
@@ -45,7 +43,7 @@ import { ERC20SafeLib } from "../../libraries/Vault/ERC20SafeLib.sol";
  *   specific desired needs. Including the customization of strategies, accountants,
  *   ownership etc.
  */
-contract Vault is IVault {
+contract MultistrategyVault is IMultistrategyVault {
     // CONSTANTS
     // The max length the withdrawal queue can be.
     uint256 public constant MAX_QUEUE = 10;

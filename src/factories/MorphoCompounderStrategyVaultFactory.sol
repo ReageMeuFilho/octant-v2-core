@@ -2,9 +2,9 @@
 pragma solidity >=0.8.25;
 
 import { CREATE3 } from "@solady/utils/CREATE3.sol";
-import { MorphoCompounder } from "src/regens/YieldSkimming/strategy/MorphoCompounder.sol";
+import { MorphoCompounderStrategy } from "src/strategies/YieldSkimming/MorphoCompounderStrategy.sol";
 
-contract MorphoCompounderVaultFactory {
+contract MorphoCompounderStrategyVaultFactory {
     /**
      * @dev Struct to store information about a strategy.
      * @param deployerAddress The address of the deployer who created the strategy.
@@ -64,7 +64,7 @@ contract MorphoCompounderVaultFactory {
         bytes32 _salt
     ) external returns (address strategyAddress) {
         bytes memory bytecode = abi.encodePacked(
-            type(MorphoCompounder).creationCode,
+            type(MorphoCompounderStrategy).creationCode,
             abi.encode(ysUSDC, _name, _management, _keeper, _emergencyAdmin, _donationAddress)
         );
 

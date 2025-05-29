@@ -2,25 +2,25 @@
 pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
-import { Vault } from "src/dragons/vaults/Vault.sol";
-import { IVault } from "src/interfaces/IVault.sol";
+import { MultistrategyVault } from "src/core/MultistrategyVault.sol";
+import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MockYieldStrategy } from "test/mocks/MockYieldStrategy.sol";
 import { MockLockedStrategy } from "test/mocks/MockLockedStrategy.sol";
 import { MockLossyStrategy } from "test/mocks/MockLossyStrategy.sol";
-import { VaultFactory } from "src/dragons/vaults/VaultFactory.sol";
+import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
 
 contract StrategyWithdrawTest is Test {
     uint256 constant DAY = 86400;
     uint256 constant MAX_BPS = 10000;
 
-    Vault vault;
+    MultistrategyVault vault;
     MockERC20 asset;
     address gov;
     address fish;
     uint256 fishAmount;
-    VaultFactory vaultFactory;
-    Vault vaultImplementation;
+    MultistrategyVaultFactory vaultFactory;
+    MultistrategyVault vaultImplementation;
 
     function setUp() public {
         gov = address(this);
@@ -30,15 +30,15 @@ contract StrategyWithdrawTest is Test {
         asset = new MockERC20();
 
         // Create and initialize the vault
-        vaultImplementation = new Vault();
-        vaultFactory = new VaultFactory("Test Vault", address(vaultImplementation), gov);
-        vault = Vault(vaultFactory.deployNewVault(address(asset), "Test Vault", "tvTEST", gov, 7 days));
+        vaultImplementation = new MultistrategyVault();
+        vaultFactory = new MultistrategyVaultFactory("Test Vault", address(vaultImplementation), gov);
+        vault = MultistrategyVault(vaultFactory.deployNewVault(address(asset), "Test Vault", "tvTEST", gov, 7 days));
 
         // add roles
-        vault.addRole(gov, IVault.Roles.ADD_STRATEGY_MANAGER);
-        vault.addRole(gov, IVault.Roles.DEBT_MANAGER);
-        vault.addRole(gov, IVault.Roles.MAX_DEBT_MANAGER);
-        vault.addRole(gov, IVault.Roles.DEPOSIT_LIMIT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.ADD_STRATEGY_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEBT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.MAX_DEBT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEPOSIT_LIMIT_MANAGER);
 
         // Set deposit limit
         vault.setDepositLimit(type(uint256).max, false);
@@ -64,7 +64,7 @@ contract StrategyWithdrawTest is Test {
 
         // Try to withdraw using inactive strategy
         vm.prank(fish);
-        vm.expectRevert(IVault.InactiveStrategy.selector);
+        vm.expectRevert(IMultistrategyVault.InactiveStrategy.selector);
         vault.withdraw(shares, fish, fish, maxLoss, strategies);
     }
 
@@ -169,7 +169,7 @@ contract StrategyWithdrawTest is Test {
 
         // Try to withdraw
         vm.prank(fish);
-        vm.expectRevert(IVault.InsufficientAssetsInVault.selector);
+        vm.expectRevert(IMultistrategyVault.InsufficientAssetsInVault.selector);
         vault.withdraw(amountToWithdraw, fish, fish, maxLoss, strategies);
     }
 
@@ -239,7 +239,7 @@ contract StrategyWithdrawTest is Test {
 
         // Try to withdraw - should revert due to loss
         vm.prank(fish);
-        vm.expectRevert(IVault.TooMuchLoss.selector);
+        vm.expectRevert(IMultistrategyVault.TooMuchLoss.selector);
         vault.withdraw(amountToWithdraw, fish, fish, maxLoss, strategies);
     }
 
@@ -579,7 +579,7 @@ contract StrategyWithdrawTest is Test {
 
         // Try to withdraw - should revert due to loss
         vm.prank(fish);
-        vm.expectRevert(IVault.TooMuchLoss.selector);
+        vm.expectRevert(IMultistrategyVault.TooMuchLoss.selector);
         vault.withdraw(amountToWithdraw, fish, fish, maxLoss, strategies);
     }
 
@@ -692,7 +692,7 @@ contract StrategyWithdrawTest is Test {
 
         // Try to redeem with no allowed loss - should revert
         vm.prank(fish);
-        vm.expectRevert(IVault.TooMuchLoss.selector);
+        vm.expectRevert(IMultistrategyVault.TooMuchLoss.selector);
         vault.redeem(shares, fish, fish, maxLoss, strategies);
     }
 
@@ -803,7 +803,7 @@ contract StrategyWithdrawTest is Test {
 
         // Try to redeem with no loss allowed (should revert)
         vm.prank(fish);
-        vm.expectRevert(IVault.TooMuchLoss.selector);
+        vm.expectRevert(IMultistrategyVault.TooMuchLoss.selector);
         vault.redeem(shares, fish, fish, 0, strategies);
 
         // Now redeem with max loss allowed
@@ -928,7 +928,7 @@ contract StrategyWithdrawTest is Test {
 
         // Try to withdraw with no allowed loss - should revert
         vm.prank(fish);
-        vm.expectRevert(IVault.TooMuchLoss.selector);
+        vm.expectRevert(IMultistrategyVault.TooMuchLoss.selector);
         vault.withdraw(amountToWithdraw, fish, fish, maxLoss, strategies);
     }
 
@@ -1067,7 +1067,7 @@ contract StrategyWithdrawTest is Test {
 
         // Try to redeem with no allowed loss - should revert
         vm.prank(fish);
-        vm.expectRevert(IVault.TooMuchLoss.selector);
+        vm.expectRevert(IMultistrategyVault.TooMuchLoss.selector);
         vault.redeem(shares, fish, fish, maxLoss, strategies);
     }
 
@@ -1141,7 +1141,7 @@ contract StrategyWithdrawTest is Test {
         userDeposit(fish, amount);
 
         // Add required role for default queue management
-        vault.addRole(gov, IVault.Roles.QUEUE_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.QUEUE_MANAGER);
 
         // Add strategies and allocate debt
         vault.addStrategy(address(firstStrategy), true);
@@ -1189,7 +1189,7 @@ contract StrategyWithdrawTest is Test {
         userDeposit(fish, amount);
 
         // Add required role for queue management
-        vault.addRole(gov, IVault.Roles.QUEUE_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.QUEUE_MANAGER);
 
         // Add strategies and allocate debt
         vault.addStrategy(address(firstStrategy), true);
@@ -1211,8 +1211,8 @@ contract StrategyWithdrawTest is Test {
         vault.redeem(shares, fish, fish, maxLoss, strategies);
 
         // Verify the same state as withdraw
-        Vault.StrategyParams memory firstParams = vault.strategies(address(firstStrategy));
-        Vault.StrategyParams memory secondParams = vault.strategies(address(secondStrategy));
+        MultistrategyVault.StrategyParams memory firstParams = vault.strategies(address(firstStrategy));
+        MultistrategyVault.StrategyParams memory secondParams = vault.strategies(address(secondStrategy));
 
         assertEq(firstParams.currentDebt, amountPerStrategy);
         assertEq(secondParams.currentDebt, 0);
@@ -1232,7 +1232,7 @@ contract StrategyWithdrawTest is Test {
 
         // Try to withdraw with max loss too high - should revert
         vm.prank(fish);
-        vm.expectRevert(IVault.MaxLossExceeded.selector);
+        vm.expectRevert(IMultistrategyVault.MaxLossExceeded.selector);
         vault.withdraw(amount, fish, fish, maxLoss, new address[](0));
     }
 
@@ -1245,7 +1245,7 @@ contract StrategyWithdrawTest is Test {
 
         // Try to redeem with max loss too high - should revert
         vm.prank(fish);
-        vm.expectRevert(IVault.MaxLossExceeded.selector);
+        vm.expectRevert(IMultistrategyVault.MaxLossExceeded.selector);
         vault.redeem(shares, fish, fish, maxLoss, new address[](0));
     }
 
@@ -1268,7 +1268,7 @@ contract StrategyWithdrawTest is Test {
         vault.updateDebt(strategyAddress, amount, 0);
     }
 
-    function checkVaultEmpty(Vault _vault) internal view {
+    function checkVaultEmpty(MultistrategyVault _vault) internal view {
         assertEq(_vault.totalAssets(), 0);
         assertEq(_vault.totalSupply(), 0);
         assertEq(_vault.totalIdle(), 0);

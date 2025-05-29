@@ -2,10 +2,10 @@
 pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
-import { Vault } from "src/dragons/vaults/Vault.sol";
-import { VaultFactory } from "src/dragons/vaults/VaultFactory.sol";
+import { MultistrategyVault } from "src/core/MultistrategyVault.sol";
+import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IVault } from "src/interfaces/IVault.sol";
+import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MockYieldStrategy } from "test/mocks/MockYieldStrategy.sol";
 import { MockFactory } from "test/mocks/MockFactory.sol";
@@ -15,12 +15,12 @@ import { MockWithdrawLimitModule } from "test/mocks/MockWithdrawLimitModule.sol"
 import { MockDepositLimitModule } from "test/mocks/MockDepositLimitModule.sol";
 
 contract ERC4626Test is Test {
-    Vault vaultImplementation;
-    Vault vault;
+    MultistrategyVault vaultImplementation;
+    MultistrategyVault vault;
     MockERC20 public asset;
     MockYieldStrategy public strategy;
     MockFactory public factory;
-    VaultFactory vaultFactory;
+    MultistrategyVaultFactory vaultFactory;
 
     address public gov = address(0x1);
     address public fish = address(0x2);
@@ -44,17 +44,17 @@ contract ERC4626Test is Test {
 
         // Deploy vault
         vm.startPrank(address(factory));
-        vaultImplementation = new Vault();
-        vaultFactory = new VaultFactory("Test Vault", address(vaultImplementation), gov);
-        vault = Vault(vaultFactory.deployNewVault(address(asset), "Test Vault", "vTST", gov, 7 days));
+        vaultImplementation = new MultistrategyVault();
+        vaultFactory = new MultistrategyVaultFactory("Test Vault", address(vaultImplementation), gov);
+        vault = MultistrategyVault(vaultFactory.deployNewVault(address(asset), "Test Vault", "vTST", gov, 7 days));
         vm.stopPrank();
 
         vm.startPrank(gov);
         // Add roles to gov
-        vault.addRole(gov, IVault.Roles.ADD_STRATEGY_MANAGER);
-        vault.addRole(gov, IVault.Roles.DEBT_MANAGER);
-        vault.addRole(gov, IVault.Roles.MAX_DEBT_MANAGER);
-        vault.addRole(gov, IVault.Roles.DEPOSIT_LIMIT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.ADD_STRATEGY_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEBT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.MAX_DEBT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEPOSIT_LIMIT_MANAGER);
         vm.stopPrank();
 
         // set max deposit limit
@@ -355,7 +355,7 @@ contract ERC4626Test is Test {
         uint256 strategyDeposit = assets;
 
         vm.prank(gov);
-        vault.addRole(gov, IVault.Roles.QUEUE_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.QUEUE_MANAGER);
 
         userDeposit(fish, assets);
         addStrategyToVault(strategyAddress);
@@ -379,7 +379,7 @@ contract ERC4626Test is Test {
         // Using inactive strategy when useDefaultQueue is false should revert
         address[] memory invalidStrategies = new address[](1);
         invalidStrategies[0] = address(vault); // vault is not a strategy
-        vm.expectRevert(IVault.InactiveStrategy.selector);
+        vm.expectRevert(IMultistrategyVault.InactiveStrategy.selector);
         vault.maxWithdraw(fish, 22, invalidStrategies);
 
         // Enable useDefaultQueue
@@ -545,7 +545,7 @@ contract ERC4626Test is Test {
         uint256 strategyDeposit = assets;
 
         vm.prank(gov);
-        vault.addRole(gov, IVault.Roles.QUEUE_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.QUEUE_MANAGER);
 
         userDeposit(fish, assets);
         addStrategyToVault(strategyAddress);
@@ -569,7 +569,7 @@ contract ERC4626Test is Test {
         // Using inactive strategy when useDefaultQueue is false should revert
         address[] memory invalidStrategies = new address[](1);
         invalidStrategies[0] = address(vault); // vault is not a strategy
-        vm.expectRevert(IVault.InactiveStrategy.selector);
+        vm.expectRevert(IMultistrategyVault.InactiveStrategy.selector);
         vault.maxRedeem(fish, 22, invalidStrategies);
 
         // Enable useDefaultQueue
@@ -619,7 +619,7 @@ contract ERC4626Test is Test {
 
         // Set withdraw limit module
         vm.prank(gov);
-        vault.addRole(gov, IVault.Roles.WITHDRAW_LIMIT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.WITHDRAW_LIMIT_MANAGER);
 
         vm.prank(gov);
         vault.setWithdrawLimitModule(address(limitModule));
@@ -668,7 +668,7 @@ contract ERC4626Test is Test {
 
         // Set withdraw limit module
         vm.prank(gov);
-        vault.addRole(gov, IVault.Roles.WITHDRAW_LIMIT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.WITHDRAW_LIMIT_MANAGER);
 
         vm.prank(gov);
         vault.setWithdrawLimitModule(address(limitModule));
@@ -743,7 +743,7 @@ contract ERC4626Test is Test {
         assertEq(vault.maxDeposit(fish), 0, "Max deposit should be 0 for non-whitelisted");
 
         vm.prank(fish);
-        vm.expectRevert(IVault.ExceedDepositLimit.selector);
+        vm.expectRevert(IMultistrategyVault.ExceedDepositLimit.selector);
         vault.deposit(assets, fish);
 
         // Whitelist fish and make deposit succeed
@@ -785,7 +785,7 @@ contract ERC4626Test is Test {
         assertEq(vault.maxMint(fish), 0, "Max mint should be 0 for non-whitelisted");
 
         vm.prank(fish);
-        vm.expectRevert(IVault.ExceedDepositLimit.selector);
+        vm.expectRevert(IMultistrategyVault.ExceedDepositLimit.selector);
         vault.mint(assets, fish);
 
         // Whitelist fish and make mint succeed
@@ -814,7 +814,7 @@ contract ERC4626Test is Test {
 
         // Set withdraw limit module
         vm.prank(gov);
-        vault.addRole(gov, IVault.Roles.WITHDRAW_LIMIT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.WITHDRAW_LIMIT_MANAGER);
 
         vm.prank(gov);
         vault.setWithdrawLimitModule(address(limitModule));
@@ -830,7 +830,7 @@ contract ERC4626Test is Test {
 
         // Attempt withdraw - should fail
         vm.prank(fish);
-        vm.expectRevert(IVault.ExceedWithdrawLimit.selector);
+        vm.expectRevert(IMultistrategyVault.ExceedWithdrawLimit.selector);
         vault.withdraw(assets, fish, fish, 0, new address[](0));
 
         // Now set limit to match assets for successful withdraw
@@ -865,7 +865,7 @@ contract ERC4626Test is Test {
 
         // Set withdraw limit module
         vm.prank(gov);
-        vault.addRole(gov, IVault.Roles.WITHDRAW_LIMIT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.WITHDRAW_LIMIT_MANAGER);
 
         vm.prank(gov);
         vault.setWithdrawLimitModule(address(limitModule));
@@ -881,7 +881,7 @@ contract ERC4626Test is Test {
 
         // Attempt redeem - should fail
         vm.prank(fish);
-        vm.expectRevert(IVault.ExceedWithdrawLimit.selector);
+        vm.expectRevert(IMultistrategyVault.ExceedWithdrawLimit.selector);
         vault.redeem(shares, fish, fish, 0, new address[](0));
 
         // Now set limit to match shares for successful redeem

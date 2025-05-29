@@ -2,20 +2,20 @@
 pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
-import { Vault } from "src/dragons/vaults/Vault.sol";
-import { VaultFactory } from "src/dragons/vaults/VaultFactory.sol";
+import { MultistrategyVault } from "src/core/MultistrategyVault.sol";
+import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IVault } from "src/interfaces/IVault.sol";
+import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MockYieldStrategy } from "test/mocks/MockYieldStrategy.sol";
 import { MockDepositLimitModule } from "test/mocks/MockDepositLimitModule.sol";
 
 contract EmergencyShutdownTest is Test {
-    Vault vaultImplementation;
-    Vault vault;
+    MultistrategyVault vaultImplementation;
+    MultistrategyVault vault;
     MockERC20 asset;
     MockYieldStrategy strategy;
-    VaultFactory vaultFactory;
+    MultistrategyVaultFactory vaultFactory;
     address gov;
     address panda;
 
@@ -25,21 +25,21 @@ contract EmergencyShutdownTest is Test {
 
         asset = new MockERC20();
 
-        vaultImplementation = new Vault();
-        vaultFactory = new VaultFactory("Test Vault", address(vaultImplementation), gov);
+        vaultImplementation = new MultistrategyVault();
+        vaultFactory = new MultistrategyVaultFactory("Test Vault", address(vaultImplementation), gov);
 
         // Create and initialize the vault
-        vault = Vault(vaultFactory.deployNewVault(address(asset), "Test Vault", "tvTEST", gov, 7 days));
+        vault = MultistrategyVault(vaultFactory.deployNewVault(address(asset), "Test Vault", "tvTEST", gov, 7 days));
 
         // Set up strategy
         strategy = new MockYieldStrategy(address(asset), address(vault));
 
         // Set roles - equivalent to the fixture in the Python test
-        vault.addRole(gov, IVault.Roles.EMERGENCY_MANAGER);
-        vault.addRole(gov, IVault.Roles.ADD_STRATEGY_MANAGER);
-        vault.addRole(gov, IVault.Roles.DEBT_MANAGER);
-        vault.addRole(gov, IVault.Roles.MAX_DEBT_MANAGER);
-        vault.addRole(gov, IVault.Roles.DEPOSIT_LIMIT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.EMERGENCY_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.ADD_STRATEGY_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEBT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.MAX_DEBT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEPOSIT_LIMIT_MANAGER);
 
         // set max deposit limit
         vault.setDepositLimit(type(uint256).max, false);
@@ -48,7 +48,7 @@ contract EmergencyShutdownTest is Test {
     function testShutdown() public {
         // Test that unauthorized users can't shut down
         vm.prank(panda);
-        vm.expectRevert(IVault.NotAllowed.selector);
+        vm.expectRevert(IMultistrategyVault.NotAllowed.selector);
         vault.shutdownVault();
 
         // Test that authorized users can shut down
@@ -58,20 +58,20 @@ contract EmergencyShutdownTest is Test {
 
     function testShutdownGivesDebtManagerRole() public {
         // Set panda as EMERGENCY_MANAGER only
-        vault.setRole(panda, 1 << uint256(IVault.Roles.EMERGENCY_MANAGER));
+        vault.setRole(panda, 1 << uint256(IMultistrategyVault.Roles.EMERGENCY_MANAGER));
 
         // Verify panda doesn't have DEBT_MANAGER initially
-        assertTrue((vault.roles(panda) & (1 << uint256(IVault.Roles.DEBT_MANAGER))) == 0);
+        assertTrue((vault.roles(panda) & (1 << uint256(IMultistrategyVault.Roles.DEBT_MANAGER))) == 0);
 
         // Have panda shut down the vault
         vm.prank(panda);
         vault.shutdownVault();
 
         // Verify panda now has DEBT_MANAGER role
-        assertTrue((vault.roles(panda) & (1 << uint256(IVault.Roles.DEBT_MANAGER))) != 0);
+        assertTrue((vault.roles(panda) & (1 << uint256(IMultistrategyVault.Roles.DEBT_MANAGER))) != 0);
 
         // Also still has EMERGENCY_MANAGER role
-        assertTrue((vault.roles(panda) & (1 << uint256(IVault.Roles.EMERGENCY_MANAGER))) != 0);
+        assertTrue((vault.roles(panda) & (1 << uint256(IMultistrategyVault.Roles.EMERGENCY_MANAGER))) != 0);
     }
 
     function testShutdownIncreaseDepositLimitReverts() public {
@@ -85,7 +85,7 @@ contract EmergencyShutdownTest is Test {
         assertEq(vault.maxDeposit(gov), 0);
 
         // Try to set deposit limit
-        vm.expectRevert(IVault.VaultShutdown.selector);
+        vm.expectRevert(IMultistrategyVault.VaultShutdown.selector);
         vault.setDepositLimit(1e18, false);
 
         // Verify deposit limit is still 0
@@ -106,7 +106,7 @@ contract EmergencyShutdownTest is Test {
         MockDepositLimitModule limitModule = new MockDepositLimitModule();
 
         // Try to set deposit limit module
-        vm.expectRevert(IVault.VaultShutdown.selector);
+        vm.expectRevert(IMultistrategyVault.VaultShutdown.selector);
         vault.setDepositLimitModule(address(limitModule), false);
 
         // Verify deposit limit is still 0
@@ -150,7 +150,7 @@ contract EmergencyShutdownTest is Test {
         // Try to deposit will fail at maxDeposit check
         asset.mint(address(this), depositAmount);
         asset.approve(address(vault), depositAmount);
-        vm.expectRevert(IVault.ExceedDepositLimit.selector);
+        vm.expectRevert(IMultistrategyVault.ExceedDepositLimit.selector);
         vault.deposit(depositAmount, gov);
 
         // Vault balance unchanged

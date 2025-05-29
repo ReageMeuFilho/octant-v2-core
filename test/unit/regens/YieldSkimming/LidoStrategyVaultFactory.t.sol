@@ -4,23 +4,23 @@ pragma solidity ^0.8.0;
 import { Test } from "forge-std/Test.sol";
 import { console } from "forge-std/console.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
-import { Lido } from "src/regens/YieldSkimming/strategy/Lido.sol";
-import { LidoVaultFactory } from "src/factories/LidoVaultFactory.sol";
+import { LidoStrategy } from "src/strategies/YieldSkimming/LidoStrategy.sol";
+import { LidoStrategyVaultFactory } from "src/factories/LidoStrategyVaultFactory.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { YieldSkimmingTokenizedStrategy } from "src/regens/YieldSkimming/YieldSkimmingTokenizedStrategy.sol";
+import { YieldSkimmingTokenizedStrategy } from "src/strategies/yieldSkimming/YieldSkimmingTokenizedStrategy.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import { CREATE3 } from "lib/solady/src/utils/CREATE3.sol";
 
 /// @title LidoVaultFactory Test
 /// @author Octant
 /// @notice Integration tests for the LidoVaultFactory using a mainnet fork
-contract LidoVaultFactoryTest is Test {
+contract LidoStrategyVaultFactoryTest is Test {
     using SafeERC20 for ERC20;
 
     // Factory for creating strategies
     YieldSkimmingTokenizedStrategy public tokenizedStrategy;
-    LidoVaultFactory public factory;
+    LidoStrategyVaultFactory public factory;
 
     // Strategy parameters
     address public management;
@@ -59,7 +59,7 @@ contract LidoVaultFactoryTest is Test {
         donationAddress = address(0x4);
 
         // Deploy factory
-        factory = new LidoVaultFactory();
+        factory = new LidoStrategyVaultFactory();
 
         // Label addresses for better trace outputs
         vm.label(address(factory), "LidoVaultFactory");
@@ -81,7 +81,12 @@ contract LidoVaultFactoryTest is Test {
         // Create a strategy and check events
         vm.startPrank(management);
         vm.expectEmit(true, true, true, false); // Check first 3 indexed params, ignore the non-indexed timestamp
-        emit LidoVaultFactory.StrategyDeploy(management, donationAddress, expectedStrategyAddress, vaultSharesName); // We can't predict the exact address
+        emit LidoStrategyVaultFactory.StrategyDeploy(
+            management,
+            donationAddress,
+            expectedStrategyAddress,
+            vaultSharesName
+        ); // We can't predict the exact address
 
         address strategyAddress = factory.createStrategy(
             vaultSharesName,
@@ -103,7 +108,7 @@ contract LidoVaultFactoryTest is Test {
         assertTrue(timestamp > 0, "Timestamp should be set");
 
         // Verify strategy was initialized correctly
-        Lido strategy = Lido(strategyAddress);
+        LidoStrategy strategy = LidoStrategy(strategyAddress);
         assertEq(IERC4626(address(strategy)).asset(), WSTETH, "Yield vault address incorrect");
     }
 
@@ -216,7 +221,7 @@ contract LidoVaultFactoryTest is Test {
         vm.stopPrank();
 
         // Create a new factory
-        LidoVaultFactory newFactory = new LidoVaultFactory();
+        LidoStrategyVaultFactory newFactory = new LidoStrategyVaultFactory();
 
         // Create a strategy with the same salt but from a different factory
         vm.startPrank(management);

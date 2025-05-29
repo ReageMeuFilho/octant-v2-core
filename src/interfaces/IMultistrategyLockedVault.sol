@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.25;
 
-import { IVault } from "src/dragons/vaults/Vault.sol";
+import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
 
-interface ILockedVault is IVault {
+interface IMultistrategyLockedVault is IMultistrategyVault {
     // Add necessary error definitions
     error InvalidRageQuitCooldownPeriod();
     error SharesStillLocked();

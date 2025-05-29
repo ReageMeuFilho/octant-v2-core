@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.25;
 
-import { Vault, IVault } from "src/dragons/vaults/Vault.sol";
-import { ILockedVault } from "src/interfaces/ILockedVault.sol";
+import { MultistrategyVault } from "src/core/MultistrategyVault.sol";
+import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
+import { IMultistrategyLockedVault } from "src/interfaces/IMultistrategyLockedVault.sol";
 
 /**
- * @title LockedVault
+ * @title LockedMultistrategyVault
  * @notice Vault with modified unlocking mechanism similar to DragonTokenizedStrategy
  * that consults strategies for minimum unlock times during rage quit
  *
@@ -40,7 +41,7 @@ import { ILockedVault } from "src/interfaces/ILockedVault.sol";
  *       - Same one-time window rules apply to total balance
  *
  */
-contract LockedVault is Vault, ILockedVault {
+contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVault {
     // Mapping of user address to their lockup info
     mapping(address => LockupInfo) public voluntaryLockups;
 
@@ -64,7 +65,7 @@ contract LockedVault is Vault, ILockedVault {
         string memory _symbol,
         address _roleManager,
         uint256 _profitMaxUnlockTime
-    ) public override(Vault, IVault) {
+    ) public override(MultistrategyVault, IMultistrategyVault) {
         rageQuitCooldownPeriod = INITIAL_RAGE_QUIT_COOLDOWN_PERIOD;
         super.initialize(_asset, _name, _symbol, _roleManager, _profitMaxUnlockTime);
     }
@@ -113,7 +114,7 @@ contract LockedVault is Vault, ILockedVault {
         address owner,
         uint256 maxLoss,
         address[] calldata strategiesArray
-    ) public override(IVault, Vault) nonReentrant returns (uint256) {
+    ) public override(MultistrategyVault, IMultistrategyVault) nonReentrant returns (uint256) {
         _checkUnlocked(owner);
         voluntaryLockups[owner].lockupTime = 0;
         uint256 shares = _convertToShares(assets, Rounding.ROUND_UP);
@@ -130,7 +131,7 @@ contract LockedVault is Vault, ILockedVault {
         address owner,
         uint256 maxLoss,
         address[] calldata strategiesArray
-    ) public override(IVault, Vault) nonReentrant returns (uint256) {
+    ) public override(MultistrategyVault, IMultistrategyVault) nonReentrant returns (uint256) {
         _checkUnlocked(owner);
         voluntaryLockups[owner].lockupTime = 0;
         uint256 assets = _convertToAssets(shares, Rounding.ROUND_DOWN);
