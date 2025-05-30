@@ -33,7 +33,7 @@ contract MorphoCompounderStrategyVaultFactory {
      */
     mapping(address => StrategyInfo[]) public strategies;
 
-    address public constant ysUSDC = 0x074134A2784F4F66b6ceD6f68849382990Ff3215;
+    address public constant YS_USDC = 0x074134A2784F4F66b6ceD6f68849382990Ff3215;
 
     event StrategyDeploy(
         address indexed deployer,
@@ -65,7 +65,7 @@ contract MorphoCompounderStrategyVaultFactory {
     ) external returns (address strategyAddress) {
         bytes memory bytecode = abi.encodePacked(
             type(MorphoCompounderStrategy).creationCode,
-            abi.encode(ysUSDC, _name, _management, _keeper, _emergencyAdmin, _donationAddress)
+            abi.encode(YS_USDC, _name, _management, _keeper, _emergencyAdmin, _donationAddress)
         );
 
         strategyAddress = CREATE3.deployDeterministic(bytecode, _salt);
