@@ -151,7 +151,18 @@ contract Setup is ExtendedTest {
     }
 
     function setUpFaultyStrategy() public returns (address) {
-        IMockStrategy _strategy = IMockStrategy(address(new MockFaultyStrategy(address(asset), address(yieldSource))));
+        IMockStrategy _strategy = IMockStrategy(
+            address(
+                new MockFaultyStrategy(
+                    address(asset),
+                    address(yieldSource),
+                    management,
+                    keeper,
+                    emergencyAdmin,
+                    donationAddress
+                )
+            )
+        );
 
         // set keeper
         _strategy.setKeeper(keeper);

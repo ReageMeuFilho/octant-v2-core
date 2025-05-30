@@ -58,94 +58,6 @@ contract SkyCompounderStrategy is BaseHealthCheck, UniswapV3Swapper {
         minAmountToSell = 50e18; // Set the min amount for the swapper to sell
     }
 
-    function _deployFunds(uint256 _amount) internal override {
-        IStaking(staking).stake(_amount, referral);
-    }
-
-    function _freeFunds(uint256 _amount) internal override {
-        IStaking(staking).withdraw(_amount);
-    }
-
-    function _harvestAndReport() internal override returns (uint256 _totalAssets) {
-        if (claimRewards) {
-            IStaking(staking).getReward();
-            if (useUniV3) {
-                // UniV3
-                _swapFrom(rewardsToken, address(asset), balanceOfRewards(), 0); // minAmountOut = 0 since we only sell rewards
-            } else {
-                // UniV2
-                _uniV2swapFrom(rewardsToken, address(asset), balanceOfRewards(), 0); // minAmountOut = 0 since we only sell rewards
-            }
-        }
-
-        uint256 balance = balanceOfAsset();
-        if (TokenizedStrategy.isShutdown()) {
-            _totalAssets = balance + balanceOfStake();
-        } else {
-            if (balance > ASSET_DUST) {
-                _deployFunds(balance);
-            }
-            _totalAssets = balanceOfStake();
-        }
-    }
-
-    function availableDepositLimit(address /*_owner*/) public view override returns (uint256) {
-        bool paused = IStaking(staking).paused();
-        if (paused) return 0;
-        return type(uint256).max;
-    }
-
-    function _uniV2swapFrom(address _from, address _to, uint256 _amountIn, uint256 _minAmountOut) internal {
-        if (_amountIn > minAmountToSell) {
-            IUniswapV2Router02(UNIV2ROUTER).swapExactTokensForTokens(
-                _amountIn,
-                _minAmountOut,
-                _getTokenOutPath(_from, _to),
-                address(this),
-                block.timestamp
-            );
-        }
-    }
-
-    function _getTokenOutPath(
-        address _tokenIn,
-        address _tokenOut
-    ) internal view virtual returns (address[] memory _path) {
-        address _base = base;
-        bool isBase = _tokenIn == _base || _tokenOut == _base;
-        _path = new address[](isBase ? 2 : 3);
-        _path[0] = _tokenIn;
-
-        if (isBase) {
-            _path[1] = _tokenOut;
-        } else {
-            _path[1] = _base;
-            _path[2] = _tokenOut;
-        }
-    }
-
-    function _min(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a < b ? a : b;
-    }
-
-    function balanceOfAsset() public view returns (uint256) {
-        return asset.balanceOf(address(this));
-    }
-
-    function balanceOfStake() public view returns (uint256 _amount) {
-        return ERC20(staking).balanceOf(address(this));
-    }
-
-    function balanceOfRewards() public view returns (uint256) {
-        return ERC20(rewardsToken).balanceOf(address(this));
-    }
-
-    function claimableRewards() public view returns (uint256) {
-        return IStaking(staking).earned(address(this));
-    }
-
-    //////// EXTERNAL
-
     /**
      * @notice Set the `claimRewards` bool.
      * @dev For management to set if the strategy should claim rewards during reports.
@@ -197,12 +109,98 @@ contract SkyCompounderStrategy is BaseHealthCheck, UniswapV3Swapper {
         }
     }
 
+    function availableDepositLimit(address /*_owner*/) public view override returns (uint256) {
+        bool paused = IStaking(staking).paused();
+        if (paused) return 0;
+        return type(uint256).max;
+    }
+
+    function balanceOfAsset() public view returns (uint256) {
+        return asset.balanceOf(address(this));
+    }
+
+    function balanceOfStake() public view returns (uint256 _amount) {
+        return ERC20(staking).balanceOf(address(this));
+    }
+
+    function balanceOfRewards() public view returns (uint256) {
+        return ERC20(rewardsToken).balanceOf(address(this));
+    }
+
+    function claimableRewards() public view returns (uint256) {
+        return IStaking(staking).earned(address(this));
+    }
+
     /**
      * @notice Set the referral code for staking.
      * @param _referral uint16 referral code
      */
     function setReferral(uint16 _referral) external onlyManagement {
         referral = _referral;
+    }
+
+    function _deployFunds(uint256 _amount) internal override {
+        IStaking(staking).stake(_amount, referral);
+    }
+
+    function _freeFunds(uint256 _amount) internal override {
+        IStaking(staking).withdraw(_amount);
+    }
+
+    function _harvestAndReport() internal override returns (uint256 _totalAssets) {
+        if (claimRewards) {
+            IStaking(staking).getReward();
+            if (useUniV3) {
+                // UniV3
+                _swapFrom(rewardsToken, address(asset), balanceOfRewards(), 0); // minAmountOut = 0 since we only sell rewards
+            } else {
+                // UniV2
+                _uniV2swapFrom(rewardsToken, address(asset), balanceOfRewards(), 0); // minAmountOut = 0 since we only sell rewards
+            }
+        }
+
+        uint256 balance = balanceOfAsset();
+        if (TokenizedStrategy.isShutdown()) {
+            _totalAssets = balance + balanceOfStake();
+        } else {
+            if (balance > ASSET_DUST) {
+                _deployFunds(balance);
+            }
+            _totalAssets = balanceOfStake();
+        }
+    }
+
+    function _uniV2swapFrom(address _from, address _to, uint256 _amountIn, uint256 _minAmountOut) internal {
+        if (_amountIn > minAmountToSell) {
+            IUniswapV2Router02(UNIV2ROUTER).swapExactTokensForTokens(
+                _amountIn,
+                _minAmountOut,
+                _getTokenOutPath(_from, _to),
+                address(this),
+                block.timestamp
+            );
+        }
+    }
+
+    function _getTokenOutPath(
+        address _tokenIn,
+        address _tokenOut
+    ) internal view virtual returns (address[] memory _path) {
+        address _base = base;
+        bool isBase = _tokenIn == _base || _tokenOut == _base;
+        _path = new address[](isBase ? 2 : 3);
+        _path[0] = _tokenIn;
+
+        if (isBase) {
+            _path[1] = _tokenOut;
+        } else {
+            _path[1] = _base;
+            _path[2] = _tokenOut;
+        }
+    }
+
+    function _min(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a < b ? a : b;
     }
 
     function _emergencyWithdraw(uint256 _amount) internal override {
