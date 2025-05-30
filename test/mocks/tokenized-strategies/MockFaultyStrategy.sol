@@ -2,20 +2,27 @@
 pragma solidity >=0.8.18;
 
 import { MockYieldSource } from "../MockYieldSource.sol";
-import { BaseStrategy, ERC20 } from "@tokenized-strategy/BaseStrategy.sol";
+import { DragonBaseStrategy, ERC20 } from "src/core/DragonBaseStrategy.sol";
 
 interface IPappa {
     function callBack(uint256 _pps, uint256 _convertAmountToShares, uint256 _convertAmountToAssets) external;
 }
 
-contract MockFaultyStrategy is BaseStrategy {
+contract MockFaultyStrategy is DragonBaseStrategy {
     address public yieldSource;
     bool public dontTend;
     address public pappa;
     uint256 public fault;
     bool public doCallBack;
 
-    constructor(address _asset, address _yieldSource) BaseStrategy(_asset, "Test Strategy") {
+    constructor(
+        address _asset,
+        address _yieldSource,
+        address _management,
+        address _keeper,
+        address _emergencyAdmin,
+        address _donationAddress
+    ) DragonBaseStrategy(_asset, "Test Strategy", _management, _keeper, _emergencyAdmin, _donationAddress) {
         yieldSource = _yieldSource;
         ERC20(_asset).approve(_yieldSource, type(uint256).max);
         pappa = msg.sender;

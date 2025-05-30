@@ -50,7 +50,12 @@ contract AccountingTest is Setup {
     ) public {
         _amount = bound(_amount, minFuzzAmount, maxFuzzAmount);
         _profitFactor = uint16(bound(uint256(_profitFactor), 10, MAX_BPS));
-        vm.assume(_address != address(0) && _address != address(strategy) && _address != address(yieldSource));
+        vm.assume(
+            _address != address(0) &&
+                _address != address(strategy) &&
+                _address != address(yieldSource) &&
+                _address != donationAddress
+        );
 
         // nothing has happened pps should be 1
         uint256 pricePerShare = strategy.pricePerShare();
@@ -157,7 +162,12 @@ contract AccountingTest is Setup {
     ) public {
         _amount = bound(_amount, minFuzzAmount, maxFuzzAmount);
         _profitFactor = uint16(bound(uint256(_profitFactor), 10, MAX_BPS));
-        vm.assume(_address != address(0) && _address != address(strategy) && _address != address(yieldSource));
+        vm.assume(
+            _address != address(0) &&
+                _address != address(strategy) &&
+                _address != address(yieldSource) &&
+                _address != donationAddress
+        );
 
         // nothing has happened pps should be 1
         uint256 pricePerShare = strategy.pricePerShare();
@@ -488,7 +498,12 @@ contract AccountingTest is Setup {
 
     function test_deposit_zeroAssetsPositiveSupply_reverts(address _address, uint256 _amount) public {
         _amount = bound(_amount, minFuzzAmount, maxFuzzAmount);
-        vm.assume(_address != address(0) && _address != address(strategy) && _address != address(yieldSource));
+        vm.assume(
+            _address != address(0) &&
+                _address != address(strategy) &&
+                _address != address(yieldSource) &&
+                _address != donationAddress
+        );
 
         mintAndDepositIntoStrategy(strategy, _address, _amount);
 
@@ -522,7 +537,12 @@ contract AccountingTest is Setup {
 
     function test_mint_zeroAssetsPositiveSupply_reverts(address _address, uint256 _amount) public {
         _amount = bound(_amount, minFuzzAmount, maxFuzzAmount);
-        vm.assume(_address != address(0) && _address != address(strategy) && _address != address(yieldSource));
+        vm.assume(
+            _address != address(0) &&
+                _address != address(strategy) &&
+                _address != address(yieldSource) &&
+                _address != donationAddress
+        );
 
         mintAndDepositIntoStrategy(strategy, _address, _amount);
 
