@@ -50,10 +50,6 @@ contract YieldSkimmingTokenizedStrategy is DragonTokenizedStrategy {
         uint256 oldTotalAssets = _totalAssets(S);
         if (newTotalAssets < oldTotalAssets) {
             loss = oldTotalAssets - newTotalAssets;
-        }
-
-        if (loss != 0) {
-            // Handle loss protection
             _handleDragonLossProtection(S, loss);
         }
 
@@ -82,9 +78,6 @@ contract YieldSkimmingTokenizedStrategy is DragonTokenizedStrategy {
         uint256 assets,
         uint256 shares
     ) internal override(DragonTokenizedStrategy) {
-        // report to update the exchange rate
-        ITokenizedStrategy(address(this)).report();
-
         super._deposit(S, receiver, assets, shares);
     }
 
@@ -101,11 +94,6 @@ contract YieldSkimmingTokenizedStrategy is DragonTokenizedStrategy {
         address owner,
         uint256 maxLoss
     ) public override(DragonTokenizedStrategy) returns (uint256) {
-        StrategyData storage S = super._strategyStorage();
-        // if totalAssets < balance of assets, lets update the totalAssets
-        if (S.totalAssets < S.asset.balanceOf(address(this))) {
-            S.totalAssets = S.asset.balanceOf(address(this));
-        }
         return super.redeem(shares, receiver, owner, maxLoss);
     }
 
@@ -122,10 +110,6 @@ contract YieldSkimmingTokenizedStrategy is DragonTokenizedStrategy {
         address owner,
         uint256 maxLoss
     ) public override(DragonTokenizedStrategy) returns (uint256 shares) {
-        StrategyData storage S = super._strategyStorage();
-        if (S.totalAssets < S.asset.balanceOf(address(this))) {
-            S.totalAssets = S.asset.balanceOf(address(this));
-        }
         return super.withdraw(assets, receiver, owner, maxLoss);
     }
 
