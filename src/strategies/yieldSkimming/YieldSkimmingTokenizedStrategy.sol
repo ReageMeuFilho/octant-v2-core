@@ -46,8 +46,20 @@ contract YieldSkimmingTokenizedStrategy is DragonTokenizedStrategy {
             _mint(S, _dragonRouter, shares);
         }
 
+        uint256 newTotalAssets = S.asset.balanceOf(address(this));
+        uint256 oldTotalAssets = _totalAssets(S);
+        if (newTotalAssets < oldTotalAssets) {
+            loss = oldTotalAssets - newTotalAssets;
+        }
+
+        if (loss != 0) {
+            // Handle loss protection
+            _handleDragonLossProtection(S, loss);
+        }
+
         // Update the new total assets value
         S.lastReport = uint96(block.timestamp);
+        S.totalAssets = newTotalAssets;
 
         emit Reported(profit, loss);
 
@@ -144,5 +156,25 @@ contract YieldSkimmingTokenizedStrategy is DragonTokenizedStrategy {
         if (totalAssets_ == 0) return 0;
 
         return assets.mulDiv(totalSupply_, totalAssets_ - assets, _rounding);
+    }
+
+    /**
+     * @dev Internal function to handle loss protection for dragon principal
+     * @param S Storage struct pointer to access strategy's storage variables
+     * @param loss The amount of loss in terms of asset to protect against
+     *
+     * This function calculates how many shares would be equivalent to the loss amount,
+     * then burns up to that amount of shares from dragonRouter, limited by the router's
+     * actual balance. This effectively socializes the loss among all shareholders by
+     * burning shares from the donation recipient rather than reducing the value of all shares.
+     */
+    function _handleDragonLossProtection(StrategyData storage S, uint256 loss) internal {
+        // Can only burn up to available shares
+        uint256 sharesBurned = Math.min(_convertToShares(S, loss, Math.Rounding.Floor), S.balances[S.dragonRouter]);
+
+        if (sharesBurned > 0) {
+            // Burn shares from dragon router
+            _burn(S, S.dragonRouter, sharesBurned);
+        }
     }
 }
