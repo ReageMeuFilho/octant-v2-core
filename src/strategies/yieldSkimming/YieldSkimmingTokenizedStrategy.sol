@@ -40,6 +40,7 @@ contract YieldSkimmingTokenizedStrategy is DragonTokenizedStrategy {
 
         if (profit > 0) {
             // Mint shares based on the adjusted profit amount
+            // todo review the case where profit > totalAssets (reverts in _convertToSharesFromReport)
             uint256 shares = _convertToSharesFromReport(S, profit, Math.Rounding.Floor);
             // mint the value
             _mint(S, _dragonRouter, shares);
@@ -73,6 +74,47 @@ contract YieldSkimmingTokenizedStrategy is DragonTokenizedStrategy {
         ITokenizedStrategy(address(this)).report();
 
         super._deposit(S, receiver, assets, shares);
+    }
+
+    /**
+     * @dev Override redeem to ensure the totalAssets is updated before redeeming and removed reentrancy protection
+     * @param shares The amount of shares to redeem
+     * @param receiver The address that will receive the assets
+     * @param owner The address that is redeeming the shares
+     * @param maxLoss The maximum loss that is allowed
+     */
+    function redeem(
+        uint256 shares,
+        address receiver,
+        address owner,
+        uint256 maxLoss
+    ) public override(DragonTokenizedStrategy) returns (uint256) {
+        StrategyData storage S = super._strategyStorage();
+        // if totalAssets < balance of assets, lets update the totalAssets
+        if (S.totalAssets < S.asset.balanceOf(address(this))) {
+            S.totalAssets = S.asset.balanceOf(address(this));
+        }
+        return super.redeem(shares, receiver, owner, maxLoss);
+    }
+
+    /**
+     * @dev Override withdraw to ensure the totalAssets is updated before withdrawing and removed reentrancy protection
+     * @param assets The amount of assets to withdraw
+     * @param receiver The address that will receive the assets
+     * @param owner The address that is withdrawing the assets
+     * @param maxLoss The maximum loss that is allowed
+     */
+    function withdraw(
+        uint256 assets,
+        address receiver,
+        address owner,
+        uint256 maxLoss
+    ) public override(DragonTokenizedStrategy) returns (uint256 shares) {
+        StrategyData storage S = super._strategyStorage();
+        if (S.totalAssets < S.asset.balanceOf(address(this))) {
+            S.totalAssets = S.asset.balanceOf(address(this));
+        }
+        return super.withdraw(assets, receiver, owner, maxLoss);
     }
 
     /**
