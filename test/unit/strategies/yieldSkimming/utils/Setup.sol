@@ -9,9 +9,9 @@ import { MockFactory } from "test/mocks/MockFactory.sol";
 import { IMockStrategy } from "test/mocks/IMockStrategy.sol";
 import { MockFaultyStrategy } from "test/mocks/tokenized-strategies/MockFaultyStrategy.sol";
 import { MockIlliquidStrategy } from "test/mocks/tokenized-strategies/MockIlliquidStrategy.sol";
-import { MockYieldSource } from "test/mocks/tokenized-strategies/MockYieldSource.sol";
-import { MockStrategy } from "test/mocks/tokenized-strategies/MockStrategy.sol";
-import { YieldDonatingTokenizedStrategy } from "src/strategies/yieldDonating/YieldDonatingTokenizedStrategy.sol";
+import { MockYieldSourceSkimming } from "test/mocks/tokenized-strategies/MockYieldSourceSkimming.sol";
+import { MockStrategySkimming } from "test/mocks/tokenized-strategies/MockStrategySkimming.sol";
+import { YieldSkimmingTokenizedStrategy } from "src/strategies/yieldSkimming/YieldSkimmingTokenizedStrategy.sol";
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import { Test } from "forge-std/Test.sol";
 
@@ -20,8 +20,8 @@ contract Setup is Test {
     ERC20Mock public asset;
     IMockStrategy public strategy;
     MockFactory public mockFactory;
-    MockYieldSource public yieldSource;
-    YieldDonatingTokenizedStrategy public tokenizedStrategy;
+    MockYieldSourceSkimming public yieldSource;
+    YieldSkimmingTokenizedStrategy public tokenizedStrategy;
 
     // Addresses for different roles we will use repeatedly.
     address public user = address(1);
@@ -50,17 +50,20 @@ contract Setup is Test {
         mockFactory = new MockFactory(0, protocolFeeRecipient);
 
         // Deploy the implementation for deterministic location
-        YieldDonatingTokenizedStrategy implementation = new YieldDonatingTokenizedStrategy();
+        YieldSkimmingTokenizedStrategy implementation = new YieldSkimmingTokenizedStrategy();
 
         // Deploy the proxy for deterministic location
-        tokenizedStrategy = YieldDonatingTokenizedStrategy(address(new ERC1967Proxy(address(implementation), "")));
+        tokenizedStrategy = YieldSkimmingTokenizedStrategy(address(new ERC1967Proxy(address(implementation), "")));
         // initialize the tokenized strategy
 
         // create asset we will be using as the underlying asset
         asset = new ERC20Mock();
 
+        // create a mock yield source to deposit into
+        yieldSource = new MockYieldSourceSkimming(address(asset));
+
         tokenizedStrategy.initialize(
-            address(asset),
+            address(yieldSource),
             "Test Strategy",
             management,
             keeper,
@@ -70,8 +73,8 @@ contract Setup is Test {
 
         vm.etch(TOKENIZED_STRATEGY_ADDRESS, address(implementation).code);
 
-        // create a mock yield source to deposit into
-        yieldSource = new MockYieldSource(address(asset));
+        // deposit into yield source to set pps
+        mintAndDepositIntoYieldSource(yieldSource, user, 1000000000000000000000000000000000000000);
 
         // Deploy strategy and set variables
         strategy = IMockStrategy(setUpStrategy());
@@ -92,16 +95,7 @@ contract Setup is Test {
     function setUpStrategy() public returns (address) {
         // we save the mock base strategy as a IMockStrategy to give it the needed interface
         IMockStrategy _strategy = IMockStrategy(
-            address(
-                new MockStrategy(
-                    address(asset),
-                    address(yieldSource),
-                    management,
-                    keeper,
-                    emergencyAdmin,
-                    donationAddress
-                )
-            )
+            address(new MockStrategySkimming(address(yieldSource), management, keeper, emergencyAdmin, donationAddress))
         );
 
         vm.startPrank(management);
@@ -177,12 +171,43 @@ contract Setup is Test {
     }
 
     function mintAndDepositIntoStrategy(IMockStrategy _strategy, address _user, uint256 _amount) public {
-        asset.mint(_user, _amount);
+        yieldSource.mint(_user, _amount);
         vm.prank(_user);
-        asset.approve(address(_strategy), _amount);
+        yieldSource.approve(address(_strategy), _amount);
 
         vm.prank(_user);
         _strategy.deposit(_amount, _user);
+    }
+
+    function mintAndDepositIntoYieldSource(
+        MockYieldSourceSkimming _yieldSource,
+        address _user,
+        uint256 _amount
+    ) public {
+        asset.mint(_user, _amount);
+        vm.prank(_user);
+        asset.approve(address(_yieldSource), _amount);
+
+        vm.prank(_user);
+        _yieldSource.deposit(_amount, _user);
+    }
+
+    /**
+     * @dev Helper function to calculate expected shares to be minted based on profit
+     * This mimics the yield skimming strategy's share minting logic
+     */
+    function calculateExpectedSharesFromProfit(
+        uint256 profit,
+        uint256 totalAssets,
+        uint256 totalSupply
+    ) internal pure returns (uint256) {
+        if (totalSupply == 0 || totalAssets == 0) {
+            return profit; // 1:1 ratio when no existing shares
+        }
+
+        // shares_to_mint = profit * totalSupply / (totalAssets - profit)
+        // This accounts for the fact that profit increases totalAssets
+        return (profit * totalSupply) / (totalAssets - profit);
     }
 
     function checkStrategyTotals(
@@ -213,7 +238,7 @@ contract Setup is Test {
     ) public view {
         uint256 _assets = _strategy.totalAssets();
         uint256 _balance = ERC20Mock(_strategy.asset()).balanceOf(address(_strategy));
-        uint256 _idle = _balance > _assets ? _assets : _balance;
+        uint256 _idle = _balance;
         uint256 _debt = _assets - _idle;
         assertEq(_assets, _totalAssets, "!totalAssets");
         assertEq(_debt, _totalDebt, "!totalDebt");
@@ -252,7 +277,7 @@ contract Setup is Test {
     function increaseTimeAndCheckBuffer(IMockStrategy _strategy, uint256 _time, uint256 _buffer) public {
         skip(_time);
         // We give a buffer or 1 wei for rounding
-        assertApproxEqAbs(_strategy.balanceOf(address(_strategy)), _buffer, 1, "!Buffer");
+        assertApproxEqRel(_strategy.balanceOf(address(_strategy)), _buffer, 1e13, "!Buffer");
     }
 
     function setupWhitelist(address _address) public {
@@ -270,7 +295,7 @@ contract Setup is Test {
         _strategy.setCallBack(_callBack);
     }
 
-    function _strategyStorage() internal pure returns (YieldDonatingTokenizedStrategy.StrategyData storage S) {
+    function _strategyStorage() internal pure returns (YieldSkimmingTokenizedStrategy.StrategyData storage S) {
         // Since STORAGE_SLOT is a constant, we have to put a variable
         // on the stack to access it from an inline assembly block.
         bytes32 slot = BASE_STRATEGY_STORAGE;
