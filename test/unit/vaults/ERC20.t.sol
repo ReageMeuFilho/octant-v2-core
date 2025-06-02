@@ -25,7 +25,7 @@ contract ERC20Test is Test {
 
     function setUp() public {
         // Setup asset
-        asset = new MockERC20();
+        asset = new MockERC20(18);
         asset.mint(gov, 1_000_000e18);
         asset.mint(fish, fishAmount);
 

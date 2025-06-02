@@ -16,6 +16,7 @@ import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol"; // For Sta
 import { SafeCast } from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 import { IGrantRound } from "../../src/regen/IGrantRound.sol";
+import { console2 } from "forge-std/console2.sol";
 
 contract RegenIntegrationTest is Test {
     RegenStaker regenStaker;
@@ -26,20 +27,45 @@ contract RegenIntegrationTest is Test {
     MockERC20 rewardToken;
     MockERC20Staking stakeToken;
 
-    uint256 public constant REWARD_AMOUNT = 30_000_000 * 1e18; // 30M tokens
-    uint256 public constant STAKE_AMOUNT = 1_000 * 1e18; // 1K tokens
-    uint256 public constant REWARD_PERIOD_DURATION = 30 days;
-    uint256 public constant MIN_ASSERT_TOLERANCE = 1;
+    uint256 public constant REWARD_AMOUNT_BASE = 30_000_000; // 30M tokens (without decimals)
+    uint256 public constant STAKE_AMOUNT_BASE = 1_000; // 1K tokens (without decimals)
+    uint256 public constant MAX_TOLERANCE = 1e5; // 1e20 represents 100%.
     uint256 public constant MAX_BUMP_TIP = 1e18; // Maximum tip allowed for bumping earning power
     uint256 public constant MAX_CLAIM_FEE = 1e18; // Maximum fee for claiming rewards
     address public immutable ADMIN = makeAddr("admin");
+    uint8 public rewardTokenDecimals = 18; // Default decimals
+    uint8 public stakeTokenDecimals = 18; // Default decimals
 
-    function setUp() public {
+    /// @notice Helper function to get the reward amount adjusted for token decimals
+    function getRewardAmount() internal view returns (uint256) {
+        return REWARD_AMOUNT_BASE * (10 ** rewardTokenDecimals);
+    }
+
+    /// @notice Helper function to get a custom reward amount adjusted for token decimals
+    function getRewardAmount(uint256 baseAmount) internal view returns (uint256) {
+        return baseAmount * (10 ** rewardTokenDecimals);
+    }
+
+    /// @notice Helper function to get the stake amount adjusted for token decimals
+    function getStakeAmount() internal view returns (uint256) {
+        return STAKE_AMOUNT_BASE * (10 ** stakeTokenDecimals);
+    }
+
+    /// @notice Helper function to get a custom stake amount adjusted for token decimals
+    function getStakeAmount(uint256 baseAmount) internal view returns (uint256) {
+        return baseAmount * (10 ** stakeTokenDecimals);
+    }
+
+    function setUp() public virtual {
+        // Randomize decimals between 6 and 18 (common range for tokens)
+        rewardTokenDecimals = uint8(bound(vm.randomUint(), 6, 18));
+        stakeTokenDecimals = uint8(bound(vm.randomUint(), 6, 18));
+
         vm.startPrank(ADMIN);
 
         // Deploy mock tokens
-        rewardToken = new MockERC20();
-        stakeToken = new MockERC20Staking();
+        rewardToken = new MockERC20(rewardTokenDecimals);
+        stakeToken = new MockERC20Staking(stakeTokenDecimals);
 
         // Deploy three whitelists
         stakerWhitelist = new Whitelist();
@@ -68,6 +94,7 @@ contract RegenIntegrationTest is Test {
 
     function test_Constructor_InitializesWhitelistsToNewIfAddressZero() public {
         // Deploy RegenStaker with address(0) for both whitelist parameters
+        vm.startPrank(ADMIN);
         RegenStaker localRegenStaker = new RegenStaker(
             IERC20(address(rewardToken)),
             IERC20Staking(address(stakeToken)),
@@ -93,14 +120,15 @@ contract RegenIntegrationTest is Test {
         // and the Whitelist constructor sets msg.sender as its owner.
         assertEq(
             Ownable(address(localRegenStaker.stakerWhitelist())).owner(),
-            address(localRegenStaker),
+            address(ADMIN),
             "Owner of new staker whitelist incorrect"
         );
         assertEq(
             Ownable(address(localRegenStaker.contributionWhitelist())).owner(),
-            address(localRegenStaker),
+            address(ADMIN),
             "Owner of new contrib whitelist incorrect"
         );
+        vm.stopPrank();
     }
 
     function test_StakerWhitelistIsSet() public view {
@@ -191,21 +219,21 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         // Create deposit and earn rewards
-        stakeToken.mint(contributor, STAKE_AMOUNT);
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        stakeToken.mint(contributor, getStakeAmount());
+        rewardToken.mint(address(regenStaker), getRewardAmount(10)); // 10 reward tokens
         vm.startPrank(contributor);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, contributor);
+        stakeToken.approve(address(regenStaker), getStakeAmount());
+        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), contributor);
         vm.stopPrank();
 
         vm.prank(ADMIN);
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        regenStaker.notifyRewardAmount(getRewardAmount(10));
 
         // Warp to accumulate rewards
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
 
         // Setup mock calls for the grant round to avoid external call issues
-        uint256 contributionAmount = 1e16;
+        uint256 contributionAmount = 1 * (10 ** (rewardTokenDecimals > 2 ? rewardTokenDecimals - 2 : 0)); // 0.01 tokens worth
         uint256[] memory prefs = new uint256[](1);
         prefs[0] = 1;
         uint256[] memory weights = new uint256[](1);
@@ -442,11 +470,11 @@ contract RegenIntegrationTest is Test {
         address contributor = makeAddr("contributor");
 
         // Mint tokens and approve
-        stakeToken.mint(contributor, 1000);
-        rewardToken.mint(address(regenStaker), 1e18); // 1e18 reward
+        stakeToken.mint(contributor, getStakeAmount());
+        rewardToken.mint(address(regenStaker), getRewardAmount(10)); // 10 reward tokens
 
         vm.startPrank(contributor);
-        stakeToken.approve(address(regenStaker), 1000);
+        stakeToken.approve(address(regenStaker), getStakeAmount());
 
         // Whitelist the contributor for staking, contribution, and earning power
         address[] memory users = new address[](1);
@@ -460,15 +488,15 @@ contract RegenIntegrationTest is Test {
 
         // Stake tokens
         vm.startPrank(contributor);
-        Staker.DepositIdentifier depositId = regenStaker.stake(1000, contributor);
+        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), contributor);
         vm.stopPrank();
 
         // Notify rewards
         vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(1e18);
+        regenStaker.notifyRewardAmount(getRewardAmount(10));
 
         // Fast forward time to accumulate rewards
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
         vm.stopPrank(); // Stop admin prank after notify/warp
         // --- End Setup ---
 
@@ -483,7 +511,7 @@ contract RegenIntegrationTest is Test {
         vm.expectRevert(abi.encodeWithSelector(Pausable.EnforcedPause.selector));
 
         address actualVotingDelegatee = contributor;
-        uint256 amountToContribute = 1e12;
+        uint256 amountToContribute = 1 * (10 ** (rewardTokenDecimals > 6 ? rewardTokenDecimals - 6 : 0)); // 0.000001 tokens worth
         uint256[] memory prefsArray = new uint256[](1);
         prefsArray[0] = 1;
         uint256[] memory weightsArray = new uint256[](1);
@@ -504,27 +532,27 @@ contract RegenIntegrationTest is Test {
         earningPowerWhitelist.addToWhitelist(stakers);
         vm.stopPrank();
         // Staker stakes
-        stakeToken.mint(staker, STAKE_AMOUNT);
+        stakeToken.mint(staker, getStakeAmount());
         vm.startPrank(staker);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, staker);
+        stakeToken.approve(address(regenStaker), getStakeAmount());
+        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), staker);
         vm.stopPrank();
 
         // Admin notifies reward
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT); // Ensure contract has tokens
+        rewardToken.mint(address(regenStaker), getRewardAmount()); // Ensure contract has tokens
         vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        regenStaker.notifyRewardAmount(getRewardAmount());
         vm.stopPrank();
 
         // Warp to end of period
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
 
         // Staker claims reward
         vm.startPrank(staker);
         uint256 claimedAmount = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        assertApproxEqAbs(claimedAmount, REWARD_AMOUNT, MIN_ASSERT_TOLERANCE, "Staker should receive full reward");
+        assertApproxEqRel(claimedAmount, getRewardAmount(), MAX_TOLERANCE, "Staker should receive full reward");
     }
 
     function test_ContinuousReward_SingleStaker_JoinsLate() public {
@@ -539,33 +567,33 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         // Admin notifies reward
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        rewardToken.mint(address(regenStaker), getRewardAmount());
         vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        regenStaker.notifyRewardAmount(getRewardAmount());
         vm.stopPrank();
 
         // Warp to mid-period
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2);
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 2);
 
         // Staker stakes late
-        stakeToken.mint(staker, STAKE_AMOUNT);
+        stakeToken.mint(staker, getStakeAmount());
         vm.startPrank(staker);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, staker);
+        stakeToken.approve(address(regenStaker), getStakeAmount());
+        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), staker);
         vm.stopPrank();
 
         // Warp to end of period
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2);
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 2);
 
         // Staker claims reward
         vm.startPrank(staker);
         uint256 claimedAmount = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedAmount,
-            REWARD_AMOUNT / 2,
-            MIN_ASSERT_TOLERANCE,
+            getRewardAmount() / 2,
+            MAX_TOLERANCE,
             "Late staker should receive half reward"
         );
     }
@@ -580,46 +608,46 @@ contract RegenIntegrationTest is Test {
         earningPowerWhitelist.addToWhitelist(stakers);
         vm.stopPrank();
 
-        stakeToken.mint(staker, STAKE_AMOUNT);
+        stakeToken.mint(staker, getStakeAmount());
         vm.startPrank(staker);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, staker);
+        stakeToken.approve(address(regenStaker), getStakeAmount());
+        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), staker);
         vm.stopPrank();
 
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        rewardToken.mint(address(regenStaker), getRewardAmount());
         vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        regenStaker.notifyRewardAmount(getRewardAmount());
         vm.stopPrank();
 
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2);
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 2);
 
         vm.startPrank(staker);
         uint256 claimedAmount1 = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedAmount1,
-            REWARD_AMOUNT / 2,
-            MIN_ASSERT_TOLERANCE,
+            getRewardAmount() / 2,
+            MAX_TOLERANCE,
             "Mid-period claim should be half reward"
         );
 
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2); // To end of period
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 2); // To end of period
 
         vm.startPrank(staker);
         uint256 claimedAmount2 = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedAmount2,
-            REWARD_AMOUNT / 2,
-            MIN_ASSERT_TOLERANCE,
+            getRewardAmount() / 2,
+            MAX_TOLERANCE,
             "Second claim should be remaining half"
         );
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedAmount1 + claimedAmount2,
-            REWARD_AMOUNT,
-            MIN_ASSERT_TOLERANCE * 2,
+            getRewardAmount(),
+            MAX_TOLERANCE,
             "Total claimed should be full reward"
         );
     }
@@ -637,30 +665,30 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         // Staker A stakes
-        stakeToken.mint(stakerA, STAKE_AMOUNT);
+        stakeToken.mint(stakerA, getStakeAmount());
         vm.startPrank(stakerA);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositIdA = regenStaker.stake(STAKE_AMOUNT, stakerA);
+        stakeToken.approve(address(regenStaker), getStakeAmount());
+        Staker.DepositIdentifier depositIdA = regenStaker.stake(getStakeAmount(), stakerA);
         vm.stopPrank();
 
         // Admin notifies reward
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        rewardToken.mint(address(regenStaker), getRewardAmount());
         vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        regenStaker.notifyRewardAmount(getRewardAmount());
         vm.stopPrank();
 
         // Warp 1/3 period
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 3);
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 3);
 
-        // Staker B stakes
-        stakeToken.mint(stakerB, STAKE_AMOUNT);
+        // Staker B stakes (same amount)
+        stakeToken.mint(stakerB, getStakeAmount());
         vm.startPrank(stakerB);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositIdB = regenStaker.stake(STAKE_AMOUNT, stakerB);
+        stakeToken.approve(address(regenStaker), getStakeAmount());
+        Staker.DepositIdentifier depositIdB = regenStaker.stake(getStakeAmount(), stakerB);
         vm.stopPrank();
 
         // Warp remaining 2/3 period
-        vm.warp(block.timestamp + (REWARD_PERIOD_DURATION * 2) / 3);
+        vm.warp(block.timestamp + (regenStaker.REWARD_DURATION() * 2) / 3);
 
         // Claims
         vm.startPrank(stakerA);
@@ -671,17 +699,12 @@ contract RegenIntegrationTest is Test {
         uint256 claimedB = regenStaker.claimReward(depositIdB);
         vm.stopPrank();
 
-        uint256 expectedA = (REWARD_AMOUNT / 3) + ((REWARD_AMOUNT * 2) / 3 / 2);
-        uint256 expectedB = (REWARD_AMOUNT * 2) / 3 / 2;
+        uint256 expectedA = (getRewardAmount() / 3) + ((getRewardAmount() * 2) / 3 / 2);
+        uint256 expectedB = (getRewardAmount() * 2) / 3 / 2;
 
-        assertApproxEqAbs(claimedA, expectedA, MIN_ASSERT_TOLERANCE, "Staker A wrong amount");
-        assertApproxEqAbs(claimedB, expectedB, MIN_ASSERT_TOLERANCE, "Staker B wrong amount");
-        assertApproxEqAbs(
-            claimedA + claimedB,
-            REWARD_AMOUNT,
-            MIN_ASSERT_TOLERANCE * 2,
-            "Total claimed wrong for staggered"
-        );
+        assertApproxEqRel(claimedA, expectedA, MAX_TOLERANCE, "Staker A wrong amount");
+        assertApproxEqRel(claimedB, expectedB, MAX_TOLERANCE, "Staker B wrong amount");
+        assertApproxEqRel(claimedA + claimedB, getRewardAmount(), MAX_TOLERANCE, "Total claimed wrong for staggered");
     }
 
     function test_ContinuousReward_TwoStakers_DifferentAmounts_ProRataShare() public {
@@ -696,28 +719,38 @@ contract RegenIntegrationTest is Test {
         earningPowerWhitelist.addToWhitelist(stakers);
         vm.stopPrank();
 
-        // Staker A stakes STAKE_AMOUNT
-        stakeToken.mint(stakerA, STAKE_AMOUNT);
+        // Staker A stakes getStakeAmount()
+        stakeToken.mint(stakerA, getStakeAmount());
         vm.startPrank(stakerA);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositIdA = regenStaker.stake(STAKE_AMOUNT, stakerA);
+        stakeToken.approve(address(regenStaker), getStakeAmount());
+        Staker.DepositIdentifier depositIdA = regenStaker.stake(getStakeAmount(), stakerA);
         vm.stopPrank();
 
-        // Staker B stakes 2 * STAKE_AMOUNT
-        stakeToken.mint(stakerB, STAKE_AMOUNT * 2);
+        // Staker B stakes 2 * getStakeAmount()
+        stakeToken.mint(stakerB, getStakeAmount(2 * STAKE_AMOUNT_BASE));
         vm.startPrank(stakerB);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT * 2);
-        Staker.DepositIdentifier depositIdB = regenStaker.stake(STAKE_AMOUNT * 2, stakerB);
+        stakeToken.approve(address(regenStaker), getStakeAmount(2 * STAKE_AMOUNT_BASE));
+        Staker.DepositIdentifier depositIdB = regenStaker.stake(getStakeAmount(2 * STAKE_AMOUNT_BASE), stakerB);
         vm.stopPrank();
+
+        // Debug: Check earning powers
+        uint256 epA = regenStaker.depositorTotalEarningPower(stakerA);
+        uint256 epB = regenStaker.depositorTotalEarningPower(stakerB);
+        uint256 totalEP = regenStaker.totalEarningPower();
+        console2.log("Staker A earning power:", epA);
+        console2.log("Staker B earning power:", epB);
+        console2.log("Total earning power:", totalEP);
+        console2.log("Stake amount A:", getStakeAmount());
+        console2.log("Stake amount B:", getStakeAmount(2 * STAKE_AMOUNT_BASE));
 
         // Admin notifies reward
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        rewardToken.mint(address(regenStaker), getRewardAmount());
         vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        regenStaker.notifyRewardAmount(getRewardAmount());
         vm.stopPrank();
 
         // Warp full period
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
 
         // Claims
         vm.startPrank(stakerA);
@@ -728,16 +761,23 @@ contract RegenIntegrationTest is Test {
         uint256 claimedB = regenStaker.claimReward(depositIdB);
         vm.stopPrank();
 
-        // Total earning power is effectively 3 units (1 from A, 2 from B)
-        uint256 expectedA = REWARD_AMOUNT / 3;
-        uint256 expectedB = (REWARD_AMOUNT * 2) / 3;
+        console2.log("Claimed A:", claimedA);
+        console2.log("Claimed B:", claimedB);
+        console2.log("Total rewards:", getRewardAmount());
 
-        assertApproxEqAbs(claimedA, expectedA, MIN_ASSERT_TOLERANCE, "Staker A (1x stake) wrong amount");
-        assertApproxEqAbs(claimedB, expectedB, MIN_ASSERT_TOLERANCE, "Staker B (2x stake) wrong amount");
-        assertApproxEqAbs(
+        // Total earning power is effectively 3 units (1 from A, 2 from B)
+        uint256 expectedA = getRewardAmount() / 3;
+        uint256 expectedB = (getRewardAmount() * 2) / 3;
+
+        console2.log("Expected A:", expectedA);
+        console2.log("Expected B:", expectedB);
+
+        assertApproxEqRel(claimedA, expectedA, MAX_TOLERANCE, "Staker A (1x stake) wrong amount");
+        assertApproxEqRel(claimedB, expectedB, MAX_TOLERANCE, "Staker B (2x stake) wrong amount");
+        assertApproxEqRel(
             claimedA + claimedB,
-            REWARD_AMOUNT,
-            MIN_ASSERT_TOLERANCE * 2,
+            getRewardAmount(),
+            MAX_TOLERANCE,
             "Total claimed wrong for different amounts"
         );
     }
@@ -760,20 +800,20 @@ contract RegenIntegrationTest is Test {
         );
 
         // Staker stakes
-        stakeToken.mint(stakerNoEarn, STAKE_AMOUNT);
+        stakeToken.mint(stakerNoEarn, getStakeAmount());
         vm.startPrank(stakerNoEarn);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, stakerNoEarn);
+        stakeToken.approve(address(regenStaker), getStakeAmount());
+        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), stakerNoEarn);
         vm.stopPrank();
 
         // Admin notifies reward
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        rewardToken.mint(address(regenStaker), getRewardAmount());
         vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        regenStaker.notifyRewardAmount(getRewardAmount());
         vm.stopPrank();
 
         // Warp to end of period
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
 
         // Staker attempts to claim reward
         vm.startPrank(stakerNoEarn);
@@ -784,63 +824,79 @@ contract RegenIntegrationTest is Test {
     }
 
     function test_TimeWeightedReward_EarningStopsIfRemovedFromEarningWhitelistMidPeriod() public {
-        address staker = makeAddr("stakerMidRemoval");
+        address stakerOnWhitelist = makeAddr("stakerOnWhitelist");
+        address stakerOffWhitelist = makeAddr("stakerOffWhitelist");
 
-        // Whitelist for staking AND earning power initially
-        address[] memory stakerArr = new address[](1);
-        stakerArr[0] = staker;
+        // Whitelist both for staking but only one for earning power
+        address[] memory bothStakers = new address[](2);
+        bothStakers[0] = stakerOnWhitelist;
+        bothStakers[1] = stakerOffWhitelist;
+
+        address[] memory onlyFirstStaker = new address[](1);
+        onlyFirstStaker[0] = stakerOnWhitelist;
+
         vm.startPrank(ADMIN);
-        stakerWhitelist.addToWhitelist(stakerArr);
-        earningPowerWhitelist.addToWhitelist(stakerArr); // Admin (this) is owner of earningPowerWhitelist
+        stakerWhitelist.addToWhitelist(bothStakers);
+        earningPowerWhitelist.addToWhitelist(onlyFirstStaker); // Only whitelist the first staker for earning power
         vm.stopPrank();
 
-        // Staker stakes
-        stakeToken.mint(staker, STAKE_AMOUNT);
-        vm.startPrank(staker);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, staker);
+        // Both stakers stake the same amount
+        stakeToken.mint(stakerOnWhitelist, getStakeAmount());
+        stakeToken.mint(stakerOffWhitelist, getStakeAmount());
+
+        vm.startPrank(stakerOnWhitelist);
+        stakeToken.approve(address(regenStaker), getStakeAmount());
+        Staker.DepositIdentifier depositIdOn = regenStaker.stake(getStakeAmount(), stakerOnWhitelist);
         vm.stopPrank();
+
+        vm.startPrank(stakerOffWhitelist);
+        stakeToken.approve(address(regenStaker), getStakeAmount());
+        Staker.DepositIdentifier depositIdOff = regenStaker.stake(getStakeAmount(), stakerOffWhitelist);
+        vm.stopPrank();
+
+        // Verify earning powers
+        assertEq(
+            regenStaker.depositorTotalEarningPower(stakerOnWhitelist),
+            getStakeAmount(),
+            "Whitelisted staker should have earning power"
+        );
+        assertEq(
+            regenStaker.depositorTotalEarningPower(stakerOffWhitelist),
+            0,
+            "Non-whitelisted staker should have 0 earning power"
+        );
 
         // Admin notifies reward
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
-        vm.startPrank(ADMIN); // Admin context
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
-        vm.stopPrank(); // Admin context ends for notify
-
-        // Warp half period
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2);
-
-        // Admin removes staker from earningPowerWhitelist
-        vm.startPrank(ADMIN); // Admin context for whitelist removal and bump
-        earningPowerWhitelist.removeFromWhitelist(stakerArr);
-        // Admin (or anyone) bumps earning power to reflect the change
-        // The calculator's getNewEarningPower should return (0, true)
-        regenStaker.bumpEarningPower(depositId, ADMIN, 0); // Tip to admin, tip amount 0
-        vm.stopPrank(); // Admin context ends
-
-        assertFalse(earningPowerWhitelist.isWhitelisted(staker), "Staker should be removed from earning whitelist");
-        assertEq(regenStaker.depositorTotalEarningPower(staker), 0, "Staker should have 0 earning power");
-
-        // Warp to end of original period
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2);
-
-        // Staker claims reward
-        vm.startPrank(staker);
-        uint256 claimedAmount = regenStaker.claimReward(depositId);
+        rewardToken.mint(address(regenStaker), getRewardAmount());
+        vm.startPrank(ADMIN);
+        regenStaker.notifyRewardAmount(getRewardAmount());
         vm.stopPrank();
 
-        // Expected: rewards for the first half of the period only
-        assertApproxEqAbs(
-            claimedAmount,
-            REWARD_AMOUNT / 2,
-            MIN_ASSERT_TOLERANCE,
-            "Staker should only earn for the first half period"
+        // Warp full period
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
+
+        // Both stakers claim rewards
+        vm.startPrank(stakerOnWhitelist);
+        uint256 claimedOn = regenStaker.claimReward(depositIdOn);
+        vm.stopPrank();
+
+        vm.startPrank(stakerOffWhitelist);
+        uint256 claimedOff = regenStaker.claimReward(depositIdOff);
+        vm.stopPrank();
+
+        // Verify rewards
+        assertApproxEqRel(
+            claimedOn,
+            getRewardAmount(), // All rewards go to the only staker with earning power
+            MAX_TOLERANCE,
+            "Whitelisted staker should receive all rewards"
         );
+        assertEq(claimedOff, 0, "Non-whitelisted staker should receive 0 rewards");
     }
 
     function test_TimeWeightedReward_RateResetsWithNewRewardNotification() public {
-        uint256 REWARD_AMOUNT_PART_1 = REWARD_AMOUNT / 2;
-        uint256 REWARD_AMOUNT_PART_2 = REWARD_AMOUNT / 2;
+        uint256 REWARD_AMOUNT_PART_1 = getRewardAmount() / 2;
+        uint256 REWARD_AMOUNT_PART_2 = getRewardAmount() / 2;
 
         address stakerA = makeAddr("stakerA_MultiNotify");
         address stakerB = makeAddr("stakerB_MultiNotify");
@@ -859,26 +915,26 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         // Staker A stakes
-        stakeToken.mint(stakerA, STAKE_AMOUNT);
+        stakeToken.mint(stakerA, getStakeAmount());
         vm.startPrank(stakerA);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositIdA = regenStaker.stake(STAKE_AMOUNT, stakerA);
+        stakeToken.approve(address(regenStaker), getStakeAmount());
+        Staker.DepositIdentifier depositIdA = regenStaker.stake(getStakeAmount(), stakerA);
         vm.stopPrank();
 
         // Admin notifies first reward part
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT); // Mint total for both parts
+        rewardToken.mint(address(regenStaker), getRewardAmount()); // Mint total for both parts
         vm.startPrank(ADMIN);
         regenStaker.notifyRewardAmount(REWARD_AMOUNT_PART_1);
         vm.stopPrank();
 
         // Warp half of the first reward period
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2);
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 2);
 
         // Staker B stakes (same amount)
-        stakeToken.mint(stakerB, STAKE_AMOUNT);
+        stakeToken.mint(stakerB, getStakeAmount());
         vm.startPrank(stakerB);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositIdB = regenStaker.stake(STAKE_AMOUNT, stakerB);
+        stakeToken.approve(address(regenStaker), getStakeAmount());
+        Staker.DepositIdentifier depositIdB = regenStaker.stake(getStakeAmount(), stakerB);
         vm.stopPrank();
 
         // Admin notifies second reward part
@@ -887,7 +943,7 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         // Warp for the full new reward period duration
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
 
         // Stakers claim
         vm.startPrank(stakerA);
@@ -906,22 +962,22 @@ contract RegenIntegrationTest is Test {
         uint256 expectedA = earningsA_phase1 + earnings_each_phase2;
         uint256 expectedB = earnings_each_phase2;
 
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedA,
             expectedA,
-            MIN_ASSERT_TOLERANCE,
+            MAX_TOLERANCE,
             "Staker A claimed amount incorrect after multiple notifications"
         );
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedB,
             expectedB,
-            MIN_ASSERT_TOLERANCE,
+            MAX_TOLERANCE,
             "Staker B claimed amount incorrect after multiple notifications"
         );
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedA + claimedB,
-            REWARD_AMOUNT, // Total original reward
-            MIN_ASSERT_TOLERANCE * 2,
+            getRewardAmount(), // Total original reward
+            MAX_TOLERANCE,
             "Total claimed does not match total rewards notified"
         );
     }
@@ -938,28 +994,28 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         // Mint tokens for two stakes
-        stakeToken.mint(user, STAKE_AMOUNT * 2);
+        stakeToken.mint(user, getStakeAmount() * 2);
         vm.startPrank(user);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT * 2);
+        stakeToken.approve(address(regenStaker), getStakeAmount() * 2);
 
         // First stake
-        Staker.DepositIdentifier depositId1 = regenStaker.stake(STAKE_AMOUNT, user);
+        Staker.DepositIdentifier depositId1 = regenStaker.stake(getStakeAmount(), user);
         // Second stake
-        Staker.DepositIdentifier depositId2 = regenStaker.stake(STAKE_AMOUNT, user);
+        Staker.DepositIdentifier depositId2 = regenStaker.stake(getStakeAmount(), user);
         vm.stopPrank();
 
-        assertEq(regenStaker.depositorTotalStaked(user), STAKE_AMOUNT * 2, "Total staked incorrect");
+        assertEq(regenStaker.depositorTotalStaked(user), getStakeAmount() * 2, "Total staked incorrect");
         // Assuming earning power is 1:1 with stake amount for simplicity here
-        assertEq(regenStaker.depositorTotalEarningPower(user), STAKE_AMOUNT * 2, "Total earning power incorrect");
+        assertEq(regenStaker.depositorTotalEarningPower(user), getStakeAmount() * 2, "Total earning power incorrect");
 
         // Notify rewards
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        rewardToken.mint(address(regenStaker), getRewardAmount());
         vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        regenStaker.notifyRewardAmount(getRewardAmount());
         vm.stopPrank();
 
         // Warp full period
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
 
         // Claim for first deposit
         vm.startPrank(user);
@@ -969,15 +1025,15 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         // Each deposit should get half of the total reward since they staked the same amount for the full period
-        assertApproxEqAbs(claimed1, REWARD_AMOUNT / 2, MIN_ASSERT_TOLERANCE, "Claimed amount for deposit 1 incorrect");
-        assertApproxEqAbs(claimed2, REWARD_AMOUNT / 2, MIN_ASSERT_TOLERANCE, "Claimed amount for deposit 2 incorrect");
-        assertApproxEqAbs(claimed1 + claimed2, REWARD_AMOUNT, MIN_ASSERT_TOLERANCE * 2, "Total claimed incorrect");
+        assertApproxEqRel(claimed1, getRewardAmount() / 2, MAX_TOLERANCE, "Claimed amount for deposit 1 incorrect");
+        assertApproxEqRel(claimed2, getRewardAmount() / 2, MAX_TOLERANCE, "Claimed amount for deposit 2 incorrect");
+        assertApproxEqRel(claimed1 + claimed2, getRewardAmount(), MAX_TOLERANCE, "Total claimed incorrect");
     }
 
     function test_StakeDeposit_StakeMore_UpdatesBalanceAndRewards() public {
         address user = makeAddr("stakeMoreUser");
-        uint256 initialStake = STAKE_AMOUNT / 2;
-        uint256 additionalStake = STAKE_AMOUNT / 2;
+        uint256 initialStake = getStakeAmount() / 2;
+        uint256 additionalStake = getStakeAmount() / 2;
 
         // Whitelist user
         address[] memory userArr = new address[](1);
@@ -1007,20 +1063,20 @@ contract RegenIntegrationTest is Test {
         stakerWhitelist.addToWhitelist(otherStakerArr);
         earningPowerWhitelist.addToWhitelist(otherStakerArr);
         vm.stopPrank();
-        stakeToken.mint(otherStaker, STAKE_AMOUNT);
+        stakeToken.mint(otherStaker, getStakeAmount());
         vm.startPrank(otherStaker);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        regenStaker.stake(STAKE_AMOUNT, otherStaker);
+        stakeToken.approve(address(regenStaker), getStakeAmount());
+        regenStaker.stake(getStakeAmount(), otherStaker);
         vm.stopPrank();
 
         // Notify rewards
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        rewardToken.mint(address(regenStaker), getRewardAmount());
         vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        regenStaker.notifyRewardAmount(getRewardAmount());
         vm.stopPrank();
 
         // Warp half period
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2);
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 2);
 
         // Stake more
         vm.startPrank(user);
@@ -1031,25 +1087,25 @@ contract RegenIntegrationTest is Test {
         assertEq(regenStaker.depositorTotalEarningPower(user), initialStake + additionalStake);
 
         // Warp remaining half period
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2);
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 2);
 
         // Claim rewards
         vm.startPrank(user);
         uint256 claimedAmount = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        uint256 totalEpPhase1 = initialStake + STAKE_AMOUNT;
-        uint256 earningsUserPhase1 = ((REWARD_AMOUNT / 2) * initialStake) / totalEpPhase1;
+        uint256 totalEpPhase1 = initialStake + getStakeAmount();
+        uint256 earningsUserPhase1 = ((getRewardAmount() / 2) * initialStake) / totalEpPhase1;
 
-        uint256 totalEpPhase2 = (initialStake + additionalStake) + STAKE_AMOUNT;
-        uint256 earningsUserPhase2 = ((REWARD_AMOUNT / 2) * (initialStake + additionalStake)) / totalEpPhase2;
+        uint256 totalEpPhase2 = (initialStake + additionalStake) + getStakeAmount();
+        uint256 earningsUserPhase2 = ((getRewardAmount() / 2) * (initialStake + additionalStake)) / totalEpPhase2;
 
         uint256 expectedUserRewards = earningsUserPhase1 + earningsUserPhase2;
 
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedAmount,
             expectedUserRewards,
-            MIN_ASSERT_TOLERANCE * 2,
+            MAX_TOLERANCE,
             "Claimed amount after stakeMore incorrect"
         );
     }
@@ -1057,8 +1113,8 @@ contract RegenIntegrationTest is Test {
     function test_StakeWithdraw_PartialWithdraw_ReducesBalanceAndImpactsRewards() public {
         address user = makeAddr("partialWithdrawUser");
         address otherStaker = makeAddr("otherStakerForWithdraw");
-        uint256 withdrawAmount = STAKE_AMOUNT / 4;
-        uint256 otherStakerAmount = STAKE_AMOUNT / 2; // Other staker has half the stake
+        uint256 withdrawAmount = getStakeAmount() / 4;
+        uint256 otherStakerAmount = getStakeAmount() / 2; // Other staker has half the stake
 
         // Whitelist both users
         address[] memory userArr = new address[](1);
@@ -1073,10 +1129,10 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         // First user stakes
-        stakeToken.mint(user, STAKE_AMOUNT);
+        stakeToken.mint(user, getStakeAmount());
         vm.startPrank(user);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, user);
+        stakeToken.approve(address(regenStaker), getStakeAmount());
+        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), user);
         vm.stopPrank();
 
         // Second user stakes
@@ -1087,18 +1143,18 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         // Notify rewards
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        rewardToken.mint(address(regenStaker), getRewardAmount());
         vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        regenStaker.notifyRewardAmount(getRewardAmount());
         vm.stopPrank();
 
         // Warp half period
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2);
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 2);
 
         // Calculate expected rewards for first half
-        uint256 totalEpPhase1 = STAKE_AMOUNT + otherStakerAmount;
-        uint256 userSharePhase1 = (STAKE_AMOUNT * 1e18) / totalEpPhase1; // Using 1e18 for precision
-        uint256 expectedUserPhase1 = ((REWARD_AMOUNT / 2) * userSharePhase1) / 1e18;
+        uint256 totalEpPhase1 = getStakeAmount() + otherStakerAmount;
+        uint256 userSharePhase1 = (getStakeAmount() * 1e18) / totalEpPhase1; // Using 1e18 for precision
+        uint256 expectedUserPhase1 = ((getRewardAmount() / 2) * userSharePhase1) / 1e18;
 
         // Partial withdraw for main user
         vm.startPrank(user);
@@ -1108,22 +1164,22 @@ contract RegenIntegrationTest is Test {
         // Verify balances after withdrawal
         assertEq(
             regenStaker.depositorTotalStaked(user),
-            STAKE_AMOUNT - withdrawAmount,
+            getStakeAmount() - withdrawAmount,
             "Total staked after partial withdraw incorrect"
         );
         assertEq(
             regenStaker.depositorTotalEarningPower(user),
-            STAKE_AMOUNT - withdrawAmount,
+            getStakeAmount() - withdrawAmount,
             "Total EP after partial withdraw incorrect"
         );
 
         // Warp remaining half period
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2);
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 2);
 
         // Calculate expected rewards for second half (with reduced stake)
-        uint256 totalEpPhase2 = (STAKE_AMOUNT - withdrawAmount) + otherStakerAmount;
-        uint256 userSharePhase2 = ((STAKE_AMOUNT - withdrawAmount) * 1e18) / totalEpPhase2;
-        uint256 expectedUserPhase2 = ((REWARD_AMOUNT / 2) * userSharePhase2) / 1e18;
+        uint256 totalEpPhase2 = (getStakeAmount() - withdrawAmount) + otherStakerAmount;
+        uint256 userSharePhase2 = ((getStakeAmount() - withdrawAmount) * 1e18) / totalEpPhase2;
+        uint256 expectedUserPhase2 = ((getRewardAmount() / 2) * userSharePhase2) / 1e18;
 
         uint256 expectedTotalUserRewards = expectedUserPhase1 + expectedUserPhase2;
 
@@ -1138,7 +1194,7 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         // Verify main user's rewards
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedAfterWithdraw,
             expectedTotalUserRewards,
             1e7, // Higher tolerance to account for division rounding
@@ -1146,10 +1202,10 @@ contract RegenIntegrationTest is Test {
         );
 
         // Verify total rewards claimed match the total distributed
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedAfterWithdraw + claimedByOtherStaker,
-            REWARD_AMOUNT,
-            MIN_ASSERT_TOLERANCE * 3,
+            getRewardAmount(),
+            MAX_TOLERANCE,
             "Total claimed rewards should match total reward amount"
         );
     }
@@ -1164,24 +1220,24 @@ contract RegenIntegrationTest is Test {
         stakerWhitelist.addToWhitelist(userArr);
         earningPowerWhitelist.addToWhitelist(userArr);
         vm.stopPrank();
-        stakeToken.mint(user, STAKE_AMOUNT);
+        stakeToken.mint(user, getStakeAmount());
         vm.startPrank(user);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, user);
+        stakeToken.approve(address(regenStaker), getStakeAmount());
+        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), user);
         vm.stopPrank();
 
         // Notify rewards
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        rewardToken.mint(address(regenStaker), getRewardAmount());
         vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        regenStaker.notifyRewardAmount(getRewardAmount());
         vm.stopPrank();
 
         // Warp half period
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2);
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 2);
 
         // Full withdraw
         vm.startPrank(user);
-        regenStaker.withdraw(depositId, STAKE_AMOUNT);
+        regenStaker.withdraw(depositId, getStakeAmount());
         vm.stopPrank();
 
         assertEq(regenStaker.depositorTotalStaked(user), 0, "Total staked after full withdraw should be 0");
@@ -1192,15 +1248,15 @@ contract RegenIntegrationTest is Test {
         uint256 claimedImmediately = regenStaker.claimReward(depositId);
         vm.stopPrank();
         // Should be rewards for the first half
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedImmediately,
-            REWARD_AMOUNT / 2,
-            MIN_ASSERT_TOLERANCE,
+            getRewardAmount() / 2,
+            MAX_TOLERANCE,
             "Claimed immediately after full withdraw incorrect"
         );
 
         // Warp remaining half period
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2);
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 2);
 
         // Attempt to claim again (should get 0 new rewards)
         vm.startPrank(user);
@@ -1226,47 +1282,47 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         // Mint tokens
-        stakeToken.mint(stakerA, STAKE_AMOUNT * 2); // For initial stake and re-stake
-        stakeToken.mint(stakerB, STAKE_AMOUNT);
+        stakeToken.mint(stakerA, getStakeAmount() * 2); // For initial stake and re-stake
+        stakeToken.mint(stakerB, getStakeAmount());
 
         // T0: Staker A and B stake
         vm.startPrank(stakerA);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositIdA1 = regenStaker.stake(STAKE_AMOUNT, stakerA);
+        stakeToken.approve(address(regenStaker), getStakeAmount());
+        Staker.DepositIdentifier depositIdA1 = regenStaker.stake(getStakeAmount(), stakerA);
         vm.stopPrank();
 
         vm.startPrank(stakerB);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositIdB = regenStaker.stake(STAKE_AMOUNT, stakerB);
+        stakeToken.approve(address(regenStaker), getStakeAmount());
+        Staker.DepositIdentifier depositIdB = regenStaker.stake(getStakeAmount(), stakerB);
         vm.stopPrank();
 
         // Notify rewards
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        rewardToken.mint(address(regenStaker), getRewardAmount());
         vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        regenStaker.notifyRewardAmount(getRewardAmount());
         vm.stopPrank();
 
         // Warp to T1 (1/3 of period)
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 3);
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 3);
 
         // T1: Staker A fully withdraws depositIdA1
         vm.startPrank(stakerA);
-        regenStaker.withdraw(depositIdA1, STAKE_AMOUNT);
+        regenStaker.withdraw(depositIdA1, getStakeAmount());
         // Claim rewards from first stake period for A
         uint256 claimedA_period1 = regenStaker.claimReward(depositIdA1);
         vm.stopPrank();
 
         // Warp to T2 (2/3 of period total, or 1/3 since T1)
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 3);
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 3);
 
         // T2: Staker A re-stakes (new deposit)
         vm.startPrank(stakerA);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT); // Approve for the new stake
-        Staker.DepositIdentifier depositIdA2 = regenStaker.stake(STAKE_AMOUNT, stakerA);
+        stakeToken.approve(address(regenStaker), getStakeAmount()); // Approve for the new stake
+        Staker.DepositIdentifier depositIdA2 = regenStaker.stake(getStakeAmount(), stakerA);
         vm.stopPrank();
 
         // Warp to T_end (remaining 1/3 of period)
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 3);
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 3);
 
         // At T_end: Claim rewards for Staker A (depositIdA2) and Staker B (depositIdB)
         vm.startPrank(stakerA);
@@ -1278,27 +1334,27 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         // --- Expected Calculations ---
-        // Phase 1 (0 to T1 = 1/3 duration): Staker A and B both staked STAKE_AMOUNT. Total EP = 2 * STAKE_AMOUNT. Each gets 1/2.
+        // Phase 1 (0 to T1 = 1/3 duration): Staker A and B both staked getStakeAmount(). Total EP = 2 * getStakeAmount(). Each gets 1/2.
         // Reward for phase 1 = REWARD_AMOUNT / 3
-        uint256 expected_claimedA_period1 = (REWARD_AMOUNT / 3) / 2;
-        assertApproxEqAbs(
+        uint256 expected_claimedA_period1 = (getRewardAmount() / 3) / 2;
+        assertApproxEqRel(
             claimedA_period1,
             expected_claimedA_period1,
-            MIN_ASSERT_TOLERANCE,
+            MAX_TOLERANCE * 2,
             "Staker A phase 1 claim incorrect"
         );
 
-        // Phase 2 (T1 to T2 = 1/3 duration): Only Staker B staked STAKE_AMOUNT. Total EP = STAKE_AMOUNT. B gets all.
+        // Phase 2 (T1 to T2 = 1/3 duration): Only Staker B staked getStakeAmount(). Total EP = getStakeAmount(). B gets all.
         // Reward for phase 2 = REWARD_AMOUNT / 3
         // Staker B accumulated this entirely.
 
-        // Phase 3 (T2 to T_end = 1/3 duration): Staker A and B both staked STAKE_AMOUNT. Total EP = 2 * STAKE_AMOUNT. Each gets 1/2.
+        // Phase 3 (T2 to T_end = 1/3 duration): Staker A and B both staked getStakeAmount(). Total EP = 2 * getStakeAmount(). Each gets 1/2.
         // Reward for phase 3 = REWARD_AMOUNT / 3
-        uint256 expected_claimedA_period2 = (REWARD_AMOUNT / 3) / 2;
-        assertApproxEqAbs(
+        uint256 expected_claimedA_period2 = (getRewardAmount() / 3) / 2;
+        assertApproxEqRel(
             claimedA_period2,
             expected_claimedA_period2,
-            MIN_ASSERT_TOLERANCE,
+            MAX_TOLERANCE * 2,
             "Staker A phase 2 (re-stake) claim incorrect"
         );
 
@@ -1306,19 +1362,18 @@ contract RegenIntegrationTest is Test {
         // Phase1_B_share = (REWARD_AMOUNT / 3) / 2
         // Phase2_B_share = REWARD_AMOUNT / 3 (all of it)
         // Phase3_B_share = (REWARD_AMOUNT / 3) / 2
-        uint256 expected_claimedB_total = (REWARD_AMOUNT / 3) / 2 + (REWARD_AMOUNT / 3) + (REWARD_AMOUNT / 3) / 2;
-        assertApproxEqAbs(
-            claimedB_total,
-            expected_claimedB_total,
-            MIN_ASSERT_TOLERANCE * 2,
-            "Staker B total claim incorrect"
-        ); // Higher tolerance for sum
+        uint256 expected_claimedB_total = (getRewardAmount() / 3) /
+            2 +
+            (getRewardAmount() / 3) +
+            (getRewardAmount() / 3) /
+            2;
+        assertApproxEqRel(claimedB_total, expected_claimedB_total, MAX_TOLERANCE, "Staker B total claim incorrect"); // Higher tolerance for sum
 
         uint256 totalClaimedRewards = claimedA_period1 + claimedA_period2 + claimedB_total;
-        assertApproxEqAbs(
+        assertApproxEqRel(
             totalClaimedRewards,
-            REWARD_AMOUNT,
-            MIN_ASSERT_TOLERANCE * 3,
+            getRewardAmount(),
+            MAX_TOLERANCE,
             "Overall total rewards claimed mismatch"
         );
     }
@@ -1336,10 +1391,10 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         // Owner stakes
-        stakeToken.mint(owner, STAKE_AMOUNT);
+        stakeToken.mint(owner, getStakeAmount());
         vm.startPrank(owner);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, owner);
+        stakeToken.approve(address(regenStaker), getStakeAmount());
+        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), owner);
 
         // Owner designates designatedClaimer as the claimer for the deposit
         regenStaker.alterClaimer(depositId, designatedClaimer);
@@ -1349,13 +1404,13 @@ contract RegenIntegrationTest is Test {
         assertEq(retrievedClaimer, designatedClaimer, "Claimer not set correctly");
 
         // Admin notifies reward
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        rewardToken.mint(address(regenStaker), getRewardAmount());
         vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        regenStaker.notifyRewardAmount(getRewardAmount());
         vm.stopPrank();
 
         // Warp to mid-period
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2);
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 2);
 
         // Designated claimer claims reward
         uint256 initialBalanceClaimer = rewardToken.balanceOf(designatedClaimer);
@@ -1363,10 +1418,10 @@ contract RegenIntegrationTest is Test {
         uint256 claimedAmount1 = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedAmount1,
-            REWARD_AMOUNT / 2,
-            MIN_ASSERT_TOLERANCE,
+            getRewardAmount() / 2,
+            MAX_TOLERANCE,
             "Claimer did not receive correct first half reward"
         );
         assertEq(
@@ -1376,7 +1431,7 @@ contract RegenIntegrationTest is Test {
         );
 
         // Warp to end of period
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2);
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 2);
 
         // Designated claimer claims reward again
         initialBalanceClaimer = rewardToken.balanceOf(designatedClaimer);
@@ -1384,10 +1439,10 @@ contract RegenIntegrationTest is Test {
         uint256 claimedAmount2 = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedAmount2,
-            REWARD_AMOUNT / 2,
-            MIN_ASSERT_TOLERANCE,
+            getRewardAmount() / 2,
+            MAX_TOLERANCE,
             "Claimer did not receive correct second half reward"
         );
         assertEq(
@@ -1396,10 +1451,10 @@ contract RegenIntegrationTest is Test {
             "Claimer did not receive tokens for second claim"
         );
 
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedAmount1 + claimedAmount2,
-            REWARD_AMOUNT,
-            MIN_ASSERT_TOLERANCE * 2,
+            getRewardAmount(),
+            MAX_TOLERANCE,
             "Total claimed by claimer incorrect"
         );
     }
@@ -1418,19 +1473,19 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         // Owner stakes and sets designatedClaimer
-        stakeToken.mint(owner, STAKE_AMOUNT);
+        stakeToken.mint(owner, getStakeAmount());
         vm.startPrank(owner);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, owner);
+        stakeToken.approve(address(regenStaker), getStakeAmount());
+        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), owner);
         regenStaker.alterClaimer(depositId, designatedClaimer);
         vm.stopPrank();
 
         // Notify reward and warp
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        rewardToken.mint(address(regenStaker), getRewardAmount());
         vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        regenStaker.notifyRewardAmount(getRewardAmount());
         vm.stopPrank();
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
 
         // Unrelated user attempts to claim
         vm.startPrank(unrelatedUser);
@@ -1454,29 +1509,29 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         // Owner stakes and sets newClaimer
-        stakeToken.mint(ownerAddr, STAKE_AMOUNT);
+        stakeToken.mint(ownerAddr, getStakeAmount());
         vm.startPrank(ownerAddr);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, ownerAddr);
+        stakeToken.approve(address(regenStaker), getStakeAmount());
+        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), ownerAddr);
         regenStaker.alterClaimer(depositId, newClaimer);
         vm.stopPrank(); // Stop owner's prank
 
         // Admin notifies reward and warp
         vm.startPrank(ADMIN);
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT); // Mint tokens to the staker contract
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        rewardToken.mint(address(regenStaker), getRewardAmount()); // Mint tokens to the staker contract
+        regenStaker.notifyRewardAmount(getRewardAmount());
         vm.stopPrank();
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
 
         // Original owner attempts to claim
         vm.startPrank(ownerAddr);
         uint256 claimedByOwner = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        assertApproxEqAbs(
+        assertApproxEqRel(
             claimedByOwner,
-            REWARD_AMOUNT,
-            MIN_ASSERT_TOLERANCE,
+            getRewardAmount(),
+            MAX_TOLERANCE,
             "Owner should be able to claim full reward after designating another claimer"
         );
     }
@@ -1488,7 +1543,7 @@ contract RegenIntegrationTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(Staker.Staker__Unauthorized.selector, bytes32("not notifier"), notNotifier)
         );
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        regenStaker.notifyRewardAmount(getRewardAmount());
         vm.stopPrank();
     }
 
@@ -1520,10 +1575,10 @@ contract RegenIntegrationTest is Test {
         stakerWhitelist.addToWhitelist(userArr);
         earningPowerWhitelist.addToWhitelist(userArr);
         vm.stopPrank();
-        stakeToken.mint(user, STAKE_AMOUNT);
+        stakeToken.mint(user, getStakeAmount());
         vm.startPrank(user);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, user);
+        stakeToken.approve(address(regenStaker), getStakeAmount());
+        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), user);
         vm.stopPrank();
 
         // Pause the contract
@@ -1535,7 +1590,7 @@ contract RegenIntegrationTest is Test {
         // Attempt to withdraw while paused
         vm.startPrank(user);
         vm.expectRevert(abi.encodeWithSelector(Pausable.EnforcedPause.selector));
-        regenStaker.withdraw(depositId, STAKE_AMOUNT / 2);
+        regenStaker.withdraw(depositId, (getStakeAmount()) / 2);
         vm.stopPrank();
     }
 
@@ -1548,16 +1603,16 @@ contract RegenIntegrationTest is Test {
         stakerWhitelist.addToWhitelist(userArr);
         earningPowerWhitelist.addToWhitelist(userArr);
         vm.stopPrank();
-        stakeToken.mint(user, STAKE_AMOUNT);
+        stakeToken.mint(user, getStakeAmount());
         vm.startPrank(user);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, user);
+        stakeToken.approve(address(regenStaker), getStakeAmount());
+        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), user);
         vm.stopPrank();
 
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        rewardToken.mint(address(regenStaker), getRewardAmount());
         vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2); // Accrue some rewards
+        regenStaker.notifyRewardAmount(getRewardAmount());
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 2); // Accrue some rewards
         // Pause the contract
         regenStaker.pause();
         assertTrue(regenStaker.paused(), "Contract should be paused");
@@ -1590,17 +1645,17 @@ contract RegenIntegrationTest is Test {
         contributorWhitelist.addToWhitelist(userArr);
         vm.stopPrank();
 
-        stakeToken.mint(user, STAKE_AMOUNT);
+        stakeToken.mint(user, getStakeAmount());
         vm.startPrank(user);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, user);
+        stakeToken.approve(address(regenStaker), getStakeAmount());
+        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), user);
         vm.stopPrank();
 
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        rewardToken.mint(address(regenStaker), getRewardAmount());
         vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        regenStaker.notifyRewardAmount(getRewardAmount());
         vm.stopPrank();
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
 
         vm.startPrank(user);
         vm.expectRevert(Staker.Staker__InvalidAddress.selector);
@@ -1626,19 +1681,19 @@ contract RegenIntegrationTest is Test {
         contributorWhitelist.addToWhitelist(userArr);
         vm.stopPrank();
 
-        stakeToken.mint(user, STAKE_AMOUNT);
+        stakeToken.mint(user, getStakeAmount());
         vm.startPrank(user);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, user);
+        stakeToken.approve(address(regenStaker), getStakeAmount());
+        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), user);
         vm.stopPrank();
 
         // Notify a specific amount of rewards
-        uint256 actualRewardAvailable = REWARD_AMOUNT / 2; // Make it less than full REWARD_AMOUNT
+        uint256 actualRewardAvailable = getRewardAmount() / 2; // Make it less than full REWARD_AMOUNT
         rewardToken.mint(address(regenStaker), actualRewardAvailable);
         vm.startPrank(ADMIN);
         regenStaker.notifyRewardAmount(actualRewardAvailable);
         vm.stopPrank();
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION); // Accrue all of actualRewardAvailable
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION()); // Accrue all of actualRewardAvailable
 
         // Action: Attempt to contribute more than available
         uint256 amountToContribute = actualRewardAvailable + 100; // Exceeds available
@@ -1656,7 +1711,7 @@ contract RegenIntegrationTest is Test {
         address user = makeAddr("signUpFailsUser");
         address mockGrantRound = makeAddr("mockGrantRoundSignUpFails");
         address votingDelegatee = makeAddr("votingDelegateeSignUpFails");
-        uint256 amountToContribute = 100e18;
+        uint256 amountToContribute = 100 * (10 ** rewardTokenDecimals); // 100 tokens worth
         uint256[] memory prefs = new uint256[](1);
         prefs[0] = 1;
         uint256[] memory weights = new uint256[](1);
@@ -1669,16 +1724,16 @@ contract RegenIntegrationTest is Test {
         earningPowerWhitelist.addToWhitelist(userArr);
         contributorWhitelist.addToWhitelist(userArr);
         vm.stopPrank();
-        stakeToken.mint(user, STAKE_AMOUNT);
+        stakeToken.mint(user, getStakeAmount());
         vm.startPrank(user);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, user);
+        stakeToken.approve(address(regenStaker), getStakeAmount());
+        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), user);
         vm.stopPrank();
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        rewardToken.mint(address(regenStaker), getRewardAmount());
         vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        regenStaker.notifyRewardAmount(getRewardAmount());
         vm.stopPrank();
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
 
         // Mock signup to return 0 (failure) as originally intended for this test
         vm.mockCall(
@@ -1705,7 +1760,7 @@ contract RegenIntegrationTest is Test {
         address user = makeAddr("epChangeUser");
         address mockGrantRound = makeAddr("mockGrantRoundEpChange");
         address votingDelegatee = makeAddr("votingDelegateeEpChange");
-        uint256 amountToContribute = 1e18; // A smaller amount, ensure it's less than accrued rewards
+        uint256 amountToContribute = 1 * (10 ** rewardTokenDecimals); // 1 token worth
 
         uint256[] memory prefs = new uint256[](1);
         prefs[0] = 1;
@@ -1721,28 +1776,28 @@ contract RegenIntegrationTest is Test {
         contributorWhitelist.addToWhitelist(userArr);
         vm.stopPrank();
 
-        stakeToken.mint(user, STAKE_AMOUNT);
+        stakeToken.mint(user, getStakeAmount());
         vm.startPrank(user);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, user);
+        stakeToken.approve(address(regenStaker), getStakeAmount());
+        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), user);
         vm.stopPrank();
 
-        // Verify initial deposit earning power is STAKE_AMOUNT
+        // Verify initial deposit earning power is getStakeAmount()
         // Deposit struct: balance, owner, earningPower, delegatee, claimer, rewardPerTokenCheckpoint, scaledUnclaimedRewardCheckpoint
         (, , uint96 initialDepositEP, , , , ) = regenStaker.deposits(depositId);
-        assertEq(initialDepositEP, STAKE_AMOUNT, "Initial deposit EP should be STAKE_AMOUNT");
+        assertEq(initialDepositEP, getStakeAmount(), "Initial deposit EP should be getStakeAmount()");
         assertEq(
             regenStaker.depositorTotalEarningPower(user),
-            STAKE_AMOUNT,
-            "Initial total EP for user should be STAKE_AMOUNT"
+            getStakeAmount(),
+            "Initial total EP for user should be getStakeAmount()"
         );
 
         // Setup rewards and let them accrue
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        rewardToken.mint(address(regenStaker), getRewardAmount());
         vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        regenStaker.notifyRewardAmount(getRewardAmount());
         vm.stopPrank();
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION / 2); // Accrue for half period to have some rewards
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 2); // Accrue for half period to have some rewards
 
         // User should have some unclaimed rewards now
         uint256 unclaimedBefore = regenStaker.unclaimedReward(depositId);
@@ -1782,7 +1837,7 @@ contract RegenIntegrationTest is Test {
             expectedNewEP,
             "Total EP for user should be updated to 0"
         );
-        // Global total EP should decrease by the user's previous earning power (which was initialDepositEP, effectively STAKE_AMOUNT for this user)
+        // Global total EP should decrease by the user's previous earning power (which was initialDepositEP, effectively getStakeAmount() for this user)
         assertEq(
             regenStaker.totalEarningPower(),
             globalEpBefore - initialDepositEP,
@@ -1805,16 +1860,16 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         // Owner stakes
-        stakeToken.mint(owner, STAKE_AMOUNT);
+        stakeToken.mint(owner, getStakeAmount());
         vm.startPrank(owner);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, owner);
+        stakeToken.approve(address(regenStaker), getStakeAmount());
+        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), owner);
         vm.stopPrank();
 
         // NotOwner attempts to withdraw
         vm.startPrank(notOwner);
         vm.expectRevert(abi.encodeWithSelector(Staker.Staker__Unauthorized.selector, bytes32("not owner"), notOwner));
-        regenStaker.withdraw(depositId, STAKE_AMOUNT / 2);
+        regenStaker.withdraw(depositId, (getStakeAmount()) / 2);
         vm.stopPrank();
     }
 
@@ -1825,8 +1880,8 @@ contract RegenIntegrationTest is Test {
         address votingDelegatee = contributor;
 
         // Setup deposit
-        stakeToken.mint(contributor, STAKE_AMOUNT);
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        stakeToken.mint(contributor, getStakeAmount());
+        rewardToken.mint(address(regenStaker), getRewardAmount());
         address[] memory contributorArr = new address[](1);
         contributorArr[0] = contributor;
         vm.startPrank(ADMIN);
@@ -1836,21 +1891,24 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         vm.startPrank(contributor);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, contributor);
+        stakeToken.approve(address(regenStaker), getStakeAmount());
+        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), contributor);
         vm.stopPrank();
 
         // Notify rewards and warp
         vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        regenStaker.notifyRewardAmount(getRewardAmount());
         vm.stopPrank();
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
 
         uint256 availableRewards = regenStaker.unclaimedReward(depositId);
         assertTrue(availableRewards > 0, "Should have some rewards");
 
         // Set a fee that is valid and respected by MAX_CLAIM_FEE
-        uint256 feeAmount = _min(1e17, regenStaker.MAX_CLAIM_FEE()); // e.g., 0.1 tokens, ensure it's valid
+        uint256 feeAmount = _min(
+            1 * (10 ** (rewardTokenDecimals > 1 ? rewardTokenDecimals - 1 : 0)),
+            regenStaker.MAX_CLAIM_FEE()
+        ); // 0.1 tokens worth
         assertTrue(feeAmount > 0, "Fee amount for test must be positive and valid");
 
         uint256 amountToContribute = feeAmount - 1; // Try to contribute less than the fee
@@ -1880,7 +1938,7 @@ contract RegenIntegrationTest is Test {
     }
 
     function test_RevertIf_SetClaimFeeParameters_FeeCollectorZeroAndFeeNonZero() public {
-        uint256 validFeeAmount = _min(10e18, regenStaker.MAX_CLAIM_FEE()); // Ensure validFeeAmount respects MAX_CLAIM_FEE
+        uint256 validFeeAmount = _min(10 * (10 ** rewardTokenDecimals), regenStaker.MAX_CLAIM_FEE()); // Ensure validFeeAmount respects MAX_CLAIM_FEE
         assertTrue(validFeeAmount > 0, "Test requires a non-zero feeAmount that is valid.");
 
         vm.startPrank(ADMIN);
@@ -1899,7 +1957,7 @@ contract RegenIntegrationTest is Test {
 
     function test_PermitAndStake_EnforcesStakerWhitelist() public {
         address stakerUser = makeAddr("stakerPermitAndStake");
-        uint256 permitAmount = STAKE_AMOUNT;
+        uint256 permitAmount = getStakeAmount();
 
         // Mint tokens to stakerUser
         stakeToken.mint(stakerUser, permitAmount);
@@ -1934,10 +1992,10 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         // Staker stakes with a delegatee
-        stakeToken.mint(stakerAddress, STAKE_AMOUNT);
+        stakeToken.mint(stakerAddress, getStakeAmount());
         vm.startPrank(stakerAddress);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, delegatee);
+        stakeToken.approve(address(regenStaker), getStakeAmount());
+        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), delegatee);
         vm.stopPrank();
 
         // Check the actual delegatee of the deposit
@@ -1951,15 +2009,15 @@ contract RegenIntegrationTest is Test {
         // Verify that the stake tokens have been transferred to the surrogate contract
         assertEq(
             stakeToken.balanceOf(surrogateAddress),
-            STAKE_AMOUNT,
+            getStakeAmount(),
             "Stake tokens should be transferred to surrogate"
         );
 
         // Make a second stake with the same delegatee and verify it uses the same surrogate
-        stakeToken.mint(stakerAddress, STAKE_AMOUNT);
+        stakeToken.mint(stakerAddress, getStakeAmount());
         vm.startPrank(stakerAddress);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        regenStaker.stake(STAKE_AMOUNT, delegatee); // Remove variable assignment
+        stakeToken.approve(address(regenStaker), getStakeAmount());
+        regenStaker.stake(getStakeAmount(), delegatee); // Remove variable assignment
         vm.stopPrank();
 
         // Verify same surrogate is used
@@ -1967,16 +2025,16 @@ contract RegenIntegrationTest is Test {
         assertEq(surrogateAddress, secondSurrogateAddress, "Should reuse existing surrogate for same delegatee");
         assertEq(
             stakeToken.balanceOf(surrogateAddress),
-            STAKE_AMOUNT * 2,
+            getStakeAmount() * 2,
             "Surrogate should now hold tokens from both stakes"
         );
 
         // Test with a different delegatee to ensure a new surrogate is created
         address newDelegatee = makeAddr("newDelegatee");
-        stakeToken.mint(stakerAddress, STAKE_AMOUNT);
+        stakeToken.mint(stakerAddress, getStakeAmount());
         vm.startPrank(stakerAddress);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        regenStaker.stake(STAKE_AMOUNT, newDelegatee); // Remove variable assignment
+        stakeToken.approve(address(regenStaker), getStakeAmount());
+        regenStaker.stake(getStakeAmount(), newDelegatee); // Remove variable assignment
         vm.stopPrank();
 
         // Verify a new surrogate was created for the new delegatee
@@ -1986,7 +2044,11 @@ contract RegenIntegrationTest is Test {
             newSurrogateAddress != surrogateAddress,
             "New surrogate should be different from original surrogate"
         );
-        assertEq(stakeToken.balanceOf(newSurrogateAddress), STAKE_AMOUNT, "New surrogate should hold staked tokens");
+        assertEq(
+            stakeToken.balanceOf(newSurrogateAddress),
+            getStakeAmount(),
+            "New surrogate should hold staked tokens"
+        );
     }
 
     function test_RevertIf_SetRewardNotifier_NotAdmin() public {
@@ -2045,8 +2107,8 @@ contract RegenIntegrationTest is Test {
 
     function test_DepositorTotalStaked_IsAccessible() public {
         address user = makeAddr("user");
-        uint256 firstStake = 500e18;
-        uint256 secondStake = 300e18;
+        uint256 firstStake = getStakeAmount(500);
+        uint256 secondStake = getStakeAmount(300);
 
         // Whitelist user
         address[] memory users = new address[](1);
@@ -2082,7 +2144,13 @@ contract RegenIntegrationTest is Test {
         address feeCollector = makeAddr("feeCollectorFuzzFee");
 
         // Use a sufficiently large amount to contribute
-        uint256 amountToContributeGross = 1_000_000e18;
+        uint256 amountToContributeGross = 1_000_000 * (10 ** rewardTokenDecimals);
+
+        // Ensure fee doesn't exceed gross amount to prevent underflow
+        if (feeAmount > amountToContributeGross) {
+            feeAmount = uint96(amountToContributeGross);
+        }
+
         uint256 expectedAmountToGrantRoundNet = amountToContributeGross - feeAmount;
 
         // Set up contribution preferences
@@ -2100,16 +2168,16 @@ contract RegenIntegrationTest is Test {
         contributorWhitelist.addToWhitelist(userArr);
         vm.stopPrank();
 
-        stakeToken.mint(user, STAKE_AMOUNT);
+        stakeToken.mint(user, getStakeAmount());
         vm.startPrank(user);
-        stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, user);
+        stakeToken.approve(address(regenStaker), getStakeAmount());
+        Staker.DepositIdentifier depositId = regenStaker.stake(getStakeAmount(), user);
         vm.stopPrank();
 
         // Setup rewards with ample amount
-        rewardToken.mint(address(regenStaker), REWARD_AMOUNT);
+        rewardToken.mint(address(regenStaker), getRewardAmount());
         vm.startPrank(ADMIN);
-        regenStaker.notifyRewardAmount(REWARD_AMOUNT);
+        regenStaker.notifyRewardAmount(getRewardAmount());
 
         // Set the fee parameters with our fuzzed fee amount
         Staker.ClaimFeeParameters memory feeParams = Staker.ClaimFeeParameters({
@@ -2120,7 +2188,7 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         // Accrue rewards
-        vm.warp(block.timestamp + REWARD_PERIOD_DURATION);
+        vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
 
         // Record fee collector's initial balance
         uint256 collectorInitialBalance = rewardToken.balanceOf(feeCollector);

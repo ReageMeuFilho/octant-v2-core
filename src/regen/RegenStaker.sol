@@ -7,12 +7,14 @@ pragma solidity ^0.8.0;
 
 // OpenZeppelin Imports
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 import { EIP712 } from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import { SafeCast } from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
 // Staker Library Imports
 import { IERC20Staking } from "staker/interfaces/IERC20Staking.sol";
@@ -77,6 +79,10 @@ import { IGrantRound } from "./IGrantRound.sol";
 /// @title RegenStaker
 /// @author [Golem Foundation](https://golem.foundation)
 /// @notice This contract is an extended version of the Staker contract by [ScopeLift](https://scopelift.co).
+/// @notice As defined by Staker, REWARD_DURATION is constant and set to 30 days.
+/// @notice You can tax the rewards with a claim fee. If you don't want rewards to be taxable, set MAX_CLAIM_FEE to 0.
+/// @notice Earning power needs to be updated after deposit amount changes. Some changes are automatically triggering the update.
+/// @notice Earning power is updated via bumpEarningPower externally. This action is incentivized with a tip. Use maxBumpTip to set the maximum tip.
 contract RegenStaker is
     Staker,
     StakerDelegateSurrogateVotes,
@@ -139,10 +145,19 @@ contract RegenStaker is
         StakerDelegateSurrogateVotes(_stakeToken)
         EIP712("RegenStaker", "1")
     {
-        stakerWhitelist = address(_stakerWhitelist) == address(0) ? new Whitelist() : _stakerWhitelist;
-        contributionWhitelist = address(_contributionWhitelist) == address(0)
-            ? new Whitelist()
-            : _contributionWhitelist;
+        if (address(_stakerWhitelist) == address(0)) {
+            stakerWhitelist = new Whitelist();
+            Ownable(address(stakerWhitelist)).transferOwnership(_admin);
+        } else {
+            stakerWhitelist = _stakerWhitelist;
+        }
+
+        if (address(_contributionWhitelist) == address(0)) {
+            contributionWhitelist = new Whitelist();
+            Ownable(address(contributionWhitelist)).transferOwnership(_admin);
+        } else {
+            contributionWhitelist = _contributionWhitelist;
+        }
 
         MAX_CLAIM_FEE = _maxClaimFee;
         _setClaimFeeParameters(ClaimFeeParameters({ feeAmount: 0, feeCollector: address(0) }));
@@ -187,6 +202,94 @@ contract RegenStaker is
         Deposit storage deposit = deposits[_depositId];
 
         _revertIfNotDepositOwner(deposit, msg.sender);
+        _stakeMore(deposit, _depositId, _amount);
+    }
+
+    /// @inheritdoc StakerOnBehalf
+    function stakeOnBehalf(
+        uint256 _amount,
+        address _delegatee,
+        address _claimer,
+        address _depositor,
+        uint256 _deadline,
+        bytes memory _signature
+    ) external override whenNotPaused nonReentrant returns (DepositIdentifier _depositId) {
+        _revertIfPastDeadline(_deadline);
+        _revertIfSignatureIsNotValidNow(
+            _depositor,
+            _hashTypedDataV4(
+                keccak256(
+                    abi.encode(
+                        STAKE_TYPEHASH,
+                        _amount,
+                        _delegatee,
+                        _claimer,
+                        _depositor,
+                        _useNonce(_depositor),
+                        _deadline
+                    )
+                )
+            ),
+            _signature
+        );
+        _depositId = _stake(_depositor, _amount, _delegatee, _claimer);
+    }
+
+    /// @inheritdoc StakerOnBehalf
+    function stakeMoreOnBehalf(
+        DepositIdentifier _depositId,
+        uint256 _amount,
+        address _depositor,
+        uint256 _deadline,
+        bytes memory _signature
+    ) external override whenNotPaused nonReentrant {
+        Deposit storage deposit = deposits[_depositId];
+        _revertIfNotDepositOwner(deposit, _depositor);
+        _revertIfPastDeadline(_deadline);
+        _revertIfSignatureIsNotValidNow(
+            _depositor,
+            _hashTypedDataV4(
+                keccak256(
+                    abi.encode(STAKE_MORE_TYPEHASH, _depositId, _amount, _depositor, _useNonce(_depositor), _deadline)
+                )
+            ),
+            _signature
+        );
+
+        _stakeMore(deposit, _depositId, _amount);
+    }
+
+    /// @inheritdoc StakerPermitAndStake
+    function permitAndStake(
+        uint256 _amount,
+        address _delegatee,
+        address _claimer,
+        uint256 _deadline,
+        uint8 _v,
+        bytes32 _r,
+        bytes32 _s
+    ) external override whenNotPaused nonReentrant returns (DepositIdentifier _depositId) {
+        try
+            IERC20Permit(address(STAKE_TOKEN)).permit(msg.sender, address(this), _amount, _deadline, _v, _r, _s)
+        {} catch {}
+        _depositId = _stake(msg.sender, _amount, _delegatee, _claimer);
+    }
+
+    /// @inheritdoc StakerPermitAndStake
+    function permitAndStakeMore(
+        DepositIdentifier _depositId,
+        uint256 _amount,
+        uint256 _deadline,
+        uint8 _v,
+        bytes32 _r,
+        bytes32 _s
+    ) external override whenNotPaused nonReentrant {
+        Deposit storage deposit = deposits[_depositId];
+        _revertIfNotDepositOwner(deposit, msg.sender);
+
+        try
+            IERC20Permit(address(STAKE_TOKEN)).permit(msg.sender, address(this), _amount, _deadline, _v, _r, _s)
+        {} catch {}
         _stakeMore(deposit, _depositId, _amount);
     }
 

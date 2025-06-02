@@ -41,7 +41,7 @@ contract StrategyAccountingTest is Test {
 
     function setUp() public {
         gov = address(this);
-        asset = new MockERC20();
+        asset = new MockERC20(18);
 
         vaultImplementation = new Vault();
         vaultFactory = new VaultFactory("Test Vault", address(vaultImplementation), gov);

@@ -11,6 +11,7 @@ import { MockFactory } from "../../mocks/MockFactory.sol";
 import { MockAccountant } from "../../mocks/MockAccountant.sol";
 import { MockFlexibleAccountant } from "../../mocks/MockFlexibleAccountant.sol";
 import { VaultFactory } from "../../../src/dragons/vaults/VaultFactory.sol";
+
 contract QueueManagementTest is Test {
     Vault vaultImplementation;
     Vault vault;
@@ -32,7 +33,7 @@ contract QueueManagementTest is Test {
 
     function setUp() public {
         // Setup asset
-        asset = new MockERC20();
+        asset = new MockERC20(18);
         asset.mint(gov, 1_000_000e18);
         asset.mint(fish, fishAmount);
 

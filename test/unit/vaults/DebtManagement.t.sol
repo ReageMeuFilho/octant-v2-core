@@ -30,7 +30,7 @@ contract DebtManagementTest is Test {
         gov = address(this);
         bunny = address(0x123);
 
-        asset = new MockERC20();
+        asset = new MockERC20(18);
 
         // Create and initialize the vault
         vaultImplementation = new Vault();

@@ -27,7 +27,7 @@ contract StrategyWithdrawTest is Test {
         fish = address(0xFE5);
         fishAmount = 1e18; // 1 ETH
 
-        asset = new MockERC20();
+        asset = new MockERC20(18);
 
         // Create and initialize the vault
         vaultImplementation = new Vault();

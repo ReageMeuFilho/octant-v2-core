@@ -24,7 +24,7 @@ contract AutoAllocateTest is Test {
         gov = address(this);
         fish = makeAddr("fish");
         fishAmount = 1e18;
-        asset = new MockERC20();
+        asset = new MockERC20(18);
 
         // Create and initialize the vault
         vaultImplementation = new Vault();
