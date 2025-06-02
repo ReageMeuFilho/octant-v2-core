@@ -82,38 +82,6 @@ contract YieldSkimmingTokenizedStrategy is DragonTokenizedStrategy {
     }
 
     /**
-     * @dev Override redeem to ensure the totalAssets is updated before redeeming and removed reentrancy protection
-     * @param shares The amount of shares to redeem
-     * @param receiver The address that will receive the assets
-     * @param owner The address that is redeeming the shares
-     * @param maxLoss The maximum loss that is allowed
-     */
-    function redeem(
-        uint256 shares,
-        address receiver,
-        address owner,
-        uint256 maxLoss
-    ) public override(DragonTokenizedStrategy) returns (uint256) {
-        return super.redeem(shares, receiver, owner, maxLoss);
-    }
-
-    /**
-     * @dev Override withdraw to ensure the totalAssets is updated before withdrawing and removed reentrancy protection
-     * @param assets The amount of assets to withdraw
-     * @param receiver The address that will receive the assets
-     * @param owner The address that is withdrawing the assets
-     * @param maxLoss The maximum loss that is allowed
-     */
-    function withdraw(
-        uint256 assets,
-        address receiver,
-        address owner,
-        uint256 maxLoss
-    ) public override(DragonTokenizedStrategy) returns (uint256 shares) {
-        return super.withdraw(assets, receiver, owner, maxLoss);
-    }
-
-    /**
      * @dev Helper function to convert assets to shares during a report
      * @param S Storage struct pointer to access strategy's storage variables
      * @param assets The amount of assets to convert to shares
