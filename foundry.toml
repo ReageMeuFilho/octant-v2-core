@@ -6,7 +6,7 @@ evm_version = "cancun"
 optimizer = true
 # Runs changed from 10M to 25k to fit code in EVM
 optimizer_runs = 1
-solc = "0.8.28"
+solc = "0.8.30"
 verbosity = 3
 ast = true
 fs_permissions = [
