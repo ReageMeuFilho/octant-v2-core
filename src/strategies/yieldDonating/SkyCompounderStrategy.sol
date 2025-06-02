@@ -7,12 +7,12 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 
 import { IUniswapV2Router02 } from "@tokenized-strategy-periphery/interfaces/Uniswap/V2/IUniswapV2Router02.sol";
 import { UniswapV3Swapper } from "src/strategies/periphery/UniswapV3Swapper.sol";
-import { IStaking } from "src/interfaces/ISky.sol";
+import { IStaking, ISkyCompounder } from "src/interfaces/ISky.sol";
 
 /// @title yearn-v3-SkyCompounder
 /// @author mil0x
 /// @notice yearn v3 Strategy that autocompounds staking rewards.
-contract SkyCompounderStrategy is BaseHealthCheck, UniswapV3Swapper {
+contract SkyCompounderStrategy is BaseHealthCheck, UniswapV3Swapper, ISkyCompounder {
     using SafeERC20 for ERC20;
 
     ///@notice Represents if we should claim rewards. Default to true.
@@ -39,6 +39,11 @@ contract SkyCompounderStrategy is BaseHealthCheck, UniswapV3Swapper {
     address private constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
 
     uint256 private constant ASSET_DUST = 100;
+
+    modifier onlyGovernance() {
+        require(msg.sender == GOV, "!gov");
+        _;
+    }
 
     constructor(
         address _staking,
@@ -68,6 +73,7 @@ contract SkyCompounderStrategy is BaseHealthCheck, UniswapV3Swapper {
      */
     function setClaimRewards(bool _claimRewards) external onlyManagement {
         claimRewards = _claimRewards;
+        emit ClaimRewardsUpdated(_claimRewards);
     }
 
     /**
@@ -77,8 +83,11 @@ contract SkyCompounderStrategy is BaseHealthCheck, UniswapV3Swapper {
      */
     function setUseUniV3andFees(bool _useUniV3, uint24 _rewardToBase, uint24 _baseToAsset) external onlyManagement {
         useUniV3 = _useUniV3;
-        _setUniFees(rewardsToken, base, _rewardToBase);
-        _setUniFees(base, address(asset), _baseToAsset);
+        if (useUniV3) {
+            _setUniFees(rewardsToken, base, _rewardToBase);
+            _setUniFees(base, address(asset), _baseToAsset);
+        }
+        emit UniV3SettingsUpdated(_useUniV3, _rewardToBase, _baseToAsset);
     }
 
     /**
@@ -87,15 +96,19 @@ contract SkyCompounderStrategy is BaseHealthCheck, UniswapV3Swapper {
      */
     function setMinAmountToSell(uint256 _minAmountToSell) external onlyManagement {
         minAmountToSell = _minAmountToSell;
+        emit MinAmountToSellUpdated(_minAmountToSell);
     }
 
     /**
-     * @notice Set the base token between USDS, DAI, USDC, or WETH. (Default = USDS)
+     * @notice Set the base token and optionally UniswapV3 usage with fees
      * @param _base address of either USDS, DAI, USDC, or WETH.
-     * @dev This can be used for management to change which pool
-     * to trade reward tokens.
+     * @param _useUniV3 whether to use UniswapV3 (true) or UniswapV2 (false) for swaps
+     * @param _rewardToBase fee for reward token to base token (only used if _useUniV3 is true)
+     * @param _baseToAsset fee for base token to asset (only used if _useUniV3 is true)
+     * @dev This can be used for management to change which pool to trade reward tokens.
+     * If _useUniV3 is true, fee parameters must be provided to prevent issues on the report function.
      */
-    function setBase(address _base) external onlyManagement {
+    function setBase(address _base, bool _useUniV3, uint24 _rewardToBase, uint24 _baseToAsset) external onlyManagement {
         if (_base == USDS) {
             base = USDS;
         } else if (_base == DAI) {
@@ -107,6 +120,24 @@ contract SkyCompounderStrategy is BaseHealthCheck, UniswapV3Swapper {
         } else {
             revert("!base in list");
         }
+
+        useUniV3 = _useUniV3;
+
+        if (_useUniV3) {
+            _setUniFees(rewardsToken, base, _rewardToBase);
+            _setUniFees(base, address(asset), _baseToAsset);
+        }
+
+        emit BaseTokenUpdated(_base, _useUniV3, _rewardToBase, _baseToAsset);
+    }
+
+    /**
+     * @notice Set the referral code for staking.
+     * @param _referral uint16 referral code
+     */
+    function setReferral(uint16 _referral) external onlyManagement {
+        referral = _referral;
+        emit ReferralUpdated(_referral);
     }
 
     function availableDepositLimit(address /*_owner*/) public view override returns (uint256) {
@@ -131,14 +162,6 @@ contract SkyCompounderStrategy is BaseHealthCheck, UniswapV3Swapper {
         return IStaking(staking).earned(address(this));
     }
 
-    /**
-     * @notice Set the referral code for staking.
-     * @param _referral uint16 referral code
-     */
-    function setReferral(uint16 _referral) external onlyManagement {
-        referral = _referral;
-    }
-
     function _deployFunds(uint256 _amount) internal override {
         IStaking(staking).stake(_amount, referral);
     }
@@ -148,6 +171,10 @@ contract SkyCompounderStrategy is BaseHealthCheck, UniswapV3Swapper {
     }
 
     function _harvestAndReport() internal override returns (uint256 _totalAssets) {
+        // MEV PROTECTION: The swaps below use minAmountOut=0 which creates front-running vulnerability.
+        // Strategy keepers MUST use private RPCs (Flashbots Protect) to prevent sandwich attacks
+        // until proper slippage protection is implemented. Without private mempool protection,
+        // MEV bots can extract significant value from these reward swaps.
         if (claimRewards) {
             IStaking(staking).getReward();
             if (useUniV3) {
@@ -182,6 +209,11 @@ contract SkyCompounderStrategy is BaseHealthCheck, UniswapV3Swapper {
         }
     }
 
+    function _emergencyWithdraw(uint256 _amount) internal override {
+        _amount = _min(_amount, balanceOfStake());
+        _freeFunds(_amount);
+    }
+
     function _getTokenOutPath(
         address _tokenIn,
         address _tokenOut
@@ -201,26 +233,5 @@ contract SkyCompounderStrategy is BaseHealthCheck, UniswapV3Swapper {
 
     function _min(uint256 a, uint256 b) internal pure returns (uint256) {
         return a < b ? a : b;
-    }
-
-    function _emergencyWithdraw(uint256 _amount) internal override {
-        _amount = _min(_amount, balanceOfStake());
-        _freeFunds(_amount);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                GOVERNANCE:
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Sweep of non-asset ERC20 tokens to governance (onlyGovernance)
-    /// @param _token The ERC20 token to sweep
-    function sweep(address _token) external onlyGovernance {
-        require(_token != address(asset), "!asset");
-        ERC20(_token).safeTransfer(GOV, ERC20(_token).balanceOf(address(this)));
-    }
-
-    modifier onlyGovernance() {
-        require(msg.sender == GOV, "!gov");
-        _;
     }
 }
