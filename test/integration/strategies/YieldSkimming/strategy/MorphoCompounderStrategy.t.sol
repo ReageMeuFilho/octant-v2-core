@@ -3,7 +3,7 @@ pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
-import { MorphoCompounderStrategy } from "src/strategies/YieldSkimming/MorphoCompounderStrategy.sol";
+import { MorphoCompounderStrategy } from "src/strategies/yieldSkimming/MorphoCompounderStrategy.sol";
 import { BaseHealthCheck } from "src/strategies/periphery/BaseHealthCheck.sol";
 import { UniswapV3Swapper } from "src/strategies/periphery/UniswapV3Swapper.sol";
 import { MorphoCompounderStrategyVaultFactory } from "src/factories/MorphoCompounderStrategyVaultFactory.sol";

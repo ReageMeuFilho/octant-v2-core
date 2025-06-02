@@ -3,7 +3,7 @@ pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
-import { LidoStrategy } from "src/strategies/YieldSkimming/LidoStrategy.sol";
+import { LidoStrategy } from "src/strategies/yieldSkimming/LidoStrategy.sol";
 import { LidoStrategyVaultFactory } from "src/factories/LidoStrategyVaultFactory.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";

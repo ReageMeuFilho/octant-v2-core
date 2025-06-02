@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.23;
 
-import { MorphoCompounderStrategy } from "src/strategies/YieldSkimming/MorphoCompounderStrategy.sol";
+import { MorphoCompounderStrategy } from "src/strategies/yieldSkimming/MorphoCompounderStrategy.sol";
 
 contract MorphoCompounderWrapper is MorphoCompounderStrategy {
     constructor(

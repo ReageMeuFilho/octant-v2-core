@@ -2,7 +2,7 @@
 pragma solidity >=0.8.25;
 
 import { CREATE3 } from "@solady/utils/CREATE3.sol";
-import { LidoStrategy } from "src/strategies/YieldSkimming/LidoStrategy.sol";
+import { LidoStrategy } from "src/strategies/yieldSkimming/LidoStrategy.sol";
 
 contract LidoStrategyVaultFactory {
     /**

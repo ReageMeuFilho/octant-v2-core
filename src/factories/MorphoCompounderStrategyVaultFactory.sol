@@ -2,7 +2,7 @@
 pragma solidity >=0.8.25;
 
 import { CREATE3 } from "@solady/utils/CREATE3.sol";
-import { MorphoCompounderStrategy } from "src/strategies/YieldSkimming/MorphoCompounderStrategy.sol";
+import { MorphoCompounderStrategy } from "src/strategies/yieldSkimming/MorphoCompounderStrategy.sol";
 
 contract MorphoCompounderStrategyVaultFactory {
     /**
