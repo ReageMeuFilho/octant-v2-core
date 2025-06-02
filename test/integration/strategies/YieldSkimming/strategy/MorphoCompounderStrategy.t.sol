@@ -94,7 +94,6 @@ contract MorphoCompounderStrategyTest is Test {
         // where mainnet = "${ETHEREUM_NODE_MAINNET}" environment variable
         mainnetFork = vm.createFork("mainnet");
         vm.selectFork(mainnetFork);
-        vm.rollFork(mainnetForkBlock);
 
         // Etch YieldSkimmingTokenizedStrategy
         YieldSkimmingTokenizedStrategy tempStrategy = new YieldSkimmingTokenizedStrategy{
@@ -477,9 +476,6 @@ contract MorphoCompounderStrategyTest is Test {
         uint256 userShares = vault.balanceOf(user);
         uint256 assetsReceived = vault.redeem(userShares, user, user);
         vm.stopPrank();
-
-        // roll for 30 days
-        vm.rollFork(block.number + 6500 * 30);
 
         // The user should receive approximately their original deposit in value
         // We allow a small deviation due to potential rounding in the calculations

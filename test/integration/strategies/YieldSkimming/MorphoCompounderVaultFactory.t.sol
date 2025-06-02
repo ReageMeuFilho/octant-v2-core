@@ -40,7 +40,6 @@ contract MorphoCompounderVaultFactoryTest is Test {
         // Create a mainnet fork
         mainnetFork = vm.createFork("mainnet");
         vm.selectFork(mainnetFork);
-        vm.rollFork(mainnetForkBlock);
 
         // Etch YieldSkimmingTokenizedStrategy
         YieldSkimmingTokenizedStrategy tempStrategy = new YieldSkimmingTokenizedStrategy{
