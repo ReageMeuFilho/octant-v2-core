@@ -2,11 +2,11 @@
 pragma solidity ^0.8.25;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IERC4626Payable } from "../../interfaces/IERC4626Payable.sol";
+import { IERC4626Payable } from "src/interfaces/IERC4626Payable.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
-import { IAccountant } from "../../interfaces/IAccountant.sol";
-import { IVaultFactory } from "../../interfaces/IVaultFactory.sol";
-import { IVault } from "../../interfaces/IVault.sol";
+import { IAccountant } from "src/interfaces/IAccountant.sol";
+import { IMultistrategyVaultFactory } from "src/interfaces/IMultistrategyVaultFactory.sol";
+import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
 /// @notice Library with all actions that can be performed on strategies
@@ -48,7 +48,7 @@ library StrategyManagementLib {
      * @param maxQueueLength The maximum length allowed for the queue
      */
     function addStrategy(
-        mapping(address => IVault.StrategyParams) storage strategies,
+        mapping(address => IMultistrategyVault.StrategyParams) storage strategies,
         address[] storage defaultQueue,
         address newStrategy,
         bool addToQueue,
@@ -56,16 +56,16 @@ library StrategyManagementLib {
         uint256 maxQueueLength
     ) external {
         // Validate the strategy
-        if (newStrategy == address(0)) revert IVault.StrategyCannotBeZeroAddress();
+        if (newStrategy == address(0)) revert IMultistrategyVault.StrategyCannotBeZeroAddress();
 
         // Verify the strategy asset matches the vault's asset
-        if (IERC4626Payable(newStrategy).asset() != vaultAsset) revert IVault.InvalidAsset();
+        if (IERC4626Payable(newStrategy).asset() != vaultAsset) revert IMultistrategyVault.InvalidAsset();
 
         // Check the strategy is not already active
-        if (strategies[newStrategy].activation != 0) revert IVault.StrategyAlreadyActive();
+        if (strategies[newStrategy].activation != 0) revert IMultistrategyVault.StrategyAlreadyActive();
 
         // Add the new strategy to the mapping with initialization parameters
-        strategies[newStrategy] = IVault.StrategyParams({
+        strategies[newStrategy] = IMultistrategyVault.StrategyParams({
             activation: block.timestamp,
             lastReport: block.timestamp,
             currentDebt: 0,
@@ -87,16 +87,16 @@ library StrategyManagementLib {
      * @return lossAmount The amount of loss realized if force revoking a strategy with debt
      */
     function revokeStrategy(
-        mapping(address => IVault.StrategyParams) storage strategies,
+        mapping(address => IMultistrategyVault.StrategyParams) storage strategies,
         address[] storage defaultQueue,
         address strategy,
         bool force
     ) external returns (uint256 lossAmount) {
-        if (strategies[strategy].activation == 0) revert IVault.StrategyNotActive();
+        if (strategies[strategy].activation == 0) revert IMultistrategyVault.StrategyNotActive();
 
         uint256 currentDebt = strategies[strategy].currentDebt;
         if (currentDebt != 0) {
-            if (!force) revert IVault.StrategyHasDebt();
+            if (!force) revert IMultistrategyVault.StrategyHasDebt();
 
             // If force is true, we realize the full loss of outstanding debt
             lossAmount = currentDebt;
@@ -105,7 +105,12 @@ library StrategyManagementLib {
         }
 
         // Set strategy params all back to 0 (WARNING: it can be re-added)
-        strategies[strategy] = IVault.StrategyParams({ activation: 0, lastReport: 0, currentDebt: 0, maxDebt: 0 });
+        strategies[strategy] = IMultistrategyVault.StrategyParams({
+            activation: 0,
+            lastReport: 0,
+            currentDebt: 0,
+            maxDebt: 0
+        });
 
         // First count how many strategies we'll keep to properly size the new array
         uint256 strategiesInQueue = 0;
@@ -148,7 +153,7 @@ library StrategyManagementLib {
     }
 
     function assessStrategy(
-        mapping(address => IVault.StrategyParams) storage strategies,
+        mapping(address => IMultistrategyVault.StrategyParams) storage strategies,
         address strategy,
         address accountant,
         address asset,
@@ -162,7 +167,7 @@ library StrategyManagementLib {
 
         if (strategy != vaultAddress) {
             // Make sure we have a valid strategy
-            if (strategies[strategy].activation == 0) revert IVault.InactiveStrategy();
+            if (strategies[strategy].activation == 0) revert IMultistrategyVault.InactiveStrategy();
 
             // Vault assesses profits using 4626 compliant interface
             uint256 strategyShares = IERC4626(strategy).balanceOf(vaultAddress);
@@ -207,9 +212,8 @@ library StrategyManagementLib {
 
         // Protocol fee config information
         if (assessment.totalFees > 0) {
-            (assessment.protocolFeeBps, assessment.protocolFeeRecipient) = IVaultFactory(factory).protocolFeeConfig(
-                vaultAddress
-            );
+            (assessment.protocolFeeBps, assessment.protocolFeeRecipient) = IMultistrategyVaultFactory(factory)
+                .protocolFeeConfig(vaultAddress);
         }
 
         // Store profit max unlock time for later use in the vault
@@ -260,7 +264,7 @@ library StrategyManagementLib {
         uint256 strategyCurrentDebt,
         uint256 assetsNeeded
     ) external view returns (uint256) {
-        if (strategyCurrentDebt < assetsNeeded) revert IVault.NotEnoughDebt();
+        if (strategyCurrentDebt < assetsNeeded) revert IMultistrategyVault.NotEnoughDebt();
 
         // The actual amount that the debt is currently worth.
         uint256 vaultShares = IERC4626Payable(strategy).balanceOf(address(this));

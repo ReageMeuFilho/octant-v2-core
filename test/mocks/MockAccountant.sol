@@ -3,7 +3,7 @@ pragma solidity ^0.8.25;
 
 import { IAccountant } from "../../src/interfaces/IAccountant.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IVault } from "../../src/interfaces/IVault.sol";
+import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
 
 // based off https://github.com/yearn/yearn-vaults-v3/blob/master/tests/unit/vault/test_strategy_accounting.py
 contract MockAccountant is IAccountant {
@@ -45,7 +45,7 @@ contract MockAccountant is IAccountant {
         uint256 loss
     ) external override returns (uint256 totalFees, uint256 totalRefunds) {
         // Get strategy params from the vault
-        IVault.StrategyParams memory strategyParams = IVault(msg.sender).strategies(strategy);
+        IMultistrategyVault.StrategyParams memory strategyParams = IMultistrategyVault(msg.sender).strategies(strategy);
         Fee memory fee = fees[strategy];
         uint256 duration = block.timestamp - strategyParams.lastReport;
 

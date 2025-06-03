@@ -2,7 +2,7 @@
 pragma solidity ^0.8.25;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IVault } from "../../interfaces/IVault.sol";
+import { IMultistrategyVault } from "../../interfaces/IMultistrategyVault.sol";
 
 /**
  * @title ERC20SafeLib
@@ -21,7 +21,7 @@ library ERC20SafeLib {
             abi.encodeWithSelector(IERC20.approve.selector, spender, amount)
         );
         if (!success || (data.length > 0 && !abi.decode(data, (bool)))) {
-            revert IVault.ApprovalFailed();
+            revert IMultistrategyVault.ApprovalFailed();
         }
     }
 
@@ -37,7 +37,7 @@ library ERC20SafeLib {
             abi.encodeWithSelector(IERC20.transferFrom.selector, sender, receiver, amount)
         );
         if (!success || (data.length > 0 && !abi.decode(data, (bool)))) {
-            revert IVault.TransferFailed();
+            revert IMultistrategyVault.TransferFailed();
         }
     }
 
@@ -52,7 +52,7 @@ library ERC20SafeLib {
             abi.encodeWithSelector(IERC20.transfer.selector, receiver, amount)
         );
         if (!success || (data.length > 0 && !abi.decode(data, (bool)))) {
-            revert IVault.TransferFailed();
+            revert IMultistrategyVault.TransferFailed();
         }
     }
 }

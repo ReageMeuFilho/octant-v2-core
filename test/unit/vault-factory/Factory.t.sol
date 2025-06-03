@@ -2,13 +2,13 @@
 pragma solidity ^0.8.25;
 
 import "forge-std/Test.sol";
-import { VaultFactory } from "../../../src/dragons/vaults/VaultFactory.sol";
-import { Vault } from "../../../src/dragons/vaults/Vault.sol";
-import { IVaultFactory } from "../../../src/interfaces/IVaultFactory.sol";
-import { IVault } from "../../../src/interfaces/IVault.sol";
+import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
+import { MultistrategyVault } from "src/core/MultistrategyVault.sol";
+import { IMultistrategyVaultFactory } from "src/interfaces/IMultistrategyVaultFactory.sol";
+import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
 
 // Mocks needed for testing
-import { MockERC20 } from "../../mocks/MockERC20.sol";
+import { MockERC20 } from "test/mocks/MockERC20.sol";
 
 contract VaultFactoryTest is Test {
     // Constants
@@ -21,7 +21,7 @@ contract VaultFactoryTest is Test {
 
     // Contracts
     MockERC20 asset;
-    VaultFactory vaultFactory;
+    MultistrategyVaultFactory vaultFactory;
     address vaultImplementation;
 
     function setUp() public {
@@ -35,10 +35,10 @@ contract VaultFactoryTest is Test {
 
         // Deploy a vault implementation
         // Note: In a real test, you'd deploy the actual vault implementation
-        vaultImplementation = address(new Vault());
+        vaultImplementation = address(new MultistrategyVault());
 
         // Deploy the vault factory
-        vaultFactory = new VaultFactory("Vault V3 Factory test", vaultImplementation, gov);
+        vaultFactory = new MultistrategyVaultFactory("Vault V3 Factory test", vaultImplementation, gov);
 
         // Label addresses for better trace output
         vm.label(gov, "Governor");
@@ -57,7 +57,7 @@ contract VaultFactoryTest is Test {
         address newVaultAddr = vaultFactory.deployNewVault(address(asset), "first_vault", "fv", bunny, WEEK);
 
         // Check the events and vault properties
-        IVault newVault = IVault(newVaultAddr);
+        MultistrategyVault newVault = MultistrategyVault(newVaultAddr);
         assertEq(newVault.name(), "first_vault");
         assertEq(newVault.roleManager(), bunny);
 
@@ -66,7 +66,7 @@ contract VaultFactoryTest is Test {
         address secondVaultAddr = vaultFactory.deployNewVault(address(asset), "second_vault", "sv", fish, WEEK);
 
         // Check the events and vault properties
-        IVault secondVault = IVault(secondVaultAddr);
+        IMultistrategyVault secondVault = IMultistrategyVault(secondVaultAddr);
         assertEq(secondVault.name(), "second_vault");
         assertEq(secondVault.roleManager(), fish);
     }
@@ -77,7 +77,7 @@ contract VaultFactoryTest is Test {
         address newVaultAddr = vaultFactory.deployNewVault(address(asset), "first_vault", "fv", bunny, WEEK);
 
         // Check properties
-        IVault newVault = IVault(newVaultAddr);
+        IMultistrategyVault newVault = IMultistrategyVault(newVaultAddr);
         assertEq(newVault.name(), "first_vault");
         assertEq(newVault.roleManager(), bunny);
 
@@ -86,7 +86,7 @@ contract VaultFactoryTest is Test {
         address anotherVaultAddr = vaultFactory.deployNewVault(address(asset), "first_vault", "fv", bunny, WEEK);
 
         // Check properties
-        IVault anotherVault = IVault(anotherVaultAddr);
+        IMultistrategyVault anotherVault = IMultistrategyVault(anotherVaultAddr);
         assertEq(anotherVault.name(), "first_vault");
         assertEq(anotherVault.roleManager(), bunny);
     }
@@ -97,7 +97,7 @@ contract VaultFactoryTest is Test {
         address newVaultAddr = vaultFactory.deployNewVault(address(asset), "first_vault", "fv", bunny, WEEK);
 
         // Check properties
-        IVault newVault = IVault(newVaultAddr);
+        IMultistrategyVault newVault = IMultistrategyVault(newVaultAddr);
         assertEq(newVault.name(), "first_vault");
         assertEq(newVault.roleManager(), bunny);
 
@@ -138,21 +138,21 @@ contract VaultFactoryTest is Test {
 
         // Try to initialize the original vault
         vm.prank(gov);
-        vm.expectRevert(IVault.AlreadyInitialized.selector);
-        IVault(original).initialize(address(asset), "first_vault", "fv", bunny, WEEK);
+        vm.expectRevert(IMultistrategyVault.AlreadyInitialized.selector);
+        IMultistrategyVault(original).initialize(address(asset), "first_vault", "fv", bunny, WEEK);
 
         // Deploy a new vault
         vm.prank(gov);
         address newVaultAddr = vaultFactory.deployNewVault(address(asset), "first_vault", "fv", bunny, WEEK);
 
         // Check properties
-        IVault newVault = IVault(newVaultAddr);
+        IMultistrategyVault newVault = IMultistrategyVault(newVaultAddr);
         assertEq(newVault.name(), "first_vault");
         assertEq(newVault.roleManager(), bunny);
 
         // Try to reinitialize the new vault
         vm.prank(gov);
-        vm.expectRevert(IVault.AlreadyInitialized.selector);
+        vm.expectRevert(IMultistrategyVault.AlreadyInitialized.selector);
         newVault.initialize(address(asset), "first_vault", "fv", bunny, WEEK);
     }
 }

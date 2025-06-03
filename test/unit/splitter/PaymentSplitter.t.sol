@@ -2,10 +2,10 @@
 pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
-import { PaymentSplitter } from "src/dragons/splitter/PaymentSplitter.sol";
-import { PaymentSplitterFactory } from "src/dragons/splitter/PaymentSplitterFactory.sol";
+import { PaymentSplitter } from "src/core/PaymentSplitter.sol";
+import { PaymentSplitterFactory } from "src/factories/PaymentSplitterFactory.sol";
 import { ERC20, IERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import { MockERC20 } from "../../mocks/MockERC20.sol";
+import { MockERC20 } from "test/mocks/MockERC20.sol";
 
 contract PaymentSplitterTest is Test {
     PaymentSplitter public splitter;

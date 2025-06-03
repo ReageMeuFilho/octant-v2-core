@@ -2,11 +2,11 @@
 pragma solidity ^0.8.25;
 
 import "forge-std/Script.sol";
-import { VaultFactory } from "src/dragons/vaults/VaultFactory.sol";
-import { IVault } from "src/interfaces/IVault.sol";
+import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
+import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
 
 contract DeployVaults is Script {
-    VaultFactory vaultFactory;
+    MultistrategyVaultFactory vaultFactory;
     address public factoryAddress;
 
     // Vault parameters
@@ -27,7 +27,7 @@ contract DeployVaults is Script {
         // Get factory address
         try vm.prompt("Enter VaultFactory address") returns (string memory res) {
             factoryAddress = vm.parseAddress(res);
-            vaultFactory = VaultFactory(factoryAddress);
+            vaultFactory = MultistrategyVaultFactory(factoryAddress);
             console.log("Using VaultFactory at:", factoryAddress);
         } catch (bytes memory) {
             revert("Invalid VaultFactory address");
@@ -97,7 +97,7 @@ contract DeployVaults is Script {
         console.log("  - Profit Max Unlock Time:", profitMaxUnlockTime);
 
         // Check that the vault has the expected values
-        IVault vault = IVault(vaultAddress);
+        IMultistrategyVault vault = IMultistrategyVault(vaultAddress);
         console.log("Vault verification:");
         console.log("  - API Version:", vault.apiVersion());
         console.log("  - Asset matches:", vault.asset() == asset);
@@ -114,7 +114,7 @@ contract DeployVaults is Script {
         // Get factory address only once
         try vm.prompt("Enter VaultFactory address") returns (string memory res) {
             factoryAddress = vm.parseAddress(res);
-            vaultFactory = VaultFactory(factoryAddress);
+            vaultFactory = MultistrategyVaultFactory(factoryAddress);
             console.log("Using VaultFactory at:", factoryAddress);
         } catch (bytes memory) {
             revert("Invalid VaultFactory address");

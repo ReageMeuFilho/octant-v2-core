@@ -2,10 +2,11 @@
 pragma solidity ^0.8.25;
 
 import "forge-std/Test.sol";
-import "../../../src/dragons/vaults/VaultFactory.sol";
+import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
+import { MultistrategyVault } from "src/core/MultistrategyVault.sol";
 
 contract OwnershipTest is Test {
-    VaultFactory vaultFactory;
+    MultistrategyVaultFactory vaultFactory;
     address gov;
     address strategist;
     address bunny;
@@ -19,7 +20,7 @@ contract OwnershipTest is Test {
         vaultOriginal = address(0x4);
 
         vm.startPrank(gov);
-        vaultFactory = new VaultFactory("Test Factory", vaultOriginal, gov);
+        vaultFactory = new MultistrategyVaultFactory("Test Factory", vaultOriginal, gov);
         vm.stopPrank();
     }
 

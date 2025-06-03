@@ -2,11 +2,11 @@
 pragma solidity ^0.8.25;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IERC4626Payable } from "../../interfaces/IERC4626Payable.sol";
+import { IERC4626Payable } from "src/interfaces/IERC4626Payable.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
-import { IAccountant } from "../../interfaces/IAccountant.sol";
-import { IVaultFactory } from "../../interfaces/IVaultFactory.sol";
-import { IVault } from "../../interfaces/IVault.sol";
+import { IAccountant } from "src/interfaces/IAccountant.sol";
+import { IMultistrategyVaultFactory } from "src/interfaces/IMultistrategyVaultFactory.sol";
+import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
 /// @notice Library with all actions that can be performed on strategies
@@ -33,7 +33,7 @@ library DebtManagementLib {
     }
     /* solhint-disable code-complexity */
     function updateDebt(
-        mapping(address => IVault.StrategyParams) storage strategies,
+        mapping(address => IMultistrategyVault.StrategyParams) storage strategies,
         address strategy,
         uint256 targetDebt,
         uint256 totalIdle,
@@ -57,7 +57,7 @@ library DebtManagementLib {
         }
 
         // Can't update to the same debt level
-        if (vars.newDebt == vars.currentDebt) revert IVault.NewDebtEqualsCurrentDebt();
+        if (vars.newDebt == vars.currentDebt) revert IMultistrategyVault.NewDebtEqualsCurrentDebt();
 
         // Determine if we're decreasing or increasing debt
         vars.isDebtDecrease = vars.currentDebt > vars.newDebt;
@@ -92,14 +92,14 @@ library DebtManagementLib {
             }
 
             // Check for unrealized losses
-            uint256 unrealisedLossesShare = IVault(vaultAddress).assessShareOfUnrealisedLosses(
+            uint256 unrealisedLossesShare = IMultistrategyVault(vaultAddress).assessShareOfUnrealisedLosses(
                 strategy,
                 vars.currentDebt,
                 vars.assetsToWithdraw
             );
 
             // Strategy shouldn't have unrealized losses to proceed
-            if (unrealisedLossesShare > 0) revert IVault.StrategyHasUnrealisedLosses();
+            if (unrealisedLossesShare > 0) revert IMultistrategyVault.StrategyHasUnrealisedLosses();
 
             // Update tracking variables
             result.newTotalIdle += vars.assetsToWithdraw;

@@ -5,7 +5,7 @@
     "no-unused-import": "warn",
     "imports-on-top": "error",
     "no-global-import": "error",
-    "gas-custom-errors": "error",
+    "gas-custom-errors": "off",
     "gas-small-strings": "warn",
     "gas-struct-packing": "warn",
     "no-unused-vars": "error",

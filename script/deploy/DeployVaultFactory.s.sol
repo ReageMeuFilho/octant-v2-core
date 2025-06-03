@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.25;
 
-import "forge-std/Script.sol";
-import "src/dragons/vaults/Vault.sol";
-import "src/dragons/vaults/VaultFactory.sol";
+import { Script } from "forge-std/Script.sol";
+import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
+import { MultistrategyVault } from "src/core/MultistrategyVault.sol";
+import { console } from "forge-std/console.sol";
 
 contract DeployVaultFactory is Script {
-    Vault vaultImplementation;
-    VaultFactory vaultFactory;
+    MultistrategyVault vaultImplementation;
+    MultistrategyVaultFactory vaultFactory;
     string factoryName;
     address governance;
 
@@ -26,10 +27,10 @@ contract DeployVaultFactory is Script {
             )
         returns (string memory res) {
             if (keccak256(abi.encode(res)) == keccak256(abi.encode("no"))) {
-                vaultImplementation = new Vault();
+                vaultImplementation = new MultistrategyVault();
                 console.log("Vault implementation deployed at:", address(vaultImplementation));
             } else {
-                vaultImplementation = Vault(payable(vm.parseAddress(res)));
+                vaultImplementation = MultistrategyVault(payable(vm.parseAddress(res)));
                 console.log("Using existing Vault implementation at:", address(vaultImplementation));
             }
         } catch (bytes memory) {
@@ -51,7 +52,7 @@ contract DeployVaultFactory is Script {
         }
 
         // Deploy VaultFactory
-        vaultFactory = new VaultFactory(factoryName, address(vaultImplementation), governance);
+        vaultFactory = new MultistrategyVaultFactory(factoryName, address(vaultImplementation), governance);
 
         console.log("VaultFactory successfully deployed at:", address(vaultFactory));
         console.log("VaultFactory details:");

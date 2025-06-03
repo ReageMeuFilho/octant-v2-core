@@ -3,9 +3,9 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 import { RegenEarningPowerCalculator } from "../../src/regen/RegenEarningPowerCalculator.sol";
-import { Whitelist } from "../../src/regen/whitelist/Whitelist.sol";
-import { IWhitelist } from "../../src/regen/whitelist/IWhitelist.sol";
-import { IWhitelistedEarningPowerCalculator } from "../../src/regen/IWhitelistedEarningPowerCalculator.sol";
+import { Whitelist } from "src/utils/Whitelist.sol";
+import { IWhitelist } from "src/utils/IWhitelist.sol";
+import { IWhitelistedEarningPowerCalculator } from "src/regen/IWhitelistedEarningPowerCalculator.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";

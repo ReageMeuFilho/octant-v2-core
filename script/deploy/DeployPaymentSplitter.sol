@@ -3,8 +3,8 @@ pragma solidity ^0.8.25;
 
 import { console2 } from "forge-std/Test.sol";
 import { Script } from "forge-std/Script.sol";
-import { PaymentSplitterFactory } from "src/dragons/splitter/PaymentSplitterFactory.sol";
-import { PaymentSplitter } from "src/dragons/splitter/PaymentSplitter.sol";
+import { PaymentSplitterFactory } from "src/factories/PaymentSplitterFactory.sol";
+import { PaymentSplitter } from "src/core/PaymentSplitter.sol";
 
 contract DeployPaymentSplitter is Script {
     address public paymentSplitter;

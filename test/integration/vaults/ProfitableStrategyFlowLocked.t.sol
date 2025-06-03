@@ -2,13 +2,14 @@
 pragma solidity ^0.8.25;
 
 import "forge-std/Test.sol";
-import { LockedVault } from "../../../src/dragons/vaults/LockedVault.sol";
-import { MockERC20 } from "../../mocks/MockERC20.sol";
-import { MockYieldStrategy } from "../../mocks/MockYieldStrategy.sol";
-import { IVault } from "../../../src/interfaces/IVault.sol";
-import { ILockedVault } from "../../../src/interfaces/ILockedVault.sol";
-import { VaultFactory } from "../../../src/dragons/vaults/VaultFactory.sol";
-import { MockAccountant } from "../../mocks/MockAccountant.sol";
+import { MultistrategyLockedVault } from "src/core/MultistrategyLockedVault.sol";
+import { MockERC20 } from "test/mocks/MockERC20.sol";
+import { MockYieldStrategy } from "test/mocks/MockYieldStrategy.sol";
+
+import { IMultistrategyLockedVault } from "src/interfaces/IMultistrategyLockedVault.sol";
+import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
+import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
+import { MockAccountant } from "test/mocks/MockAccountant.sol";
 
 contract ProfitableStrategyFlowLockedTest is Test {
     // Define structs to avoid stack too deep error
@@ -31,11 +32,11 @@ contract ProfitableStrategyFlowLockedTest is Test {
         uint256 performanceFee;
     }
 
-    LockedVault public vault;
+    MultistrategyLockedVault public vault;
     MockERC20 public asset;
     MockYieldStrategy public strategy;
-    VaultFactory public vaultFactory;
-    LockedVault public vaultImplementation;
+    MultistrategyVaultFactory public vaultFactory;
+    MultistrategyLockedVault public vaultImplementation;
     MockAccountant public accountant;
 
     address gov;
@@ -63,8 +64,8 @@ contract ProfitableStrategyFlowLockedTest is Test {
         asset.mint(fish, fishAmount);
         asset.mint(whale, 1_000_000e18);
 
-        vaultImplementation = new LockedVault();
-        vaultFactory = new VaultFactory("Locked Test Factory", address(vaultImplementation), gov);
+        vaultImplementation = new MultistrategyLockedVault();
+        vaultFactory = new MultistrategyVaultFactory("Locked Test Factory", address(vaultImplementation), gov);
 
         initialTimestamp = block.timestamp;
     }
@@ -288,20 +289,22 @@ contract ProfitableStrategyFlowLockedTest is Test {
 
     function _createVault() internal {
         vm.startPrank(gov);
-        vault = LockedVault(vaultFactory.deployNewVault(address(asset), "Locked Test Vault", "vLTST", gov, 7 days));
+        vault = MultistrategyLockedVault(
+            vaultFactory.deployNewVault(address(asset), "Locked Test Vault", "vLTST", gov, 7 days)
+        );
 
         // Add roles to gov
-        vault.addRole(gov, IVault.Roles.ADD_STRATEGY_MANAGER);
-        vault.addRole(gov, IVault.Roles.REVOKE_STRATEGY_MANAGER);
-        vault.addRole(gov, IVault.Roles.FORCE_REVOKE_MANAGER);
-        vault.addRole(gov, IVault.Roles.DEBT_MANAGER);
-        vault.addRole(gov, IVault.Roles.ACCOUNTANT_MANAGER);
-        vault.addRole(gov, IVault.Roles.REPORTING_MANAGER);
-        vault.addRole(gov, IVault.Roles.DEPOSIT_LIMIT_MANAGER);
-        vault.addRole(gov, IVault.Roles.WITHDRAW_LIMIT_MANAGER);
-        vault.addRole(gov, IVault.Roles.MINIMUM_IDLE_MANAGER);
-        vault.addRole(gov, IVault.Roles.PROFIT_UNLOCK_MANAGER);
-        vault.addRole(gov, IVault.Roles.MAX_DEBT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.ADD_STRATEGY_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.REVOKE_STRATEGY_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.FORCE_REVOKE_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEBT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.ACCOUNTANT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.REPORTING_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.DEPOSIT_LIMIT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.WITHDRAW_LIMIT_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.MINIMUM_IDLE_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.PROFIT_UNLOCK_MANAGER);
+        vault.addRole(gov, IMultistrategyVault.Roles.MAX_DEBT_MANAGER);
 
         strategy = _createStrategy();
 
