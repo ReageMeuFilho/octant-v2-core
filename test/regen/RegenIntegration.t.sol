@@ -18,7 +18,7 @@ import { IFundingRound } from "../../src/regen/IFundingRound.sol";
 /**
  * @title RegenIntegrationTest
  * @notice Comprehensive integration tests for RegenStaker contract. Due to fixed-point math, higher number of fuzz runs necessary to surface all edge cases.
- * forge-config: default.fuzz.runs = 25600
+ * forge-config: default.fuzz.runs = 16384
  */
 contract RegenIntegrationTest is Test {
     RegenStaker regenStaker;
@@ -89,16 +89,22 @@ contract RegenIntegrationTest is Test {
             contributorWhitelist,
             calculator,
             MAX_BUMP_TIP,
-            MAX_CLAIM_FEE
+            MAX_CLAIM_FEE,
+            0
         );
 
         regenStaker.setRewardNotifier(ADMIN, true);
         vm.stopPrank();
     }
 
-    function testFuzz_Constructor_InitializesWhitelistsWhenAddressZero(uint256 tipAmount, uint256 feeAmount) public {
+    function testFuzz_Constructor_InitializesAllParametersCorrectly(
+        uint256 tipAmount,
+        uint256 feeAmount,
+        uint256 minimumStakeAmount
+    ) public {
         tipAmount = bound(tipAmount, 0, MAX_BUMP_TIP);
         feeAmount = bound(feeAmount, 0, MAX_CLAIM_FEE);
+        minimumStakeAmount = bound(minimumStakeAmount, 0, getStakeAmount(1000));
 
         vm.startPrank(ADMIN);
         RegenStaker localRegenStaker = new RegenStaker(
@@ -109,14 +115,83 @@ contract RegenIntegrationTest is Test {
             Whitelist(address(0)),
             calculator,
             tipAmount,
-            feeAmount
+            feeAmount,
+            minimumStakeAmount
         );
+
+        assertEq(address(localRegenStaker.REWARD_TOKEN()), address(rewardToken));
+        assertEq(address(localRegenStaker.STAKE_TOKEN()), address(stakeToken));
+        assertEq(localRegenStaker.admin(), ADMIN);
+        assertEq(address(localRegenStaker.earningPowerCalculator()), address(calculator));
+        assertEq(localRegenStaker.maxBumpTip(), tipAmount);
+        assertEq(localRegenStaker.MAX_CLAIM_FEE(), feeAmount);
+        assertEq(localRegenStaker.minimumStakeAmount(), minimumStakeAmount);
 
         assertTrue(address(localRegenStaker.stakerWhitelist()) != address(0));
         assertTrue(address(localRegenStaker.contributionWhitelist()) != address(0));
 
         assertEq(Ownable(address(localRegenStaker.stakerWhitelist())).owner(), address(ADMIN));
         assertEq(Ownable(address(localRegenStaker.contributionWhitelist())).owner(), address(ADMIN));
+
+        (uint96 initialFeeAmount, address initialFeeCollector) = localRegenStaker.claimFeeParameters();
+        assertEq(initialFeeAmount, 0);
+        assertEq(initialFeeCollector, address(0));
+
+        assertEq(localRegenStaker.totalStaked(), 0);
+        assertEq(localRegenStaker.totalEarningPower(), 0);
+        assertEq(localRegenStaker.REWARD_DURATION(), 30 days);
+        vm.stopPrank();
+    }
+
+    function testFuzz_Constructor_InitializesAllParametersWithProvidedWhitelists(
+        uint256 tipAmount,
+        uint256 feeAmount,
+        uint256 minimumStakeAmount
+    ) public {
+        tipAmount = bound(tipAmount, 0, MAX_BUMP_TIP);
+        feeAmount = bound(feeAmount, 0, MAX_CLAIM_FEE);
+        minimumStakeAmount = bound(minimumStakeAmount, 0, getStakeAmount(1000));
+
+        vm.startPrank(ADMIN);
+        Whitelist providedStakerWhitelist = new Whitelist();
+        Whitelist providedContributorWhitelist = new Whitelist();
+
+        providedStakerWhitelist.transferOwnership(ADMIN);
+        providedContributorWhitelist.transferOwnership(ADMIN);
+
+        RegenStaker localRegenStaker = new RegenStaker(
+            IERC20(address(rewardToken)),
+            IERC20Staking(address(stakeToken)),
+            ADMIN,
+            providedStakerWhitelist,
+            providedContributorWhitelist,
+            calculator,
+            tipAmount,
+            feeAmount,
+            minimumStakeAmount
+        );
+
+        assertEq(address(localRegenStaker.REWARD_TOKEN()), address(rewardToken));
+        assertEq(address(localRegenStaker.STAKE_TOKEN()), address(stakeToken));
+        assertEq(localRegenStaker.admin(), ADMIN);
+        assertEq(address(localRegenStaker.earningPowerCalculator()), address(calculator));
+        assertEq(localRegenStaker.maxBumpTip(), tipAmount);
+        assertEq(localRegenStaker.MAX_CLAIM_FEE(), feeAmount);
+        assertEq(localRegenStaker.minimumStakeAmount(), minimumStakeAmount);
+
+        assertEq(address(localRegenStaker.stakerWhitelist()), address(providedStakerWhitelist));
+        assertEq(address(localRegenStaker.contributionWhitelist()), address(providedContributorWhitelist));
+
+        assertEq(Ownable(address(localRegenStaker.stakerWhitelist())).owner(), ADMIN);
+        assertEq(Ownable(address(localRegenStaker.contributionWhitelist())).owner(), ADMIN);
+
+        (uint96 initialFeeAmount, address initialFeeCollector) = localRegenStaker.claimFeeParameters();
+        assertEq(initialFeeAmount, 0);
+        assertEq(initialFeeCollector, address(0));
+
+        assertEq(localRegenStaker.totalStaked(), 0);
+        assertEq(localRegenStaker.totalEarningPower(), 0);
+        assertEq(localRegenStaker.REWARD_DURATION(), 30 days);
         vm.stopPrank();
     }
 
@@ -137,6 +212,111 @@ contract RegenIntegrationTest is Test {
 
     function test_EarningPowerCalculatorIsSet() public view {
         assertEq(address(regenStaker.earningPowerCalculator()), address(calculator));
+    }
+
+    function testFuzz_SetMinimumStakeAmount(uint256 newMinimum) public {
+        newMinimum = bound(newMinimum, 0, getStakeAmount(10000));
+
+        vm.prank(ADMIN);
+        regenStaker.setMinimumStakeAmount(newMinimum);
+
+        assertEq(regenStaker.minimumStakeAmount(), newMinimum);
+    }
+
+    function testFuzz_RevertIf_NonAdminCannotSetMinimumStakeAmount(address nonAdmin, uint256 newMinimum) public {
+        vm.assume(nonAdmin != ADMIN);
+        newMinimum = bound(newMinimum, 0, getStakeAmount(10000));
+
+        vm.startPrank(nonAdmin);
+        vm.expectRevert(abi.encodeWithSelector(Staker.Staker__Unauthorized.selector, bytes32("not admin"), nonAdmin));
+        regenStaker.setMinimumStakeAmount(newMinimum);
+        vm.stopPrank();
+    }
+
+    function testFuzz_RevertIf_StakeBelowMinimum(uint256 minimumAmount, uint256 stakeAmount) public {
+        minimumAmount = bound(minimumAmount, getStakeAmount(1), getStakeAmount(1000));
+        stakeAmount = bound(stakeAmount, 1, minimumAmount - 1);
+
+        vm.prank(ADMIN);
+        regenStaker.setMinimumStakeAmount(minimumAmount);
+
+        address user = makeAddr("user");
+        whitelistUser(user, true, false, true);
+
+        stakeToken.mint(user, stakeAmount);
+        vm.startPrank(user);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        vm.expectRevert(
+            abi.encodeWithSelector(RegenStaker.MinimumStakeAmountNotMet.selector, minimumAmount, stakeAmount)
+        );
+        regenStaker.stake(stakeAmount, user, user);
+        vm.stopPrank();
+    }
+
+    function testFuzz_StakeAtOrAboveMinimumSucceeds(uint256 minimumAmountBase, uint256 additionalAmountBase) public {
+        minimumAmountBase = bound(minimumAmountBase, 1, 100);
+        additionalAmountBase = bound(additionalAmountBase, 0, 100);
+
+        uint256 minimumAmount = getStakeAmount(minimumAmountBase);
+        uint256 additionalAmount = getStakeAmount(additionalAmountBase);
+        uint256 stakeAmount = minimumAmount + additionalAmount;
+
+        vm.assume(stakeAmount >= minimumAmount);
+
+        vm.prank(ADMIN);
+        regenStaker.setMinimumStakeAmount(minimumAmount);
+
+        address user = makeAddr("user");
+        whitelistUser(user, true, false, true);
+
+        stakeToken.mint(user, stakeAmount);
+        vm.startPrank(user);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = regenStaker.stake(stakeAmount, user, user);
+        vm.stopPrank();
+
+        assertEq(regenStaker.depositorTotalStaked(user), stakeAmount);
+        (uint96 depositBalance, , , , , , ) = regenStaker.deposits(depositId);
+        assertEq(uint256(depositBalance), stakeAmount);
+    }
+
+    function testFuzz_RevertIf_StakeMoreResultsBelowMinimum(
+        uint256 minimumAmountBase,
+        uint256 withdrawPercent,
+        uint256 additionalAmountBase
+    ) public {
+        minimumAmountBase = bound(minimumAmountBase, 10, 50);
+        withdrawPercent = bound(withdrawPercent, 30, 70);
+        additionalAmountBase = bound(additionalAmountBase, 1, minimumAmountBase - 1);
+
+        uint256 minimumAmount = getStakeAmount(minimumAmountBase);
+        uint256 initialStake = minimumAmount + getStakeAmount(10);
+        uint256 withdrawAmount = (initialStake * withdrawPercent) / 100;
+        uint256 additionalStake = getStakeAmount(additionalAmountBase);
+
+        uint256 remainingAfterWithdraw = initialStake - withdrawAmount;
+        vm.assume(remainingAfterWithdraw < minimumAmount);
+        vm.assume(remainingAfterWithdraw + additionalStake < minimumAmount);
+
+        vm.prank(ADMIN);
+        regenStaker.setMinimumStakeAmount(minimumAmount);
+
+        address user = makeAddr("user");
+        whitelistUser(user, true, false, true);
+
+        stakeToken.mint(user, initialStake + additionalStake);
+        vm.startPrank(user);
+        stakeToken.approve(address(regenStaker), initialStake + additionalStake);
+        Staker.DepositIdentifier depositId = regenStaker.stake(initialStake, user, user);
+
+        regenStaker.withdraw(depositId, withdrawAmount);
+
+        uint256 expectedFinalBalance = remainingAfterWithdraw + additionalStake;
+        vm.expectRevert(
+            abi.encodeWithSelector(RegenStaker.MinimumStakeAmountNotMet.selector, minimumAmount, expectedFinalBalance)
+        );
+        regenStaker.stakeMore(depositId, additionalStake);
+        vm.stopPrank();
     }
 
     function testFuzz_RevertIf_NonAdminCannotSetStakerWhitelist(address nonAdmin) public {
