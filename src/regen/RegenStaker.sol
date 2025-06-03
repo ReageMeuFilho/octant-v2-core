@@ -95,7 +95,7 @@ contract RegenStaker is
 
     IWhitelist public stakerWhitelist;
     IWhitelist public contributionWhitelist;
-
+    uint256 public minimumStakeAmount = 0;
     uint256 public constant MIN_PREFERENCES = 1;
     uint256 public constant MAX_PREFERENCES = 16;
 
@@ -113,6 +113,7 @@ contract RegenStaker is
     error FundingRoundSignUpFailed(address fundingRound, address contributor, uint256 amount, address votingDelegatee);
     error PreferencesAndPreferenceWeightsMustHaveTheSameLength();
     error InvalidNumberOfPreferences(uint256 actual, uint256 min, uint256 max); // Changed uint to uint256 for consistency
+    error MinimumStakeAmountNotMet(uint256 expected, uint256 actual);
 
     modifier onlyWhitelistedIfWhitelistIsSet(IWhitelist _whitelist) {
         if (_whitelist != IWhitelist(address(0)) && !_whitelist.isWhitelisted(msg.sender)) {
@@ -138,7 +139,8 @@ contract RegenStaker is
         IWhitelist _contributionWhitelist,
         IEarningPowerCalculator _earningPowerCalculator,
         uint256 _maxBumpTip,
-        uint256 _maxClaimFee
+        uint256 _maxClaimFee,
+        uint256 _minimumStakeAmount
     )
         Staker(_rewardsToken, _stakeToken, _earningPowerCalculator, _maxBumpTip, _admin)
         StakerPermitAndStake(_stakeToken)
@@ -161,6 +163,7 @@ contract RegenStaker is
 
         MAX_CLAIM_FEE = _maxClaimFee;
         _setClaimFeeParameters(ClaimFeeParameters({ feeAmount: 0, feeCollector: address(0) }));
+        minimumStakeAmount = _minimumStakeAmount;
     }
 
     /// @inheritdoc Staker
@@ -192,6 +195,7 @@ contract RegenStaker is
         returns (DepositIdentifier _depositId)
     {
         _depositId = _stake(msg.sender, amount, delegatee, claimer);
+        _revertIfMinimumStakeAmountNotMet(_depositId);
     }
 
     // @inheritdoc Staker
@@ -203,6 +207,7 @@ contract RegenStaker is
 
         _revertIfNotDepositOwner(deposit, msg.sender);
         _stakeMore(deposit, _depositId, _amount);
+        _revertIfMinimumStakeAmountNotMet(_depositId);
     }
 
     /// @inheritdoc StakerOnBehalf
@@ -233,6 +238,7 @@ contract RegenStaker is
             _signature
         );
         _depositId = _stake(_depositor, _amount, _delegatee, _claimer);
+        _revertIfMinimumStakeAmountNotMet(_depositId);
     }
 
     /// @inheritdoc StakerOnBehalf
@@ -257,6 +263,7 @@ contract RegenStaker is
         );
 
         _stakeMore(deposit, _depositId, _amount);
+        _revertIfMinimumStakeAmountNotMet(_depositId);
     }
 
     /// @inheritdoc StakerPermitAndStake
@@ -273,6 +280,7 @@ contract RegenStaker is
             IERC20Permit(address(STAKE_TOKEN)).permit(msg.sender, address(this), _amount, _deadline, _v, _r, _s)
         {} catch {}
         _depositId = _stake(msg.sender, _amount, _delegatee, _claimer);
+        _revertIfMinimumStakeAmountNotMet(_depositId);
     }
 
     /// @inheritdoc StakerPermitAndStake
@@ -291,6 +299,7 @@ contract RegenStaker is
             IERC20Permit(address(STAKE_TOKEN)).permit(msg.sender, address(this), _amount, _deadline, _v, _r, _s)
         {} catch {}
         _stakeMore(deposit, _depositId, _amount);
+        _revertIfMinimumStakeAmountNotMet(_depositId);
     }
 
     /// @notice Sets the whitelist for the staker. If the whitelist is not set, the staking will be open to all users.
@@ -309,6 +318,11 @@ contract RegenStaker is
         contributionWhitelist = _contributionWhitelist;
     }
 
+    function setMinimumStakeAmount(uint256 _minimumStakeAmount) external {
+        _revertIfNotAdmin();
+        minimumStakeAmount = _minimumStakeAmount;
+    }
+
     /// @notice Pauses the contract.
     function pause() external whenNotPaused {
         _revertIfNotAdmin();
@@ -319,6 +333,13 @@ contract RegenStaker is
     function unpause() external whenPaused {
         _revertIfNotAdmin();
         _unpause();
+    }
+
+    function _revertIfMinimumStakeAmountNotMet(DepositIdentifier _depositId) internal view {
+        Deposit storage deposit = deposits[_depositId];
+        if (deposit.balance < minimumStakeAmount) {
+            revert MinimumStakeAmountNotMet(minimumStakeAmount, deposit.balance);
+        }
     }
 
     // @inheritdoc Staker
