@@ -179,6 +179,7 @@ contract RegenStaker is
         returns (DepositIdentifier _depositId)
     {
         _depositId = _stake(msg.sender, amount, delegatee, msg.sender);
+        _revertIfMinimumStakeAmountNotMet(_depositId);
     }
 
     /// @inheritdoc Staker
@@ -337,7 +338,7 @@ contract RegenStaker is
 
     function _revertIfMinimumStakeAmountNotMet(DepositIdentifier _depositId) internal view {
         Deposit storage deposit = deposits[_depositId];
-        if (deposit.balance < minimumStakeAmount) {
+        if (deposit.balance < minimumStakeAmount && deposit.balance > 0) {
             revert MinimumStakeAmountNotMet(minimumStakeAmount, deposit.balance);
         }
     }
@@ -350,6 +351,7 @@ contract RegenStaker is
         Deposit storage deposit = deposits[_depositId];
         _revertIfNotDepositOwner(deposit, msg.sender);
         _withdraw(deposit, _depositId, _amount);
+        _revertIfMinimumStakeAmountNotMet(_depositId);
     }
 
     /// @inheritdoc Staker
@@ -360,7 +362,9 @@ contract RegenStaker is
         if (deposit.claimer != msg.sender && deposit.owner != msg.sender) {
             revert Staker__Unauthorized("not claimer or owner", msg.sender);
         }
-        return _claimReward(_depositId, deposit, msg.sender);
+        uint256 payout = _claimReward(_depositId, deposit, msg.sender);
+        _revertIfMinimumStakeAmountNotMet(_depositId);
+        return payout;
     }
 
     /// @notice Contributes to a funding round.

@@ -309,13 +309,10 @@ contract RegenIntegrationTest is Test {
         stakeToken.approve(address(regenStaker), initialStake + additionalStake);
         Staker.DepositIdentifier depositId = regenStaker.stake(initialStake, user, user);
 
-        regenStaker.withdraw(depositId, withdrawAmount);
-
-        uint256 expectedFinalBalance = remainingAfterWithdraw + additionalStake;
         vm.expectRevert(
-            abi.encodeWithSelector(RegenStaker.MinimumStakeAmountNotMet.selector, minimumAmount, expectedFinalBalance)
+            abi.encodeWithSelector(RegenStaker.MinimumStakeAmountNotMet.selector, minimumAmount, remainingAfterWithdraw)
         );
-        regenStaker.stakeMore(depositId, additionalStake);
+        regenStaker.withdraw(depositId, withdrawAmount);
         vm.stopPrank();
     }
 
