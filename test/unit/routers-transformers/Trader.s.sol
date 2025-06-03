@@ -27,7 +27,7 @@ contract TestTraderRandomness is Test, TestPlus {
     Trader trader;
 
     function setUp() public {
-        token = new MockERC20();
+        token = new MockERC20(18);
 
         helperConfig = new HelperConfig(true);
         (, address wethToken, , , , , , , address integrator_, ) = helperConfig.activeNetworkConfig();

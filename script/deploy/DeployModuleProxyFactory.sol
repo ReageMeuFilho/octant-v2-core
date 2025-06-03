@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import "forge-std/Test.sol";
-import {console2} from "forge-std/console2.sol";
-import {ModuleProxyFactory} from "src/dragons/ModuleProxyFactory.sol";
+import "forge-std/Script.sol";
+import { ModuleProxyFactory } from "src/dragons/ModuleProxyFactory.sol";
+import { SplitChecker } from "src/dragons/SplitChecker.sol";
+import { DragonRouter } from "src/dragons/DragonRouter.sol";
 
 /**
  * @title DeployModuleProxyFactory
@@ -11,16 +12,34 @@ import {ModuleProxyFactory} from "src/dragons/ModuleProxyFactory.sol";
  * @dev This factory is used to deploy minimal proxy clones of Safe modules
  *      following the EIP-1167 standard for minimal proxy contracts
  */
-contract DeployModuleProxyFactory is Test {
+contract DeployModuleProxyFactory is Script {
+    address public governance;
+    address public regenGovernance;
+    address public metapool;
+    address public splitCheckerImplementation = address(new SplitChecker());
+    address public dragonRouterImplementation = address(new DragonRouter());
     /// @notice The deployed ModuleProxyFactory instance
     ModuleProxyFactory public moduleProxyFactory;
 
+    constructor(address _governance, address _regenGovernance, address _metapool) {
+        governance = _governance;
+        regenGovernance = _regenGovernance;
+        metapool = _metapool;
+    }
+
     function deploy() public virtual {
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        vm.startBroadcast(deployerPrivateKey);
 
         // Deploy the factory
-        moduleProxyFactory = new ModuleProxyFactory();
+        moduleProxyFactory = new ModuleProxyFactory(
+            governance,
+            regenGovernance,
+            metapool,
+            splitCheckerImplementation,
+            dragonRouterImplementation
+        );
 
-        // Log deployment information
-        // console2.log("ModuleProxyFactory deployed at:", address(moduleProxyFactory));
+        vm.stopBroadcast();
     }
 }

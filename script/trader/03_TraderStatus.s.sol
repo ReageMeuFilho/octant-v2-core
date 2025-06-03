@@ -6,8 +6,8 @@ import "forge-std/Test.sol";
 
 import "solady/tokens/ERC20.sol";
 
-import {HelperConfig} from "../helpers/HelperConfig.s.sol";
-import {Trader} from "src/routers-transformers/Trader.sol";
+import { HelperConfig } from "../helpers/HelperConfig.s.sol";
+import { Trader } from "src/routers-transformers/Trader.sol";
 
 contract TraderStatus is Script, Test {
     address ETH;
@@ -21,8 +21,8 @@ contract TraderStatus is Script, Test {
         emit log_named_uint("Height", block.number);
 
         Trader trader = Trader(payable(traderAddress));
-        address base = trader.base();
-        address quote = trader.quote();
+        address base = trader.BASE();
+        address quote = trader.QUOTE();
         ETH = trader.ETH();
         console.log("Selling (base):", getTicker(base), base);
         console.log("Buying (quote):", getTicker(quote), quote);

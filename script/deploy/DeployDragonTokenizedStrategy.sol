@@ -2,8 +2,8 @@
 pragma solidity ^0.8.25;
 
 import "forge-std/Test.sol";
-import {console2} from "forge-std/console2.sol";
-import {DragonTokenizedStrategy} from "src/dragons/vaults/DragonTokenizedStrategy.sol";
+import { console2 } from "forge-std/console2.sol";
+import { DragonTokenizedStrategy } from "src/dragons/vaults/DragonTokenizedStrategy.sol";
 
 /**
  * @title DeployDragonTokenizedStrategy
@@ -14,7 +14,8 @@ contract DeployDragonTokenizedStrategy is Test {
     DragonTokenizedStrategy public dragonTokenizedStrategySingleton;
 
     function deploy() public virtual {
-        vm.startBroadcast();
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        vm.startBroadcast(deployerPrivateKey);
         dragonTokenizedStrategySingleton = new DragonTokenizedStrategy();
         vm.stopBroadcast();
     }

@@ -3,7 +3,10 @@ pragma solidity >=0.8.18;
 
 import { DragonBaseStrategy, ERC20 } from "src/dragons/vaults/DragonBaseStrategy.sol";
 import { Math } from "lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
+import { IBaseStrategy } from "src/interfaces/IBaseStrategy.sol";
 import { IStrategy } from "../../interfaces/IStrategy.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IERC4626Payable } from "src/interfaces/IERC4626Payable.sol";
 
 contract YearnPolygonUsdcStrategy is DragonBaseStrategy {
     /// @dev Yearn Polygon Aave V3 USDC Lender Vault
@@ -27,9 +30,14 @@ contract YearnPolygonUsdcStrategy is DragonBaseStrategy {
             uint256 _maxReportDelay,
             address _regenGovernance
         ) = abi.decode(data, (address, address, address, address, uint256, address));
-
+        // Effects
         __Ownable_init(msg.sender);
         string memory _name = "Octant Polygon USDC Strategy";
+        setAvatar(_owner);
+        setTarget(_owner);
+        transferOwnership(_owner);
+
+        // Interactions
         __BaseStrategy_init(
             _tokenizedStrategyImplementation,
             _asset,
@@ -43,19 +51,7 @@ contract YearnPolygonUsdcStrategy is DragonBaseStrategy {
         );
 
         ERC20(_asset).approve(YIELD_SOURCE, type(uint256).max);
-        IStrategy(YIELD_SOURCE).approve(_owner, type(uint256).max);
-
-        setAvatar(_owner);
-        setTarget(_owner);
-        transferOwnership(_owner);
-    }
-
-    function _deployFunds(uint256 _amount) internal override {
-        uint256 limit = IStrategy(YIELD_SOURCE).availableDepositLimit(address(this));
-        _amount = Math.min(_amount, limit);
-        if (_amount > 0) {
-            IStrategy(YIELD_SOURCE).deposit(_amount, address(this));
-        }
+        IERC20(YIELD_SOURCE).approve(_owner, type(uint256).max);
     }
 
     function availableDepositLimit(address _user) public view override returns (uint256) {
@@ -64,29 +60,38 @@ contract YearnPolygonUsdcStrategy is DragonBaseStrategy {
         return Math.min(actualLimit, vaultLimit);
     }
 
+    function _deployFunds(uint256 _amount) internal override {
+        uint256 limit = IBaseStrategy(YIELD_SOURCE).availableDepositLimit(address(this));
+        _amount = Math.min(_amount, limit);
+        if (_amount > 0) {
+            IERC4626Payable(YIELD_SOURCE).deposit(_amount, address(this));
+        }
+    }
+
     function _freeFunds(uint256 _amount) internal override {
-        IStrategy(YIELD_SOURCE).withdraw(_amount, address(this), address(this));
+        uint256 _withdrawAmount = Math.min(_amount, IERC4626Payable(YIELD_SOURCE).maxWithdraw(address(this)));
+        IERC4626Payable(YIELD_SOURCE).withdraw(_withdrawAmount, address(this), address(this));
     }
 
     /* @dev As we are using yearn vault, the strategy accrues yield in the vault. so the value of strategy's shares
-     * is increased therfore to accrue rewards to the dragon router we have to withdraw all funds and deposit back the remaining funds after
+     * is increased therefore to accrue rewards to the dragon router we have to withdraw all funds and deposit back the remaining funds after
      * shares of dragon router are allocated.
      */
     function _harvestAndReport() internal override returns (uint256) {
-        uint256 _withdrawAmount = IStrategy(YIELD_SOURCE).maxWithdraw(address(this));
-        IStrategy(YIELD_SOURCE).withdraw(_withdrawAmount, address(this), address(this));
+        uint256 _withdrawAmount = IERC4626Payable(YIELD_SOURCE).maxWithdraw(address(this));
+        IERC4626Payable(YIELD_SOURCE).withdraw(_withdrawAmount, address(this), address(this));
         return ERC20(asset).balanceOf(address(this));
     }
 
     function _tend(uint256 /*_idle*/) internal override {
         uint256 balance = ERC20(asset).balanceOf(address(this));
         if (balance > 0) {
-            IStrategy(YIELD_SOURCE).deposit(balance, address(this));
+            IERC4626Payable(YIELD_SOURCE).deposit(balance, address(this));
         }
     }
 
     function _emergencyWithdraw(uint256 _amount) internal override {
-        IStrategy(YIELD_SOURCE).withdraw(_amount, address(this), address(this));
+        IERC4626Payable(YIELD_SOURCE).withdraw(_amount, address(this), address(this));
     }
 
     function _tendTrigger() internal pure override returns (bool) {

@@ -9,10 +9,12 @@ import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract LockupsTest is Setup {
     // Events to track
-    event NewLockupSet(address indexed user, uint256 indexed unlockTime, uint256 indexed lockedShares);
+    event NewLockupSet(address indexed user, uint256 lockTime, uint256 unlockTime, uint256 lockedShares);
     event RageQuitInitiated(address indexed user, uint256 indexed unlockTime);
 
     uint256 constant MINIMUM_LOCKUP_DURATION = 90 days;
+    uint256 constant MAXIMUM_LOCKUP_DURATION = 3650 days;
+    uint256 constant DEFAULT_RAGE_QUIT_DURATION = 90 days;
     uint256 constant INITIAL_DEPOSIT = 100_000e18;
 
     function setUp() public override {
@@ -31,7 +33,7 @@ contract LockupsTest is Setup {
 
         // Expect the NewLockupSet event with appropriate parameters
         vm.expectEmit(true, true, true, true, address(strategy));
-        emit NewLockupSet(user, block.timestamp + lockupDuration, depositAmount);
+        emit NewLockupSet(user, 1, block.timestamp + lockupDuration, depositAmount);
 
         vm.startPrank(user);
         uint256 sharesBefore = strategy.totalSupply();
@@ -63,7 +65,7 @@ contract LockupsTest is Setup {
         uint256 sharesToMint = 10_000e18;
 
         vm.expectEmit(true, true, true, true, address(strategy));
-        emit NewLockupSet(user, block.timestamp + lockupDuration, sharesToMint);
+        emit NewLockupSet(user, 1, block.timestamp + lockupDuration, sharesToMint);
 
         vm.startPrank(user);
         uint256 assetsBefore = asset.balanceOf(user);
@@ -1100,8 +1102,83 @@ contract LockupsTest is Setup {
         (, uint256 remainingLockedShares, , uint256 newTotalShares, uint256 newWithdrawableShares) = strategy
             .getUserLockupInfo(user);
 
-        assertEq(remainingLockedShares, depositAmount - redeemAmount, "Remaining locked shares incorrect");
+        assertEq(remainingLockedShares, depositAmount, "Remaining locked shares incorrect");
         assertEq(newTotalShares, shares - redeemAmount, "New total shares incorrect");
-        assertEq(newWithdrawableShares, 0, "New withdrawable shares incorrect");
+        assertEq(newWithdrawableShares, (actualUnlocked / 2), "New withdrawable shares incorrect");
+
+        // Skip another 25% through rage quit (so 50% in total)
+        skip(MINIMUM_LOCKUP_DURATION / 4);
+
+        // Calculate expected unlocked amount (50% should be unlocked, including amount already redeemed)
+        uint256 expectedUnlocked2 = (depositAmount * (MINIMUM_LOCKUP_DURATION / 2)) / MINIMUM_LOCKUP_DURATION;
+        uint256 actualUnlocked2 = redeemAmount + strategy.maxRedeem(user, 0);
+        assertEq(actualUnlocked2, expectedUnlocked2, "Incorrect unlock amount at 50%");
+    }
+
+    function test_topUpDepositWithLockup_rageQuit_withdrawSteps(
+        uint64 randomInitialDeposit,
+        uint64 randomSecondDeposit,
+        uint8 initialLockupMultiplier,
+        uint8 secondLockupMultiplier,
+        uint8 topUpLockupMultiplier
+    ) public {
+        uint64 lockupBaseConstant = 30 days;
+        // // Due to rounding down (`shares = _convertToShares(S, assets, Math.Rounding.Floor), 1 wei deposits end up with arithmetic issues
+        vm.assume(randomInitialDeposit > 1 wei);
+        vm.assume(randomSecondDeposit > 1 wei);
+
+        // Keep existing assumptions
+        vm.assume(
+            lockupBaseConstant * initialLockupMultiplier >= MINIMUM_LOCKUP_DURATION &&
+                lockupBaseConstant * initialLockupMultiplier <= MAXIMUM_LOCKUP_DURATION
+        );
+        vm.assume(
+            lockupBaseConstant * secondLockupMultiplier >= MINIMUM_LOCKUP_DURATION &&
+                lockupBaseConstant * secondLockupMultiplier <= MAXIMUM_LOCKUP_DURATION
+        );
+        vm.assume(
+            lockupBaseConstant * topUpLockupMultiplier >= MINIMUM_LOCKUP_DURATION &&
+                lockupBaseConstant * topUpLockupMultiplier <= MAXIMUM_LOCKUP_DURATION
+        );
+        vm.assume(lockupBaseConstant * (secondLockupMultiplier + topUpLockupMultiplier) <= MAXIMUM_LOCKUP_DURATION);
+
+        uint256 initialLockup = lockupBaseConstant * initialLockupMultiplier;
+        uint256 secondLockup = lockupBaseConstant * secondLockupMultiplier;
+        uint256 topUpLockup = lockupBaseConstant * topUpLockupMultiplier;
+
+        uint256 initialDeposit = uint256(randomInitialDeposit);
+        uint256 secondDeposit = uint256(randomSecondDeposit);
+
+        vm.startPrank(user);
+        strategy.depositWithLockup(initialDeposit, user, initialLockup);
+
+        // Withdraw initial deposit
+        skip(initialLockup);
+        strategy.withdraw(initialDeposit, user, user);
+
+        // New deposit
+        strategy.depositWithLockup(secondDeposit, user, secondLockup);
+
+        // Top up deposit
+        strategy.depositWithLockup(secondDeposit, user, topUpLockup);
+
+        // Initiate rage quit
+        strategy.initiateRageQuit();
+
+        uint256 totalWithdrawn;
+        for (uint256 i = 0; i < DEFAULT_RAGE_QUIT_DURATION / lockupBaseConstant; i++) {
+            skip(lockupBaseConstant);
+            uint256 available = strategy.maxWithdraw(user);
+
+            strategy.withdraw(available, user, user);
+            totalWithdrawn += available;
+
+            uint256 remaining = (secondDeposit * 2) - totalWithdrawn;
+            assertEq(strategy.balanceOf(user), remaining, "Incorrect remaining balance");
+        }
+
+        // Verify full withdrawal after loop
+        assertEq(strategy.balanceOf(user), 0, "Should have 0 balance");
+        vm.stopPrank();
     }
 }

@@ -25,3 +25,13 @@
 [submodule "lib/hats-protocol"]
 	path = lib/hats-protocol
 	url = https://github.com/hats-protocol/hats-protocol
+[submodule "lib/kontrol-cheatcodes"]
+	path = lib/kontrol-cheatcodes
+	url = https://github.com/runtimeverification/kontrol-cheatcodes
+[submodule "lib/staker"]
+	path = lib/staker
+	url = https://github.com/withtally/staker
+[submodule "lib/tokenized-strategy"]
+	path = lib/tokenized-strategy
+	url = https://github.com/yearn/tokenized-strategy
+	branch = v3.0.3

@@ -23,7 +23,7 @@ can be viewed within the Strategy by a simple call using the
 
 ## Smart Contract Flow Diagram:
 
-![Base Strategy Flow Diagram](../../assets/base-strategy-flow.svg)
+![Base Strategy Flow Diagram](../../../assets/base-strategy-flow.svg)
 
 ## Functionality Breakdown
 

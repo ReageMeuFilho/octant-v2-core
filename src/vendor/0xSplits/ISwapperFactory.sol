@@ -6,8 +6,6 @@ import { ISwapperImpl } from "./SwapperImpl.sol";
 import { IUniV3OracleImpl } from "./IUniV3OracleImpl.sol";
 
 interface ISwapperFactory {
-    event CreateSwapper(ISwapperImpl indexed swapper, ISwapperImpl.InitParams params);
-
     struct CreateSwapperParams {
         address owner;
         bool paused;
@@ -17,6 +15,8 @@ interface ISwapperFactory {
         uint32 defaultScaledOfferFactor;
         ISwapperImpl.SetPairScaledOfferFactorParams[] pairScaledOfferFactors;
     }
+
+    event CreateSwapper(ISwapperImpl indexed swapper, ISwapperImpl.InitParams params);
 
     function createSwapper(CreateSwapperParams calldata params_) external returns (ISwapperImpl swapper);
 

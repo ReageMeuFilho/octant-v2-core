@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "./AbstractHatsManager.sol";
+import { AbstractHatsManager } from "./AbstractHatsManager.sol";
+import { Hats__InvalidHat, Hats__DoesNotHaveThisHat, Hats__NotAdminOfHat } from "./HatsErrors.sol";
 
 /**
  * @title DragonHatter
@@ -24,7 +25,6 @@ contract DragonHatter is AbstractHatsManager {
 
     bool public initialized;
 
-    event RoleInitialized(bytes32 indexed roleId, uint256 indexed hatId);
     event BranchInitialized();
 
     error AlreadyInitialized();
@@ -40,43 +40,39 @@ contract DragonHatter is AbstractHatsManager {
         if (initialized) revert AlreadyInitialized();
 
         // Verify contract has its branch hat
-        require(HATS.isWearerOfHat(address(this), branchHat), "Must wear branch hat");
+        require(HATS.isWearerOfHat(address(this), branchHat), Hats__DoesNotHaveThisHat(address(this), branchHat));
 
         // Create keeper role hat (1.1.1.1.1)
-        uint256 keeperHat = createRole(
+        _createRole(
             KEEPER_ROLE,
             string("Dragon Protocol Keeper"),
             10, // Max 10 keepers
             new address[](0) // No initial keepers
         );
-        emit RoleInitialized(KEEPER_ROLE, keeperHat);
 
         // Create management role hat (1.1.1.1.2)
-        uint256 managementHat = createRole(
+        _createRole(
             MANAGEMENT_ROLE,
             string("Dragon Protocol Management"),
             5, // Max 5 managers
             new address[](0) // No initial managers
         );
-        emit RoleInitialized(MANAGEMENT_ROLE, managementHat);
 
         // Create emergency role hat (1.1.1.1.3)
-        uint256 emergencyHat = createRole(
+        _createRole(
             EMERGENCY_ROLE,
             string("Dragon Protocol Emergency Responder"),
             3, // Max 3 emergency responders
             new address[](0) // No initial responders
         );
-        emit RoleInitialized(EMERGENCY_ROLE, emergencyHat);
 
         // Create regen governance role hat (1.1.1.1.4)
-        uint256 regenGovernanceHat = createRole(
+        _createRole(
             REGEN_GOVERNANCE_ROLE,
             string("Dragon Protocol Regen Governance"),
             5, // Max 5 governance members
             new address[](0) // No initial members
         );
-        emit RoleInitialized(REGEN_GOVERNANCE_ROLE, regenGovernanceHat);
 
         initialized = true;
         emit BranchInitialized();
@@ -94,10 +90,10 @@ contract DragonHatter is AbstractHatsManager {
         uint256 hatId
     ) external view override returns (bool eligible, bool standing) {
         bytes32 roleId = hatRoles[hatId];
-        require(roleId != bytes32(0), "Invalid role hat");
+        require(roleId != bytes32(0), Hats__InvalidHat(hatId));
 
         // Check if hat is under our branch
-        require(HATS.isAdminOfHat(address(this), hatId), "Not branch hat");
+        require(HATS.isAdminOfHat(address(this), hatId), Hats__NotAdminOfHat(address(this), hatId));
 
         // Default to true standing - can be extended with role-specific checks
         standing = true;
@@ -114,26 +110,6 @@ contract DragonHatter is AbstractHatsManager {
         } else {
             eligible = false;
         }
-    }
-
-    /**
-     * @notice Custom eligibility checks for each role
-     * @dev These can be extended with additional logic as needed
-     */
-    function _isEligibleKeeper(address) internal pure returns (bool) {
-        return true; // Base implementation - extend as needed
-    }
-
-    function _isEligibleManager(address) internal pure returns (bool) {
-        return true; // Base implementation - extend as needed
-    }
-
-    function _isEligibleEmergencyResponder(address) internal pure returns (bool) {
-        return true; // Base implementation - extend as needed
-    }
-
-    function _isEligibleRegenGovernance(address) internal pure returns (bool) {
-        return true; // Base implementation - extend as needed
     }
 
     /**
@@ -154,5 +130,25 @@ contract DragonHatter is AbstractHatsManager {
     function hasRole(address account, bytes32 roleId) external view returns (bool) {
         uint256 hatId = roleHats[roleId];
         return hatId != 0 && HATS.isWearerOfHat(account, hatId);
+    }
+
+    /**
+     * @notice Custom eligibility checks for each role
+     * @dev These can be extended with additional logic as needed
+     */
+    function _isEligibleKeeper(address) internal pure returns (bool) {
+        return true; // Base implementation - extend as needed
+    }
+
+    function _isEligibleManager(address) internal pure returns (bool) {
+        return true; // Base implementation - extend as needed
+    }
+
+    function _isEligibleEmergencyResponder(address) internal pure returns (bool) {
+        return true; // Base implementation - extend as needed
+    }
+
+    function _isEligibleRegenGovernance(address) internal pure returns (bool) {
+        return true; // Base implementation - extend as needed
     }
 }

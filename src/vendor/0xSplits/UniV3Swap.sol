@@ -2,7 +2,6 @@
 pragma solidity ^0.8.17;
 
 import { ERC20 } from "solady/tokens/ERC20.sol";
-import { IOracle } from "./IOracle.sol";
 import { ISwapRouter } from "../uniswap/ISwapRouter.sol";
 import { WETH } from "solady/tokens/WETH.sol";
 import { QuoteParams } from "./LibQuotes.sol";
@@ -21,9 +20,6 @@ contract UniV3Swap is ISwapperFlashCallback {
     using SafeTransferLib for address;
     using TokenUtils for address;
 
-    error Unauthorized();
-    error InsufficientFunds();
-
     struct InitFlashParams {
         QuoteParams[] quoteParams;
         FlashCallbackData flashCallbackData;
@@ -37,6 +33,9 @@ contract UniV3Swap is ISwapperFlashCallback {
     ISwapperFactory public immutable swapperFactory;
     ISwapRouter public immutable swapRouter;
     WETH public immutable weth9;
+
+    error Unauthorized();
+    error InsufficientFunds();
 
     constructor(ISwapperFactory swapperFactory_, ISwapRouter swapRouter_, WETH weth9_) {
         swapperFactory = swapperFactory_;
@@ -99,6 +98,8 @@ contract UniV3Swap is ISwapperFlashCallback {
             weth9.withdraw(weth9Balance);
 
             // send req'd amt to swapper#payback
+            // False positive: totalAmount out is checked before sending
+            //slither-disable-next-line arbitrary-send-eth
             ISwapperImpl(msg.sender).payback{ value: amountToBeneficiary_ }();
 
             // xfr excess out

@@ -1,20 +1,19 @@
 {
   "extends": "solhint:recommended",
-  "plugins": [
-    "prettier"
-  ],
+  "plugins": ["prettier"],
   "rules": {
+    "no-unused-import": "warn",
     "imports-on-top": "error",
+    "no-global-import": "error",
+    "gas-custom-errors": "error",
+    "gas-small-strings": "warn",
+    "gas-struct-packing": "warn",
     "no-unused-vars": "error",
-    "code-complexity": [
-      "error",
-      9
-    ],
-    "compiler-version": [
-      "error",
-      "^0.8.0"
-    ],
+    "code-complexity": ["error", 12],
+    "compiler-version": ["error", "^0.8.0"],
     "const-name-snakecase": "error",
+    "immutable-vars-naming": "off",
+    "avoid-low-level-calls": "off",
     "event-name-camelcase": "error",
     "constructor-syntax": "error",
     "func-name-mixedcase": "off",
@@ -51,6 +50,7 @@
       {
         "maxLength": 64
       }
-    ]
+    ],
+    "ordering": "warn"
   }
 }

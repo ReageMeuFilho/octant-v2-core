@@ -1,45 +1,77 @@
 {
-  "name": "octant-v2-core",
-  "version": "0.0.1",
+  "name": "@golemfoundation/octant-v2-core",
+  "version": "0.2.5-develop.0",
   "description": "",
-  "packageManager": "yarn@4.6.0",
+  "packageManager": "yarn@4.9.1+sha512.f95ce356460e05be48d66401c1ae64ef84d163dd689964962c6888a9810865e39097a5e9de748876c2e0bf89b232d583c33982773e9903ae7a76257270986538",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/golemfoundation/octant-v2-core.git"
+  },
+  "bugs": {
+    "url": "https://github.com/golemfoundation/octant-v2-core/issues"
+  },
+  "homepage": "https://github.com/golemfoundation/octant-v2-core#readme",
   "engines": {
     "npm": "please-use-yarn",
     "node": ">=22.0.0"
   },
+  "files": [
+    "out",
+    "src",
+    "script",
+    "lib",
+    "test",
+    "remappings.txt",
+    "foundry.toml",
+    "kontrol.toml"
+  ],
   "scripts": {
-    "format": "prettier --config .prettierrc --plugin=prettier-plugin-solidity '{contracts,src,test}/**/*.sol' -w",
-    "format:check": "prettier --config .prettierrc --plugin=prettier-plugin-solidity '{contracts,src,test}/**/*.sol' -c",
+    "format": "prettier --config .prettierrc --plugin=prettier-plugin-solidity '{script,src,test,verification}/**/*.sol' -w",
+    "format:check": "prettier --config .prettierrc --plugin=prettier-plugin-solidity '{script,src,test,verification}/**/*.sol' -c",
     "lint": "solhint './{src,scripts,test}/**/*.sol'",
     "precommit": "lint-staged",
-    "build": "forge clean && forge compile",
+    "build": "forge clean && forge compile --sizes",
+    "build:contracts": "forge clean && forge compile --sizes --skip test --skip script",
     "test": "forge clean && forge test",
     "test:ci": "forge clean && mkdir -p reports && (forge test --junit > reports/junit.xml || forge test --summary)",
     "gas": "forge snapshot --isolate --gas-report --diff .gas-snapshot > gasreport.txt",
     "coverage": "forge coverage --ir-minimum --report lcov",
     "coverage:genhtml": "genhtml lcov.info --branch-coverage --output-dir coverage --ignore-errors inconsistent,corrupt,category",
-    "slither:setup": "python3 -m venv .venv && . .venv/bin/activate && pip3 install slither-analyzer",
-    "slither": ". .venv/bin/activate && slither ./ --exclude-dependencies --filter-paths \"test\" --print human-summary",
+    "slither:setup": "python3 -m venv .venv && .venv/bin/pip3 install slither-analyzer",
+    "slither": ".venv/bin/slither . --exclude-dependencies --filter-paths \"test\" --print human-summary",
+    "slither:ci": "slither . --exclude-dependencies --filter-paths \"test\" --print human-summary --disable-color 2> reports/slither.txt; slither . --exclude-dependencies --filter-paths \"test\"",
     "storage:generate": "./script/storage.sh generate",
-    "storage:check": "./script/storage.sh check"
+    "storage:check": "./script/storage.sh check",
+    "init": "husky && shx chmod +x .husky/*",
+    "deploy:tenderly": "bash -c 'source .env; patch -fp1 -d lib/hats-protocol -i ../../ci/lib_hats_protocol_erc1155_import.diff; forge script script/deployment/staging/DeployProtocol.s.sol --slow -f $RPC_URL && forge script script/deployment/staging/DeployProtocol.s.sol --slow --verify --verifier custom --broadcast -f $RPC_URL'",
+    "release": "release-it",
+    "lint:commits": "commitlint --last --verbose"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@gnosis.pm/safe-contracts": "^1.3.0",
     "@openzeppelin/upgrades-core": "^1.41.0",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.5.0"
   },
   "devDependencies": {
-    "@gnosis.pm/safe-contracts": "^1.3.0",
-    "dotenv": "^16.4.5",
-    "forge-stack-tracer": "^1.0.3",
-    "lint-staged": "^15.2.10",
-    "prettier": "^3.3.3",
-    "prettier-plugin-solidity": "^1.4.1",
-    "solady": "^0.0.243",
-    "solhint": "^5.0.3",
+    "@commitlint/cli": "^19.8.0",
+    "@commitlint/config-conventional": "^19.8.0",
+    "@release-it/conventional-changelog": "^8.0.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.1",
+    "prettier": "^3.5.3",
+    "prettier-plugin-solidity": "^1.4.2",
+    "release-it": "^18.1.2",
+    "shx": "^0.3.4",
+    "solhint": "^5.0.5",
     "solhint-plugin-prettier": "^0.1.0",
-    "typescript": "^5.6.2"
+    "typescript": "5.3.3"
+  },
+  "publishConfig": {
+    "access": "restricted",
+    "provenance": true,
+    "registry": "https://npm.pkg.github.com"
   }
 }

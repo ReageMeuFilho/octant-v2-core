@@ -398,7 +398,7 @@ contract ERC20PermitTest is Setup {
         // Any other value should fail.
         // If v is 27, then 28 should make it past the MALLEABLE require, but should result in an invalid signature,
         // and vice versa when v is 28.
-        (uint8 v, bytes32 r, bytes32 s) = _getValidPermitSignature(
+        (, bytes32 r, bytes32 s) = _getValidPermitSignature(
             address(strategy),
             _owner,
             _spender,

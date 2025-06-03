@@ -35,6 +35,82 @@ abstract contract DragonBaseStrategy is BaseStrategy, Module {
 
     address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE; // using this address to represent native ETH
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    receive() external payable {}
+
+    /**
+     * @dev Execute a function on the TokenizedStrategy and return any value.
+     *
+     * This fallback function will be executed when any of the standard functions
+     * defined in the TokenizedStrategy are called since they wont be defined in
+     * this contract.
+     *
+     * It will delegatecall the TokenizedStrategy implementation with the exact
+     * calldata and return any relevant values.
+     *
+     */
+    fallback() external payable {
+        assembly ("memory-safe") {
+            if and(iszero(calldatasize()), not(iszero(callvalue()))) {
+                return(0, 0)
+            }
+        }
+        // load our target address
+        address _tokenizedStrategyAddress = tokenizedStrategyImplementation;
+        // Execute external function using delegatecall and return any value.
+        assembly ("memory-safe") {
+            // Copy function selector and any arguments.
+            calldatacopy(0, 0, calldatasize())
+            // Execute function delegatecall.
+            let result := delegatecall(gas(), _tokenizedStrategyAddress, 0, calldatasize(), 0, 0)
+            // Get any return value
+            returndatacopy(0, 0, returndatasize())
+            // Return any return value or error back to the caller
+            switch result
+            case 0 {
+                revert(0, returndatasize())
+            }
+            default {
+                return(0, returndatasize())
+            }
+        }
+    }
+
+    /// @dev Handle the liquidation of strategy assets.
+    /// @param _amountNeeded Amount to be liquidated.
+    /// @return _liquidatedAmount liquidated amount.
+    /// @return _loss loss amount if it resulted in liquidation.
+    function liquidatePosition(
+        uint256 _amountNeeded
+    ) external virtual onlyManagement returns (uint256 _liquidatedAmount, uint256 _loss) {}
+
+    /*//////////////////////////////////////////////////////////////
+                    OPTIONAL TO OVERRIDE BY STRATEGIST
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Handle the strategy’s core position adjustments.
+    /// @param _debtOutstanding Amount of position to adjust.
+    function adjustPosition(uint256 _debtOutstanding) external virtual onlyManagement {}
+
+    /*//////////////////////////////////////////////////////////////
+                        TokenizedStrategy HOOKS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Provide a signal to the keeper that `report()` should be called.
+     * @return timeToReport `true` if `report()` should be called, `false` otherwise.
+     */
+    function harvestTrigger() external view virtual returns (bool timeToReport) {
+        // Should not trigger if strategy is not active (no assets) or harvest has been recently called.
+        if (
+            TokenizedStrategy.totalAssets() != 0 && (block.timestamp - TokenizedStrategy.lastReport()) >= maxReportDelay
+        ) return true;
+    }
+
     /**
      * @notice Used to initialize the strategy on deployment.
      *
@@ -89,47 +165,6 @@ abstract contract DragonBaseStrategy is BaseStrategy, Module {
         }
     }
 
-    /// @dev Handle the liquidation of strategy assets.
-    /// @param _amountNeeded Amount to be liquidated.
-    /// @return _liquidatedAmount liquidated amount.
-    /// @return _loss loss amount if it resulted in liquidation.
-    function liquidatePosition(
-        uint256 _amountNeeded
-    ) external virtual onlyManagement returns (uint256 _liquidatedAmount, uint256 _loss) {}
-
-    /*//////////////////////////////////////////////////////////////
-                    OPTIONAL TO OVERRIDE BY STRATEGIST
-    //////////////////////////////////////////////////////////////*/
-
-    /// @dev Handle the strategy’s core position adjustments.
-    /// @param _debtOutstanding Amount of position to adjust.
-    function adjustPosition(uint256 _debtOutstanding) external virtual onlyManagement {}
-
-    /*//////////////////////////////////////////////////////////////
-                        TokenizedStrategy HOOKS
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice Provide a signal to the keeper that `report()` should be called.
-     * @return `true` if `report()` should be called, `false` otherwise.
-     */
-    function harvestTrigger() external view virtual returns (bool) {
-        // Should not trigger if strategy is not active (no assets) or harvest has been recently called.
-        if (
-            TokenizedStrategy.totalAssets() != 0 && (block.timestamp - TokenizedStrategy.lastReport()) >= maxReportDelay
-        ) return true;
-    }
-
-    /**
-     * @dev Optional trigger to override if tend() will be used by the strategy.
-     * This must be implemented if the strategy hopes to invoke _tend().
-     *
-     * @return . Should return true if tend() should be called by keeper or false if not.
-     */
-    function _tendTrigger() internal view virtual override returns (bool) {
-        return (address(asset) == ETH ? address(this).balance : asset.balanceOf(address(this))) > 0;
-    }
-
     /**
      * @dev Function used to delegate call the TokenizedStrategy with
      * certain `_calldata` and return any return values.
@@ -143,6 +178,7 @@ abstract contract DragonBaseStrategy is BaseStrategy, Module {
      */
     function _delegateCall(bytes memory _calldata) internal returns (bytes memory) {
         // Delegate call the tokenized strategy with provided calldata.
+        //slither-disable-next-line controlled-delegatecall
         (bool success, bytes memory result) = tokenizedStrategyImplementation.delegatecall(_calldata);
 
         // If the call reverted. Return the error.
@@ -159,43 +195,13 @@ abstract contract DragonBaseStrategy is BaseStrategy, Module {
         return result;
     }
 
-    receive() external payable {}
-
     /**
-     * @dev Execute a function on the TokenizedStrategy and return any value.
+     * @dev Optional trigger to override if tend() will be used by the strategy.
+     * This must be implemented if the strategy hopes to invoke _tend().
      *
-     * This fallback function will be executed when any of the standard functions
-     * defined in the TokenizedStrategy are called since they wont be defined in
-     * this contract.
-     *
-     * It will delegatecall the TokenizedStrategy implementation with the exact
-     * calldata and return any relevant values.
-     *
+     * @return . Should return true if tend() should be called by keeper or false if not.
      */
-    fallback() external payable {
-        assembly ("memory-safe") {
-            if and(iszero(calldatasize()), not(iszero(callvalue()))) {
-                return(0, 0)
-            }
-        }
-        // load our target address
-        address _tokenizedStrategyAddress = tokenizedStrategyImplementation;
-        // Execute external function using delegatecall and return any value.
-        assembly ("memory-safe") {
-            // Copy function selector and any arguments.
-            calldatacopy(0, 0, calldatasize())
-            // Execute function delegatecall.
-            let result := delegatecall(gas(), _tokenizedStrategyAddress, 0, calldatasize(), 0, 0)
-            // Get any return value
-            returndatacopy(0, 0, returndatasize())
-            // Return any return value or error back to the caller
-            switch result
-            case 0 {
-                revert(0, returndatasize())
-            }
-            default {
-                return(0, returndatasize())
-            }
-        }
+    function _tendTrigger() internal view virtual override returns (bool) {
+        return (address(asset) == ETH ? address(this).balance : asset.balanceOf(address(this))) > 0;
     }
 }

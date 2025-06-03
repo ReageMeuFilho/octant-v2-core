@@ -7,8 +7,8 @@ import "forge-std/Test.sol";
 import "solady/tokens/ERC20.sol";
 import "solady/tokens/WETH.sol";
 
-import {HelperConfig} from "../helpers/HelperConfig.s.sol";
-import {Trader} from "src/routers-transformers/Trader.sol";
+import { HelperConfig } from "../helpers/HelperConfig.s.sol";
+import { Trader } from "src/routers-transformers/Trader.sol";
 
 contract TraderRun is Script {
     Trader trader;
@@ -23,12 +23,12 @@ contract TraderRun is Script {
     }
 
     function run() external {
-        (,,, uint256 deployerKey,,,,,,) = new HelperConfig(false).activeNetworkConfig();
+        (, , , uint256 deployerKey, , , , , , ) = new HelperConfig(false).activeNetworkConfig();
 
         trader = Trader(payable(vm.envAddress("TRADER")));
         ETH = trader.ETH();
-        base = trader.base();
-        quote = trader.quote();
+        base = trader.BASE();
+        quote = trader.QUOTE();
 
         console.log("ChainID:", block.chainid);
         console.log("Trader at", address(trader));
