@@ -13,7 +13,7 @@ import { MockERC20 } from "../mocks/MockERC20.sol";
 import { MockERC20Staking } from "../mocks/MockERC20Staking.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
-import { IGrantRound } from "../../src/regen/IGrantRound.sol";
+import { IFundingRound } from "../../src/regen/IFundingRound.sol";
 
 /**
  * @title RegenIntegrationTest
@@ -187,7 +187,7 @@ contract RegenIntegrationTest is Test {
         uint256 contributionAmount = getRewardAmount(contributionAmountBase);
 
         address contributor = makeAddr("contributor");
-        address mockGrantRound = makeAddr("mockGrantRound");
+        address mockFundingRound = makeAddr("mockFundingRound");
 
         whitelistUser(contributor, true, false, true);
 
@@ -209,12 +209,12 @@ contract RegenIntegrationTest is Test {
             uint256 netContribution = contributionAmount - uint256(feeAmount);
 
             vm.mockCall(
-                mockGrantRound,
+                mockFundingRound,
                 abi.encodeWithSignature("signup(uint256,address,bytes32)", netContribution, contributor, bytes32(0)),
                 abi.encode(uint256(1))
             );
             vm.mockCall(
-                mockGrantRound,
+                mockFundingRound,
                 abi.encodeWithSignature("vote(uint256,uint256)", uint256(1), contributionAmount),
                 abi.encode()
             );
@@ -230,7 +230,7 @@ contract RegenIntegrationTest is Test {
                     contributor
                 )
             );
-            regenStaker.contribute(depositId, mockGrantRound, contributor, contributionAmount, bytes32(0));
+            regenStaker.contribute(depositId, mockFundingRound, contributor, contributionAmount, bytes32(0));
             vm.stopPrank();
         }
 
@@ -246,20 +246,20 @@ contract RegenIntegrationTest is Test {
             if (fee > 0) {
                 vm.expectRevert(abi.encodeWithSelector(RegenStaker.CantAfford.selector, fee, contributionAmount));
                 vm.prank(contributor);
-                regenStaker.contribute(depositId, mockGrantRound, contributor, contributionAmount, bytes32(0));
+                regenStaker.contribute(depositId, mockFundingRound, contributor, contributionAmount, bytes32(0));
             } else {
                 vm.mockCall(
-                    mockGrantRound,
+                    mockFundingRound,
                     abi.encodeWithSignature("signup(uint256,address,bytes32)", 0, contributor, bytes32(0)),
                     abi.encode(uint256(1))
                 );
                 vm.mockCall(
-                    mockGrantRound,
+                    mockFundingRound,
                     abi.encodeWithSignature("vote(uint256,uint256)", uint256(1), uint256(0)),
                     abi.encode()
                 );
                 vm.prank(contributor);
-                regenStaker.contribute(depositId, mockGrantRound, contributor, contributionAmount, bytes32(0));
+                regenStaker.contribute(depositId, mockFundingRound, contributor, contributionAmount, bytes32(0));
             }
         } else {
             vm.assume(contributionAmount <= unclaimedRewards);
@@ -268,17 +268,17 @@ contract RegenIntegrationTest is Test {
             uint256 netContribution = contributionAmount - fee;
 
             vm.mockCall(
-                mockGrantRound,
+                mockFundingRound,
                 abi.encodeWithSignature("signup(uint256,address,bytes32)", netContribution, contributor, bytes32(0)),
                 abi.encode(uint256(1))
             );
             vm.mockCall(
-                mockGrantRound,
+                mockFundingRound,
                 abi.encodeWithSignature("vote(uint256,uint256)", uint256(1), netContribution),
                 abi.encode()
             );
             vm.prank(contributor);
-            regenStaker.contribute(depositId, mockGrantRound, contributor, contributionAmount, bytes32(0));
+            regenStaker.contribute(depositId, mockFundingRound, contributor, contributionAmount, bytes32(0));
         }
     }
 
@@ -394,16 +394,16 @@ contract RegenIntegrationTest is Test {
         uint256 rewardAmount = getRewardAmount(rewardAmountBase);
         uint256 contributionAmount = getRewardAmount(contributionAmountBase);
 
-        address mockGrantRound = makeAddr("mockGrantRound");
+        address mockFundingRound = makeAddr("mockFundingRound");
         address contributor = makeAddr("contributor");
 
         vm.mockCall(
-            mockGrantRound,
+            mockFundingRound,
             abi.encodeWithSignature("signup(uint256,address,bytes32)", contributionAmount, address(this), bytes32(0)),
             abi.encode(uint256(1))
         );
         vm.mockCall(
-            mockGrantRound,
+            mockFundingRound,
             abi.encodeWithSignature("vote(uint256,uint256)", uint256(1), contributionAmount),
             abi.encode()
         );
@@ -428,7 +428,7 @@ contract RegenIntegrationTest is Test {
 
         vm.startPrank(contributor);
         vm.expectRevert(abi.encodeWithSelector(Pausable.EnforcedPause.selector));
-        regenStaker.contribute(depositId, mockGrantRound, contributor, contributionAmount, bytes32(0));
+        regenStaker.contribute(depositId, mockFundingRound, contributor, contributionAmount, bytes32(0));
         vm.stopPrank();
 
         vm.prank(ADMIN);

@@ -28,25 +28,26 @@ import { IEarningPowerCalculator } from "staker/interfaces/IEarningPowerCalculat
 import { Whitelist } from "src/utils/Whitelist.sol";
 import { IWhitelist } from "src/utils/IWhitelist.sol";
 import { IWhitelistedEarningPowerCalculator } from "src/regen/IWhitelistedEarningPowerCalculator.sol";
-import { IGrantRound } from "src/regen/IGrantRound.sol";
+import { IWhitelistedEarningPowerCalculator } from "./IWhitelistedEarningPowerCalculator.sol";
+import { IFundingRound } from "./IFundingRound.sol";
 
-// --- EIP-712 Specification for IGrantRound Implementations ---
+// --- EIP-712 Specification for IFundingRound Implementations ---
 // To ensure security against replay attacks for the `signup` method,
-// any contract implementing the `IGrantRound` interface is expected to:
+// any contract implementing the `IFundingRound` interface is expected to:
 //
 // 1. Be EIP-712 Compliant:
-//    The `IGrantRound` contract should have its own EIP-712 domain separator.
+//    The `IFundingRound` contract should have its own EIP-712 domain separator.
 //    This typically includes:
-//    - name: The name of the grant round contract (e.g., "SpecificGrantRound").
+//    - name: The name of the funding round contract (e.g., "SpecificFundingRound").
 //    - version: The version of the signing domain (e.g., "1").
 //    - chainId: The chainId of the network where the contract is deployed.
-//    - verifyingContract: The address of the `IGrantRound` contract itself.
+//    - verifyingContract: The address of the `IFundingRound` contract itself.
 //
 // 2. Define a Typed Data Structure for Signup:
 //    The data signed by the user (e.g., `deposit.owner`) must include a nonce.
 //    Example structure (names can vary):
 //    /*
-//    struct GrantRoundSignupPayload {
+//    struct FundingRoundSignupPayload {
 //        uint256 assets;        // The amount of tokens for signup
 //        address receiver;      // The address receiving voting power/shares
 //        uint256 nonce;         // The signer's current nonce for this action
@@ -57,13 +58,13 @@ import { IGrantRound } from "src/regen/IGrantRound.sol";
 //    This is `keccak256` of the EIP-712 struct definition string.
 //    Example:
 //    // bytes32 constant SIGNUP_PAYLOAD_TYPEHASH =
-//    //     keccak256("GrantRoundSignupPayload(uint256 assets,address receiver,uint256 nonce)");
+//    //     keccak256("FundingRoundSignupPayload(uint256 assets,address receiver,uint256 nonce)");
 //
 // 4. Manage Nonces:
-//    The `IGrantRound` contract must maintain a nonce for each signer to prevent signature reuse.
+//    The `IFundingRound` contract must maintain a nonce for each signer to prevent signature reuse.
 //    Example:
 //    // mapping(address => uint256) public userNonces;
-//    Upon successful processing of a `signup` call, the `IGrantRound` contract must:
+//    Upon successful processing of a `signup` call, the `IFundingRound` contract must:
 //    - Verify that the nonce in the signed payload matches `userNonces[signer]`.
 //    - Increment `userNonces[signer]`.
 //
@@ -72,9 +73,8 @@ import { IGrantRound } from "src/regen/IGrantRound.sol";
 //    its domain separator, the `SIGNUP_PAYLOAD_TYPEHASH`, and the specific
 //    `assets`, `receiver`, and expected `nonce` for the signer.
 //
-// The `bytes32 signature` parameter in `IGrantRound.signup` is intended to be the
-// EIP-712 signature (r, s, v components) of this structured data.
-// --- End EIP-712 Specification for IGrantRound ---
+// The `bytes32 signature` parameter in `IFundingRound.signup` is intended to be the
+// EIP-712 signature (r, s
 
 /// @title RegenStaker
 /// @author [Golem Foundation](https://golem.foundation)
@@ -104,13 +104,13 @@ contract RegenStaker is
     event RewardContributed(
         DepositIdentifier indexed depositId,
         address indexed contributor,
-        address indexed grantRound,
+        address indexed fundingRound,
         uint256 amount
     );
 
     error NotWhitelisted(IWhitelist whitelist, address user);
     error CantAfford(uint256 requested, uint256 available);
-    error GrantRoundSignUpFailed(address grantRound, address contributor, uint256 amount, address votingDelegatee);
+    error FundingRoundSignUpFailed(address fundingRound, address contributor, uint256 amount, address votingDelegatee);
     error PreferencesAndPreferenceWeightsMustHaveTheSameLength();
     error InvalidNumberOfPreferences(uint256 actual, uint256 min, uint256 max); // Changed uint to uint256 for consistency
 
@@ -342,15 +342,15 @@ contract RegenStaker is
         return _claimReward(_depositId, deposit, msg.sender);
     }
 
-    /// @notice Contributes to a grant round.
+    /// @notice Contributes to a funding round.
     /// @param _depositId The deposit identifier for the staked amount.
-    /// @param _grantRoundAddress The address of the grant round.
+    /// @param _fundingRoundAddress The address of the funding round.
     /// @param _votingDelegatee The address of the delegatee to delegate voting power to.
     /// @param _amount The amount of reward tokens to contribute.
-    /// @param _signature The signature for the IGrantRound.signup call.
+    /// @param _signature The signature for the IFundingRound.signup call.
     function contribute(
         DepositIdentifier _depositId,
-        address _grantRoundAddress,
+        address _fundingRoundAddress,
         address _votingDelegatee,
         uint256 _amount,
         bytes32 _signature
@@ -359,9 +359,9 @@ contract RegenStaker is
         whenNotPaused
         nonReentrant
         onlyWhitelistedIfWhitelistIsSet(contributionWhitelist)
-        returns (uint256 amountContributedToGrant)
+        returns (uint256 amountContributedToFundingRound)
     {
-        _revertIfAddressZero(_grantRoundAddress);
+        _revertIfAddressZero(_fundingRoundAddress);
 
         Deposit storage deposit = deposits[_depositId];
 
@@ -373,10 +373,10 @@ contract RegenStaker is
 
         uint256 fee = claimFeeParameters.feeAmount;
         if (fee == 0) {
-            amountContributedToGrant = _amount;
+            amountContributedToFundingRound = _amount;
         } else {
             require(_amount >= fee, CantAfford(fee, _amount));
-            amountContributedToGrant = _amount - fee;
+            amountContributedToFundingRound = _amount - fee;
         }
 
         // Update deposit's reward checkpoint by the gross amount used
@@ -403,22 +403,28 @@ contract RegenStaker is
         deposit.earningPower = newCalculatedEarningPower.toUint96();
 
         // Emit Staker.RewardClaimed event for compatibility/observers, using net amount
-        emit RewardClaimed(_depositId, msg.sender, amountContributedToGrant, deposit.earningPower);
+        emit RewardClaimed(_depositId, msg.sender, amountContributedToFundingRound, deposit.earningPower);
 
         // Transfer fee if applicable
         if (fee > 0) {
             SafeERC20.safeTransfer(REWARD_TOKEN, claimFeeParameters.feeCollector, fee);
         }
 
-        // Perform grant round actions with the net amount
-        SafeERC20.safeIncreaseAllowance(REWARD_TOKEN, _grantRoundAddress, amountContributedToGrant);
+        // Perform funding round actions with the net amount
+        SafeERC20.safeIncreaseAllowance(REWARD_TOKEN, _fundingRoundAddress, amountContributedToFundingRound);
         require(
-            IGrantRound(_grantRoundAddress).signup(amountContributedToGrant, _votingDelegatee, _signature) > 0,
-            GrantRoundSignUpFailed(_grantRoundAddress, msg.sender, amountContributedToGrant, _votingDelegatee)
+            IFundingRound(_fundingRoundAddress).signup(amountContributedToFundingRound, _votingDelegatee, _signature) >
+                0,
+            FundingRoundSignUpFailed(
+                _fundingRoundAddress,
+                msg.sender,
+                amountContributedToFundingRound,
+                _votingDelegatee
+            )
         );
 
-        emit RewardContributed(_depositId, msg.sender, _grantRoundAddress, amountContributedToGrant);
+        emit RewardContributed(_depositId, msg.sender, _fundingRoundAddress, amountContributedToFundingRound);
 
-        return amountContributedToGrant;
+        return amountContributedToFundingRound;
     }
 }
