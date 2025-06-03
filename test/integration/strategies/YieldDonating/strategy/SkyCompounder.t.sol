@@ -51,7 +51,7 @@ contract SkyCompounderTest is Test {
     // Test constants
     uint256 public constant INITIAL_DEPOSIT = 100000e18;
     uint256 public mainnetFork;
-    uint256 public mainnetForkBlock = 19230000; // A recent Ethereum mainnet block
+    uint256 public mainnetForkBlock = 21880848; // A recent Ethereum mainnet block
 
     // Events from ITokenizedStrategy
     event Reported(uint256 profit, uint256 loss);
@@ -73,6 +73,7 @@ contract SkyCompounderTest is Test {
         // where mainnet = "${ETHEREUM_NODE_MAINNET}" environment variable
         mainnetFork = vm.createFork("mainnet");
         vm.selectFork(mainnetFork);
+        vm.rollFork(mainnetForkBlock);
 
         // Etch YieldDonatingTokenizedStrategy
         YieldDonatingTokenizedStrategy tempStrategy = new YieldDonatingTokenizedStrategy{
@@ -766,6 +767,7 @@ contract SkyCompounderTest is Test {
         skip(45 days);
 
         // 4. Verify we have claimable rewards and enable reward claiming
+
         vm.startPrank(management);
         uint256 claimableRewardsBefore = strategy.claimableRewards();
         console.log("Claimable rewards before report:", claimableRewardsBefore);
