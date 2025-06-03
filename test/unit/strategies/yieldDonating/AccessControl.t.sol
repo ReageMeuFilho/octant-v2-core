@@ -31,7 +31,7 @@ contract AccessControlTest is Setup {
     }
 
     function test_setKeeper(address _address) public {
-        vm.assume(_address != keeper);
+        vm.assume(_address != keeper && _address != address(0));
 
         vm.expectEmit(true, true, true, true, address(strategy));
         emit TokenizedStrategy.UpdateKeeper(_address);
