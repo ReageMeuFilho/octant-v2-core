@@ -474,7 +474,7 @@ contract LidoStrategyTest is Test {
     /// @notice Test the sweep function for non-asset ERC20 tokens
     function testSweep() public {
         // Create a mock token that we'll sweep
-        MockERC20 mockToken = new MockERC20();
+        MockERC20 mockToken = new MockERC20(18);
         mockToken.mint(address(strategy), 1000e18);
 
         // Verify token balance in strategy
@@ -560,7 +560,7 @@ contract LidoStrategyTest is Test {
 
     /// @notice Test sweep function for unauthorized access
     function testSweepUnauthorized() public {
-        MockERC20 mockToken = new MockERC20();
+        MockERC20 mockToken = new MockERC20(18);
         mockToken.mint(address(strategy), 1000e18);
 
         // Try to sweep as a non-governance address
@@ -573,7 +573,7 @@ contract LidoStrategyTest is Test {
     /// @notice Test onlyGovernance modifier
     function testOnlyGovernanceModifier() public {
         // Try to call sweep as a non-governance address
-        MockERC20 mockToken = new MockERC20();
+        MockERC20 mockToken = new MockERC20(18);
         mockToken.mint(address(strategy), 1000e18);
 
         vm.startPrank(user);
