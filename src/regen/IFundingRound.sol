@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-interface IGrantRound {
+interface IFundingRound {
     /// @notice Grants voting power to `receiver` by
     /// depositing exactly `assets` of underlying tokens.
     /// @param assets The amount of underlying to deposit in.
