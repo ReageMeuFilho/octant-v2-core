@@ -11,7 +11,7 @@ import { MockModule } from "test/mocks/zodiac-core/MockModule.sol";
 import { MockSafe } from "test/mocks/zodiac-core/MockSafe.sol";
 import { MockLinearAllowance } from "test/mocks/zodiac-core/MockLinearAllowance.sol";
 import { MockSafeDragonRouter } from "test/mocks/zodiac-core/MockSafeDragonRouter.sol";
-import { MultiSendCallOnly } from "src/libraries/Safe/MultiSendCallOnly.sol";
+import { MultiSendCallOnly } from "src/utils/libs/Safe/MultiSendCallOnly.sol";
 import { SplitChecker } from "src/zodiac-core/SplitChecker.sol";
 
 contract ModuleProxyFactoryTest is BaseTest {

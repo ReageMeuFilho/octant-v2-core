@@ -7,7 +7,7 @@ import { IMantleStaking } from "src/zodiac-core/interfaces/IMantleStaking.sol";
 import { ITokenizedStrategy } from "src/zodiac-core/interfaces/ITokenizedStrategy.sol";
 import { IMethYieldStrategy } from "src/zodiac-core/interfaces/IMethYieldStrategy.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { WadRayMath } from "src/libraries/Maths/WadRay.sol";
+import { WadRayMath } from "src/utils/libs/Maths/WadRay.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**

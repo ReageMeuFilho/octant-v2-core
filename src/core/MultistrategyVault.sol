@@ -10,9 +10,9 @@ import { IMultistrategyVault } from "src/core/interfaces/IMultistrategyVault.sol
 import { IDepositLimitModule } from "src/core/interfaces/IDepositLimitModule.sol";
 import { IWithdrawLimitModule } from "src/core/interfaces/IWithdrawLimitModule.sol";
 import { IERC4626Payable } from "src/zodiac-core/interfaces/IERC4626Payable.sol";
-import { StrategyManagementLib } from "src/libraries/Vault/StrategyManagementLib.sol";
-import { DebtManagementLib } from "src/libraries/Vault/DebtManagementLib.sol";
-import { ERC20SafeLib } from "src/libraries/Vault/ERC20SafeLib.sol";
+import { StrategyManagementLib } from "src/core/libs/StrategyManagementLib.sol";
+import { DebtManagementLib } from "src/core/libs/DebtManagementLib.sol";
+import { ERC20SafeLib } from "src/core/libs/ERC20SafeLib.sol";
 
 /**
  * @notice
