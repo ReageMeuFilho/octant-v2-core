@@ -3,7 +3,7 @@ pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
 import { TestPlus } from "lib/solady/test/utils/TestPlus.sol";
-import "src/routers-transformers/Trader.sol";
+import "src/utils/routers-transformers/Trader.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 import { HelperConfig } from "script/helpers/HelperConfig.s.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";

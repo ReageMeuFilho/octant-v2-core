@@ -7,7 +7,7 @@ import "forge-std/Test.sol";
 import "solady/tokens/ERC20.sol";
 
 import { HelperConfig } from "../helpers/HelperConfig.s.sol";
-import { Trader } from "src/routers-transformers/Trader.sol";
+import { Trader } from "src/utils/routers-transformers/Trader.sol";
 
 contract TraderStatus is Script, Test {
     address ETH;

@@ -3,7 +3,7 @@ pragma solidity >=0.8.25;
 
 import "forge-std/console.sol";
 import { Setup } from "test/unit/zodiac-core/vaults/Setup.sol";
-import { IERC20Permit } from "src/vendor/shamirlabs/IERC20Permit.sol";
+import { IERC20Permit } from "src/utils/vendor/shamirlabs/IERC20Permit.sol";
 import { MultistrategyVault } from "src/core/MultistrategyVault.sol";
 import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
 import { IMultistrategyVault } from "src/core/interfaces/IMultistrategyVault.sol";

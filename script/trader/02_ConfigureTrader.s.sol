@@ -3,7 +3,7 @@ pragma solidity ^0.8.23;
 
 import "forge-std/Script.sol";
 import { HelperConfig } from "../helpers/HelperConfig.s.sol";
-import { Trader } from "src/routers-transformers/Trader.sol";
+import { Trader } from "src/utils/routers-transformers/Trader.sol";
 
 contract DeployTraderHelper is Script {
     function run() external {

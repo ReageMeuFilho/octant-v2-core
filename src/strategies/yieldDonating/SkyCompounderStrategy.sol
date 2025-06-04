@@ -7,7 +7,7 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 
 import { IUniswapV2Router02 } from "@tokenized-strategy-periphery/interfaces/Uniswap/V2/IUniswapV2Router02.sol";
 import { UniswapV3Swapper } from "src/strategies/periphery/UniswapV3Swapper.sol";
-import { IStaking, ISkyCompounder } from "src/interfaces/ISky.sol";
+import { IStaking, ISkyCompounder } from "src/strategies/interfaces/ISky.sol";
 
 /// @title yearn-v3-SkyCompounder
 /// @author mil0x

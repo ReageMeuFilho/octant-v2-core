@@ -7,13 +7,13 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 
-import { IOracle } from "src/vendor/0xSplits/OracleParams.sol";
-import { QuotePair, QuoteParams } from "src/vendor/0xSplits/LibQuotes.sol";
-import { IUniV3Swap } from "src/vendor/0xSplits/IUniV3Swap.sol";
+import { IOracle } from "src/utils/vendor/0xSplits/OracleParams.sol";
+import { QuotePair, QuoteParams } from "src/utils/vendor/0xSplits/LibQuotes.sol";
+import { IUniV3Swap } from "src/utils/vendor/0xSplits/IUniV3Swap.sol";
 
-import { ITransformer } from "../zodiac-core/interfaces/ITransformer.sol";
-import { ISwapperImpl } from "src/vendor/0xSplits/SwapperImpl.sol";
-import { ISwapRouter } from "src/vendor/uniswap/ISwapRouter.sol";
+import { ITransformer } from "src/zodiac-core/interfaces/ITransformer.sol";
+import { ISwapperImpl } from "src/utils/vendor/0xSplits/SwapperImpl.sol";
+import { ISwapRouter } from "src/utils/vendor/uniswap/ISwapRouter.sol";
 
 /// @author .
 /// @title Octant Trader

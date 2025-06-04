@@ -4,8 +4,8 @@ pragma solidity ^0.8.23;
 
 import { Script } from "forge-std/Script.sol";
 import { ERC20Mock } from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
-import { IUniswapV3Pool } from "../../src/vendor/uniswap/IUniswapV3Pool.sol";
-import { IUniswapV3Factory } from "../../src/vendor/uniswap/IUniswapV3Factory.sol";
+import { IUniswapV3Pool } from "../../src/utils/vendor/uniswap/IUniswapV3Pool.sol";
+import { IUniswapV3Factory } from "../../src/utils/vendor/uniswap/IUniswapV3Factory.sol";
 
 contract HelperConfig is Script {
     address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import { IHatsEligibility } from "src/hats/interfaces/IHatsEligibility.sol";
-import { IHatsToggle } from "src/hats/interfaces/IHatsToggle.sol";
+import { IHatsEligibility } from "src/utils/hats/interfaces/IHatsEligibility.sol";
+import { IHatsToggle } from "src/utils/hats/interfaces/IHatsToggle.sol";
 
 /**
  * @title SimpleEligibilityAndToggle

@@ -2,8 +2,8 @@
 pragma solidity ^0.8.23;
 
 import "forge-std/Script.sol";
-import { Trader } from "src/routers-transformers/Trader.sol";
-import { UniV3Swap } from "src/vendor/0xSplits/UniV3Swap.sol";
+import { Trader } from "src/utils/routers-transformers/Trader.sol";
+import { UniV3Swap } from "src/utils/vendor/0xSplits/UniV3Swap.sol";
 import { HelperConfig } from "../helpers/HelperConfig.s.sol";
 import { DeployTrader } from "../deploy/DeployTrader.sol";
 

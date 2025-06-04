@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import { BaseStrategy } from "src/core/BaseStrategy.sol";
-import { IBaseHealthCheck } from "src/interfaces/IBaseHealthCheck.sol";
+import { IBaseHealthCheck } from "src/strategies/interfaces/IBaseHealthCheck.sol";
 
 /**
  *   @title Base Health Check

@@ -12,8 +12,8 @@ import { SafeProxy } from "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxy
 import { SafeProxyFactory } from "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
 import { Enum } from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 import { Hats } from "lib/hats-protocol/src/Hats.sol";
-import { DragonHatter } from "src/hats/DragonHatter.sol";
-import { SimpleEligibilityAndToggle } from "src/hats/SimpleEligibilityAndToggle.sol";
+import { DragonHatter } from "src/utils/hats/DragonHatter.sol";
+import { SimpleEligibilityAndToggle } from "src/utils/hats/SimpleEligibilityAndToggle.sol";
 import { DragonRouter } from "src/zodiac-core/DragonRouter.sol";
 import { SplitChecker } from "src/zodiac-core/SplitChecker.sol";
 import { DragonTokenizedStrategy } from "src/zodiac-core/vaults/DragonTokenizedStrategy.sol";

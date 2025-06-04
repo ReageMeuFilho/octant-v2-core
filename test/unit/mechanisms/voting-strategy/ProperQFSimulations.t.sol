@@ -2,8 +2,8 @@
 pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
-import {HarnessProperQF} from "test/unit/allocation-mechanism/harness/HarnessProperQF.sol";
-import {ProperQF} from "src/allocation-mechanism/voting-strategy/ProperQF.sol";
+import {HarnessProperQF} from "test/unit/mechanisms/harness/HarnessProperQF.sol";
+import {ProperQF} from "src/mechanisms/voting-strategy/ProperQF.sol";
 import {console2 as console} from "forge-std/console2.sol";
 
 contract ProperQFSimulationTest is Test {

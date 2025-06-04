@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { ProperQF } from "src/allocation-mechanism/voting-strategy/ProperQF.sol";
+import { ProperQF } from "src/mechanisms/voting-strategy/ProperQF.sol";
 
 contract HarnessProperQF is ProperQF {
     // Custom Errors

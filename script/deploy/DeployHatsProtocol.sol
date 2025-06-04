@@ -4,8 +4,8 @@ pragma solidity ^0.8.20;
 import "forge-std/Test.sol";
 import { console } from "forge-std/console.sol";
 import { Hats } from "lib/hats-protocol/src/Hats.sol";
-import { DragonHatter } from "src/hats/DragonHatter.sol";
-import { SimpleEligibilityAndToggle } from "src/hats/SimpleEligibilityAndToggle.sol";
+import { DragonHatter } from "src/utils/hats/DragonHatter.sol";
+import { SimpleEligibilityAndToggle } from "src/utils/hats/SimpleEligibilityAndToggle.sol";
 
 /**
  * @title DeployHatsProtocol

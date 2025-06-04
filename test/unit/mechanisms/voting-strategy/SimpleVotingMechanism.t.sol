@@ -2,8 +2,8 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
-import {SimpleVotingMechanism} from "src/allocation-mechanism/mechanism/SimpleVotingMechanism.sol";
-import {BaseAllocationMechanism} from "src/allocation-mechanism/BaseAllocationMechanism.sol";
+import {SimpleVotingMechanism} from "src/mechanisms/mechanism/SimpleVotingMechanism.sol";
+import {BaseAllocationMechanism} from "src/mechanisms/BaseAllocationMechanism.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
