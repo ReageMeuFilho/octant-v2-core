@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.25;
 
-import "src/dragons/DragonRouter.sol";
-import { IDragonRouter } from "src/interfaces/IDragonRouter.sol";
-import { ITransformer } from "src/interfaces/ITransformer.sol";
+import "src/zodiac-core/DragonRouter.sol";
+import { IDragonRouter } from "src/zodiac-core/interfaces/IDragonRouter.sol";
+import { ITransformer } from "src/zodiac-core/interfaces/ITransformer.sol";
 
 /**
  * @title DragonRouterTesting

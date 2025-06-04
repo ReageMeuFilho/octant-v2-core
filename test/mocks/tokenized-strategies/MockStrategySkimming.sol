@@ -3,7 +3,7 @@ pragma solidity >=0.8.18;
 
 import { MockYieldSource } from "../MockYieldSource.sol";
 import { BaseStrategy, ERC20 } from "src/core/BaseStrategy.sol";
-import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
+import { ITokenizedStrategy } from "src/zodiac-core/interfaces/ITokenizedStrategy.sol";
 import { console2 } from "forge-std/console2.sol";
 import { MockYieldSourceSkimming } from "./MockYieldSourceSkimming.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";

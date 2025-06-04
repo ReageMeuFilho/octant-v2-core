@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import { MultistrategyVault } from "src/core/MultistrategyVault.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MockYieldStrategy } from "test/mocks/MockYieldStrategy.sol";
-import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
+import { IMultistrategyVault } from "src/core/interfaces/IMultistrategyVault.sol";
 import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
 import { MockAccountant } from "test/mocks/MockAccountant.sol";
 

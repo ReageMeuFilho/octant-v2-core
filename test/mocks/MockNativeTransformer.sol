@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.25;
 
-import { ITransformer } from "src/interfaces/ITransformer.sol";
+import { ITransformer } from "src/zodiac-core/interfaces/ITransformer.sol";
 
 /**
  * @title MockNativeTransformer

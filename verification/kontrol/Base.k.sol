@@ -6,7 +6,7 @@ import { TestPlus } from "lib/solady/test/utils/TestPlus.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
 import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
-import { ISafe } from "src/interfaces/Safe.sol";
+import { ISafe } from "src/zodiac-core/interfaces/Safe.sol";
 
 contract BaseTest is Test, TestPlus {
     struct testTemps {

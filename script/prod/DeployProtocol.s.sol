@@ -6,9 +6,9 @@ import { console2 } from "forge-std/console2.sol";
 import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxy.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
-import { DragonTokenizedStrategy } from "src/dragons/vaults/DragonTokenizedStrategy.sol";
-import { ModuleProxyFactory } from "src/dragons/ModuleProxyFactory.sol";
-import { SplitChecker } from "src/dragons/SplitChecker.sol";
+import { DragonTokenizedStrategy } from "src/zodiac-core/vaults/DragonTokenizedStrategy.sol";
+import { ModuleProxyFactory } from "src/zodiac-core/ModuleProxyFactory.sol";
+import { SplitChecker } from "src/zodiac-core/SplitChecker.sol";
 
 import { DeploySafe } from "script/deploy/DeploySafe.sol";
 import { DeployDragonRouter } from "script/deploy/DeployDragonRouter.sol";

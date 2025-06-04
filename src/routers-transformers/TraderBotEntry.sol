@@ -2,7 +2,7 @@
 pragma solidity ^0.8.23;
 
 import { Trader } from "./Trader.sol";
-import { DragonRouter } from "../dragons/DragonRouter.sol";
+import { DragonRouter } from "../zodiac-core/DragonRouter.sol";
 
 contract TraderBotEntry {
     constructor() {}

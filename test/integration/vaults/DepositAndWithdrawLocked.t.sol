@@ -4,8 +4,8 @@ pragma solidity ^0.8.25;
 import { Test } from "forge-std/Test.sol";
 import { MultistrategyLockedVault } from "src/core/MultistrategyLockedVault.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
-import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
-import { IMultistrategyLockedVault } from "src/interfaces/IMultistrategyLockedVault.sol";
+import { IMultistrategyVault } from "src/core/interfaces/IMultistrategyVault.sol";
+import { IMultistrategyLockedVault } from "src/core/interfaces/IMultistrategyLockedVault.sol";
 import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
 
 contract DepositAndWithdrawLockedTest is Test {

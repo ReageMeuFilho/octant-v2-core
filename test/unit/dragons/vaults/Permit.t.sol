@@ -6,7 +6,7 @@ import { Setup } from "./Setup.sol";
 import { IERC20Permit } from "src/vendor/shamirlabs/IERC20Permit.sol";
 import { MultistrategyVault } from "src/core/MultistrategyVault.sol";
 import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
-import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
+import { IMultistrategyVault } from "src/core/interfaces/IMultistrategyVault.sol";
 
 contract PermitTest is Setup {
     uint256 constant AMOUNT = 10 ** 18;

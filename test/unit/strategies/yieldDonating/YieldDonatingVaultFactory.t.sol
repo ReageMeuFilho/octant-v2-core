@@ -6,20 +6,20 @@ import { console } from "forge-std/console.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { SkyCompounderStrategy } from "src/strategies/yieldDonating/SkyCompounderStrategy.sol";
 import { IStaking } from "src/interfaces/ISky.sol";
-import { YieldDonatingVaultFactory } from "src/factories/yieldDonatingVaultFactory.sol";
+import { SkyCompounderStrategyFactory } from "src/factories/SkyCompounderStrategyFactory.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { YieldDonatingTokenizedStrategy } from "src/strategies/yieldDonating/YieldDonatingTokenizedStrategy.sol";
 
-/// @title YieldDonatingVaultFactory Test
+/// @title SkyCompounderStrategyFactory Test
 /// @author mil0x
-/// @notice Unit tests for the YieldDonatingVaultFactory using a mainnet fork
-contract YieldDonatingVaultFactoryTest is Test {
+/// @notice Unit tests for the SkyCompounderStrategyFactory using a mainnet fork
+contract SkyCompounderStrategyFactoryTest is Test {
     using SafeERC20 for ERC20;
 
     // Factory for creating strategies
     YieldDonatingTokenizedStrategy tokenizedStrategy;
-    YieldDonatingVaultFactory public factory;
+    SkyCompounderStrategyFactory public factory;
 
     // Strategy parameters
     address public management;
@@ -60,10 +60,10 @@ contract YieldDonatingVaultFactoryTest is Test {
         donationAddress = address(0x4);
 
         // Deploy factory
-        factory = new YieldDonatingVaultFactory();
+        factory = new SkyCompounderStrategyFactory();
 
         // Label addresses for better trace outputs
-        vm.label(address(factory), "YieldDonatingVaultFactory");
+        vm.label(address(factory), "SkyCompounderStrategyFactory");
         vm.label(USDS, "USDS Token");
         vm.label(STAKING, "Sky Staking");
         vm.label(TOKENIZED_STRATEGY_ADDRESS, "TokenizedStrategy");
@@ -217,7 +217,7 @@ contract YieldDonatingVaultFactoryTest is Test {
         vm.stopPrank();
 
         // Create a new factory
-        YieldDonatingVaultFactory newFactory = new YieldDonatingVaultFactory();
+        SkyCompounderStrategyFactory newFactory = new SkyCompounderStrategyFactory();
 
         // Create a strategy with the same salt but from a different factory
         vm.startPrank(management);

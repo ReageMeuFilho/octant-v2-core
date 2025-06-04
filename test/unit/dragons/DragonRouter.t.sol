@@ -3,33 +3,33 @@ pragma solidity ^0.8.25;
 
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "forge-std/Test.sol";
-import "src/dragons/SplitChecker.sol";
-import { DragonRouter } from "src/dragons/DragonRouter.sol";
+import "src/zodiac-core/SplitChecker.sol";
+import { DragonRouter } from "src/zodiac-core/DragonRouter.sol";
 import { MockStrategy } from "test/mocks/MockStrategy.sol";
 import { MockDragonRouterTesting } from "test/mocks/MockDragonRouterTesting.sol";
 import { MockNativeTransformer } from "test/mocks/MockNativeTransformer.sol";
-import { ISplitChecker } from "src/interfaces/ISplitChecker.sol";
-import { ITransformer } from "src/interfaces/ITransformer.sol";
-import { IDragonRouter } from "src/interfaces/IDragonRouter.sol";
+import { ISplitChecker } from "src/zodiac-core/interfaces/ISplitChecker.sol";
+import { ITransformer } from "src/zodiac-core/interfaces/ITransformer.sol";
+import { IDragonRouter } from "src/zodiac-core/interfaces/IDragonRouter.sol";
 import { MockDragonRouterTesting } from "test/mocks/MockDragonRouterTesting.sol";
 import { MockNativeTransformer } from "test/mocks/MockNativeTransformer.sol";
-import { ISplitChecker } from "src/interfaces/ISplitChecker.sol";
-import { ITransformer } from "src/interfaces/ITransformer.sol";
-import { IDragonRouter } from "src/interfaces/IDragonRouter.sol";
+import { ISplitChecker } from "src/zodiac-core/interfaces/ISplitChecker.sol";
+import { ITransformer } from "src/zodiac-core/interfaces/ITransformer.sol";
+import { IDragonRouter } from "src/zodiac-core/interfaces/IDragonRouter.sol";
 
 import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC4626 } from "lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
-import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
-import { DragonRouter } from "src/dragons/DragonRouter.sol";
+import { ITokenizedStrategy } from "src/zodiac-core/interfaces/ITokenizedStrategy.sol";
+import { DragonRouter } from "src/zodiac-core/DragonRouter.sol";
 
-import { ITransformer } from "src/interfaces/ITransformer.sol";
+import { ITransformer } from "src/zodiac-core/interfaces/ITransformer.sol";
 import { MockDragonRouterTesting } from "test/mocks/MockDragonRouterTesting.sol";
 import { MockNativeTransformer } from "test/mocks/MockNativeTransformer.sol";
 import { MockStrategy } from "test/mocks/MockStrategy.sol";
-import { ISplitChecker } from "src/interfaces/ISplitChecker.sol";
+import { ISplitChecker } from "src/zodiac-core/interfaces/ISplitChecker.sol";
 import { AccessControl } from "lib/openzeppelin-contracts/contracts/access/AccessControl.sol";
-import { DragonTokenizedStrategy } from "src/dragons/vaults/DragonTokenizedStrategy.sol";
+import { DragonTokenizedStrategy } from "src/zodiac-core/vaults/DragonTokenizedStrategy.sol";
 
 import { MockStrategy } from "test/mocks/MockStrategy.sol";
 import { MockYieldSource } from "test/mocks/MockYieldSource.sol";

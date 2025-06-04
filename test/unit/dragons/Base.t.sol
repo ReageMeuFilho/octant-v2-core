@@ -3,13 +3,13 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 import { TestPlus } from "lib/solady/test/utils/TestPlus.sol";
-import { ModuleProxyFactory } from "src/dragons/ModuleProxyFactory.sol";
-import { SplitChecker } from "src/dragons/SplitChecker.sol";
-import { DragonRouter } from "src/dragons/DragonRouter.sol";
+import { ModuleProxyFactory } from "src/zodiac-core/ModuleProxyFactory.sol";
+import { SplitChecker } from "src/zodiac-core/SplitChecker.sol";
+import { DragonRouter } from "src/zodiac-core/DragonRouter.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
 import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
-import { ISafe } from "src/interfaces/Safe.sol";
+import { ISafe } from "src/zodiac-core/interfaces/Safe.sol";
 
 contract BaseTest is Test, TestPlus {
     struct testTemps {

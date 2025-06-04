@@ -3,7 +3,7 @@
 pragma solidity ^0.8.25;
 
 import { IMultistrategyVaultFactory } from "src/interfaces/IMultistrategyVaultFactory.sol";
-import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
+import { IMultistrategyVault } from "src/core/interfaces/IMultistrategyVault.sol";
 /**
  * @title Yearn Vault Factory
  * @author yearn.finance

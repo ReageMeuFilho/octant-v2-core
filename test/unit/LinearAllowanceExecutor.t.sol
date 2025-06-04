@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import { LinearAllowanceExecutor } from "src/dragons/LinearAllowanceExecutor.sol";
+import { LinearAllowanceExecutor } from "src/zodiac-core/LinearAllowanceExecutor.sol";
 import { LinearAllowanceSingletonForGnosisSafeWrapper } from "test/wrappers/LinearAllowanceSingletonForGnosisSafeWrapper.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MockSafe } from "test/mocks/MockSafe.sol";

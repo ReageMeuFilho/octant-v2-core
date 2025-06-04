@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.25;
 
-import { TokenizedStrategy, IBaseStrategy, Math } from "src/dragons/vaults/TokenizedStrategy.sol";
-import { IDragonTokenizedStrategy } from "src/interfaces/IDragonTokenizedStrategy.sol";
+import { TokenizedStrategy, IBaseStrategy, Math } from "src/zodiac-core/vaults/TokenizedStrategy.sol";
+import { IDragonTokenizedStrategy } from "src/zodiac-core/interfaces/IDragonTokenizedStrategy.sol";
 import { Unauthorized, TokenizedStrategy__NotOperator, DragonTokenizedStrategy__NoOperation, DragonTokenizedStrategy__InvalidReceiver, DragonTokenizedStrategy__VaultSharesNotTransferable, DragonTokenizedStrategy__ZeroLockupDuration, DragonTokenizedStrategy__InsufficientLockupDuration, DragonTokenizedStrategy__SharesStillLocked, DragonTokenizedStrategy__InvalidLockupDuration, DragonTokenizedStrategy__InvalidRageQuitCooldownPeriod, DragonTokenizedStrategy__RageQuitInProgress, DragonTokenizedStrategy__StrategyInShutdown, DragonTokenizedStrategy__NoSharesToRageQuit, DragonTokenizedStrategy__SharesAlreadyUnlocked, DragonTokenizedStrategy__DepositMoreThanMax, DragonTokenizedStrategy__MintMoreThanMax, DragonTokenizedStrategy__WithdrawMoreThanMax, DragonTokenizedStrategy__RedeemMoreThanMax, ZeroShares, ZeroAssets, DragonTokenizedStrategy__ReceiverHasExistingShares } from "src/errors.sol";
-import { IERC4626Payable } from "src/interfaces/IERC4626Payable.sol";
+import { IERC4626Payable } from "src/zodiac-core/interfaces/IERC4626Payable.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
-import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
+import { ITokenizedStrategy } from "src/zodiac-core/interfaces/ITokenizedStrategy.sol";
 
 contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy {
     // DragonTokenizedStrategy storage slot

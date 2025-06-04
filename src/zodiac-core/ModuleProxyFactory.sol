@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 pragma solidity >=0.8.0;
 
-import { ISafe } from "../interfaces/Safe.sol";
-import { IModuleProxyFactory } from "../interfaces/IModuleProxyFactory.sol";
+import { ISafe } from "./interfaces/Safe.sol";
+import { IModuleProxyFactory } from "./interfaces/IModuleProxyFactory.sol";
 
 contract ModuleProxyFactory is IModuleProxyFactory {
     /*

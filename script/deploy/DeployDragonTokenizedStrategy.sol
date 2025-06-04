@@ -3,7 +3,7 @@ pragma solidity ^0.8.25;
 
 import "forge-std/Test.sol";
 import { console2 } from "forge-std/console2.sol";
-import { DragonTokenizedStrategy } from "src/dragons/vaults/DragonTokenizedStrategy.sol";
+import { DragonTokenizedStrategy } from "src/zodiac-core/vaults/DragonTokenizedStrategy.sol";
 
 /**
  * @title DeployDragonTokenizedStrategy

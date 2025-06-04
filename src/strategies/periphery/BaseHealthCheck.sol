@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import { BaseStrategy } from "src/core/BaseStrategy.sol";
+import { IBaseHealthCheck } from "src/interfaces/IBaseHealthCheck.sol";
 
 /**
  *   @title Base Health Check
@@ -22,7 +23,7 @@ import { BaseStrategy } from "src/core/BaseStrategy.sol";
  *   losses, but rather can make sure manual intervention is
  *   needed before reporting an unexpected loss or profit.
  */
-abstract contract BaseHealthCheck is BaseStrategy {
+abstract contract BaseHealthCheck is BaseStrategy, IBaseHealthCheck {
     // Can be used to determine if a healthcheck should be called.
     // Defaults to true;
     bool public doHealthCheck = true;

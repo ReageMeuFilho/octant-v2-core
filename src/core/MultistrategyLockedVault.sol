@@ -2,8 +2,8 @@
 pragma solidity ^0.8.25;
 
 import { MultistrategyVault } from "src/core/MultistrategyVault.sol";
-import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
-import { IMultistrategyLockedVault } from "src/interfaces/IMultistrategyLockedVault.sol";
+import { IMultistrategyVault } from "src/core/interfaces/IMultistrategyVault.sol";
+import { IMultistrategyLockedVault } from "src/core/interfaces/IMultistrategyLockedVault.sol";
 
 /**
  * @title LockedMultistrategyVault

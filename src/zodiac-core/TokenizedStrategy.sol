@@ -8,10 +8,10 @@ import { Enum } from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 import { IAvatar } from "zodiac/interfaces/IAvatar.sol";
 import { ZeroAddress, ReentrancyGuard__ReentrantCall, TokenizedStrategy__NotOperator, TokenizedStrategy__NotManagement, TokenizedStrategy__NotKeeperOrManagement, TokenizedStrategy__NotRegenGovernance, TokenizedStrategy__NotEmergencyAuthorized, TokenizedStrategy__AlreadyInitialized, TokenizedStrategy__DepositMoreThanMax, TokenizedStrategy__InvalidMaxLoss, TokenizedStrategy__MintToZeroAddress, TokenizedStrategy__BurnFromZeroAddress, TokenizedStrategy__ApproveFromZeroAddress, TokenizedStrategy__ApproveToZeroAddress, TokenizedStrategy__InsufficientAllowance, TokenizedStrategy__PermitDeadlineExpired, TokenizedStrategy__InvalidSigner, TokenizedStrategy__NotSelf, TokenizedStrategy__TransferFailed, TokenizedStrategy__NotPendingManagement, TokenizedStrategy__StrategyNotInShutdown, TokenizedStrategy__TooMuchLoss, TokenizedStrategy__HatsAlreadyInitialized, TokenizedStrategy__InvalidHatsAddress } from "src/errors.sol";
 
-import { IBaseStrategy } from "src/interfaces/IBaseStrategy.sol";
-import { IHats } from "src/interfaces/IHats.sol";
-import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
-import { IERC4626Payable } from "src/interfaces/IERC4626Payable.sol";
+import { IBaseStrategy } from "src/zodiac-core/interfaces/IBaseStrategy.sol";
+import { IHats } from "src/zodiac-core/interfaces/IHats.sol";
+import { ITokenizedStrategy } from "src/zodiac-core/interfaces/ITokenizedStrategy.sol";
+import { IERC4626Payable } from "src/zodiac-core/interfaces/IERC4626Payable.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { IERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";

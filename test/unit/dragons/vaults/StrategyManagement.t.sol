@@ -5,7 +5,7 @@ import { Test } from "forge-std/Test.sol";
 import { MultistrategyVault } from "src/core/MultistrategyVault.sol";
 import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
+import { IMultistrategyVault } from "src/core/interfaces/IMultistrategyVault.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MockYieldStrategy } from "test/mocks/MockYieldStrategy.sol";
 import { Constants } from "test/unit/dragons/vaults/utils/constants.sol";

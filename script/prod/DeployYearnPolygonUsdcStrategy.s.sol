@@ -7,10 +7,10 @@ import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxy.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
 
-import { YearnPolygonUsdcStrategy } from "src/dragons/modules/YearnPolygonUsdcStrategy.sol";
-import { DragonTokenizedStrategy } from "src/dragons/vaults/DragonTokenizedStrategy.sol";
+import { YearnPolygonUsdcStrategy } from "src/zodiac-core/modules/YearnPolygonUsdcStrategy.sol";
+import { DragonTokenizedStrategy } from "src/zodiac-core/vaults/DragonTokenizedStrategy.sol";
 import { DeployDragonRouter } from "./DeployDragonRouter.s.sol";
-import { ModuleProxyFactory } from "src/dragons/ModuleProxyFactory.sol";
+import { ModuleProxyFactory } from "src/zodiac-core/ModuleProxyFactory.sol";
 
 contract DeployYearnPolygonUsdcStrategy is DeployDragonRouter {
     address[] public owners;

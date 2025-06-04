@@ -2,7 +2,7 @@
 pragma solidity ^0.8.25;
 
 import { Initializable } from "solady/utils/Initializable.sol";
-import { ISplitChecker } from "src/interfaces/ISplitChecker.sol";
+import { ISplitChecker } from "src/zodiac-core/interfaces/ISplitChecker.sol";
 
 import { AlreadyInitialized } from "src/errors.sol";
 /// @title SplitChecker

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.25;
 
-import { DragonBaseStrategy } from "src/dragons/vaults/DragonBaseStrategy.sol";
-import { IERC4626Payable } from "src/interfaces/IERC4626Payable.sol";
-import { IMantleStaking } from "src/interfaces/IMantleStaking.sol";
-import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
-import { IMethYieldStrategy } from "src/interfaces/IMethYieldStrategy.sol";
+import { DragonBaseStrategy } from "src/zodiac-core/vaults/DragonBaseStrategy.sol";
+import { IERC4626Payable } from "src/zodiac-core/interfaces/IERC4626Payable.sol";
+import { IMantleStaking } from "src/zodiac-core/interfaces/IMantleStaking.sol";
+import { ITokenizedStrategy } from "src/zodiac-core/interfaces/ITokenizedStrategy.sol";
+import { IMethYieldStrategy } from "src/zodiac-core/interfaces/IMethYieldStrategy.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { WadRayMath } from "src/libraries/Maths/WadRay.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";

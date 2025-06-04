@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import "../Base.t.sol";
-import { OctantRewardsSafe, OctantRewardsSafe__InvalidNumberOfValidators, OctantRewardsSafe__InvalidAddress, OctantRewardsSafe__InvalidMaxYield, OctantRewardsSafe__TransferFailed, OctantRewardsSafe__YieldNotInRange } from "src/dragons/modules/OctantRewardsSafe.sol";
+import { OctantRewardsSafe, OctantRewardsSafe__InvalidNumberOfValidators, OctantRewardsSafe__InvalidAddress, OctantRewardsSafe__InvalidMaxYield, OctantRewardsSafe__TransferFailed, OctantRewardsSafe__YieldNotInRange } from "src/zodiac-core/modules/OctantRewardsSafe.sol";
 import { FailSafe } from "test/mocks/MockFailSafe.sol";
 
 contract OctantRewardsSafeModule is BaseTest {

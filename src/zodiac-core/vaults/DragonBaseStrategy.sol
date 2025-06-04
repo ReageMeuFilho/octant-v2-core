@@ -6,7 +6,7 @@ import { Module } from "zodiac/core/Module.sol";
 
 import { BaseStrategy } from "../BaseStrategy.sol";
 // TokenizedStrategy interface used for internal view delegateCalls.
-import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
+import { ITokenizedStrategy } from "src/zodiac-core/interfaces/ITokenizedStrategy.sol";
 
 /**
  * @title Dragon Base Strategy

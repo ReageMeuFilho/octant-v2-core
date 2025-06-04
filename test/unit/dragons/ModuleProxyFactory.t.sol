@@ -2,17 +2,17 @@
 pragma solidity ^0.8.13;
 
 import { BaseTest } from "./Base.t.sol";
-import { ModuleProxyFactory } from "src/dragons/ModuleProxyFactory.sol";
-import { IModuleProxyFactory } from "src/interfaces/IModuleProxyFactory.sol";
-import { DragonRouter } from "src/dragons/DragonRouter.sol";
-import { ISplitChecker } from "src/interfaces/ISplitChecker.sol";
-import { ISafe } from "src/interfaces/Safe.sol";
+import { ModuleProxyFactory } from "src/zodiac-core/ModuleProxyFactory.sol";
+import { IModuleProxyFactory } from "src/zodiac-core/interfaces/IModuleProxyFactory.sol";
+import { DragonRouter } from "src/zodiac-core/DragonRouter.sol";
+import { ISplitChecker } from "src/zodiac-core/interfaces/ISplitChecker.sol";
+import { ISafe } from "src/zodiac-core/interfaces/Safe.sol";
 import { MockModule } from "test/mocks/MockModule.sol";
 import { MockSafe } from "test/mocks/MockSafe.sol";
 import { MockLinearAllowance } from "test/mocks/MockLinearAllowance.sol";
 import { MockSafeDragonRouter } from "test/mocks/MockSafeDragonRouter.sol";
 import { MultiSendCallOnly } from "src/libraries/Safe/MultiSendCallOnly.sol";
-import { SplitChecker } from "src/dragons/SplitChecker.sol";
+import { SplitChecker } from "src/zodiac-core/SplitChecker.sol";
 
 contract ModuleProxyFactoryTest is BaseTest {
     ModuleProxyFactory public factory;

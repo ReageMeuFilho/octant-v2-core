@@ -2,7 +2,7 @@
 pragma solidity ^0.8.25;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IMultistrategyVault } from "../../interfaces/IMultistrategyVault.sol";
+import { IMultistrategyVault } from "../../core/interfaces/IMultistrategyVault.sol";
 
 /**
  * @title ERC20SafeLib

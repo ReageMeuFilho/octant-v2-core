@@ -5,7 +5,7 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { Enum } from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { NATIVE_TOKEN } from "../../constants.sol";
-import { ILinearAllowanceSingleton } from "../../interfaces/ILinearAllowanceSingleton.sol";
+import { ILinearAllowanceSingleton } from "../interfaces/ILinearAllowanceSingleton.sol";
 import { SafeCast } from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 interface ISafe {

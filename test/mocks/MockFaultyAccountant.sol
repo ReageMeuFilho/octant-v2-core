@@ -3,7 +3,7 @@ pragma solidity ^0.8.25;
 
 import { IAccountant } from "../../src/interfaces/IAccountant.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
+import { IMultistrategyVault } from "src/core/interfaces/IMultistrategyVault.sol";
 
 // based off https://github.com/yearn/yearn-vaults-v3/blob/master/contracts/test/mocks/periphery/FaultyAccountant.vy
 contract MockFaultyAccountant is IAccountant {

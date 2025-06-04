@@ -8,10 +8,10 @@ import { SkyCompounderStrategy } from "src/strategies/yieldDonating/SkyCompounde
 import { IStaking } from "src/interfaces/ISky.sol";
 import { BaseHealthCheck } from "src/strategies/periphery/BaseHealthCheck.sol";
 import { UniswapV3Swapper } from "src/strategies/periphery/UniswapV3Swapper.sol";
-import { YieldDonatingVaultFactory } from "src/factories/yieldDonatingVaultFactory.sol";
+import { SkyCompounderStrategyFactory } from "src/factories/SkyCompounderStrategyFactory.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
+import { IMultistrategyVault } from "src/core/interfaces/IMultistrategyVault.sol";
 import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
 import { YieldDonatingTokenizedStrategy } from "src/strategies/yieldDonating/YieldDonatingTokenizedStrategy.sol";
 
@@ -27,7 +27,7 @@ contract SkyCompounderTest is Test {
 
     // Factory for creating strategies
     YieldDonatingTokenizedStrategy tokenizedStrategy;
-    YieldDonatingVaultFactory public factory;
+    SkyCompounderStrategyFactory public factory;
 
     // Strategy parameters
     address public management;
@@ -92,7 +92,7 @@ contract SkyCompounderTest is Test {
         donationAddress = address(0x4);
 
         // Deploy factory
-        factory = new YieldDonatingVaultFactory();
+        factory = new SkyCompounderStrategyFactory();
 
         // Deploy strategy using the factory's createStrategy method
         // The management address should be the deployer
@@ -113,7 +113,7 @@ contract SkyCompounderTest is Test {
 
         // Label addresses for better trace outputs
         vm.label(address(strategy), "SkyCompounder");
-        vm.label(address(factory), "YieldDonatingVaultFactory");
+        vm.label(address(factory), "SkyCompounderStrategyFactory");
         vm.label(USDS, "USDS Token");
         vm.label(STAKING, "Sky Staking");
         vm.label(TOKENIZED_STRATEGY_ADDRESS, "TokenizedStrategy");

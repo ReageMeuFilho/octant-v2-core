@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.18;
 
-import { MethYieldStrategy } from "src/dragons/modules/MethYieldStrategy.sol";
+import { MethYieldStrategy } from "src/zodiac-core/modules/MethYieldStrategy.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IMantleStaking } from "src/interfaces/IMantleStaking.sol";
-import { IERC4626Payable } from "src/interfaces/IERC4626Payable.sol";
+import { IMantleStaking } from "src/zodiac-core/interfaces/IMantleStaking.sol";
+import { IERC4626Payable } from "src/zodiac-core/interfaces/IERC4626Payable.sol";
 
 /**
  * @title MockMethYieldStrategy

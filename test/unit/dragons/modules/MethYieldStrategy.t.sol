@@ -2,21 +2,21 @@
 pragma solidity ^0.8.18;
 
 import { BaseTest } from "../Base.t.sol";
-import { MethYieldStrategy } from "src/dragons/modules/MethYieldStrategy.sol";
-import { YieldBearingDragonTokenizedStrategy } from "src/dragons/vaults/YieldBearingDragonTokenizedStrategy.sol";
+import { MethYieldStrategy } from "src/zodiac-core/modules/MethYieldStrategy.sol";
+import { YieldBearingDragonTokenizedStrategy } from "src/zodiac-core/vaults/YieldBearingDragonTokenizedStrategy.sol";
 import { TokenizedStrategy__DepositMoreThanMax } from "src/errors.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
-import { IDragonTokenizedStrategy } from "src/interfaces/IDragonTokenizedStrategy.sol";
+import { ITokenizedStrategy } from "src/zodiac-core/interfaces/ITokenizedStrategy.sol";
+import { IDragonTokenizedStrategy } from "src/zodiac-core/interfaces/IDragonTokenizedStrategy.sol";
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 import { MockMETH } from "test/mocks/MockMETH.sol";
 import { MockMantleStaking } from "test/mocks/MockMantleStaking.sol";
 import { MockMethYieldStrategy } from "test/mocks/MockMethYieldStrategy.sol";
 import { console } from "forge-std/console.sol";
-import { IERC4626Payable } from "src/interfaces/IERC4626Payable.sol";
+import { IERC4626Payable } from "src/zodiac-core/interfaces/IERC4626Payable.sol";
 import { DragonTokenizedStrategy__WithdrawMoreThanMax } from "src/errors.sol";
-import { IMethYieldStrategy } from "src/interfaces/IMethYieldStrategy.sol";
+import { IMethYieldStrategy } from "src/zodiac-core/interfaces/IMethYieldStrategy.sol";
 
 /**
  * @title MethYieldStrategyTest

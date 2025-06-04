@@ -11,7 +11,7 @@ import { IOracle } from "src/vendor/0xSplits/OracleParams.sol";
 import { QuotePair, QuoteParams } from "src/vendor/0xSplits/LibQuotes.sol";
 import { IUniV3Swap } from "src/vendor/0xSplits/IUniV3Swap.sol";
 
-import { ITransformer } from "../interfaces/ITransformer.sol";
+import { ITransformer } from "../zodiac-core/interfaces/ITransformer.sol";
 import { ISwapperImpl } from "src/vendor/0xSplits/SwapperImpl.sol";
 import { ISwapRouter } from "src/vendor/uniswap/ISwapRouter.sol";
 

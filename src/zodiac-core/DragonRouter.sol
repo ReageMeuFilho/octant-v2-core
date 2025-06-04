@@ -6,11 +6,11 @@ import { ReentrancyGuardUpgradeable } from "openzeppelin-upgradeable/utils/Reent
 import { AccessControlUpgradeable } from "openzeppelin-upgradeable/access/AccessControlUpgradeable.sol";
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
-import { ITransformer } from "src/interfaces/ITransformer.sol";
-import { IDragonRouter } from "src/interfaces/IDragonRouter.sol";
-import { LinearAllowanceExecutor } from "src/dragons/LinearAllowanceExecutor.sol";
-import { ISplitChecker } from "src/interfaces/ISplitChecker.sol";
+import { ITokenizedStrategy } from "src/zodiac-core/interfaces/ITokenizedStrategy.sol";
+import { ITransformer } from "src/zodiac-core/interfaces/ITransformer.sol";
+import { IDragonRouter } from "src/zodiac-core/interfaces/IDragonRouter.sol";
+import { LinearAllowanceExecutor } from "src/zodiac-core/LinearAllowanceExecutor.sol";
+import { ISplitChecker } from "src/zodiac-core/interfaces/ISplitChecker.sol";
 
 /**
  * @title Dragon Router

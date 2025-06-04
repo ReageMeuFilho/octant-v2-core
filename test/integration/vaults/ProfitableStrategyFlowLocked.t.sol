@@ -6,8 +6,8 @@ import { MultistrategyLockedVault } from "src/core/MultistrategyLockedVault.sol"
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MockYieldStrategy } from "test/mocks/MockYieldStrategy.sol";
 
-import { IMultistrategyLockedVault } from "src/interfaces/IMultistrategyLockedVault.sol";
-import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
+import { IMultistrategyLockedVault } from "src/core/interfaces/IMultistrategyLockedVault.sol";
+import { IMultistrategyVault } from "src/core/interfaces/IMultistrategyVault.sol";
 import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
 import { MockAccountant } from "test/mocks/MockAccountant.sol";
 

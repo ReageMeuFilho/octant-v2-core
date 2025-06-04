@@ -14,10 +14,10 @@ import { Enum } from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 import { Hats } from "lib/hats-protocol/src/Hats.sol";
 import { DragonHatter } from "src/hats/DragonHatter.sol";
 import { SimpleEligibilityAndToggle } from "src/hats/SimpleEligibilityAndToggle.sol";
-import { DragonRouter } from "src/dragons/DragonRouter.sol";
-import { SplitChecker } from "src/dragons/SplitChecker.sol";
-import { DragonTokenizedStrategy } from "src/dragons/vaults/DragonTokenizedStrategy.sol";
-import { ModuleProxyFactory } from "src/dragons/ModuleProxyFactory.sol";
+import { DragonRouter } from "src/zodiac-core/DragonRouter.sol";
+import { SplitChecker } from "src/zodiac-core/SplitChecker.sol";
+import { DragonTokenizedStrategy } from "src/zodiac-core/vaults/DragonTokenizedStrategy.sol";
+import { ModuleProxyFactory } from "src/zodiac-core/ModuleProxyFactory.sol";
 import { LibString } from "solady/utils/LibString.sol";
 
 import { TokenizedStrategy__StrategyNotInShutdown, TokenizedStrategy__NotEmergencyAuthorized, TokenizedStrategy__HatsAlreadyInitialized, TokenizedStrategy__NotKeeperOrManagement, TokenizedStrategy__NotManagement } from "src/errors.sol";

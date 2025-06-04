@@ -4,7 +4,7 @@ pragma solidity >=0.8.25;
 import { CREATE3 } from "@solady/utils/CREATE3.sol";
 import { SkyCompounderStrategy } from "src/strategies/yieldDonating/SkyCompounderStrategy.sol";
 
-contract YieldDonatingVaultFactory {
+contract SkyCompounderStrategyFactory {
     /**
      * @dev Struct to store information about a strategy.
      * @param deployerAddress The address of the deployer who created the strategy.
