@@ -6,12 +6,12 @@ import { MultistrategyVault } from "src/core/MultistrategyVault.sol";
 import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
 import { IMultistrategyVault } from "src/core/interfaces/IMultistrategyVault.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
-import { MockYieldStrategy } from "test/mocks/MockYieldStrategy.sol";
-import { MockAccountant } from "test/mocks/MockAccountant.sol";
+import { MockYieldStrategy } from "test/mocks/zodiac-core/MockYieldStrategy.sol";
+import { MockAccountant } from "test/mocks/core/MockAccountant.sol";
 
 import { IFactory } from "src/interfaces/IFactory.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
-import { MockFlexibleAccountant } from "test/mocks/MockFlexibleAccountant.sol";
+import { MockFlexibleAccountant } from "test/mocks/core/MockFlexibleAccountant.sol";
 
 contract ProfitUnlockingTest is Test {
     MultistrategyVault vaultImplementation;

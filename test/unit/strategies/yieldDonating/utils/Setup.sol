@@ -6,11 +6,11 @@ import { ERC20Mock } from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 
 import { TokenizedStrategy } from "src/core/TokenizedStrategy.sol";
 import { MockFactory } from "test/mocks/MockFactory.sol";
-import { IMockStrategy } from "test/mocks/IMockStrategy.sol";
-import { MockFaultyStrategy } from "test/mocks/tokenized-strategies/MockFaultyStrategy.sol";
-import { MockIlliquidStrategy } from "test/mocks/tokenized-strategies/MockIlliquidStrategy.sol";
-import { MockYieldSource } from "test/mocks/tokenized-strategies/MockYieldSource.sol";
-import { MockStrategy } from "test/mocks/tokenized-strategies/MockStrategy.sol";
+import { IMockStrategy } from "test/mocks/zodiac-core/IMockStrategy.sol";
+import { MockFaultyStrategy } from "test/mocks/core/tokenized-strategies/MockFaultyStrategy.sol";
+import { MockIlliquidStrategy } from "test/mocks/core/tokenized-strategies/MockIlliquidStrategy.sol";
+import { MockYieldSource } from "test/mocks/core/tokenized-strategies/MockYieldSource.sol";
+import { MockStrategy } from "test/mocks/core/tokenized-strategies/MockStrategy.sol";
 import { YieldDonatingTokenizedStrategy } from "src/strategies/yieldDonating/YieldDonatingTokenizedStrategy.sol";
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import { Test } from "forge-std/Test.sol";

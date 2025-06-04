@@ -8,12 +8,12 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IMultistrategyVault } from "src/core/interfaces/IMultistrategyVault.sol";
 import { IAccountant } from "src/interfaces/IAccountant.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
-import { MockYieldStrategy } from "test/mocks/MockYieldStrategy.sol";
-import { MockAccountant } from "test/mocks/MockAccountant.sol";
+import { MockYieldStrategy } from "test/mocks/zodiac-core/MockYieldStrategy.sol";
+import { MockAccountant } from "test/mocks/core/MockAccountant.sol";
 import { Constants } from "./utils/constants.sol";
-import { MockFlexibleAccountant } from "test/mocks/MockFlexibleAccountant.sol";
-import { MockFaultyAccountant } from "test/mocks/MockFaultyAccountant.sol";
-import { MockLossyStrategy } from "test/mocks/MockLossyStrategy.sol";
+import { MockFlexibleAccountant } from "test/mocks/core/MockFlexibleAccountant.sol";
+import { MockFaultyAccountant } from "test/mocks/core/MockFaultyAccountant.sol";
+import { MockLossyStrategy } from "test/mocks/core/MockLossyStrategy.sol";
 
 contract StrategyAccountingTest is Test {
     MultistrategyVault vaultImplementation;

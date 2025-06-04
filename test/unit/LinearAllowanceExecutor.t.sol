@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import { LinearAllowanceExecutor } from "src/zodiac-core/LinearAllowanceExecutor.sol";
 import { LinearAllowanceSingletonForGnosisSafeWrapper } from "test/wrappers/LinearAllowanceSingletonForGnosisSafeWrapper.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
-import { MockSafe } from "test/mocks/MockSafe.sol";
+import { MockSafe } from "test/mocks/zodiac-core/MockSafe.sol";
 import { NATIVE_TOKEN } from "src/constants.sol";
 
 contract LinearAllowanceExecutorTest is Test {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.25;
 
-import { IAccountant } from "../../src/interfaces/IAccountant.sol";
+import { IAccountant } from "src/interfaces/IAccountant.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IMultistrategyVault } from "src/core/interfaces/IMultistrategyVault.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";

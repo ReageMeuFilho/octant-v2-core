@@ -7,10 +7,10 @@ import { IModuleProxyFactory } from "src/zodiac-core/interfaces/IModuleProxyFact
 import { DragonRouter } from "src/zodiac-core/DragonRouter.sol";
 import { ISplitChecker } from "src/zodiac-core/interfaces/ISplitChecker.sol";
 import { ISafe } from "src/zodiac-core/interfaces/Safe.sol";
-import { MockModule } from "test/mocks/MockModule.sol";
-import { MockSafe } from "test/mocks/MockSafe.sol";
-import { MockLinearAllowance } from "test/mocks/MockLinearAllowance.sol";
-import { MockSafeDragonRouter } from "test/mocks/MockSafeDragonRouter.sol";
+import { MockModule } from "test/mocks/zodiac-core/MockModule.sol";
+import { MockSafe } from "test/mocks/zodiac-core/MockSafe.sol";
+import { MockLinearAllowance } from "test/mocks/zodiac-core/MockLinearAllowance.sol";
+import { MockSafeDragonRouter } from "test/mocks/zodiac-core/MockSafeDragonRouter.sol";
 import { MultiSendCallOnly } from "src/libraries/Safe/MultiSendCallOnly.sol";
 import { SplitChecker } from "src/zodiac-core/SplitChecker.sol";
 

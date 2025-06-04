@@ -3,8 +3,8 @@ pragma solidity ^0.8.15;
 
 import { Test } from "forge-std/Test.sol";
 import { DragonTokenizedStrategy } from "src/zodiac-core/vaults/DragonTokenizedStrategy.sol";
-import { MockStrategy } from "test/mocks/MockStrategy.sol";
-import { MockYieldSource } from "test/mocks/MockYieldSource.sol";
+import { MockStrategy } from "test/mocks/zodiac-core/MockStrategy.sol";
+import { MockYieldSource } from "test/mocks/core/MockYieldSource.sol";
 import { TokenizedStrategy__NotOperator, DragonTokenizedStrategy__InsufficientLockupDuration, DragonTokenizedStrategy__InvalidReceiver, DragonTokenizedStrategy__RageQuitInProgress, DragonTokenizedStrategy__SharesStillLocked, DragonTokenizedStrategy__StrategyInShutdown, DragonTokenizedStrategy__SharesAlreadyUnlocked, DragonTokenizedStrategy__NoSharesToRageQuit, DragonTokenizedStrategy__ZeroLockupDuration, DragonTokenizedStrategy__WithdrawMoreThanMax, DragonTokenizedStrategy__RedeemMoreThanMax, TokenizedStrategy__TransferFailed, ZeroAssets, ZeroShares, DragonTokenizedStrategy__DepositMoreThanMax, DragonTokenizedStrategy__MintMoreThanMax, ERC20InsufficientBalance, DragonTokenizedStrategy__ReceiverHasExistingShares } from "src/errors.sol";
 import { BaseTest } from "../Base.t.sol";
 import { ITokenizedStrategy } from "src/zodiac-core/interfaces/ITokenizedStrategy.sol";

@@ -7,12 +7,12 @@ import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFacto
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IMultistrategyVault } from "src/core/interfaces/IMultistrategyVault.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
-import { MockYieldStrategy } from "test/mocks/MockYieldStrategy.sol";
+import { MockYieldStrategy } from "test/mocks/zodiac-core/MockYieldStrategy.sol";
 import { MockFactory } from "test/mocks/MockFactory.sol";
-import { MockLossyStrategy } from "test/mocks/MockLossyStrategy.sol";
-import { MockLockedStrategy } from "test/mocks/MockLockedStrategy.sol";
-import { MockWithdrawLimitModule } from "test/mocks/MockWithdrawLimitModule.sol";
-import { MockDepositLimitModule } from "test/mocks/MockDepositLimitModule.sol";
+import { MockLossyStrategy } from "test/mocks/core/MockLossyStrategy.sol";
+import { MockLockedStrategy } from "test/mocks/core/MockLockedStrategy.sol";
+import { MockWithdrawLimitModule } from "test/mocks/core/MockWithdrawLimitModule.sol";
+import { MockDepositLimitModule } from "test/mocks/core/MockDepositLimitModule.sol";
 
 contract ERC4626Test is Test {
     MultistrategyVault vaultImplementation;

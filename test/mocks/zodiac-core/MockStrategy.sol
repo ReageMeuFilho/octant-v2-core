@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.8.18;
 
-import { MockYieldSource } from "./MockYieldSource.sol";
+import { MockYieldSource } from "../core/MockYieldSource.sol";
 import { DragonBaseStrategy, ERC20 } from "src/zodiac-core/vaults/DragonBaseStrategy.sol";
 import { Module } from "zodiac/core/Module.sol";
+import "forge-std/Test.sol";
 
 contract MockStrategy is Module, DragonBaseStrategy {
     address public yieldSource;
@@ -51,14 +52,9 @@ contract MockStrategy is Module, DragonBaseStrategy {
         transferOwnership(_owner);
     }
 
-    function initialize(address _asset, address _yieldSource) public {
-        require(yieldSource == address(0));
-        yieldSource = _yieldSource;
-        ERC20(_asset).approve(_yieldSource, type(uint256).max);
-    }
-
     function _deployFunds(uint256 _amount) internal override {
-        MockYieldSource(yieldSource).deposit(_amount);
+        if (address(asset) == ETH) MockYieldSource(yieldSource).deposit{ value: _amount }(_amount);
+        else MockYieldSource(yieldSource).deposit(_amount);
     }
 
     function _freeFunds(uint256 _amount) internal override {
@@ -66,16 +62,19 @@ contract MockStrategy is Module, DragonBaseStrategy {
     }
 
     function _harvestAndReport() internal override returns (uint256) {
-        uint256 balance = ERC20(asset).balanceOf(address(this));
-        if (balance > 0 && !TokenizedStrategy.isShutdown()) {
-            MockYieldSource(yieldSource).deposit(balance);
-        }
-        return MockYieldSource(yieldSource).balance() + ERC20(asset).balanceOf(address(this));
+        uint256 amount = 0.1 ether;
+        MockYieldSource(yieldSource).simulateHarvestRewards(amount);
+        uint256 balance = address(asset) == ETH ? address(this).balance : ERC20(asset).balanceOf(address(this));
+        return MockYieldSource(yieldSource).balance() + balance;
     }
 
     function _tend(uint256 /*_idle*/) internal override {
-        uint256 balance = ERC20(asset).balanceOf(address(this));
+        uint256 balance = address(asset) == ETH ? address(this).balance : ERC20(asset).balanceOf(address(this));
         if (balance > 0) {
+            if (address(asset) == ETH) {
+                MockYieldSource(yieldSource).deposit{ value: balance }(balance);
+                return;
+            }
             MockYieldSource(yieldSource).deposit(balance);
         }
     }
@@ -92,15 +91,14 @@ contract MockStrategy is Module, DragonBaseStrategy {
         trigger = _trigger;
     }
 
-    function onlyLetManagers() public onlyManagement {
-        managed = true;
+    function adjustPosition(uint256 _debtOutstanding) external override onlyManagement {
+        MockYieldSource(yieldSource).withdraw(_debtOutstanding);
     }
 
-    function onlyLetKeepersIn() public onlyKeepers {
-        kept = true;
-    }
-
-    function onlyLetEmergencyAdminsIn() public onlyEmergencyAuthorized {
-        emergentizated = true;
+    function liquidatePosition(
+        uint256 _amountNeeded
+    ) external override onlyManagement returns (uint256 _liquidatedAmount, uint256 _loss) {
+        MockYieldSource(yieldSource).withdraw(_amountNeeded);
+        return (_amountNeeded, 0);
     }
 }

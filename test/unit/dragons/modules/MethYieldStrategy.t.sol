@@ -12,7 +12,7 @@ import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy
 
 import { MockMETH } from "test/mocks/MockMETH.sol";
 import { MockMantleStaking } from "test/mocks/MockMantleStaking.sol";
-import { MockMethYieldStrategy } from "test/mocks/MockMethYieldStrategy.sol";
+import { MockMethYieldStrategy } from "test/mocks/zodiac-core/MockMethYieldStrategy.sol";
 import { console } from "forge-std/console.sol";
 import { IERC4626Payable } from "src/zodiac-core/interfaces/IERC4626Payable.sol";
 import { DragonTokenizedStrategy__WithdrawMoreThanMax } from "src/errors.sol";
