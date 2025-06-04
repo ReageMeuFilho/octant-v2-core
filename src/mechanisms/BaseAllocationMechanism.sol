@@ -293,11 +293,13 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
     /// @return recipient Address of the recipient for the proposal
     function _getRecipientAddressHook(uint256 pid) internal view virtual returns (address recipient);
 
-    /// @dev Hook to request a redeem of shares for a proposal. Can be used to enforce additional checks or actions.
+    /// @dev Hook to perform the actual distribution of shares when a proposal is queued.
+    /// This is where the concrete implementation should mint shares, transfer tokens, or perform the actual distribution.
+    /// For vault-based mechanisms, this is where shares would be minted to the recipient.
     /// @param recipient Address of the recipient for the proposal
-    /// @param sharesToRedeem Number of shares to redeem
-    /// @return allow True if redeem request should proceed
-    function _requestDistributionHook(address recipient, uint256 sharesToRedeem) internal view virtual returns (bool);
+    /// @param sharesToMint Number of shares to distribute/mint to the recipient
+    /// @return success True if distribution was successful
+    function _requestDistributionHook(address recipient, uint256 sharesToMint) internal virtual returns (bool);
 
     // ---------- Registration ----------
 

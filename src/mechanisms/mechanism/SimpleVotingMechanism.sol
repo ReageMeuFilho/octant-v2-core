@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {BaseAllocationMechanism} from "../BaseAllocationMechanism.sol";
+import {DistributionMechanism} from "../DistributionMechanism.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract SimpleVotingMechanism is BaseAllocationMechanism {
+/// @title Simple Voting Mechanism with Share Distribution
+/// @notice Implements a basic 1:1 voting mechanism where net votes directly convert to shares
+contract SimpleVotingMechanism is DistributionMechanism {
     constructor(
         IERC20 _asset,
         string memory _name,
@@ -15,7 +17,7 @@ contract SimpleVotingMechanism is BaseAllocationMechanism {
         uint256 _timelockDelay,
         uint256 _startBlock
     )
-        BaseAllocationMechanism(
+        DistributionMechanism(
             _asset,
             _name,
             _symbol,
@@ -83,7 +85,8 @@ contract SimpleVotingMechanism is BaseAllocationMechanism {
         return _getStorage().proposals[pid].recipient;
     }
 
-    function _requestDistributionHook(address, uint256) internal pure override returns (bool) {
-        return true;
+    function _requestDistributionHook(address recipient, uint256 sharesToMint) internal override returns (bool) {
+        // Call the parent implementation which handles the actual minting
+        return super._requestDistributionHook(recipient, sharesToMint);
     }
 }

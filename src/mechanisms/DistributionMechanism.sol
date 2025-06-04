@@ -39,48 +39,35 @@ pragma solidity >=0.8.18;
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 
 import {IBaseStrategy} from "../core/interfaces/IBaseStrategy.sol";
+import {BaseAllocationMechanism} from "./BaseAllocationMechanism.sol";
 
 /**
- * @title Tokenized Strategy (Octant V2 Fork)
- * @author yearn.finance; forked and modified by octant.finance
+ * @title Distribution Mechanism with Integrated Voting
+ * @author octant.finance
  * @notice
- *  This TokenizedStrategy is a fork of Yearn's TokenizedStrategy that has been
- *  modified by Octant to support donation functionality and other security enhancements.
+ *  This contract combines the ERC4626 tokenized vault functionality with the
+ *  allocation voting mechanism to create a complete distribution system.
+ *  
+ *  It inherits from BaseAllocationMechanism to get voting functionality and
+ *  implements a tokenized strategy vault that can mint shares based on vote outcomes.
  *
- *  The original contract can be used by anyone wishing to easily buildIBaseStrategy
- *  and deploy their own custom ERC4626 compliant single strategy Vault.
+ *  The contract manages both:
+ *  - Voting mechanism: Users vote on proposals to allocate shares
+ *  - Vault mechanism: Shares are minted to proposal recipients based on votes
  *
- *  The TokenizedStrategy contract is meant to be used as the proxy
- *  implementation contract that will handle all logic, storage and
- *  management for a custom strategy that inherits the `BaseStrategy`.
- *  Any function calls to the strategy that are not defined within that
- *  strategy will be forwarded through a delegateCall to this contract.
- *
- *  A strategist only needs to override a few simple functions that are
- *  focused entirely on the strategy specific needs to easily and cheaply
- *  deploy their own permissionless 4626 compliant vault.
- *
- *  @dev Changes from Yearn V3:
- *  - Added dragonRouter to the StrategyData struct to enable yield distribution
- *  - Added getter and setter for dragonRouter
- *  - Added validation checks for all critical addresses (management, keeper, emergencyAdmin, dragonRouter)
- *  - Enhanced initialize function to include emergencyAdmin and dragonRouter parameters
- *  - Standardized error messages for zero-address checks
- *  - Removed the yield/profit unlocking mechanism (profits are immediately realized)
- *  - Made the report() function virtual to enable specialized implementations
- *  - Made this contract abstract as a base for specialized strategy implementations
- *
- *  Two specialized implementations are provided:
- *  - YieldDonatingTokenizedStrategy: Mints profits as new shares and sends them to a specified dragon router
- *  - YieldSkimmingTokenizedStrategy: Skims the appreciation of asset and dilutes the original shares by minting new ones to the dragon router
- *
- *  WARNING: When creating custom strategies, DO NOT declare state variables outside
- *  the StrategyData struct. Doing so risks storage collisions if the implementation
- *  contract changes. Either extend the StrategyData struct or use a custom storage slot.
+ *  Key features:
+ *  - ERC4626 compliant vault with share minting
+ *  - Democratic voting for share allocation
+ *  - Integrated totalAssets management
+ *  - Hook-based architecture for customization
  */
-abstract contract DragonTokenizedStrategy {
+abstract contract DistributionMechanism is BaseAllocationMechanism {
     using Math for uint256;
     using SafeERC20 for ERC20;
 
@@ -191,10 +178,36 @@ abstract contract DragonTokenizedStrategy {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @dev On contract creation we set `asset` for this contract to address(1).
-     * This prevents it from ever being initialized in the future.
+     * @dev Constructor initializes both the BaseAllocationMechanism and sets up the strategy storage.
+     * @param _asset Underlying ERC20 token used for vault
+     * @param _name ERC20 name for vault share token
+     * @param _symbol ERC20 symbol for vault share token
+     * @param _votingDelay Blocks required between proposals by same proposer
+     * @param _votingPeriod Blocks duration that voting remains open
+     * @param _quorumShares Minimum net votes for a proposal to pass
+     * @param _timelockDelay Seconds after queuing before redemption allowed
+     * @param _startBlock Block number when voting mechanism starts
      */
-    constructor() {
+    constructor(
+        IERC20 _asset,
+        string memory _name,
+        string memory _symbol,
+        uint256 _votingDelay,
+        uint256 _votingPeriod,
+        uint256 _quorumShares,
+        uint256 _timelockDelay,
+        uint256 _startBlock
+    ) BaseAllocationMechanism(
+        _asset,
+        _name,
+        _symbol,
+        _votingDelay,
+        _votingPeriod,
+        _quorumShares,
+        _timelockDelay,
+        _startBlock
+    ) {
+        // Initialize strategy storage to prevent future initialization
         _strategyStorage().asset = ERC20(address(1));
     }
 
@@ -232,19 +245,19 @@ abstract contract DragonTokenizedStrategy {
      * @dev Prevents a contract from calling itself, directly or indirectly.
      * Placed over all state changing functions for increased safety.
      */
-    modifier nonReentrant() {
-        StrategyData storage S = _strategyStorage();
-        // On the first call to nonReentrant, `entered` will be false (2)
-        require(S.entered != ENTERED, "ReentrancyGuard: reentrant call");
+    // modifier nonReentrant() {
+    //     StrategyData storage S = _strategyStorage();
+    //     // On the first call to nonReentrant, `entered` will be false (2)
+    //     require(S.entered != ENTERED, "ReentrancyGuard: reentrant call");
 
-        // Any calls to nonReentrant after this point will fail
-        S.entered = ENTERED;
+    //     // Any calls to nonReentrant after this point will fail
+    //     S.entered = ENTERED;
 
-        _;
+    //     _;
 
-        // Reset to false (1) once call has finished.
-        S.entered = NOT_ENTERED;
-    }
+    //     // Reset to false (1) once call has finished.
+    //     S.entered = NOT_ENTERED;
+    // }
 
     /**
      * @notice Require a caller is `management`.
@@ -749,13 +762,7 @@ abstract contract DragonTokenizedStrategy {
                         GETTER FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @notice Get the underlying asset for the strategy.
-     * @return . The underlying asset.
-     */
-    function asset() external view returns (address) {
-        return address(_strategyStorage().asset);
-    }
+    // Note: asset() is already defined in BaseAllocationMechanism as immutable variable
 
     /**
      * @notice Get the API version for this TokenizedStrategy.
@@ -897,22 +904,7 @@ abstract contract DragonTokenizedStrategy {
                         ERC20 METHODS
     //////////////////////////////////////////////////////////////*/
 
-    /**
-     * @notice Returns the name of the token.
-     * @return . The name the strategy is using for its token.
-     */
-    function name() external view returns (string memory) {
-        return _strategyStorage().name;
-    }
-
-    /**
-     * @notice Returns the symbol of the strategies token.
-     * @dev Will be 'ys + asset symbol'.
-     * @return . The symbol the strategy is using for its tokens.
-     */
-    function symbol() external view returns (string memory) {
-        return string(abi.encodePacked("ys", _strategyStorage().asset.symbol()));
-    }
+    // Note: name() and symbol() are already defined in BaseAllocationMechanism
 
     /**
      * @notice Returns the number of decimals used to get its user representation.
@@ -1241,5 +1233,51 @@ abstract contract DragonTokenizedStrategy {
                 address(this)
             )
         );
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    ALLOCATION MECHANISM HOOKS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Hook to validate finalization can proceed
+    function _beforeFinalizeVoteTallyHook() internal view virtual override returns (bool) {
+        return true;
+    }
+
+    /// @dev Hook to actually mint shares when a proposal is queued
+    function _requestDistributionHook(address recipient, uint256 sharesToMint) 
+        internal 
+        virtual 
+        override 
+        returns (bool) 
+    {
+        if (sharesToMint == 0 || recipient == address(0)) return false;
+        
+        // Perform the actual share minting
+        StrategyData storage S = _strategyStorage();
+        _mint(S, recipient, sharesToMint);
+        return true;
+    }
+
+    /// @dev Convert vote tallies to shares based on vault conversion logic
+    function _convertVotesToShares(uint256 pid) 
+        internal 
+        view 
+        virtual 
+        override 
+        returns (uint256 sharesToMint) 
+    {
+        BaseAllocationStorage storage s = _getStorage();
+        ProposalVote storage votes = s.proposalVotes[pid];
+        
+        // Calculate net votes (For - Against)
+        uint256 netVotes = votes.sharesFor > votes.sharesAgainst ? 
+            votes.sharesFor - votes.sharesAgainst : 0;
+        
+        if (netVotes == 0) return 0;
+        
+        // For now, return net votes directly as shares
+        // In a real implementation, this would use the vault's conversion logic
+        return netVotes;
     }
 }
