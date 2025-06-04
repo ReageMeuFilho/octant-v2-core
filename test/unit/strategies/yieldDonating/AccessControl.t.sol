@@ -3,8 +3,8 @@ pragma solidity >=0.8.18;
 
 import "forge-std/console.sol";
 import { Setup } from "./utils/Setup.sol";
-import { DragonTokenizedStrategy } from "src/core/DragonTokenizedStrategy.sol";
-import { DragonBaseStrategy } from "src/core/DragonBaseStrategy.sol";
+import { TokenizedStrategy } from "src/core/TokenizedStrategy.sol";
+import { BaseStrategy } from "src/core/BaseStrategy.sol";
 
 contract AccessControlTest is Setup {
     function setUp() public override {
@@ -15,7 +15,7 @@ contract AccessControlTest is Setup {
         vm.assume(_address != management && _address != address(0));
 
         vm.expectEmit(true, true, true, true, address(strategy));
-        emit DragonTokenizedStrategy.UpdatePendingManagement(_address);
+        emit TokenizedStrategy.UpdatePendingManagement(_address);
 
         vm.prank(management);
         strategy.setPendingManagement(_address);
@@ -34,7 +34,7 @@ contract AccessControlTest is Setup {
         vm.assume(_address != keeper);
 
         vm.expectEmit(true, true, true, true, address(strategy));
-        emit DragonTokenizedStrategy.UpdateKeeper(_address);
+        emit TokenizedStrategy.UpdateKeeper(_address);
 
         vm.prank(management);
         strategy.setKeeper(_address);
@@ -46,7 +46,7 @@ contract AccessControlTest is Setup {
         assertTrue(!strategy.isShutdown());
 
         vm.expectEmit(true, true, true, true, address(strategy));
-        emit DragonTokenizedStrategy.StrategyShutdown();
+        emit TokenizedStrategy.StrategyShutdown();
 
         vm.prank(management);
         strategy.shutdownStrategy();
@@ -138,11 +138,11 @@ contract AccessControlTest is Setup {
 
         // doesn't work from random address
         vm.prank(_address);
-        vm.expectRevert(DragonBaseStrategy.NotSelf.selector);
+        vm.expectRevert(BaseStrategy.NotSelf.selector);
         strategy.deployFunds(_amount);
 
         vm.prank(management);
-        vm.expectRevert(DragonBaseStrategy.NotSelf.selector);
+        vm.expectRevert(BaseStrategy.NotSelf.selector);
         strategy.deployFunds(_amount);
 
         assertEq(asset.balanceOf(address(yieldSource)), 0);
@@ -167,13 +167,13 @@ contract AccessControlTest is Setup {
 
         // doesn't work from random address
         vm.prank(_address);
-        vm.expectRevert(DragonBaseStrategy.NotSelf.selector);
+        vm.expectRevert(BaseStrategy.NotSelf.selector);
         strategy.freeFunds(_amount);
         (_amount);
 
         // doesn't work from management either
         vm.prank(management);
-        vm.expectRevert(DragonBaseStrategy.NotSelf.selector);
+        vm.expectRevert(BaseStrategy.NotSelf.selector);
         strategy.freeFunds(_amount);
 
         assertEq(asset.balanceOf(address(strategy)), 0);
@@ -198,12 +198,12 @@ contract AccessControlTest is Setup {
 
         // doesn't work from random address
         vm.prank(_address);
-        vm.expectRevert(DragonBaseStrategy.NotSelf.selector);
+        vm.expectRevert(BaseStrategy.NotSelf.selector);
         strategy.harvestAndReport();
 
         // doesn't work from management either
         vm.prank(management);
-        vm.expectRevert(DragonBaseStrategy.NotSelf.selector);
+        vm.expectRevert(BaseStrategy.NotSelf.selector);
         strategy.harvestAndReport();
 
         vm.prank(address(strategy));
@@ -218,7 +218,7 @@ contract AccessControlTest is Setup {
 
         // doesn't work from random address
         vm.prank(_address);
-        vm.expectRevert(DragonBaseStrategy.NotSelf.selector);
+        vm.expectRevert(BaseStrategy.NotSelf.selector);
         strategy.tendThis(_amount);
 
         vm.prank(address(strategy));

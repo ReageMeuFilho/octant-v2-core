@@ -2,9 +2,9 @@
 pragma solidity >=0.8.18;
 
 import { MockYieldSource } from "../MockYieldSource.sol";
-import { DragonBaseStrategy, ERC20 } from "src/core/DragonBaseStrategy.sol";
+import { BaseStrategy, ERC20 } from "src/core/BaseStrategy.sol";
 
-contract MockIlliquidStrategy is DragonBaseStrategy {
+contract MockIlliquidStrategy is BaseStrategy {
     address public yieldSource;
     bool public whitelist;
     mapping(address => bool) public allowed;
@@ -16,7 +16,7 @@ contract MockIlliquidStrategy is DragonBaseStrategy {
         address _keeper,
         address _emergencyAdmin,
         address _donationAddress
-    ) DragonBaseStrategy(_asset, "Test Strategy", _management, _keeper, _emergencyAdmin, _donationAddress) {
+    ) BaseStrategy(_asset, "Test Strategy", _management, _keeper, _emergencyAdmin, _donationAddress) {
         yieldSource = _yieldSource;
         ERC20(_asset).approve(_yieldSource, type(uint256).max);
     }

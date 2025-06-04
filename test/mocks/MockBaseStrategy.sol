@@ -2,9 +2,9 @@
 pragma solidity >=0.8.18;
 
 import { MockYieldSource } from "./MockYieldSource.sol";
-import { DragonBaseStrategy, ERC20 } from "src/core/DragonBaseStrategy.sol";
+import { BaseStrategy, ERC20 } from "src/core/BaseStrategy.sol";
 
-contract MockStrategy is DragonBaseStrategy {
+contract MockStrategy is BaseStrategy {
     address public yieldSource;
     bool public trigger;
     bool public managed;
@@ -14,7 +14,7 @@ contract MockStrategy is DragonBaseStrategy {
     constructor(
         address _asset,
         address _yieldSource
-    ) DragonBaseStrategy(_asset, "Test Strategy", msg.sender, msg.sender, msg.sender, msg.sender) {
+    ) BaseStrategy(_asset, "Test Strategy", msg.sender, msg.sender, msg.sender, msg.sender) {
         initialize(_asset, _yieldSource);
     }
 

@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0
-pragma solidity >=0.8.18;
+pragma solidity >=0.8.25;
 
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 // TokenizedStrategy interface used for internal view delegateCalls.
-import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
-import { BaseStrategy__NotSelf } from "src/errors.sol";
+import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
 
 /**
  * @title YearnV3 Base Strategy
@@ -15,7 +14,7 @@ import { BaseStrategy__NotSelf } from "src/errors.sol";
  *  seamlessly integrate with the `TokenizedStrategy` implementation contract
  *  allowing anyone to easily build a fully permissionless ERC-4626 compliant
  *  Vault by inheriting this contract and overriding three simple functions.
- *
+
  *  It utilizes an immutable proxy pattern that allows the BaseStrategy
  *  to remain simple and small. All standard logic is held within the
  *  `TokenizedStrategy` and is reused over any n strategies all using the
@@ -37,30 +36,6 @@ import { BaseStrategy__NotSelf } from "src/errors.sol";
  *  `TokenizedStrategy` variable. IE: TokenizedStrategy.globalVariable();.
  */
 abstract contract BaseStrategy {
-    /*//////////////////////////////////////////////////////////////
-                            IMMUTABLES
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @dev Underlying asset the Strategy is earning yield on.
-     * Stored here for cheap retrievals within the strategy.
-     */
-    ERC20 internal asset;
-
-    /**
-     * @dev This variable is set to address(this) during initialization of each strategy.
-     *
-     * This can be used to retrieve storage data within the strategy
-     * contract as if it were a linked library.
-     *
-     *       i.e. uint256 totalAssets = TokenizedStrategy.totalAssets()
-     *
-     * Using address(this) will mean any calls using this variable will lead
-     * to a call to itself. Which will hit the fallback function and
-     * delegateCall that to the actual TokenizedStrategy.
-     */
-    ITokenizedStrategy internal TokenizedStrategy;
-
     /*//////////////////////////////////////////////////////////////
                             MODIFIERS
     //////////////////////////////////////////////////////////////*/
@@ -99,151 +74,111 @@ abstract contract BaseStrategy {
         _;
     }
 
+    /**
+     * @dev Require that the msg.sender is this address.
+     */
+    function _onlySelf() internal view {
+        if (msg.sender != address(this)) {
+            revert NotSelf();
+        }
+    }
+
     /*//////////////////////////////////////////////////////////////
-                        TokenizedStrategy HOOKS
+                            ERRORS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Thrown when a non-self address tries to call a self-only function
+    error NotSelf();
+
+    /*//////////////////////////////////////////////////////////////
+                            CONSTANTS
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Can deploy up to '_amount' of 'asset' in yield source.
-     * @dev Callback for the TokenizedStrategy to call during a {deposit}
-     * or {mint} to tell the strategy it can deploy funds.
+     * @dev This is the address of the TokenizedStrategy implementation
+     * contract that will be used by all strategies to handle the
+     * accounting, logic, storage etc.
      *
-     * Since this can only be called after a {deposit} or {mint}
-     * delegateCall to the TokenizedStrategy msg.sender == address(this).
+     * Any external calls to the that don't hit one of the functions
+     * defined in this base or the strategy will end up being forwarded
+     * through the fallback function, which will delegateCall this address.
      *
-     * Unless a whitelist is implemented this will be entirely permissionless
-     * and thus can be sandwiched or otherwise manipulated.
-     *
-     * @param _amount The amount of 'asset' that the strategy can
-     * attempt to deposit in the yield source.
+     * This address should be the same for every strategy, never be adjusted
+     * and always be checked before any integration with the Strategy.
      */
-    function deployFunds(uint256 _amount) external virtual onlySelf {
-        _deployFunds(_amount);
-    }
+    // NOTE: This is a placeholder address - should be updated for production use
+    address public constant TOKENIZED_STRATEGY_ADDRESS = 0x8cf7246a74704bBE59c9dF614ccB5e3d9717d8Ac;
+
+    /*//////////////////////////////////////////////////////////////
+                            IMMUTABLES
+    //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Should attempt to free the '_amount' of 'asset'.
-     * @dev Callback for the TokenizedStrategy to call during a withdraw
-     * or redeem to free the needed funds to service the withdraw.
-     *
-     * This can only be called after a 'withdraw' or 'redeem' delegateCall
-     * to the TokenizedStrategy so msg.sender == address(this).
-     *
-     * @param _amount The amount of 'asset' that the strategy should attempt to free up.
+     * @dev Underlying asset the Strategy is earning yield on.
+     * Stored here for cheap retrievals within the strategy.
      */
-    function freeFunds(uint256 _amount) external virtual onlySelf {
-        _freeFunds(_amount);
-    }
+    ERC20 internal immutable asset;
 
     /**
-     * @notice Returns the accurate amount of all funds currently
-     * held by the Strategy.
-     * @dev Callback for the TokenizedStrategy to call during a report to
-     * get an accurate accounting of assets the strategy controls.
+     * @dev This variable is set to address(this) during initialization of each strategy.
      *
-     * This can only be called after a report() delegateCall to the
-     * TokenizedStrategy so msg.sender == address(this).
+     * This can be used to retrieve storage data within the strategy
+     * contract as if it were a linked library.
      *
-     * @return . A trusted and accurate account for the total amount
-     * of 'asset' the strategy currently holds including idle funds.
+     *       i.e. uint256 totalAssets = TokenizedStrategy.totalAssets()
+     *
+     * Using address(this) will mean any calls using this variable will lead
+     * to a call to itself. Which will hit the fallback function and
+     * delegateCall that to the actual TokenizedStrategy.
      */
-    function harvestAndReport() external virtual onlySelf returns (uint256) {
-        return _harvestAndReport();
-    }
+    ITokenizedStrategy internal immutable TokenizedStrategy;
 
     /**
-     * @notice Will call the internal '_tend' when a keeper tends the strategy.
-     * @dev Callback for the TokenizedStrategy to initiate a _tend call in the strategy.
+     * @notice Used to initialize the strategy on deployment.
      *
-     * This can only be called after a tend() delegateCall to the TokenizedStrategy
-     * so msg.sender == address(this).
+     * This will set the `TokenizedStrategy` variable for easy
+     * internal view calls to the implementation. As well as
+     * initializing the default storage variables based on the
+     * parameters and using the deployer for the permissioned roles.
      *
-     * We name the function `tendThis` so that `tend` calls are forwarded to
-     * the TokenizedStrategy.
-     *
-     * @param _totalIdle The amount of current idle funds that can be
-     * deployed during the tend
+     * @param _asset Address of the underlying asset.
+     * @param _name Name the strategy will use.
+     * @param _management Address with management permissions
+     * @param _keeper Address with keeper permissions
+     * @param _emergencyAdmin Address with emergency admin permissions
+     * @param _donationAddress Address that will receive donations for this specific strategy
      */
-    function tendThis(uint256 _totalIdle) external virtual onlySelf {
-        _tend(_totalIdle);
-    }
+    constructor(
+        address _asset,
+        string memory _name,
+        address _management,
+        address _keeper,
+        address _emergencyAdmin,
+        address _donationAddress
+    ) {
+        asset = ERC20(_asset);
 
-    /**
-     * @notice Will call the internal '_emergencyWithdraw' function.
-     * @dev Callback for the TokenizedStrategy during an emergency withdraw.
-     *
-     * This can only be called after a emergencyWithdraw() delegateCall to
-     * the TokenizedStrategy so msg.sender == address(this).
-     *
-     * We name the function `shutdownWithdraw` so that `emergencyWithdraw`
-     * calls are forwarded to the TokenizedStrategy.
-     *
-     * @param _amount The amount of asset to attempt to free.
-     */
-    function shutdownWithdraw(uint256 _amount) external virtual onlySelf {
-        _emergencyWithdraw(_amount);
-    }
+        // Set instance of the implementation for internal use.
+        TokenizedStrategy = ITokenizedStrategy(address(this));
 
-    /**
-     * @notice Returns if tend() should be called by a keeper.
-     *
-     * @return . Should return true if tend() should be called by keeper or false if not.
-     * @return . Calldata for the tend call.
-     */
-    function tendTrigger() external view virtual returns (bool, bytes memory) {
-        return (
-            // Return the status of the tend trigger.
-            _tendTrigger(),
-            // And the needed calldata either way.
-            abi.encodeWithSelector(ITokenizedStrategy.tend.selector)
+        // Initialize the strategy's storage variables.
+        _delegateCall(
+            abi.encodeCall(
+                ITokenizedStrategy.initialize,
+                (_asset, _name, _management, _keeper, _emergencyAdmin, _donationAddress)
+            )
         );
-    }
 
-    /**
-     * @notice Gets the max amount of `asset` that an address can deposit.
-     * @dev Defaults to an unlimited amount for any address. But can
-     * be overridden by strategists.
-     *
-     * This function will be called before any deposit or mints to enforce
-     * any limits desired by the strategist. This can be used for either a
-     * traditional deposit limit or for implementing a whitelist etc.
-     *
-     *   EX:
-     *      if(isAllowed[_owner]) return super.availableDepositLimit(_owner);
-     *
-     * This does not need to take into account any conversion rates
-     * from shares to assets. But should know that any non max uint256
-     * amounts may be converted to shares. So it is recommended to keep
-     * custom amounts low enough as not to cause overflow when multiplied
-     * by `totalSupply`.
-     *
-     * @param . The address that is depositing into the strategy.
-     * @return . The available amount the `_owner` can deposit in terms of `asset`
-     */
-    function availableDepositLimit(address /*_owner*/) public view virtual returns (uint256) {
-        return type(uint256).max;
-    }
-
-    /**
-     * @notice Gets the max amount of `asset` that can be withdrawn.
-     * @dev Defaults to an unlimited amount for any address. But can
-     * be overridden by strategists.
-     *
-     * This function will be called before any withdraw or redeem to enforce
-     * any limits desired by the strategist. This can be used for illiquid
-     * or sandwichable strategies. It should never be lower than `totalIdle`.
-     *
-     *   EX:
-     *       return TokenIzedStrategy.totalIdle();
-     *
-     * This does not need to take into account the `_owner`'s share balance
-     * or conversion rates from shares to assets.
-     *
-     * @param . The address that is withdrawing from the strategy.
-     * @return . The available amount that can be withdrawn in terms of `asset`
-     */
-    function availableWithdrawLimit(address /*_owner*/) public view virtual returns (uint256) {
-        return type(uint256).max;
+        // Store the tokenizedStrategyAddress at the standard implementation
+        // address storage slot so etherscan picks up the interface. This gets
+        // stored on initialization and never updated.
+        assembly {
+            sstore(
+                // keccak256('eip1967.proxy.implementation' - 1)
+                0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc,
+                TOKENIZED_STRATEGY_ADDRESS
+            )
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -338,6 +273,78 @@ abstract contract BaseStrategy {
     function _tend(uint256 _totalIdle) internal virtual {}
 
     /**
+     * @dev Optional trigger to override if tend() will be used by the strategy.
+     * This must be implemented if the strategy hopes to invoke _tend().
+     *
+     * @return . Should return true if tend() should be called by keeper or false if not.
+     */
+    function _tendTrigger() internal view virtual returns (bool) {
+        return false;
+    }
+
+    /**
+     * @notice Returns if tend() should be called by a keeper.
+     *
+     * @return . Should return true if tend() should be called by keeper or false if not.
+     * @return . Calldata for the tend call.
+     */
+    function tendTrigger() external view virtual returns (bool, bytes memory) {
+        return (
+            // Return the status of the tend trigger.
+            _tendTrigger(),
+            // And the needed calldata either way.
+            abi.encodeWithSelector(ITokenizedStrategy.tend.selector)
+        );
+    }
+
+    /**
+     * @notice Gets the max amount of `asset` that an address can deposit.
+     * @dev Defaults to an unlimited amount for any address. But can
+     * be overridden by strategists.
+     *
+     * This function will be called before any deposit or mints to enforce
+     * any limits desired by the strategist. This can be used for either a
+     * traditional deposit limit or for implementing a whitelist etc.
+     *
+     *   EX:
+     *      if(isAllowed[_owner]) return super.availableDepositLimit(_owner);
+     *
+     * This does not need to take into account any conversion rates
+     * from shares to assets. But should know that any non max uint256
+     * amounts may be converted to shares. So it is recommended to keep
+     * custom amounts low enough as not to cause overflow when multiplied
+     * by `totalSupply`.
+     *
+     * @param . The address that is depositing into the strategy.
+     * @return . The available amount the `_owner` can deposit in terms of `asset`
+     */
+    function availableDepositLimit(address /*_owner*/) public view virtual returns (uint256) {
+        return type(uint256).max;
+    }
+
+    /**
+     * @notice Gets the max amount of `asset` that can be withdrawn.
+     * @dev Defaults to an unlimited amount for any address. But can
+     * be overridden by strategists.
+     *
+     * This function will be called before any withdraw or redeem to enforce
+     * any limits desired by the strategist. This can be used for illiquid
+     * or sandwichable strategies. It should never be lower than `totalIdle`.
+     *
+     *   EX:
+     *       return TokenIzedStrategy.totalIdle();
+     *
+     * This does not need to take into account the `_owner`'s share balance
+     * or conversion rates from shares to assets.
+     *
+     * @param . The address that is withdrawing from the strategy.
+     * @return . The available amount that can be withdrawn in terms of `asset`
+     */
+    function availableWithdrawLimit(address /*_owner*/) public view virtual returns (uint256) {
+        return type(uint256).max;
+    }
+
+    /**
      * @dev Optional function for a strategist to override that will
      * allow management to manually withdraw deployed funds from the
      * yield source if a strategy is shutdown.
@@ -360,20 +367,150 @@ abstract contract BaseStrategy {
      */
     function _emergencyWithdraw(uint256 _amount) internal virtual {}
 
+    /*//////////////////////////////////////////////////////////////
+                        TokenizedStrategy HOOKS
+    //////////////////////////////////////////////////////////////*/
+
     /**
-     * @dev Require that the msg.sender is this address.
+     * @notice Can deploy up to '_amount' of 'asset' in yield source.
+     * @dev Callback for the TokenizedStrategy to call during a {deposit}
+     * or {mint} to tell the strategy it can deploy funds.
+     *
+     * Since this can only be called after a {deposit} or {mint}
+     * delegateCall to the TokenizedStrategy msg.sender == address(this).
+     *
+     * Unless a whitelist is implemented this will be entirely permissionless
+     * and thus can be sandwiched or otherwise manipulated.
+     *
+     * @param _amount The amount of 'asset' that the strategy can
+     * attempt to deposit in the yield source.
      */
-    function _onlySelf() internal view {
-        if (msg.sender != address(this)) revert BaseStrategy__NotSelf();
+    function deployFunds(uint256 _amount) external virtual onlySelf {
+        _deployFunds(_amount);
     }
 
     /**
-     * @dev Optional trigger to override if tend() will be used by the strategy.
-     * This must be implemented if the strategy hopes to invoke _tend().
+     * @notice Should attempt to free the '_amount' of 'asset'.
+     * @dev Callback for the TokenizedStrategy to call during a withdraw
+     * or redeem to free the needed funds to service the withdraw.
      *
-     * @return . Should return true if tend() should be called by keeper or false if not.
+     * This can only be called after a 'withdraw' or 'redeem' delegateCall
+     * to the TokenizedStrategy so msg.sender == address(this).
+     *
+     * @param _amount The amount of 'asset' that the strategy should attempt to free up.
      */
-    function _tendTrigger() internal view virtual returns (bool) {
-        return false;
+    function freeFunds(uint256 _amount) external virtual onlySelf {
+        _freeFunds(_amount);
+    }
+
+    /**
+     * @notice Returns the accurate amount of all funds currently
+     * held by the Strategy.
+     * @dev Callback for the TokenizedStrategy to call during a report to
+     * get an accurate accounting of assets the strategy controls.
+     *
+     * This can only be called after a report() delegateCall to the
+     * TokenizedStrategy so msg.sender == address(this).
+     *
+     * @return . A trusted and accurate account for the total amount
+     * of 'asset' the strategy currently holds including idle funds.
+     */
+    function harvestAndReport() external virtual onlySelf returns (uint256) {
+        return _harvestAndReport();
+    }
+
+    /**
+     * @notice Will call the internal '_tend' when a keeper tends the strategy.
+     * @dev Callback for the TokenizedStrategy to initiate a _tend call in the strategy.
+     *
+     * This can only be called after a tend() delegateCall to the TokenizedStrategy
+     * so msg.sender == address(this).
+     *
+     * We name the function `tendThis` so that `tend` calls are forwarded to
+     * the TokenizedStrategy.
+
+     * @param _totalIdle The amount of current idle funds that can be
+     * deployed during the tend
+     */
+    function tendThis(uint256 _totalIdle) external virtual onlySelf {
+        _tend(_totalIdle);
+    }
+
+    /**
+     * @notice Will call the internal '_emergencyWithdraw' function.
+     * @dev Callback for the TokenizedStrategy during an emergency withdraw.
+     *
+     * This can only be called after a emergencyWithdraw() delegateCall to
+     * the TokenizedStrategy so msg.sender == address(this).
+     *
+     * We name the function `shutdownWithdraw` so that `emergencyWithdraw`
+     * calls are forwarded to the TokenizedStrategy.
+     *
+     * @param _amount The amount of asset to attempt to free.
+     */
+    function shutdownWithdraw(uint256 _amount) external virtual onlySelf {
+        _emergencyWithdraw(_amount);
+    }
+
+    /**
+     * @dev Function used to delegate call the TokenizedStrategy with
+     * certain `_calldata` and return any return values.
+     *
+     * This is used to setup the initial storage of the strategy, and
+     * can be used by strategist to forward any other call to the
+     * TokenizedStrategy implementation.
+     *
+     * @param _calldata The abi encoded calldata to use in delegatecall.
+     * @return . The return value if the call was successful in bytes.
+     */
+    function _delegateCall(bytes memory _calldata) internal returns (bytes memory) {
+        // Delegate call the tokenized strategy with provided calldata.
+        (bool success, bytes memory result) = TOKENIZED_STRATEGY_ADDRESS.delegatecall(_calldata);
+
+        // If the call reverted. Return the error.
+        if (!success) {
+            assembly {
+                let ptr := mload(0x40)
+                let size := returndatasize()
+                returndatacopy(ptr, 0, size)
+                revert(ptr, size)
+            }
+        }
+
+        // Return the result.
+        return result;
+    }
+
+    /**
+     * @dev Execute a function on the TokenizedStrategy and return any value.
+     *
+     * This fallback function will be executed when any of the standard functions
+     * defined in the TokenizedStrategy are called since they wont be defined in
+     * this contract.
+     *
+     * It will delegatecall the TokenizedStrategy implementation with the exact
+     * calldata and return any relevant values.
+     *
+     */
+    fallback() external {
+        // load our target address
+        address _tokenizedStrategyAddress = TOKENIZED_STRATEGY_ADDRESS;
+        // Execute external function using delegatecall and return any value.
+        assembly {
+            // Copy function selector and any arguments.
+            calldatacopy(0, 0, calldatasize())
+            // Execute function delegatecall.
+            let result := delegatecall(gas(), _tokenizedStrategyAddress, 0, calldatasize(), 0, 0)
+            // Get any return value
+            returndatacopy(0, 0, returndatasize())
+            // Return any return value or error back to the caller
+            switch result
+            case 0 {
+                revert(0, returndatasize())
+            }
+            default {
+                return(0, returndatasize())
+            }
+        }
     }
 }

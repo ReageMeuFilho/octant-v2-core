@@ -2,13 +2,13 @@
 pragma solidity >=0.8.18;
 
 import { MockYieldSource } from "../MockYieldSource.sol";
-import { DragonBaseStrategy, ERC20 } from "src/core/DragonBaseStrategy.sol";
+import { BaseStrategy, ERC20 } from "src/core/BaseStrategy.sol";
 import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
 import { console2 } from "forge-std/console2.sol";
 import { MockYieldSourceSkimming } from "./MockYieldSourceSkimming.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract MockStrategySkimming is DragonBaseStrategy {
+contract MockStrategySkimming is BaseStrategy {
     address public yieldSource;
     bool public trigger;
     bool public managed;
@@ -25,7 +25,7 @@ contract MockStrategySkimming is DragonBaseStrategy {
         address _keeper,
         address _emergencyAdmin,
         address _donationAddress
-    ) DragonBaseStrategy(_yieldSource, "Test Strategy", _management, _keeper, _emergencyAdmin, _donationAddress) {
+    ) BaseStrategy(_yieldSource, "Test Strategy", _management, _keeper, _emergencyAdmin, _donationAddress) {
         initialize(_yieldSource, _yieldSource);
         yieldSourceSkimming = _yieldSource;
         lastReportedPPS = MockYieldSourceSkimming(_yieldSource).pricePerShare();

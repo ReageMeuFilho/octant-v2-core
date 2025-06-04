@@ -4,7 +4,7 @@ pragma solidity >=0.8.18;
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { ERC20Mock } from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 
-import { DragonTokenizedStrategy } from "src/core/DragonTokenizedStrategy.sol";
+import { TokenizedStrategy } from "src/core/TokenizedStrategy.sol";
 import { MockFactory } from "test/mocks/MockFactory.sol";
 import { IMockStrategy } from "test/mocks/IMockStrategy.sol";
 import { MockFaultyStrategy } from "test/mocks/tokenized-strategies/MockFaultyStrategy.sol";

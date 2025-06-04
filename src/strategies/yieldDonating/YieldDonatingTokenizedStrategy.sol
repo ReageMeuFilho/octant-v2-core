@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.25;
-import { DragonTokenizedStrategy, Math } from "src/core/DragonTokenizedStrategy.sol";
+import { TokenizedStrategy, Math } from "src/core/TokenizedStrategy.sol";
 import { IBaseStrategy } from "src/interfaces/IBaseStrategy.sol";
 /**
  * @title YieldDonatingTokenizedStrategy
@@ -12,9 +12,9 @@ import { IBaseStrategy } from "src/interfaces/IBaseStrategy.sol";
  *      - Minting these shares directly to the dragonRouter address
  *      - Protecting against losses by burning shares from dragonRouter
  */
-contract YieldDonatingTokenizedStrategy is DragonTokenizedStrategy {
+contract YieldDonatingTokenizedStrategy is TokenizedStrategy {
     /**
-     * @inheritdoc DragonTokenizedStrategy
+     * @inheritdoc TokenizedStrategy
      * @dev This implementation overrides the base report function to mint profit-derived shares to dragonRouter.
      * When the strategy generates profits (newTotalAssets > oldTotalAssets), the difference is converted to shares
      * and minted to the dragonRouter. When losses occur, those losses can be offset by burning shares from dragonRouter
@@ -23,7 +23,7 @@ contract YieldDonatingTokenizedStrategy is DragonTokenizedStrategy {
     function report()
         public
         virtual
-        override(DragonTokenizedStrategy)
+        override(TokenizedStrategy)
         nonReentrant
         onlyKeepers
         returns (

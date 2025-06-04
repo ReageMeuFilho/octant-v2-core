@@ -2,13 +2,13 @@
 pragma solidity >=0.8.18;
 
 import { MockYieldSource } from "../MockYieldSource.sol";
-import { DragonBaseStrategy, ERC20 } from "src/core/DragonBaseStrategy.sol";
+import { BaseStrategy, ERC20 } from "src/core/BaseStrategy.sol";
 
 interface IPappa {
     function callBack(uint256 _pps, uint256 _convertAmountToShares, uint256 _convertAmountToAssets) external;
 }
 
-contract MockFaultyStrategy is DragonBaseStrategy {
+contract MockFaultyStrategy is BaseStrategy {
     address public yieldSource;
     bool public dontTend;
     address public pappa;
@@ -22,7 +22,7 @@ contract MockFaultyStrategy is DragonBaseStrategy {
         address _keeper,
         address _emergencyAdmin,
         address _donationAddress
-    ) DragonBaseStrategy(_asset, "Test Strategy", _management, _keeper, _emergencyAdmin, _donationAddress) {
+    ) BaseStrategy(_asset, "Test Strategy", _management, _keeper, _emergencyAdmin, _donationAddress) {
         yieldSource = _yieldSource;
         ERC20(_asset).approve(_yieldSource, type(uint256).max);
         pappa = msg.sender;

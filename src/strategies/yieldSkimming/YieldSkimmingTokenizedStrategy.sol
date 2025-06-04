@@ -3,12 +3,12 @@ pragma solidity >=0.8.25;
 
 import { IBaseStrategy } from "src/interfaces/IBaseStrategy.sol";
 import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
-import { DragonTokenizedStrategy, Math } from "src/core/DragonTokenizedStrategy.sol";
+import { TokenizedStrategy, Math } from "src/core/TokenizedStrategy.sol";
 
 /**
  * @title YieldSkimmingTokenizedStrategy
  * @author octant.finance
- * @notice A specialized version of DragonTokenizedStrategy designed for yield-bearing tokens
+ * @notice A specialized version of TokenizedStrategy designed for yield-bearing tokens
  * like mETH whose value in ETH terms appreciates over time.
  * @dev This strategy implements a yield skimming mechanism by:
  *      - Recognizing appreciation of the underlying asset during report()
@@ -16,11 +16,11 @@ import { DragonTokenizedStrategy, Math } from "src/core/DragonTokenizedStrategy.
  *      - Using a modified asset-to-shares conversion that accounts for dilution
  *      - Calling report() during deposits to ensure up-to-date exchange rates
  */
-contract YieldSkimmingTokenizedStrategy is DragonTokenizedStrategy {
+contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     using Math for uint256;
 
     /**
-     * @inheritdoc DragonTokenizedStrategy
+     * @inheritdoc TokenizedStrategy
      * @dev Overrides report to handle asset appreciation in yield-bearing tokens.
      * This implementation specifically:
      * 1. Calls harvestAndReport to get profit in the asset's terms
@@ -31,7 +31,7 @@ contract YieldSkimmingTokenizedStrategy is DragonTokenizedStrategy {
      * This approach works well for assets like LSTs (Liquid Staking Tokens) that
      * continuously appreciate in value.
      */
-    function report() public override(DragonTokenizedStrategy) returns (uint256 profit, uint256 loss) {
+    function report() public override(TokenizedStrategy) returns (uint256 profit, uint256 loss) {
         StrategyData storage S = super._strategyStorage();
 
         // Get the profit in mETH terms
@@ -77,7 +77,7 @@ contract YieldSkimmingTokenizedStrategy is DragonTokenizedStrategy {
         address receiver,
         uint256 assets,
         uint256 shares
-    ) internal override(DragonTokenizedStrategy) {
+    ) internal override(TokenizedStrategy) {
         super._deposit(S, receiver, assets, shares);
     }
 

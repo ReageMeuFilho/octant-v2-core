@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { DragonBaseStrategy } from "src/core/DragonBaseStrategy.sol";
+import { BaseStrategy } from "src/core/BaseStrategy.sol";
 
 /**
  *   @title Base Health Check
@@ -22,7 +22,7 @@ import { DragonBaseStrategy } from "src/core/DragonBaseStrategy.sol";
  *   losses, but rather can make sure manual intervention is
  *   needed before reporting an unexpected loss or profit.
  */
-abstract contract BaseHealthCheck is DragonBaseStrategy {
+abstract contract BaseHealthCheck is BaseStrategy {
     // Can be used to determine if a healthcheck should be called.
     // Defaults to true;
     bool public doHealthCheck = true;
@@ -42,7 +42,7 @@ abstract contract BaseHealthCheck is DragonBaseStrategy {
         address _keeper,
         address _emergencyAdmin,
         address _donationAddress
-    ) DragonBaseStrategy(_asset, _name, _management, _keeper, _emergencyAdmin, _donationAddress) {}
+    ) BaseStrategy(_asset, _name, _management, _keeper, _emergencyAdmin, _donationAddress) {}
 
     /**
      * @notice Returns the current profit limit ratio.

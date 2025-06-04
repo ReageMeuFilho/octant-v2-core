@@ -4,7 +4,7 @@ pragma solidity >=0.8.18;
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { Module } from "zodiac/core/Module.sol";
 
-import { BaseStrategy } from "src/core/BaseStrategy.sol";
+import { BaseStrategy } from "../BaseStrategy.sol";
 // TokenizedStrategy interface used for internal view delegateCalls.
 import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
 
