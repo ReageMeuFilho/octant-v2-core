@@ -8,7 +8,7 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IMultistrategyVault } from "src/core/interfaces/IMultistrategyVault.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MockYieldStrategy } from "test/mocks/zodiac-core/MockYieldStrategy.sol";
-import { Constants } from "test/unit/dragons/vaults/utils/constants.sol";
+import { Constants } from "test/unit/utils/constants.sol";
 
 contract AutoAllocateTest is Test {
     MultistrategyVault vaultImplementation;

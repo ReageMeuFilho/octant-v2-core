@@ -7,7 +7,7 @@ import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFacto
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IMultistrategyVault } from "src/core/interfaces/IMultistrategyVault.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
-import { Constants } from "./utils/constants.sol";
+import { Constants } from "test/unit/utils/constants.sol";
 
 contract VaultRolesTest is Test {
     MultistrategyVault vaultImplementation;

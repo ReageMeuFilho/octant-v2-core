@@ -2,8 +2,8 @@
 pragma solidity ^0.8.19;
 
 import { IHats } from "lib/hats-protocol/src/Interfaces/IHats.sol";
-import { IHatsEligibility } from "src/interfaces/IHatsEligibility.sol";
-import { IHatsToggle } from "src/interfaces/IHatsToggle.sol";
+import { IHatsEligibility } from "src/hats/interfaces/IHatsEligibility.sol";
+import { IHatsToggle } from "src/hats/interfaces/IHatsToggle.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { Hats__InvalidAddressFor, Hats__InvalidHat, Hats__DoesNotHaveThisHat, Hats__HatAlreadyExists, Hats__HatDoesNotExist, Hats__TooManyInitialHolders, Hats__NotAdminOfHat } from "./HatsErrors.sol";
 

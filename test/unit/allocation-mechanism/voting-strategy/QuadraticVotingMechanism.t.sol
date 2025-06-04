@@ -2,9 +2,9 @@
 pragma solidity ^0.8.20;
 
 import {Test, console} from "forge-std/Test.sol";
-import {QuadraticVotingMechanism} from "../../../src/allocation-mechanism/mechanism/QuadraticVotingMechanism.sol";
-import {BaseAllocationMechanism} from "../../../src/allocation-mechanism/BaseAllocationMechanism.sol";
-import {MockERC20} from "../../mocks/MockERC20.sol";
+import {QuadraticVotingMechanism} from "src/allocation-mechanism/mechanism/QuadraticVotingMechanism.sol";
+import {BaseAllocationMechanism} from "src/allocation-mechanism/BaseAllocationMechanism.sol";
+import {MockERC20} from "test/mocks/MockERC20.sol";
 
 contract QuadraticVotingMechanismTest is Test {
     QuadraticVotingMechanism public mechanism;

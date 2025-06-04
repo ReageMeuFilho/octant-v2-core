@@ -7,9 +7,9 @@ import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxy.sol";
 import { LinearAllowanceSingletonForGnosisSafeWrapper } from "test/wrappers/LinearAllowanceSingletonForGnosisSafeWrapper.sol";
 import { NATIVE_TOKEN } from "src/constants.sol";
 import "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
-import { LinearAllowanceExecutor } from "../../src/zodiac-core/LinearAllowanceExecutor.sol";
+import { LinearAllowanceExecutor } from "src/zodiac-core/LinearAllowanceExecutor.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import { ILinearAllowanceSingleton } from "../../src/zodiac-core/interfaces/ILinearAllowanceSingleton.sol";
+import { ILinearAllowanceSingleton } from "src/zodiac-core/interfaces/ILinearAllowanceSingleton.sol";
 
 contract TestERC20 is ERC20 {
     constructor(uint256 initialSupply) ERC20("TestToken", "TST") {

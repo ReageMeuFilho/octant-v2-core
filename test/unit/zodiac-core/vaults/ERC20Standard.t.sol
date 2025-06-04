@@ -2,7 +2,7 @@
 pragma solidity >=0.8.25;
 
 import "forge-std/console.sol";
-import { Setup, MockStrategy, IMockStrategy } from "./Setup.sol";
+import { Setup, MockStrategy, IMockStrategy } from "test/unit/zodiac-core/vaults/Setup.sol";
 import { DragonTokenizedStrategy__VaultSharesNotTransferable, TokenizedStrategy__InvalidSigner, TokenizedStrategy__PermitDeadlineExpired } from "src/errors.sol";
 
 // Adapted from Yearn and Maple finance's ERC20 standard testing packages

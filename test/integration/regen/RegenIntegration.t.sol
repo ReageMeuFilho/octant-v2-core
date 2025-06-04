@@ -2,18 +2,18 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import { RegenStaker } from "../../src/regen/RegenStaker.sol";
-import { RegenEarningPowerCalculator } from "../../src/regen/RegenEarningPowerCalculator.sol";
+import { RegenStaker } from "src/regen/RegenStaker.sol";
+import { RegenEarningPowerCalculator } from "src/regen/RegenEarningPowerCalculator.sol";
 import { Whitelist } from "src/utils/Whitelist.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC20Staking } from "lib/staker/src/interfaces/IERC20Staking.sol";
-import { IWhitelistedEarningPowerCalculator } from "../../src/interfaces/IWhitelistedEarningPowerCalculator.sol";
+import { IWhitelistedEarningPowerCalculator } from "src/regen/interfaces/IWhitelistedEarningPowerCalculator.sol";
 import { Staker } from "lib/staker/src/Staker.sol";
-import { MockERC20 } from "../mocks/MockERC20.sol";
-import { MockERC20Staking } from "../mocks/MockERC20Staking.sol";
+import { MockERC20 } from "test/mocks/MockERC20.sol";
+import { MockERC20Staking } from "test/mocks/MockERC20Staking.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
-import { IGrantRound } from "../../src/interfaces/IGrantRound.sol";
+import { IFundingRound } from "src/regen/interfaces/IFundingRound.sol";
 
 /**
  * @title RegenIntegrationTest

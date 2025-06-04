@@ -4,7 +4,7 @@ pragma solidity ^0.8.25;
 import "forge-std/Test.sol";
 import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
 import { MultistrategyVault } from "src/core/MultistrategyVault.sol";
-import { IMultistrategyVaultFactory } from "src/interfaces/IMultistrategyVaultFactory.sol";
+import { IMultistrategyVaultFactory } from "src/factories/interfaces/IMultistrategyVaultFactory.sol";
 import { IMultistrategyVault } from "src/core/interfaces/IMultistrategyVault.sol";
 
 // Mocks needed for testing
