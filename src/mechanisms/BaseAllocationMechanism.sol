@@ -286,7 +286,7 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
 
     /// @dev Hook to modify the behavior of finalizeVoteTally. Can be used to enforce additional checks or actions.
     /// @return allow True if finalization should proceed
-    function _beforeFinalizeVoteTallyHook() internal view virtual returns (bool);
+    function _beforeFinalizeVoteTallyHook() internal virtual returns (bool);
 
     /// @dev a hook to fetch the recipient address for a proposal. Can be used to enforce additional checks or actions.
     /// @param pid Proposal ID being redeemed
@@ -376,7 +376,6 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
         s.proposalShares[pid] = sharesToMint;
 
         _requestDistributionHook(_getRecipientAddressHook(pid), sharesToMint);
-        //_mint(p.recipient, sharesToMint);
 
         uint256 eta = block.timestamp + timelockDelay;
         p.eta = eta;

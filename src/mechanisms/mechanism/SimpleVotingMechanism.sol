@@ -73,20 +73,27 @@ contract SimpleVotingMechanism is DistributionMechanism {
         return true;
     }
 
-    function _convertVotesToShares(uint256 pid) internal view override returns (uint256) {
-        BaseAllocationStorage storage s = _getStorage();
-        uint256 forVotes = s.proposalVotes[pid].sharesFor;
-        uint256 againstVotes = s.proposalVotes[pid].sharesAgainst;
-        uint256 net = forVotes > againstVotes ? forVotes - againstVotes : 0;
-        return net;
-    }
-
     function _getRecipientAddressHook(uint256 pid) internal view override returns (address) {
         return _getStorage().proposals[pid].recipient;
     }
-
-    function _requestDistributionHook(address recipient, uint256 sharesToMint) internal override returns (bool) {
-        // Call the parent implementation which handles the actual minting
-        return super._requestDistributionHook(recipient, sharesToMint);
+    function _convertVotesToShares(uint256 pid) 
+        internal 
+        view 
+        virtual 
+        override 
+        returns (uint256 sharesToMint) 
+    {
+        BaseAllocationStorage storage s = _getStorage();
+        ProposalVote storage votes = s.proposalVotes[pid];
+        
+        // Calculate net votes (For - Against)
+        uint256 netVotes = votes.sharesFor > votes.sharesAgainst ? 
+            votes.sharesFor - votes.sharesAgainst : 0;
+        
+        if (netVotes == 0) return 0;
+        
+        // For now, return net votes directly as shares
+        // In a real implementation, this would use the vault's conversion logic
+        return netVotes;
     }
 }

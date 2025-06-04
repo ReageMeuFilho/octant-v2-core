@@ -1240,8 +1240,12 @@ abstract contract DistributionMechanism is BaseAllocationMechanism {
     //////////////////////////////////////////////////////////////*/
 
     /// @dev Hook to validate finalization can proceed
-    function _beforeFinalizeVoteTallyHook() internal view virtual override returns (bool) {
-        return true;
+    function _beforeFinalizeVoteTallyHook() internal virtual override returns (bool) {
+        // Set total assets to current balance when finalizing
+        StrategyData storage S = _strategyStorage();
+        uint256 asset  = asset.balanceOf(address(this));
+        S.totalAssets = asset;
+        return asset>0;
     }
 
     /// @dev Hook to actually mint shares when a proposal is queued
