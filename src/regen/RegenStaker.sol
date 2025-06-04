@@ -27,9 +27,8 @@ import { IEarningPowerCalculator } from "staker/interfaces/IEarningPowerCalculat
 // Local Imports
 import { Whitelist } from "src/utils/Whitelist.sol";
 import { IWhitelist } from "src/utils/IWhitelist.sol";
-import { IWhitelistedEarningPowerCalculator } from "src/regen/IWhitelistedEarningPowerCalculator.sol";
-import { IWhitelistedEarningPowerCalculator } from "./IWhitelistedEarningPowerCalculator.sol";
-import { IFundingRound } from "./IFundingRound.sol";
+import { IWhitelistedEarningPowerCalculator } from "src/interfaces/IWhitelistedEarningPowerCalculator.sol";
+import { IGrantRound } from "src/interfaces/IGrantRound.sol";
 
 // --- EIP-712 Specification for IFundingRound Implementations ---
 // To ensure security against replay attacks for the `signup` method,

@@ -7,13 +7,13 @@ import { RegenEarningPowerCalculator } from "../../src/regen/RegenEarningPowerCa
 import { Whitelist } from "src/utils/Whitelist.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC20Staking } from "lib/staker/src/interfaces/IERC20Staking.sol";
-import { IWhitelistedEarningPowerCalculator } from "../../src/regen/IWhitelistedEarningPowerCalculator.sol";
+import { IWhitelistedEarningPowerCalculator } from "../../src/interfaces/IWhitelistedEarningPowerCalculator.sol";
 import { Staker } from "lib/staker/src/Staker.sol";
 import { MockERC20 } from "../mocks/MockERC20.sol";
 import { MockERC20Staking } from "../mocks/MockERC20Staking.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
-import { IFundingRound } from "../../src/regen/IFundingRound.sol";
+import { IGrantRound } from "../../src/interfaces/IGrantRound.sol";
 
 /**
  * @title RegenIntegrationTest
