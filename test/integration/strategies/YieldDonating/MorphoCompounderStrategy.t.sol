@@ -8,7 +8,7 @@ import { BaseHealthCheck } from "src/strategies/periphery/BaseHealthCheck.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
-import { IMockStrategy } from "test/mocks/IMockStrategy.sol";
+import { IMockStrategy } from "test/mocks/zodiac-core/IMockStrategy.sol";
 import { MorphoCompounderStrategyVaultFactory } from "src/factories/yieldDonating/MorphoCompounderStrategyVaultFactory.sol";
 import { YieldDonatingTokenizedStrategy } from "src/strategies/yieldDonating/YieldDonatingTokenizedStrategy.sol";
 
