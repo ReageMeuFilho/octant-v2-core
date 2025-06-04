@@ -7,10 +7,10 @@ import { LidoStrategy } from "src/strategies/yieldSkimming/LidoStrategy.sol";
 import { LidoStrategyVaultFactory } from "src/factories/LidoStrategyVaultFactory.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { ITokenizedStrategy } from "src/interfaces/ITokenizedStrategy.sol";
+import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
 import { YieldSkimmingTokenizedStrategy } from "src/strategies/yieldSkimming/YieldSkimmingTokenizedStrategy.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
-import { IBaseStrategy } from "src/interfaces/IBaseStrategy.sol";
+import { IBaseStrategy } from "src/core/interfaces/IBaseStrategy.sol";
 
 /// @title Lido Test
 /// @author Octant

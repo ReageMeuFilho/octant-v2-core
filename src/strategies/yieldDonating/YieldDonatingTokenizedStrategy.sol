@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.25;
 import { TokenizedStrategy, Math } from "src/core/TokenizedStrategy.sol";
-import { IBaseStrategy } from "src/interfaces/IBaseStrategy.sol";
+import { IBaseStrategy } from "src/core/interfaces/IBaseStrategy.sol";
 /**
  * @title YieldDonatingTokenizedStrategy
  * @author octant.finance

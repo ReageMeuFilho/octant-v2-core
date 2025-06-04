@@ -40,7 +40,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {IBaseStrategy} from "../regens/interfaces/IBaseStrategy.sol";
+import {IBaseStrategy} from "../core/interfaces/IBaseStrategy.sol";
 
 /**
  * @title Tokenized Strategy (Octant V2 Fork)
