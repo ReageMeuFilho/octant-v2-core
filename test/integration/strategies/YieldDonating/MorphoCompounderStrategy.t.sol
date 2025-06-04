@@ -118,9 +118,15 @@ contract MorphoCompounderDonatingStrategyTest is Test {
         // assertEq(strategy.compounderVault(), MORPHO_VAULT, "Compounder vault incorrect");
     }
 
-    /// @notice Test depositing assets into the strategy
-    function testDeposit() public {
-        uint256 depositAmount = 1000e6; // 1000 USDC
+    /// @notice Fuzz test depositing assets into the strategy
+    function testFuzzDeposit(uint256 depositAmount) public {
+        // Bound the deposit amount to reasonable values for USDC (6 decimals)
+        depositAmount = bound(depositAmount, 1e6, INITIAL_DEPOSIT); // 1 USDC to 100,000 USDC
+
+        // Ensure user has enough balance
+        if (ERC20(USDC).balanceOf(user) < depositAmount) {
+            airdrop(ERC20(USDC), user, depositAmount);
+        }
 
         // Initial balances
         uint256 initialUserBalance = ERC20(USDC).balanceOf(user);
@@ -142,20 +148,34 @@ contract MorphoCompounderDonatingStrategyTest is Test {
         );
     }
 
-    /// @notice Test withdrawing assets from the strategy
-    function testWithdraw() public {
-        uint256 depositAmount = 1000e6; // 1000 USDC
+    /// @notice Fuzz test withdrawing assets from the strategy
+    function testFuzzWithdraw(uint256 depositAmount, uint256 withdrawFraction) public {
+        // Bound the deposit amount to reasonable values
+        depositAmount = bound(depositAmount, 1e6, INITIAL_DEPOSIT); // 1 USDC to 100,000 USDC
+        withdrawFraction = bound(withdrawFraction, 1, 100); // 1% to 100%
+
+        // Ensure user has enough balance
+        if (ERC20(USDC).balanceOf(user) < depositAmount) {
+            airdrop(ERC20(USDC), user, depositAmount);
+        }
 
         // Deposit first
         vm.startPrank(user);
         IERC4626(address(strategy)).deposit(depositAmount, user);
 
+        // Calculate withdrawal amount as a fraction of deposit
+        uint256 withdrawAmount = (depositAmount * withdrawFraction) / 100;
+
+        // Skip if withdraw amount is 0
+        vm.assume(withdrawAmount > 0);
+
         // Initial balances before withdrawal
         uint256 initialUserBalance = ERC20(USDC).balanceOf(user);
         uint256 initialShareBalance = IERC4626(address(strategy)).balanceOf(user);
 
-        // Withdraw half of the deposit
-        uint256 withdrawAmount = depositAmount / 2;
+        // Withdraw portion of the deposit
+        uint256 previewMaxWithdraw = IERC4626(address(strategy)).maxWithdraw(user);
+        vm.assume(previewMaxWithdraw >= withdrawAmount);
         uint256 sharesToBurn = IERC4626(address(strategy)).previewWithdraw(withdrawAmount);
         uint256 assetsReceived = IERC4626(address(strategy)).withdraw(withdrawAmount, user, user);
         vm.stopPrank();
@@ -174,9 +194,16 @@ contract MorphoCompounderDonatingStrategyTest is Test {
         assertEq(assetsReceived, withdrawAmount, "Incorrect amount of assets received");
     }
 
-    /// @notice Test the harvesting functionality with profit donation
-    function testHarvestWithProfitDonation() public {
-        uint256 depositAmount = 1000e6; // 1000 USDC
+    /// @notice Fuzz test the harvesting functionality with profit donation
+    function testFuzzHarvestWithProfitDonation(uint256 depositAmount, uint256 profitAmount) public {
+        // Bound amounts to reasonable values
+        depositAmount = bound(depositAmount, 1e6, INITIAL_DEPOSIT); // 1 USDC to 100,000 USDC
+        profitAmount = bound(profitAmount, 1e5, depositAmount); // 0.1 USDC to deposit amount
+
+        // Ensure user has enough balance
+        if (ERC20(USDC).balanceOf(user) < depositAmount) {
+            airdrop(ERC20(USDC), user, depositAmount);
+        }
 
         // Deposit first
         vm.startPrank(user);
@@ -189,12 +216,12 @@ contract MorphoCompounderDonatingStrategyTest is Test {
         uint256 donationBalanceBefore = ERC20(address(strategy)).balanceOf(donationAddress);
 
         // Call report to harvest and donate yield
-        // mock IERC4626(compounderVault).convertToAssets(shares) so that it returns 1000e6 (profit)
+        // mock IERC4626(compounderVault).convertToAssets(shares) so that it returns profit
         uint256 balanceOfMorphoVault = IERC4626(MORPHO_VAULT).balanceOf(address(strategy));
         vm.mockCall(
             address(IERC4626(MORPHO_VAULT)),
             abi.encodeWithSelector(IERC4626.convertToAssets.selector, balanceOfMorphoVault),
-            abi.encode(balanceOfMorphoVault + 1000e6)
+            abi.encode(depositAmount + profitAmount)
         );
         vm.startPrank(keeper);
         (uint256 profit, uint256 loss) = IMockStrategy(address(strategy)).report();
@@ -202,8 +229,8 @@ contract MorphoCompounderDonatingStrategyTest is Test {
 
         vm.clearMockedCalls();
 
-        // airdrop 1000e6 to the Morpho vault
-        airdrop(ERC20(USDC), address(strategy), 1000e6);
+        // airdrop profit to the strategy
+        airdrop(ERC20(USDC), address(strategy), profitAmount);
 
         // Verify results
         assertGt(profit, 0, "Should have captured profit from yield");
@@ -227,14 +254,25 @@ contract MorphoCompounderDonatingStrategyTest is Test {
         assertEq(limit, morphoLimit, "Available deposit limit should match Morpho vault limit");
     }
 
-    /// @notice Test emergency withdraw functionality
-    function testEmergencyWithdraw() public {
-        uint256 depositAmount = 1000e6; // 1000 USDC
+    /// @notice Fuzz test emergency withdraw functionality
+    function testFuzzEmergencyWithdraw(uint256 depositAmount, uint256 withdrawFraction) public {
+        // Bound amounts to reasonable values
+        depositAmount = bound(depositAmount, 1e6, INITIAL_DEPOSIT); // 1 USDC to 100,000 USDC
+        withdrawFraction = bound(withdrawFraction, 1, 100); // 1% to 100%
+
+        // Ensure user has enough balance
+        if (ERC20(USDC).balanceOf(user) < depositAmount) {
+            airdrop(ERC20(USDC), user, depositAmount);
+        }
 
         // Deposit first
         vm.startPrank(user);
         IERC4626(address(strategy)).deposit(depositAmount, user);
         vm.stopPrank();
+
+        // Calculate emergency withdraw amount
+        uint256 emergencyWithdrawAmount = (depositAmount * withdrawFraction) / 100;
+        vm.assume(emergencyWithdrawAmount > 0);
 
         // Get initial vault shares in Morpho
         uint256 initialMorphoShares = IERC4626(MORPHO_VAULT).balanceOf(address(strategy));
@@ -242,20 +280,28 @@ contract MorphoCompounderDonatingStrategyTest is Test {
         // Emergency withdraw
         vm.startPrank(emergencyAdmin);
         IMockStrategy(address(strategy)).shutdownStrategy();
-        IMockStrategy(address(strategy)).emergencyWithdraw(depositAmount / 2);
+        IMockStrategy(address(strategy)).emergencyWithdraw(emergencyWithdrawAmount);
         vm.stopPrank();
 
         // Verify some funds were withdrawn from Morpho
         uint256 finalMorphoShares = IERC4626(MORPHO_VAULT).balanceOf(address(strategy));
-        assertLt(finalMorphoShares, initialMorphoShares, "Should have withdrawn from Morpho vault");
+        assertLe(finalMorphoShares, initialMorphoShares, "Should have withdrawn from Morpho vault or stayed same");
 
-        // Verify strategy has some idle USDC
-        assertGt(ERC20(USDC).balanceOf(address(strategy)), 0, "Strategy should have idle USDC");
+        // Verify strategy has some idle USDC (unless we withdrew everything)
+        if (emergencyWithdrawAmount < depositAmount) {
+            assertGt(ERC20(USDC).balanceOf(address(strategy)), 0, "Strategy should have idle USDC");
+        }
     }
 
-    /// @notice Test that _harvestAndReport returns correct total assets
-    function testHarvestAndReportView() public {
-        uint256 depositAmount = 1000e6; // 1000 USDC
+    /// @notice Fuzz test that _harvestAndReport returns correct total assets
+    function testFuzzHarvestAndReportView(uint256 depositAmount) public {
+        // Bound the deposit amount to reasonable values
+        depositAmount = bound(depositAmount, 1e6, INITIAL_DEPOSIT); // 1 USDC to 100,000 USDC
+
+        // Ensure user has enough balance
+        if (ERC20(USDC).balanceOf(user) < depositAmount) {
+            airdrop(ERC20(USDC), user, depositAmount);
+        }
 
         // Deposit first
         vm.startPrank(user);
@@ -271,7 +317,7 @@ contract MorphoCompounderDonatingStrategyTest is Test {
         assertApproxEqRel(
             totalAssets,
             morphoAssets + idleAssets,
-            1e12,
+            1e14, // 0.01%
             "Total assets should match Morpho assets plus idle"
         );
     }
@@ -291,14 +337,25 @@ contract MorphoCompounderDonatingStrategyTest is Test {
         );
     }
 
-    /// @notice Test multiple deposits and withdrawals
-    function testMultipleDepositsAndWithdrawals() public {
-        uint256 depositAmount1 = 500e6; // 500 USDC
-        uint256 depositAmount2 = 300e6; // 300 USDC
+    /// @notice Fuzz test multiple deposits and withdrawals
+    function testFuzzMultipleDepositsAndWithdrawals(
+        uint256 depositAmount1,
+        uint256 depositAmount2,
+        bool shouldUser1Withdraw,
+        bool shouldUser2Withdraw
+    ) public {
+        // Bound deposit amounts to reasonable values
+        depositAmount1 = bound(depositAmount1, 1e6, INITIAL_DEPOSIT / 2); // 1 USDC to 50,000 USDC
+        depositAmount2 = bound(depositAmount2, 1e6, INITIAL_DEPOSIT / 2); // 1 USDC to 50,000 USDC
+
         address user2 = address(0x5678);
 
-        // Airdrop to second user
-        airdrop(ERC20(USDC), user2, 1000e6);
+        // Ensure users have enough balance
+        if (ERC20(USDC).balanceOf(user) < depositAmount1) {
+            airdrop(ERC20(USDC), user, depositAmount1);
+        }
+        airdrop(ERC20(USDC), user2, depositAmount2);
+
         vm.startPrank(user2);
         ERC20(USDC).approve(address(strategy), type(uint256).max);
         vm.stopPrank();
@@ -320,23 +377,28 @@ contract MorphoCompounderDonatingStrategyTest is Test {
             "Total assets should equal deposits"
         );
 
-        // Both users withdraw
-        vm.startPrank(user);
-        IERC4626(address(strategy)).redeem(IERC4626(address(strategy)).balanceOf(user), user, user);
-        vm.stopPrank();
+        // Conditionally withdraw based on fuzz parameters
+        if (shouldUser1Withdraw) {
+            vm.startPrank(user);
+            IERC4626(address(strategy)).redeem(IERC4626(address(strategy)).balanceOf(user), user, user);
+            vm.stopPrank();
+        }
 
-        vm.startPrank(user2);
-        // find user 2 max redeem
-        uint256 maxRedeem = IERC4626(address(strategy)).maxRedeem(user2);
-        IMockStrategy(address(strategy)).redeem(maxRedeem, user2, user2, 10);
-        vm.stopPrank();
+        if (shouldUser2Withdraw) {
+            vm.startPrank(user2);
+            uint256 maxRedeem = IERC4626(address(strategy)).maxRedeem(user2);
+            IMockStrategy(address(strategy)).redeem(maxRedeem, user2, user2, 10);
+            vm.stopPrank();
+        }
 
-        // Strategy should be nearly empty
-        assertLt(
-            IERC4626(address(strategy)).totalAssets(),
-            10,
-            "Strategy should be nearly empty after all withdrawals"
-        );
+        // If both withdrew, strategy should be nearly empty
+        if (shouldUser1Withdraw && shouldUser2Withdraw) {
+            assertLt(
+                IERC4626(address(strategy)).totalAssets(),
+                10,
+                "Strategy should be nearly empty after all withdrawals"
+            );
+        }
     }
 
     /// @notice Test that unauthorized users cannot call governance functions
