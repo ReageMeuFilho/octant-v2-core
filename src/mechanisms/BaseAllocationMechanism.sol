@@ -141,47 +141,47 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
     }
 
     /// @notice Public getter for name (delegating to storage)
-    function name() public view returns (string memory) {
+    function name() public view virtual returns (string memory) {
         return _getStorage().name;
     }
 
     /// @notice Public getter for symbol (delegating to storage)
-    function symbol() public view returns (string memory) {
+    function symbol() public view virtual returns (string memory) {
         return _getStorage().symbol;
     }
 
     /// @notice Public getter for tallyFinalized (delegating to storage)
-    function tallyFinalized() public view returns (bool) {
+    function tallyFinalized() public view virtual returns (bool) {
         return _getStorage().tallyFinalized;
     }
 
     /// @notice Public getter for proposals mapping (delegating to storage)
-    function proposals(uint256 pid) public view returns (Proposal memory) {
+    function proposals(uint256 pid) public view virtual returns (Proposal memory) {
         return _getStorage().proposals[pid];
     }
 
     /// @notice Public getter for proposalVotes mapping (delegating to storage)
-    function proposalVotes(uint256 pid) public view returns (ProposalVote memory) {
+    function proposalVotes(uint256 pid) public view virtual returns (ProposalVote memory) {
         return _getStorage().proposalVotes[pid];
     }
 
     /// @notice Public getter for hasVoted mapping (delegating to storage)
-    function hasVoted(uint256 pid, address voter) public view returns (bool) {
+    function hasVoted(uint256 pid, address voter) public view virtual returns (bool) {
         return _getStorage().hasVoted[pid][voter];
     }
 
     /// @notice Public getter for votingPower mapping (delegating to storage)
-    function votingPower(address user) public view returns (uint256) {
+    function votingPower(address user) public view virtual returns (uint256) {
         return _getStorage().votingPower[user];
     }
 
     /// @notice Public getter for redeemableAfter mapping (delegating to storage)
-    function redeemableAfter(address recipient) public view returns (uint256) {
+    function redeemableAfter(address recipient) public view virtual returns (uint256) {
         return _getStorage().redeemableAfter[recipient];
     }
 
     /// @notice Public getter for proposalShares mapping (delegating to storage)
-    function proposalShares(uint256 pid) public view returns (uint256) {
+    function proposalShares(uint256 pid) public view virtual returns (uint256) {
         return _getStorage().proposalShares[pid];
     }
 
@@ -312,10 +312,11 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
 
     /// @notice Register to gain voting power by depositing underlying tokens.
     /// @param deposit Amount of underlying to deposit (may be zero).
-    function signup(uint256 deposit) external nonReentrant whenNotPaused {
+    function signup(uint256 deposit) external virtual nonReentrant whenNotPaused {
         address user = msg.sender;
         if (!_beforeSignupHook(user)) revert RegistrationBlocked(user);
-        if (block.number >= startBlock + votingDelay + votingPeriod) revert VotingEnded(block.number, startBlock + votingDelay + votingPeriod);
+        if (block.number >= startBlock + votingDelay + votingPeriod)
+            revert VotingEnded(block.number, startBlock + votingDelay + votingPeriod);
         BaseAllocationStorage storage s = _getStorage();
         if (s.votingPower[user] != 0) revert AlreadyRegistered(user);
         if (deposit > MAX_SAFE_VALUE) revert DepositTooLarge(deposit, MAX_SAFE_VALUE);
@@ -332,7 +333,10 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
     /// @param recipient Address to receive allocated vault shares upon queue.
     /// @param description Description or rationale for the proposal
     /// @return pid Unique identifier for the new proposal.
-    function propose(address recipient, string calldata description) external whenNotPaused returns (uint256 pid) {
+    function propose(
+        address recipient,
+        string calldata description
+    ) external virtual whenNotPaused returns (uint256 pid) {
         address proposer = msg.sender;
         if (!_beforeProposeHook(proposer)) revert ProposeNotAllowed(proposer);
         if (recipient == address(0)) revert InvalidRecipient(recipient);
@@ -354,8 +358,9 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
 
     /// @notice Finalize vote tally once voting period (from first proposal) has ended.
     /// @dev **SECURITY CRITICAL**: ensure this can only be called once and only after voting ends.
-    function finalizeVoteTally() external onlyOwner {
-        if (block.number < startBlock + votingDelay + votingPeriod) revert VotingNotEnded(block.number, startBlock + votingDelay + votingPeriod);
+    function finalizeVoteTally() external virtual onlyOwner {
+        if (block.number < startBlock + votingDelay + votingPeriod)
+            revert VotingNotEnded(block.number, startBlock + votingDelay + votingPeriod);
         BaseAllocationStorage storage s = _getStorage();
         if (s.tallyFinalized) revert TallyAlreadyFinalized();
         if (!_beforeFinalizeVoteTallyHook()) revert FinalizationBlocked();
@@ -368,13 +373,14 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
     /// @notice Queue proposal and mint vault shares based on vote tallies.
     /// @dev Calls `_convertVotesToShares(pid)` to determine mint amount.
     /// @param pid Proposal ID to queue.
-    function queueProposal(uint256 pid) external onlyOwner {
+    function queueProposal(uint256 pid) external virtual onlyOwner {
         BaseAllocationStorage storage s = _getStorage();
         if (!s.tallyFinalized) revert TallyNotFinalized();
         if (!_validateProposalHook(pid)) revert InvalidProposal(pid);
         Proposal storage p = s.proposals[pid];
         if (p.canceled) revert ProposalCanceledError(pid);
-        if (!_hasQuorumHook(pid)) revert NoQuorum(pid, s.proposalVotes[pid].sharesFor, s.proposalVotes[pid].sharesAgainst, quorumShares);
+        if (!_hasQuorumHook(pid))
+            revert NoQuorum(pid, s.proposalVotes[pid].sharesFor, s.proposalVotes[pid].sharesAgainst, quorumShares);
         if (p.earliestRedeemableTime != 0) revert AlreadyQueued(pid);
 
         uint256 sharesToMint = _convertVotesToShares(pid);
@@ -395,7 +401,7 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
     /// @param pid Proposal ID
     /// @param choice VoteType (Against, For, Abstain)
     /// @param weight Amount of voting power to apply
-    function castVote(uint256 pid, VoteType choice, uint256 weight) external nonReentrant whenNotPaused {
+    function castVote(uint256 pid, VoteType choice, uint256 weight) external virtual nonReentrant whenNotPaused {
         if (!_validateProposalHook(pid)) revert InvalidProposal(pid);
         if (block.number < startBlock + votingDelay || block.number > startBlock + votingDelay + votingPeriod)
             revert VotingClosed(block.number, startBlock + votingDelay, startBlock + votingDelay + votingPeriod);
@@ -417,7 +423,7 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
     // ---------- State Machine ----------
 
     /// @dev Internal state computation for a proposal
-    function _state(uint256 pid) internal view returns (ProposalState) {
+    function _state(uint256 pid) internal view virtual returns (ProposalState) {
         BaseAllocationStorage storage s = _getStorage();
         Proposal storage p = s.proposals[pid];
         // Check for canceled first
@@ -440,14 +446,14 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
     /// @notice Get the current state of a proposal
     /// @param pid Proposal ID
     /// @return Current state of the proposal
-    function state(uint256 pid) external view returns (ProposalState) {
+    function state(uint256 pid) external view virtual returns (ProposalState) {
         if (!_validateProposalHook(pid)) revert InvalidProposal(pid);
         return _state(pid);
     }
 
     /// @notice Cancel a proposal
     /// @param pid Proposal ID to cancel
-    function cancelProposal(uint256 pid) external {
+    function cancelProposal(uint256 pid) external virtual {
         BaseAllocationStorage storage s = _getStorage();
         if (!_validateProposalHook(pid)) revert InvalidProposal(pid);
         Proposal storage p = s.proposals[pid];
@@ -466,7 +472,7 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
     /// @return sharesAbstain Number of shares abstained
     function getVoteTally(
         uint256 pid
-    ) external view returns (uint256 sharesFor, uint256 sharesAgainst, uint256 sharesAbstain) {
+    ) external view virtual returns (uint256 sharesFor, uint256 sharesAgainst, uint256 sharesAbstain) {
         BaseAllocationStorage storage s = _getStorage();
         if (!_validateProposalHook(pid)) revert InvalidProposal(pid);
         ProposalVote storage votes = s.proposalVotes[pid];
@@ -476,14 +482,14 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
     /// @notice Get remaining voting power for an address
     /// @param voter Address to check voting power for
     /// @return Remaining voting power
-    function getRemainingVotingPower(address voter) external view returns (uint256) {
+    function getRemainingVotingPower(address voter) external view virtual returns (uint256) {
         BaseAllocationStorage storage s = _getStorage();
         return s.votingPower[voter];
     }
 
     /// @notice Get total number of proposals created
     /// @return Total proposal count
-    function getProposalCount() external view returns (uint256) {
+    function getProposalCount() external view virtual returns (uint256) {
         BaseAllocationStorage storage s = _getStorage();
         return s.proposalIdCounter;
     }
@@ -492,13 +498,13 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
 
     /// @notice Emergency pause all operations
     /// @dev Only owner can pause the contract. Prevents all user interactions until unpaused.
-    function pause() external onlyOwner {
+    function pause() external virtual onlyOwner {
         _pause();
     }
 
     /// @notice Resume operations after pause
     /// @dev Only owner can unpause the contract. Restores normal operation after emergency pause.
-    function unpause() external onlyOwner {
+    function unpause() external virtual onlyOwner {
         _unpause();
     }
 }
