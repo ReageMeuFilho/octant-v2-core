@@ -60,9 +60,8 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
     /// @dev Configurable timeframe allowing state transitions after proposal expiry
     uint256 public immutable gracePeriod;
 
-    /// @notice EIP-712 storage slot for the main storage struct
-    /// @dev keccak256("BaseAllocationMechanism.storage") - 1
-    bytes32 private constant STORAGE_SLOT = 0x82b56d4e0bf4db9b38e3ed3de5b78a9e6c07e0e7b2a5f4a5e7e4b8d8a5c8a8b0;
+    /// EIP-1967 pattern for deterministic storage slot generation.
+    bytes32 private constant STORAGE_SLOT = bytes32(uint256(keccak256("BaseAllocationMechanism.storage")) - 1);
 
     /// @notice Immutable configuration parameters
     /// @notice start block to start counting the voting delay before votingPeriod
