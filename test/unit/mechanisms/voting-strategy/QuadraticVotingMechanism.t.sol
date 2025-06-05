@@ -446,11 +446,11 @@ contract QuadraticVotingMechanismTest is Test {
         vm.prank(owner);
         mechanism.finalizeVoteTally();
 
-        // Check state - should be succeeded after queuing
+        // Check state - should be queued after queuing
         vm.prank(owner);
         mechanism.queueProposal(pid);
 
-        assertEq(uint8(mechanism.state(pid)), uint8(BaseAllocationMechanism.ProposalState.Succeeded));
+        assertEq(uint8(mechanism.state(pid)), uint8(BaseAllocationMechanism.ProposalState.Queued));
     }
 
     function testQuorumWithInsufficientFunding() public {
@@ -578,16 +578,23 @@ contract QuadraticVotingMechanismTest is Test {
         vm.prank(user1);
         mechanism.castVote(pid, BaseAllocationMechanism.VoteType.For, 15);
 
-        // After voting period, before finalization - should be Pending
+        // After voting period but before finalization - should still be Active
         vm.roll(START_BLOCK + VOTING_DELAY + VOTING_PERIOD + 1);
-        assertEq(uint8(mechanism.state(pid)), uint8(BaseAllocationMechanism.ProposalState.Pending));
+        assertEq(uint8(mechanism.state(pid)), uint8(BaseAllocationMechanism.ProposalState.Active));
 
-        // After finalization and queuing - should be Succeeded
+        // Finalize tally
         vm.prank(owner);
         mechanism.finalizeVoteTally();
+
+        // After finalization with quorum - should be Succeeded
+        assertEq(uint8(mechanism.state(pid)), uint8(BaseAllocationMechanism.ProposalState.Succeeded));
+
+        // Queue proposal
         vm.prank(owner);
         mechanism.queueProposal(pid);
-        assertEq(uint8(mechanism.state(pid)), uint8(BaseAllocationMechanism.ProposalState.Succeeded));
+
+        // After queuing - should be Queued
+        assertEq(uint8(mechanism.state(pid)), uint8(BaseAllocationMechanism.ProposalState.Queued));
     }
 
     function testProposalCancellation() public {

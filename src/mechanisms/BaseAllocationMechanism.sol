@@ -385,7 +385,6 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
 
         uint256 earliestRedeemableTime = block.timestamp + timelockDelay;
         p.earliestRedeemableTime = earliestRedeemableTime;
-        p.claimed = true;
         s.redeemableAfter[p.recipient] = earliestRedeemableTime;
         emit ProposalQueued(pid, earliestRedeemableTime, sharesToMint);
     }
@@ -421,12 +420,19 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
     function _state(uint256 pid) internal view returns (ProposalState) {
         BaseAllocationStorage storage s = _getStorage();
         Proposal storage p = s.proposals[pid];
+        // Check for canceled first
         if (p.canceled) return ProposalState.Canceled;
+        // Before voting starts
         if (block.number < startBlock) return ProposalState.Pending;
-        if (block.number <= startBlock + votingDelay + votingPeriod) return ProposalState.Active;
+        // During voting period or before finalization
+        if (block.number <= startBlock + votingDelay + votingPeriod || !s.tallyFinalized) return ProposalState.Active;
+        // After finalization - check quorum
         if (!_hasQuorumHook(pid)) return ProposalState.Defeated;
-        if (p.earliestRedeemableTime == 0) return ProposalState.Pending;
-        if (p.claimed) return ProposalState.Succeeded;
+        // Has quorum - check if queued
+        if (p.earliestRedeemableTime == 0) return ProposalState.Succeeded; // Not queued yet
+        // Queued - check if claimed (by external mechanisms like redeem)
+        if (p.claimed) return ProposalState.Executed;
+        // Check expiration
         if (block.timestamp > p.earliestRedeemableTime + gracePeriod) return ProposalState.Expired;
         return ProposalState.Queued;
     }

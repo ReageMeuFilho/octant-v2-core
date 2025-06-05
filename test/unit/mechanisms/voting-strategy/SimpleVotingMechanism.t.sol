@@ -641,42 +641,47 @@ contract SimpleVotingMechanismTest is Test {
     function testProposalStateMachine() public {
         // Setup: register user and create proposal
         vm.startPrank(user1);
-        token.approve(address(voting), 100);
-        voting.signup(100);
+        token.approve(address(voting), 200);
+        voting.signup(200);
         uint256 pid = voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
 
-        // Initial state: Pending/Active (before voting period starts)
+        // Initial state should be Active (during voting period)
         assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Active));
 
-        // Move to voting period
+        // Move to voting period and cast votes
         vm.roll(block.number + votingDelay + 1);
+        vm.prank(user1);
+        voting.castVote(pid, BaseAllocationMechanism.VoteType.For, 150);
 
-        // State during voting: Active
+        // State should still be Active during voting
         assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Active));
 
-        // Vote to pass quorum
-        vm.prank(user1);
-        voting.castVote(pid, BaseAllocationMechanism.VoteType.For, 100);
-
-        // Move past voting period and finalize
+        // Move past voting period
         vm.roll(block.number + votingPeriod);
+
+        // Before finalization, state should still be Active
+        assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Active));
+
+        // Finalize tally
         vm.prank(admin);
         voting.finalizeVoteTally();
 
-        // State after voting but before queuing: Should be Pending
-        assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Pending));
+        // After finalization with quorum, state should be Succeeded
+        assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Succeeded));
 
         // Queue the proposal
         vm.prank(admin);
         voting.queueProposal(pid);
 
-        // State after queuing: Succeeded (since claimed is set to true immediately)
-        assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Succeeded));
+        // After queuing, state should be Queued
+        assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Queued));
 
-        // Check proposal is marked as claimed
-        BaseAllocationMechanism.Proposal memory proposal = voting.proposals(pid);
-        assertTrue(proposal.claimed);
+        // Fast forward past timelock - proposal remains queued until externally marked as claimed
+        vm.warp(block.timestamp + timelockDelay + 1);
+
+        // State should still be Queued (not automatically executed)
+        assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Queued));
     }
 
     function testProposalStateDefeated() public {
@@ -692,7 +697,14 @@ contract SimpleVotingMechanismTest is Test {
         // Move past voting period
         vm.roll(block.number + votingDelay + votingPeriod + 1);
 
-        // State should be Defeated (no quorum)
+        // Before finalization, state should still be Active
+        assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Active));
+
+        // Finalize tally
+        vm.prank(admin);
+        voting.finalizeVoteTally();
+
+        // After finalization with no quorum, state should be Defeated
         assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Defeated));
     }
 
@@ -839,12 +851,12 @@ contract SimpleVotingMechanismTest is Test {
         voting.queueProposal(pid);
         vm.stopPrank();
 
-        // Check that the proposal is marked as claimed
+        // Check that the proposal is NOT claimed automatically
         BaseAllocationMechanism.Proposal memory proposal = voting.proposals(pid);
-        assertTrue(proposal.claimed);
+        assertFalse(proposal.claimed);
 
-        // Check the proposal state is Succeeded
-        assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Succeeded));
+        // Check the proposal state is Queued (not Succeeded)
+        assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Queued));
     }
 
     // 10. Additional Revert Case Tests for Branch Coverage
@@ -1226,6 +1238,13 @@ contract SimpleVotingMechanismTest is Test {
         // Move past voting period without any votes
         vm.roll(block.number + votingDelay + votingPeriod + 1);
 
+        // Before finalization, state should still be Active
+        assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Active));
+
+        // Finalize tally
+        vm.prank(admin);
+        voting.finalizeVoteTally();
+
         // With no votes, there's no quorum, so state should be Defeated
         assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Defeated));
     }
@@ -1248,8 +1267,15 @@ contract SimpleVotingMechanismTest is Test {
         // Move past voting period
         vm.roll(block.number + votingPeriod);
 
-        // After voting with quorum met but before queuing, state should be Pending
-        assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Pending));
+        // Before finalization, state should still be Active
+        assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Active));
+
+        // Finalize tally
+        vm.prank(admin);
+        voting.finalizeVoteTally();
+
+        // After voting with quorum met but before queuing, state should be Succeeded
+        assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Succeeded));
     }
 
     function testStateQueuedThenExpired() public {
@@ -1284,5 +1310,87 @@ contract SimpleVotingMechanismTest is Test {
 
         // No way to test the Expired state anymore since claiming happens automatically
         // But we've covered the important branches of the _state function
+    }
+
+    function testProposalClaimLifecycle() public {
+        // Setup
+        token.mint(user1, 1000);
+        token.mint(user2, 1000);
+        
+        vm.prank(user1);
+        token.approve(address(voting), 1000);
+        vm.prank(user1);
+        voting.signup(100);
+
+        vm.prank(user2);
+        token.approve(address(voting), 1000);
+        vm.prank(user2);
+        voting.signup(100);
+
+        // Create proposal
+        vm.prank(user1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
+
+        // Check initial state
+        assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Active));
+
+        // Vote
+        vm.roll(block.number + votingDelay + 1);
+        vm.prank(user1);
+        voting.castVote(pid, BaseAllocationMechanism.VoteType.For, 60);
+        vm.prank(user2);
+        voting.castVote(pid, BaseAllocationMechanism.VoteType.For, 40);
+
+        // End voting period
+        vm.roll(block.number + votingPeriod + 1);
+        
+        // Check state before finalization
+        assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Active));
+
+        // Finalize tally
+        vm.prank(admin);
+        voting.finalizeVoteTally();
+
+        // Check state is now Succeeded (has quorum but not queued)
+        assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Succeeded));
+
+        // Queue proposal
+        vm.prank(admin);
+        voting.queueProposal(pid);
+
+        // Check state is now Queued
+        assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Queued));
+
+        // Verify proposal is NOT marked as claimed initially
+        BaseAllocationMechanism.Proposal memory proposal = voting.proposals(pid);
+        assertFalse(proposal.claimed);
+    }
+
+    function testStateExpiredAfterGracePeriod() public {
+        // Setup proposal workflow first
+        token.mint(user1, 1000);
+        vm.prank(user1);
+        token.approve(address(voting), 1000);
+        vm.prank(user1);
+        voting.signup(100);
+
+        vm.prank(user1);
+        uint256 pid = voting.propose(recipient1, "Test proposal");
+
+        vm.roll(block.number + votingDelay + 1);
+        vm.prank(user1);
+        voting.castVote(pid, BaseAllocationMechanism.VoteType.For, 60);
+
+        vm.roll(block.number + votingPeriod + 1);
+        vm.prank(admin);
+        voting.finalizeVoteTally();
+        vm.prank(admin);
+        voting.queueProposal(pid);
+
+        // Fast forward past grace period to test expiration
+        vm.warp(block.timestamp + timelockDelay + gracePeriod + 1);
+
+        // Verify state is now Expired
+        assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Expired));
     }
 }
