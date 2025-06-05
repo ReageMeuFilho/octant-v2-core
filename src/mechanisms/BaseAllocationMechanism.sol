@@ -18,6 +18,7 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
     error ZeroVotingPeriod();
     error ZeroQuorumShares();
     error ZeroTimelockDelay();
+    error ZeroGracePeriod();
     error ZeroStartBlock();
     error EmptyName();
     error EmptySymbol();
@@ -56,7 +57,8 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
     uint256 public constant MAX_SAFE_VALUE = type(uint128).max;
 
     /// @notice Grace period after timelock expiry for state computation
-    uint256 public constant GRACE_PERIOD = 14 days;
+    /// @dev Configurable timeframe allowing state transitions after proposal expiry
+    uint256 public immutable gracePeriod;
 
     /// @notice EIP-712 storage slot for the main storage struct
     /// @dev keccak256("BaseAllocationMechanism.storage") - 1
@@ -203,6 +205,7 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
     /// @param _votingPeriod Blocks duration that voting remains open
     /// @param _quorumShares Minimum net votes for a proposal to pass
     /// @param _timelockDelay Seconds after queuing before redemption allowed
+    /// @param _gracePeriod Seconds after timelock expiry for state computation
     /// @param _startBlock Block number when voting mechanism starts
     constructor(
         IERC20 _asset,
@@ -212,6 +215,7 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
         uint256 _votingPeriod,
         uint256 _quorumShares,
         uint256 _timelockDelay,
+        uint256 _gracePeriod,
         uint256 _startBlock
     ) Ownable(msg.sender) {
         if (address(_asset) == address(0)) revert ZeroAssetAddress();
@@ -219,6 +223,7 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
         if (_votingPeriod == 0) revert ZeroVotingPeriod();
         if (_quorumShares == 0) revert ZeroQuorumShares();
         if (_timelockDelay == 0) revert ZeroTimelockDelay();
+        if (_gracePeriod == 0) revert ZeroGracePeriod();
         if (_startBlock == 0) revert ZeroStartBlock();
         if (bytes(_name).length == 0) revert EmptyName();
         if (bytes(_symbol).length == 0) revert EmptySymbol();
@@ -229,6 +234,7 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
         votingPeriod = _votingPeriod;
         quorumShares = _quorumShares;
         timelockDelay = _timelockDelay;
+        gracePeriod = _gracePeriod;
         startBlock = _startBlock;
 
         // Initialize storage struct
@@ -422,7 +428,7 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
         if (!_hasQuorumHook(pid)) return ProposalState.Defeated;
         if (p.eta == 0) return ProposalState.Pending;
         if (p.claimed) return ProposalState.Succeeded;
-        if (block.timestamp > p.eta + GRACE_PERIOD) return ProposalState.Expired;
+        if (block.timestamp > p.eta + gracePeriod) return ProposalState.Expired;
         return ProposalState.Queued;
     }
 

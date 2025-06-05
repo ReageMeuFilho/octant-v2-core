@@ -38,6 +38,7 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
         uint256 _votingPeriod,
         uint256 _quorumShares,
         uint256 _timelockDelay,
+        uint256 _gracePeriod,
         uint256 _startBlock,
         uint256 _alphaNumerator,
         uint256 _alphaDenominator
@@ -50,6 +51,7 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
             _votingPeriod,
             _quorumShares,
             _timelockDelay,
+            _gracePeriod,
             _startBlock
         )
     {

@@ -32,6 +32,7 @@ contract SimpleVotingMechanismTest is Test {
     uint256 votingPeriod = 100;
     uint256 quorumShares = 50;
     uint256 timelockDelay = 1 days;
+    uint256 gracePeriod = 14 days;
 
     function setUp() public {
         vm.startPrank(admin);
@@ -44,6 +45,7 @@ contract SimpleVotingMechanismTest is Test {
             votingPeriod,
             quorumShares,
             timelockDelay,
+            gracePeriod,
             1
         );
 
@@ -477,6 +479,7 @@ contract SimpleVotingMechanismTest is Test {
             votingPeriod,
             quorumShares,
             timelockDelay,
+            gracePeriod,
             1
         );
 
@@ -490,6 +493,7 @@ contract SimpleVotingMechanismTest is Test {
             votingPeriod,
             quorumShares,
             timelockDelay,
+            gracePeriod,
             1
         );
 
@@ -503,6 +507,7 @@ contract SimpleVotingMechanismTest is Test {
             0,
             quorumShares,
             timelockDelay,
+            gracePeriod,
             1
         );
 
@@ -516,6 +521,7 @@ contract SimpleVotingMechanismTest is Test {
             votingPeriod,
             0,
             timelockDelay,
+            gracePeriod,
             1
         );
 
@@ -528,6 +534,21 @@ contract SimpleVotingMechanismTest is Test {
             votingDelay,
             votingPeriod,
             quorumShares,
+            0,
+            gracePeriod,
+            1
+        );
+
+        // Test with zero grace period
+        vm.expectRevert(BaseAllocationMechanism.ZeroGracePeriod.selector);
+        new SimpleVotingMechanism(
+            IERC20(address(token)),
+            "Voting Shares",
+            "VOTE",
+            votingDelay,
+            votingPeriod,
+            quorumShares,
+            timelockDelay,
             0,
             1
         );
@@ -1077,6 +1098,7 @@ contract SimpleVotingMechanismTest is Test {
             votingPeriod,
             quorumShares,
             timelockDelay,
+            gracePeriod,
             1
         );
 
@@ -1090,6 +1112,7 @@ contract SimpleVotingMechanismTest is Test {
             votingPeriod,
             quorumShares,
             timelockDelay,
+            gracePeriod,
             1
         );
 
@@ -1103,6 +1126,7 @@ contract SimpleVotingMechanismTest is Test {
             0,
             quorumShares,
             timelockDelay,
+            gracePeriod,
             1
         );
 
@@ -1116,6 +1140,7 @@ contract SimpleVotingMechanismTest is Test {
             votingPeriod,
             0,
             timelockDelay,
+            gracePeriod,
             1
         );
 
@@ -1128,6 +1153,21 @@ contract SimpleVotingMechanismTest is Test {
             votingDelay,
             votingPeriod,
             quorumShares,
+            0,
+            gracePeriod,
+            1
+        );
+
+        // Test with zero grace period
+        vm.expectRevert(BaseAllocationMechanism.ZeroGracePeriod.selector);
+        new SimpleVotingMechanism(
+            IERC20(address(testToken)),
+            "Voting Shares",
+            "VOTE",
+            votingDelay,
+            votingPeriod,
+            quorumShares,
+            timelockDelay,
             0,
             1
         );
@@ -1145,6 +1185,7 @@ contract SimpleVotingMechanismTest is Test {
             votingPeriod,
             quorumShares,
             timelockDelay,
+            gracePeriod,
             1
         );
 

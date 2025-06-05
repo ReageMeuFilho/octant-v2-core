@@ -21,6 +21,7 @@ contract QuadraticVotingMechanismTest is Test {
     uint256 public constant VOTING_PERIOD = 2000;
     uint256 public constant QUORUM_SHARES = 100;
     uint256 public constant TIMELOCK_DELAY = 7 days;
+    uint256 public constant GRACE_PERIOD = 14 days;
     uint256 public constant START_BLOCK = 1;
     uint256 public constant ALPHA_NUMERATOR = 5;
     uint256 public constant ALPHA_DENOMINATOR = 10; // 50% quadratic, 50% linear
@@ -36,6 +37,7 @@ contract QuadraticVotingMechanismTest is Test {
             VOTING_PERIOD,
             QUORUM_SHARES,
             TIMELOCK_DELAY,
+            GRACE_PERIOD,
             START_BLOCK,
             ALPHA_NUMERATOR,
             ALPHA_DENOMINATOR
@@ -65,6 +67,7 @@ contract QuadraticVotingMechanismTest is Test {
         assertEq(mechanism.votingPeriod(), VOTING_PERIOD);
         assertEq(mechanism.quorumShares(), QUORUM_SHARES);
         assertEq(mechanism.timelockDelay(), TIMELOCK_DELAY);
+        assertEq(mechanism.gracePeriod(), GRACE_PERIOD);
         assertEq(mechanism.startBlock(), START_BLOCK);
         assertEq(mechanism.alphaNumerator(), ALPHA_NUMERATOR);
         assertEq(mechanism.alphaDenominator(), ALPHA_DENOMINATOR);
@@ -83,6 +86,7 @@ contract QuadraticVotingMechanismTest is Test {
             VOTING_PERIOD,
             QUORUM_SHARES,
             TIMELOCK_DELAY,
+            GRACE_PERIOD,
             START_BLOCK,
             ALPHA_NUMERATOR,
             ALPHA_DENOMINATOR
@@ -98,6 +102,7 @@ contract QuadraticVotingMechanismTest is Test {
             0,
             QUORUM_SHARES,
             TIMELOCK_DELAY,
+            GRACE_PERIOD,
             START_BLOCK,
             ALPHA_NUMERATOR,
             ALPHA_DENOMINATOR
@@ -113,6 +118,7 @@ contract QuadraticVotingMechanismTest is Test {
             VOTING_PERIOD,
             0,
             TIMELOCK_DELAY,
+            GRACE_PERIOD,
             START_BLOCK,
             ALPHA_NUMERATOR,
             ALPHA_DENOMINATOR
@@ -127,6 +133,23 @@ contract QuadraticVotingMechanismTest is Test {
             VOTING_DELAY,
             VOTING_PERIOD,
             QUORUM_SHARES,
+            0,
+            GRACE_PERIOD,
+            START_BLOCK,
+            ALPHA_NUMERATOR,
+            ALPHA_DENOMINATOR
+        );
+
+        // Test zero grace period
+        vm.expectRevert(BaseAllocationMechanism.ZeroGracePeriod.selector);
+        new QuadraticVotingMechanism(
+            asset,
+            "Test",
+            "TST",
+            VOTING_DELAY,
+            VOTING_PERIOD,
+            QUORUM_SHARES,
+            TIMELOCK_DELAY,
             0,
             START_BLOCK,
             ALPHA_NUMERATOR,
@@ -143,6 +166,7 @@ contract QuadraticVotingMechanismTest is Test {
             VOTING_PERIOD,
             QUORUM_SHARES,
             TIMELOCK_DELAY,
+            GRACE_PERIOD,
             START_BLOCK,
             11,
             10
@@ -158,6 +182,7 @@ contract QuadraticVotingMechanismTest is Test {
             VOTING_PERIOD,
             QUORUM_SHARES,
             TIMELOCK_DELAY,
+            GRACE_PERIOD,
             START_BLOCK,
             0,
             0
@@ -481,6 +506,7 @@ contract QuadraticVotingMechanismTest is Test {
             VOTING_PERIOD,
             QUORUM_SHARES,
             TIMELOCK_DELAY,
+            GRACE_PERIOD,
             START_BLOCK,
             9, // 90% quadratic
             10

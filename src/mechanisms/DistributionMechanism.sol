@@ -190,6 +190,7 @@ abstract contract DistributionMechanism is BaseAllocationMechanism {
      * @param _votingPeriod Blocks duration that voting remains open
      * @param _quorumShares Minimum net votes for a proposal to pass
      * @param _timelockDelay Seconds after queuing before redemption allowed
+     * @param _gracePeriod Seconds after timelock expiry for state computation
      * @param _startBlock Block number when voting mechanism starts
      */
     constructor(
@@ -200,6 +201,7 @@ abstract contract DistributionMechanism is BaseAllocationMechanism {
         uint256 _votingPeriod,
         uint256 _quorumShares,
         uint256 _timelockDelay,
+        uint256 _gracePeriod,
         uint256 _startBlock
     )
         BaseAllocationMechanism(
@@ -210,6 +212,7 @@ abstract contract DistributionMechanism is BaseAllocationMechanism {
             _votingPeriod,
             _quorumShares,
             _timelockDelay,
+            _gracePeriod,
             _startBlock
         )
     {

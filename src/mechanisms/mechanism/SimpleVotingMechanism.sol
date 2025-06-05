@@ -15,6 +15,7 @@ contract SimpleVotingMechanism is DistributionMechanism {
         uint256 _votingPeriod,
         uint256 _quorumShares,
         uint256 _timelockDelay,
+        uint256 _gracePeriod,
         uint256 _startBlock
     )
         DistributionMechanism(
@@ -25,6 +26,7 @@ contract SimpleVotingMechanism is DistributionMechanism {
             _votingPeriod,
             _quorumShares,
             _timelockDelay,
+            _gracePeriod,
             _startBlock
         )
     {}
