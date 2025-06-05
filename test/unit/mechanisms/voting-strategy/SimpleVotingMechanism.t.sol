@@ -286,7 +286,7 @@ contract SimpleVotingMechanismTest is Test {
         // Check proposal is queued
         BaseAllocationMechanism.Proposal memory proposal = voting.proposals(pid);
         assertEq(proposal.sharesRequested, 0);
-        assertTrue(proposal.eta > 0);
+        assertTrue(proposal.earliestRedeemableTime > 0);
         assertEq(voting.proposalShares(pid), 150);
     }
 
@@ -583,9 +583,9 @@ contract SimpleVotingMechanismTest is Test {
         uint256 redeemableTime = voting.redeemableAfter(recipient1);
         assertEq(redeemableTime, timestampBefore + timelockDelay);
 
-        // Check proposal eta
+        // Check proposal earliestRedeemableTime
         BaseAllocationMechanism.Proposal memory proposal = voting.proposals(pid);
-        assertEq(proposal.eta, redeemableTime);
+        assertEq(proposal.earliestRedeemableTime, redeemableTime);
     }
 
     function testInvalidVoteWeight() public {
@@ -814,9 +814,9 @@ contract SimpleVotingMechanismTest is Test {
         uint256 redeemableTime = voting.redeemableAfter(recipient1);
         assertEq(redeemableTime, timestampBefore + timelockDelay);
 
-        // Check that eta matches redeemableAfter
+        // Check proposal earliestRedeemableTime
         BaseAllocationMechanism.Proposal memory proposal = voting.proposals(pid);
-        assertEq(proposal.eta, redeemableTime);
+        assertEq(proposal.earliestRedeemableTime, redeemableTime);
     }
 
     function testProposalAlreadyClaimedWhenQueued() public {

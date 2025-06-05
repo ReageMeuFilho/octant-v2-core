@@ -115,7 +115,8 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
 
     struct Proposal {
         uint256 sharesRequested;
-        uint256 eta;
+        /// @notice Earliest timestamp when proposal shares become redeemable (block.timestamp + timelockDelay)
+        uint256 earliestRedeemableTime;
         address proposer;
         address recipient;
         string description;
@@ -374,7 +375,7 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
         Proposal storage p = s.proposals[pid];
         if (p.canceled) revert ProposalCanceledError();
         if (!_hasQuorumHook(pid)) revert NoQuorum();
-        if (p.eta != 0) revert AlreadyQueued();
+        if (p.earliestRedeemableTime != 0) revert AlreadyQueued();
 
         uint256 sharesToMint = _convertVotesToShares(pid);
         if (sharesToMint == 0) revert NoAllocation();
@@ -382,11 +383,11 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
 
         _requestDistributionHook(_getRecipientAddressHook(pid), sharesToMint);
 
-        uint256 eta = block.timestamp + timelockDelay;
-        p.eta = eta;
+        uint256 earliestRedeemableTime = block.timestamp + timelockDelay;
+        p.earliestRedeemableTime = earliestRedeemableTime;
         p.claimed = true;
-        s.redeemableAfter[p.recipient] = eta;
-        emit ProposalQueued(pid, eta, sharesToMint);
+        s.redeemableAfter[p.recipient] = earliestRedeemableTime;
+        emit ProposalQueued(pid, earliestRedeemableTime, sharesToMint);
     }
 
     // ---------- Voting ----------
@@ -424,9 +425,9 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
         if (block.number < startBlock) return ProposalState.Pending;
         if (block.number <= startBlock + votingDelay + votingPeriod) return ProposalState.Active;
         if (!_hasQuorumHook(pid)) return ProposalState.Defeated;
-        if (p.eta == 0) return ProposalState.Pending;
+        if (p.earliestRedeemableTime == 0) return ProposalState.Pending;
         if (p.claimed) return ProposalState.Succeeded;
-        if (block.timestamp > p.eta + gracePeriod) return ProposalState.Expired;
+        if (block.timestamp > p.earliestRedeemableTime + gracePeriod) return ProposalState.Expired;
         return ProposalState.Queued;
     }
 
@@ -446,7 +447,7 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
         Proposal storage p = s.proposals[pid];
         if (msg.sender != p.proposer) revert NotProposer();
         if (p.canceled) revert AlreadyCanceled();
-        if (p.eta != 0) revert AlreadyQueued();
+        if (p.earliestRedeemableTime != 0) revert AlreadyQueued();
 
         p.canceled = true;
         emit ProposalCanceled(pid, p.proposer);
