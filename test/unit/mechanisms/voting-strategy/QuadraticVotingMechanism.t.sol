@@ -227,7 +227,13 @@ contract QuadraticVotingMechanismTest is Test {
         vm.roll(block.number + VOTING_DELAY + VOTING_PERIOD + 1);
 
         vm.prank(user1);
-        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.VotingEnded.selector, block.number, 1 + VOTING_DELAY + VOTING_PERIOD));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                BaseAllocationMechanism.VotingEnded.selector,
+                block.number,
+                1 + VOTING_DELAY + VOTING_PERIOD
+            )
+        );
         mechanism.signup(1000e18);
     }
 
@@ -399,7 +405,13 @@ contract QuadraticVotingMechanismTest is Test {
 
         // Weight larger than uint128.max should revert with InvalidWeight since it's too large for voting power
         vm.prank(user1);
-        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.InvalidWeight.selector, uint256(type(uint128).max) + 1, 1000e18));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                BaseAllocationMechanism.InvalidWeight.selector,
+                uint256(type(uint128).max) + 1,
+                1000e18
+            )
+        );
         mechanism.castVote(pid, BaseAllocationMechanism.VoteType.For, uint256(type(uint128).max) + 1);
     }
 

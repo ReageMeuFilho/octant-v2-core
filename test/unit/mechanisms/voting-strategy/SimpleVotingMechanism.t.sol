@@ -92,7 +92,13 @@ contract SimpleVotingMechanismTest is Test {
         vm.roll(block.number + votingDelay + votingPeriod + 1);
 
         vm.prank(user1);
-        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.VotingEnded.selector, block.number, 1 + votingDelay + votingPeriod));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                BaseAllocationMechanism.VotingEnded.selector,
+                block.number,
+                1 + votingDelay + votingPeriod
+            )
+        );
         voting.signup(100);
     }
 
@@ -1316,7 +1322,7 @@ contract SimpleVotingMechanismTest is Test {
         // Setup
         token.mint(user1, 1000);
         token.mint(user2, 1000);
-        
+
         vm.prank(user1);
         token.approve(address(voting), 1000);
         vm.prank(user1);
@@ -1343,7 +1349,7 @@ contract SimpleVotingMechanismTest is Test {
 
         // End voting period
         vm.roll(block.number + votingPeriod + 1);
-        
+
         // Check state before finalization
         assertEq(uint256(voting.state(pid)), uint256(BaseAllocationMechanism.ProposalState.Active));
 
