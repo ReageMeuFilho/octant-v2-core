@@ -340,7 +340,6 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
         if (bytes(description).length == 0) revert EmptyDescription();
         if (bytes(description).length > 1000) revert DescriptionTooLong();
 
-        if (s.proposalIdCounter >= type(uint256).max) revert MaxProposalsReached();
         s.proposalIdCounter++;
         pid = s.proposalIdCounter;
 
