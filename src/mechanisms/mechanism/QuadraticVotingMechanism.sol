@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {BaseAllocationMechanism} from "../BaseAllocationMechanism.sol";
-import {ProperQF} from "../voting-strategy/ProperQF.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import { BaseAllocationMechanism } from "../BaseAllocationMechanism.sol";
+import { ProperQF } from "../voting-strategy/ProperQF.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title Quadratic Voting Mechanism
 /// @notice Implements quadratic funding for proposal allocation using the ProperQF strategy
@@ -87,11 +87,13 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
 
     /// @notice Process vote using quadratic funding algorithm
     /// @dev The cost of voting is quadratic: to cast `weight` votes, you pay `weight^2` voting power
-    function _processVoteHook(uint256 pid, address, VoteType choice, uint256 weight, uint256 oldPower)
-        internal
-        override
-        returns (uint256)
-    {
+    function _processVoteHook(
+        uint256 pid,
+        address,
+        VoteType choice,
+        uint256 weight,
+        uint256 oldPower
+    ) internal override returns (uint256) {
         if (choice != VoteType.For) revert OnlyForVotesSupported();
 
         // Validate weight to prevent overflow in quadratic cost calculation
@@ -116,11 +118,13 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
     /// @notice Check quorum based on quadratic funding threshold
     function _hasQuorumHook(uint256 pid) internal view override returns (bool) {
         // Get the project's funding metrics
-        (,, uint256 quadraticFunding, uint256 linearFunding) = getTally(pid);
+        (, , uint256 quadraticFunding, uint256 linearFunding) = getTally(pid);
 
         // Calculate total funding for this project using alpha weighting
-        uint256 projectTotalFunding = (quadraticFunding * alphaNumerator()) / alphaDenominator()
-            + (linearFunding * (alphaDenominator() - alphaNumerator())) / alphaDenominator();
+        uint256 projectTotalFunding = (quadraticFunding * alphaNumerator()) /
+            alphaDenominator() +
+            (linearFunding * (alphaDenominator() - alphaNumerator())) /
+            alphaDenominator();
 
         // Project meets quorum if it has minimum funding threshold
         return projectTotalFunding >= quorumShares;
@@ -131,15 +135,19 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
         if (totalFunding() == 0) return 0;
 
         // Get project funding metrics
-        (,, uint256 quadraticFunding, uint256 linearFunding) = getTally(pid);
+        (, , uint256 quadraticFunding, uint256 linearFunding) = getTally(pid);
 
         // Calculate project's weighted funding
-        uint256 projectWeightedFunding = (quadraticFunding * alphaNumerator()) / alphaDenominator()
-            + (linearFunding * (alphaDenominator() - alphaNumerator())) / alphaDenominator();
+        uint256 projectWeightedFunding = (quadraticFunding * alphaNumerator()) /
+            alphaDenominator() +
+            (linearFunding * (alphaDenominator() - alphaNumerator())) /
+            alphaDenominator();
 
         // Calculate total weighted funding across all projects
-        uint256 totalWeightedFunding = (totalQuadraticSum() * alphaNumerator()) / alphaDenominator()
-            + (totalLinearSum() * (alphaDenominator() - alphaNumerator())) / alphaDenominator();
+        uint256 totalWeightedFunding = (totalQuadraticSum() * alphaNumerator()) /
+            alphaDenominator() +
+            (totalLinearSum() * (alphaDenominator() - alphaNumerator())) /
+            alphaDenominator();
 
         // Return proportional shares (scaled by total voting power for meaningful allocation)
         if (totalWeightedFunding == 0 || totalVotingPower == 0) return 0;
@@ -171,14 +179,15 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
         emit AlphaParameterUpdated(newNumerator, newDenominator);
     }
 
-
     /// @notice Get project funding breakdown for a proposal
     /// @param pid Proposal ID
     /// @return sumContributions Total contribution amounts
     /// @return sumSquareRoots Sum of square roots for quadratic calculation
     /// @return quadraticFunding Quadratic funding component
     /// @return linearFunding Linear funding component
-    function getProposalFunding(uint256 pid)
+    function getProposalFunding(
+        uint256 pid
+    )
         external
         view
         returns (uint256 sumContributions, uint256 sumSquareRoots, uint256 quadraticFunding, uint256 linearFunding)

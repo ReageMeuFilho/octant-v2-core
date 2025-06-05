@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Test} from "forge-std/Test.sol";
-import {HarnessProperQF} from "test/unit/mechanisms/harness/HarnessProperQF.sol";
-import {ProperQF} from "src/mechanisms/voting-strategy/ProperQF.sol";
-import {console2 as console} from "forge-std/console2.sol";
+import { Test } from "forge-std/Test.sol";
+import { HarnessProperQF } from "test/unit/mechanisms/harness/HarnessProperQF.sol";
+import { ProperQF } from "src/mechanisms/voting-strategy/ProperQF.sol";
+import { console2 as console } from "forge-std/console2.sol";
 
 contract ProperQFSimulationTest is Test {
     HarnessProperQF public qf;
@@ -22,11 +22,11 @@ contract ProperQFSimulationTest is Test {
     /// @param numProjects Number of projects each voter can vote for
     /// @param baseContribution Base contribution amount (will be varied per voter/project)
     /// @return VoterProfile[] Array of voter profiles with their contributions
-    function generateVoterProfiles(uint256 numVoters, uint256 numProjects, uint256 baseContribution)
-        internal
-        pure
-        returns (VoterProfile[] memory)
-    {
+    function generateVoterProfiles(
+        uint256 numVoters,
+        uint256 numProjects,
+        uint256 baseContribution
+    ) internal pure returns (VoterProfile[] memory) {
         VoterProfile[] memory voters = new VoterProfile[](numVoters);
 
         for (uint256 i = 0; i < numVoters; i++) {
@@ -48,10 +48,10 @@ contract ProperQFSimulationTest is Test {
     /// @param voters Array of voter profiles
     /// @param numProjects Number of projects
     /// @return projectTallies Array of (sumContributions, sumSquareRoots, quadFunding, linearFunding) for each project
-    function simulateVotingRound(VoterProfile[] memory voters, uint256 numProjects)
-        internal
-        returns (uint256[4][] memory projectTallies)
-    {
+    function simulateVotingRound(
+        VoterProfile[] memory voters,
+        uint256 numProjects
+    ) internal returns (uint256[4][] memory projectTallies) {
         projectTallies = new uint256[4][](numProjects);
 
         // Process all votes
@@ -66,8 +66,8 @@ contract ProperQFSimulationTest is Test {
 
         // Collect results
         for (uint256 i = 0; i < numProjects; i++) {
-            (uint256 sumContributions, uint256 sumSquareRoots, uint256 quadraticFunding, uint256 linearFunding) =
-                qf.getTally(i + 1);
+            (uint256 sumContributions, uint256 sumSquareRoots, uint256 quadraticFunding, uint256 linearFunding) = qf
+                .getTally(i + 1);
 
             projectTallies[i] = [sumContributions, sumSquareRoots, quadraticFunding, linearFunding];
         }
@@ -175,13 +175,13 @@ contract ProperQFSimulationTest is Test {
         qf.exposed_processVote(projectId, contribution, voteWeight);
 
         // Get initial funding distribution
-        (,, uint256 initialQuadratic, uint256 initialLinear) = qf.getTally(projectId);
+        (, , uint256 initialQuadratic, uint256 initialLinear) = qf.getTally(projectId);
 
         // Set alpha to 0.6
         qf.exposed_setAlpha(6000, 10000);
 
         // Get new funding distribution
-        (,, uint256 newQuadratic, uint256 newLinear) = qf.getTally(projectId);
+        (, , uint256 newQuadratic, uint256 newLinear) = qf.getTally(projectId);
 
         // Verify that quadratic portion is 60% of what it was
         assertEq(newQuadratic, (initialQuadratic * 6000) / 10000, "Quadratic funding should be 60% of original");
@@ -214,7 +214,7 @@ contract ProperQFSimulationTest is Test {
 
         qf.exposed_processVote(projectId, contribution, voteWeight);
 
-        (,, uint256 quadraticFunding,) = qf.getTally(projectId);
+        (, , uint256 quadraticFunding, ) = qf.getTally(projectId);
 
         // Verify precise calculation
         uint256 expectedQuadratic = (voteWeight * voteWeight * 12345) / 100000;
@@ -289,7 +289,8 @@ contract ProperQFSimulationTest is Test {
                         expectedQuadraticSum += projectQuadraticSums[k] * projectQuadraticSums[k];
                         expectedLinearSum += projectLinearSums[k];
                         expectedTotalFunding +=
-                            projectLinearSums[k] + (projectQuadraticSums[k] * projectQuadraticSums[k]);
+                            projectLinearSums[k] +
+                            (projectQuadraticSums[k] * projectQuadraticSums[k]);
                     }
 
                     // Verify running totals match contract state
@@ -381,7 +382,9 @@ contract ProperQFSimulationTest is Test {
         for (uint256 i = 0; i < numProjects; i++) {
             assertEq(results[i][0], expectedContributionPerProject, " contributions per project mismatch");
             assertEq(
-                results[i][2], expectedQuadraticPerProject, " contributions per project quadratic funding mismatch"
+                results[i][2],
+                expectedQuadraticPerProject,
+                " contributions per project quadratic funding mismatch"
             );
         }
 
@@ -432,8 +435,8 @@ contract ProperQFSimulationTest is Test {
         console.log("\n=== Final Totals ===");
         // Print per-project totals
         for (uint256 i = 0; i < numProjects; i++) {
-            (uint256 sumContributions, uint256 sumSquareRoots, uint256 quadraticFunding, uint256 linearFunding) =
-                qf.getTally(i + 1);
+            (uint256 sumContributions, uint256 sumSquareRoots, uint256 quadraticFunding, uint256 linearFunding) = qf
+                .getTally(i + 1);
 
             console.log("\nProject", i + 1, "Stats:");
             console.log("Total Contributions:", sumContributions / 1e18);

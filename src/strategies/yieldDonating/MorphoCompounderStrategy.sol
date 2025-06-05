@@ -2,12 +2,10 @@
 pragma solidity ^0.8.0;
 
 import { BaseHealthCheck } from "src/strategies/periphery/BaseHealthCheck.sol";
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { console2 } from "forge-std/console2.sol";
 
 /// @title MorphoCompounderStrategy
 /// @author Octant
@@ -36,10 +34,6 @@ contract MorphoCompounderStrategy is BaseHealthCheck {
         address _donationAddress
     ) BaseHealthCheck(_asset, _name, _management, _keeper, _emergencyAdmin, _donationAddress) {
         // make sure asset is Morpho's asset
-        // require(_asset == IERC4626(_compounderVault).asset(), "!asset");
-        console2.log("asset", _asset);
-        console2.log("compounderVault", _compounderVault);
-        console2.log("asset", IERC4626(_compounderVault).asset());
         IERC20(_asset).forceApprove(_compounderVault, type(uint256).max);
         compounderVault = _compounderVault;
     }
@@ -56,8 +50,6 @@ contract MorphoCompounderStrategy is BaseHealthCheck {
     }
 
     function availableWithdrawLimit(address /*_owner*/) public view override returns (uint256) {
-        console2.log("availableWithdrawLimit");
-        console2.log("maxWithdraw", IERC4626(compounderVault).maxWithdraw(address(this)));
         return IERC20(asset).balanceOf(address(this)) + IERC4626(compounderVault).maxWithdraw(address(this));
     }
 

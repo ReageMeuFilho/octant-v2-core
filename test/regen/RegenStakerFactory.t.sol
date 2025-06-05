@@ -57,6 +57,7 @@ contract RegenStakerFactoryTest is Test {
     function testCreateStaker() public {
         bytes32 salt = keccak256("TEST_STAKER_SALT");
 
+        vm.prank(deployer1);
         address predictedAddress = factory.predictStakerAddress(salt);
 
         vm.expectEmit(true, true, true, true);
@@ -68,7 +69,8 @@ contract RegenStakerFactoryTest is Test {
             address(stakeToken),
             MAX_BUMP_TIP,
             MAX_CLAIM_FEE,
-            MINIMUM_STAKE_AMOUNT
+            MINIMUM_STAKE_AMOUNT,
+            salt
         );
 
         vm.startPrank(deployer1);
@@ -202,6 +204,7 @@ contract RegenStakerFactoryTest is Test {
     function testDeterministicAddressing() public {
         bytes32 salt = keccak256("DETERMINISTIC_SALT");
 
+        vm.prank(deployer1);
         address predictedAddress = factory.predictStakerAddress(salt);
 
         vm.prank(deployer1);
@@ -265,5 +268,6 @@ event StakerDeploy(
     address stakeToken,
     uint256 maxBumpTip,
     uint256 maxClaimFee,
-    uint256 minimumStakeAmount
+    uint256 minimumStakeAmount,
+    bytes32 salt
 );

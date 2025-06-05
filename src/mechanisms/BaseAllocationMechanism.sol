@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title Abstract Allocation Mechanism for ERC4626 Vault-Based Voting
 /// @notice Provides the core structure for on-chain voting mechanisms that mint ERC4626 shares to proposal recipients based on vote tallies.
@@ -54,7 +54,7 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
 
     /// @notice Maximum safe value for mathematical operations
     uint256 public constant MAX_SAFE_VALUE = type(uint128).max;
-    
+
     /// @notice Grace period after timelock expiry for state computation
     uint256 public constant GRACE_PERIOD = 14 days;
 
@@ -81,11 +81,9 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
         // Basic token information
         string name;
         string symbol;
-        
         // Voting state
         bool tallyFinalized;
         uint256 proposalIdCounter;
-        
         // Mappings
         mapping(uint256 => Proposal) proposals;
         mapping(uint256 => ProposalVote) proposalVotes;
@@ -232,7 +230,7 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
         quorumShares = _quorumShares;
         timelockDelay = _timelockDelay;
         startBlock = _startBlock;
-        
+
         // Initialize storage struct
         BaseAllocationStorage storage s = _getStorage();
         s.name = _name;
@@ -269,10 +267,13 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
     /// @param weight Voting power weight to apply
     /// @param oldPower Voting power before vote
     /// @return newPower Voting power after vote (must be <= oldPower)
-    function _processVoteHook(uint256 pid, address voter, VoteType choice, uint256 weight, uint256 oldPower)
-        internal
-        virtual
-        returns (uint256 newPower);
+    function _processVoteHook(
+        uint256 pid,
+        address voter,
+        VoteType choice,
+        uint256 weight,
+        uint256 oldPower
+    ) internal virtual returns (uint256 newPower);
 
     /// @notice Check if proposal met quorum requirement.
     /// @param pid Proposal ID
@@ -392,9 +393,8 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
     /// @param weight Amount of voting power to apply
     function castVote(uint256 pid, VoteType choice, uint256 weight) external nonReentrant whenNotPaused {
         if (!_validateProposalHook(pid)) revert InvalidProposal();
-        if (
-            block.number < startBlock + votingDelay || block.number > startBlock + votingDelay + votingPeriod
-        ) revert VotingClosed();
+        if (block.number < startBlock + votingDelay || block.number > startBlock + votingDelay + votingPeriod)
+            revert VotingClosed();
         BaseAllocationStorage storage s = _getStorage();
         if (s.hasVoted[pid][msg.sender]) revert AlreadyVoted();
 
@@ -453,11 +453,9 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
     /// @return sharesFor Number of shares voted for
     /// @return sharesAgainst Number of shares voted against
     /// @return sharesAbstain Number of shares abstained
-    function getVoteTally(uint256 pid)
-        external
-        view
-        returns (uint256 sharesFor, uint256 sharesAgainst, uint256 sharesAbstain)
-    {
+    function getVoteTally(
+        uint256 pid
+    ) external view returns (uint256 sharesFor, uint256 sharesAgainst, uint256 sharesAbstain) {
         BaseAllocationStorage storage s = _getStorage();
         if (!_validateProposalHook(pid)) revert InvalidProposal();
         ProposalVote storage votes = s.proposalVotes[pid];

@@ -7,7 +7,7 @@ contract HarnessProperQF is ProperQF {
     // Custom Errors
     error AlphaMustBeLEQOne();
     error PercentageMustBeLEQ100();
-    
+
     // Expose internal functions for testing
     function exposed_sqrt(uint256 x) public pure returns (uint256) {
         return ProperQF._sqrt(x);

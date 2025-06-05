@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Test} from "forge-std/Test.sol";
-import {HarnessProperQF} from "test/unit/mechanisms/harness/HarnessProperQF.sol";
-import {ProperQF} from "src/mechanisms/voting-strategy/ProperQF.sol";
-import {console2 as console} from "forge-std/console2.sol";
+import { Test } from "forge-std/Test.sol";
+import { HarnessProperQF } from "test/unit/mechanisms/harness/HarnessProperQF.sol";
+import { ProperQF } from "src/mechanisms/voting-strategy/ProperQF.sol";
+import { console2 as console } from "forge-std/console2.sol";
 
 contract ProperQFTest is Test {
     HarnessProperQF public qf;
@@ -78,7 +78,7 @@ contract ProperQFTest is Test {
         qf.exposed_processVote(projectId, contribution1, qf.exposed_sqrt(contribution1));
         qf.exposed_processVote(projectId, contribution2, qf.exposed_sqrt(contribution2));
 
-        (uint256 sumC, uint256 sumSR,,) = qf.getTally(projectId);
+        (uint256 sumC, uint256 sumSR, , ) = qf.getTally(projectId);
 
         assertEq(sumC, contribution1 + contribution2, "sumContributions incorrect");
         assertEq(sumSR, qf.exposed_sqrt(contribution1) + qf.exposed_sqrt(contribution2), "sumSquareRoots incorrect");
@@ -91,7 +91,7 @@ contract ProperQFTest is Test {
         uint256 projectId = 1;
         qf.exposed_processVote(projectId, contribution, qf.exposed_sqrt(contribution));
 
-        (uint256 sumC, uint256 sumSR,,) = qf.getTally(projectId);
+        (uint256 sumC, uint256 sumSR, , ) = qf.getTally(projectId);
         assertEq(sumC, contribution, "sumContributions incorrect");
         assertEq(sumSR, qf.exposed_sqrt(contribution), "sumSquareRoots incorrect");
     }
@@ -212,8 +212,9 @@ contract ProperQFTest is Test {
         }
 
         // Check global totals
-        uint256 expectedTotalQuadratic = qf.exposed_sqrt(contribution1) ** 2 + qf.exposed_sqrt(contribution2) ** 2
-            + qf.exposed_sqrt(contribution3) ** 2;
+        uint256 expectedTotalQuadratic = qf.exposed_sqrt(contribution1) ** 2 +
+            qf.exposed_sqrt(contribution2) ** 2 +
+            qf.exposed_sqrt(contribution3) ** 2;
 
         uint256 expectedTotalLinear = contribution1 + contribution2 + contribution3;
 
@@ -288,12 +289,13 @@ contract ProperQFTest is Test {
         }
 
         // Check global totals
-        uint256 expectedTotalQuadratic = (qf.exposed_sqrt(contribution1A) + qf.exposed_sqrt(contribution1B)) ** 2
-            + (qf.exposed_sqrt(contribution2A) + qf.exposed_sqrt(contribution2B)) ** 2
-            + (qf.exposed_sqrt(contribution3A) + qf.exposed_sqrt(contribution3B)) ** 2;
+        uint256 expectedTotalQuadratic = (qf.exposed_sqrt(contribution1A) + qf.exposed_sqrt(contribution1B)) ** 2 +
+            (qf.exposed_sqrt(contribution2A) + qf.exposed_sqrt(contribution2B)) ** 2 +
+            (qf.exposed_sqrt(contribution3A) + qf.exposed_sqrt(contribution3B)) ** 2;
 
-        uint256 expectedTotalLinear =
-            (contribution1A + contribution1B) + (contribution2A + contribution2B) + (contribution3A + contribution3B);
+        uint256 expectedTotalLinear = (contribution1A + contribution1B) +
+            (contribution2A + contribution2B) +
+            (contribution3A + contribution3B);
 
         assertEq(qf.totalQuadraticSum(), expectedTotalQuadratic, "Total quadratic sum incorrect");
         assertEq(qf.totalLinearSum(), expectedTotalLinear, "Total linear sum incorrect");
@@ -328,7 +330,7 @@ contract ProperQFTest is Test {
         console.log("Gas used for processing single vote with warm totals but cold project:", gasUsed);
 
         // Optional: Add assertions to ensure the vote was processed correctly
-        (uint256 sumC, uint256 sumSR,,) = qf.getTally(projectId);
+        (uint256 sumC, uint256 sumSR, , ) = qf.getTally(projectId);
         assertEq(sumC, contribution, "Contribution not recorded correctly");
         assertEq(sumSR, voteWeight, "Vote weight not recorded correctly");
     }

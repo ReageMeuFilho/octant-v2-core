@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {DistributionMechanism} from "../DistributionMechanism.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { DistributionMechanism } from "../DistributionMechanism.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @title Simple Voting Mechanism with Share Distribution
 /// @notice Implements a basic 1:1 voting mechanism where net votes directly convert to shares
@@ -45,11 +45,13 @@ contract SimpleVotingMechanism is DistributionMechanism {
         return deposit;
     }
 
-    function _processVoteHook(uint256 pid, address, VoteType choice, uint256 weight, uint256 oldPower)
-        internal
-        override
-        returns (uint256)
-    {
+    function _processVoteHook(
+        uint256 pid,
+        address,
+        VoteType choice,
+        uint256 weight,
+        uint256 oldPower
+    ) internal override returns (uint256) {
         BaseAllocationStorage storage s = _getStorage();
         if (choice == VoteType.For) {
             s.proposalVotes[pid].sharesFor += weight;
@@ -76,22 +78,15 @@ contract SimpleVotingMechanism is DistributionMechanism {
     function _getRecipientAddressHook(uint256 pid) internal view override returns (address) {
         return _getStorage().proposals[pid].recipient;
     }
-    function _convertVotesToShares(uint256 pid) 
-        internal 
-        view 
-        virtual 
-        override 
-        returns (uint256 sharesToMint) 
-    {
+    function _convertVotesToShares(uint256 pid) internal view virtual override returns (uint256 sharesToMint) {
         BaseAllocationStorage storage s = _getStorage();
         ProposalVote storage votes = s.proposalVotes[pid];
-        
+
         // Calculate net votes (For - Against)
-        uint256 netVotes = votes.sharesFor > votes.sharesAgainst ? 
-            votes.sharesFor - votes.sharesAgainst : 0;
-        
+        uint256 netVotes = votes.sharesFor > votes.sharesAgainst ? votes.sharesFor - votes.sharesAgainst : 0;
+
         if (netVotes == 0) return 0;
-        
+
         // For now, return net votes directly as shares
         // In a real implementation, this would use the vault's conversion logic
         return netVotes;

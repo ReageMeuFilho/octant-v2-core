@@ -36,16 +36,16 @@ pragma solidity >=0.8.18;
  * 4$$$$$$$$$$$$$$$$$$$$$$$$$%zt-+>iiiiiiiiiiiiiiiiiiiiiiiiiiiii+_tc%$$$$$$$$$$$$$$$$$$$$$$$$
  * $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$W#u/|{+~>iiiiiiiiiiii><+{|/n#W$$$$$$$$$$$$$$$$$$$$$$$$$$$$
  */
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 
-import {IBaseStrategy} from "../core/interfaces/IBaseStrategy.sol";
-import {BaseAllocationMechanism} from "./BaseAllocationMechanism.sol";
+import { IBaseStrategy } from "../core/interfaces/IBaseStrategy.sol";
+import { BaseAllocationMechanism } from "./BaseAllocationMechanism.sol";
 
 /**
  * @title Distribution Mechanism with Integrated Voting
@@ -53,7 +53,7 @@ import {BaseAllocationMechanism} from "./BaseAllocationMechanism.sol";
  * @notice
  *  This contract combines the ERC4626 tokenized vault functionality with the
  *  allocation voting mechanism to create a complete distribution system.
- *  
+ *
  *  It inherits from BaseAllocationMechanism to get voting functionality and
  *  implements a tokenized strategy vault that can mint shares based on vote outcomes.
  *
@@ -124,7 +124,11 @@ abstract contract DistributionMechanism is BaseAllocationMechanism {
      * and transferred those `assets` to `receiver`.
      */
     event Withdraw(
-        address indexed caller, address indexed receiver, address indexed owner, uint256 assets, uint256 shares
+        address indexed caller,
+        address indexed receiver,
+        address indexed owner,
+        uint256 assets,
+        uint256 shares
     );
 
     /*//////////////////////////////////////////////////////////////
@@ -197,16 +201,18 @@ abstract contract DistributionMechanism is BaseAllocationMechanism {
         uint256 _quorumShares,
         uint256 _timelockDelay,
         uint256 _startBlock
-    ) BaseAllocationMechanism(
-        _asset,
-        _name,
-        _symbol,
-        _votingDelay,
-        _votingPeriod,
-        _quorumShares,
-        _timelockDelay,
-        _startBlock
-    ) {
+    )
+        BaseAllocationMechanism(
+            _asset,
+            _name,
+            _symbol,
+            _votingDelay,
+            _votingPeriod,
+            _quorumShares,
+            _timelockDelay,
+            _startBlock
+        )
+    {
         // Initialize strategy storage to prevent future initialization
         _strategyStorage().asset = ERC20(address(1));
     }
@@ -448,11 +454,12 @@ abstract contract DistributionMechanism is BaseAllocationMechanism {
      * @param maxLoss The amount of acceptable loss in Basis points.
      * @return . The actual amount of underlying withdrawn.
      */
-    function redeem(uint256 shares, address receiver, address owner, uint256 maxLoss)
-        public
-        nonReentrant
-        returns (uint256)
-    {
+    function redeem(
+        uint256 shares,
+        address receiver,
+        address owner,
+        uint256 maxLoss
+    ) public nonReentrant returns (uint256) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
         require(shares <= _maxRedeem(S, owner), "ERC4626: redeem more than max");
@@ -549,7 +556,7 @@ abstract contract DistributionMechanism is BaseAllocationMechanism {
      * @dev Accepts a `maxLoss` variable in order to match the multi
      * strategy vaults ABI.
      */
-    function maxRedeem(address owner, uint256 /*maxLoss*/ ) external view returns (uint256) {
+    function maxRedeem(address owner, uint256 /*maxLoss*/) external view returns (uint256) {
         return _maxRedeem(_strategyStorage(), owner);
     }
 
@@ -568,11 +575,11 @@ abstract contract DistributionMechanism is BaseAllocationMechanism {
     }
 
     /// @dev Internal implementation of {convertToShares}.
-    function _convertToShares(StrategyData storage S, uint256 assets, Math.Rounding _rounding)
-        internal
-        view
-        returns (uint256)
-    {
+    function _convertToShares(
+        StrategyData storage S,
+        uint256 assets,
+        Math.Rounding _rounding
+    ) internal view returns (uint256) {
         // Saves an extra SLOAD if values are non-zero.
         uint256 totalSupply_ = _totalSupply(S);
         // If supply is 0, PPS = 1.
@@ -586,11 +593,11 @@ abstract contract DistributionMechanism is BaseAllocationMechanism {
     }
 
     /// @dev Internal implementation of {convertToAssets}.
-    function _convertToAssets(StrategyData storage S, uint256 shares, Math.Rounding _rounding)
-        internal
-        view
-        returns (uint256)
-    {
+    function _convertToAssets(
+        StrategyData storage S,
+        uint256 shares,
+        Math.Rounding _rounding
+    ) internal view returns (uint256) {
         // Saves an extra SLOAD if totalSupply() is non-zero.
         uint256 supply = _totalSupply(S);
 
@@ -1179,9 +1186,15 @@ abstract contract DistributionMechanism is BaseAllocationMechanism {
      * https://eips.ethereum.org/EIPS/eip-2612#specification[relevant EIP
      * section].
      */
-    function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s)
-        external
-    {
+    function permit(
+        address owner,
+        address spender,
+        uint256 value,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external {
         require(deadline >= block.timestamp, "ERC20: PERMIT_DEADLINE_EXPIRED");
 
         // Unchecked because the only math done is incrementing
@@ -1224,15 +1237,16 @@ abstract contract DistributionMechanism is BaseAllocationMechanism {
      * @return . The domain separator that will be used for any {permit} calls.
      */
     function DOMAIN_SEPARATOR() public view returns (bytes32) {
-        return keccak256(
-            abi.encode(
-                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                keccak256("Yearn Vault"),
-                keccak256(bytes(API_VERSION)),
-                block.chainid,
-                address(this)
-            )
-        );
+        return
+            keccak256(
+                abi.encode(
+                    keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                    keccak256("Yearn Vault"),
+                    keccak256(bytes(API_VERSION)),
+                    block.chainid,
+                    address(this)
+                )
+            );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -1243,20 +1257,18 @@ abstract contract DistributionMechanism is BaseAllocationMechanism {
     function _beforeFinalizeVoteTallyHook() internal virtual override returns (bool) {
         // Set total assets to current balance when finalizing
         StrategyData storage S = _strategyStorage();
-        uint256 asset  = asset.balanceOf(address(this));
+        uint256 asset = asset.balanceOf(address(this));
         S.totalAssets = asset;
-        return asset>0;
+        return asset > 0;
     }
 
     /// @dev Hook to actually mint shares when a proposal is queued
-    function _requestDistributionHook(address recipient, uint256 sharesToMint) 
-        internal 
-        virtual 
-        override 
-        returns (bool) 
-    {
+    function _requestDistributionHook(
+        address recipient,
+        uint256 sharesToMint
+    ) internal virtual override returns (bool) {
         if (sharesToMint == 0 || recipient == address(0)) return false;
-        
+
         // Perform the actual share minting
         StrategyData storage S = _strategyStorage();
         _mint(S, recipient, sharesToMint);
@@ -1264,22 +1276,15 @@ abstract contract DistributionMechanism is BaseAllocationMechanism {
     }
 
     /// @dev Convert vote tallies to shares based on vault conversion logic
-    function _convertVotesToShares(uint256 pid) 
-        internal 
-        view 
-        virtual 
-        override 
-        returns (uint256 sharesToMint) 
-    {
+    function _convertVotesToShares(uint256 pid) internal view virtual override returns (uint256 sharesToMint) {
         BaseAllocationStorage storage s = _getStorage();
         ProposalVote storage votes = s.proposalVotes[pid];
-        
+
         // Calculate net votes (For - Against)
-        uint256 netVotes = votes.sharesFor > votes.sharesAgainst ? 
-            votes.sharesFor - votes.sharesAgainst : 0;
-        
+        uint256 netVotes = votes.sharesFor > votes.sharesAgainst ? votes.sharesFor - votes.sharesAgainst : 0;
+
         if (netVotes == 0) return 0;
-        
+
         // For now, return net votes directly as shares
         // In a real implementation, this would use the vault's conversion logic
         return netVotes;

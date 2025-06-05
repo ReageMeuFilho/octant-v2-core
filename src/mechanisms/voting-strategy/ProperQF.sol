@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 abstract contract ProperQF {
     using Math for uint256;
@@ -171,7 +171,9 @@ abstract contract ProperQF {
      * @return quadraticFunding The raw quadratic funding component (S_j^2)
      * @return linearFunding The raw linear funding component (Sum_j)
      */
-    function getTally(uint256 projectId)
+    function getTally(
+        uint256 projectId
+    )
         public
         view
         returns (uint256 sumContributions, uint256 sumSquareRoots, uint256 quadraticFunding, uint256 linearFunding)
@@ -201,7 +203,7 @@ abstract contract ProperQF {
         if (newNumerator > newDenominator) revert AlphaMustBeLessOrEqualToOne();
 
         ProperQFStorage storage s = _getProperQFStorage();
-        
+
         // Store old values for event emission
         uint256 oldNumerator = s.alphaNumerator;
         uint256 oldDenominator = s.alphaDenominator;
