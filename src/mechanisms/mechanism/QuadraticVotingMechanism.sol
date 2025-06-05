@@ -164,7 +164,7 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
     /// @notice Get recipient address for proposal
     function _getRecipientAddressHook(uint256 pid) internal view override returns (address) {
         address recipient = _getStorage().proposals[pid].recipient;
-        if (recipient == address(0)) revert InvalidRecipientAddress();
+        if (recipient == address(0)) revert InvalidRecipientAddress(recipient);
         return recipient;
     }
 
@@ -194,7 +194,7 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
         view
         returns (uint256 sumContributions, uint256 sumSquareRoots, uint256 quadraticFunding, uint256 linearFunding)
     {
-        if (!_validateProposalHook(pid)) revert InvalidProposal();
+        if (!_validateProposalHook(pid)) revert InvalidProposal(pid);
         return getTally(pid);
     }
 }

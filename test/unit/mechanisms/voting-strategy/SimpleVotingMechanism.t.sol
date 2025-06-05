@@ -92,7 +92,7 @@ contract SimpleVotingMechanismTest is Test {
         vm.roll(block.number + votingDelay + votingPeriod + 1);
 
         vm.prank(user1);
-        vm.expectRevert(BaseAllocationMechanism.VotingEnded.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.VotingEnded.selector, block.number, 1 + votingDelay + votingPeriod));
         voting.signup(100);
     }
 
@@ -101,7 +101,7 @@ contract SimpleVotingMechanismTest is Test {
         token.approve(address(voting), 100);
         voting.signup(100);
 
-        vm.expectRevert(BaseAllocationMechanism.AlreadyRegistered.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.AlreadyRegistered.selector, user1));
         voting.signup(100);
         vm.stopPrank();
     }
@@ -124,7 +124,7 @@ contract SimpleVotingMechanismTest is Test {
 
     function testProposalCreationByUnregisteredUser() public {
         vm.prank(user1);
-        vm.expectRevert(BaseAllocationMechanism.ProposeNotAllowed.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.ProposeNotAllowed.selector, user1));
         voting.propose(recipient1, "Test proposal");
     }
 
@@ -140,7 +140,7 @@ contract SimpleVotingMechanismTest is Test {
         token.approve(address(voting), 100);
         voting.signup(100);
 
-        vm.expectRevert(BaseAllocationMechanism.RecipientUsed.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.RecipientUsed.selector, recipient1));
         voting.propose(recipient1, "Test proposal");
         vm.stopPrank();
     }
@@ -187,7 +187,7 @@ contract SimpleVotingMechanismTest is Test {
         voting.signup(100);
         uint256 pid = voting.propose(recipient1, "Test proposal");
 
-        vm.expectRevert(BaseAllocationMechanism.VotingClosed.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.VotingClosed.selector, 1, 11, 111));
         voting.castVote(pid, BaseAllocationMechanism.VoteType.For, 50);
         vm.stopPrank();
     }
@@ -204,7 +204,7 @@ contract SimpleVotingMechanismTest is Test {
         vm.roll(block.number + votingDelay + votingPeriod + 1);
 
         vm.prank(user1);
-        vm.expectRevert(BaseAllocationMechanism.VotingClosed.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.VotingClosed.selector, 112, 11, 111));
         voting.castVote(pid, BaseAllocationMechanism.VoteType.For, 50);
     }
 
@@ -222,7 +222,7 @@ contract SimpleVotingMechanismTest is Test {
         vm.startPrank(user1);
         voting.castVote(pid, BaseAllocationMechanism.VoteType.For, 50);
 
-        vm.expectRevert(BaseAllocationMechanism.AlreadyVoted.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.AlreadyVoted.selector, user1, pid));
         voting.castVote(pid, BaseAllocationMechanism.VoteType.For, 50);
         vm.stopPrank();
     }
@@ -254,7 +254,7 @@ contract SimpleVotingMechanismTest is Test {
         vm.stopPrank();
 
         vm.prank(admin);
-        vm.expectRevert(BaseAllocationMechanism.VotingNotEnded.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.VotingNotEnded.selector, 1, 111));
         voting.finalizeVoteTally();
     }
 
@@ -332,7 +332,7 @@ contract SimpleVotingMechanismTest is Test {
 
         // Try to queue
         vm.prank(admin);
-        vm.expectRevert(BaseAllocationMechanism.NoQuorum.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.NoQuorum.selector, pid, 0, 150, quorumShares));
         voting.queueProposal(pid);
     }
 
@@ -400,7 +400,7 @@ contract SimpleVotingMechanismTest is Test {
 
         // Try to queue proposal - should fail with 0 net votes
         vm.prank(admin);
-        vm.expectRevert(BaseAllocationMechanism.NoQuorum.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.NoQuorum.selector, pid, 100, 100, quorumShares));
         voting.queueProposal(pid);
     }
 
@@ -451,7 +451,7 @@ contract SimpleVotingMechanismTest is Test {
         voting.queueProposal(pid);
 
         // Try to queue again
-        vm.expectRevert(BaseAllocationMechanism.AlreadyQueued.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.AlreadyQueued.selector, pid));
         voting.queueProposal(pid);
         vm.stopPrank();
     }
@@ -463,7 +463,7 @@ contract SimpleVotingMechanismTest is Test {
         voting.signup(100);
 
         // Try to propose with zero address
-        vm.expectRevert(BaseAllocationMechanism.InvalidRecipient.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.InvalidRecipient.selector, address(0)));
         voting.propose(address(0), "Test proposal");
         vm.stopPrank();
     }
@@ -601,12 +601,12 @@ contract SimpleVotingMechanismTest is Test {
 
         // Try to vote with zero weight
         vm.prank(user1);
-        vm.expectRevert(BaseAllocationMechanism.InvalidWeight.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.InvalidWeight.selector, 0, 100));
         voting.castVote(pid, BaseAllocationMechanism.VoteType.For, 0);
 
         // Try to vote with weight > voting power
         vm.prank(user1);
-        vm.expectRevert(BaseAllocationMechanism.InvalidWeight.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.InvalidWeight.selector, 101, 100));
         voting.castVote(pid, BaseAllocationMechanism.VoteType.For, 101);
     }
 
@@ -620,7 +620,7 @@ contract SimpleVotingMechanismTest is Test {
 
         // Try to vote on non-existent proposal
         vm.prank(user1);
-        vm.expectRevert(BaseAllocationMechanism.InvalidProposal.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.InvalidProposal.selector, 999));
         voting.castVote(999, BaseAllocationMechanism.VoteType.For, 50);
     }
 
@@ -632,7 +632,7 @@ contract SimpleVotingMechanismTest is Test {
 
         // Try to queue non-existent proposal
         vm.prank(admin);
-        vm.expectRevert(BaseAllocationMechanism.InvalidProposal.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.InvalidProposal.selector, 999));
         voting.queueProposal(999);
     }
 
@@ -753,7 +753,7 @@ contract SimpleVotingMechanismTest is Test {
 
         // Try to queue canceled proposal
         vm.prank(admin);
-        vm.expectRevert(BaseAllocationMechanism.ProposalCanceledError.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.ProposalCanceledError.selector, pid));
         voting.queueProposal(pid);
     }
 
@@ -779,7 +779,7 @@ contract SimpleVotingMechanismTest is Test {
 
         // Try to cancel after queuing
         vm.prank(user1);
-        vm.expectRevert(BaseAllocationMechanism.AlreadyQueued.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.AlreadyQueued.selector, pid));
         voting.cancelProposal(pid);
     }
 
@@ -793,7 +793,7 @@ contract SimpleVotingMechanismTest is Test {
 
         // Try to cancel from non-proposer
         vm.prank(user2);
-        vm.expectRevert(BaseAllocationMechanism.NotProposer.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.NotProposer.selector, user2, user1));
         voting.cancelProposal(pid);
     }
 
@@ -874,14 +874,14 @@ contract SimpleVotingMechanismTest is Test {
     function testProposeWhenNotRegistered() public {
         // Testing the _beforeProposeHook fails when user has no voting power
         vm.prank(user1);
-        vm.expectRevert(BaseAllocationMechanism.ProposeNotAllowed.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.ProposeNotAllowed.selector, user1));
         voting.propose(recipient1, "Test proposal");
     }
 
     // Tests for finalizeVoteTally() function reverts
     function testFinalizeVoteTallyBeforeVotingEnds() public {
         vm.prank(admin);
-        vm.expectRevert(BaseAllocationMechanism.VotingNotEnded.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.VotingNotEnded.selector, 1, 111));
         voting.finalizeVoteTally();
     }
 
@@ -929,7 +929,7 @@ contract SimpleVotingMechanismTest is Test {
 
         // Try to queue canceled proposal
         vm.prank(admin);
-        vm.expectRevert(BaseAllocationMechanism.ProposalCanceledError.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.ProposalCanceledError.selector, pid));
         voting.queueProposal(pid);
     }
 
@@ -948,7 +948,7 @@ contract SimpleVotingMechanismTest is Test {
 
         // Try to queue with 0 net votes
         vm.prank(admin);
-        vm.expectRevert(BaseAllocationMechanism.NoQuorum.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.NoQuorum.selector, pid, 0, 0, quorumShares));
         voting.queueProposal(pid);
     }
 
@@ -982,7 +982,7 @@ contract SimpleVotingMechanismTest is Test {
 
         // Try to queue with equal votes
         vm.prank(admin);
-        vm.expectRevert(BaseAllocationMechanism.NoQuorum.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.NoQuorum.selector, pid, 100, 100, quorumShares));
         voting.queueProposal(pid);
     }
 
@@ -999,7 +999,7 @@ contract SimpleVotingMechanismTest is Test {
 
         // Try to vote on non-existent proposal
         vm.prank(user1);
-        vm.expectRevert(BaseAllocationMechanism.InvalidProposal.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.InvalidProposal.selector, 999));
         voting.castVote(999, BaseAllocationMechanism.VoteType.For, 50);
     }
 
@@ -1011,7 +1011,7 @@ contract SimpleVotingMechanismTest is Test {
         uint256 pid = voting.propose(recipient1, "Test proposal");
 
         // Try to vote immediately (before voting period)
-        vm.expectRevert(BaseAllocationMechanism.VotingClosed.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.VotingClosed.selector, 1, 11, 111));
         voting.castVote(pid, BaseAllocationMechanism.VoteType.For, 50);
         vm.stopPrank();
     }
@@ -1029,7 +1029,7 @@ contract SimpleVotingMechanismTest is Test {
 
         // Try to vote with zero weight
         vm.prank(user1);
-        vm.expectRevert(BaseAllocationMechanism.InvalidWeight.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.InvalidWeight.selector, 0, 100));
         voting.castVote(pid, BaseAllocationMechanism.VoteType.For, 0);
     }
 
@@ -1046,7 +1046,7 @@ contract SimpleVotingMechanismTest is Test {
 
         // Try to vote with more than voting power
         vm.prank(user1);
-        vm.expectRevert(BaseAllocationMechanism.InvalidWeight.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.InvalidWeight.selector, 101, 100));
         voting.castVote(pid, BaseAllocationMechanism.VoteType.For, 101);
     }
 
@@ -1061,7 +1061,7 @@ contract SimpleVotingMechanismTest is Test {
 
     // Tests for state() function reverts
     function testStateForInvalidProposal() public {
-        vm.expectRevert(BaseAllocationMechanism.InvalidProposal.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.InvalidProposal.selector, 999));
         voting.state(999);
     }
 
@@ -1076,7 +1076,7 @@ contract SimpleVotingMechanismTest is Test {
 
         // Try to cancel from different address
         vm.prank(user2);
-        vm.expectRevert(BaseAllocationMechanism.NotProposer.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.NotProposer.selector, user2, user1));
         voting.cancelProposal(pid);
     }
 
@@ -1091,7 +1091,7 @@ contract SimpleVotingMechanismTest is Test {
         voting.cancelProposal(pid);
 
         // Try to cancel again
-        vm.expectRevert(BaseAllocationMechanism.AlreadyCanceled.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.AlreadyCanceled.selector, pid));
         voting.cancelProposal(pid);
         vm.stopPrank();
     }

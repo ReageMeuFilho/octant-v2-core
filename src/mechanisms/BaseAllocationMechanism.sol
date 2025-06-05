@@ -22,34 +22,34 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
     error ZeroStartBlock();
     error EmptyName();
     error EmptySymbol();
-    error RegistrationBlocked();
-    error VotingEnded();
-    error AlreadyRegistered();
-    error DepositTooLarge();
-    error VotingPowerTooLarge();
-    error ProposeNotAllowed();
-    error InvalidRecipient();
-    error RecipientUsed();
+    error RegistrationBlocked(address user);
+    error VotingEnded(uint256 currentBlock, uint256 endBlock);
+    error AlreadyRegistered(address user);
+    error DepositTooLarge(uint256 deposit, uint256 maxAllowed);
+    error VotingPowerTooLarge(uint256 votingPower, uint256 maxAllowed);
+    error ProposeNotAllowed(address proposer);
+    error InvalidRecipient(address recipient);
+    error RecipientUsed(address recipient);
     error EmptyDescription();
-    error DescriptionTooLong();
-    error MaxProposalsReached();
-    error VotingNotEnded();
+    error DescriptionTooLong(uint256 length, uint256 maxLength);
+    error MaxProposalsReached(uint256 current, uint256 max);
+    error VotingNotEnded(uint256 currentBlock, uint256 endBlock);
     error TallyAlreadyFinalized();
     error FinalizationBlocked();
     error TallyNotFinalized();
-    error InvalidProposal();
-    error ProposalCanceledError();
-    error NoQuorum();
-    error AlreadyQueued();
-    error NoAllocation();
-    error VotingClosed();
-    error AlreadyVoted();
-    error InvalidWeight();
-    error WeightTooLarge();
-    error PowerIncreased();
-    error NotProposer();
-    error AlreadyCanceled();
-    error InvalidRecipientAddress();
+    error InvalidProposal(uint256 pid);
+    error ProposalCanceledError(uint256 pid);
+    error NoQuorum(uint256 pid, uint256 forVotes, uint256 againstVotes, uint256 required);
+    error AlreadyQueued(uint256 pid);
+    error NoAllocation(uint256 pid, uint256 sharesToMint);
+    error VotingClosed(uint256 currentBlock, uint256 startBlock, uint256 endBlock);
+    error AlreadyVoted(address voter, uint256 pid);
+    error InvalidWeight(uint256 weight, uint256 votingPower);
+    error WeightTooLarge(uint256 weight, uint256 maxAllowed);
+    error PowerIncreased(uint256 oldPower, uint256 newPower);
+    error NotProposer(address caller, address proposer);
+    error AlreadyCanceled(uint256 pid);
+    error InvalidRecipientAddress(address recipient);
     using SafeERC20 for IERC20;
     using Math for uint256;
 
@@ -314,14 +314,14 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
     /// @param deposit Amount of underlying to deposit (may be zero).
     function signup(uint256 deposit) external nonReentrant whenNotPaused {
         address user = msg.sender;
-        if (!_beforeSignupHook(user)) revert RegistrationBlocked();
-        if (block.number >= startBlock + votingDelay + votingPeriod) revert VotingEnded();
+        if (!_beforeSignupHook(user)) revert RegistrationBlocked(user);
+        if (block.number >= startBlock + votingDelay + votingPeriod) revert VotingEnded(block.number, startBlock + votingDelay + votingPeriod);
         BaseAllocationStorage storage s = _getStorage();
-        if (s.votingPower[user] != 0) revert AlreadyRegistered();
-        if (deposit > MAX_SAFE_VALUE) revert DepositTooLarge();
+        if (s.votingPower[user] != 0) revert AlreadyRegistered(user);
+        if (deposit > MAX_SAFE_VALUE) revert DepositTooLarge(deposit, MAX_SAFE_VALUE);
         if (deposit > 0) asset.safeTransferFrom(user, address(this), deposit);
         uint256 newPower = _getVotingPowerHook(user, deposit);
-        if (newPower > MAX_SAFE_VALUE) revert VotingPowerTooLarge();
+        if (newPower > MAX_SAFE_VALUE) revert VotingPowerTooLarge(newPower, MAX_SAFE_VALUE);
         s.votingPower[user] = newPower;
         emit UserRegistered(user, newPower);
     }
@@ -334,12 +334,12 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
     /// @return pid Unique identifier for the new proposal.
     function propose(address recipient, string calldata description) external whenNotPaused returns (uint256 pid) {
         address proposer = msg.sender;
-        if (!_beforeProposeHook(proposer)) revert ProposeNotAllowed();
-        if (recipient == address(0)) revert InvalidRecipient();
+        if (!_beforeProposeHook(proposer)) revert ProposeNotAllowed(proposer);
+        if (recipient == address(0)) revert InvalidRecipient(recipient);
         BaseAllocationStorage storage s = _getStorage();
-        if (s.recipientUsed[recipient]) revert RecipientUsed();
+        if (s.recipientUsed[recipient]) revert RecipientUsed(recipient);
         if (bytes(description).length == 0) revert EmptyDescription();
-        if (bytes(description).length > 1000) revert DescriptionTooLong();
+        if (bytes(description).length > 1000) revert DescriptionTooLong(bytes(description).length, 1000);
 
         s.proposalIdCounter++;
         pid = s.proposalIdCounter;
@@ -355,7 +355,7 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
     /// @notice Finalize vote tally once voting period (from first proposal) has ended.
     /// @dev **SECURITY CRITICAL**: ensure this can only be called once and only after voting ends.
     function finalizeVoteTally() external onlyOwner {
-        if (block.number < startBlock + votingDelay + votingPeriod) revert VotingNotEnded();
+        if (block.number < startBlock + votingDelay + votingPeriod) revert VotingNotEnded(block.number, startBlock + votingDelay + votingPeriod);
         BaseAllocationStorage storage s = _getStorage();
         if (s.tallyFinalized) revert TallyAlreadyFinalized();
         if (!_beforeFinalizeVoteTallyHook()) revert FinalizationBlocked();
@@ -371,14 +371,14 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
     function queueProposal(uint256 pid) external onlyOwner {
         BaseAllocationStorage storage s = _getStorage();
         if (!s.tallyFinalized) revert TallyNotFinalized();
-        if (!_validateProposalHook(pid)) revert InvalidProposal();
+        if (!_validateProposalHook(pid)) revert InvalidProposal(pid);
         Proposal storage p = s.proposals[pid];
-        if (p.canceled) revert ProposalCanceledError();
-        if (!_hasQuorumHook(pid)) revert NoQuorum();
-        if (p.earliestRedeemableTime != 0) revert AlreadyQueued();
+        if (p.canceled) revert ProposalCanceledError(pid);
+        if (!_hasQuorumHook(pid)) revert NoQuorum(pid, s.proposalVotes[pid].sharesFor, s.proposalVotes[pid].sharesAgainst, quorumShares);
+        if (p.earliestRedeemableTime != 0) revert AlreadyQueued(pid);
 
         uint256 sharesToMint = _convertVotesToShares(pid);
-        if (sharesToMint == 0) revert NoAllocation();
+        if (sharesToMint == 0) revert NoAllocation(pid, sharesToMint);
         s.proposalShares[pid] = sharesToMint;
 
         _requestDistributionHook(_getRecipientAddressHook(pid), sharesToMint);
@@ -396,18 +396,18 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
     /// @param choice VoteType (Against, For, Abstain)
     /// @param weight Amount of voting power to apply
     function castVote(uint256 pid, VoteType choice, uint256 weight) external nonReentrant whenNotPaused {
-        if (!_validateProposalHook(pid)) revert InvalidProposal();
+        if (!_validateProposalHook(pid)) revert InvalidProposal(pid);
         if (block.number < startBlock + votingDelay || block.number > startBlock + votingDelay + votingPeriod)
-            revert VotingClosed();
+            revert VotingClosed(block.number, startBlock + votingDelay, startBlock + votingDelay + votingPeriod);
         BaseAllocationStorage storage s = _getStorage();
-        if (s.hasVoted[pid][msg.sender]) revert AlreadyVoted();
+        if (s.hasVoted[pid][msg.sender]) revert AlreadyVoted(msg.sender, pid);
 
         uint256 oldPower = s.votingPower[msg.sender];
-        if (weight == 0 || weight > oldPower) revert InvalidWeight();
-        if (weight > MAX_SAFE_VALUE) revert WeightTooLarge();
+        if (weight == 0 || weight > oldPower) revert InvalidWeight(weight, oldPower);
+        if (weight > MAX_SAFE_VALUE) revert WeightTooLarge(weight, MAX_SAFE_VALUE);
 
         uint256 newPower = _processVoteHook(pid, msg.sender, choice, weight, oldPower);
-        if (newPower > oldPower) revert PowerIncreased();
+        if (newPower > oldPower) revert PowerIncreased(oldPower, newPower);
 
         s.votingPower[msg.sender] = newPower;
         s.hasVoted[pid][msg.sender] = true;
@@ -441,7 +441,7 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
     /// @param pid Proposal ID
     /// @return Current state of the proposal
     function state(uint256 pid) external view returns (ProposalState) {
-        if (!_validateProposalHook(pid)) revert InvalidProposal();
+        if (!_validateProposalHook(pid)) revert InvalidProposal(pid);
         return _state(pid);
     }
 
@@ -449,11 +449,11 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
     /// @param pid Proposal ID to cancel
     function cancelProposal(uint256 pid) external {
         BaseAllocationStorage storage s = _getStorage();
-        if (!_validateProposalHook(pid)) revert InvalidProposal();
+        if (!_validateProposalHook(pid)) revert InvalidProposal(pid);
         Proposal storage p = s.proposals[pid];
-        if (msg.sender != p.proposer) revert NotProposer();
-        if (p.canceled) revert AlreadyCanceled();
-        if (p.earliestRedeemableTime != 0) revert AlreadyQueued();
+        if (msg.sender != p.proposer) revert NotProposer(msg.sender, p.proposer);
+        if (p.canceled) revert AlreadyCanceled(pid);
+        if (p.earliestRedeemableTime != 0) revert AlreadyQueued(pid);
 
         p.canceled = true;
         emit ProposalCanceled(pid, p.proposer);
@@ -468,7 +468,7 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
         uint256 pid
     ) external view returns (uint256 sharesFor, uint256 sharesAgainst, uint256 sharesAbstain) {
         BaseAllocationStorage storage s = _getStorage();
-        if (!_validateProposalHook(pid)) revert InvalidProposal();
+        if (!_validateProposalHook(pid)) revert InvalidProposal(pid);
         ProposalVote storage votes = s.proposalVotes[pid];
         return (votes.sharesFor, votes.sharesAgainst, votes.sharesAbstain);
     }

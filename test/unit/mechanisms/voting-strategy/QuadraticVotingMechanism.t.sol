@@ -218,16 +218,16 @@ contract QuadraticVotingMechanismTest is Test {
         mechanism.signup(1000e18);
 
         vm.prank(user1);
-        vm.expectRevert(BaseAllocationMechanism.AlreadyRegistered.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.AlreadyRegistered.selector, user1));
         mechanism.signup(500e18);
     }
 
     function testRegistrationAfterVotingPeriod() public {
-        // Move to after voting period
-        vm.roll(START_BLOCK + VOTING_DELAY + VOTING_PERIOD + 1);
+        // Move past voting period
+        vm.roll(block.number + VOTING_DELAY + VOTING_PERIOD + 1);
 
         vm.prank(user1);
-        vm.expectRevert(BaseAllocationMechanism.VotingEnded.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.VotingEnded.selector, block.number, 1 + VOTING_DELAY + VOTING_PERIOD));
         mechanism.signup(1000e18);
     }
 
@@ -253,7 +253,7 @@ contract QuadraticVotingMechanismTest is Test {
 
     function testProposalCreationByUnregisteredUser() public {
         vm.prank(user1);
-        vm.expectRevert(BaseAllocationMechanism.ProposeNotAllowed.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.ProposeNotAllowed.selector, user1));
         mechanism.propose(recipient1, "Test proposal");
     }
 
@@ -262,7 +262,7 @@ contract QuadraticVotingMechanismTest is Test {
         mechanism.signup(1000e18);
 
         vm.prank(user1);
-        vm.expectRevert(BaseAllocationMechanism.InvalidRecipient.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.InvalidRecipient.selector, address(0)));
         mechanism.propose(address(0), "Test proposal");
     }
 
@@ -279,7 +279,7 @@ contract QuadraticVotingMechanismTest is Test {
 
         // Second proposal with same recipient should fail
         vm.prank(user2);
-        vm.expectRevert(BaseAllocationMechanism.RecipientUsed.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.RecipientUsed.selector, recipient1));
         mechanism.propose(recipient1, "Second proposal");
     }
 
@@ -399,7 +399,7 @@ contract QuadraticVotingMechanismTest is Test {
 
         // Weight larger than uint128.max should revert with InvalidWeight since it's too large for voting power
         vm.prank(user1);
-        vm.expectRevert(BaseAllocationMechanism.InvalidWeight.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.InvalidWeight.selector, uint256(type(uint128).max) + 1, 1000e18));
         mechanism.castVote(pid, BaseAllocationMechanism.VoteType.For, uint256(type(uint128).max) + 1);
     }
 
@@ -418,7 +418,7 @@ contract QuadraticVotingMechanismTest is Test {
 
         // Second vote should fail
         vm.prank(user1);
-        vm.expectRevert(BaseAllocationMechanism.AlreadyVoted.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.AlreadyVoted.selector, user1, pid));
         mechanism.castVote(pid, BaseAllocationMechanism.VoteType.For, 5);
     }
 
@@ -473,7 +473,7 @@ contract QuadraticVotingMechanismTest is Test {
 
         // Should fail to queue due to insufficient quorum
         vm.prank(owner);
-        vm.expectRevert(BaseAllocationMechanism.NoQuorum.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.NoQuorum.selector, pid, 0, 0, QUORUM_SHARES));
         mechanism.queueProposal(pid);
     }
 
@@ -622,7 +622,7 @@ contract QuadraticVotingMechanismTest is Test {
         uint256 pid = mechanism.propose(recipient1, "Test proposal");
 
         vm.prank(user2);
-        vm.expectRevert(BaseAllocationMechanism.NotProposer.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.NotProposer.selector, user2, user1));
         mechanism.cancelProposal(pid);
     }
 
@@ -687,7 +687,7 @@ contract QuadraticVotingMechanismTest is Test {
     // ===== Error Handling Tests =====
 
     function testGetProposalFundingInvalidProposal() public {
-        vm.expectRevert(BaseAllocationMechanism.InvalidProposal.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.InvalidProposal.selector, 999));
         mechanism.getProposalFunding(999);
     }
 
@@ -698,7 +698,7 @@ contract QuadraticVotingMechanismTest is Test {
         vm.roll(START_BLOCK + VOTING_DELAY + 1);
 
         vm.prank(user1);
-        vm.expectRevert(BaseAllocationMechanism.InvalidProposal.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.InvalidProposal.selector, 999));
         mechanism.castVote(999, BaseAllocationMechanism.VoteType.For, 10);
     }
 
@@ -709,7 +709,7 @@ contract QuadraticVotingMechanismTest is Test {
         mechanism.signup(1000e18);
 
         vm.prank(user1);
-        vm.expectRevert(BaseAllocationMechanism.InvalidRecipient.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.InvalidRecipient.selector, address(0)));
         mechanism.propose(address(0), "Test proposal");
     }
 
@@ -765,7 +765,7 @@ contract QuadraticVotingMechanismTest is Test {
         vm.roll(START_BLOCK + VOTING_DELAY + 1);
 
         vm.prank(user1);
-        vm.expectRevert(BaseAllocationMechanism.InvalidWeight.selector);
+        vm.expectRevert(abi.encodeWithSelector(BaseAllocationMechanism.InvalidWeight.selector, 0, 1000e18));
         mechanism.castVote(pid, BaseAllocationMechanism.VoteType.For, 0);
     }
 }
