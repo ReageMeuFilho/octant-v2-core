@@ -31,8 +31,19 @@ contract MorphoCompounderStrategy is BaseHealthCheck {
         address _management,
         address _keeper,
         address _emergencyAdmin,
-        address _donationAddress
-    ) BaseHealthCheck(_asset, _name, _management, _keeper, _emergencyAdmin, _donationAddress) {
+        address _donationAddress,
+        address _tokenizedStrategyAddress
+    )
+        BaseHealthCheck(
+            _asset,
+            _name,
+            _management,
+            _keeper,
+            _emergencyAdmin,
+            _donationAddress,
+            _tokenizedStrategyAddress
+        )
+    {
         // make sure asset is Morpho's asset
         IERC20(_asset).forceApprove(_compounderVault, type(uint256).max);
         compounderVault = _compounderVault;
