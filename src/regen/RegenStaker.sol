@@ -78,14 +78,7 @@ import { IFundingRound } from "src/regen/interfaces/IFundingRound.sol";
 /// @notice You can tax the rewards with a claim fee. If you don't want rewards to be taxable, set MAX_CLAIM_FEE to 0.
 /// @notice Earning power needs to be updated after deposit amount changes. Some changes are automatically triggering the update.
 /// @notice Earning power is updated via bumpEarningPower externally. This action is incentivized with a tip. Use maxBumpTip to set the maximum tip.
-contract RegenStaker is
-    Staker,
-    StakerDelegateSurrogateVotes,
-    StakerPermitAndStake,
-    StakerOnBehalf,
-    Pausable,
-    ReentrancyGuard
-{
+contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndStake, Pausable, ReentrancyGuard {
     using SafeCast for uint256;
 
     uint256 public constant MIN_REWARD_DURATION = 30 days;
@@ -146,7 +139,6 @@ contract RegenStaker is
         Staker(_rewardsToken, _stakeToken, _earningPowerCalculator, _maxBumpTip, _admin)
         StakerPermitAndStake(_stakeToken)
         StakerDelegateSurrogateVotes(_stakeToken)
-        EIP712("RegenStaker", "1")
     {
         if (address(_stakerWhitelist) == address(0)) {
             stakerWhitelist = new Whitelist();
@@ -265,76 +257,6 @@ contract RegenStaker is
         Deposit storage deposit = deposits[_depositId];
 
         _revertIfNotDepositOwner(deposit, msg.sender);
-        _stakeMore(deposit, _depositId, _amount);
-        _revertIfMinimumStakeAmountNotMet(_depositId);
-    }
-
-    /// @inheritdoc StakerOnBehalf
-    /// @notice Overrides to prevent staking more below the minimum stake amount.
-    /// @notice Overrides to prevent staking more when the contract is paused.
-    /// @notice Overrides to prevent staking more if the staker is not whitelisted.
-    function stakeOnBehalf(
-        uint256 _amount,
-        address _delegatee,
-        address _claimer,
-        address _depositor,
-        uint256 _deadline,
-        bytes memory _signature
-    )
-        external
-        override
-        whenNotPaused
-        nonReentrant
-        onlyWhitelistedIfWhitelistIsSet(stakerWhitelist, _depositor)
-        returns (DepositIdentifier _depositId)
-    {
-        _revertIfPastDeadline(_deadline);
-        _revertIfSignatureIsNotValidNow(
-            _depositor,
-            _hashTypedDataV4(
-                keccak256(
-                    abi.encode(
-                        STAKE_TYPEHASH,
-                        _amount,
-                        _delegatee,
-                        _claimer,
-                        _depositor,
-                        _useNonce(_depositor),
-                        _deadline
-                    )
-                )
-            ),
-            _signature
-        );
-        _depositId = _stake(_depositor, _amount, _delegatee, _claimer);
-        _revertIfMinimumStakeAmountNotMet(_depositId);
-    }
-
-    /// @inheritdoc StakerOnBehalf
-    /// @notice Overrides to prevent staking more below the minimum stake amount.
-    /// @notice Overrides to prevent staking more when the contract is paused.
-    /// @notice Overrides to prevent staking more if the staker is not whitelisted.
-    function stakeMoreOnBehalf(
-        DepositIdentifier _depositId,
-        uint256 _amount,
-        address _depositor,
-        uint256 _deadline,
-        bytes memory _signature
-    ) external override whenNotPaused nonReentrant {
-        Deposit storage deposit = deposits[_depositId];
-        require(stakerWhitelist.isWhitelisted(deposit.owner), NotWhitelisted(stakerWhitelist, deposit.owner));
-        _revertIfNotDepositOwner(deposit, _depositor);
-        _revertIfPastDeadline(_deadline);
-        _revertIfSignatureIsNotValidNow(
-            _depositor,
-            _hashTypedDataV4(
-                keccak256(
-                    abi.encode(STAKE_MORE_TYPEHASH, _depositId, _amount, _depositor, _useNonce(_depositor), _deadline)
-                )
-            ),
-            _signature
-        );
-
         _stakeMore(deposit, _depositId, _amount);
         _revertIfMinimumStakeAmountNotMet(_depositId);
     }
