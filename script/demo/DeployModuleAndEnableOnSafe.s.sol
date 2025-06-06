@@ -5,7 +5,7 @@ import "forge-std/Script.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxy.sol";
 import { BatchScript } from "forge-safe/src/BatchScript.sol";
 
-import { ModuleProxyFactory } from "src/dragons/ModuleProxyFactory.sol";
+import { ModuleProxyFactory } from "src/zodiac-core/ModuleProxyFactory.sol";
 
 contract DeployModuleAndEnableOnSafe is Script, BatchScript {
     address public safe_;

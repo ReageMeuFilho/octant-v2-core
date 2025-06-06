@@ -2,7 +2,7 @@
 pragma solidity >=0.8.18;
 
 import { Setup, IMockStrategy } from "./utils/Setup.sol";
-import { MockYieldSourceSkimming } from "test/mocks/tokenized-strategies/MockYieldSourceSkimming.sol";
+import { MockYieldSourceSkimming } from "test/mocks/core/tokenized-strategies/MockYieldSourceSkimming.sol";
 
 contract AccountingTest is Setup {
     function setUp() public override {

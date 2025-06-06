@@ -2,7 +2,7 @@
 pragma solidity ^0.8.25;
 
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
-import { IStrategy } from "src/interfaces/IStrategy.sol";
+import { IStrategy } from "src/zodiac-core/interfaces/IStrategy.sol";
 import "src/errors.sol";
 
 import { TestERC20 } from "test/kontrol/TestERC20.k.sol";

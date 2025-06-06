@@ -2,13 +2,13 @@
 pragma solidity ^0.8.19;
 
 import { console2 } from "forge-std/Test.sol";
-import { ModuleProxyFactory } from "src/dragons/ModuleProxyFactory.sol";
-import { MockStrategy } from "test/mocks/MockStrategy.sol";
-import { MockYieldSource } from "test/mocks/MockYieldSource.sol";
+import { ModuleProxyFactory } from "src/zodiac-core/ModuleProxyFactory.sol";
+import { MockStrategy } from "test/mocks/zodiac-core/MockStrategy.sol";
+import { MockYieldSource } from "test/mocks/core/MockYieldSource.sol";
 import { DeployModuleProxyFactory } from "./DeployModuleProxyFactory.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
-import { ISafe } from "src/interfaces/Safe.sol";
-import { IMockStrategy } from "test/mocks/IMockStrategy.sol";
+import { ISafe } from "src/zodiac-core/interfaces/Safe.sol";
+import { IMockStrategy } from "test/mocks/zodiac-core/IMockStrategy.sol";
 
 contract DeployMockStrategy is DeployModuleProxyFactory {
     MockStrategy public mockStrategySingleton;

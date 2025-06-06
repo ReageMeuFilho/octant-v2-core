@@ -3,7 +3,7 @@ pragma solidity ^0.8.25;
 
 import "forge-std/Script.sol";
 import { MultistrategyVaultFactory } from "src/factories/MultistrategyVaultFactory.sol";
-import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
+import { IMultistrategyVault } from "src/core/interfaces/IMultistrategyVault.sol";
 
 contract DeployVaults is Script {
     MultistrategyVaultFactory vaultFactory;

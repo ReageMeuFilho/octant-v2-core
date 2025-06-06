@@ -4,7 +4,7 @@ pragma solidity >=0.8.18;
 import { ERC4626Test } from "erc4626-tests/ERC4626.test.sol";
 
 import { Setup } from "./utils/Setup.sol";
-import { MockYieldSourceSkimming } from "test/mocks/tokenized-strategies/MockYieldSourceSkimming.sol";
+import { MockYieldSourceSkimming } from "test/mocks/core/tokenized-strategies/MockYieldSourceSkimming.sol";
 
 // SEE https://github.com/a16z/erc4626-tests
 contract ERC4626StdTestHere is ERC4626Test, Setup {

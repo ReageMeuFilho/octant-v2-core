@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.25;
 
-import { IMultistrategyVaultFactory } from "src/interfaces/IMultistrategyVaultFactory.sol";
-import { IMultistrategyVault } from "src/interfaces/IMultistrategyVault.sol";
+import { IMultistrategyVaultFactory } from "src/factories/interfaces/IMultistrategyVaultFactory.sol";
+import { IMultistrategyVault } from "src/core/interfaces/IMultistrategyVault.sol";
 /**
  * @title Yearn Vault Factory
  * @author yearn.finance

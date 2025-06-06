@@ -3,8 +3,8 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Script.sol";
 
-import { DragonRouter } from "../../src/dragons/DragonRouter.sol";
-import { SplitChecker } from "../../src/dragons/SplitChecker.sol";
+import { DragonRouter } from "../../src/zodiac-core/DragonRouter.sol";
+import { SplitChecker } from "../../src/zodiac-core/SplitChecker.sol";
 import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import { ProxyAdmin } from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 

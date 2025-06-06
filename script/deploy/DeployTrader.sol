@@ -2,16 +2,16 @@ pragma solidity ^0.8.23;
 
 import { Script } from "forge-std/Script.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import { CreateOracleParams, IOracleFactory, IOracle, OracleParams } from "src/vendor/0xSplits/OracleParams.sol";
-import { QuotePair, QuoteParams } from "src/vendor/0xSplits/LibQuotes.sol";
-import { IUniV3OracleImpl } from "src/vendor/0xSplits/IUniV3OracleImpl.sol";
-import { ISwapperImpl } from "src/vendor/0xSplits/SwapperImpl.sol";
-import { ISwapperFactory } from "src/vendor/0xSplits/ISwapperFactory.sol";
-import { UniV3Swap } from "src/vendor/0xSplits/UniV3Swap.sol";
-import { ISwapRouter } from "src/vendor/uniswap/ISwapRouter.sol";
+import { CreateOracleParams, IOracleFactory, IOracle, OracleParams } from "src/utils/vendor/0xSplits/OracleParams.sol";
+import { QuotePair, QuoteParams } from "src/utils/vendor/0xSplits/LibQuotes.sol";
+import { IUniV3OracleImpl } from "src/utils/vendor/0xSplits/IUniV3OracleImpl.sol";
+import { ISwapperImpl } from "src/utils/vendor/0xSplits/SwapperImpl.sol";
+import { ISwapperFactory } from "src/utils/vendor/0xSplits/ISwapperFactory.sol";
+import { UniV3Swap } from "src/utils/vendor/0xSplits/UniV3Swap.sol";
+import { ISwapRouter } from "src/utils/vendor/uniswap/ISwapRouter.sol";
 import { WETH } from "solady/tokens/WETH.sol";
 
-import { Trader } from "src/routers-transformers/Trader.sol";
+import { Trader } from "src/utils/routers-transformers/Trader.sol";
 import { HelperConfig } from "script/helpers/HelperConfig.s.sol";
 
 contract DeployTrader is Script {

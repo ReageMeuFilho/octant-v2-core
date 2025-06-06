@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { ModuleProxyFactory } from "../src/dragons/ModuleProxyFactory.sol";
-import { OctantRewardsSafe } from "../src/dragons/modules/OctantRewardsSafe.sol";
-import { SplitChecker } from "../src/dragons/SplitChecker.sol";
-import { DragonRouter } from "../src/dragons/DragonRouter.sol";
+import { ModuleProxyFactory } from "../src/zodiac-core/ModuleProxyFactory.sol";
+import { OctantRewardsSafe } from "../src/zodiac-core/modules/OctantRewardsSafe.sol";
+import { SplitChecker } from "../src/zodiac-core/SplitChecker.sol";
+import { DragonRouter } from "../src/zodiac-core/DragonRouter.sol";
 import "forge-std/Script.sol";
 
 contract DeployOctantModuleFactory is Script {

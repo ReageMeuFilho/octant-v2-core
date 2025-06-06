@@ -6,10 +6,10 @@ import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxy.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
 import "forge-std/Script.sol";
 
-import { MockStrategy } from "../../test/mocks/MockStrategy2.sol";
-import { DragonTokenizedStrategy } from "src/dragons/vaults/DragonTokenizedStrategy.sol";
+import { MockStrategy } from "../../test/mocks/zodiac-core/MockStrategy2.sol";
+import { DragonTokenizedStrategy } from "src/zodiac-core/vaults/DragonTokenizedStrategy.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
-import { MockYieldSource } from "../../test/mocks/MockYieldSource.sol";
+import { MockYieldSource } from "../../test/mocks/core/MockYieldSource.sol";
 
 contract DeployStrategyModuleWithSafe is Script {
     address[] public owners;

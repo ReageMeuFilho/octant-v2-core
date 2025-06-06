@@ -1,0 +1,81 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import { BaseHealthCheck } from "src/strategies/periphery/BaseHealthCheck.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
+import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+/// @title MorphoCompounderStrategy
+/// @author Octant
+/// @notice Yearn v3 Strategy that donates rewards.
+contract MorphoCompounderStrategy is BaseHealthCheck {
+    using SafeERC20 for IERC20;
+
+    ///@notice yearn governance
+    address public constant GOV = 0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52;
+
+    // morpho vault
+    address public immutable compounderVault;
+
+    modifier onlyGovernance() {
+        require(msg.sender == GOV, "!gov");
+        _;
+    }
+
+    constructor(
+        address _compounderVault,
+        address _asset,
+        string memory _name,
+        address _management,
+        address _keeper,
+        address _emergencyAdmin,
+        address _donationAddress
+    ) BaseHealthCheck(_asset, _name, _management, _keeper, _emergencyAdmin, _donationAddress) {
+        // make sure asset is Morpho's asset
+        IERC20(_asset).forceApprove(_compounderVault, type(uint256).max);
+        compounderVault = _compounderVault;
+    }
+
+    /// @notice Sweep of non-asset ERC20 tokens to governance (onlyGovernance)
+    /// @param _token The ERC20 token to sweep
+    function sweep(address _token) external onlyGovernance {
+        require(_token != address(asset), "!asset");
+        IERC20(_token).safeTransfer(GOV, IERC20(_token).balanceOf(address(this)));
+    }
+
+    function availableDepositLimit(address /*_owner*/) public view override returns (uint256) {
+        return IERC4626(compounderVault).maxDeposit(address(this));
+    }
+
+    function availableWithdrawLimit(address /*_owner*/) public view override returns (uint256) {
+        return IERC20(asset).balanceOf(address(this)) + IERC4626(compounderVault).maxWithdraw(address(this));
+    }
+
+    function _deployFunds(uint256 _amount) internal override {
+        IERC4626(compounderVault).deposit(_amount, address(this));
+    }
+
+    function _freeFunds(uint256 _amount) internal override {
+        IERC4626(compounderVault).withdraw(_amount, address(this), address(this));
+    }
+
+    function _emergencyWithdraw(uint256 _amount) internal override {
+        _amount = _min(_amount, IERC4626(compounderVault).balanceOf(address(this)));
+        _amount = _min(_amount, IERC4626(compounderVault).maxWithdraw(address(this)));
+        _freeFunds(_amount);
+    }
+
+    function _harvestAndReport() internal view override returns (uint256 _totalAssets) {
+        // get strategy's balance
+        uint256 shares = IERC4626(compounderVault).balanceOf(address(this));
+        _totalAssets = IERC4626(compounderVault).convertToAssets(shares);
+
+        return _totalAssets;
+    }
+
+    function _min(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a < b ? a : b;
+    }
+}

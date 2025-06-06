@@ -6,7 +6,7 @@ import { console2 } from "forge-std/console2.sol";
 import { ProxyAdmin } from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import { TransparentUpgradeableProxy } from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import { SplitChecker } from "src/dragons/SplitChecker.sol";
+import { SplitChecker } from "src/zodiac-core/SplitChecker.sol";
 
 /**
  * @title DeploySplitChecker

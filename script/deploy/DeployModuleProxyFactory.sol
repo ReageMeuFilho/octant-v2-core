@@ -2,9 +2,9 @@
 pragma solidity ^0.8.25;
 
 import "forge-std/Script.sol";
-import { ModuleProxyFactory } from "src/dragons/ModuleProxyFactory.sol";
-import { SplitChecker } from "src/dragons/SplitChecker.sol";
-import { DragonRouter } from "src/dragons/DragonRouter.sol";
+import { ModuleProxyFactory } from "src/zodiac-core/ModuleProxyFactory.sol";
+import { SplitChecker } from "src/zodiac-core/SplitChecker.sol";
+import { DragonRouter } from "src/zodiac-core/DragonRouter.sol";
 
 /**
  * @title DeployModuleProxyFactory
