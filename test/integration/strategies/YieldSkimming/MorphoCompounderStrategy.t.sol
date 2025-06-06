@@ -50,6 +50,7 @@ contract MorphoCompounderStrategyTest is Test {
     uint256 public constant INITIAL_DEPOSIT = 100000e18; // YIELD_VAULT has 18 decimals
     uint256 public mainnetFork;
     uint256 public mainnetForkBlock = 22508883 - 6500 * 90; // latest alchemy block - 90 days
+    YieldSkimmingTokenizedStrategy public implementation;
 
     // Events from ITokenizedStrategy
     event Reported(uint256 profit, uint256 loss);
@@ -96,10 +97,8 @@ contract MorphoCompounderStrategyTest is Test {
         vm.selectFork(mainnetFork);
 
         // Etch YieldSkimmingTokenizedStrategy
-        YieldSkimmingTokenizedStrategy tempStrategy = new YieldSkimmingTokenizedStrategy{
-            salt: keccak256("OCT_YIELD_SKIMMING_STRATEGY_V1")
-        }();
-        bytes memory tokenizedStrategyBytecode = address(tempStrategy).code;
+        implementation = new YieldSkimmingTokenizedStrategy{ salt: keccak256("OCT_YIELD_SKIMMING_STRATEGY_V1") }();
+        bytes memory tokenizedStrategyBytecode = address(implementation).code;
         vm.etch(TOKENIZED_STRATEGY_ADDRESS, tokenizedStrategyBytecode);
 
         // Now use that address as our tokenizedStrategy
@@ -121,7 +120,8 @@ contract MorphoCompounderStrategyTest is Test {
             management,
             keeper,
             emergencyAdmin,
-            donationAddress
+            donationAddress,
+            address(tokenizedStrategy)
         );
 
         // Deploy strategy using the factory's createStrategy method
@@ -132,7 +132,8 @@ contract MorphoCompounderStrategyTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
-            strategySalt
+            strategySalt,
+            address(implementation)
         );
         vm.stopPrank();
 

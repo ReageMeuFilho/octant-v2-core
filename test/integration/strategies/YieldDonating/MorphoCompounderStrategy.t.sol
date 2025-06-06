@@ -36,6 +36,7 @@ contract MorphoCompounderDonatingStrategyTest is Test {
     address public constant MORPHO_VAULT = 0x074134A2784F4F66b6ceD6f68849382990Ff3215; // Steakhouse USDC vault
     address public constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48; // USDC token
     address public constant TOKENIZED_STRATEGY_ADDRESS = 0x8cf7246a74704bBE59c9dF614ccB5e3d9717d8Ac;
+    YieldDonatingTokenizedStrategy public implementation;
 
     // Test constants
     uint256 public constant INITIAL_DEPOSIT = 100000e6; // USDC has 6 decimals
@@ -59,10 +60,8 @@ contract MorphoCompounderDonatingStrategyTest is Test {
         vm.selectFork(mainnetFork);
 
         // Etch YieldSkimmingTokenizedStrategy
-        YieldDonatingTokenizedStrategy tempStrategy = new YieldDonatingTokenizedStrategy{
-            salt: keccak256("OCT_YIELD_SKIMMING_STRATEGY_V1")
-        }();
-        bytes memory tokenizedStrategyBytecode = address(tempStrategy).code;
+        implementation = new YieldDonatingTokenizedStrategy{ salt: keccak256("OCT_YIELD_SKIMMING_STRATEGY_V1") }();
+        bytes memory tokenizedStrategyBytecode = address(implementation).code;
         vm.etch(TOKENIZED_STRATEGY_ADDRESS, tokenizedStrategyBytecode);
 
         // Set up addresses
@@ -85,7 +84,8 @@ contract MorphoCompounderDonatingStrategyTest is Test {
                 keeper,
                 emergencyAdmin,
                 donationAddress,
-                keccak256("OCT_MORPHO_COMPOUNDER_STRATEGY_V1")
+                keccak256("OCT_MORPHO_COMPOUNDER_STRATEGY_V1"),
+                address(implementation)
             )
         );
 
@@ -333,7 +333,8 @@ contract MorphoCompounderDonatingStrategyTest is Test {
             management,
             keeper,
             emergencyAdmin,
-            donationAddress
+            donationAddress,
+            address(implementation)
         );
     }
 

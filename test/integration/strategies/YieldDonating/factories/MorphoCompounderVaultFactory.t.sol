@@ -21,6 +21,7 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
     // Factory for creating strategies
     YieldDonatingTokenizedStrategy public tokenizedStrategy;
     MorphoCompounderStrategyVaultFactory public factory;
+    YieldDonatingTokenizedStrategy public implementation;
 
     // Strategy parameters
     address public management;
@@ -43,10 +44,8 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
         vm.selectFork(mainnetFork);
 
         // Etch YieldDonatingTokenizedStrategy
-        YieldDonatingTokenizedStrategy tempStrategy = new YieldDonatingTokenizedStrategy{
-            salt: keccak256("OCT_YIELD_DONATING_STRATEGY_V1")
-        }();
-        bytes memory tokenizedStrategyBytecode = address(tempStrategy).code;
+        implementation = new YieldDonatingTokenizedStrategy{ salt: keccak256("OCT_YIELD_DONATING_STRATEGY_V1") }();
+        bytes memory tokenizedStrategyBytecode = address(implementation).code;
         vm.etch(TOKENIZED_STRATEGY_ADDRESS, tokenizedStrategyBytecode);
 
         // Now use that address as our tokenizedStrategy
@@ -96,7 +95,8 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
-            strategySalt
+            strategySalt,
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -128,7 +128,8 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
-            firstSalt
+            firstSalt,
+            address(implementation)
         );
 
         // Create second strategy for same user
@@ -142,7 +143,8 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
-            secondSalt
+            secondSalt,
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -176,7 +178,8 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
-            firstSalt
+            firstSalt,
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -192,7 +195,8 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
-            secondSalt
+            secondSalt,
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -223,7 +227,8 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
-            strategySalt
+            strategySalt,
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -239,7 +244,8 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
-            strategySalt
+            strategySalt,
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -258,7 +264,8 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
-            differentSalt
+            differentSalt,
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -283,7 +290,8 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
-            firstSalt
+            firstSalt,
+            address(implementation)
         );
 
         address secondStrategyAddress = factory.createStrategy(
@@ -293,7 +301,8 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
-            secondSalt
+            secondSalt,
+            address(implementation)
         );
         vm.stopPrank();
 

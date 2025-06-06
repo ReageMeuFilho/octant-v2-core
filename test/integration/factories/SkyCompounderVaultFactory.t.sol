@@ -89,7 +89,8 @@ contract SkyCompounderStrategyFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
-            strategySalt
+            strategySalt,
+            address(tokenizedStrategy)
         );
         vm.stopPrank();
 
@@ -121,7 +122,8 @@ contract SkyCompounderStrategyFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
-            firstSalt
+            firstSalt,
+            address(tokenizedStrategy)
         );
 
         // Create second strategy for same user
@@ -134,7 +136,8 @@ contract SkyCompounderStrategyFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
-            secondSalt
+            secondSalt,
+            address(tokenizedStrategy)
         );
         vm.stopPrank();
 
@@ -167,7 +170,8 @@ contract SkyCompounderStrategyFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
-            firstSalt
+            firstSalt,
+            address(tokenizedStrategy)
         );
         vm.stopPrank();
 
@@ -182,7 +186,8 @@ contract SkyCompounderStrategyFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
-            secondSalt
+            secondSalt,
+            address(tokenizedStrategy)
         );
         vm.stopPrank();
 
@@ -212,7 +217,8 @@ contract SkyCompounderStrategyFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
-            strategySalt
+            strategySalt,
+            address(tokenizedStrategy)
         );
         vm.stopPrank();
 
@@ -227,7 +233,8 @@ contract SkyCompounderStrategyFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
-            strategySalt
+            strategySalt,
+            address(tokenizedStrategy)
         );
         vm.stopPrank();
 
@@ -245,7 +252,8 @@ contract SkyCompounderStrategyFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
-            differentSalt
+            differentSalt,
+            address(tokenizedStrategy)
         );
         vm.stopPrank();
 
