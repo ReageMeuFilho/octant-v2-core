@@ -10,8 +10,19 @@ contract MorphoCompounderWrapper is MorphoCompounderStrategy {
         address _management,
         address _keeper,
         address _emergencyAdmin,
-        address _donationAddress
-    ) MorphoCompounderStrategy(_asset, _name, _management, _keeper, _emergencyAdmin, _donationAddress) {}
+        address _donationAddress,
+        address _tokenizedStrategyAddress
+    )
+        MorphoCompounderStrategy(
+            _asset,
+            _name,
+            _management,
+            _keeper,
+            _emergencyAdmin,
+            _donationAddress,
+            _tokenizedStrategyAddress
+        )
+    {}
 
     // expose _emergencyWithdraw
     function exposeEmergencyWithdraw(uint256 _amount) public {

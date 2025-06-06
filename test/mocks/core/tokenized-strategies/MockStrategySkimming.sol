@@ -24,8 +24,19 @@ contract MockStrategySkimming is BaseStrategy {
         address _management,
         address _keeper,
         address _emergencyAdmin,
-        address _donationAddress
-    ) BaseStrategy(_yieldSource, "Test Strategy", _management, _keeper, _emergencyAdmin, _donationAddress) {
+        address _donationAddress,
+        address _tokenizedStrategyAddress
+    )
+        BaseStrategy(
+            _yieldSource,
+            "Test Strategy",
+            _management,
+            _keeper,
+            _emergencyAdmin,
+            _donationAddress,
+            _tokenizedStrategyAddress
+        )
+    {
         initialize(_yieldSource, _yieldSource);
         yieldSourceSkimming = _yieldSource;
         lastReportedPPS = MockYieldSourceSkimming(_yieldSource).pricePerShare();
