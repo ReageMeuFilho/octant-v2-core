@@ -42,8 +42,9 @@ contract USDSFarmerUSDCStrategy is BaseHealthCheck, UniswapV3Swapper {
         address _management,
         address _keeper,
         address _emergencyAdmin,
-        address _donationAddress
-    ) BaseHealthCheck(USDC, _name, _management, _keeper, _emergencyAdmin, _donationAddress) {
+        address _donationAddress,
+        address _tokenizedStrategyAddress
+    ) BaseHealthCheck(USDC, _name, _management, _keeper, _emergencyAdmin, _donationAddress, _tokenizedStrategyAddress) {
         require(IVault(_vault).asset() == USDS, "!asset");
         vault = _vault;
         depositLimit = 100e6 * 1e6; //100M USDC deposit limit to start with
