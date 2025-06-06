@@ -35,6 +35,7 @@ contract LidoStrategyVaultFactoryTest is Test {
     // Test constants
     uint256 public mainnetFork;
     uint256 public mainnetForkBlock = 22508883 - 6500 * 90; // latest alchemy block - 90 days
+    YieldSkimmingTokenizedStrategy public implementation;
 
     function setUp() public {
         // Create a mainnet fork
@@ -42,10 +43,8 @@ contract LidoStrategyVaultFactoryTest is Test {
         vm.selectFork(mainnetFork);
 
         // Etch YieldSkimmingTokenizedStrategy
-        YieldSkimmingTokenizedStrategy tempStrategy = new YieldSkimmingTokenizedStrategy{
-            salt: keccak256("OCT_YIELD_SKIMMING_STRATEGY_V1")
-        }();
-        bytes memory tokenizedStrategyBytecode = address(tempStrategy).code;
+        implementation = new YieldSkimmingTokenizedStrategy{ salt: keccak256("OCT_YIELD_SKIMMING_STRATEGY_V1") }();
+        bytes memory tokenizedStrategyBytecode = address(implementation).code;
         vm.etch(TOKENIZED_STRATEGY_ADDRESS, tokenizedStrategyBytecode);
 
         // Now use that address as our tokenizedStrategy
@@ -93,7 +92,8 @@ contract LidoStrategyVaultFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
-            strategySalt
+            strategySalt,
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -124,7 +124,8 @@ contract LidoStrategyVaultFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
-            firstSalt
+            firstSalt,
+            address(implementation)
         );
 
         // Create second strategy for same user
@@ -137,7 +138,8 @@ contract LidoStrategyVaultFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
-            secondSalt
+            secondSalt,
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -170,7 +172,8 @@ contract LidoStrategyVaultFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
-            firstSalt
+            firstSalt,
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -185,7 +188,8 @@ contract LidoStrategyVaultFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
-            secondSalt
+            secondSalt,
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -215,7 +219,8 @@ contract LidoStrategyVaultFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
-            strategySalt
+            strategySalt,
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -230,7 +235,8 @@ contract LidoStrategyVaultFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
-            strategySalt
+            strategySalt,
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -248,7 +254,8 @@ contract LidoStrategyVaultFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
-            differentSalt
+            differentSalt,
+            address(implementation)
         );
         vm.stopPrank();
 

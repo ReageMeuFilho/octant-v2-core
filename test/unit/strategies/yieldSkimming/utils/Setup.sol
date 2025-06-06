@@ -22,6 +22,7 @@ contract Setup is Test {
     MockFactory public mockFactory;
     MockYieldSourceSkimming public yieldSource;
     YieldSkimmingTokenizedStrategy public tokenizedStrategy;
+    YieldSkimmingTokenizedStrategy public implementation;
 
     // Addresses for different roles we will use repeatedly.
     address public user = address(1);
@@ -50,7 +51,7 @@ contract Setup is Test {
         mockFactory = new MockFactory(0, protocolFeeRecipient);
 
         // Deploy the implementation for deterministic location
-        YieldSkimmingTokenizedStrategy implementation = new YieldSkimmingTokenizedStrategy();
+        implementation = new YieldSkimmingTokenizedStrategy();
 
         // Deploy the proxy for deterministic location
         tokenizedStrategy = YieldSkimmingTokenizedStrategy(address(new ERC1967Proxy(address(implementation), "")));
@@ -95,7 +96,16 @@ contract Setup is Test {
     function setUpStrategy() public returns (address) {
         // we save the mock base strategy as a IMockStrategy to give it the needed interface
         IMockStrategy _strategy = IMockStrategy(
-            address(new MockStrategySkimming(address(yieldSource), management, keeper, emergencyAdmin, donationAddress))
+            address(
+                new MockStrategySkimming(
+                    address(yieldSource),
+                    management,
+                    keeper,
+                    emergencyAdmin,
+                    donationAddress,
+                    address(implementation)
+                )
+            )
         );
 
         vm.startPrank(management);
@@ -122,7 +132,8 @@ contract Setup is Test {
                     management,
                     keeper,
                     emergencyAdmin,
-                    donationAddress
+                    donationAddress,
+                    address(implementation)
                 )
             )
         );
@@ -152,7 +163,8 @@ contract Setup is Test {
                     management,
                     keeper,
                     emergencyAdmin,
-                    donationAddress
+                    donationAddress,
+                    address(implementation)
                 )
             )
         );

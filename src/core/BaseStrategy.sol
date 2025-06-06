@@ -91,7 +91,7 @@ abstract contract BaseStrategy {
     error NotSelf();
 
     /*//////////////////////////////////////////////////////////////
-                            CONSTANTS
+                            IMMUTABLES
     //////////////////////////////////////////////////////////////*/
 
     /**
@@ -106,12 +106,7 @@ abstract contract BaseStrategy {
      * This address should be the same for every strategy, never be adjusted
      * and always be checked before any integration with the Strategy.
      */
-    // NOTE: This is a placeholder address - should be updated for production use
-    address public constant TOKENIZED_STRATEGY_ADDRESS = 0x8cf7246a74704bBE59c9dF614ccB5e3d9717d8Ac;
-
-    /*//////////////////////////////////////////////////////////////
-                            IMMUTABLES
-    //////////////////////////////////////////////////////////////*/
+    address public immutable TOKENIZED_STRATEGY_ADDRESS;
 
     /**
      * @dev Underlying asset the Strategy is earning yield on.
@@ -147,6 +142,7 @@ abstract contract BaseStrategy {
      * @param _keeper Address with keeper permissions
      * @param _emergencyAdmin Address with emergency admin permissions
      * @param _donationAddress Address that will receive donations for this specific strategy
+     * @param _tokenizedStrategyAddress Address of the TokenizedStrategy implementation
      */
     constructor(
         address _asset,
@@ -154,9 +150,11 @@ abstract contract BaseStrategy {
         address _management,
         address _keeper,
         address _emergencyAdmin,
-        address _donationAddress
+        address _donationAddress,
+        address _tokenizedStrategyAddress
     ) {
         asset = ERC20(_asset);
+        TOKENIZED_STRATEGY_ADDRESS = _tokenizedStrategyAddress;
 
         // Set instance of the implementation for internal use.
         TokenizedStrategy = ITokenizedStrategy(address(this));
@@ -176,7 +174,7 @@ abstract contract BaseStrategy {
             sstore(
                 // keccak256('eip1967.proxy.implementation' - 1)
                 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc,
-                TOKENIZED_STRATEGY_ADDRESS
+                _tokenizedStrategyAddress
             )
         }
     }

@@ -42,8 +42,9 @@ abstract contract BaseHealthCheck is BaseStrategy, IBaseHealthCheck {
         address _management,
         address _keeper,
         address _emergencyAdmin,
-        address _donationAddress
-    ) BaseStrategy(_asset, _name, _management, _keeper, _emergencyAdmin, _donationAddress) {}
+        address _donationAddress,
+        address _tokenizedStrategyAddress
+    ) BaseStrategy(_asset, _name, _management, _keeper, _emergencyAdmin, _donationAddress, _tokenizedStrategyAddress) {}
 
     /**
      * @notice Returns the current profit limit ratio.

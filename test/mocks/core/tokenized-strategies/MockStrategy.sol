@@ -17,8 +17,19 @@ contract MockStrategy is BaseStrategy {
         address _management,
         address _keeper,
         address _emergencyAdmin,
-        address _donationAddress
-    ) BaseStrategy(_asset, "Test Strategy", _management, _keeper, _emergencyAdmin, _donationAddress) {
+        address _donationAddress,
+        address _tokenizedStrategyAddress
+    )
+        BaseStrategy(
+            _asset,
+            "Test Strategy",
+            _management,
+            _keeper,
+            _emergencyAdmin,
+            _donationAddress,
+            _tokenizedStrategyAddress
+        )
+    {
         initialize(_asset, _yieldSource);
     }
 

@@ -43,7 +43,8 @@ contract LidoStrategy is BaseHealthCheck {
         address _management,
         address _keeper,
         address _emergencyAdmin,
-        address _donationAddress
+        address _donationAddress,
+        address _tokenizedStrategyAddress
     )
         BaseHealthCheck(
             _asset, // shares address
@@ -51,7 +52,8 @@ contract LidoStrategy is BaseHealthCheck {
             _management,
             _keeper,
             _emergencyAdmin,
-            _donationAddress
+            _donationAddress,
+            _tokenizedStrategyAddress
         )
     {
         // Initialize the exchange rate on setup
