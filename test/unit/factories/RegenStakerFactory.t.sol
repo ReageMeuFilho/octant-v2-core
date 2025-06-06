@@ -31,6 +31,7 @@ contract RegenStakerFactoryTest is Test {
     uint256 public constant MAX_BUMP_TIP = 1000e18;
     uint256 public constant MAX_CLAIM_FEE = 500;
     uint256 public constant MINIMUM_STAKE_AMOUNT = 100e18;
+    uint256 public constant REWARD_DURATION = 0; // 0 defaults to 30 days
 
     function setUp() public {
         admin = address(0x1);
@@ -73,15 +74,18 @@ contract RegenStakerFactoryTest is Test {
             salt
         );
         address stakerAddress = factory.createStaker(
-            rewardsToken,
-            stakeToken,
-            admin,
-            stakerWhitelist,
-            contributionWhitelist,
-            earningPowerCalculator,
-            MAX_BUMP_TIP,
-            MAX_CLAIM_FEE,
-            MINIMUM_STAKE_AMOUNT,
+            RegenStakerFactory.CreateStakerParams({
+                rewardsToken: rewardsToken,
+                stakeToken: stakeToken,
+                admin: admin,
+                stakerWhitelist: stakerWhitelist,
+                contributionWhitelist: contributionWhitelist,
+                earningPowerCalculator: earningPowerCalculator,
+                maxBumpTip: MAX_BUMP_TIP,
+                maxClaimFee: MAX_CLAIM_FEE,
+                minimumStakeAmount: MINIMUM_STAKE_AMOUNT,
+                rewardDuration: REWARD_DURATION
+            }),
             salt
         );
         vm.stopPrank();
@@ -111,28 +115,34 @@ contract RegenStakerFactoryTest is Test {
 
         vm.startPrank(deployer1);
         address firstStaker = factory.createStaker(
-            rewardsToken,
-            stakeToken,
-            admin,
-            stakerWhitelist,
-            contributionWhitelist,
-            earningPowerCalculator,
-            MAX_BUMP_TIP,
-            MAX_CLAIM_FEE,
-            MINIMUM_STAKE_AMOUNT,
+            RegenStakerFactory.CreateStakerParams({
+                rewardsToken: rewardsToken,
+                stakeToken: stakeToken,
+                admin: admin,
+                stakerWhitelist: stakerWhitelist,
+                contributionWhitelist: contributionWhitelist,
+                earningPowerCalculator: earningPowerCalculator,
+                maxBumpTip: MAX_BUMP_TIP,
+                maxClaimFee: MAX_CLAIM_FEE,
+                minimumStakeAmount: MINIMUM_STAKE_AMOUNT,
+                rewardDuration: REWARD_DURATION
+            }),
             salt1
         );
 
         address secondStaker = factory.createStaker(
-            rewardsToken,
-            stakeToken,
-            admin,
-            stakerWhitelist,
-            contributionWhitelist,
-            earningPowerCalculator,
-            MAX_BUMP_TIP + 100,
-            MAX_CLAIM_FEE + 50,
-            MINIMUM_STAKE_AMOUNT + 50e18,
+            RegenStakerFactory.CreateStakerParams({
+                rewardsToken: rewardsToken,
+                stakeToken: stakeToken,
+                admin: admin,
+                stakerWhitelist: stakerWhitelist,
+                contributionWhitelist: contributionWhitelist,
+                earningPowerCalculator: earningPowerCalculator,
+                maxBumpTip: MAX_BUMP_TIP + 100,
+                maxClaimFee: MAX_CLAIM_FEE + 50,
+                minimumStakeAmount: MINIMUM_STAKE_AMOUNT + 50e18,
+                rewardDuration: REWARD_DURATION
+            }),
             salt2
         );
         vm.stopPrank();
@@ -161,29 +171,35 @@ contract RegenStakerFactoryTest is Test {
 
         vm.prank(deployer1);
         address staker1 = factory.createStaker(
-            rewardsToken,
-            stakeToken,
-            admin,
-            stakerWhitelist,
-            contributionWhitelist,
-            earningPowerCalculator,
-            MAX_BUMP_TIP,
-            MAX_CLAIM_FEE,
-            MINIMUM_STAKE_AMOUNT,
+            RegenStakerFactory.CreateStakerParams({
+                rewardsToken: rewardsToken,
+                stakeToken: stakeToken,
+                admin: admin,
+                stakerWhitelist: stakerWhitelist,
+                contributionWhitelist: contributionWhitelist,
+                earningPowerCalculator: earningPowerCalculator,
+                maxBumpTip: MAX_BUMP_TIP,
+                maxClaimFee: MAX_CLAIM_FEE,
+                minimumStakeAmount: MINIMUM_STAKE_AMOUNT,
+                rewardDuration: REWARD_DURATION
+            }),
             salt1
         );
 
         vm.prank(deployer2);
         address staker2 = factory.createStaker(
-            rewardsToken,
-            stakeToken,
-            admin,
-            stakerWhitelist,
-            contributionWhitelist,
-            earningPowerCalculator,
-            MAX_BUMP_TIP,
-            MAX_CLAIM_FEE,
-            MINIMUM_STAKE_AMOUNT,
+            RegenStakerFactory.CreateStakerParams({
+                rewardsToken: rewardsToken,
+                stakeToken: stakeToken,
+                admin: admin,
+                stakerWhitelist: stakerWhitelist,
+                contributionWhitelist: contributionWhitelist,
+                earningPowerCalculator: earningPowerCalculator,
+                maxBumpTip: MAX_BUMP_TIP,
+                maxClaimFee: MAX_CLAIM_FEE,
+                minimumStakeAmount: MINIMUM_STAKE_AMOUNT,
+                rewardDuration: REWARD_DURATION
+            }),
             salt2
         );
 
@@ -207,15 +223,18 @@ contract RegenStakerFactoryTest is Test {
 
         vm.prank(deployer1);
         address actualAddress = factory.createStaker(
-            rewardsToken,
-            stakeToken,
-            admin,
-            stakerWhitelist,
-            contributionWhitelist,
-            earningPowerCalculator,
-            MAX_BUMP_TIP,
-            MAX_CLAIM_FEE,
-            MINIMUM_STAKE_AMOUNT,
+            RegenStakerFactory.CreateStakerParams({
+                rewardsToken: rewardsToken,
+                stakeToken: stakeToken,
+                admin: admin,
+                stakerWhitelist: stakerWhitelist,
+                contributionWhitelist: contributionWhitelist,
+                earningPowerCalculator: earningPowerCalculator,
+                maxBumpTip: MAX_BUMP_TIP,
+                maxClaimFee: MAX_CLAIM_FEE,
+                minimumStakeAmount: MINIMUM_STAKE_AMOUNT,
+                rewardDuration: REWARD_DURATION
+            }),
             salt
         );
 
@@ -227,15 +246,18 @@ contract RegenStakerFactoryTest is Test {
 
         vm.prank(deployer1);
         address stakerAddress = factory.createStaker(
-            rewardsToken,
-            stakeToken,
-            admin,
-            IWhitelist(address(0)), // null staker whitelist
-            IWhitelist(address(0)), // null contribution whitelist
-            earningPowerCalculator,
-            MAX_BUMP_TIP,
-            MAX_CLAIM_FEE,
-            MINIMUM_STAKE_AMOUNT,
+            RegenStakerFactory.CreateStakerParams({
+                rewardsToken: rewardsToken,
+                stakeToken: stakeToken,
+                admin: admin,
+                stakerWhitelist: IWhitelist(address(0)), // null staker whitelist
+                contributionWhitelist: IWhitelist(address(0)), // null contribution whitelist
+                earningPowerCalculator: earningPowerCalculator,
+                maxBumpTip: MAX_BUMP_TIP,
+                maxClaimFee: MAX_CLAIM_FEE,
+                minimumStakeAmount: MINIMUM_STAKE_AMOUNT,
+                rewardDuration: REWARD_DURATION
+            }),
             salt
         );
 

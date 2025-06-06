@@ -32,11 +32,14 @@ contract RegenIntegrationTest is Test {
 
     uint256 public constant REWARD_AMOUNT_BASE = 30_000_000;
     uint256 public constant STAKE_AMOUNT_BASE = 1_000;
-    uint256 public constant ONE_IN_A_PICO = 1e8;
-    uint256 public constant ONE_IN_A_NANO = 1e11;
-    uint256 public constant ONE_IN_A_MICRO = 1e14;
     uint256 public constant MAX_BUMP_TIP = 1e18;
     uint256 public constant MAX_CLAIM_FEE = 1e18;
+    uint256 public constant MIN_REWARD_DURATION = 30 days;
+    uint256 public constant MAX_REWARD_DURATION = 3000 days;
+
+    uint256 public constant ONE_PICO = 1e8;
+    uint256 public constant ONE_NANO = 1e11;
+    uint256 public constant ONE_MICRO = 1e14;
 
     address public immutable ADMIN = makeAddr("admin");
     uint8 public rewardTokenDecimals = 18;
@@ -69,6 +72,7 @@ contract RegenIntegrationTest is Test {
     function setUp() public virtual {
         rewardTokenDecimals = uint8(bound(vm.randomUint(), 6, 18));
         stakeTokenDecimals = uint8(bound(vm.randomUint(), 6, 18));
+        uint256 rewardDuration = bound(vm.randomUint(), MIN_REWARD_DURATION, MAX_REWARD_DURATION);
 
         vm.startPrank(ADMIN);
 
@@ -90,7 +94,8 @@ contract RegenIntegrationTest is Test {
             calculator,
             MAX_BUMP_TIP,
             MAX_CLAIM_FEE,
-            0
+            0,
+            rewardDuration
         );
 
         regenStaker.setRewardNotifier(ADMIN, true);
@@ -116,7 +121,8 @@ contract RegenIntegrationTest is Test {
             calculator,
             tipAmount,
             feeAmount,
-            minimumStakeAmount
+            minimumStakeAmount,
+            0
         );
 
         assertEq(address(localRegenStaker.REWARD_TOKEN()), address(rewardToken));
@@ -139,7 +145,7 @@ contract RegenIntegrationTest is Test {
 
         assertEq(localRegenStaker.totalStaked(), 0);
         assertEq(localRegenStaker.totalEarningPower(), 0);
-        assertEq(localRegenStaker.REWARD_DURATION(), 30 days);
+        assertEq(localRegenStaker.rewardDuration(), MIN_REWARD_DURATION);
         vm.stopPrank();
     }
 
@@ -168,7 +174,8 @@ contract RegenIntegrationTest is Test {
             calculator,
             tipAmount,
             feeAmount,
-            minimumStakeAmount
+            minimumStakeAmount,
+            0
         );
 
         assertEq(address(localRegenStaker.REWARD_TOKEN()), address(rewardToken));
@@ -191,7 +198,7 @@ contract RegenIntegrationTest is Test {
 
         assertEq(localRegenStaker.totalStaked(), 0);
         assertEq(localRegenStaker.totalEarningPower(), 0);
-        assertEq(localRegenStaker.REWARD_DURATION(), 30 days);
+        assertEq(localRegenStaker.rewardDuration(), MIN_REWARD_DURATION);
         vm.stopPrank();
     }
 
@@ -356,7 +363,7 @@ contract RegenIntegrationTest is Test {
         uint256 contributionAmountBase
     ) public {
         stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
-        rewardAmountBase = bound(rewardAmountBase, regenStaker.REWARD_DURATION(), 100_000_000);
+        rewardAmountBase = bound(rewardAmountBase, regenStaker.rewardDuration(), MAX_REWARD_DURATION + 1_000_000_000);
         contributionAmountBase = bound(contributionAmountBase, 0, 1_000);
 
         uint256 stakeAmount = getStakeAmount(stakeAmountBase);
@@ -378,7 +385,7 @@ contract RegenIntegrationTest is Test {
 
         vm.prank(ADMIN);
         regenStaker.notifyRewardAmount(rewardAmount);
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
+        vm.warp(block.timestamp + regenStaker.rewardDuration());
 
         if (contributionAmount > 0) {
             (uint96 feeAmount, ) = regenStaker.claimFeeParameters();
@@ -562,7 +569,7 @@ contract RegenIntegrationTest is Test {
         uint256 contributionAmountBase
     ) public {
         stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
-        rewardAmountBase = bound(rewardAmountBase, regenStaker.REWARD_DURATION(), 100_000_000);
+        rewardAmountBase = bound(rewardAmountBase, regenStaker.rewardDuration(), MAX_REWARD_DURATION + 1_000_000_000);
         uint256 minContributionAmount = 1;
         uint256 maxContributionAmount = 1_000;
         contributionAmountBase = bound(contributionAmountBase, minContributionAmount, maxContributionAmount);
@@ -597,7 +604,7 @@ contract RegenIntegrationTest is Test {
 
         vm.prank(ADMIN);
         regenStaker.notifyRewardAmount(rewardAmount);
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
+        vm.warp(block.timestamp + regenStaker.rewardDuration());
 
         vm.prank(ADMIN);
         regenStaker.pause();
@@ -618,7 +625,7 @@ contract RegenIntegrationTest is Test {
         uint256 rewardAmountBase
     ) public {
         stakeAmountBase = bound(stakeAmountBase, 1, 100_000);
-        rewardAmountBase = bound(rewardAmountBase, regenStaker.REWARD_DURATION(), 100_000_000);
+        rewardAmountBase = bound(rewardAmountBase, regenStaker.rewardDuration(), MAX_REWARD_DURATION + 1_000_000_000);
 
         address staker = makeAddr("staker");
         whitelistUser(staker, true, false, true);
@@ -636,13 +643,13 @@ contract RegenIntegrationTest is Test {
         vm.prank(ADMIN);
         regenStaker.notifyRewardAmount(rewardAmount);
 
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
+        vm.warp(block.timestamp + regenStaker.rewardDuration());
 
         vm.startPrank(staker);
         uint256 claimedAmount = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        assertApproxEqRel(claimedAmount, rewardAmount, ONE_IN_A_MICRO);
+        assertApproxEqRel(claimedAmount, rewardAmount, ONE_MICRO);
     }
 
     function testFuzz_ContinuousReward_SingleStaker_JoinsLate(uint256 joinTimePercent) public {
@@ -658,7 +665,7 @@ contract RegenIntegrationTest is Test {
         vm.prank(ADMIN);
         regenStaker.notifyRewardAmount(totalRewardAmount);
 
-        uint256 joinTime = (regenStaker.REWARD_DURATION() * joinTimePercent) / 100;
+        uint256 joinTime = (regenStaker.rewardDuration() * joinTimePercent) / 100;
         vm.warp(block.timestamp + joinTime);
 
         uint256 stakeAmount = getStakeAmount();
@@ -668,7 +675,7 @@ contract RegenIntegrationTest is Test {
         Staker.DepositIdentifier depositId = regenStaker.stake(stakeAmount, staker);
         vm.stopPrank();
 
-        uint256 remainingTime = regenStaker.REWARD_DURATION() - joinTime;
+        uint256 remainingTime = regenStaker.rewardDuration() - joinTime;
         vm.warp(block.timestamp + remainingTime);
 
         vm.startPrank(staker);
@@ -678,7 +685,7 @@ contract RegenIntegrationTest is Test {
         uint256 timeStakedPercent = 100 - joinTimePercent;
         uint256 expectedReward = (totalRewardAmount * timeStakedPercent) / 100;
 
-        assertApproxEqRel(claimedAmount, expectedReward, ONE_IN_A_NANO);
+        assertApproxEqRel(claimedAmount, expectedReward, ONE_MICRO);
     }
 
     function testFuzz_ContinuousReward_SingleStaker_ClaimsMidPeriod(uint256 firstClaimTimePercent) public {
@@ -702,7 +709,7 @@ contract RegenIntegrationTest is Test {
         vm.prank(ADMIN);
         regenStaker.notifyRewardAmount(totalRewardAmount);
 
-        uint256 firstClaimTime = (regenStaker.REWARD_DURATION() * firstClaimTimePercent) / 100;
+        uint256 firstClaimTime = (regenStaker.rewardDuration() * firstClaimTimePercent) / 100;
         vm.warp(block.timestamp + firstClaimTime);
 
         vm.startPrank(staker);
@@ -710,9 +717,9 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         uint256 expectedFirst = (totalRewardAmount * firstClaimTimePercent) / 100;
-        assertApproxEqRel(claimedAmount1, expectedFirst, ONE_IN_A_PICO);
+        assertApproxEqRel(claimedAmount1, expectedFirst, ONE_MICRO);
 
-        uint256 remainingTime = regenStaker.REWARD_DURATION() - firstClaimTime;
+        uint256 remainingTime = regenStaker.rewardDuration() - firstClaimTime;
         vm.warp(block.timestamp + remainingTime);
 
         vm.startPrank(staker);
@@ -722,8 +729,8 @@ contract RegenIntegrationTest is Test {
         uint256 remainingTimePercent = 100 - firstClaimTimePercent;
         uint256 expectedSecond = (totalRewardAmount * remainingTimePercent) / 100;
 
-        assertApproxEqRel(claimedAmount2, expectedSecond, ONE_IN_A_PICO);
-        assertApproxEqRel(claimedAmount1 + claimedAmount2, totalRewardAmount, ONE_IN_A_PICO);
+        assertApproxEqRel(claimedAmount2, expectedSecond, ONE_MICRO);
+        assertApproxEqRel(claimedAmount1 + claimedAmount2, totalRewardAmount, ONE_MICRO);
     }
 
     function testFuzz_ContinuousReward_TwoStakers_StaggeredEntry_ProRataShare(uint256 stakerBJoinTimePercent) public {
@@ -750,7 +757,7 @@ contract RegenIntegrationTest is Test {
         vm.prank(ADMIN);
         regenStaker.notifyRewardAmount(totalRewardAmount);
 
-        uint256 stakerBJoinTime = (regenStaker.REWARD_DURATION() * stakerBJoinTimePercent) / 100;
+        uint256 stakerBJoinTime = (regenStaker.rewardDuration() * stakerBJoinTimePercent) / 100;
         vm.warp(block.timestamp + stakerBJoinTime);
 
         stakeToken.mint(stakerB, stakeAmount);
@@ -759,7 +766,7 @@ contract RegenIntegrationTest is Test {
         Staker.DepositIdentifier depositIdB = regenStaker.stake(stakeAmount, stakerB);
         vm.stopPrank();
 
-        uint256 remainingTime = regenStaker.REWARD_DURATION() - stakerBJoinTime;
+        uint256 remainingTime = regenStaker.rewardDuration() - stakerBJoinTime;
         vm.warp(block.timestamp + remainingTime);
 
         vm.startPrank(stakerA);
@@ -777,9 +784,9 @@ contract RegenIntegrationTest is Test {
         uint256 expectedA = soloPhaseRewards + (sharedPhaseRewards / 2);
         uint256 expectedB = sharedPhaseRewards / 2;
 
-        assertApproxEqRel(claimedA, expectedA, ONE_IN_A_NANO);
-        assertApproxEqRel(claimedB, expectedB, ONE_IN_A_NANO);
-        assertApproxEqRel(claimedA + claimedB, totalRewardAmount, ONE_IN_A_NANO);
+        assertApproxEqRel(claimedA, expectedA, ONE_MICRO);
+        assertApproxEqRel(claimedB, expectedB, ONE_MICRO);
+        assertApproxEqRel(claimedA + claimedB, totalRewardAmount, ONE_MICRO);
     }
 
     function testFuzz_ContinuousReward_TwoStakers_DifferentAmounts_ProRataShare(
@@ -819,7 +826,7 @@ contract RegenIntegrationTest is Test {
         vm.prank(ADMIN);
         regenStaker.notifyRewardAmount(totalRewardAmount);
 
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
+        vm.warp(block.timestamp + regenStaker.rewardDuration());
 
         vm.startPrank(stakerA);
         uint256 claimedA = regenStaker.claimReward(depositIdA);
@@ -833,9 +840,9 @@ contract RegenIntegrationTest is Test {
         uint256 expectedA = (totalRewardAmount * stakeAmountA) / totalStake;
         uint256 expectedB = (totalRewardAmount * stakeAmountB) / totalStake;
 
-        assertApproxEqRel(claimedA, expectedA, ONE_IN_A_PICO);
-        assertApproxEqRel(claimedB, expectedB, ONE_IN_A_PICO);
-        assertApproxEqRel(claimedA + claimedB, totalRewardAmount, ONE_IN_A_PICO);
+        assertApproxEqRel(claimedA, expectedA, ONE_PICO);
+        assertApproxEqRel(claimedB, expectedB, ONE_PICO);
+        assertApproxEqRel(claimedA + claimedB, totalRewardAmount, ONE_PICO);
     }
 
     function testFuzz_TimeWeightedReward_NoEarningIfNotOnEarningWhitelist(
@@ -843,7 +850,7 @@ contract RegenIntegrationTest is Test {
         uint256 rewardAmountBase
     ) public {
         stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
-        rewardAmountBase = bound(rewardAmountBase, regenStaker.REWARD_DURATION(), 100_000_000);
+        rewardAmountBase = bound(rewardAmountBase, regenStaker.rewardDuration(), MAX_REWARD_DURATION + 1_000_000_000);
 
         address staker = makeAddr("staker");
         whitelistUser(staker, true, false, false);
@@ -861,7 +868,7 @@ contract RegenIntegrationTest is Test {
         vm.prank(ADMIN);
         regenStaker.notifyRewardAmount(rewardAmount);
 
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
+        vm.warp(block.timestamp + regenStaker.rewardDuration());
 
         vm.startPrank(staker);
         uint256 claimedAmount = regenStaker.claimReward(depositId);
@@ -875,7 +882,7 @@ contract RegenIntegrationTest is Test {
         uint256 rewardAmountBase
     ) public {
         stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
-        rewardAmountBase = bound(rewardAmountBase, regenStaker.REWARD_DURATION(), 100_000_000);
+        rewardAmountBase = bound(rewardAmountBase, regenStaker.rewardDuration(), MAX_REWARD_DURATION + 1_000_000_000);
 
         address whitelistedStaker = makeAddr("whitelistedStaker");
         address nonWhitelistedStaker = makeAddr("nonWhitelistedStaker");
@@ -905,7 +912,7 @@ contract RegenIntegrationTest is Test {
         vm.prank(ADMIN);
         regenStaker.notifyRewardAmount(rewardAmount);
 
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
+        vm.warp(block.timestamp + regenStaker.rewardDuration());
 
         vm.startPrank(whitelistedStaker);
         uint256 claimedByWhitelisted = regenStaker.claimReward(whitelistedDepositId);
@@ -915,7 +922,7 @@ contract RegenIntegrationTest is Test {
         uint256 claimedByNonWhitelisted = regenStaker.claimReward(nonWhitelistedDepositId);
         vm.stopPrank();
 
-        assertApproxEqRel(claimedByWhitelisted, rewardAmount, ONE_IN_A_MICRO);
+        assertApproxEqRel(claimedByWhitelisted, rewardAmount, ONE_MICRO);
         assertEq(claimedByNonWhitelisted, 0);
     }
 
@@ -925,8 +932,8 @@ contract RegenIntegrationTest is Test {
         uint256 stakeAmountBase,
         uint256 stakerBJoinTimePercent
     ) public {
-        rewardPart1Base = bound(rewardPart1Base, regenStaker.REWARD_DURATION(), 50_000_000);
-        rewardPart2Base = bound(rewardPart2Base, regenStaker.REWARD_DURATION(), 50_000_000);
+        rewardPart1Base = bound(rewardPart1Base, regenStaker.rewardDuration(), MAX_REWARD_DURATION + 1_000_000_000);
+        rewardPart2Base = bound(rewardPart2Base, regenStaker.rewardDuration(), MAX_REWARD_DURATION + 1_000_000_000);
         stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
         uint256 minJoinTime = 10;
         uint256 maxJoinTime = 90;
@@ -954,7 +961,7 @@ contract RegenIntegrationTest is Test {
         vm.prank(ADMIN);
         regenStaker.notifyRewardAmount(rewardPart1);
 
-        uint256 stakerBJoinTime = (regenStaker.REWARD_DURATION() * stakerBJoinTimePercent) / 100;
+        uint256 stakerBJoinTime = (regenStaker.rewardDuration() * stakerBJoinTimePercent) / 100;
         vm.warp(block.timestamp + stakerBJoinTime);
 
         stakeToken.mint(stakerB, stakeAmount);
@@ -966,7 +973,7 @@ contract RegenIntegrationTest is Test {
         vm.prank(ADMIN);
         regenStaker.notifyRewardAmount(rewardPart2);
 
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
+        vm.warp(block.timestamp + regenStaker.rewardDuration());
 
         vm.startPrank(stakerA);
         uint256 claimedA = regenStaker.claimReward(depositIdA);
@@ -984,9 +991,9 @@ contract RegenIntegrationTest is Test {
         uint256 expectedA = stakerASoloEarnings + eachStakerNewPeriodEarnings;
         uint256 expectedB = eachStakerNewPeriodEarnings;
 
-        assertApproxEqRel(claimedA, expectedA, ONE_IN_A_MICRO);
-        assertApproxEqRel(claimedB, expectedB, ONE_IN_A_MICRO);
-        assertApproxEqRel(claimedA + claimedB, totalRewardAmount, ONE_IN_A_MICRO);
+        assertApproxEqRel(claimedA, expectedA, ONE_MICRO);
+        assertApproxEqRel(claimedB, expectedB, ONE_MICRO);
+        assertApproxEqRel(claimedA + claimedB, totalRewardAmount, ONE_MICRO);
     }
 
     function testFuzz_StakeDeposit_StakeMore_UpdatesBalanceAndRewards(
@@ -1026,7 +1033,7 @@ contract RegenIntegrationTest is Test {
         vm.prank(ADMIN);
         regenStaker.notifyRewardAmount(getRewardAmount());
 
-        vm.warp(block.timestamp + (regenStaker.REWARD_DURATION() * timingPercent) / 100);
+        vm.warp(block.timestamp + (regenStaker.rewardDuration() * timingPercent) / 100);
 
         vm.startPrank(user);
         regenStaker.stakeMore(depositId, additionalStake);
@@ -1035,9 +1042,7 @@ contract RegenIntegrationTest is Test {
         assertEq(regenStaker.depositorTotalStaked(user), initialStake + additionalStake);
         assertEq(regenStaker.depositorTotalEarningPower(user), initialStake + additionalStake);
 
-        vm.warp(
-            block.timestamp + regenStaker.REWARD_DURATION() - (regenStaker.REWARD_DURATION() * timingPercent) / 100
-        );
+        vm.warp(block.timestamp + regenStaker.rewardDuration() - (regenStaker.rewardDuration() * timingPercent) / 100);
 
         vm.startPrank(user);
         uint256 claimedAmount = regenStaker.claimReward(depositId);
@@ -1054,7 +1059,7 @@ contract RegenIntegrationTest is Test {
     ) public {
         stakeAmountBase1 = bound(stakeAmountBase1, 1, 10_000);
         stakeAmountBase2 = bound(stakeAmountBase2, 1, 10_000);
-        rewardAmountBase = bound(rewardAmountBase, regenStaker.REWARD_DURATION(), 100_000_000);
+        rewardAmountBase = bound(rewardAmountBase, regenStaker.rewardDuration(), MAX_REWARD_DURATION + 1_000_000_000);
 
         address user = makeAddr("user");
         whitelistUser(user, true, false, true);
@@ -1079,7 +1084,7 @@ contract RegenIntegrationTest is Test {
         vm.prank(ADMIN);
         regenStaker.notifyRewardAmount(rewardAmount);
 
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
+        vm.warp(block.timestamp + regenStaker.rewardDuration());
 
         vm.startPrank(user);
         uint256 claimed1 = regenStaker.claimReward(depositId1);
@@ -1089,9 +1094,9 @@ contract RegenIntegrationTest is Test {
         uint256 expected1 = (rewardAmount * stakeAmount1) / totalStakeAmount;
         uint256 expected2 = (rewardAmount * stakeAmount2) / totalStakeAmount;
 
-        assertApproxEqRel(claimed1, expected1, ONE_IN_A_MICRO);
-        assertApproxEqRel(claimed2, expected2, ONE_IN_A_MICRO);
-        assertApproxEqRel(claimed1 + claimed2, rewardAmount, ONE_IN_A_MICRO);
+        assertApproxEqRel(claimed1, expected1, ONE_MICRO);
+        assertApproxEqRel(claimed2, expected2, ONE_MICRO);
+        assertApproxEqRel(claimed1 + claimed2, rewardAmount, ONE_MICRO);
     }
 
     function testFuzz_StakeWithdraw_PartialWithdraw_ReducesBalanceAndImpactsRewards(
@@ -1103,7 +1108,7 @@ contract RegenIntegrationTest is Test {
         stakeAmountBase = bound(stakeAmountBase, 100, 10_000);
         withdrawRatio = bound(withdrawRatio, 1, 75);
         otherStakeRatio = bound(otherStakeRatio, 10, 200);
-        rewardAmountBase = bound(rewardAmountBase, regenStaker.REWARD_DURATION(), 100_000_000);
+        rewardAmountBase = bound(rewardAmountBase, regenStaker.rewardDuration(), MAX_REWARD_DURATION + 1_000_000_000);
 
         address user = makeAddr("user");
         address otherStaker = makeAddr("otherStaker");
@@ -1130,7 +1135,7 @@ contract RegenIntegrationTest is Test {
         vm.prank(ADMIN);
         regenStaker.notifyRewardAmount(rewardAmount);
 
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 2);
+        vm.warp(block.timestamp + regenStaker.rewardDuration() / 2);
 
         uint256 withdrawAmount = (userStakeAmount * withdrawRatio) / 100;
         vm.startPrank(user);
@@ -1141,7 +1146,7 @@ contract RegenIntegrationTest is Test {
         assertEq(regenStaker.depositorTotalStaked(user), remainingUserStake);
         assertEq(regenStaker.depositorTotalEarningPower(user), remainingUserStake);
 
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION() / 2);
+        vm.warp(block.timestamp + regenStaker.rewardDuration() / 2);
 
         vm.startPrank(user);
         uint256 claimedAfterWithdraw = regenStaker.claimReward(depositId);
@@ -1151,7 +1156,7 @@ contract RegenIntegrationTest is Test {
         uint256 claimedByOtherStaker = regenStaker.claimReward(otherDepositId);
         vm.stopPrank();
 
-        assertApproxEqRel(claimedAfterWithdraw + claimedByOtherStaker, rewardAmount, ONE_IN_A_MICRO);
+        assertApproxEqRel(claimedAfterWithdraw + claimedByOtherStaker, rewardAmount, ONE_MICRO);
         assertGt(claimedAfterWithdraw, 0);
         assertGt(claimedByOtherStaker, 0);
     }
@@ -1162,7 +1167,7 @@ contract RegenIntegrationTest is Test {
         uint256 withdrawTimePercent
     ) public {
         stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
-        rewardAmountBase = bound(rewardAmountBase, regenStaker.REWARD_DURATION(), 100_000_000);
+        rewardAmountBase = bound(rewardAmountBase, regenStaker.rewardDuration(), MAX_REWARD_DURATION + 1_000_000_000);
         uint256 minWithdrawTime = 10;
         uint256 maxWithdrawTime = 90;
         withdrawTimePercent = bound(withdrawTimePercent, minWithdrawTime, maxWithdrawTime);
@@ -1182,7 +1187,7 @@ contract RegenIntegrationTest is Test {
         vm.prank(ADMIN);
         regenStaker.notifyRewardAmount(rewardAmount);
 
-        uint256 withdrawTime = (regenStaker.REWARD_DURATION() * withdrawTimePercent) / 100;
+        uint256 withdrawTime = (regenStaker.rewardDuration() * withdrawTimePercent) / 100;
         vm.warp(block.timestamp + withdrawTime);
 
         vm.startPrank(user);
@@ -1197,9 +1202,9 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         uint256 expectedReward = (rewardAmount * withdrawTimePercent) / 100;
-        assertApproxEqRel(claimedImmediately, expectedReward, ONE_IN_A_MICRO);
+        assertApproxEqRel(claimedImmediately, expectedReward, ONE_MICRO);
 
-        uint256 remainingTime = regenStaker.REWARD_DURATION() - withdrawTime;
+        uint256 remainingTime = regenStaker.rewardDuration() - withdrawTime;
         vm.warp(block.timestamp + remainingTime);
 
         vm.startPrank(user);
@@ -1215,7 +1220,7 @@ contract RegenIntegrationTest is Test {
         uint256 firstClaimTimePercent
     ) public {
         stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
-        rewardAmountBase = bound(rewardAmountBase, regenStaker.REWARD_DURATION(), 100_000_000);
+        rewardAmountBase = bound(rewardAmountBase, regenStaker.rewardDuration(), MAX_REWARD_DURATION + 1_000_000_000);
         uint256 minClaimTime = 10;
         uint256 maxClaimTime = 90;
         firstClaimTimePercent = bound(firstClaimTimePercent, minClaimTime, maxClaimTime);
@@ -1241,7 +1246,7 @@ contract RegenIntegrationTest is Test {
         vm.prank(ADMIN);
         regenStaker.notifyRewardAmount(rewardAmount);
 
-        uint256 firstClaimTime = (regenStaker.REWARD_DURATION() * firstClaimTimePercent) / 100;
+        uint256 firstClaimTime = (regenStaker.rewardDuration() * firstClaimTimePercent) / 100;
         vm.warp(block.timestamp + firstClaimTime);
 
         uint256 initialClaimerBalance = rewardToken.balanceOf(designatedClaimer);
@@ -1250,10 +1255,10 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         uint256 expectedFirst = (rewardAmount * firstClaimTimePercent) / 100;
-        assertApproxEqRel(claimedAmount1, expectedFirst, ONE_IN_A_MICRO);
+        assertApproxEqRel(claimedAmount1, expectedFirst, ONE_MICRO);
         assertEq(rewardToken.balanceOf(designatedClaimer), initialClaimerBalance + claimedAmount1);
 
-        uint256 remainingTime = regenStaker.REWARD_DURATION() - firstClaimTime;
+        uint256 remainingTime = regenStaker.rewardDuration() - firstClaimTime;
         vm.warp(block.timestamp + remainingTime);
 
         initialClaimerBalance = rewardToken.balanceOf(designatedClaimer);
@@ -1263,10 +1268,10 @@ contract RegenIntegrationTest is Test {
 
         uint256 remainingTimePercent = 100 - firstClaimTimePercent;
         uint256 expectedSecond = (rewardAmount * remainingTimePercent) / 100;
-        assertApproxEqRel(claimedAmount2, expectedSecond, ONE_IN_A_MICRO);
+        assertApproxEqRel(claimedAmount2, expectedSecond, ONE_MICRO);
         assertEq(rewardToken.balanceOf(designatedClaimer), initialClaimerBalance + claimedAmount2);
 
-        assertApproxEqRel(claimedAmount1 + claimedAmount2, rewardAmount, ONE_IN_A_MICRO);
+        assertApproxEqRel(claimedAmount1 + claimedAmount2, rewardAmount, ONE_MICRO);
     }
 
     function testFuzz_RewardClaiming_RevertIf_ClaimByNonOwnerNonClaimer(
@@ -1275,7 +1280,7 @@ contract RegenIntegrationTest is Test {
         uint256 seedForAddresses
     ) public {
         stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
-        rewardAmountBase = bound(rewardAmountBase, regenStaker.REWARD_DURATION(), 100_000_000);
+        rewardAmountBase = bound(rewardAmountBase, regenStaker.rewardDuration(), MAX_REWARD_DURATION + 1_000_000_000);
 
         address owner = makeAddr(string(abi.encodePacked("owner", seedForAddresses)));
         address designatedClaimer = makeAddr(string(abi.encodePacked("claimer", seedForAddresses)));
@@ -1299,7 +1304,7 @@ contract RegenIntegrationTest is Test {
         rewardToken.mint(address(regenStaker), rewardAmount);
         vm.prank(ADMIN);
         regenStaker.notifyRewardAmount(rewardAmount);
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
+        vm.warp(block.timestamp + regenStaker.rewardDuration());
 
         vm.startPrank(unrelatedUser);
         vm.expectRevert(
@@ -1315,7 +1320,7 @@ contract RegenIntegrationTest is Test {
         uint256 seedForAddresses
     ) public {
         stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
-        rewardAmountBase = bound(rewardAmountBase, regenStaker.REWARD_DURATION(), 100_000_000);
+        rewardAmountBase = bound(rewardAmountBase, regenStaker.rewardDuration(), MAX_REWARD_DURATION + 1_000_000_000);
 
         address ownerAddr = makeAddr(string(abi.encodePacked("owner", seedForAddresses)));
         address newClaimer = makeAddr(string(abi.encodePacked("claimer", seedForAddresses)));
@@ -1336,13 +1341,13 @@ contract RegenIntegrationTest is Test {
         rewardToken.mint(address(regenStaker), rewardAmount);
         vm.prank(ADMIN);
         regenStaker.notifyRewardAmount(rewardAmount);
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
+        vm.warp(block.timestamp + regenStaker.rewardDuration());
 
         vm.startPrank(ownerAddr);
         uint256 claimedByOwner = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        assertApproxEqRel(claimedByOwner, rewardAmount, ONE_IN_A_MICRO);
+        assertApproxEqRel(claimedByOwner, rewardAmount, ONE_MICRO);
     }
 
     function testFuzz_RevertIf_WithdrawWhenPaused(uint256 stakeAmountBase, uint256 withdrawAmountRatio) public {
@@ -1382,7 +1387,7 @@ contract RegenIntegrationTest is Test {
 
     function testFuzz_RevertIf_ClaimRewardWhenPaused(uint256 stakeAmountBase, uint256 rewardAmountBase) public {
         stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
-        rewardAmountBase = bound(rewardAmountBase, regenStaker.REWARD_DURATION(), 100_000_000);
+        rewardAmountBase = bound(rewardAmountBase, regenStaker.rewardDuration(), MAX_REWARD_DURATION + 1_000_000_000);
 
         uint256 stakeAmount = getStakeAmount(stakeAmountBase);
         uint256 rewardAmount = getRewardAmount(rewardAmountBase);
@@ -1399,7 +1404,7 @@ contract RegenIntegrationTest is Test {
         rewardToken.mint(address(regenStaker), rewardAmount);
         vm.prank(ADMIN);
         regenStaker.notifyRewardAmount(rewardAmount);
-        uint256 halfDuration = regenStaker.REWARD_DURATION() / 2;
+        uint256 halfDuration = regenStaker.rewardDuration() / 2;
         vm.warp(block.timestamp + halfDuration);
 
         vm.prank(ADMIN);
@@ -1422,7 +1427,7 @@ contract RegenIntegrationTest is Test {
         uint256 contributionAmountBase
     ) public {
         stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
-        rewardAmountBase = bound(rewardAmountBase, regenStaker.REWARD_DURATION(), 100_000_000);
+        rewardAmountBase = bound(rewardAmountBase, regenStaker.rewardDuration(), MAX_REWARD_DURATION + 1_000_000_000);
         contributionAmountBase = bound(contributionAmountBase, 1, 1_000);
 
         uint256 stakeAmount = getStakeAmount(stakeAmountBase);
@@ -1455,7 +1460,7 @@ contract RegenIntegrationTest is Test {
 
         vm.prank(ADMIN);
         regenStaker.notifyRewardAmount(rewardAmount);
-        vm.warp(block.timestamp + regenStaker.REWARD_DURATION());
+        vm.warp(block.timestamp + regenStaker.rewardDuration());
 
         vm.prank(ADMIN);
         regenStaker.pause();
@@ -1469,5 +1474,327 @@ contract RegenIntegrationTest is Test {
         vm.startPrank(ADMIN);
         regenStaker.unpause();
         assertFalse(regenStaker.paused());
+    }
+
+    function testFuzz_SetRewardDuration(uint256 newDuration) public {
+        newDuration = bound(newDuration, MIN_REWARD_DURATION, MAX_REWARD_DURATION);
+
+        vm.prank(ADMIN);
+        vm.expectEmit(true, true, true, true);
+        emit RegenStaker.RewardDurationSet(newDuration);
+        regenStaker.setRewardDuration(newDuration);
+
+        assertEq(regenStaker.rewardDuration(), newDuration);
+    }
+
+    function testFuzz_RevertIf_NonAdminCannotSetRewardDuration(address nonAdmin, uint256 newDuration) public {
+        vm.assume(nonAdmin != ADMIN);
+        newDuration = bound(newDuration, MIN_REWARD_DURATION, MAX_REWARD_DURATION);
+
+        vm.startPrank(nonAdmin);
+        vm.expectRevert(abi.encodeWithSelector(Staker.Staker__Unauthorized.selector, bytes32("not admin"), nonAdmin));
+        regenStaker.setRewardDuration(newDuration);
+        vm.stopPrank();
+    }
+
+    function testFuzz_RevertIf_SetRewardDurationTooLow() public {
+        vm.startPrank(ADMIN);
+        vm.expectRevert(abi.encodeWithSelector(RegenStaker.InvalidRewardDuration.selector, 29 days));
+        regenStaker.setRewardDuration(29 days);
+        vm.stopPrank();
+    }
+
+    function testFuzz_RevertIf_SetRewardDurationToZero() public {
+        vm.startPrank(ADMIN);
+        vm.expectRevert(abi.encodeWithSelector(RegenStaker.InvalidRewardDuration.selector, 0));
+        regenStaker.setRewardDuration(0);
+        vm.stopPrank();
+    }
+
+    function testFuzz_RevertIf_SetRewardDurationTooHigh() public {
+        vm.startPrank(ADMIN);
+        vm.expectRevert(abi.encodeWithSelector(RegenStaker.InvalidRewardDuration.selector, 3001 days));
+        regenStaker.setRewardDuration(3001 days);
+        vm.stopPrank();
+    }
+
+    function testFuzz_RevertIf_SetRewardDurationDuringActiveReward(uint256 newDuration) public {
+        newDuration = bound(newDuration, MIN_REWARD_DURATION, MAX_REWARD_DURATION);
+
+        address staker = makeAddr("staker");
+        whitelistUser(staker, true, false, true);
+
+        uint256 stakeAmount = getStakeAmount(1);
+        uint256 rewardAmount = getRewardAmount(regenStaker.rewardDuration());
+
+        stakeToken.mint(staker, stakeAmount);
+        vm.startPrank(staker);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        regenStaker.stake(stakeAmount, staker);
+        vm.stopPrank();
+
+        rewardToken.mint(address(regenStaker), rewardAmount);
+        vm.prank(ADMIN);
+        regenStaker.notifyRewardAmount(rewardAmount);
+
+        vm.warp(block.timestamp + regenStaker.rewardDuration() / 2);
+
+        vm.startPrank(ADMIN);
+        vm.expectRevert(abi.encodeWithSelector(RegenStaker.CannotChangeRewardDurationDuringActiveReward.selector));
+        regenStaker.setRewardDuration(newDuration);
+        vm.stopPrank();
+    }
+
+    function testFuzz_Constructor_WithCustomRewardDuration(uint256 customDuration) public {
+        customDuration = bound(customDuration, MIN_REWARD_DURATION, MAX_REWARD_DURATION);
+
+        vm.startPrank(ADMIN);
+        RegenStaker localRegenStaker = new RegenStaker(
+            IERC20(address(rewardToken)),
+            IERC20Staking(address(stakeToken)),
+            ADMIN,
+            Whitelist(address(0)),
+            Whitelist(address(0)),
+            calculator,
+            MAX_BUMP_TIP,
+            MAX_CLAIM_FEE,
+            0,
+            customDuration
+        );
+
+        assertEq(localRegenStaker.rewardDuration(), customDuration);
+        vm.stopPrank();
+    }
+
+    function testFuzz_Constructor_WithZeroRewardDurationDefaultsToThirtyDays() public {
+        vm.startPrank(ADMIN);
+        RegenStaker localRegenStaker = new RegenStaker(
+            IERC20(address(rewardToken)),
+            IERC20Staking(address(stakeToken)),
+            ADMIN,
+            Whitelist(address(0)),
+            Whitelist(address(0)),
+            calculator,
+            MAX_BUMP_TIP,
+            MAX_CLAIM_FEE,
+            0,
+            0
+        );
+
+        assertEq(localRegenStaker.rewardDuration(), MIN_REWARD_DURATION);
+        vm.stopPrank();
+    }
+
+    function testFuzz_VariableRewardDuration_SingleStaker_FullPeriod(
+        uint256 stakeAmountBase,
+        uint256 rewardAmountBase,
+        uint256 customDurationDays
+    ) public {
+        stakeAmountBase = bound(stakeAmountBase, 1, 100_000);
+        customDurationDays = bound(customDurationDays, 30, 365);
+        uint256 customDuration = customDurationDays * 1 days;
+        rewardAmountBase = bound(rewardAmountBase, customDuration, 100_000_000);
+
+        vm.prank(ADMIN);
+        regenStaker.setRewardDuration(customDuration);
+
+        address staker = makeAddr("staker");
+        whitelistUser(staker, true, false, true);
+
+        uint256 stakeAmount = getStakeAmount(stakeAmountBase);
+        uint256 rewardAmount = getRewardAmount(rewardAmountBase);
+
+        stakeToken.mint(staker, stakeAmount);
+        vm.startPrank(staker);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = regenStaker.stake(stakeAmount, staker);
+        vm.stopPrank();
+
+        rewardToken.mint(address(regenStaker), rewardAmount);
+        vm.prank(ADMIN);
+        regenStaker.notifyRewardAmount(rewardAmount);
+
+        vm.warp(block.timestamp + customDuration);
+
+        vm.startPrank(staker);
+        uint256 claimedAmount = regenStaker.claimReward(depositId);
+        vm.stopPrank();
+
+        assertApproxEqRel(claimedAmount, rewardAmount, ONE_MICRO);
+    }
+
+    function testFuzz_VariableRewardDuration_TwoStakers_ProRataShare(
+        uint256 stakeAmountBase,
+        uint256 rewardAmountBase,
+        uint256 customDurationDays,
+        uint256 secondStakerJoinPercent
+    ) public {
+        stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
+        customDurationDays = bound(customDurationDays, 30, 100);
+        uint256 customDuration = customDurationDays * 1 days;
+        rewardAmountBase = bound(rewardAmountBase, customDuration, 100_000_000);
+        secondStakerJoinPercent = bound(secondStakerJoinPercent, 10, 90);
+
+        vm.prank(ADMIN);
+        regenStaker.setRewardDuration(customDuration);
+
+        address stakerA = makeAddr("stakerA");
+        address stakerB = makeAddr("stakerB");
+
+        whitelistUser(stakerA, true, false, true);
+        whitelistUser(stakerB, true, false, true);
+
+        uint256 stakeAmount = getStakeAmount(stakeAmountBase);
+        uint256 rewardAmount = getRewardAmount(rewardAmountBase);
+
+        stakeToken.mint(stakerA, stakeAmount);
+        vm.startPrank(stakerA);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        Staker.DepositIdentifier depositIdA = regenStaker.stake(stakeAmount, stakerA);
+        vm.stopPrank();
+
+        rewardToken.mint(address(regenStaker), rewardAmount);
+        vm.prank(ADMIN);
+        regenStaker.notifyRewardAmount(rewardAmount);
+
+        uint256 stakerBJoinTime = (customDuration * secondStakerJoinPercent) / 100;
+        vm.warp(block.timestamp + stakerBJoinTime);
+
+        stakeToken.mint(stakerB, stakeAmount);
+        vm.startPrank(stakerB);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        Staker.DepositIdentifier depositIdB = regenStaker.stake(stakeAmount, stakerB);
+        vm.stopPrank();
+
+        uint256 remainingTime = customDuration - stakerBJoinTime;
+        vm.warp(block.timestamp + remainingTime);
+
+        vm.startPrank(stakerA);
+        uint256 claimedA = regenStaker.claimReward(depositIdA);
+        vm.stopPrank();
+
+        vm.startPrank(stakerB);
+        uint256 claimedB = regenStaker.claimReward(depositIdB);
+        vm.stopPrank();
+
+        uint256 soloPhaseRewards = (rewardAmount * secondStakerJoinPercent) / 100;
+        uint256 sharedPhasePercent = 100 - secondStakerJoinPercent;
+        uint256 sharedPhaseRewards = (rewardAmount * sharedPhasePercent) / 100;
+
+        uint256 expectedA = soloPhaseRewards + (sharedPhaseRewards / 2);
+        uint256 expectedB = sharedPhaseRewards / 2;
+
+        assertApproxEqRel(claimedA, expectedA, ONE_MICRO);
+        assertApproxEqRel(claimedB, expectedB, ONE_MICRO);
+        assertApproxEqRel(claimedA + claimedB, rewardAmount, ONE_MICRO);
+    }
+
+    function testFuzz_VariableRewardDuration_ClaimsMidPeriod(
+        uint256 stakeAmountBase,
+        uint256 rewardAmountBase,
+        uint256 customDurationDays,
+        uint256 firstClaimTimePercent
+    ) public {
+        stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
+        customDurationDays = bound(customDurationDays, 30, 100);
+        uint256 customDuration = customDurationDays * 1 days;
+        rewardAmountBase = bound(rewardAmountBase, customDuration, 100_000_000);
+        firstClaimTimePercent = bound(firstClaimTimePercent, 10, 90);
+
+        vm.prank(ADMIN);
+        regenStaker.setRewardDuration(customDuration);
+
+        address staker = makeAddr("staker");
+        whitelistUser(staker, true, false, true);
+
+        uint256 stakeAmount = getStakeAmount(stakeAmountBase);
+        uint256 rewardAmount = getRewardAmount(rewardAmountBase);
+
+        stakeToken.mint(staker, stakeAmount);
+        vm.startPrank(staker);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = regenStaker.stake(stakeAmount, staker);
+        vm.stopPrank();
+
+        rewardToken.mint(address(regenStaker), rewardAmount);
+        vm.prank(ADMIN);
+        regenStaker.notifyRewardAmount(rewardAmount);
+
+        uint256 firstClaimTime = (customDuration * firstClaimTimePercent) / 100;
+        vm.warp(block.timestamp + firstClaimTime);
+
+        vm.startPrank(staker);
+        uint256 claimedAmount1 = regenStaker.claimReward(depositId);
+        vm.stopPrank();
+
+        uint256 expectedFirst = (rewardAmount * firstClaimTimePercent) / 100;
+        assertApproxEqRel(claimedAmount1, expectedFirst, ONE_NANO);
+
+        uint256 remainingTime = customDuration - firstClaimTime;
+        vm.warp(block.timestamp + remainingTime);
+
+        vm.startPrank(staker);
+        uint256 claimedAmount2 = regenStaker.claimReward(depositId);
+        vm.stopPrank();
+
+        uint256 remainingTimePercent = 100 - firstClaimTimePercent;
+        uint256 expectedSecond = (rewardAmount * remainingTimePercent) / 100;
+
+        assertApproxEqRel(claimedAmount2, expectedSecond, ONE_NANO);
+        assertApproxEqRel(claimedAmount1 + claimedAmount2, rewardAmount, ONE_NANO);
+    }
+
+    function testFuzz_VariableRewardDuration_ChangeDurationBetweenRewards(
+        uint256 stakeAmountBase,
+        uint256 rewardAmountBase,
+        uint256 firstDurationDays,
+        uint256 secondDurationDays
+    ) public {
+        stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
+        firstDurationDays = bound(firstDurationDays, 30, 60);
+        secondDurationDays = bound(secondDurationDays, 30, 60);
+        uint256 firstDuration = firstDurationDays * 1 days;
+        uint256 secondDuration = secondDurationDays * 1 days;
+        rewardAmountBase = bound(rewardAmountBase, max(firstDuration, secondDuration), 100_000_000);
+
+        vm.prank(ADMIN);
+        regenStaker.setRewardDuration(firstDuration);
+
+        address staker = makeAddr("staker");
+        whitelistUser(staker, true, false, true);
+
+        uint256 stakeAmount = getStakeAmount(stakeAmountBase);
+        uint256 rewardAmount = getRewardAmount(rewardAmountBase);
+
+        stakeToken.mint(staker, stakeAmount);
+        vm.startPrank(staker);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = regenStaker.stake(stakeAmount, staker);
+        vm.stopPrank();
+
+        rewardToken.mint(address(regenStaker), rewardAmount * 2);
+        vm.prank(ADMIN);
+        regenStaker.notifyRewardAmount(rewardAmount);
+
+        vm.warp(block.timestamp + firstDuration + 1);
+
+        vm.prank(ADMIN);
+        regenStaker.setRewardDuration(secondDuration);
+
+        vm.prank(ADMIN);
+        regenStaker.notifyRewardAmount(rewardAmount);
+
+        vm.warp(block.timestamp + secondDuration);
+
+        vm.startPrank(staker);
+        uint256 claimedAmount = regenStaker.claimReward(depositId);
+        vm.stopPrank();
+
+        assertGt(claimedAmount, 0);
+        assertLe(claimedAmount, rewardAmount * 2);
+    }
+
+    function max(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a >= b ? a : b;
     }
 }

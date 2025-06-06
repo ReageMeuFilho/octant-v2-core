@@ -24,6 +24,19 @@ contract RegenStakerFactory {
         uint256 minimumStakeAmount;
     }
 
+    struct CreateStakerParams {
+        IERC20 rewardsToken;
+        IERC20Staking stakeToken;
+        address admin;
+        IWhitelist stakerWhitelist;
+        IWhitelist contributionWhitelist;
+        IEarningPowerCalculator earningPowerCalculator;
+        uint256 maxBumpTip;
+        uint256 maxClaimFee;
+        uint256 minimumStakeAmount;
+        uint256 rewardDuration;
+    }
+
     mapping(address => StakerInfo[]) public stakers;
 
     event StakerDeploy(
@@ -39,41 +52,23 @@ contract RegenStakerFactory {
     );
 
     /// @notice Creates a RegenStaker contract.
-    /// @param _rewardsToken The address of the rewards token.
-    /// @param _stakeToken The address of the stake token.
-    /// @param _admin The address of the admin.
-    /// @param _stakerWhitelist The address of the staker whitelist.
-    /// @param _contributionWhitelist The address of the contribution whitelist.
-    /// @param _earningPowerCalculator The address of the earning power calculator.
-    /// @param _maxBumpTip The maximum bump tip.
-    /// @param _maxClaimFee The maximum claim fee.
-    /// @param _minimumStakeAmount The minimum stake amount.
+    /// @param _params The parameters for creating the RegenStaker contract.
     /// @param _salt The salt used to deploy the RegenStaker contract.
     /// @return stakerAddress The address of the RegenStaker contract.
-    function createStaker(
-        IERC20 _rewardsToken,
-        IERC20Staking _stakeToken,
-        address _admin,
-        IWhitelist _stakerWhitelist,
-        IWhitelist _contributionWhitelist,
-        IEarningPowerCalculator _earningPowerCalculator,
-        uint256 _maxBumpTip,
-        uint256 _maxClaimFee,
-        uint256 _minimumStakeAmount,
-        bytes32 _salt
-    ) external returns (address stakerAddress) {
+    function createStaker(CreateStakerParams calldata _params, bytes32 _salt) external returns (address stakerAddress) {
         bytes memory bytecode = abi.encodePacked(
             type(RegenStaker).creationCode,
             abi.encode(
-                _rewardsToken,
-                _stakeToken,
-                _admin,
-                _stakerWhitelist,
-                _contributionWhitelist,
-                _earningPowerCalculator,
-                _maxBumpTip,
-                _maxClaimFee,
-                _minimumStakeAmount
+                _params.rewardsToken,
+                _params.stakeToken,
+                _params.admin,
+                _params.stakerWhitelist,
+                _params.contributionWhitelist,
+                _params.earningPowerCalculator,
+                _params.maxBumpTip,
+                _params.maxClaimFee,
+                _params.minimumStakeAmount,
+                _params.rewardDuration
             )
         );
 
@@ -81,25 +76,25 @@ contract RegenStakerFactory {
 
         emit StakerDeploy(
             msg.sender,
-            _admin,
+            _params.admin,
             stakerAddress,
-            address(_rewardsToken),
-            address(_stakeToken),
-            _maxBumpTip,
-            _maxClaimFee,
-            _minimumStakeAmount,
+            address(_params.rewardsToken),
+            address(_params.stakeToken),
+            _params.maxBumpTip,
+            _params.maxClaimFee,
+            _params.minimumStakeAmount,
             _salt
         );
 
         StakerInfo memory stakerInfo = StakerInfo({
             deployerAddress: msg.sender,
             timestamp: block.timestamp,
-            admin: _admin,
-            rewardsToken: address(_rewardsToken),
-            stakeToken: address(_stakeToken),
-            maxBumpTip: _maxBumpTip,
-            maxClaimFee: _maxClaimFee,
-            minimumStakeAmount: _minimumStakeAmount
+            admin: _params.admin,
+            rewardsToken: address(_params.rewardsToken),
+            stakeToken: address(_params.stakeToken),
+            maxBumpTip: _params.maxBumpTip,
+            maxClaimFee: _params.maxClaimFee,
+            minimumStakeAmount: _params.minimumStakeAmount
         });
 
         stakers[msg.sender].push(stakerInfo);

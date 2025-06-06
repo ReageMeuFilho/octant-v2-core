@@ -95,7 +95,8 @@ contract SkyCompounterHealthCheckTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
-            strategySalt
+            strategySalt,
+            address(tokenizedStrategy)
         );
         vm.stopPrank();
 

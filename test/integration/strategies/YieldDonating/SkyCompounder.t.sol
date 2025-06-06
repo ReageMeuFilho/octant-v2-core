@@ -28,6 +28,7 @@ contract SkyCompounderTest is Test {
     // Factory for creating strategies
     YieldDonatingTokenizedStrategy tokenizedStrategy;
     SkyCompounderStrategyFactory public factory;
+    YieldDonatingTokenizedStrategy public implementation;
 
     // Strategy parameters
     address public management;
@@ -76,10 +77,8 @@ contract SkyCompounderTest is Test {
         vm.rollFork(mainnetForkBlock);
 
         // Etch YieldDonatingTokenizedStrategy
-        YieldDonatingTokenizedStrategy tempStrategy = new YieldDonatingTokenizedStrategy{
-            salt: keccak256("OCT_YIELD_DONATING_STRATEGY_V1")
-        }();
-        bytes memory tokenizedStrategyBytecode = address(tempStrategy).code;
+        implementation = new YieldDonatingTokenizedStrategy{ salt: keccak256("OCT_YIELD_DONATING_STRATEGY_V1") }();
+        bytes memory tokenizedStrategyBytecode = address(implementation).code;
         vm.etch(TOKENIZED_STRATEGY_ADDRESS, tokenizedStrategyBytecode);
 
         // Now use that address as our tokenizedStrategy
@@ -103,7 +102,8 @@ contract SkyCompounderTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
-            strategySalt
+            strategySalt,
+            address(implementation)
         );
         vm.stopPrank();
 

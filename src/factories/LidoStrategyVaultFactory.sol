@@ -61,11 +61,20 @@ contract LidoStrategyVaultFactory {
         address _keeper,
         address _emergencyAdmin,
         address _donationAddress,
-        bytes32 _salt
+        bytes32 _salt,
+        address _tokenizedStrategyAddress
     ) external returns (address strategyAddress) {
         bytes memory bytecode = abi.encodePacked(
             type(LidoStrategy).creationCode,
-            abi.encode(WSTETH, _name, _management, _keeper, _emergencyAdmin, _donationAddress)
+            abi.encode(
+                WSTETH,
+                _name,
+                _management,
+                _keeper,
+                _emergencyAdmin,
+                _donationAddress,
+                _tokenizedStrategyAddress
+            )
         );
 
         strategyAddress = CREATE3.deployDeterministic(bytecode, _salt);

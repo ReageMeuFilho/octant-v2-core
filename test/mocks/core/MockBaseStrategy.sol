@@ -13,8 +13,9 @@ contract MockStrategy is BaseStrategy {
 
     constructor(
         address _asset,
-        address _yieldSource
-    ) BaseStrategy(_asset, "Test Strategy", msg.sender, msg.sender, msg.sender, msg.sender) {
+        address _yieldSource,
+        address _tokenizedStrategyAddress
+    ) BaseStrategy(_asset, "Test Strategy", msg.sender, msg.sender, msg.sender, msg.sender, _tokenizedStrategyAddress) {
         initialize(_asset, _yieldSource);
     }
 

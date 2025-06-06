@@ -22,6 +22,7 @@ contract Setup is Test {
     MockFactory public mockFactory;
     MockYieldSource public yieldSource;
     YieldDonatingTokenizedStrategy public tokenizedStrategy;
+    YieldDonatingTokenizedStrategy public implementation;
 
     // Addresses for different roles we will use repeatedly.
     address public user = address(1);
@@ -50,7 +51,7 @@ contract Setup is Test {
         mockFactory = new MockFactory(0, protocolFeeRecipient);
 
         // Deploy the implementation for deterministic location
-        YieldDonatingTokenizedStrategy implementation = new YieldDonatingTokenizedStrategy();
+        implementation = new YieldDonatingTokenizedStrategy();
 
         // Deploy the proxy for deterministic location
         tokenizedStrategy = YieldDonatingTokenizedStrategy(address(new ERC1967Proxy(address(implementation), "")));
@@ -99,7 +100,8 @@ contract Setup is Test {
                     management,
                     keeper,
                     emergencyAdmin,
-                    donationAddress
+                    donationAddress,
+                    address(implementation)
                 )
             )
         );
@@ -128,7 +130,8 @@ contract Setup is Test {
                     management,
                     keeper,
                     emergencyAdmin,
-                    donationAddress
+                    donationAddress,
+                    address(implementation)
                 )
             )
         );
@@ -158,7 +161,8 @@ contract Setup is Test {
                     management,
                     keeper,
                     emergencyAdmin,
-                    donationAddress
+                    donationAddress,
+                    address(implementation)
                 )
             )
         );

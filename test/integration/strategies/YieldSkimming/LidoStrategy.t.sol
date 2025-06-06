@@ -33,6 +33,7 @@ contract LidoStrategyTest is Test {
     address public donationAddress;
     string public vaultSharesName = "Lido Vault Shares";
     bytes32 public strategySalt = keccak256("TEST_STRATEGY_SALT");
+    YieldSkimmingTokenizedStrategy public implementation;
 
     // Test user
     address public user = address(0x1234);
@@ -91,10 +92,8 @@ contract LidoStrategyTest is Test {
         vm.selectFork(mainnetFork);
 
         // Etch YieldSkimmingTokenizedStrategy
-        YieldSkimmingTokenizedStrategy tempStrategy = new YieldSkimmingTokenizedStrategy{
-            salt: keccak256("OCT_YIELD_SKIMMING_STRATEGY_V1")
-        }();
-        bytes memory tokenizedStrategyBytecode = address(tempStrategy).code;
+        implementation = new YieldSkimmingTokenizedStrategy{ salt: keccak256("OCT_YIELD_SKIMMING_STRATEGY_V1") }();
+        bytes memory tokenizedStrategyBytecode = address(implementation).code;
         vm.etch(TOKENIZED_STRATEGY_ADDRESS, tokenizedStrategyBytecode);
 
         // Now use that address as our tokenizedStrategy
@@ -117,7 +116,8 @@ contract LidoStrategyTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
-            strategySalt
+            strategySalt,
+            address(implementation)
         );
         vm.stopPrank();
 
