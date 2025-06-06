@@ -158,7 +158,9 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
         _setClaimFeeParameters(ClaimFeeParameters({ feeAmount: 0, feeCollector: address(0) }));
         minimumStakeAmount = _minimumStakeAmount;
 
-        rewardDuration = _rewardDuration == 0 ? MIN_REWARD_DURATION : _rewardDuration;
+        if (_rewardDuration < MIN_REWARD_DURATION) rewardDuration = MIN_REWARD_DURATION;
+        else if (_rewardDuration > MAX_REWARD_DURATION) rewardDuration = MAX_REWARD_DURATION;
+        else rewardDuration = _rewardDuration;
     }
 
     /// @notice Sets the reward duration for future reward notifications
