@@ -88,6 +88,9 @@ contract RegenStaker is
 {
     using SafeCast for uint256;
 
+    uint256 public constant MIN_REWARD_DURATION = 30 days;
+    uint256 public constant MAX_REWARD_DURATION = 3000 days;
+
     IWhitelist public stakerWhitelist;
     IWhitelist public contributionWhitelist;
     uint256 public minimumStakeAmount = 0;
@@ -109,7 +112,7 @@ contract RegenStaker is
     error PreferencesAndPreferenceWeightsMustHaveTheSameLength();
     error InvalidNumberOfPreferences(uint256 actual, uint256 min, uint256 max);
     error MinimumStakeAmountNotMet(uint256 expected, uint256 actual);
-    error InvalidRewardDuration();
+    error InvalidRewardDuration(uint256 rewardDuration);
 
     modifier onlyWhitelistedIfWhitelistIsSet(IWhitelist _whitelist, address _user) {
         if (_whitelist != IWhitelist(address(0)) && !_whitelist.isWhitelisted(_user)) {
@@ -163,14 +166,17 @@ contract RegenStaker is
         _setClaimFeeParameters(ClaimFeeParameters({ feeAmount: 0, feeCollector: address(0) }));
         minimumStakeAmount = _minimumStakeAmount;
 
-        rewardDuration = _rewardDuration == 0 ? 30 days : _rewardDuration;
+        rewardDuration = _rewardDuration == 0 ? MIN_REWARD_DURATION : _rewardDuration;
     }
 
     /// @notice Sets the reward duration for future reward notifications
     /// @param _rewardDuration The new reward duration in seconds
     function setRewardDuration(uint256 _rewardDuration) external {
         _revertIfNotAdmin();
-        if (_rewardDuration == 0) revert InvalidRewardDuration();
+        require(
+            _rewardDuration >= MIN_REWARD_DURATION && _rewardDuration <= MAX_REWARD_DURATION,
+            InvalidRewardDuration(_rewardDuration)
+        );
 
         emit RewardDurationSet(_rewardDuration);
         rewardDuration = _rewardDuration;
