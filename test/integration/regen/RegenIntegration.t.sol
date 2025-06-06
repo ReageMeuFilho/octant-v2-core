@@ -1518,6 +1518,33 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
     }
 
+    function testFuzz_RevertIf_SetRewardDurationDuringActiveReward(uint256 newDuration) public {
+        newDuration = bound(newDuration, MIN_REWARD_DURATION, MAX_REWARD_DURATION);
+
+        address staker = makeAddr("staker");
+        whitelistUser(staker, true, false, true);
+
+        uint256 stakeAmount = getStakeAmount(1);
+        uint256 rewardAmount = getRewardAmount(regenStaker.rewardDuration());
+
+        stakeToken.mint(staker, stakeAmount);
+        vm.startPrank(staker);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        regenStaker.stake(stakeAmount, staker);
+        vm.stopPrank();
+
+        rewardToken.mint(address(regenStaker), rewardAmount);
+        vm.prank(ADMIN);
+        regenStaker.notifyRewardAmount(rewardAmount);
+
+        vm.warp(block.timestamp + regenStaker.rewardDuration() / 2);
+
+        vm.startPrank(ADMIN);
+        vm.expectRevert(abi.encodeWithSelector(RegenStaker.CannotChangeRewardDurationDuringActiveReward.selector));
+        regenStaker.setRewardDuration(newDuration);
+        vm.stopPrank();
+    }
+
     function testFuzz_Constructor_WithCustomRewardDuration(uint256 customDuration) public {
         customDuration = bound(customDuration, MIN_REWARD_DURATION, MAX_REWARD_DURATION);
 
@@ -1749,7 +1776,7 @@ contract RegenIntegrationTest is Test {
         vm.prank(ADMIN);
         regenStaker.notifyRewardAmount(rewardAmount);
 
-        vm.warp(block.timestamp + firstDuration / 2);
+        vm.warp(block.timestamp + firstDuration + 1);
 
         vm.prank(ADMIN);
         regenStaker.setRewardDuration(secondDuration);

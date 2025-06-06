@@ -106,6 +106,7 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
     error InvalidNumberOfPreferences(uint256 actual, uint256 min, uint256 max);
     error MinimumStakeAmountNotMet(uint256 expected, uint256 actual);
     error InvalidRewardDuration(uint256 rewardDuration);
+    error CannotChangeRewardDurationDuringActiveReward();
 
     modifier onlyWhitelistedIfWhitelistIsSet(IWhitelist _whitelist, address _user) {
         if (_whitelist != IWhitelist(address(0)) && !_whitelist.isWhitelisted(_user)) {
@@ -167,6 +168,7 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
     /// @param _rewardDuration The new reward duration in seconds
     function setRewardDuration(uint256 _rewardDuration) external {
         _revertIfNotAdmin();
+        require(block.timestamp > rewardEndTime, CannotChangeRewardDurationDuringActiveReward());
         require(
             _rewardDuration >= MIN_REWARD_DURATION && _rewardDuration <= MAX_REWARD_DURATION,
             InvalidRewardDuration(_rewardDuration)
