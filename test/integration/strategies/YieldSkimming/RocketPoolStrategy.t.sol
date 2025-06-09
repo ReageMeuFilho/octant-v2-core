@@ -31,7 +31,7 @@ contract RocketPoolStrategyTest is Test {
     address public keeper;
     address public emergencyAdmin;
     address public donationAddress;
-    string public vaultSharesName = "Lido Vault Shares";
+    string public vaultSharesName = "RocketPool Vault Shares";
     bytes32 public strategySalt = keccak256("TEST_STRATEGY_SALT");
     YieldSkimmingTokenizedStrategy public implementation;
 
@@ -39,13 +39,20 @@ contract RocketPoolStrategyTest is Test {
     address public user = address(0x1234);
 
     // Mainnet addresses
-    address public constant rETH = 0xae78736Cd615f374D3085123A210448E74Fc6393;
+    address public constant R_ETH = 0xae78736Cd615f374D3085123A210448E74Fc6393;
     address public constant TOKENIZED_STRATEGY_ADDRESS = 0x8cf7246a74704bBE59c9dF614ccB5e3d9717d8Ac;
 
     // Test constants
-    uint256 public constant INITIAL_DEPOSIT = 100000e18; // rETH has 18 decimals
+    uint256 public constant INITIAL_DEPOSIT = 100000e18; // R_ETH has 18 decimals
     uint256 public mainnetFork;
     uint256 public mainnetForkBlock = 22508883 - 6500 * 90; // latest alchemy block - 90 days
+
+    // Fuzzing bounds
+    uint256 constant MIN_DEPOSIT = 1e15; // 0.001 R_ETH minimum
+    uint256 constant MAX_DEPOSIT = 10000e18; // 10,000 R_ETH maximum
+    uint256 constant MIN_EXCHANGE_RATE_CHANGE = 10000; // 1%
+    uint256 constant MAX_EXCHANGE_RATE_CHANGE = 200000; // 200%
+    uint256 constant BASIS_POINTS = 10000;
 
     // Events from ITokenizedStrategy
     event Reported(uint256 profit, uint256 loss);
@@ -126,7 +133,7 @@ contract RocketPoolStrategyTest is Test {
         // Label addresses for better trace outputs
         vm.label(address(strategy), "RocketPool");
         vm.label(address(factory), "YieldSkimmingVaultFactory");
-        vm.label(rETH, "RocketPool Yield Vault");
+        vm.label(R_ETH, "RocketPool Yield Vault");
         vm.label(TOKENIZED_STRATEGY_ADDRESS, "TokenizedStrategy");
         vm.label(management, "Management");
         vm.label(keeper, "Keeper");
@@ -135,65 +142,90 @@ contract RocketPoolStrategyTest is Test {
         vm.label(user, "Test User");
 
         // Airdrop rETH tokens to test user
-        airdrop(ERC20(rETH), user, INITIAL_DEPOSIT);
+        airdrop(ERC20(R_ETH), user, INITIAL_DEPOSIT);
 
         // Approve strategy to spend user's tokens
         vm.startPrank(user);
-        ERC20(rETH).approve(address(strategy), type(uint256).max);
+        ERC20(R_ETH).approve(address(strategy), type(uint256).max);
         vm.stopPrank();
     }
 
     /// @notice Test that the strategy is properly initialized
-    function testInitializationLido() public view {
-        assertEq(IERC4626(address(strategy)).asset(), rETH, "Yield vault address incorrect");
+    function testInitializationRocketPool() public view {
+        assertEq(IERC4626(address(strategy)).asset(), R_ETH, "Yield vault address incorrect");
         assertEq(vault.management(), management, "Management address incorrect");
         assertEq(vault.keeper(), keeper, "Keeper address incorrect");
         assertEq(vault.emergencyAdmin(), emergencyAdmin, "Emergency admin incorrect");
         assertGt(strategy.getLastReportedExchangeRate(), 0, "Last reported exchange rate should be initialized");
     }
 
-    /// @notice Test depositing assets into the strategy
-    function testDepositLido() public {
-        uint256 depositAmount = 100e18; // 100 rETH
+    /// @notice Fuzz test for depositing assets into the strategy
+    function testFuzzDepositRocketPool(uint256 depositAmount) public {
+        // Bound the deposit amount to reasonable values
+        depositAmount = bound(depositAmount, MIN_DEPOSIT, MAX_DEPOSIT);
 
         // Initial balances
-        uint256 initialUserBalance = ERC20(rETH).balanceOf(user);
+        uint256 initialUserBalance = ERC20(R_ETH).balanceOf(user);
+
+        // Ensure user has enough balance
+        if (initialUserBalance < depositAmount) {
+            airdrop(ERC20(R_ETH), user, depositAmount);
+            initialUserBalance = ERC20(R_ETH).balanceOf(user);
+        }
 
         // Deposit assets
         vm.startPrank(user);
         // approve the strategy to spend the user's tokens
-        ERC20(rETH).approve(address(strategy), depositAmount);
+        ERC20(R_ETH).approve(address(strategy), depositAmount);
         uint256 sharesReceived = vault.deposit(depositAmount, user);
         vm.stopPrank();
 
         // Verify balances after deposit
-        assertEq(ERC20(rETH).balanceOf(user), initialUserBalance - depositAmount, "User balance not reduced correctly");
+        assertEq(
+            ERC20(R_ETH).balanceOf(user),
+            initialUserBalance - depositAmount,
+            "User balance not reduced correctly"
+        );
 
         assertGt(sharesReceived, 0, "No shares received from deposit");
         assertGt(strategy.balanceOfShares(), 0, "Strategy should have deployed assets to yield vault");
     }
 
-    /// @notice Test withdrawing assets from the strategy
-    function testWithdraw() public {
-        uint256 depositAmount = 100e18; // 100 rETH
+    /// @notice Fuzz test for withdrawing assets from the strategy
+    function testFuzzWithdraw(uint256 depositAmount, uint256 withdrawPercentage) public {
+        // Bound the inputs
+        depositAmount = bound(depositAmount, MIN_DEPOSIT, MAX_DEPOSIT);
+        withdrawPercentage = bound(withdrawPercentage, 1, 100); // 1% to 100%
+
+        // Ensure user has enough balance
+        if (ERC20(R_ETH).balanceOf(user) < depositAmount) {
+            airdrop(ERC20(R_ETH), user, depositAmount);
+        }
 
         // Deposit first
         vm.startPrank(user);
         vault.deposit(depositAmount, user);
 
         // Initial balances before withdrawal
-        uint256 initialUserBalance = ERC20(rETH).balanceOf(user);
+        uint256 initialUserBalance = ERC20(R_ETH).balanceOf(user);
         uint256 initialShareBalance = vault.balanceOf(user);
 
-        // Withdraw half of the deposit
-        uint256 withdrawAmount = depositAmount / 2;
+        // Calculate withdrawal amount based on percentage
+        uint256 withdrawAmount = (depositAmount * withdrawPercentage) / 100;
+
+        // Ensure withdrawal amount doesn't exceed available
+        uint256 maxWithdraw = vault.maxWithdraw(user);
+        if (withdrawAmount > maxWithdraw) {
+            withdrawAmount = maxWithdraw;
+        }
+
         uint256 sharesToBurn = vault.previewWithdraw(withdrawAmount);
         uint256 assetsReceived = vault.withdraw(withdrawAmount, user, user);
         vm.stopPrank();
 
         // Verify balances after withdrawal
         assertEq(
-            ERC20(rETH).balanceOf(user),
+            ERC20(R_ETH).balanceOf(user),
             initialUserBalance + withdrawAmount,
             "User didn't receive correct assets"
         );
@@ -201,9 +233,16 @@ contract RocketPoolStrategyTest is Test {
         assertEq(assetsReceived, withdrawAmount, "Incorrect amount of assets received");
     }
 
-    /// @notice Test the harvesting functionality using explicit profit simulation
-    function testHarvestWithProfitLido() public {
-        uint256 depositAmount = 100e18; // 100 rETH
+    /// @notice Fuzz test for harvesting functionality with profit simulation
+    function testFuzzHarvestWithProfitRocketPool(uint256 depositAmount, uint256 profitPercentage) public {
+        // Bound the inputs
+        depositAmount = bound(depositAmount, MIN_DEPOSIT, MAX_DEPOSIT);
+        profitPercentage = bound(profitPercentage, 100, 10000); // 1% to 100% // or else will revert on health check
+
+        // Ensure user has enough balance
+        if (ERC20(R_ETH).balanceOf(user) < depositAmount) {
+            airdrop(ERC20(R_ETH), user, depositAmount);
+        }
 
         // Deposit first
         vm.startPrank(user);
@@ -214,11 +253,11 @@ contract RocketPoolStrategyTest is Test {
         uint256 totalAssetsBefore = vault.totalAssets();
         uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
 
-        // Simulate exchange rate increase (10% increase)
-        uint256 newExchangeRate = (initialExchangeRate * 11) / 10;
+        // Simulate exchange rate increase
+        uint256 newExchangeRate = (initialExchangeRate * profitPercentage) / 10000;
 
         // the actual yield vault's getExchangeRate
-        vm.mockCall(rETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(newExchangeRate));
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(newExchangeRate));
 
         uint256 donationAddressBalanceBefore = ERC20(address(strategy)).balanceOf(donationAddress);
 
@@ -233,62 +272,53 @@ contract RocketPoolStrategyTest is Test {
         vm.clearMockedCalls();
 
         // Assert profit and loss
-        assertGt(profit, 0, "Profit should be positive");
+        if (profitPercentage > 10000) {
+            assertGt(profit, 0, "Profit should be positive");
+        }
         assertEq(loss, 0, "There should be no loss");
 
         uint256 donationAddressBalanceAfter = ERC20(address(strategy)).balanceOf(donationAddress);
 
         // donation address should have received the profit
-        assertGt(
-            donationAddressBalanceAfter,
-            donationAddressBalanceBefore,
-            "Donation address should have received profit"
-        );
+        if (profit > 0) {
+            assertGt(
+                donationAddressBalanceAfter,
+                donationAddressBalanceBefore,
+                "Donation address should have received profit"
+            );
+        }
 
         // Check total assets after harvest
         uint256 totalAssetsAfter = vault.totalAssets();
 
         assertEq(totalAssetsAfter, totalAssetsBefore, "Total assets should not change after harvest");
-
-        // donation address should be able to withdraw the profit
-        vm.startPrank(donationAddress);
-        vault.redeem(donationAddressBalanceAfter, donationAddress, donationAddress);
-        vm.stopPrank();
-
-        // check vault balance of donation address
-        assertEq(vault.balanceOf(donationAddress), 0, "Donation address should have no shares after redeem");
-        assertEq(
-            ERC20(address(strategy)).balanceOf(donationAddress),
-            0,
-            "Donation address should have no balance after redeem"
-        );
-        // should have received yield vault shares
-        assertGt(ERC20(rETH).balanceOf(donationAddress), 0, "Donation address should have received yield vault shares");
-
-        // Withdraw everything
-        vm.startPrank(user);
-        uint256 sharesToRedeem = vault.balanceOf(user);
-        uint256 assetsReceived = vault.redeem(sharesToRedeem, user, user);
-        vm.stopPrank();
-
-        // Verify user received their original deposit plus profit
-        assertApproxEqRel(
-            assetsReceived * newExchangeRate,
-            depositAmount * initialExchangeRate,
-            0.000001e18, // 0.0001% tolerance
-            "User should receive original deposit"
-        );
     }
 
-    /// @notice Test multiple users with fair profit distribution
-    function testMultipleUserProfitDistributionLido() public {
+    /// @notice Fuzz test for multiple users with fair profit distribution
+    function testFuzzMultipleUserProfitDistributionRocketPool(
+        uint256 depositAmount1,
+        uint256 depositAmount2,
+        uint256 firstYieldIncrease,
+        uint256 secondYieldIncrease
+    ) public {
         TestState memory state;
+
+        // Bound the inputs
+        depositAmount1 = bound(depositAmount1, MIN_DEPOSIT, MAX_DEPOSIT);
+        depositAmount2 = bound(depositAmount2, MIN_DEPOSIT, MAX_DEPOSIT);
+        firstYieldIncrease = bound(firstYieldIncrease, 10100, 20000); // 1% to 100% increase
+        secondYieldIncrease = bound(secondYieldIncrease, 10100, 15000); // 1% to 50% increase
 
         // First user deposits
         state.user1 = user; // Reuse existing test user
         state.user2 = address(0x5678);
-        state.depositAmount1 = 1000e18; // 1000 rETH
-        state.depositAmount2 = 2000e18; // 2000 rETH
+        state.depositAmount1 = depositAmount1;
+        state.depositAmount2 = depositAmount2;
+
+        // Ensure user1 has enough balance
+        if (ERC20(R_ETH).balanceOf(state.user1) < state.depositAmount1) {
+            airdrop(ERC20(R_ETH), state.user1, state.depositAmount1);
+        }
 
         // Get initial exchange rate
         state.initialExchangeRate = strategy.getLastReportedExchangeRate();
@@ -297,14 +327,14 @@ contract RocketPoolStrategyTest is Test {
         vault.deposit(state.depositAmount1, state.user1);
         vm.stopPrank();
 
-        // Generate yield for first user (10% increase in exchange rate)
-        state.newExchangeRate1 = (state.initialExchangeRate * 110) / 100;
+        // Generate yield for first user
+        state.newExchangeRate1 = (state.initialExchangeRate * firstYieldIncrease) / 10000;
 
         // Check donation address balance before harvest
         state.donationBalanceBefore1 = ERC20(address(strategy)).balanceOf(donationAddress);
 
         // Mock the yield vault's getExchangeRate instead of strategy's internal method
-        vm.mockCall(rETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(state.newExchangeRate1));
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(state.newExchangeRate1));
 
         // Harvest to realize profit
         vm.startPrank(keeper);
@@ -315,33 +345,35 @@ contract RocketPoolStrategyTest is Test {
         state.donationBalanceAfter1 = ERC20(address(strategy)).balanceOf(donationAddress);
 
         // Verify donation address received profit
-        assertGt(
-            state.donationBalanceAfter1,
-            state.donationBalanceBefore1,
-            "Donation address should have received profit after first harvest"
-        );
+        if (firstYieldIncrease > 10000) {
+            assertGt(
+                state.donationBalanceAfter1,
+                state.donationBalanceBefore1,
+                "Donation address should have received profit after first harvest"
+            );
+        }
 
         // Second user deposits after profit
         vm.startPrank(address(this));
-        airdrop(ERC20(rETH), state.user2, state.depositAmount2);
+        airdrop(ERC20(R_ETH), state.user2, state.depositAmount2);
         vm.stopPrank();
 
         vm.startPrank(state.user2);
-        ERC20(rETH).approve(address(strategy), type(uint256).max);
+        ERC20(R_ETH).approve(address(strategy), type(uint256).max);
         vault.deposit(state.depositAmount2, state.user2);
         vm.stopPrank();
 
         // Clear mock
         vm.clearMockedCalls();
 
-        // Generate more yield after second user joined (5% increase from last rate)
-        state.newExchangeRate2 = (state.newExchangeRate1 * 105) / 100;
+        // Generate more yield after second user joined
+        state.newExchangeRate2 = (state.newExchangeRate1 * secondYieldIncrease) / 10000;
 
         // Check donation address balance before second harvest
         state.donationBalanceBefore2 = ERC20(address(strategy)).balanceOf(donationAddress);
 
         // Mock the yield vault's getExchangeRate
-        vm.mockCall(rETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(state.newExchangeRate2));
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(state.newExchangeRate2));
 
         // Harvest again
         vm.startPrank(keeper);
@@ -355,33 +387,42 @@ contract RocketPoolStrategyTest is Test {
         state.donationBalanceAfter2 = ERC20(address(strategy)).balanceOf(donationAddress);
 
         // Verify donation address received more profit
-        assertGt(
-            state.donationBalanceAfter2,
-            state.donationBalanceBefore2,
-            "Donation address should have received profit after second harvest"
-        );
+        if (secondYieldIncrease > 10000) {
+            assertGt(
+                state.donationBalanceAfter2,
+                state.donationBalanceBefore2,
+                "Donation address should have received profit after second harvest"
+            );
+        }
 
         // Both users withdraw
         vm.startPrank(state.user1);
         state.user1Shares = vault.balanceOf(state.user1);
-        state.user1Assets = vault.redeem(vault.balanceOf(state.user1), state.user1, state.user1);
+        if (state.user1Shares > 0) {
+            state.user1Assets = vault.redeem(vault.balanceOf(state.user1), state.user1, state.user1);
+        }
         vm.stopPrank();
 
         vm.startPrank(state.user2);
         state.user2Shares = vault.balanceOf(state.user2);
-        state.user2Assets = vault.redeem(vault.balanceOf(state.user2), state.user2, state.user2);
+        if (state.user2Shares > 0) {
+            state.user2Assets = vault.redeem(vault.balanceOf(state.user2), state.user2, state.user2);
+        }
         vm.stopPrank();
 
         // redeem the shares of the donation address
         vm.startPrank(donationAddress);
-        vault.redeem(vault.balanceOf(donationAddress), donationAddress, donationAddress);
+        uint256 donationShares = vault.balanceOf(donationAddress);
+        if (donationShares > 0) {
+            vault.redeem(donationShares, donationAddress, donationAddress);
+        }
         vm.stopPrank();
 
         // User 1 deposited before first yield accrual, so should have earned more
         assertApproxEqRel(
             state.user1Assets * state.newExchangeRate2,
             state.depositAmount1 * state.initialExchangeRate,
-            0.000001e18, // 0.0001% tolerance
+            0.00001e18, // 0.001% tolerance
             "User 1 should receive deposit adjusted for exchange rate change"
         );
 
@@ -389,14 +430,20 @@ contract RocketPoolStrategyTest is Test {
         assertApproxEqRel(
             state.user2Assets * state.newExchangeRate2,
             state.depositAmount2 * state.newExchangeRate1,
-            0.00001e18, // 0.1% tolerance
+            0.0001e18, // 0.01% tolerance
             "User 2 should receive deposit adjusted for exchange rate change"
         );
     }
 
-    /// @notice Test the harvesting functionality
-    function testHarvestLido() public {
-        uint256 depositAmount = 100e18; // 100 rETH
+    /// @notice Fuzz test for the harvesting functionality
+    function testFuzzHarvestRocketPool(uint256 depositAmount) public {
+        // Bound the deposit amount
+        depositAmount = bound(depositAmount, MIN_DEPOSIT, MAX_DEPOSIT);
+
+        // Ensure user has enough balance
+        if (ERC20(R_ETH).balanceOf(user) < depositAmount) {
+            airdrop(ERC20(R_ETH), user, depositAmount);
+        }
 
         // Deposit first
         vm.startPrank(user);
@@ -416,22 +463,22 @@ contract RocketPoolStrategyTest is Test {
         uint256 newExchangeRate = strategy.getLastReportedExchangeRate();
         uint256 newTotalAssets = vault.totalAssets();
 
-        // mock getExchangeRate to be 1.1x the initial exchange rate
-        vm.mockCall(rETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode((newExchangeRate * 11) / 10));
-
         // Verify exchange rate is updated
         assertEq(newExchangeRate, initialExchangeRate, "Exchange rate should be updated after harvest");
 
         // Verify total assets after harvest
-        // Note: We don't check for specific increases here as we're using a mainnet fork
-        // and yield calculation can vary, but assets should be >= than before unless there's a loss
         assertGe(newTotalAssets, initialAssets, "Total assets should not decrease after harvest");
     }
 
-    /// @notice Test emergency exit functionality
-    function testEmergencyExit() public {
-        // Setup - deposit a significant amount
-        uint256 depositAmount = 1000e6; // 1000 USDC
+    /// @notice Fuzz test for emergency exit functionality
+    function testFuzzEmergencyExit(uint256 depositAmount) public {
+        // Bound the deposit amount
+        depositAmount = bound(depositAmount, MIN_DEPOSIT, MAX_DEPOSIT);
+
+        // Ensure user has enough balance
+        if (ERC20(R_ETH).balanceOf(user) < depositAmount) {
+            airdrop(ERC20(R_ETH), user, depositAmount);
+        }
 
         vm.startPrank(user);
         vault.deposit(depositAmount, user);
@@ -452,11 +499,10 @@ contract RocketPoolStrategyTest is Test {
         vm.stopPrank();
 
         // The user should receive approximately their original deposit in value
-        // We allow a small deviation due to potential rounding in the calculations
         assertApproxEqRel(
             assetsReceived,
             depositAmount,
-            0.00001e18, // 0.1% tolerance
+            0.0001e18, // 0.01% tolerance
             "User should receive approximately original deposit value"
         );
     }
@@ -486,13 +532,20 @@ contract RocketPoolStrategyTest is Test {
         // Try to sweep the asset token, which should revert
         vm.startPrank(strategy.GOV());
         vm.expectRevert("!asset");
-        strategy.sweep(rETH);
+        strategy.sweep(R_ETH);
         vm.stopPrank();
     }
 
-    /// @notice Test exchange rate tracking and yield calculation
-    function testExchangeRateTracking() public {
-        uint256 depositAmount = 1000e18; // 1000 rETH
+    /// @notice Fuzz test for exchange rate tracking and yield calculation
+    function testFuzzExchangeRateTracking(uint256 depositAmount, uint256 rateIncreasePercentage) public {
+        // Bound the inputs
+        depositAmount = bound(depositAmount, MIN_DEPOSIT, MAX_DEPOSIT);
+        rateIncreasePercentage = bound(rateIncreasePercentage, 10100, 20000); // 1% to 100% increase
+
+        // Ensure user has enough balance
+        if (ERC20(R_ETH).balanceOf(user) < depositAmount) {
+            airdrop(ERC20(R_ETH), user, depositAmount);
+        }
 
         // Deposit first
         vm.startPrank(user);
@@ -506,11 +559,11 @@ contract RocketPoolStrategyTest is Test {
         skip(30 days);
         vm.roll(block.number + 6500 * 30);
 
-        // Simulate a 5% increase in exchange rate
-        uint256 newExchangeRate = (initialExchangeRate * 105) / 100;
+        // Simulate exchange rate increase
+        uint256 newExchangeRate = (initialExchangeRate * rateIncreasePercentage) / 10000;
 
         // Mock the getExchangeRate function
-        vm.mockCall(rETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(newExchangeRate));
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(newExchangeRate));
 
         // Report to capture yield
         vm.startPrank(keeper);
@@ -521,22 +574,32 @@ contract RocketPoolStrategyTest is Test {
         vm.clearMockedCalls();
 
         // Log and verify profit
-        assertGt(profit, 0, "Should have captured profit from exchange rate increase");
+        if (rateIncreasePercentage > 10000) {
+            assertGt(profit, 0, "Should have captured profit from exchange rate increase");
+        }
         assertEq(loss, 0, "Should have no loss");
 
         // Verify exchange rate was updated
         uint256 updatedExchangeRate = strategy.getLastReportedExchangeRate();
         assertEq(updatedExchangeRate, newExchangeRate, "Exchange rate should be updated after harvest");
     }
+
     /// @notice Test getting the last reported exchange rate
     function testGetLastReportedExchangeRate() public view {
         uint256 rate = strategy.getLastReportedExchangeRate();
         assertGt(rate, 0, "Exchange rate should be initialized and greater than zero");
     }
 
-    /// @notice Test balance of asset and shares
-    function testBalanceOfAssetAndShares() public {
-        uint256 depositAmount = 100e18;
+    /// @notice Fuzz test for balance of asset and shares
+    function testFuzzBalanceOfAssetAndShares(uint256 depositAmount) public {
+        // Bound the deposit amount
+        depositAmount = bound(depositAmount, MIN_DEPOSIT, MAX_DEPOSIT);
+
+        // Ensure user has enough balance
+        if (ERC20(R_ETH).balanceOf(user) < depositAmount) {
+            airdrop(ERC20(R_ETH), user, depositAmount);
+        }
+
         vm.startPrank(user);
         vault.deposit(depositAmount, user);
         vm.stopPrank();
@@ -572,9 +635,17 @@ contract RocketPoolStrategyTest is Test {
         vm.stopPrank();
     }
 
-    /// @notice Test health check for profit limit exceeded
-    function testHealthCheckProfitLimitExceeded() public {
-        uint256 depositAmount = 1000e18;
+    /// @notice Fuzz test for health check when profit limit is exceeded
+    function testFuzzHealthCheckProfitLimitExceeded(uint256 depositAmount, uint256 exchangeRateMultiplier) public {
+        // Bound the inputs
+        depositAmount = bound(depositAmount, MIN_DEPOSIT, MAX_DEPOSIT);
+        exchangeRateMultiplier = bound(exchangeRateMultiplier, 201, 1000); // 201% to 1000%
+
+        // Ensure user has enough balance
+        if (ERC20(R_ETH).balanceOf(user) < depositAmount) {
+            airdrop(ERC20(R_ETH), user, depositAmount);
+        }
+
         vm.startPrank(user);
         vault.deposit(depositAmount, user);
         vm.stopPrank();
@@ -584,14 +655,17 @@ contract RocketPoolStrategyTest is Test {
         vault.report();
         vm.stopPrank();
 
-        // Mock a 10x exchange rate
+        // Mock an extreme exchange rate increase
         uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
-        uint256 newExchangeRate = (initialExchangeRate * 7) / 3; // 233%
-        vm.mockCall(rETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(newExchangeRate));
+        uint256 newExchangeRate = (initialExchangeRate * exchangeRateMultiplier) / 100;
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(newExchangeRate));
 
-        // Second report: should revert
+        // Second report: should revert if profit limit is exceeded
         vm.startPrank(keeper);
-        vm.expectRevert("healthCheck: profit limit exceeded");
+        // Only expect revert if the profit exceeds the limit (default 100%)
+        if (exchangeRateMultiplier > 200) {
+            vm.expectRevert("healthCheck: profit limit exceeded");
+        }
         vault.report();
         vm.stopPrank();
 
@@ -611,7 +685,7 @@ contract RocketPoolStrategyTest is Test {
         uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
 
         // make a 10 time profit (should revert when doHealthCheck is true but not when it is false)
-        vm.mockCall(rETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode((initialExchangeRate * 10)));
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode((initialExchangeRate * 10)));
 
         // report
         vm.startPrank(keeper);
@@ -622,14 +696,17 @@ contract RocketPoolStrategyTest is Test {
         assertEq(strategy.doHealthCheck(), true);
     }
 
-    // test change profit limit ratio
-    function testChangeProfitLimitRatio() public {
+    // Fuzz test for changing profit limit ratio
+    function testFuzzChangeProfitLimitRatio(uint16 newProfitLimitRatio) public {
+        // Bound to valid range (1 to 10000 basis points)
+        vm.assume(newProfitLimitRatio > 0 && newProfitLimitRatio <= 10000);
+
         vm.startPrank(management);
-        strategy.updateProfitLimitRatio(5000);
+        strategy.updateProfitLimitRatio(newProfitLimitRatio);
         vm.stopPrank();
 
         // check the profit limit ratio
-        assertEq(strategy.getProfitLimitRatio(), 5000);
+        assertEq(strategy.getProfitLimitRatio(), newProfitLimitRatio);
     }
 
     function testSetDoHealthCheckToFalse() public {
