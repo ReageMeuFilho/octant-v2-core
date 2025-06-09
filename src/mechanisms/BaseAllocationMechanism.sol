@@ -2,509 +2,314 @@
 pragma solidity ^0.8.20;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
-import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
-import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import { TokenizedAllocationMechanism, IBaseAllocationStrategy } from "src/mechanisms/TokenizedAllocationMechanism.sol";
 
-/// @title Abstract Allocation Mechanism for ERC4626 Vault-Based Voting
-/// @notice Provides the core structure for on-chain voting mechanisms that mint ERC4626 shares to proposal recipients based on vote tallies.
-/// @dev Use by inheriting and implementing the five key hooks and the conversion hook `_convertVotesToShares`.
-abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable {
-    // Custom Errors
-    error ZeroAssetAddress();
-    error ZeroVotingDelay();
-    error ZeroVotingPeriod();
-    error ZeroQuorumShares();
-    error ZeroTimelockDelay();
-    error ZeroGracePeriod();
-    error ZeroStartBlock();
-    error EmptyName();
-    error EmptySymbol();
-    error RegistrationBlocked(address user);
-    error VotingEnded(uint256 currentBlock, uint256 endBlock);
-    error AlreadyRegistered(address user);
-    error DepositTooLarge(uint256 deposit, uint256 maxAllowed);
-    error VotingPowerTooLarge(uint256 votingPower, uint256 maxAllowed);
-    error ProposeNotAllowed(address proposer);
-    error InvalidRecipient(address recipient);
-    error RecipientUsed(address recipient);
-    error EmptyDescription();
-    error DescriptionTooLong(uint256 length, uint256 maxLength);
-    error MaxProposalsReached(uint256 current, uint256 max);
-    error VotingNotEnded(uint256 currentBlock, uint256 endBlock);
-    error TallyAlreadyFinalized();
-    error FinalizationBlocked();
-    error TallyNotFinalized();
-    error InvalidProposal(uint256 pid);
-    error ProposalCanceledError(uint256 pid);
-    error NoQuorum(uint256 pid, uint256 forVotes, uint256 againstVotes, uint256 required);
-    error AlreadyQueued(uint256 pid);
-    error NoAllocation(uint256 pid, uint256 sharesToMint);
-    error VotingClosed(uint256 currentBlock, uint256 startBlock, uint256 endBlock);
-    error AlreadyVoted(address voter, uint256 pid);
-    error InvalidWeight(uint256 weight, uint256 votingPower);
-    error WeightTooLarge(uint256 weight, uint256 maxAllowed);
-    error PowerIncreased(uint256 oldPower, uint256 newPower);
-    error NotProposer(address caller, address proposer);
-    error AlreadyCanceled(uint256 pid);
-    error InvalidRecipientAddress(address recipient);
-    using SafeERC20 for IERC20;
-    using Math for uint256;
+/// @notice Configuration parameters for allocation mechanism initialization
+struct AllocationConfig {
+    IERC20 asset;
+    string name;
+    string symbol;
+    uint256 votingDelay;
+    uint256 votingPeriod;
+    uint256 quorumShares;
+    uint256 timelockDelay;
+    uint256 gracePeriod;
+    uint256 startBlock;
+    address owner;  // Owner of the mechanism (deployer)
+}
 
-    /// @notice Maximum safe value for mathematical operations
-    uint256 public constant MAX_SAFE_VALUE = type(uint128).max;
-
-    /// @notice Grace period after timelock expiry for state computation
-    /// @dev Configurable timeframe allowing state transitions after proposal expiry
-    uint256 public immutable gracePeriod;
-
-    /// EIP-1967 pattern for deterministic storage slot generation.
-    bytes32 private constant STORAGE_SLOT = bytes32(uint256(keccak256("BaseAllocationMechanism.storage")) - 1);
-
-    /// @notice Immutable configuration parameters
-    /// @notice start block to start counting the voting delay before votingPeriod
-    uint256 public immutable startBlock;
-    /// @notice Blocks between consecutive proposals by same proposer
-    uint256 public immutable votingDelay;
-    /// @notice Blocks duration of voting window
-    uint256 public immutable votingPeriod;
-    /// @notice Seconds until minted shares become redeemable
-    uint256 public immutable timelockDelay;
-    /// @notice Minimum net votes required to queue a proposal
-    uint256 public immutable quorumShares;
-    /// @notice ERC20 asset used for the vault
-    IERC20 public immutable asset;
-
-    /// @notice Main storage struct containing all mutable state
-    struct BaseAllocationStorage {
-        // Basic token information
-        string name;
-        string symbol;
-        // Voting state
-        bool tallyFinalized;
-        uint256 proposalIdCounter;
-        // Mappings
-        mapping(uint256 => Proposal) proposals;
-        mapping(uint256 => ProposalVote) proposalVotes;
-        mapping(address => bool) recipientUsed;
-        mapping(uint256 => mapping(address => bool)) hasVoted;
-        mapping(address => uint256) votingPower;
-        mapping(address => uint256) redeemableAfter;
-        mapping(uint256 => uint256) proposalShares;
-    }
-
-    /// @notice Vote types: Against, For, Abstain
-    enum VoteType {
-        Against,
-        For,
-        Abstain
-    }
-
-    enum ProposalState {
-        Pending,
-        Active,
-        Canceled,
-        Defeated,
-        Succeeded,
-        Queued,
-        Expired,
-        Executed
-    }
-
-    struct Proposal {
-        uint256 sharesRequested;
-        /// @notice Earliest timestamp when proposal shares become redeemable (block.timestamp + timelockDelay)
-        uint256 earliestRedeemableTime;
-        address proposer;
-        address recipient;
-        string description;
-        bool claimed;
-        bool canceled;
-    }
-
-    /// @notice Data for each proposal
-    struct ProposalVote {
-        uint256 sharesFor;
-        uint256 sharesAgainst;
-        uint256 sharesAbstain;
-    }
-
-    /// @notice Get the storage struct from the predefined slot
-    /// @return s The storage struct containing all mutable state
-    function _getStorage() internal pure returns (BaseAllocationStorage storage s) {
-        bytes32 slot = STORAGE_SLOT;
-        assembly {
-            s.slot := slot
-        }
-    }
-
-    /// @notice Public getter for name (delegating to storage)
-    function name() public view virtual returns (string memory) {
-        return _getStorage().name;
-    }
-
-    /// @notice Public getter for symbol (delegating to storage)
-    function symbol() public view virtual returns (string memory) {
-        return _getStorage().symbol;
-    }
-
-    /// @notice Public getter for tallyFinalized (delegating to storage)
-    function tallyFinalized() public view virtual returns (bool) {
-        return _getStorage().tallyFinalized;
-    }
-
-    /// @notice Public getter for proposals mapping (delegating to storage)
-    function proposals(uint256 pid) public view virtual returns (Proposal memory) {
-        return _getStorage().proposals[pid];
-    }
-
-    /// @notice Public getter for proposalVotes mapping (delegating to storage)
-    function proposalVotes(uint256 pid) public view virtual returns (ProposalVote memory) {
-        return _getStorage().proposalVotes[pid];
-    }
-
-    /// @notice Public getter for hasVoted mapping (delegating to storage)
-    function hasVoted(uint256 pid, address voter) public view virtual returns (bool) {
-        return _getStorage().hasVoted[pid][voter];
-    }
-
-    /// @notice Public getter for votingPower mapping (delegating to storage)
-    function votingPower(address user) public view virtual returns (uint256) {
-        return _getStorage().votingPower[user];
-    }
-
-    /// @notice Public getter for redeemableAfter mapping (delegating to storage)
-    function redeemableAfter(address recipient) public view virtual returns (uint256) {
-        return _getStorage().redeemableAfter[recipient];
-    }
-
-    /// @notice Public getter for proposalShares mapping (delegating to storage)
-    function proposalShares(uint256 pid) public view virtual returns (uint256) {
-        return _getStorage().proposalShares[pid];
-    }
-
-    /// @notice Emitted when a user completes registration
-    event UserRegistered(address indexed user, uint256 votingPower);
-    /// @notice Emitted when a new proposal is created
-    event ProposalCreated(uint256 indexed pid, address indexed proposer, address indexed recipient, string description);
-    /// @notice Emitted when a vote is cast
-    event VotesCast(address indexed voter, uint256 indexed pid, VoteType indexed choice, uint256 weight);
-    /// @notice Emitted when vote tally is finalized
-    event VoteTallyFinalized();
-    /// @notice Emitted when a proposal is queued and shares minted
-    event ProposalQueued(uint256 indexed pid, uint256 eta, uint256 shareAmount);
-    /// @notice Emitted when a proposal is canceled
-    event ProposalCanceled(uint256 indexed pid, address indexed proposer);
-
-    /// @param _asset Underlying ERC20 token used for vault
-    /// @param _name ERC20 name for vault share token
-    /// @param _symbol ERC20 symbol for vault share token
-    /// @param _votingDelay Blocks required between proposals by same proposer
-    /// @param _votingPeriod Blocks duration that voting remains open
-    /// @param _quorumShares Minimum net votes for a proposal to pass
-    /// @param _timelockDelay Seconds after queuing before redemption allowed
-    /// @param _gracePeriod Seconds after timelock expiry for state computation
-    /// @param _startBlock Block number when voting mechanism starts
+/// @title Base Allocation Mechanism - Lightweight Proxy
+/// @notice Abstract contract following Yearn V3 pattern for allocation mechanisms
+/// @dev Inheritors only need to implement the allocation-specific hooks
+abstract contract BaseAllocationMechanism is IBaseAllocationStrategy {
+    // ---------- Immutable Storage ----------
+    
+    /// @notice Address of the shared TokenizedAllocationMechanism implementation
+    address internal immutable tokenizedAllocationAddress;
+    
+    /// @notice Underlying asset for the allocation mechanism
+    IERC20 internal immutable asset;
+    
+    // ---------- Events ----------
+    
+    /// @notice Emitted when the allocation mechanism is initialized
+    event AllocationMechanismInitialized(
+        address indexed implementation,
+        address indexed asset,
+        string name,
+        string symbol
+    );
+    
+    // ---------- Constructor ----------
+    
+    /// @param _implementation Address of the TokenizedAllocationMechanism implementation
+    /// @param _config Configuration parameters for the allocation mechanism
     constructor(
-        IERC20 _asset,
-        string memory _name,
-        string memory _symbol,
-        uint256 _votingDelay,
-        uint256 _votingPeriod,
-        uint256 _quorumShares,
-        uint256 _timelockDelay,
-        uint256 _gracePeriod,
-        uint256 _startBlock
-    ) Ownable(msg.sender) {
-        if (address(_asset) == address(0)) revert ZeroAssetAddress();
-        if (_votingDelay == 0) revert ZeroVotingDelay();
-        if (_votingPeriod == 0) revert ZeroVotingPeriod();
-        if (_quorumShares == 0) revert ZeroQuorumShares();
-        if (_timelockDelay == 0) revert ZeroTimelockDelay();
-        if (_gracePeriod == 0) revert ZeroGracePeriod();
-        if (_startBlock == 0) revert ZeroStartBlock();
-        if (bytes(_name).length == 0) revert EmptyName();
-        if (bytes(_symbol).length == 0) revert EmptySymbol();
-
-        // Set immutable values
-        asset = _asset;
-        votingDelay = _votingDelay;
-        votingPeriod = _votingPeriod;
-        quorumShares = _quorumShares;
-        timelockDelay = _timelockDelay;
-        gracePeriod = _gracePeriod;
-        startBlock = _startBlock;
-
-        // Initialize storage struct
-        BaseAllocationStorage storage s = _getStorage();
-        s.name = _name;
-        s.symbol = _symbol;
+        address _implementation,
+        AllocationConfig memory _config
+    ) {
+        // Store immutable values
+        tokenizedAllocationAddress = _implementation;
+        asset = _config.asset;
+        
+        // Initialize the TokenizedAllocationMechanism storage via delegatecall
+        (bool success, ) = _implementation.delegatecall(
+            abi.encodeCall(
+                TokenizedAllocationMechanism.initialize,
+                (
+                    _config.owner, // owner
+                    _config.asset,
+                    _config.name,
+                    _config.symbol,
+                    _config.votingDelay,
+                    _config.votingPeriod,
+                    _config.quorumShares,
+                    _config.timelockDelay,
+                    _config.gracePeriod,
+                    _config.startBlock
+                )
+            )
+        );
+        require(success, "Initialization failed");
+        
+        emit AllocationMechanismInitialized(
+            _implementation,
+            address(_config.asset),
+            _config.name,
+            _config.symbol
+        );
     }
-
-    // ---------- Hooks (to implement) ----------
-
-    /// @dev Hook to allow or block registration. **SECURITY CRITICAL**: ensure only authorized users can register if needed.
+    
+    // ---------- Abstract Internal Hooks (Yearn V3 Pattern) ----------
+    
+    /// @dev Hook to allow or block registration
     /// @param user Address attempting to register
     /// @return allow True if registration should proceed
     function _beforeSignupHook(address user) internal view virtual returns (bool);
-
-    /// @dev Hook to allow or block proposal creation. **SECURITY CRITICAL**: validate proposer identity or stake as needed.
+    
+    /// @dev Hook to allow or block proposal creation
     /// @param proposer Address proposing
     /// @return allow True if proposing allowed
     function _beforeProposeHook(address proposer) internal view virtual returns (bool);
-
-    /// @dev Hook to calculate new voting power on registration. Can include stake decay, off-chain checks, etc.
+    
+    /// @dev Hook to calculate new voting power on registration
     /// @param user Address registering
     /// @param deposit Amount of underlying tokens deposited
     /// @return power New voting power assigned
     function _getVotingPowerHook(address user, uint256 deposit) internal view virtual returns (uint256);
-
-    /// @dev Hook to validate existence and integrity of a proposal ID. **SECURITY CRITICAL**: prevent invalid pids.
+    
+    /// @dev Hook to validate existence and integrity of a proposal ID
     /// @param pid Proposal ID to validate
     /// @return valid True if pid is valid and corresponds to a created proposal
     function _validateProposalHook(uint256 pid) internal view virtual returns (bool);
-
-    /// @dev Hook to process a vote. Must update proposal shares (For/Against/Abstain) and optionally track total shares.
+    
+    /// @dev Hook to process a vote
     /// @param pid Proposal ID being voted on
     /// @param voter Address casting the vote
-    /// @param choice VoteType (Against/For/Abstain)
+    /// @param choice Vote type (Against/For/Abstain)
     /// @param weight Voting power weight to apply
     /// @param oldPower Voting power before vote
     /// @return newPower Voting power after vote (must be <= oldPower)
     function _processVoteHook(
         uint256 pid,
         address voter,
-        VoteType choice,
+        TokenizedAllocationMechanism.VoteType choice,
         uint256 weight,
         uint256 oldPower
     ) internal virtual returns (uint256 newPower);
-
-    /// @notice Check if proposal met quorum requirement.
+    
+    /// @dev Check if proposal met quorum requirement
     /// @param pid Proposal ID
-    /// @return True if net For votes >= quorumShares
+    /// @return True if proposal has quorum
     function _hasQuorumHook(uint256 pid) internal view virtual returns (bool);
-
-    /// @dev Hook to convert final vote tallies into vault shares to mint. Should use net For and totalShares ratio.
+    
+    /// @dev Hook to convert final vote tallies into vault shares to mint
     /// @param pid Proposal ID being queued
     /// @return sharesToMint Number of vault shares to mint for the proposal
     function _convertVotesToShares(uint256 pid) internal view virtual returns (uint256 sharesToMint);
-
-    /// @dev Hook to modify the behavior of finalizeVoteTally. Can be used to enforce additional checks or actions.
+    
+    /// @dev Hook to modify the behavior of finalizeVoteTally
     /// @return allow True if finalization should proceed
     function _beforeFinalizeVoteTallyHook() internal virtual returns (bool);
-
-    /// @dev a hook to fetch the recipient address for a proposal. Can be used to enforce additional checks or actions.
+    
+    /// @dev Hook to fetch the recipient address for a proposal
     /// @param pid Proposal ID being redeemed
     /// @return recipient Address of the recipient for the proposal
     function _getRecipientAddressHook(uint256 pid) internal view virtual returns (address recipient);
-
-    /// @dev Hook to perform the actual distribution of shares when a proposal is queued.
-    /// This is where the concrete implementation should mint shares, transfer tokens, or perform the actual distribution.
-    /// For vault-based mechanisms, this is where shares would be minted to the recipient.
+    
+    /// @dev Hook to perform custom distribution of shares when a proposal is queued
+    /// @dev If this returns true, default share minting is skipped
     /// @param recipient Address of the recipient for the proposal
     /// @param sharesToMint Number of shares to distribute/mint to the recipient
-    /// @return success True if distribution was successful
-    function _requestDistributionHook(address recipient, uint256 sharesToMint) internal virtual returns (bool);
-
-    // ---------- Registration ----------
-
-    /// @notice Register to gain voting power by depositing underlying tokens.
-    /// @param deposit Amount of underlying to deposit (may be zero).
-    function signup(uint256 deposit) external virtual nonReentrant whenNotPaused {
-        address user = msg.sender;
-        if (!_beforeSignupHook(user)) revert RegistrationBlocked(user);
-        if (block.number >= startBlock + votingDelay + votingPeriod)
-            revert VotingEnded(block.number, startBlock + votingDelay + votingPeriod);
-        BaseAllocationStorage storage s = _getStorage();
-        if (s.votingPower[user] != 0) revert AlreadyRegistered(user);
-        if (deposit > MAX_SAFE_VALUE) revert DepositTooLarge(deposit, MAX_SAFE_VALUE);
-        if (deposit > 0) asset.safeTransferFrom(user, address(this), deposit);
-        uint256 newPower = _getVotingPowerHook(user, deposit);
-        if (newPower > MAX_SAFE_VALUE) revert VotingPowerTooLarge(newPower, MAX_SAFE_VALUE);
-        s.votingPower[user] = newPower;
-        emit UserRegistered(user, newPower);
+    /// @return handled True if custom distribution was handled, false to use default minting
+    function _requestCustomDistributionHook(address recipient, uint256 sharesToMint) internal virtual returns (bool);
+    
+    /// @dev Hook to get the available withdraw limit for a share owner
+    /// @param shareOwner Address of the share owner
+    /// @return limit Available withdraw limit (type(uint256).max for unlimited)
+    function _availableWithdrawLimit(address shareOwner) internal view virtual returns (uint256);
+    
+    /// @dev Hook to calculate total assets including any matching pools or custom logic
+    /// @return totalAssets Total assets for this allocation mechanism
+    function _calculateTotalAssetsHook() internal view virtual returns (uint256);
+    
+    // ---------- External Hook Functions (Yearn V3 Pattern) ----------
+    // These are called by TokenizedAllocationMechanism via delegatecall
+    // and use onlySelf modifier to ensure security
+    
+    modifier onlySelf() {
+        // In delegatecall context, address(this) is the proxy and msg.sender is the external caller
+        // We need to allow calls from the TokenizedAllocationMechanism
+        require(msg.sender == address(this) || msg.sender == tokenizedAllocationAddress, "!self");
+        _;
     }
-
-    // ---------- Proposal Creation ----------
-
-    /// @notice Create a new proposal targeting `recipient`.
-    /// @param recipient Address to receive allocated vault shares upon queue.
-    /// @param description Description or rationale for the proposal
-    /// @return pid Unique identifier for the new proposal.
-    function propose(
-        address recipient,
-        string calldata description
-    ) external virtual whenNotPaused returns (uint256 pid) {
-        address proposer = msg.sender;
-        if (!_beforeProposeHook(proposer)) revert ProposeNotAllowed(proposer);
-        if (recipient == address(0)) revert InvalidRecipient(recipient);
-        BaseAllocationStorage storage s = _getStorage();
-        if (s.recipientUsed[recipient]) revert RecipientUsed(recipient);
-        if (bytes(description).length == 0) revert EmptyDescription();
-        if (bytes(description).length > 1000) revert DescriptionTooLong(bytes(description).length, 1000);
-
-        s.proposalIdCounter++;
-        pid = s.proposalIdCounter;
-
-        s.proposals[pid] = Proposal(0, 0, proposer, recipient, description, false, false);
-        s.recipientUsed[recipient] = true;
-
-        emit ProposalCreated(pid, proposer, recipient, description);
+    
+    function beforeSignupHook(address user) external view onlySelf returns (bool) {
+        return _beforeSignupHook(user);
     }
-
-    // ---------- Vote Tally Finalization ----------
-
-    /// @notice Finalize vote tally once voting period (from first proposal) has ended.
-    /// @dev **SECURITY CRITICAL**: ensure this can only be called once and only after voting ends.
-    function finalizeVoteTally() external virtual onlyOwner {
-        if (block.number < startBlock + votingDelay + votingPeriod)
-            revert VotingNotEnded(block.number, startBlock + votingDelay + votingPeriod);
-        BaseAllocationStorage storage s = _getStorage();
-        if (s.tallyFinalized) revert TallyAlreadyFinalized();
-        if (!_beforeFinalizeVoteTallyHook()) revert FinalizationBlocked();
-        s.tallyFinalized = true;
-        emit VoteTallyFinalized();
+    
+    function beforeProposeHook(address proposer) external view onlySelf returns (bool) {
+        return _beforeProposeHook(proposer);
     }
-
-    // ---------- Queue Proposal & Mint Allocation ----------
-
-    /// @notice Queue proposal and mint vault shares based on vote tallies.
-    /// @dev Calls `_convertVotesToShares(pid)` to determine mint amount.
-    /// @param pid Proposal ID to queue.
-    function queueProposal(uint256 pid) external virtual onlyOwner {
-        BaseAllocationStorage storage s = _getStorage();
-        if (!s.tallyFinalized) revert TallyNotFinalized();
-        if (!_validateProposalHook(pid)) revert InvalidProposal(pid);
-        Proposal storage p = s.proposals[pid];
-        if (p.canceled) revert ProposalCanceledError(pid);
-        if (!_hasQuorumHook(pid))
-            revert NoQuorum(pid, s.proposalVotes[pid].sharesFor, s.proposalVotes[pid].sharesAgainst, quorumShares);
-        if (p.earliestRedeemableTime != 0) revert AlreadyQueued(pid);
-
-        uint256 sharesToMint = _convertVotesToShares(pid);
-        if (sharesToMint == 0) revert NoAllocation(pid, sharesToMint);
-        s.proposalShares[pid] = sharesToMint;
-
-        _requestDistributionHook(_getRecipientAddressHook(pid), sharesToMint);
-
-        uint256 earliestRedeemableTime = block.timestamp + timelockDelay;
-        p.earliestRedeemableTime = earliestRedeemableTime;
-        s.redeemableAfter[p.recipient] = earliestRedeemableTime;
-        emit ProposalQueued(pid, earliestRedeemableTime, sharesToMint);
+    
+    function getVotingPowerHook(address user, uint256 deposit) external view onlySelf returns (uint256) {
+        return _getVotingPowerHook(user, deposit);
     }
-
-    // ---------- Voting ----------
-
-    /// @notice Cast a vote on a proposal.
-    /// @param pid Proposal ID
-    /// @param choice VoteType (Against, For, Abstain)
-    /// @param weight Amount of voting power to apply
-    function castVote(uint256 pid, VoteType choice, uint256 weight) external virtual nonReentrant whenNotPaused {
-        if (!_validateProposalHook(pid)) revert InvalidProposal(pid);
-        if (block.number < startBlock + votingDelay || block.number > startBlock + votingDelay + votingPeriod)
-            revert VotingClosed(block.number, startBlock + votingDelay, startBlock + votingDelay + votingPeriod);
-        BaseAllocationStorage storage s = _getStorage();
-        if (s.hasVoted[pid][msg.sender]) revert AlreadyVoted(msg.sender, pid);
-
-        uint256 oldPower = s.votingPower[msg.sender];
-        if (weight == 0 || weight > oldPower) revert InvalidWeight(weight, oldPower);
-        if (weight > MAX_SAFE_VALUE) revert WeightTooLarge(weight, MAX_SAFE_VALUE);
-
-        uint256 newPower = _processVoteHook(pid, msg.sender, choice, weight, oldPower);
-        if (newPower > oldPower) revert PowerIncreased(oldPower, newPower);
-
-        s.votingPower[msg.sender] = newPower;
-        s.hasVoted[pid][msg.sender] = true;
-        emit VotesCast(msg.sender, pid, choice, weight);
+    
+    function validateProposalHook(uint256 pid) external view onlySelf returns (bool) {
+        return _validateProposalHook(pid);
     }
-
-    // ---------- State Machine ----------
-
-    /// @dev Internal state computation for a proposal
-    function _state(uint256 pid) internal view virtual returns (ProposalState) {
-        BaseAllocationStorage storage s = _getStorage();
-        Proposal storage p = s.proposals[pid];
-        // Check for canceled first
-        if (p.canceled) return ProposalState.Canceled;
-        // Before voting starts
-        if (block.number < startBlock) return ProposalState.Pending;
-        // During voting period or before finalization
-        if (block.number <= startBlock + votingDelay + votingPeriod || !s.tallyFinalized) return ProposalState.Active;
-        // After finalization - check quorum
-        if (!_hasQuorumHook(pid)) return ProposalState.Defeated;
-        // Has quorum - check if queued
-        if (p.earliestRedeemableTime == 0) return ProposalState.Succeeded; // Not queued yet
-        // Queued - check if claimed (by external mechanisms like redeem)
-        if (p.claimed) return ProposalState.Executed;
-        // Check expiration
-        if (block.timestamp > p.earliestRedeemableTime + gracePeriod) return ProposalState.Expired;
-        return ProposalState.Queued;
+    
+    function processVoteHook(
+        uint256 pid,
+        address voter,
+        uint8 choice,
+        uint256 weight,
+        uint256 oldPower
+    ) external onlySelf returns (uint256) {
+        return _processVoteHook(pid, voter, TokenizedAllocationMechanism.VoteType(choice), weight, oldPower);
     }
-
-    /// @notice Get the current state of a proposal
-    /// @param pid Proposal ID
-    /// @return Current state of the proposal
-    function state(uint256 pid) external view virtual returns (ProposalState) {
-        if (!_validateProposalHook(pid)) revert InvalidProposal(pid);
-        return _state(pid);
+    
+    function hasQuorumHook(uint256 pid) external view onlySelf returns (bool) {
+        return _hasQuorumHook(pid);
     }
-
-    /// @notice Cancel a proposal
-    /// @param pid Proposal ID to cancel
-    function cancelProposal(uint256 pid) external virtual {
-        BaseAllocationStorage storage s = _getStorage();
-        if (!_validateProposalHook(pid)) revert InvalidProposal(pid);
-        Proposal storage p = s.proposals[pid];
-        if (msg.sender != p.proposer) revert NotProposer(msg.sender, p.proposer);
-        if (p.canceled) revert AlreadyCanceled(pid);
-        if (p.earliestRedeemableTime != 0) revert AlreadyQueued(pid);
-
-        p.canceled = true;
-        emit ProposalCanceled(pid, p.proposer);
+    
+    function convertVotesToShares(uint256 pid) external view onlySelf returns (uint256) {
+        return _convertVotesToShares(pid);
     }
-
-    /// @notice Get current vote tallies for a proposal
-    /// @param pid Proposal ID
-    /// @return sharesFor Number of shares voted for
-    /// @return sharesAgainst Number of shares voted against
-    /// @return sharesAbstain Number of shares abstained
-    function getVoteTally(
-        uint256 pid
-    ) external view virtual returns (uint256 sharesFor, uint256 sharesAgainst, uint256 sharesAbstain) {
-        BaseAllocationStorage storage s = _getStorage();
-        if (!_validateProposalHook(pid)) revert InvalidProposal(pid);
-        ProposalVote storage votes = s.proposalVotes[pid];
-        return (votes.sharesFor, votes.sharesAgainst, votes.sharesAbstain);
+    
+    function beforeFinalizeVoteTallyHook() external onlySelf returns (bool) {
+        return _beforeFinalizeVoteTallyHook();
     }
-
-    /// @notice Get remaining voting power for an address
-    /// @param voter Address to check voting power for
-    /// @return Remaining voting power
-    function getRemainingVotingPower(address voter) external view virtual returns (uint256) {
-        BaseAllocationStorage storage s = _getStorage();
-        return s.votingPower[voter];
+    
+    function getRecipientAddressHook(uint256 pid) external view onlySelf returns (address) {
+        return _getRecipientAddressHook(pid);
     }
-
-    /// @notice Get total number of proposals created
-    /// @return Total proposal count
-    function getProposalCount() external view virtual returns (uint256) {
-        BaseAllocationStorage storage s = _getStorage();
-        return s.proposalIdCounter;
+    
+    function requestCustomDistributionHook(address recipient, uint256 sharesToMint) external onlySelf returns (bool) {
+        return _requestCustomDistributionHook(recipient, sharesToMint);
     }
-
-    // ---------- Emergency Functions ----------
-
-    /// @notice Emergency pause all operations
-    /// @dev Only owner can pause the contract. Prevents all user interactions until unpaused.
-    function pause() external virtual onlyOwner {
-        _pause();
+    
+    function availableWithdrawLimit(address shareOwner) external view onlySelf returns (uint256) {
+        return _availableWithdrawLimit(shareOwner);
     }
-
-    /// @notice Resume operations after pause
-    /// @dev Only owner can unpause the contract. Restores normal operation after emergency pause.
-    function unpause() external virtual onlyOwner {
-        _unpause();
+    
+    function calculateTotalAssetsHook() external view onlySelf returns (uint256) {
+        return _calculateTotalAssetsHook();
+    }
+    
+    // ---------- Internal Helpers ----------
+    
+    /// @notice Access TokenizedAllocationMechanism interface for internal calls
+    /// @dev Uses current contract address since storage is local
+    function _tokenizedAllocation() internal view returns (TokenizedAllocationMechanism) {
+        return TokenizedAllocationMechanism(address(this));
+    }
+    
+    /// @notice Get redeemable time for a share owner
+    /// @param shareOwner Address to check redeemable time for
+    /// @return Timestamp when shares become redeemable
+    function _getRedeemableAfter(address shareOwner) internal view returns (uint256) {
+        return _tokenizedAllocation().redeemableAfter(shareOwner);
+    }
+    
+    /// @notice Get grace period from configuration
+    /// @return Grace period in seconds
+    function _getGracePeriod() internal view returns (uint256) {
+        return _tokenizedAllocation().gracePeriod();
+    }
+    
+    // ---------- Fallback Function ----------
+    
+    /// @notice Delegates all undefined function calls to TokenizedAllocationMechanism
+    /// @dev This enables the proxy pattern where shared logic lives in the implementation
+    fallback() external payable virtual {
+        address _impl = tokenizedAllocationAddress;
+        assembly {
+            // Copy calldata to memory
+            calldatacopy(0, 0, calldatasize())
+            
+            // Delegatecall to implementation contract
+            let result := delegatecall(gas(), _impl, 0, calldatasize(), 0, 0)
+            
+            // Copy return data
+            returndatacopy(0, 0, returndatasize())
+            
+            // Handle result
+            switch result
+            case 0 {
+                // Delegatecall failed, revert with error data
+                revert(0, returndatasize())
+            }
+            default {
+                // Delegatecall succeeded, return data
+                return(0, returndatasize())
+            }
+        }
+    }
+    
+    /// @notice Receive function to accept ETH
+    receive() external payable virtual {}
+    
+    // ---------- View Helpers for Inheritors ----------
+    
+    /// @notice Get the current proposal count
+    /// @dev Helper for concrete implementations to access storage
+    function _getProposalCount() internal view returns (uint256) {
+        return _tokenizedAllocation().getProposalCount();
+    }
+    
+    /// @notice Check if a proposal exists
+    /// @dev Helper for concrete implementations
+    function _proposalExists(uint256 pid) internal view returns (bool) {
+        return pid > 0 && pid <= _getProposalCount();
+    }
+    
+    /// @notice Get proposal details
+    /// @dev Helper for concrete implementations
+    function _getProposal(uint256 pid) internal view returns (TokenizedAllocationMechanism.Proposal memory) {
+        return _tokenizedAllocation().proposals(pid);
+    }
+    
+    /// @notice Get vote tallies
+    /// @dev Helper for concrete implementations
+    function _getVoteTally(uint256 pid) internal view returns (
+        uint256 sharesFor,
+        uint256 sharesAgainst,
+        uint256 sharesAbstain
+    ) {
+        return _tokenizedAllocation().getVoteTally(pid);
+    }
+    
+    /// @notice Get voting power for an address
+    /// @dev Helper for concrete implementations
+    function _getVotingPower(address user) internal view returns (uint256) {
+        return _tokenizedAllocation().votingPower(user);
+    }
+    
+    /// @notice Get quorum shares requirement
+    /// @dev Helper for concrete implementations
+    function _getQuorumShares() internal view returns (uint256) {
+        return _tokenizedAllocation().quorumShares();
     }
 }
