@@ -98,6 +98,13 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
         address indexed fundingRound,
         uint256 amount
     );
+    event RewardCompounded(
+        DepositIdentifier indexed depositId,
+        address indexed user,
+        uint256 rewardAmount,
+        uint256 newBalance,
+        uint256 newEarningPower
+    );
 
     error NotWhitelisted(IWhitelist whitelist, address user);
     error CantAfford(uint256 requested, uint256 available);
@@ -107,6 +114,7 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
     error MinimumStakeAmountNotMet(uint256 expected, uint256 actual);
     error InvalidRewardDuration(uint256 rewardDuration);
     error CannotChangeRewardDurationDuringActiveReward();
+    error CompoundingNotSupported();
 
     modifier onlyWhitelistedIfWhitelistIsSet(IWhitelist _whitelist, address _user) {
         if (_whitelist != IWhitelist(address(0)) && !_whitelist.isWhitelisted(_user)) {
@@ -470,5 +478,70 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
         emit RewardContributed(_depositId, msg.sender, _fundingRoundAddress, amountContributedToFundingRound);
 
         return amountContributedToFundingRound;
+    }
+
+    /// @notice Compounds rewards by claiming them and immediately restaking them into the same deposit.
+    /// @param _depositId The deposit identifier for which to compound rewards.
+    /// @return compoundedAmount The amount of rewards that were compounded into the deposit.
+    function compoundRewards(
+        DepositIdentifier _depositId
+    )
+        external
+        whenNotPaused
+        nonReentrant
+        onlyWhitelistedIfWhitelistIsSet(stakerWhitelist, msg.sender)
+        returns (uint256 compoundedAmount)
+    {
+        if (address(REWARD_TOKEN) != address(STAKE_TOKEN)) {
+            revert CompoundingNotSupported();
+        }
+
+        Deposit storage deposit = deposits[_depositId];
+        if (deposit.claimer != msg.sender && deposit.owner != msg.sender) {
+            revert Staker__Unauthorized("not claimer or owner", msg.sender);
+        }
+
+        _checkpointGlobalReward();
+        _checkpointReward(deposit);
+
+        uint256 unclaimedAmount = deposit.scaledUnclaimedRewardCheckpoint / SCALE_FACTOR;
+        if (unclaimedAmount == 0) {
+            return 0;
+        }
+
+        uint256 fee = claimFeeParameters.feeAmount;
+        if (fee > 0 && unclaimedAmount <= fee) {
+            return 0;
+        }
+
+        compoundedAmount = unclaimedAmount - fee;
+
+        uint256 scaledAmountConsumed = unclaimedAmount * SCALE_FACTOR;
+        deposit.scaledUnclaimedRewardCheckpoint = deposit.scaledUnclaimedRewardCheckpoint - scaledAmountConsumed;
+
+        uint256 newBalance = deposit.balance + compoundedAmount;
+        uint256 newEarningPower = earningPowerCalculator.getEarningPower(newBalance, deposit.owner, deposit.delegatee);
+
+        totalStaked += compoundedAmount;
+        totalEarningPower = _calculateTotalEarningPower(deposit.earningPower, newEarningPower, totalEarningPower);
+        depositorTotalStaked[deposit.owner] += compoundedAmount;
+        depositorTotalEarningPower[deposit.owner] = _calculateTotalEarningPower(
+            deposit.earningPower,
+            newEarningPower,
+            depositorTotalEarningPower[deposit.owner]
+        );
+
+        deposit.balance = newBalance.toUint96();
+        deposit.earningPower = newEarningPower.toUint96();
+
+        if (fee > 0) {
+            SafeERC20.safeTransfer(REWARD_TOKEN, claimFeeParameters.feeCollector, fee);
+        }
+
+        _revertIfMinimumStakeAmountNotMet(_depositId);
+
+        emit RewardCompounded(_depositId, msg.sender, compoundedAmount, newBalance, newEarningPower);
+
+        return compoundedAmount;
     }
 }

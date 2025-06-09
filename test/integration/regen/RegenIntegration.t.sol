@@ -1797,4 +1797,459 @@ contract RegenIntegrationTest is Test {
     function max(uint256 a, uint256 b) internal pure returns (uint256) {
         return a >= b ? a : b;
     }
+
+    function test_CompoundRewards_BasicFunctionality() public {
+        // Create a RegenStaker where reward and stake tokens are the same
+        MockERC20Staking sameToken = new MockERC20Staking(18);
+
+        vm.startPrank(ADMIN);
+        RegenStaker compoundRegenStaker = new RegenStaker(
+            IERC20(address(sameToken)),
+            IERC20Staking(address(sameToken)),
+            ADMIN,
+            stakerWhitelist,
+            contributorWhitelist,
+            calculator,
+            MAX_BUMP_TIP,
+            MAX_CLAIM_FEE,
+            0,
+            0
+        );
+        compoundRegenStaker.setRewardNotifier(ADMIN, true);
+        vm.stopPrank();
+
+        address user = makeAddr("user");
+        whitelistUser(user, true, false, true);
+
+        uint256 stakeAmount = getStakeAmount();
+        uint256 rewardAmount = getRewardAmount();
+
+        sameToken.mint(user, stakeAmount);
+        sameToken.mint(address(compoundRegenStaker), rewardAmount);
+
+        vm.startPrank(user);
+        sameToken.approve(address(compoundRegenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = compoundRegenStaker.stake(stakeAmount, user);
+        vm.stopPrank();
+
+        vm.prank(ADMIN);
+        compoundRegenStaker.notifyRewardAmount(rewardAmount);
+
+        vm.warp(block.timestamp + compoundRegenStaker.REWARD_DURATION());
+
+        uint256 unclaimedBefore = compoundRegenStaker.unclaimedReward(depositId);
+        (uint96 balanceBefore, , , , , , ) = compoundRegenStaker.deposits(depositId);
+
+        vm.expectEmit(true, true, false, true);
+        emit RegenStaker.RewardCompounded(
+            depositId,
+            user,
+            unclaimedBefore,
+            balanceBefore + unclaimedBefore,
+            balanceBefore + unclaimedBefore
+        );
+
+        vm.prank(user);
+        uint256 compoundedAmount = compoundRegenStaker.compoundRewards(depositId);
+
+        assertEq(compoundedAmount, unclaimedBefore);
+        (uint96 balanceAfter, , , , , , ) = compoundRegenStaker.deposits(depositId);
+        assertEq(balanceAfter, balanceBefore + unclaimedBefore);
+        assertEq(compoundRegenStaker.unclaimedReward(depositId), 0);
+        assertEq(compoundRegenStaker.totalStaked(), stakeAmount + unclaimedBefore);
+    }
+
+    function test_CompoundRewards_WithClaimFee() public {
+        // Create a RegenStaker where reward and stake tokens are the same with fixed 18 decimals
+        MockERC20Staking sameToken = new MockERC20Staking(18);
+
+        vm.startPrank(ADMIN);
+        RegenStaker compoundRegenStaker = new RegenStaker(
+            IERC20(address(sameToken)),
+            IERC20Staking(address(sameToken)),
+            ADMIN,
+            stakerWhitelist,
+            contributorWhitelist,
+            calculator,
+            MAX_BUMP_TIP,
+            MAX_CLAIM_FEE,
+            0,
+            0
+        );
+        compoundRegenStaker.setRewardNotifier(ADMIN, true);
+        vm.stopPrank();
+
+        address user = makeAddr("user");
+        address feeCollector = makeAddr("feeCollector");
+
+        whitelistUser(user, true, false, true);
+
+        // Use fixed amounts to ensure predictable behavior
+        uint256 stakeAmount = 1000e18;
+        uint256 rewardAmount = 100e18;
+        uint256 feeAmount = 1e18; // 1 token fee
+
+        vm.prank(ADMIN);
+        compoundRegenStaker.setClaimFeeParameters(
+            Staker.ClaimFeeParameters({ feeAmount: uint96(feeAmount), feeCollector: feeCollector })
+        );
+
+        sameToken.mint(user, stakeAmount);
+        sameToken.mint(address(compoundRegenStaker), rewardAmount);
+
+        vm.startPrank(user);
+        sameToken.approve(address(compoundRegenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = compoundRegenStaker.stake(stakeAmount, user);
+        vm.stopPrank();
+
+        vm.prank(ADMIN);
+        compoundRegenStaker.notifyRewardAmount(rewardAmount);
+
+        vm.warp(block.timestamp + compoundRegenStaker.REWARD_DURATION());
+
+        uint256 unclaimedBefore = compoundRegenStaker.unclaimedReward(depositId);
+        (uint96 balanceBefore, , , , , , ) = compoundRegenStaker.deposits(depositId);
+        uint256 expectedCompounded = unclaimedBefore - feeAmount;
+
+        vm.prank(user);
+        uint256 compoundedAmount = compoundRegenStaker.compoundRewards(depositId);
+
+        assertEq(compoundedAmount, expectedCompounded);
+        (uint96 balanceAfterFee, , , , , , ) = compoundRegenStaker.deposits(depositId);
+        assertEq(balanceAfterFee, balanceBefore + expectedCompounded);
+        assertEq(sameToken.balanceOf(feeCollector), feeAmount);
+    }
+
+    function test_CompoundRewards_RevertIf_DifferentTokens() public {
+        MockERC20 differentRewardToken = new MockERC20(18);
+
+        vm.startPrank(ADMIN);
+        RegenStaker differentTokenStaker = new RegenStaker(
+            IERC20(address(differentRewardToken)),
+            IERC20Staking(address(stakeToken)),
+            ADMIN,
+            stakerWhitelist,
+            contributorWhitelist,
+            calculator,
+            MAX_BUMP_TIP,
+            MAX_CLAIM_FEE,
+            0,
+            0
+        );
+        vm.stopPrank();
+
+        address user = makeAddr("user");
+        whitelistUser(user, true, false, true);
+
+        uint256 stakeAmount = getStakeAmount();
+        stakeToken.mint(user, stakeAmount);
+
+        vm.startPrank(user);
+        stakeToken.approve(address(differentTokenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = differentTokenStaker.stake(stakeAmount, user);
+
+        vm.expectRevert(RegenStaker.CompoundingNotSupported.selector);
+        differentTokenStaker.compoundRewards(depositId);
+        vm.stopPrank();
+    }
+
+    function test_CompoundRewards_RevertIf_NotAuthorized() public {
+        // Create a RegenStaker where reward and stake tokens are the same
+        MockERC20Staking sameToken = new MockERC20Staking(18);
+
+        vm.startPrank(ADMIN);
+        RegenStaker compoundRegenStaker = new RegenStaker(
+            IERC20(address(sameToken)),
+            IERC20Staking(address(sameToken)),
+            ADMIN,
+            stakerWhitelist,
+            contributorWhitelist,
+            calculator,
+            MAX_BUMP_TIP,
+            MAX_CLAIM_FEE,
+            0,
+            0
+        );
+        compoundRegenStaker.setRewardNotifier(ADMIN, true);
+        vm.stopPrank();
+
+        address user = makeAddr("user");
+        address unauthorized = makeAddr("unauthorized");
+        whitelistUser(user, true, false, true);
+        whitelistUser(unauthorized, true, false, true);
+
+        uint256 stakeAmount = getStakeAmount();
+        sameToken.mint(user, stakeAmount);
+
+        vm.startPrank(user);
+        sameToken.approve(address(compoundRegenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = compoundRegenStaker.stake(stakeAmount, user);
+        vm.stopPrank();
+
+        vm.prank(unauthorized);
+        vm.expectRevert(
+            abi.encodeWithSelector(Staker.Staker__Unauthorized.selector, bytes32("not claimer or owner"), unauthorized)
+        );
+        compoundRegenStaker.compoundRewards(depositId);
+    }
+
+    function test_CompoundRewards_ZeroRewards() public {
+        // Create a RegenStaker where reward and stake tokens are the same
+        MockERC20Staking sameToken = new MockERC20Staking(18);
+
+        vm.startPrank(ADMIN);
+        RegenStaker compoundRegenStaker = new RegenStaker(
+            IERC20(address(sameToken)),
+            IERC20Staking(address(sameToken)),
+            ADMIN,
+            stakerWhitelist,
+            contributorWhitelist,
+            calculator,
+            MAX_BUMP_TIP,
+            MAX_CLAIM_FEE,
+            0,
+            0
+        );
+        compoundRegenStaker.setRewardNotifier(ADMIN, true);
+        vm.stopPrank();
+
+        address user = makeAddr("user");
+        whitelistUser(user, true, false, true);
+
+        uint256 stakeAmount = getStakeAmount();
+        sameToken.mint(user, stakeAmount);
+
+        vm.startPrank(user);
+        sameToken.approve(address(compoundRegenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = compoundRegenStaker.stake(stakeAmount, user);
+        vm.stopPrank();
+
+        vm.prank(user);
+        uint256 compoundedAmount = compoundRegenStaker.compoundRewards(depositId);
+
+        assertEq(compoundedAmount, 0);
+    }
+
+    function test_CompoundRewards_FeeExceedsRewards() public {
+        // Create a RegenStaker where reward and stake tokens are the same
+        MockERC20Staking sameToken = new MockERC20Staking(18);
+
+        vm.startPrank(ADMIN);
+        RegenStaker compoundRegenStaker = new RegenStaker(
+            IERC20(address(sameToken)),
+            IERC20Staking(address(sameToken)),
+            ADMIN,
+            stakerWhitelist,
+            contributorWhitelist,
+            calculator,
+            MAX_BUMP_TIP,
+            MAX_CLAIM_FEE,
+            0,
+            0
+        );
+        compoundRegenStaker.setRewardNotifier(ADMIN, true);
+        vm.stopPrank();
+
+        address user = makeAddr("user");
+        uint256 highFee = 9e17; // High fee that will exceed small rewards
+
+        whitelistUser(user, true, false, true);
+
+        vm.prank(ADMIN);
+        compoundRegenStaker.setClaimFeeParameters(
+            Staker.ClaimFeeParameters({ feeAmount: uint96(highFee), feeCollector: makeAddr("feeCollector") })
+        );
+
+        uint256 stakeAmount = getStakeAmount();
+        uint256 smallRewardAmount = 1e15; // Very small reward amount that will be less than fee
+
+        sameToken.mint(user, stakeAmount);
+        sameToken.mint(address(compoundRegenStaker), smallRewardAmount);
+
+        vm.startPrank(user);
+        sameToken.approve(address(compoundRegenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = compoundRegenStaker.stake(stakeAmount, user);
+        vm.stopPrank();
+
+        vm.prank(ADMIN);
+        compoundRegenStaker.notifyRewardAmount(smallRewardAmount);
+
+        vm.warp(block.timestamp + compoundRegenStaker.REWARD_DURATION());
+
+        vm.prank(user);
+        uint256 compoundedAmount = compoundRegenStaker.compoundRewards(depositId);
+
+        assertEq(compoundedAmount, 0);
+    }
+
+    function test_CompoundRewards_ByDesignatedClaimer() public {
+        // Create a RegenStaker where reward and stake tokens are the same
+        MockERC20Staking sameToken = new MockERC20Staking(18);
+
+        vm.startPrank(ADMIN);
+        RegenStaker compoundRegenStaker = new RegenStaker(
+            IERC20(address(sameToken)),
+            IERC20Staking(address(sameToken)),
+            ADMIN,
+            stakerWhitelist,
+            contributorWhitelist,
+            calculator,
+            MAX_BUMP_TIP,
+            MAX_CLAIM_FEE,
+            0,
+            0
+        );
+        compoundRegenStaker.setRewardNotifier(ADMIN, true);
+        vm.stopPrank();
+
+        address owner = makeAddr("owner");
+        address claimer = makeAddr("claimer");
+        whitelistUser(owner, true, false, true);
+        whitelistUser(claimer, true, false, true);
+
+        uint256 stakeAmount = getStakeAmount();
+        uint256 rewardAmount = getRewardAmount();
+
+        sameToken.mint(owner, stakeAmount);
+        sameToken.mint(address(compoundRegenStaker), rewardAmount);
+
+        vm.startPrank(owner);
+        sameToken.approve(address(compoundRegenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = compoundRegenStaker.stake(stakeAmount, owner, claimer);
+        vm.stopPrank();
+
+        vm.prank(ADMIN);
+        compoundRegenStaker.notifyRewardAmount(rewardAmount);
+
+        vm.warp(block.timestamp + compoundRegenStaker.REWARD_DURATION());
+
+        uint256 unclaimedBefore = compoundRegenStaker.unclaimedReward(depositId);
+
+        vm.prank(claimer);
+        uint256 compoundedAmount = compoundRegenStaker.compoundRewards(depositId);
+
+        assertEq(compoundedAmount, unclaimedBefore);
+        (uint96 balanceAfter, , , , , , ) = compoundRegenStaker.deposits(depositId);
+        assertEq(balanceAfter, stakeAmount + unclaimedBefore);
+    }
+
+    function testFuzz_CompoundRewards_RespectsMinimumStakeAmount(
+        uint256 minimumAmountBase,
+        uint256 stakeAmountBase,
+        uint256 rewardAmountBase
+    ) public {
+        minimumAmountBase = bound(minimumAmountBase, 10, 100);
+        stakeAmountBase = bound(stakeAmountBase, 1, minimumAmountBase - 1);
+        rewardAmountBase = bound(rewardAmountBase, 30 days, 100_000_000);
+
+        uint256 minimumAmount = getStakeAmount(minimumAmountBase);
+        uint256 stakeAmount = getStakeAmount(stakeAmountBase);
+        uint256 rewardAmount = getRewardAmount(rewardAmountBase);
+
+        vm.assume(stakeAmount < minimumAmount);
+
+        // Create a RegenStaker where reward and stake tokens are the same
+        MockERC20Staking sameToken = new MockERC20Staking(18);
+
+        vm.startPrank(ADMIN);
+        RegenStaker compoundRegenStaker = new RegenStaker(
+            IERC20(address(sameToken)),
+            IERC20Staking(address(sameToken)),
+            ADMIN,
+            stakerWhitelist,
+            contributorWhitelist,
+            calculator,
+            MAX_BUMP_TIP,
+            MAX_CLAIM_FEE,
+            0,
+            0
+        );
+        compoundRegenStaker.setRewardNotifier(ADMIN, true);
+        compoundRegenStaker.setMinimumStakeAmount(minimumAmount);
+        vm.stopPrank();
+
+        address user = makeAddr("user");
+        whitelistUser(user, true, false, true);
+
+        // Temporarily set minimum to 0 to allow initial stake
+        vm.prank(ADMIN);
+        compoundRegenStaker.setMinimumStakeAmount(0);
+
+        sameToken.mint(user, stakeAmount);
+        sameToken.mint(address(compoundRegenStaker), rewardAmount);
+
+        vm.startPrank(user);
+        sameToken.approve(address(compoundRegenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = compoundRegenStaker.stake(stakeAmount, user);
+        vm.stopPrank();
+
+        vm.prank(ADMIN);
+        compoundRegenStaker.notifyRewardAmount(rewardAmount);
+
+        vm.warp(block.timestamp + compoundRegenStaker.REWARD_DURATION());
+
+        // Reset minimum amount
+        vm.prank(ADMIN);
+        compoundRegenStaker.setMinimumStakeAmount(minimumAmount);
+
+        uint256 unclaimedBefore = compoundRegenStaker.unclaimedReward(depositId);
+        uint256 expectedNewBalance = stakeAmount + unclaimedBefore;
+
+        if (expectedNewBalance < minimumAmount) {
+            vm.prank(user);
+            vm.expectRevert(
+                abi.encodeWithSelector(RegenStaker.MinimumStakeAmountNotMet.selector, minimumAmount, expectedNewBalance)
+            );
+            compoundRegenStaker.compoundRewards(depositId);
+        } else {
+            vm.prank(user);
+            uint256 compoundedAmount = compoundRegenStaker.compoundRewards(depositId);
+            assertEq(compoundedAmount, unclaimedBefore);
+        }
+    }
+
+    function test_CompoundRewards_WorksWithWhitelistedUser() public {
+        // Create a RegenStaker where reward and stake tokens are the same
+        MockERC20Staking sameToken = new MockERC20Staking(18);
+
+        vm.startPrank(ADMIN);
+        RegenStaker compoundRegenStaker = new RegenStaker(
+            IERC20(address(sameToken)),
+            IERC20Staking(address(sameToken)),
+            ADMIN,
+            stakerWhitelist,
+            contributorWhitelist,
+            calculator,
+            MAX_BUMP_TIP,
+            MAX_CLAIM_FEE,
+            0,
+            0
+        );
+        compoundRegenStaker.setRewardNotifier(ADMIN, true);
+        vm.stopPrank();
+
+        address user = address(0x123);
+        whitelistUser(user, true, false, true);
+
+        uint256 stakeAmount = getStakeAmount();
+        uint256 rewardAmount = getRewardAmount();
+
+        sameToken.mint(user, stakeAmount);
+        sameToken.mint(address(compoundRegenStaker), rewardAmount);
+
+        vm.startPrank(user);
+        sameToken.approve(address(compoundRegenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = compoundRegenStaker.stake(stakeAmount, user);
+        vm.stopPrank();
+
+        vm.prank(ADMIN);
+        compoundRegenStaker.notifyRewardAmount(rewardAmount);
+
+        vm.warp(block.timestamp + compoundRegenStaker.REWARD_DURATION());
+
+        // Test that compound works for whitelisted user
+        vm.prank(user);
+        uint256 compoundedAmount = compoundRegenStaker.compoundRewards(depositId);
+        assertGt(compoundedAmount, 0);
+    }
 }
