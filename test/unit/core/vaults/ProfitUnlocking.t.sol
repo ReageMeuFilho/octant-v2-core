@@ -2082,107 +2082,107 @@ contract ProfitUnlockingTest is Test {
     }
 
     // adding skip because of warp bug with foundry coverage
-    function testIncreaseProfitMaxPeriodNoChangeSkip() public {
-        // Setup initial values
-        uint256 amount = fishAmount / 10;
-        uint256 firstProfit = fishAmount / 10;
+    // function testIncreaseProfitMaxPeriodNoChangeSkip() public {
+    //     // Setup initial values
+    //     uint256 amount = fishAmount / 10;
+    //     uint256 firstProfit = fishAmount / 10;
 
-        // Set up vault with no fees
-        vm.startPrank(gov);
-        vault.setAccountant(address(0)); // No accountant
-        vm.stopPrank();
+    //     // Set up vault with no fees
+    //     vm.startPrank(gov);
+    //     vault.setAccountant(address(0)); // No accountant
+    //     vm.stopPrank();
 
-        // Deposit
-        vm.startPrank(fish);
-        asset.approve(address(vault), amount);
-        vault.deposit(amount, fish);
-        vm.stopPrank();
+    //     // Deposit
+    //     vm.startPrank(fish);
+    //     asset.approve(address(vault), amount);
+    //     vault.deposit(amount, fish);
+    //     vm.stopPrank();
 
-        // Allocate to strategy
-        vm.prank(gov);
-        vault.updateDebt(address(strategy), amount, 0);
+    //     // Allocate to strategy
+    //     vm.prank(gov);
+    //     vault.updateDebt(address(strategy), amount, 0);
 
-        // Create profit
-        vm.prank(gov);
-        asset.transfer(address(strategy), firstProfit);
-        vm.prank(gov);
-        strategy.report();
-        vm.prank(gov);
-        vault.processReport(address(strategy));
+    //     // Create profit
+    //     vm.prank(gov);
+    //     asset.transfer(address(strategy), firstProfit);
+    //     vm.prank(gov);
+    //     strategy.report();
+    //     vm.prank(gov);
+    //     vault.processReport(address(strategy));
 
-        // Record timestamp
-        uint256 timestamp = block.timestamp;
+    //     // Record timestamp
+    //     uint256 timestamp = block.timestamp;
 
-        // Initial checks
-        assertPricePerShare(1 * 10 ** 18);
-        checkVaultTotals(
-            amount + firstProfit, // total debt
-            0, // total idle
-            amount + firstProfit, // total assets
-            amount + firstProfit // total supply
-        );
+    //     // Initial checks
+    //     assertPricePerShare(1 * 10 ** 18);
+    //     checkVaultTotals(
+    //         amount + firstProfit, // total debt
+    //         0, // total idle
+    //         amount + firstProfit, // total assets
+    //         amount + firstProfit // total supply
+    //     );
 
-        // Increase time halfway through unlock period
-        increaseTimeAndCheckProfitBuffer(WEEK / 2, firstProfit / 2);
+    //     // Increase time halfway through unlock period
+    //     increaseTimeAndCheckProfitBuffer(WEEK / 2, firstProfit / 2);
 
-        // Update profit max unlock time
-        vm.startPrank(gov);
-        vault.setProfitMaxUnlockTime(WEEK * 2);
-        vm.stopPrank();
+    //     // Update profit max unlock time
+    //     vm.startPrank(gov);
+    //     vault.setProfitMaxUnlockTime(WEEK * 2);
+    //     vm.stopPrank();
 
-        // Calculate time passed
-        uint256 timePassed = block.timestamp - timestamp;
+    //     // Calculate time passed
+    //     uint256 timePassed = block.timestamp - timestamp;
 
-        // Check totals - should be unchanged from original schedule
-        checkVaultTotals(
-            amount + firstProfit, // total debt
-            0, // total idle
-            amount + firstProfit, // total assets
-            amount + firstProfit - firstProfit / (WEEK / timePassed) // total supply
-        );
+    //     // Check totals - should be unchanged from original schedule
+    //     checkVaultTotals(
+    //         amount + firstProfit, // total debt
+    //         0, // total idle
+    //         amount + firstProfit, // total assets
+    //         amount + firstProfit - firstProfit / (WEEK / timePassed) // total supply
+    //     );
 
-        // Complete unlock period
-        increaseTimeAndCheckProfitBuffer(WEEK);
+    //     // Complete unlock period
+    //     increaseTimeAndCheckProfitBuffer(WEEK);
 
-        // Verify price per share after full unlock
-        assertPricePerShare(2 * 10 ** 18);
+    //     // Verify price per share after full unlock
+    //     assertPricePerShare(2 * 10 ** 18);
 
-        // Withdraw from strategy
-        vm.prank(gov);
-        vault.updateDebt(address(strategy), 0, 0);
+    //     // Withdraw from strategy
+    //     vm.prank(gov);
+    //     vault.updateDebt(address(strategy), 0, 0);
 
-        // Strategy debt should be zero
-        assertEq(vault.strategies(address(strategy)).currentDebt, 0);
+    //     // Strategy debt should be zero
+    //     assertEq(vault.strategies(address(strategy)).currentDebt, 0);
 
-        // PPS should still be 2.0
-        assertPricePerShare(2 * 10 ** 18);
+    //     // PPS should still be 2.0
+    //     assertPricePerShare(2 * 10 ** 18);
 
-        // Check totals after withdrawal
-        checkVaultTotals(
-            0, // total debt
-            amount + firstProfit, // total idle
-            amount + firstProfit, // total assets
-            amount // total supply
-        );
+    //     // Check totals after withdrawal
+    //     checkVaultTotals(
+    //         0, // total debt
+    //         amount + firstProfit, // total idle
+    //         amount + firstProfit, // total assets
+    //         amount // total supply
+    //     );
 
-        // Fish redeems shares
-        vm.startPrank(fish);
-        vault.approve(fish, vault.balanceOf(fish));
-        vault.redeem(vault.balanceOf(fish), fish, fish, 0, new address[](0));
-        vm.stopPrank();
+    //     // Fish redeems shares
+    //     vm.startPrank(fish);
+    //     vault.approve(fish, vault.balanceOf(fish));
+    //     vault.redeem(vault.balanceOf(fish), fish, fish, 0, new address[](0));
+    //     vm.stopPrank();
 
-        // PPS should be 1.0 after redemption
-        assertPricePerShare(1 * 10 ** 18);
+    //     // PPS should be 1.0 after redemption
+    //     assertPricePerShare(1 * 10 ** 18);
 
-        // Vault should be empty
-        checkVaultTotals(0, 0, 0, 0);
+    //     // Vault should be empty
+    //     checkVaultTotals(0, 0, 0, 0);
 
-        // Vault should have no assets left
-        assertEq(asset.balanceOf(address(vault)), 0);
+    //     // Vault should have no assets left
+    //     assertEq(asset.balanceOf(address(vault)), 0);
 
-        // Fish gets back original amount plus profit
-        assertEq(asset.balanceOf(fish), fishAmount + firstProfit);
-    }
+    //     // Fish gets back original amount plus profit
+    //     assertEq(asset.balanceOf(fish), fishAmount + firstProfit);
+    // }
 
     // adding skip because of warp bug with foundry coverage
     function testDecreaseProfitMaxPeriodNoChangeSkip() public {

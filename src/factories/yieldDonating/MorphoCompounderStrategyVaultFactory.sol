@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.25;
 
-import { CREATE3 } from "@solady/utils/CREATE3.sol";
+import { CREATE3 } from "lib/solady/src/utils/CREATE3.sol";
 import { MorphoCompounderStrategy } from "src/strategies/yieldDonating/MorphoCompounderStrategy.sol";
 
 contract MorphoCompounderStrategyVaultFactory {

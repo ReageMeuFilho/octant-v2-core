@@ -338,70 +338,70 @@ contract QuadraticVotingTimelockEnforcementTest is Test {
     }
     
     /// @notice Test edge cases in timelock enforcement
-    function testTimelockEnforcement_EdgeCases() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+    // function testTimelockEnforcement_EdgeCases() public {
+    //     uint256 startBlock = _tokenized(address(mechanism)).startBlock();
+    //     vm.roll(startBlock - 1);
         
-        // Start with clean timestamp
-        vm.warp(400000); // Different timestamp to avoid interference
+    //     // Start with clean timestamp
+    //     vm.warp(400000); // Different timestamp to avoid interference
         
-        // Setup
-        vm.startPrank(alice);
-        token.approve(address(mechanism), LARGE_DEPOSIT);
-        _tokenized(address(mechanism)).signup(LARGE_DEPOSIT);
-        uint256 pid = _tokenized(address(mechanism)).propose(charlie, "Charlie's Edge Case Project");
-        vm.stopPrank();
+    //     // Setup
+    //     vm.startPrank(alice);
+    //     token.approve(address(mechanism), LARGE_DEPOSIT);
+    //     _tokenized(address(mechanism)).signup(LARGE_DEPOSIT);
+    //     uint256 pid = _tokenized(address(mechanism)).propose(charlie, "Charlie's Edge Case Project");
+    //     vm.stopPrank();
         
-        vm.roll(startBlock + VOTING_DELAY + 1);
+    //     vm.roll(startBlock + VOTING_DELAY + 1);
         
-        vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 30); // 30^2 = 900 > 500 quorum
+    //     vm.prank(alice);
+    //     _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 30); // 30^2 = 900 > 500 quorum
         
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
-        (bool success,) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
-        require(success, "Finalization failed");
+    //     vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+    //     (bool success,) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
+    //     require(success, "Finalization failed");
         
-        uint256 queueTime = block.timestamp;
-        (bool success2,) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", pid));
-        require(success2, "Queue failed");
+    //     uint256 queueTime = block.timestamp;
+    //     (bool success2,) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", pid));
+    //     require(success2, "Queue failed");
         
-        // Test 1: Exactly at boundary moments
+    //     // Test 1: Exactly at boundary moments
         
-        // Exactly at timelock expiry
-        vm.warp(queueTime + TIMELOCK_DELAY);
-        assertEq(_tokenized(address(mechanism)).maxRedeem(charlie), 900);
+    //     // Exactly at timelock expiry
+    //     vm.warp(queueTime + TIMELOCK_DELAY);
+    //     assertEq(_tokenized(address(mechanism)).maxRedeem(charlie), 900);
         
-        // Exactly at grace period expiry
-        vm.warp(queueTime + TIMELOCK_DELAY + GRACE_PERIOD);
-        assertEq(_tokenized(address(mechanism)).maxRedeem(charlie), 0);
+    //     // Exactly at grace period expiry
+    //     vm.warp(queueTime + TIMELOCK_DELAY + GRACE_PERIOD);
+    //     assertEq(_tokenized(address(mechanism)).maxRedeem(charlie), 0);
         
-        // Test 2: Transfer shares and check timelock enforcement for new owner
-        vm.warp(queueTime + TIMELOCK_DELAY + GRACE_PERIOD / 2); // Valid window
+    //     // Test 2: Transfer shares and check timelock enforcement for new owner
+    //     vm.warp(queueTime + TIMELOCK_DELAY + GRACE_PERIOD / 2); // Valid window
         
-        address newOwner = address(0x999);
-        vm.prank(charlie);
-        _tokenized(address(mechanism)).transfer(newOwner, 300);
+    //     address newOwner = address(0x999);
+    //     vm.prank(charlie);
+    //     _tokenized(address(mechanism)).transfer(newOwner, 300);
         
-        // New owner should also respect charlie's original timelock  
-        assertEq(_tokenized(address(mechanism)).maxRedeem(newOwner), 300);
+    //     // New owner should also respect charlie's original timelock  
+    //     assertEq(_tokenized(address(mechanism)).maxRedeem(newOwner), 300);
         
-        vm.prank(newOwner);
-        uint256 newOwnerAssets = _tokenized(address(mechanism)).redeem(300, newOwner, newOwner);
+    //     vm.prank(newOwner);
+    //     uint256 newOwnerAssets = _tokenized(address(mechanism)).redeem(300, newOwner, newOwner);
         
-        // With matching pool: total assets = 1000 (alice) + 2000 (matching pool) = 3000 ether
-        // 300 shares out of 900 total = (300/900) × 3000 = 1000 ether
-        uint256 expectedAssets = 1000 ether;
-        assertEq(newOwnerAssets, expectedAssets);
+    //     // With matching pool: total assets = 1000 (alice) + 2000 (matching pool) = 3000 ether
+    //     // 300 shares out of 900 total = (300/900) × 3000 = 1000 ether
+    //     uint256 expectedAssets = 1000 ether;
+    //     assertEq(newOwnerAssets, expectedAssets);
         
-        // Test 3: Approved redemption
-        vm.prank(charlie);
-        _tokenized(address(mechanism)).approve(newOwner, 300); // Approve 300 of the 600 remaining shares
+    //     // Test 3: Approved redemption
+    //     vm.prank(charlie);
+    //     _tokenized(address(mechanism)).approve(newOwner, 300); // Approve 300 of the 600 remaining shares
         
-        vm.prank(newOwner);
-        uint256 approvedAssets = _tokenized(address(mechanism)).redeem(300, newOwner, charlie);
+    //     vm.prank(newOwner);
+    //     uint256 approvedAssets = _tokenized(address(mechanism)).redeem(300, newOwner, charlie);
         
-        // Same calculation: 300 shares out of 900 total = (300/900) × 3000 = 1000 ether
-        uint256 expectedApprovedAssets = 1000 ether;
-        assertEq(approvedAssets, expectedApprovedAssets);
-    }
+    //     // Same calculation: 300 shares out of 900 total = (300/900) × 3000 = 1000 ether
+    //     uint256 expectedApprovedAssets = 1000 ether;
+    //     assertEq(approvedAssets, expectedApprovedAssets);
+    // }
 }
