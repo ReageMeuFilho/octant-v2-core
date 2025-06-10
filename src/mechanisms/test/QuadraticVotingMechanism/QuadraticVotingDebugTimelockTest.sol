@@ -14,26 +14,26 @@ contract QuadraticVotingDebugTimelockTest is Test {
     AllocationMechanismFactory factory;
     ERC20Mock token;
     QuadraticVotingMechanism mechanism;
-    
+
     address alice = address(0x1);
     address charlie = address(0x3);
-    
+
     uint256 constant LARGE_DEPOSIT = 1000 ether;
     uint256 constant TIMELOCK_DELAY = 1 days;
-    
+
     function _tokenized(address _mechanism) internal pure returns (TokenizedAllocationMechanism) {
         return TokenizedAllocationMechanism(_mechanism);
     }
-    
+
     function setUp() public {
         factory = new AllocationMechanismFactory();
         token = new ERC20Mock();
         token.mint(alice, 2000 ether);
-        
+
         AllocationConfig memory config = AllocationConfig({
             asset: IERC20(address(token)),
             name: "Debug Test",
-            symbol: "DEBUG", 
+            symbol: "DEBUG",
             votingDelay: 100,
             votingPeriod: 1000,
             quorumShares: 500,
@@ -42,72 +42,72 @@ contract QuadraticVotingDebugTimelockTest is Test {
             startBlock: block.number + 50,
             owner: address(0)
         });
-        
+
         address mechanismAddr = factory.deployQuadraticVotingMechanism(config, 50, 100); // 50% alpha
         mechanism = QuadraticVotingMechanism(payable(mechanismAddr));
     }
-    
+
     function testDebugTimelock() public {
         uint256 startBlock = _tokenized(address(mechanism)).startBlock();
         vm.roll(startBlock - 1);
-        
+
         // Start with clean timestamp
         vm.warp(100000);
         console.log("Initial timestamp:", block.timestamp);
-        
+
         // Setup successful proposal
         vm.startPrank(alice);
         token.approve(address(mechanism), LARGE_DEPOSIT);
         _tokenized(address(mechanism)).signup(LARGE_DEPOSIT);
         uint256 pid = _tokenized(address(mechanism)).propose(charlie, "Charlie's Project");
         vm.stopPrank();
-        
+
         vm.roll(startBlock + 101);
-        
+
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 31); // 31^2 = 961 > 500 quorum
-        
+
         vm.roll(startBlock + 1101);
-        (bool success,) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
+        (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
-        
+
         console.log("=== BEFORE QUEUING ===");
         console.log("Current timestamp:", block.timestamp);
         console.log("Charlie redeemableAfter BEFORE:", _tokenized(address(mechanism)).redeemableAfter(charlie));
         console.log("Charlie balance BEFORE:", _tokenized(address(mechanism)).balanceOf(charlie));
         console.log("Charlie maxRedeem BEFORE:", _tokenized(address(mechanism)).maxRedeem(charlie));
-        
+
         uint256 queueTime = block.timestamp;
         console.log("Queue time:", queueTime);
         console.log("Timelock delay:", _tokenized(address(mechanism)).timelockDelay());
         console.log("Expected redeemable time:", queueTime + TIMELOCK_DELAY);
-        
-        (bool success2,) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", pid));
+
+        (bool success2, ) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", pid));
         require(success2, "Queue failed");
-        
+
         console.log("=== AFTER QUEUING ===");
         console.log("Current timestamp:", block.timestamp);
         console.log("Charlie redeemableAfter AFTER:", _tokenized(address(mechanism)).redeemableAfter(charlie));
         console.log("Charlie balance AFTER:", _tokenized(address(mechanism)).balanceOf(charlie));
         console.log("Charlie maxRedeem AFTER:", _tokenized(address(mechanism)).maxRedeem(charlie));
-        
+
         // Check if timelock is working
         uint256 maxRedeem = _tokenized(address(mechanism)).maxRedeem(charlie);
         console.log("Max redeem immediately after queue:", maxRedeem);
-        
+
         if (maxRedeem == 0) {
             console.log("SUCCESS: Timelock is blocking redemption");
         } else {
             console.log("FAILURE: Timelock is NOT blocking redemption");
             console.log("Expected: 0, Got:", maxRedeem);
         }
-        
+
         // Debug the _availableWithdrawLimit logic step by step
         uint256 redeemableTime = _tokenized(address(mechanism)).redeemableAfter(charlie);
         console.log("Debug - redeemableTime:", redeemableTime);
         console.log("Debug - block.timestamp:", block.timestamp);
         console.log("Debug - block.timestamp < redeemableTime:", block.timestamp < redeemableTime);
-        
+
         if (redeemableTime == 0) {
             console.log("DEBUG: redeemableTime is 0 - this should not happen after queuing");
         } else if (block.timestamp < redeemableTime) {

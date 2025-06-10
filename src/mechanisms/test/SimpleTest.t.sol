@@ -11,7 +11,7 @@ contract SimpleTest is Test {
         AllocationMechanismFactory factory = new AllocationMechanismFactory();
         assertNotEq(factory.tokenizedAllocationImplementation(), address(0));
     }
-    
+
     function testTokenizedAllocationDeployment() public {
         TokenizedAllocationMechanism impl = new TokenizedAllocationMechanism();
         assertNotEq(address(impl), address(0));

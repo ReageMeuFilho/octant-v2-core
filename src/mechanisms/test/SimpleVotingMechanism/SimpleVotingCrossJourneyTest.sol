@@ -16,15 +16,15 @@ contract SimpleVotingCrossJourneyTest is Test {
     AllocationMechanismFactory factory;
     ERC20Mock token;
     SimpleVotingMechanism mechanism;
-    
-    address alice = address(0x1);    // Primary voter
-    address bob = address(0x2);      // Secondary voter
-    address charlie = address(0x3);  // Recipient 1
-    address dave = address(0x4);     // Recipient 2
-    address eve = address(0x5);      // Recipient 3
-    address frank = address(0x6);    // Small voter
+
+    address alice = address(0x1); // Primary voter
+    address bob = address(0x2); // Secondary voter
+    address charlie = address(0x3); // Recipient 1
+    address dave = address(0x4); // Recipient 2
+    address eve = address(0x5); // Recipient 3
+    address frank = address(0x6); // Small voter
     address emergencyAdmin = address(0xa);
-    
+
     uint256 constant LARGE_DEPOSIT = 1000 ether;
     uint256 constant MEDIUM_DEPOSIT = 500 ether;
     uint256 constant SMALL_DEPOSIT = 100 ether;
@@ -32,20 +32,20 @@ contract SimpleVotingCrossJourneyTest is Test {
     uint256 constant VOTING_DELAY = 100;
     uint256 constant VOTING_PERIOD = 1000;
     uint256 constant TIMELOCK_DELAY = 1 days;
-    
+
     function _tokenized(address _mechanism) internal pure returns (TokenizedAllocationMechanism) {
         return TokenizedAllocationMechanism(_mechanism);
     }
-    
+
     function setUp() public {
         factory = new AllocationMechanismFactory();
         token = new ERC20Mock();
-        
+
         // Mint tokens to all actors (including large amount for edge case testing)
         token.mint(alice, type(uint128).max);
         token.mint(bob, 1500 ether);
         token.mint(frank, 200 ether);
-        
+
         AllocationConfig memory config = AllocationConfig({
             asset: IERC20(address(token)),
             name: "Cross Journey Integration Test",
@@ -58,119 +58,128 @@ contract SimpleVotingCrossJourneyTest is Test {
             startBlock: block.number + 50,
             owner: address(0)
         });
-        
+
         address mechanismAddr = factory.deploySimpleVotingMechanism(config);
         mechanism = SimpleVotingMechanism(payable(mechanismAddr));
     }
-    
+
     /// @notice Test complete end-to-end integration across all user journeys
     function testCompleteEndToEnd_Integration() public {
         uint256 startBlock = _tokenized(address(mechanism)).startBlock();
         vm.roll(startBlock - 1);
-        
+
         // PHASE 1: ADMIN SETUP AND COMMUNITY ONBOARDING
-        
+
         // Admin monitors community joining
         vm.startPrank(alice);
         token.approve(address(mechanism), LARGE_DEPOSIT);
         _tokenized(address(mechanism)).signup(LARGE_DEPOSIT);
         vm.stopPrank();
-        
+
         vm.startPrank(bob);
         token.approve(address(mechanism), MEDIUM_DEPOSIT);
         _tokenized(address(mechanism)).signup(MEDIUM_DEPOSIT);
         vm.stopPrank();
-        
+
         vm.startPrank(frank);
         token.approve(address(mechanism), SMALL_DEPOSIT);
         _tokenized(address(mechanism)).signup(SMALL_DEPOSIT);
         vm.stopPrank();
-        
+
         // PHASE 2: RECIPIENT ADVOCACY AND PROPOSAL CREATION
-        
+
         // Recipients work with proposers
         vm.prank(alice);
         uint256 pidCharlie = _tokenized(address(mechanism)).propose(charlie, "Charlie's Renewable Energy Grid");
-        
+
         vm.prank(bob);
         uint256 pidDave = _tokenized(address(mechanism)).propose(dave, "Dave's Digital Literacy Program");
-        
+
         vm.prank(frank);
         uint256 pidEve = _tokenized(address(mechanism)).propose(eve, "Eve's Community Health Clinic");
-        
+
         // PHASE 3: DEMOCRATIC VOTING PROCESS
-        
+
         vm.roll(startBlock + VOTING_DELAY + 1);
-        
+
         // Complex voting patterns
         // Alice: Strategic voter supporting energy and education
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pidCharlie, TokenizedAllocationMechanism.VoteType.For, 600 ether);
-        
+
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pidDave, TokenizedAllocationMechanism.VoteType.For, 400 ether);
-        
+
         // Bob: Focused on education with opposition to energy
         vm.prank(bob);
         _tokenized(address(mechanism)).castVote(pidDave, TokenizedAllocationMechanism.VoteType.For, 400 ether);
-        
+
         vm.prank(bob);
         _tokenized(address(mechanism)).castVote(pidCharlie, TokenizedAllocationMechanism.VoteType.Against, 100 ether);
-        
+
         // Frank: Supporting healthcare
         vm.prank(frank);
         _tokenized(address(mechanism)).castVote(pidEve, TokenizedAllocationMechanism.VoteType.For, 100 ether);
-        
+
         // PHASE 4: ADMIN FINALIZATION AND EXECUTION
-        
+
         vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
-        
+
         // Admin finalizes voting
-        (bool success,) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
+        (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
-        
+
         // Check final outcomes
         // Charlie: 600 For - 100 Against = 500 net (exceeds 200 quorum) ✓
-        assertEq(uint(_tokenized(address(mechanism)).state(pidCharlie)), uint(TokenizedAllocationMechanism.ProposalState.Succeeded));
-        
+        assertEq(
+            uint(_tokenized(address(mechanism)).state(pidCharlie)),
+            uint(TokenizedAllocationMechanism.ProposalState.Succeeded)
+        );
+
         // Dave: 800 For - 0 Against = 800 net (exceeds 200 quorum) ✓
-        assertEq(uint(_tokenized(address(mechanism)).state(pidDave)), uint(TokenizedAllocationMechanism.ProposalState.Succeeded));
-        
+        assertEq(
+            uint(_tokenized(address(mechanism)).state(pidDave)),
+            uint(TokenizedAllocationMechanism.ProposalState.Succeeded)
+        );
+
         // Eve: 100 For - 0 Against = 100 net (below 200 quorum) ✗
-        assertEq(uint(_tokenized(address(mechanism)).state(pidEve)), uint(TokenizedAllocationMechanism.ProposalState.Defeated));
-        
+        assertEq(
+            uint(_tokenized(address(mechanism)).state(pidEve)),
+            uint(TokenizedAllocationMechanism.ProposalState.Defeated)
+        );
+
         // Admin queues successful proposals
-        (bool success1,) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", pidCharlie));
+        (bool success1, ) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", pidCharlie));
         require(success1, "Queue Charlie failed");
-        
-        (bool success2,) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", pidDave));
+
+        (bool success2, ) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", pidDave));
         require(success2, "Queue Dave failed");
-        
+
         // PHASE 5: RECIPIENT REDEMPTION AND ASSET UTILIZATION
-        
+
         // Verify share distribution
         assertEq(_tokenized(address(mechanism)).balanceOf(charlie), 500 ether);
         assertEq(_tokenized(address(mechanism)).balanceOf(dave), 800 ether);
         assertEq(_tokenized(address(mechanism)).balanceOf(eve), 0);
         assertEq(_tokenized(address(mechanism)).totalSupply(), 1300 ether);
-        
+
         // Fast forward past timelock
         vm.warp(block.timestamp + TIMELOCK_DELAY + 1);
-        
+
         // Recipients redeem allocations
         uint256 charlieTokensBefore = token.balanceOf(charlie);
         uint256 daveTokensBefore = token.balanceOf(dave);
-        
+
         // Get actual redeemable shares (accounting for proper share price)
         uint256 charlieMaxShares = _tokenized(address(mechanism)).maxRedeem(charlie);
         uint256 daveMaxShares = _tokenized(address(mechanism)).maxRedeem(dave);
-        
+
         vm.prank(charlie);
         uint256 charlieAssets = _tokenized(address(mechanism)).redeem(charlieMaxShares, charlie, charlie);
-        
+
         vm.prank(dave);
         uint256 daveAssets = _tokenized(address(mechanism)).redeem(daveMaxShares, dave, dave);
-        
+
         // Calculate expected assets based on proper accounting
         // Total deposits: 1000 + 500 + 100 = 1600 ether
         // Total shares: 500 + 800 = 1300 ether
@@ -178,8 +187,8 @@ contract SimpleVotingCrossJourneyTest is Test {
         uint256 totalDeposits = 1600 ether;
         uint256 totalShares = 1300 ether;
         uint256 expectedCharlieAssets = (500 ether * totalDeposits) / totalShares; // ~615.38 ether
-        uint256 expectedDaveAssets = (800 ether * totalDeposits) / totalShares;   // ~984.62 ether
-        
+        uint256 expectedDaveAssets = (800 ether * totalDeposits) / totalShares; // ~984.62 ether
+
         // Verify final state with proper asset accounting
         assertEq(token.balanceOf(charlie), charlieTokensBefore + charlieAssets);
         assertEq(token.balanceOf(dave), daveTokensBefore + daveAssets);
@@ -188,303 +197,322 @@ contract SimpleVotingCrossJourneyTest is Test {
         // Account for rounding errors due to floor rounding
         assertApproxEqAbs(charlieAssets, expectedCharlieAssets, 3);
         assertApproxEqAbs(daveAssets, expectedDaveAssets, 3);
-        
+
         // Verify conservation - should be very close to total deposits (within rounding error)
         uint256 totalRedeemed = charlieAssets + daveAssets;
         assertTrue(totalRedeemed >= totalDeposits - 10 && totalRedeemed <= totalDeposits + 10);
-        
+
         // PHASE 6: SYSTEM INTEGRITY VERIFICATION
-        
+
         // Verify clean state (allow for tiny rounding remainder)
         assertTrue(_tokenized(address(mechanism)).totalSupply() <= 2);
         assertTrue(_tokenized(address(mechanism)).tallyFinalized());
         assertEq(_tokenized(address(mechanism)).getProposalCount(), 3);
-        
+
         // Verify voter power consumption
         assertEq(_tokenized(address(mechanism)).votingPower(alice), 0);
         assertEq(_tokenized(address(mechanism)).votingPower(bob), 0);
         assertEq(_tokenized(address(mechanism)).votingPower(frank), 0);
     }
-    
+
     /// @notice Test crisis recovery and system resilience
     function testCrisisRecovery_SystemResilience() public {
         uint256 startBlock = _tokenized(address(mechanism)).startBlock();
         vm.roll(startBlock - 1);
-        
+
         // Setup scenario with potential failures
         vm.startPrank(alice);
         token.approve(address(mechanism), LARGE_DEPOSIT);
         _tokenized(address(mechanism)).signup(LARGE_DEPOSIT);
         vm.stopPrank();
-        
+
         vm.startPrank(bob);
         token.approve(address(mechanism), MEDIUM_DEPOSIT);
         _tokenized(address(mechanism)).signup(MEDIUM_DEPOSIT);
         vm.stopPrank();
-        
+
         vm.prank(alice);
         uint256 pid = _tokenized(address(mechanism)).propose(charlie, "Test proposal");
-        
+
         vm.roll(startBlock + VOTING_DELAY + 1);
-        
+
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 500 ether);
-        
+
         // Emergency pause during voting
-        (bool success,) = address(mechanism).call(abi.encodeWithSignature("pause()"));
+        (bool success, ) = address(mechanism).call(abi.encodeWithSignature("pause()"));
         require(success, "Pause failed");
-        
+
         // All operations blocked
         vm.expectRevert(TokenizedAllocationMechanism.PausedError.selector);
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether);
-        
+
         // Resume operations
-        (bool success2,) = address(mechanism).call(abi.encodeWithSignature("unpause()"));
+        (bool success2, ) = address(mechanism).call(abi.encodeWithSignature("unpause()"));
         require(success2, "Unpause failed");
-        
+
         // Operations work again - use bob since alice already voted
         vm.prank(bob);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether);
-        
+
         // Ownership transfer during crisis
-        (bool success3,) = address(mechanism).call(abi.encodeWithSignature("transferOwnership(address)", emergencyAdmin));
+        (bool success3, ) = address(mechanism).call(
+            abi.encodeWithSignature("transferOwnership(address)", emergencyAdmin)
+        );
         require(success3, "Transfer ownership failed");
-        
+
         // New owner manages crisis
         vm.startPrank(emergencyAdmin);
-        (bool success4,) = address(mechanism).call(abi.encodeWithSignature("pause()"));
+        (bool success4, ) = address(mechanism).call(abi.encodeWithSignature("pause()"));
         require(success4, "Emergency admin pause failed");
         vm.stopPrank();
-        
+
         // System recovery
         vm.startPrank(emergencyAdmin);
-        (bool success5,) = address(mechanism).call(abi.encodeWithSignature("unpause()"));
+        (bool success5, ) = address(mechanism).call(abi.encodeWithSignature("unpause()"));
         require(success5, "Recovery unpause failed");
         vm.stopPrank();
-        
+
         // Complete voting cycle
         vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
-        
+
         vm.startPrank(emergencyAdmin);
-        (bool success6,) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
+        (bool success6, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success6, "Emergency finalization failed");
-        
-        (bool success7,) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", pid));
+
+        (bool success7, ) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", pid));
         require(success7, "Emergency queuing failed");
         vm.stopPrank();
-        
+
         // System functions normally - alice (500) + bob (100) = 600 total
         assertEq(_tokenized(address(mechanism)).balanceOf(charlie), 600 ether);
-        assertEq(uint(_tokenized(address(mechanism)).state(pid)), uint(TokenizedAllocationMechanism.ProposalState.Queued));
+        assertEq(
+            uint(_tokenized(address(mechanism)).state(pid)),
+            uint(TokenizedAllocationMechanism.ProposalState.Queued)
+        );
     }
-    
+
     /// @notice Test edge cases and boundary conditions across journeys
     function testEdgeCases_BoundaryConditions() public {
         uint256 startBlock = _tokenized(address(mechanism)).startBlock();
         vm.roll(startBlock - 1);
-        
+
         // Maximum safe values
         vm.startPrank(alice);
         token.approve(address(mechanism), type(uint128).max);
         _tokenized(address(mechanism)).signup(type(uint128).max);
         vm.stopPrank();
-        
+
         assertEq(_tokenized(address(mechanism)).votingPower(alice), type(uint128).max);
-        
+
         // Zero voting power operations
         vm.prank(frank);
         _tokenized(address(mechanism)).signup(0);
-        
+
         // Cannot propose with zero power
-        vm.expectRevert(abi.encodeWithSelector(
-            TokenizedAllocationMechanism.ProposeNotAllowed.selector, frank
-        ));
+        vm.expectRevert(abi.encodeWithSelector(TokenizedAllocationMechanism.ProposeNotAllowed.selector, frank));
         vm.prank(frank);
         _tokenized(address(mechanism)).propose(eve, "Should fail");
-        
+
         // Boundary voting timing - ensure bob has registered before voting starts
         vm.startPrank(bob);
         token.approve(address(mechanism), MEDIUM_DEPOSIT);
         _tokenized(address(mechanism)).signup(MEDIUM_DEPOSIT);
         vm.stopPrank();
-        
+
         vm.prank(alice);
         uint256 pid = _tokenized(address(mechanism)).propose(charlie, "Boundary test");
-        
+
         // Exactly at voting start
         vm.roll(startBlock + VOTING_DELAY);
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 1000 ether);
-        
+
         // Exactly at voting end
         vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD);
         vm.prank(bob);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.Against, 100 ether);
-        
+
         // One block later should fail
         vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
         vm.expectRevert();
         vm.prank(bob);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 1 ether);
     }
-    
+
     /// @notice Test proposal cancellation across journeys
     function testProposalCancellation_CrossJourney() public {
         uint256 startBlock = _tokenized(address(mechanism)).startBlock();
         vm.roll(startBlock - 1);
-        
+
         vm.startPrank(alice);
         token.approve(address(mechanism), LARGE_DEPOSIT);
         _tokenized(address(mechanism)).signup(LARGE_DEPOSIT);
         vm.stopPrank();
-        
+
         // Test proposal states during cancellation
         vm.prank(alice);
         uint256 pid = _tokenized(address(mechanism)).propose(charlie, "Cancellable proposal");
-        
+
         // Should be in Pending state
         vm.roll(startBlock - 1);
-        assertEq(uint(_tokenized(address(mechanism)).state(pid)), uint(TokenizedAllocationMechanism.ProposalState.Pending));
-        
+        assertEq(
+            uint(_tokenized(address(mechanism)).state(pid)),
+            uint(TokenizedAllocationMechanism.ProposalState.Pending)
+        );
+
         // During voting delay
         vm.roll(startBlock + 50);
-        assertEq(uint(_tokenized(address(mechanism)).state(pid)), uint(TokenizedAllocationMechanism.ProposalState.Active));
-        
+        assertEq(
+            uint(_tokenized(address(mechanism)).state(pid)),
+            uint(TokenizedAllocationMechanism.ProposalState.Active)
+        );
+
         // Proposer cancels
         vm.prank(alice);
         _tokenized(address(mechanism)).cancelProposal(pid);
-        
-        assertEq(uint(_tokenized(address(mechanism)).state(pid)), uint(TokenizedAllocationMechanism.ProposalState.Canceled));
-        
+
+        assertEq(
+            uint(_tokenized(address(mechanism)).state(pid)),
+            uint(TokenizedAllocationMechanism.ProposalState.Canceled)
+        );
+
         // Cannot vote on canceled proposal
         vm.roll(startBlock + VOTING_DELAY + 1);
         vm.expectRevert();
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether);
-        
+
         // Non-proposer cannot cancel
         vm.prank(alice);
         uint256 pid2 = _tokenized(address(mechanism)).propose(dave, "Another proposal");
-        
-        vm.expectRevert(abi.encodeWithSelector(
-            TokenizedAllocationMechanism.NotProposer.selector, bob, alice
-        ));
+
+        vm.expectRevert(abi.encodeWithSelector(TokenizedAllocationMechanism.NotProposer.selector, bob, alice));
         vm.prank(bob);
         _tokenized(address(mechanism)).cancelProposal(pid2);
     }
-    
+
     /// @notice Test multi-proposal complex scenarios
     function testMultiProposal_ComplexScenarios() public {
         uint256 startBlock = _tokenized(address(mechanism)).startBlock();
         vm.roll(startBlock - 1);
-        
+
         // Setup diverse voter base
         vm.startPrank(alice);
         token.approve(address(mechanism), LARGE_DEPOSIT);
         _tokenized(address(mechanism)).signup(LARGE_DEPOSIT);
         vm.stopPrank();
-        
+
         vm.startPrank(bob);
         token.approve(address(mechanism), MEDIUM_DEPOSIT);
         _tokenized(address(mechanism)).signup(MEDIUM_DEPOSIT);
         vm.stopPrank();
-        
+
         vm.startPrank(frank);
         token.approve(address(mechanism), SMALL_DEPOSIT);
         _tokenized(address(mechanism)).signup(SMALL_DEPOSIT);
         vm.stopPrank();
-        
+
         // Create competing proposals
         vm.prank(alice);
         uint256 pid1 = _tokenized(address(mechanism)).propose(charlie, "High-impact Infrastructure");
-        
+
         vm.prank(bob);
         uint256 pid2 = _tokenized(address(mechanism)).propose(dave, "Community Education");
-        
+
         vm.prank(frank);
         uint256 pid3 = _tokenized(address(mechanism)).propose(eve, "Healthcare Access");
-        
+
         vm.roll(startBlock + VOTING_DELAY + 1);
-        
+
         // Strategic voting with power distribution
         // Alice: Supports infrastructure but opposes healthcare
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, 500 ether);
-        
+
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid3, TokenizedAllocationMechanism.VoteType.Against, 300 ether);
-        
+
         // Bob: Supports education and healthcare
         vm.prank(bob);
         _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 400 ether);
-        
+
         vm.prank(bob);
         _tokenized(address(mechanism)).castVote(pid3, TokenizedAllocationMechanism.VoteType.For, 100 ether);
-        
+
         // Frank: All-in on healthcare
         vm.prank(frank);
         _tokenized(address(mechanism)).castVote(pid3, TokenizedAllocationMechanism.VoteType.For, 100 ether);
-        
+
         // Finalize and determine outcomes
         vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
-        (bool success,) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
+        (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
-        
+
         // Check complex voting outcomes
         // pid1: 500 For, 0 Against = 500 net (succeeds)
-        assertEq(uint(_tokenized(address(mechanism)).state(pid1)), uint(TokenizedAllocationMechanism.ProposalState.Succeeded));
-        
+        assertEq(
+            uint(_tokenized(address(mechanism)).state(pid1)),
+            uint(TokenizedAllocationMechanism.ProposalState.Succeeded)
+        );
+
         // pid2: 400 For, 0 Against = 400 net (succeeds)
-        assertEq(uint(_tokenized(address(mechanism)).state(pid2)), uint(TokenizedAllocationMechanism.ProposalState.Succeeded));
-        
+        assertEq(
+            uint(_tokenized(address(mechanism)).state(pid2)),
+            uint(TokenizedAllocationMechanism.ProposalState.Succeeded)
+        );
+
         // pid3: 200 For, 300 Against = -100 net (defeated by negative votes)
-        assertEq(uint(_tokenized(address(mechanism)).state(pid3)), uint(TokenizedAllocationMechanism.ProposalState.Defeated));
-        
+        assertEq(
+            uint(_tokenized(address(mechanism)).state(pid3)),
+            uint(TokenizedAllocationMechanism.ProposalState.Defeated)
+        );
+
         // Queue successful proposals
-        (bool success1,) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", pid1));
+        (bool success1, ) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", pid1));
         require(success1, "Queue pid1 failed");
-        
-        (bool success2,) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", pid2));
+
+        (bool success2, ) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", pid2));
         require(success2, "Queue pid2 failed");
-        
+
         // Verify share distribution
         assertEq(_tokenized(address(mechanism)).balanceOf(charlie), 500 ether);
         assertEq(_tokenized(address(mechanism)).balanceOf(dave), 400 ether);
         assertEq(_tokenized(address(mechanism)).balanceOf(eve), 0);
         assertEq(_tokenized(address(mechanism)).totalSupply(), 900 ether);
-        
+
         // Fast forward and verify redemption with proper asset accounting
         vm.warp(block.timestamp + TIMELOCK_DELAY + 1);
-        
+
         // Calculate expected assets based on proper accounting
         // Total deposits: 1000 + 500 + 100 = 1600 ether
         // Total shares: 500 + 400 = 900 ether
         // Share price: 1600/900 assets per share
         uint256 totalDeposits = 1600 ether;
         uint256 totalShares = 900 ether;
-        
+
         // Get actual redeemable shares (accounting for proper share price)
         uint256 charlieMaxShares = _tokenized(address(mechanism)).maxRedeem(charlie);
         uint256 daveMaxShares = _tokenized(address(mechanism)).maxRedeem(dave);
-        
+
         vm.prank(charlie);
         uint256 charlieAssets = _tokenized(address(mechanism)).redeem(charlieMaxShares, charlie, charlie);
-        
+
         vm.prank(dave);
         uint256 daveAssets = _tokenized(address(mechanism)).redeem(daveMaxShares, dave, dave);
-        
+
         // Calculate expected assets
         uint256 expectedCharlieAssets = (500 ether * totalDeposits) / totalShares;
         uint256 expectedDaveAssets = (400 ether * totalDeposits) / totalShares;
-        
+
         // Account for rounding errors due to floor rounding
         assertApproxEqAbs(charlieAssets, expectedCharlieAssets, 3);
         assertApproxEqAbs(daveAssets, expectedDaveAssets, 3);
-        
+
         // Final state verification
         assertTrue(_tokenized(address(mechanism)).totalSupply() <= 2);
-        
+
         // Verify conservation - should be very close to total deposits
         uint256 totalRedeemed = charlieAssets + daveAssets;
         assertTrue(totalRedeemed >= totalDeposits - 10 && totalRedeemed <= totalDeposits + 10);

@@ -30,29 +30,29 @@ contract MockTokenWithDecimals is ERC20 {
 /// @title Test decimal conversion in voting power calculation
 contract DecimalConversionTest is Test {
     AllocationMechanismFactory factory;
-    MockTokenWithDecimals token6;  // 6 decimals (USDC-like)
-    MockTokenWithDecimals token8;  // 8 decimals (Bitcoin-like)
+    MockTokenWithDecimals token6; // 6 decimals (USDC-like)
+    MockTokenWithDecimals token8; // 8 decimals (Bitcoin-like)
     MockTokenWithDecimals token18; // 18 decimals (ETH-like)
-    
+
     address alice = address(0x1);
-    
+
     function _tokenized(address _mechanism) internal pure returns (TokenizedAllocationMechanism) {
         return TokenizedAllocationMechanism(_mechanism);
     }
-    
+
     function setUp() public {
         factory = new AllocationMechanismFactory();
-        
+
         token6 = new MockTokenWithDecimals("USDC", "USDC", 6);
         token8 = new MockTokenWithDecimals("WBTC", "WBTC", 8);
         token18 = new MockTokenWithDecimals("WETH", "WETH", 18);
-        
+
         // Mint tokens to alice
-        token6.mint(alice, 1000 * 10**6);   // 1000 USDC
-        token8.mint(alice, 1 * 10**8);      // 1 WBTC
-        token18.mint(alice, 1000 * 10**18); // 1000 WETH
+        token6.mint(alice, 1000 * 10 ** 6); // 1000 USDC
+        token8.mint(alice, 1 * 10 ** 8); // 1 WBTC
+        token18.mint(alice, 1000 * 10 ** 18); // 1000 WETH
     }
-    
+
     function deployQuadraticMechanismWithToken(IERC20 asset) internal returns (QuadraticVotingMechanism) {
         AllocationConfig memory config = AllocationConfig({
             asset: asset,
@@ -66,11 +66,11 @@ contract DecimalConversionTest is Test {
             startBlock: block.number + 50,
             owner: address(0)
         });
-        
+
         address mechanismAddr = factory.deployQuadraticVotingMechanism(config, 50, 100);
         return QuadraticVotingMechanism(payable(mechanismAddr));
     }
-    
+
     function deploySimpleMechanismWithToken(IERC20 asset) internal returns (SimpleVotingMechanism) {
         AllocationConfig memory config = AllocationConfig({
             asset: asset,
@@ -84,79 +84,79 @@ contract DecimalConversionTest is Test {
             startBlock: block.number + 50,
             owner: address(0)
         });
-        
+
         address mechanismAddr = factory.deploySimpleVotingMechanism(config);
         return SimpleVotingMechanism(payable(mechanismAddr));
     }
-    
+
     /// @notice Test that 6-decimal tokens are properly scaled to 18 decimals (Quadratic)
     function testQuadraticDecimalConversion_6Decimals() public {
         QuadraticVotingMechanism mechanism = deployQuadraticMechanismWithToken(IERC20(address(token6)));
-        
-        uint256 deposit = 100 * 10**6; // 100 USDC (6 decimals)
-        
+
+        uint256 deposit = 100 * 10 ** 6; // 100 USDC (6 decimals)
+
         // Test through actual signup to verify conversion works
         vm.roll(_tokenized(address(mechanism)).startBlock() - 1);
         vm.startPrank(alice);
         token6.approve(address(mechanism), deposit);
         _tokenized(address(mechanism)).signup(deposit);
         vm.stopPrank();
-        
+
         // Should convert to 18 decimals: 100 * 10^18
-        uint256 expected = 100 * 10**18;
+        uint256 expected = 100 * 10 ** 18;
         uint256 actualVotingPower = _tokenized(address(mechanism)).votingPower(alice);
         assertEq(actualVotingPower, expected, "6-decimal token should scale up to 18 decimals");
     }
-    
+
     /// @notice Test that 8-decimal tokens are properly scaled to 18 decimals (Quadratic)
     function testQuadraticDecimalConversion_8Decimals() public {
         QuadraticVotingMechanism mechanism = deployQuadraticMechanismWithToken(IERC20(address(token8)));
-        
-        uint256 deposit = 1 * 10**8; // 1 WBTC (8 decimals)
-        
+
+        uint256 deposit = 1 * 10 ** 8; // 1 WBTC (8 decimals)
+
         vm.roll(_tokenized(address(mechanism)).startBlock() - 1);
         vm.startPrank(alice);
         token8.approve(address(mechanism), deposit);
         _tokenized(address(mechanism)).signup(deposit);
         vm.stopPrank();
-        
+
         // Should convert to 18 decimals: 1 * 10^18
-        uint256 expected = 1 * 10**18;
+        uint256 expected = 1 * 10 ** 18;
         uint256 actualVotingPower = _tokenized(address(mechanism)).votingPower(alice);
         assertEq(actualVotingPower, expected, "8-decimal token should scale up to 18 decimals");
     }
-    
+
     /// @notice Test that 18-decimal tokens remain unchanged (Quadratic)
     function testQuadraticDecimalConversion_18Decimals() public {
         QuadraticVotingMechanism mechanism = deployQuadraticMechanismWithToken(IERC20(address(token18)));
-        
-        uint256 deposit = 100 * 10**18; // 100 WETH (18 decimals)
-        
+
+        uint256 deposit = 100 * 10 ** 18; // 100 WETH (18 decimals)
+
         vm.roll(_tokenized(address(mechanism)).startBlock() - 1);
         vm.startPrank(alice);
         token18.approve(address(mechanism), deposit);
         _tokenized(address(mechanism)).signup(deposit);
         vm.stopPrank();
-        
+
         // Should remain the same
         uint256 actualVotingPower = _tokenized(address(mechanism)).votingPower(alice);
         assertEq(actualVotingPower, deposit, "18-decimal token should remain unchanged");
     }
-    
+
     /// @notice Test that 6-decimal tokens are properly scaled to 18 decimals (Simple)
     function testSimpleDecimalConversion_6Decimals() public {
         SimpleVotingMechanism mechanism = deploySimpleMechanismWithToken(IERC20(address(token6)));
-        
-        uint256 deposit = 100 * 10**6; // 100 USDC (6 decimals)
-        
+
+        uint256 deposit = 100 * 10 ** 6; // 100 USDC (6 decimals)
+
         vm.roll(_tokenized(address(mechanism)).startBlock() - 1);
         vm.startPrank(alice);
         token6.approve(address(mechanism), deposit);
         _tokenized(address(mechanism)).signup(deposit);
         vm.stopPrank();
-        
+
         // Should convert to 18 decimals: 100 * 10^18
-        uint256 expected = 100 * 10**18;
+        uint256 expected = 100 * 10 ** 18;
         uint256 actualVotingPower = _tokenized(address(mechanism)).votingPower(alice);
         assertEq(actualVotingPower, expected, "6-decimal token should scale up to 18 decimals in SimpleVoting");
     }

@@ -14,19 +14,19 @@ contract QuadraticVotingTimelockDebugTest is Test {
     AllocationMechanismFactory factory;
     ERC20Mock token;
     QuadraticVotingMechanism mechanism;
-    
+
     address alice = address(0x1);
     address charlie = address(0x3);
-    
+
     function _tokenized(address _mechanism) internal pure returns (TokenizedAllocationMechanism) {
         return TokenizedAllocationMechanism(_mechanism);
     }
-    
+
     function setUp() public {
         factory = new AllocationMechanismFactory();
         token = new ERC20Mock();
         token.mint(alice, 2000 ether);
-        
+
         AllocationConfig memory config = AllocationConfig({
             asset: IERC20(address(token)),
             name: "Debug Test",
@@ -39,57 +39,57 @@ contract QuadraticVotingTimelockDebugTest is Test {
             startBlock: block.number + 50,
             owner: address(0)
         });
-        
+
         address mechanismAddr = factory.deployQuadraticVotingMechanism(config, 50, 100); // 50% alpha
         mechanism = QuadraticVotingMechanism(payable(mechanismAddr));
     }
-    
+
     function testTimelockDebug() public {
         uint256 startBlock = _tokenized(address(mechanism)).startBlock();
         vm.roll(startBlock - 1);
-        
+
         // Setup
         vm.startPrank(alice);
         token.approve(address(mechanism), 1000 ether);
         _tokenized(address(mechanism)).signup(1000 ether);
         uint256 pid = _tokenized(address(mechanism)).propose(charlie, "Test");
         vm.stopPrank();
-        
+
         vm.roll(startBlock + 101);
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 31); // 31^2 = 961 > 500 quorum
-        
+
         vm.roll(startBlock + 1101);
-        (bool success,) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
+        (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
-        
+
         console.log("Before queuing:");
         console.log("  Charlie balance:", _tokenized(address(mechanism)).balanceOf(charlie));
         console.log("  Charlie redeemableAfter:", _tokenized(address(mechanism)).redeemableAfter(charlie));
         console.log("  Block timestamp:", block.timestamp);
-        
+
         uint256 queueTime = block.timestamp;
-        (bool success2,) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", pid));
+        (bool success2, ) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", pid));
         require(success2, "Queue failed");
-        
+
         console.log("After queuing:");
         console.log("  Charlie balance:", _tokenized(address(mechanism)).balanceOf(charlie));
         console.log("  Charlie redeemableAfter:", _tokenized(address(mechanism)).redeemableAfter(charlie));
         console.log("  Expected redeemableAfter:", queueTime + 1 days);
         console.log("  Timelock delay:", _tokenized(address(mechanism)).timelockDelay());
         console.log("  Grace period:", _tokenized(address(mechanism)).gracePeriod());
-        
+
         // Check maxRedeem
         uint256 maxRedeemNow = _tokenized(address(mechanism)).maxRedeem(charlie);
         console.log("  Max redeem (during timelock):", maxRedeemNow);
-        
+
         // Fast forward to timelock expiry
         vm.warp(queueTime + 1 days);
         uint256 maxRedeemAfter = _tokenized(address(mechanism)).maxRedeem(charlie);
         console.log("After timelock expiry:");
         console.log("  Max redeem (after timelock):", maxRedeemAfter);
         console.log("  Current timestamp:", block.timestamp);
-        
+
         // Hook is tested indirectly through maxRedeem above
         console.log("Testing complete - timelock working correctly");
     }

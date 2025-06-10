@@ -13,9 +13,7 @@ contract SimpleVotingMechanism is BaseAllocationMechanism {
     constructor(
         address _implementation,
         AllocationConfig memory _config
-    )
-        BaseAllocationMechanism(_implementation, _config)
-    {}
+    ) BaseAllocationMechanism(_implementation, _config) {}
 
     // ---------- Internal Hook Implementations ----------
 
@@ -33,7 +31,7 @@ contract SimpleVotingMechanism is BaseAllocationMechanism {
     function _getVotingPowerHook(address, uint256 deposit) internal view override returns (uint256) {
         // Get asset decimals
         uint8 assetDecimals = IERC20Metadata(address(asset)).decimals();
-        
+
         // Convert to 18 decimals for voting power
         if (assetDecimals == 18) {
             return deposit;
@@ -63,7 +61,7 @@ contract SimpleVotingMechanism is BaseAllocationMechanism {
     ) internal override returns (uint256) {
         // Get current vote tallies
         (uint256 sharesFor, uint256 sharesAgainst, uint256 sharesAbstain) = _getVoteTally(pid);
-        
+
         // Update based on vote choice
         if (choice == TokenizedAllocationMechanism.VoteType.For) {
             sharesFor += weight;
@@ -72,10 +70,10 @@ contract SimpleVotingMechanism is BaseAllocationMechanism {
         } else {
             sharesAbstain += weight;
         }
-        
+
         // Update storage via TokenizedAllocation
         TokenizedAllocationMechanism(address(this)).updateVoteTally(pid, sharesFor, sharesAgainst, sharesAbstain);
-        
+
         // Return reduced voting power
         return oldPower - weight;
     }
@@ -90,12 +88,12 @@ contract SimpleVotingMechanism is BaseAllocationMechanism {
     /// @dev Simple net vote to shares conversion
     function _convertVotesToShares(uint256 pid) internal view override returns (uint256 sharesToMint) {
         (uint256 forVotes, uint256 againstVotes, ) = _getVoteTally(pid);
-        
+
         // Calculate net votes (For - Against)
         uint256 netVotes = forVotes > againstVotes ? forVotes - againstVotes : 0;
-        
+
         if (netVotes == 0) return 0;
-        
+
         // For now, return net votes directly as shares
         // In a real implementation, this would use the vault's conversion logic
         return netVotes;
@@ -121,35 +119,35 @@ contract SimpleVotingMechanism is BaseAllocationMechanism {
     }
 
     /// @dev Get available withdraw limit for share owner with timelock and grace period enforcement
-    /// @param shareOwner Address attempting to withdraw shares  
+    /// @param shareOwner Address attempting to withdraw shares
     /// @return availableLimit Amount of assets that can be withdrawn (0 if timelock active or expired)
     function _availableWithdrawLimit(address shareOwner) internal view override returns (uint256) {
         // Get the redeemable time for this share owner
         uint256 redeemableTime = _getRedeemableAfter(shareOwner);
-        
+
         // If no redeemable time set, allow unlimited withdrawal (shouldn't happen in normal flow)
         if (redeemableTime == 0) {
             return type(uint256).max;
         }
-        
+
         // Check if still in timelock period
         if (block.timestamp < redeemableTime) {
             return 0; // Cannot withdraw during timelock
         }
-        
+
         // Check if grace period has expired
         uint256 gracePeriod = _getGracePeriod();
         if (block.timestamp > redeemableTime + gracePeriod) {
             return 0; // Cannot withdraw after grace period expires
         }
-        
+
         // Within valid redemption window - return max assets this user can withdraw
         // Convert share balance to assets using current exchange rate
         uint256 shareBalance = _tokenizedAllocation().balanceOf(shareOwner);
         if (shareBalance == 0) {
             return 0;
         }
-        
+
         // Convert shares to assets - this gives the maximum assets withdrawable
         return _tokenizedAllocation().convertToAssets(shareBalance);
     }

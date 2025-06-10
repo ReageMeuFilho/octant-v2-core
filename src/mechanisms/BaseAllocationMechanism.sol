@@ -15,7 +15,7 @@ struct AllocationConfig {
     uint256 timelockDelay;
     uint256 gracePeriod;
     uint256 startBlock;
-    address owner;  // Owner of the mechanism (deployer)
+    address owner; // Owner of the mechanism (deployer)
 }
 
 /// @title Base Allocation Mechanism - Lightweight Proxy
@@ -23,15 +23,15 @@ struct AllocationConfig {
 /// @dev Inheritors only need to implement the allocation-specific hooks
 abstract contract BaseAllocationMechanism is IBaseAllocationStrategy {
     // ---------- Immutable Storage ----------
-    
+
     /// @notice Address of the shared TokenizedAllocationMechanism implementation
     address internal immutable tokenizedAllocationAddress;
-    
+
     /// @notice Underlying asset for the allocation mechanism
     IERC20 internal immutable asset;
-    
+
     // ---------- Events ----------
-    
+
     /// @notice Emitted when the allocation mechanism is initialized
     event AllocationMechanismInitialized(
         address indexed implementation,
@@ -39,19 +39,16 @@ abstract contract BaseAllocationMechanism is IBaseAllocationStrategy {
         string name,
         string symbol
     );
-    
+
     // ---------- Constructor ----------
-    
+
     /// @param _implementation Address of the TokenizedAllocationMechanism implementation
     /// @param _config Configuration parameters for the allocation mechanism
-    constructor(
-        address _implementation,
-        AllocationConfig memory _config
-    ) {
+    constructor(address _implementation, AllocationConfig memory _config) {
         // Store immutable values
         tokenizedAllocationAddress = _implementation;
         asset = _config.asset;
-        
+
         // Initialize the TokenizedAllocationMechanism storage via delegatecall
         (bool success, ) = _implementation.delegatecall(
             abi.encodeCall(
@@ -71,38 +68,33 @@ abstract contract BaseAllocationMechanism is IBaseAllocationStrategy {
             )
         );
         require(success, "Initialization failed");
-        
-        emit AllocationMechanismInitialized(
-            _implementation,
-            address(_config.asset),
-            _config.name,
-            _config.symbol
-        );
+
+        emit AllocationMechanismInitialized(_implementation, address(_config.asset), _config.name, _config.symbol);
     }
-    
+
     // ---------- Abstract Internal Hooks (Yearn V3 Pattern) ----------
-    
+
     /// @dev Hook to allow or block registration
     /// @param user Address attempting to register
     /// @return allow True if registration should proceed
     function _beforeSignupHook(address user) internal view virtual returns (bool);
-    
+
     /// @dev Hook to allow or block proposal creation
     /// @param proposer Address proposing
     /// @return allow True if proposing allowed
     function _beforeProposeHook(address proposer) internal view virtual returns (bool);
-    
+
     /// @dev Hook to calculate new voting power on registration
     /// @param user Address registering
     /// @param deposit Amount of underlying tokens deposited
     /// @return power New voting power assigned
     function _getVotingPowerHook(address user, uint256 deposit) internal view virtual returns (uint256);
-    
+
     /// @dev Hook to validate existence and integrity of a proposal ID
     /// @param pid Proposal ID to validate
     /// @return valid True if pid is valid and corresponds to a created proposal
     function _validateProposalHook(uint256 pid) internal view virtual returns (bool);
-    
+
     /// @dev Hook to process a vote
     /// @param pid Proposal ID being voted on
     /// @param voter Address casting the vote
@@ -117,69 +109,69 @@ abstract contract BaseAllocationMechanism is IBaseAllocationStrategy {
         uint256 weight,
         uint256 oldPower
     ) internal virtual returns (uint256 newPower);
-    
+
     /// @dev Check if proposal met quorum requirement
     /// @param pid Proposal ID
     /// @return True if proposal has quorum
     function _hasQuorumHook(uint256 pid) internal view virtual returns (bool);
-    
+
     /// @dev Hook to convert final vote tallies into vault shares to mint
     /// @param pid Proposal ID being queued
     /// @return sharesToMint Number of vault shares to mint for the proposal
     function _convertVotesToShares(uint256 pid) internal view virtual returns (uint256 sharesToMint);
-    
+
     /// @dev Hook to modify the behavior of finalizeVoteTally
     /// @return allow True if finalization should proceed
     function _beforeFinalizeVoteTallyHook() internal virtual returns (bool);
-    
+
     /// @dev Hook to fetch the recipient address for a proposal
     /// @param pid Proposal ID being redeemed
     /// @return recipient Address of the recipient for the proposal
     function _getRecipientAddressHook(uint256 pid) internal view virtual returns (address recipient);
-    
+
     /// @dev Hook to perform custom distribution of shares when a proposal is queued
     /// @dev If this returns true, default share minting is skipped
     /// @param recipient Address of the recipient for the proposal
     /// @param sharesToMint Number of shares to distribute/mint to the recipient
     /// @return handled True if custom distribution was handled, false to use default minting
     function _requestCustomDistributionHook(address recipient, uint256 sharesToMint) internal virtual returns (bool);
-    
+
     /// @dev Hook to get the available withdraw limit for a share owner
     /// @param shareOwner Address of the share owner
     /// @return limit Available withdraw limit (type(uint256).max for unlimited)
     function _availableWithdrawLimit(address shareOwner) internal view virtual returns (uint256);
-    
+
     /// @dev Hook to calculate total assets including any matching pools or custom logic
     /// @return totalAssets Total assets for this allocation mechanism
     function _calculateTotalAssetsHook() internal view virtual returns (uint256);
-    
+
     // ---------- External Hook Functions (Yearn V3 Pattern) ----------
     // These are called by TokenizedAllocationMechanism via delegatecall
     // and use onlySelf modifier to ensure security
-    
+
     modifier onlySelf() {
         // In delegatecall context, address(this) is the proxy and msg.sender is the external caller
         // We need to allow calls from the TokenizedAllocationMechanism
         require(msg.sender == address(this) || msg.sender == tokenizedAllocationAddress, "!self");
         _;
     }
-    
+
     function beforeSignupHook(address user) external view onlySelf returns (bool) {
         return _beforeSignupHook(user);
     }
-    
+
     function beforeProposeHook(address proposer) external view onlySelf returns (bool) {
         return _beforeProposeHook(proposer);
     }
-    
+
     function getVotingPowerHook(address user, uint256 deposit) external view onlySelf returns (uint256) {
         return _getVotingPowerHook(user, deposit);
     }
-    
+
     function validateProposalHook(uint256 pid) external view onlySelf returns (bool) {
         return _validateProposalHook(pid);
     }
-    
+
     function processVoteHook(
         uint256 pid,
         address voter,
@@ -189,58 +181,58 @@ abstract contract BaseAllocationMechanism is IBaseAllocationStrategy {
     ) external onlySelf returns (uint256) {
         return _processVoteHook(pid, voter, TokenizedAllocationMechanism.VoteType(choice), weight, oldPower);
     }
-    
+
     function hasQuorumHook(uint256 pid) external view onlySelf returns (bool) {
         return _hasQuorumHook(pid);
     }
-    
+
     function convertVotesToShares(uint256 pid) external view onlySelf returns (uint256) {
         return _convertVotesToShares(pid);
     }
-    
+
     function beforeFinalizeVoteTallyHook() external onlySelf returns (bool) {
         return _beforeFinalizeVoteTallyHook();
     }
-    
+
     function getRecipientAddressHook(uint256 pid) external view onlySelf returns (address) {
         return _getRecipientAddressHook(pid);
     }
-    
+
     function requestCustomDistributionHook(address recipient, uint256 sharesToMint) external onlySelf returns (bool) {
         return _requestCustomDistributionHook(recipient, sharesToMint);
     }
-    
+
     function availableWithdrawLimit(address shareOwner) external view onlySelf returns (uint256) {
         return _availableWithdrawLimit(shareOwner);
     }
-    
+
     function calculateTotalAssetsHook() external view onlySelf returns (uint256) {
         return _calculateTotalAssetsHook();
     }
-    
+
     // ---------- Internal Helpers ----------
-    
+
     /// @notice Access TokenizedAllocationMechanism interface for internal calls
     /// @dev Uses current contract address since storage is local
     function _tokenizedAllocation() internal view returns (TokenizedAllocationMechanism) {
         return TokenizedAllocationMechanism(address(this));
     }
-    
+
     /// @notice Get redeemable time for a share owner
     /// @param shareOwner Address to check redeemable time for
     /// @return Timestamp when shares become redeemable
     function _getRedeemableAfter(address shareOwner) internal view returns (uint256) {
         return _tokenizedAllocation().redeemableAfter(shareOwner);
     }
-    
+
     /// @notice Get grace period from configuration
     /// @return Grace period in seconds
     function _getGracePeriod() internal view returns (uint256) {
         return _tokenizedAllocation().gracePeriod();
     }
-    
+
     // ---------- Fallback Function ----------
-    
+
     /// @notice Delegates all undefined function calls to TokenizedAllocationMechanism
     /// @dev This enables the proxy pattern where shared logic lives in the implementation
     fallback() external payable virtual {
@@ -248,13 +240,13 @@ abstract contract BaseAllocationMechanism is IBaseAllocationStrategy {
         assembly {
             // Copy calldata to memory
             calldatacopy(0, 0, calldatasize())
-            
+
             // Delegatecall to implementation contract
             let result := delegatecall(gas(), _impl, 0, calldatasize(), 0, 0)
-            
+
             // Copy return data
             returndatacopy(0, 0, returndatasize())
-            
+
             // Handle result
             switch result
             case 0 {
@@ -267,46 +259,44 @@ abstract contract BaseAllocationMechanism is IBaseAllocationStrategy {
             }
         }
     }
-    
+
     /// @notice Receive function to accept ETH
     receive() external payable virtual {}
-    
+
     // ---------- View Helpers for Inheritors ----------
-    
+
     /// @notice Get the current proposal count
     /// @dev Helper for concrete implementations to access storage
     function _getProposalCount() internal view returns (uint256) {
         return _tokenizedAllocation().getProposalCount();
     }
-    
+
     /// @notice Check if a proposal exists
     /// @dev Helper for concrete implementations
     function _proposalExists(uint256 pid) internal view returns (bool) {
         return pid > 0 && pid <= _getProposalCount();
     }
-    
+
     /// @notice Get proposal details
     /// @dev Helper for concrete implementations
     function _getProposal(uint256 pid) internal view returns (TokenizedAllocationMechanism.Proposal memory) {
         return _tokenizedAllocation().proposals(pid);
     }
-    
+
     /// @notice Get vote tallies
     /// @dev Helper for concrete implementations
-    function _getVoteTally(uint256 pid) internal view returns (
-        uint256 sharesFor,
-        uint256 sharesAgainst,
-        uint256 sharesAbstain
-    ) {
+    function _getVoteTally(
+        uint256 pid
+    ) internal view returns (uint256 sharesFor, uint256 sharesAgainst, uint256 sharesAbstain) {
         return _tokenizedAllocation().getVoteTally(pid);
     }
-    
+
     /// @notice Get voting power for an address
     /// @dev Helper for concrete implementations
     function _getVotingPower(address user) internal view returns (uint256) {
         return _tokenizedAllocation().votingPower(user);
     }
-    
+
     /// @notice Get quorum shares requirement
     /// @dev Helper for concrete implementations
     function _getQuorumShares() internal view returns (uint256) {

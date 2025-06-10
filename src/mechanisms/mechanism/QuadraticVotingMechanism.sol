@@ -30,9 +30,7 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
         AllocationConfig memory _config,
         uint256 _alphaNumerator,
         uint256 _alphaDenominator
-    )
-        BaseAllocationMechanism(_implementation, _config)
-    {
+    ) BaseAllocationMechanism(_implementation, _config) {
         if (_alphaNumerator > _alphaDenominator) revert AlphaMustBeLEQOne();
         if (_alphaDenominator == 0) revert AlphaDenominatorMustBePositive();
 
@@ -59,7 +57,7 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
     function _getVotingPowerHook(address, uint256 deposit) internal view override returns (uint256) {
         // Get asset decimals
         uint8 assetDecimals = IERC20Metadata(address(asset)).decimals();
-        
+
         // Convert to 18 decimals for voting power
         if (assetDecimals == 18) {
             return deposit;
@@ -90,7 +88,7 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
 
         // Quadratic cost: to vote with weight W, you pay W^2 voting power
         uint256 quadraticCost = weight * weight;
-        
+
         if (quadraticCost > oldPower) revert InsufficientVotingPowerForQuadraticCost();
 
         // Use ProperQF's unchecked vote processing since we control the inputs
@@ -153,39 +151,38 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
     }
 
     /// @dev Get available withdraw limit for share owner with timelock and grace period enforcement
-    /// @param shareOwner Address attempting to withdraw shares  
+    /// @param shareOwner Address attempting to withdraw shares
     /// @return availableLimit Amount of assets that can be withdrawn (0 if timelock active or expired)
     function _availableWithdrawLimit(address shareOwner) internal view override returns (uint256) {
         // Get the redeemable time for this share owner
         uint256 redeemableTime = _getRedeemableAfter(shareOwner);
-        
+
         // If no redeemable time set, allow unlimited withdrawal (shouldn't happen in normal flow)
         if (redeemableTime == 0) {
             return type(uint256).max;
         }
-        
+
         // Check if still in timelock period
         if (block.timestamp < redeemableTime) {
             return 0; // Cannot withdraw during timelock
         }
-        
+
         // Check if grace period has expired
         uint256 gracePeriod = _getGracePeriod();
         if (block.timestamp > redeemableTime + gracePeriod) {
             return 0; // Cannot withdraw after grace period expires
         }
-        
+
         // Within valid redemption window - return max assets this user can withdraw
         // Convert share balance to assets using current exchange rate
         uint256 shareBalance = _tokenizedAllocation().balanceOf(shareOwner);
         if (shareBalance == 0) {
             return 0;
         }
-        
+
         // Convert shares to assets - this gives the maximum assets withdrawable
         return _tokenizedAllocation().convertToAssets(shareBalance);
     }
-
 
     /// @notice Calculate total assets including matching pool + user deposits for finalization
     /// @dev This snapshots the total asset balance in the contract during finalize
@@ -223,11 +220,11 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
     function setAlpha(uint256 newNumerator, uint256 newDenominator) external {
         // Access control: only owner can modify alpha
         require(_tokenizedAllocation().owner() == msg.sender, "Only owner can set alpha");
-        
+
         // Validate alpha constraints
         if (newNumerator > newDenominator) revert AlphaMustBeLEQOne();
         if (newDenominator == 0) revert AlphaDenominatorMustBePositive();
-        
+
         // Update alpha using ProperQF's internal function
         _setAlpha(newNumerator, newDenominator);
     }

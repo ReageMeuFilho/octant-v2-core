@@ -5,9 +5,9 @@ pragma solidity >=0.6.2 <0.9.0;
 // Gnosis Safe transaction batching script
 
 // 🧩 MODULES
-import {Script, console2, StdChains, stdJson, stdMath, StdStorage, stdStorageSafe, VmSafe} from "forge-std/Script.sol";
+import { Script, console2, StdChains, stdJson, stdMath, StdStorage, stdStorageSafe, VmSafe } from "forge-std/Script.sol";
 
-import {Surl} from "lib/surl/src/Surl.sol";
+import { Surl } from "lib/surl/src/Surl.sol";
 
 // ⭐️ SCRIPT
 abstract contract BatchScript is Script {
@@ -45,8 +45,7 @@ abstract contract BatchScript is Script {
     // keccak256(
     //     "SafeTx(address to,uint256 value,bytes data,uint8 operation,uint256 safeTxGas,uint256 baseGas,uint256 gasPrice,address gasToken,address refundReceiver,uint256 nonce)"
     // );
-    bytes32 private constant SAFE_TX_TYPEHASH =
-        0xbb8310d486368db6bd6f849402fdd73ad53d316b5a4b2644ad6efe0f941286d8;
+    bytes32 private constant SAFE_TX_TYPEHASH = 0xbb8310d486368db6bd6f849402fdd73ad53d316b5a4b2644ad6efe0f941286d8;
 
     // Deterministic deployment address of the Gnosis Safe Multisend contract, configured by chain.
     address private SAFE_MULTISEND_ADDRESS;
@@ -150,17 +149,13 @@ abstract contract BatchScript is Script {
     // - `value` as in msg.value, sent as a `uint256` (=> 32 bytes),
     // -  length of `data` as a `uint256` (=> 32 bytes),
     // - `data` as `bytes`.
-    function addToBatch(
-        address to_,
-        uint256 value_,
-        bytes memory data_
-    ) internal returns (bytes memory) {
+    function addToBatch(address to_, uint256 value_, bytes memory data_) internal returns (bytes memory) {
         // Add transaction to batch array
         encodedTxns.push(abi.encodePacked(Operation.CALL, to_, value_, data_.length, data_));
 
         // Simulate transaction and get return value
         vm.prank(safe);
-        (bool success, bytes memory data) = to_.call{value: value_}(data_);
+        (bool success, bytes memory data) = to_.call{ value: value_ }(data_);
         if (success) {
             return data;
         } else {
@@ -221,10 +216,7 @@ abstract contract BatchScript is Script {
         batch.txHash = _getTransactionHash(safe_, batch);
     }
 
-    function _signBatch(
-        address safe_,
-        Batch memory batch_
-    ) private returns (Batch memory) {
+    function _signBatch(address safe_, Batch memory batch_) private returns (Batch memory) {
         // Get the typed data to sign
         string memory typedData = _getTypedData(safe_, batch_);
 
@@ -232,17 +224,9 @@ abstract contract BatchScript is Script {
         string memory commandStart = "cast wallet sign ";
         string memory wallet;
         if (walletType == LOCAL) {
-            wallet = string.concat(
-                "--private-key ",
-                vm.toString(privateKey),
-                " "
-            );
+            wallet = string.concat("--private-key ", vm.toString(privateKey), " ");
         } else if (walletType == LEDGER) {
-            wallet = string.concat(
-                "--ledger --mnemonic-index ",
-                vm.toString(mnemonicIndex),
-                " "
-            );
+            wallet = string.concat("--ledger --mnemonic-index ", vm.toString(mnemonicIndex), " ");
         } else {
             revert("Unsupported wallet type");
         }
@@ -252,14 +236,7 @@ abstract contract BatchScript is Script {
         string[] memory inputs = new string[](3);
         inputs[0] = "bash";
         inputs[1] = "-c";
-        inputs[2] = string.concat(
-            commandStart,
-            wallet,
-            commandEnd,
-            "'",
-            typedData,
-            "'"
-        );
+        inputs[2] = string.concat(commandStart, wallet, commandEnd, "'", typedData, "'");
         bytes memory signature = vm.ffi(inputs);
 
         // Set the signature on the batch
@@ -289,10 +266,7 @@ abstract contract BatchScript is Script {
         string memory payload = placeholder.serialize("sender", msg.sender);
 
         // Send batch
-        (uint256 status, bytes memory data) = endpoint.post(
-            _getHeaders(),
-            payload
-        );
+        (uint256 status, bytes memory data) = endpoint.post(_getHeaders(), payload);
 
         if (status == 201) {
             console2.log("Batch sent successfully");
@@ -305,17 +279,12 @@ abstract contract BatchScript is Script {
     // Computes the EIP712 hash of a Safe transaction.
     // Look at https://github.com/safe-global/safe-eth-py/blob/174053920e0717cc9924405e524012c5f953cd8f/gnosis/safe/safe_tx.py#L186
     // and https://github.com/safe-global/safe-eth-py/blob/master/gnosis/eth/eip712/__init__.py
-    function _getTransactionHash(
-        address safe_,
-        Batch memory batch_
-    ) private view returns (bytes32) {
+    function _getTransactionHash(address safe_, Batch memory batch_) private view returns (bytes32) {
         return
             keccak256(
                 abi.encodePacked(
                     hex"1901",
-                    keccak256(
-                        abi.encode(DOMAIN_SEPARATOR_TYPEHASH, chainId, safe_)
-                    ),
+                    keccak256(abi.encode(DOMAIN_SEPARATOR_TYPEHASH, chainId, safe_)),
                     keccak256(
                         abi.encode(
                             SAFE_TX_TYPEHASH,
@@ -335,10 +304,7 @@ abstract contract BatchScript is Script {
             );
     }
 
-    function _getTypedData(
-        address safe_,
-        Batch memory batch_
-    ) private returns (string memory) {
+    function _getTypedData(address safe_, Batch memory batch_) private returns (string memory) {
         // Create EIP712 structured data for the batch transaction to sign externally via cast
 
         // EIP712Domain Field Types
@@ -418,9 +384,7 @@ abstract contract BatchScript is Script {
         return payload;
     }
 
-    function _stripSlashQuotes(
-        string memory str_
-    ) private returns (string memory) {
+    function _stripSlashQuotes(string memory str_) private returns (string memory) {
         // Remove slash quotes from string
         string memory command = string.concat(
             "sed 's/",
@@ -446,10 +410,7 @@ abstract contract BatchScript is Script {
     }
 
     function _getNonce(address safe_) private returns (uint256) {
-        string memory endpoint = string.concat(
-            _getSafeAPIEndpoint(safe_),
-            "?limit=1"
-        );
+        string memory endpoint = string.concat(_getSafeAPIEndpoint(safe_), "?limit=1");
         (uint256 status, bytes memory data) = endpoint.get();
         if (status == 200) {
             string memory resp = string(data);
@@ -462,15 +423,8 @@ abstract contract BatchScript is Script {
         }
     }
 
-    function _getSafeAPIEndpoint(
-        address safe_
-    ) private view returns (string memory) {
-        return
-            string.concat(
-                SAFE_API_BASE_URL,
-                vm.toString(safe_),
-                SAFE_API_MULTISIG_SEND
-            );
+    function _getSafeAPIEndpoint(address safe_) private view returns (string memory) {
+        return string.concat(SAFE_API_BASE_URL, vm.toString(safe_), SAFE_API_MULTISIG_SEND);
     }
 
     function _getHeaders() private pure returns (string[] memory) {

@@ -16,7 +16,7 @@ contract QuadraticVotingVoterJourneyTest is Test {
     AllocationMechanismFactory factory;
     ERC20Mock token;
     QuadraticVotingMechanism mechanism;
-    
+
     address alice = address(0x1);
     address bob = address(0x2);
     address charlie = address(0x3);
@@ -24,18 +24,18 @@ contract QuadraticVotingVoterJourneyTest is Test {
     address frank = address(0x6);
     address grace = address(0x7);
     address henry = address(0x8);
-    
+
     uint256 constant LARGE_DEPOSIT = 1000 ether;
     uint256 constant MEDIUM_DEPOSIT = 500 ether;
     uint256 constant SMALL_DEPOSIT = 100 ether;
     uint256 constant QUORUM_REQUIREMENT = 500;
     uint256 constant VOTING_DELAY = 100;
     uint256 constant VOTING_PERIOD = 1000;
-    
+
     function _tokenized(address _mechanism) internal pure returns (TokenizedAllocationMechanism) {
         return TokenizedAllocationMechanism(_mechanism);
     }
-    
+
     /// @notice Helper function to sign up a user with specified deposit
     /// @param user Address of user to sign up
     /// @param depositAmount Amount of tokens to deposit
@@ -45,41 +45,49 @@ contract QuadraticVotingVoterJourneyTest is Test {
         _tokenized(address(mechanism)).signup(depositAmount);
         vm.stopPrank();
     }
-    
+
     /// @notice Helper function to create a proposal
     /// @param proposer Address creating the proposal
     /// @param recipient Address that will receive funds if proposal passes
     /// @param description Description of the proposal
     /// @return pid The proposal ID
-    function _createProposal(address proposer, address recipient, string memory description) internal returns (uint256 pid) {
+    function _createProposal(
+        address proposer,
+        address recipient,
+        string memory description
+    ) internal returns (uint256 pid) {
         vm.prank(proposer);
         pid = _tokenized(address(mechanism)).propose(recipient, description);
     }
-    
+
     /// @notice Helper function to cast a vote on a proposal
     /// @param voter Address casting the vote
     /// @param pid Proposal ID to vote on
     /// @param weight Vote weight (quadratic cost = weight^2)
     /// @return previousPower Voting power before the vote
     /// @return newPower Voting power after the vote
-    function _castVote(address voter, uint256 pid, uint256 weight) internal returns (uint256 previousPower, uint256 newPower) {
+    function _castVote(
+        address voter,
+        uint256 pid,
+        uint256 weight
+    ) internal returns (uint256 previousPower, uint256 newPower) {
         previousPower = _tokenized(address(mechanism)).votingPower(voter);
         vm.prank(voter);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, weight);
         newPower = _tokenized(address(mechanism)).votingPower(voter);
     }
-    
+
     function setUp() public {
         factory = new AllocationMechanismFactory();
         token = new ERC20Mock();
-        
+
         // Mint tokens to test actors
         token.mint(alice, 2000 ether);
         token.mint(bob, 1500 ether);
         token.mint(frank, 200 ether);
         token.mint(grace, 50 ether);
         token.mint(henry, 300 ether);
-        
+
         AllocationConfig memory config = AllocationConfig({
             asset: IERC20(address(token)),
             name: "Voter Journey Test",
@@ -92,54 +100,52 @@ contract QuadraticVotingVoterJourneyTest is Test {
             startBlock: block.number + 50,
             owner: address(0)
         });
-        
+
         address mechanismAddr = factory.deployQuadraticVotingMechanism(config, 50, 100); // 50% alpha
         mechanism = QuadraticVotingMechanism(payable(mechanismAddr));
     }
-    
+
     /// @notice Test voter registration with various deposit amounts
     function testVoterRegistration_VariousDeposits() public {
         uint256 startBlock = _tokenized(address(mechanism)).startBlock();
         vm.roll(startBlock - 1);
-        
+
         // Large deposit registration
         _signupUser(alice, LARGE_DEPOSIT);
         assertEq(_tokenized(address(mechanism)).votingPower(alice), LARGE_DEPOSIT);
         assertEq(token.balanceOf(alice), 2000 ether - LARGE_DEPOSIT);
-        
+
         // Medium deposit registration
         _signupUser(bob, MEDIUM_DEPOSIT);
         assertEq(_tokenized(address(mechanism)).votingPower(bob), MEDIUM_DEPOSIT);
-        
+
         // Zero deposit registration
         _signupUser(grace, 0);
         assertEq(_tokenized(address(mechanism)).votingPower(grace), 0);
-        
+
         // Small deposit registration
         _signupUser(frank, SMALL_DEPOSIT);
         assertEq(_tokenized(address(mechanism)).votingPower(frank), SMALL_DEPOSIT);
-        
+
         // Verify total mechanism balance
         assertEq(token.balanceOf(address(mechanism)), LARGE_DEPOSIT + MEDIUM_DEPOSIT + SMALL_DEPOSIT);
     }
-    
+
     /// @notice Test voter registration edge cases
     function testVoterRegistration_EdgeCases() public {
         uint256 startBlock = _tokenized(address(mechanism)).startBlock();
         vm.roll(startBlock - 1);
-        
+
         // Register alice first
         _signupUser(alice, LARGE_DEPOSIT);
-        
+
         // Cannot register twice
         vm.startPrank(alice);
         token.approve(address(mechanism), SMALL_DEPOSIT);
-        vm.expectRevert(abi.encodeWithSelector(
-            TokenizedAllocationMechanism.AlreadyRegistered.selector, alice
-        ));
+        vm.expectRevert(abi.encodeWithSelector(TokenizedAllocationMechanism.AlreadyRegistered.selector, alice));
         _tokenized(address(mechanism)).signup(SMALL_DEPOSIT);
         vm.stopPrank();
-        
+
         // Cannot register after voting period ends
         vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
         vm.startPrank(henry);
@@ -147,128 +153,126 @@ contract QuadraticVotingVoterJourneyTest is Test {
         vm.expectRevert();
         _tokenized(address(mechanism)).signup(MEDIUM_DEPOSIT);
         vm.stopPrank();
-        
+
         // Can register at the last valid moment
         vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD - 1);
         _signupUser(bob, MEDIUM_DEPOSIT);
-        
+
         assertEq(_tokenized(address(mechanism)).votingPower(bob), MEDIUM_DEPOSIT);
     }
-    
+
     /// @notice Test comprehensive voting patterns
     function testVotingPatterns_Comprehensive() public {
         uint256 startBlock = _tokenized(address(mechanism)).startBlock();
         vm.roll(startBlock - 1);
-        
+
         // Register voters
         _signupUser(alice, LARGE_DEPOSIT);
         _signupUser(bob, MEDIUM_DEPOSIT);
         _signupUser(frank, SMALL_DEPOSIT);
-        
+
         // Create proposals
         uint256 pid1 = _createProposal(alice, charlie, "Fund Charlie's Project");
         uint256 pid2 = _createProposal(bob, dave, "Fund Dave's Project");
-        
+
         vm.roll(startBlock + VOTING_DELAY + 1);
-        
+
         // Quadratic voting - cost is weight^2
         // Alice votes with weight 31, cost = 31^2 = 961 voting power
         (uint256 alicePrevPower, uint256 aliceNewPower) = _castVote(alice, pid1, 31);
-        
+
         assertEq(alicePrevPower - aliceNewPower, 31 * 31, "Alice should have spent 961 voting power");
         assertEq(aliceNewPower, LARGE_DEPOSIT - (31 * 31));
         assertTrue(_tokenized(address(mechanism)).hasVoted(pid1, alice));
-        
+
         // Bob votes with weight 10, cost = 10^2 = 100 voting power
         _castVote(bob, pid1, 10);
         assertEq(_tokenized(address(mechanism)).votingPower(bob), MEDIUM_DEPOSIT - (10 * 10));
-        
+
         // Bob votes again with weight 15, cost = 15^2 = 225 voting power
         _castVote(bob, pid2, 15);
         assertEq(_tokenized(address(mechanism)).votingPower(bob), MEDIUM_DEPOSIT - 100 - 225);
-        
+
         // Frank votes with weight 5, cost = 5^2 = 25 voting power
         _castVote(frank, pid2, 5);
         assertEq(_tokenized(address(mechanism)).votingPower(frank), SMALL_DEPOSIT - 25);
-        
+
         // Note: QuadraticVoting uses ProperQF tallying, not simple vote counts
         // The actual funding calculation will be done during shares conversion
     }
-    
+
     /// @notice Test voting error conditions
     function testVoting_ErrorConditions() public {
         uint256 startBlock = _tokenized(address(mechanism)).startBlock();
         vm.roll(startBlock - 1);
-        
+
         _signupUser(alice, LARGE_DEPOSIT);
         uint256 pid = _createProposal(alice, charlie, "Test Proposal");
-        
+
         // Cannot vote before voting period
         vm.roll(startBlock + 50);
         vm.expectRevert();
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 8);
-        
+
         vm.roll(startBlock + VOTING_DELAY + 1);
-        
+
         // Cannot vote with more power than available
         vm.expectRevert();
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, LARGE_DEPOSIT + 1);
-        
+
         // Cannot vote twice
         _castVote(alice, pid, 8);
-        
-        vm.expectRevert(abi.encodeWithSelector(
-            TokenizedAllocationMechanism.AlreadyVoted.selector, alice, pid
-        ));
+
+        vm.expectRevert(abi.encodeWithSelector(TokenizedAllocationMechanism.AlreadyVoted.selector, alice, pid));
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 10);
-        
+
         // Cannot vote after voting period
         vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
         vm.expectRevert();
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 8);
-        
+
         // Unregistered user cannot vote
         vm.roll(startBlock + VOTING_DELAY + 500);
         vm.expectRevert();
         vm.prank(henry);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 1);
     }
-    
+
     /// @notice Test voter power conservation and management
     function testVoterPower_ConservationAndManagement() public {
         uint256 startBlock = _tokenized(address(mechanism)).startBlock();
         vm.roll(startBlock - 1);
-        
+
         _signupUser(alice, LARGE_DEPOSIT);
-        
+
         uint256 pid1 = _createProposal(alice, charlie, "Proposal 1");
         uint256 pid2 = _createProposal(alice, dave, "Proposal 2");
-        
+
         vm.roll(startBlock + VOTING_DELAY + 1);
-        
+
         // Track power consumption across multiple votes
         uint256 initialPower = _tokenized(address(mechanism)).votingPower(alice);
         assertEq(initialPower, LARGE_DEPOSIT);
-        
+
         // First vote - quadratic cost: 10^2 = 100
         uint256 vote1Weight = 10;
         (uint256 prevPower1, uint256 newPower1) = _castVote(alice, pid1, vote1Weight);
-        
+
         assertEq(prevPower1, initialPower, "Initial power should match");
         assertEq(newPower1, initialPower - (vote1Weight * vote1Weight), "Power consumed correctly");
-        
+
         // Second vote with remaining power
         uint256 vote2Weight = 10; // Quadratic cost: 10^2 = 100
         _castVote(alice, pid2, vote2Weight);
-        
+
         uint256 powerAfterVote2 = _tokenized(address(mechanism)).votingPower(alice);
         assertEq(powerAfterVote2, initialPower - (vote1Weight * vote1Weight) - (vote2Weight * vote2Weight));
         assertEq(powerAfterVote2, 1000 ether - (10 * 10) - (10 * 10)); // 1000 ether - 200 voting power units
-        
+
         // Verify vote records
         assertTrue(_tokenized(address(mechanism)).hasVoted(pid1, alice));
         assertTrue(_tokenized(address(mechanism)).hasVoted(pid2, alice));
