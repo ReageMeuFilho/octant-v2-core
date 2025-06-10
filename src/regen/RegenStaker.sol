@@ -521,14 +521,13 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
 
         compoundedAmount = unclaimedAmount - fee;
 
-        uint256 scaledAmountConsumed = unclaimedAmount * SCALE_FACTOR;
-        deposit.scaledUnclaimedRewardCheckpoint = deposit.scaledUnclaimedRewardCheckpoint - scaledAmountConsumed;
+        deposit.scaledUnclaimedRewardCheckpoint = 0;
 
         uint256 newBalance = deposit.balance + compoundedAmount;
         uint256 newEarningPower = earningPowerCalculator.getEarningPower(newBalance, deposit.owner, deposit.delegatee);
 
-        totalStaked += compoundedAmount;
         totalEarningPower = _calculateTotalEarningPower(deposit.earningPower, newEarningPower, totalEarningPower);
+        totalStaked += compoundedAmount;
         depositorTotalStaked[deposit.owner] += compoundedAmount;
         depositorTotalEarningPower[deposit.owner] = _calculateTotalEarningPower(
             deposit.earningPower,
@@ -543,9 +542,11 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
             SafeERC20.safeTransfer(REWARD_TOKEN, claimFeeParameters.feeCollector, fee);
         }
 
-        _revertIfMinimumStakeAmountNotMet(_depositId);
+        SafeERC20.safeTransfer(STAKE_TOKEN, address(surrogates(deposit.delegatee)), compoundedAmount);
 
         emit RewardCompounded(_depositId, msg.sender, compoundedAmount, newBalance, newEarningPower);
+
+        _revertIfMinimumStakeAmountNotMet(_depositId);
 
         return compoundedAmount;
     }
