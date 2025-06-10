@@ -501,7 +501,7 @@ contract LidoStrategyTest is Test {
     }
 
     /// @notice Test exchange rate tracking and yield calculation
-    function testExchangeRateTracking() public {
+    function testExchangeRateTrackingLido() public {
         uint256 depositAmount = 1000e18; // 1000 WSTETH
 
         // Deposit first
@@ -511,10 +511,6 @@ contract LidoStrategyTest is Test {
 
         // Get initial exchange rate
         uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
-
-        // Skip time and mine blocks
-        skip(30 days);
-        vm.roll(block.number + 6500 * 30);
 
         // Simulate a 5% increase in exchange rate
         uint256 newExchangeRate = (initialExchangeRate * 105) / 100;
@@ -538,6 +534,7 @@ contract LidoStrategyTest is Test {
         uint256 updatedExchangeRate = strategy.getLastReportedExchangeRate();
         assertEq(updatedExchangeRate, newExchangeRate, "Exchange rate should be updated after harvest");
     }
+
     /// @notice Test getting the last reported exchange rate
     function testGetLastReportedExchangeRate() public view {
         uint256 rate = strategy.getLastReportedExchangeRate();
@@ -601,7 +598,7 @@ contract LidoStrategyTest is Test {
 
         // Second report: should revert
         vm.startPrank(keeper);
-        vm.expectRevert("healthCheck: profit limit exceeded");
+        vm.expectRevert("!profit");
         vault.report();
         vm.stopPrank();
 
@@ -635,11 +632,11 @@ contract LidoStrategyTest is Test {
     // test change profit limit ratio
     function testChangeProfitLimitRatio() public {
         vm.startPrank(management);
-        strategy.updateProfitLimitRatio(5000);
+        strategy.setProfitLimitRatio(5000);
         vm.stopPrank();
 
         // check the profit limit ratio
-        assertEq(strategy.getProfitLimitRatio(), 5000);
+        assertEq(strategy.profitLimitRatio(), 5000);
     }
 
     function testSetDoHealthCheckToFalse() public {
