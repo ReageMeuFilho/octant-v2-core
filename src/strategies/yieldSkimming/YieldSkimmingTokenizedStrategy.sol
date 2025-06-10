@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.25;
 
-import { IBaseStrategy } from "src/core/interfaces/IBaseStrategy.sol";
+import { IBaseYieldSkimmingStrategy } from "src/core/interfaces/IBaseYieldSkimmingStrategy.sol";
 import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
 import { TokenizedStrategy, Math } from "src/core/TokenizedStrategy.sol";
 
@@ -35,27 +35,27 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         StrategyData storage S = super._strategyStorage();
 
         // Get the profit in mETH terms
-        profit = IBaseStrategy(address(this)).harvestAndReport();
+        int256 delta = IBaseYieldSkimmingStrategy(address(this)).harvestAndReport();
+
         address _dragonRouter = S.dragonRouter;
 
-        if (profit > 0) {
+        S.totalAssets = S.asset.balanceOf(address(this));
+
+        if (delta > 0) {
             // Mint shares based on the adjusted profit amount
-            // todo review the case where profit > totalAssets (reverts in _convertToSharesFromReport)
-            uint256 shares = _convertToSharesFromReport(S, profit, Math.Rounding.Floor);
+            // todo review the case where profit > totalAssets (currently not possible because of the health check)
+            uint256 shares = _convertToSharesFromReport(S, uint256(delta), Math.Rounding.Floor);
+            profit = uint256(delta);
             // mint the value
             _mint(S, _dragonRouter, shares);
-        }
-
-        uint256 newTotalAssets = S.asset.balanceOf(address(this));
-        uint256 oldTotalAssets = _totalAssets(S);
-        if (newTotalAssets < oldTotalAssets) {
-            loss = oldTotalAssets - newTotalAssets;
+        } else if (delta < 0) {
+            profit = 0;
+            loss = uint256(-delta);
             _handleDragonLossProtection(S, loss);
         }
 
         // Update the new total assets value
         S.lastReport = uint96(block.timestamp);
-        S.totalAssets = newTotalAssets;
 
         emit Reported(profit, loss);
 
