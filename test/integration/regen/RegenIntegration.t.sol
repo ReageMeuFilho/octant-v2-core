@@ -1718,7 +1718,7 @@ contract RegenIntegrationTest is Test {
         vm.prank(ADMIN);
         compoundRegenStaker.notifyRewardAmount(rewardAmount);
 
-        vm.warp(block.timestamp + compoundRegenStaker.REWARD_DURATION());
+        vm.warp(block.timestamp + compoundRegenStaker.REWARD_DURATION() + 1);
 
         // Reset minimum amount
         vm.prank(ADMIN);

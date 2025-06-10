@@ -115,6 +115,7 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
     error InvalidRewardDuration(uint256 rewardDuration);
     error CannotChangeRewardDurationDuringActiveReward();
     error CompoundingNotSupported();
+    error CannotRaiseMinimumStakeAmountDuringActiveReward();
 
     modifier onlyWhitelistedIfWhitelistIsSet(IWhitelist _whitelist, address _user) {
         if (_whitelist != IWhitelist(address(0)) && !_whitelist.isWhitelisted(_user)) {
@@ -345,6 +346,10 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
     /// @param _minimumStakeAmount The minimum stake amount.
     function setMinimumStakeAmount(uint256 _minimumStakeAmount) external {
         _revertIfNotAdmin();
+        require(
+            _minimumStakeAmount <= minimumStakeAmount || block.timestamp > rewardEndTime,
+            CannotRaiseMinimumStakeAmountDuringActiveReward()
+        );
         minimumStakeAmount = _minimumStakeAmount;
     }
 
