@@ -41,3 +41,6 @@
 [submodule "lib/surl"]
 	path = lib/surl
 	url = https://github.com/memester-xyz/surl
+[submodule "lib/solmate"]
+	path = lib/solmate
+	url = https://github.com/transmissions11/solmate
