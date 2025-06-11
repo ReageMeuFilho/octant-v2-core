@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.25;
 
-import { BaseHealthCheck } from "src/strategies/periphery/BaseHealthCheck.sol";
-
+import { BaseYieldSkimmingHealthCheck } from "src/strategies/periphery/BaseYieldSkimmingHealthCheck.sol";
 import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -14,7 +13,7 @@ import { WadRayMath } from "src/utils/libs/Maths/WadRay.sol";
  * @notice A strategy that manages deposits in a Morpho yield source and captures yield
  * @dev This strategy tracks the value of deposits and captures yield as the price per share increases
  */
-contract MorphoCompounderStrategy is BaseHealthCheck {
+contract MorphoCompounderStrategy is BaseYieldSkimmingHealthCheck {
     using WadRayMath for uint256;
     using SafeERC20 for IERC20;
 
@@ -44,7 +43,7 @@ contract MorphoCompounderStrategy is BaseHealthCheck {
         address _donationAddress,
         address _tokenizedStrategyAddress
     )
-        BaseHealthCheck(
+        BaseYieldSkimmingHealthCheck(
             _asset, // shares address
             _name,
             _management,
@@ -123,19 +122,6 @@ contract MorphoCompounderStrategy is BaseHealthCheck {
         // nothing to do here as assets are always held in the strategy
     }
 
-    function _executeHealthCheck(uint256 _profit) internal override {
-        if (!doHealthCheck) {
-            doHealthCheck = true;
-            return;
-        }
-
-        // Get the current total assets from the implementation.
-        uint256 currentTotalAssets = TokenizedStrategy.totalAssets();
-
-        uint256 previousTotalAssets = currentTotalAssets - _profit;
-        require(_profit <= (previousTotalAssets * _profitLimitRatio) / MAX_BPS, "healthCheck: profit limit exceeded");
-    }
-
     /**
      * @notice Withdraws funds from the yield vault
      * @param _amount Amount to free
@@ -146,26 +132,22 @@ contract MorphoCompounderStrategy is BaseHealthCheck {
 
     /**
      * @notice Captures yield by calculating the increase in value based on exchange rate changes
-     * @return _totalAssets The current total assets of the strategy
+     * @return deltaInUnderlyingAssetValue The current delta of the strategy
      */
-    function _harvestAndReport() internal override returns (uint256) {
+    function _harvestAndReport() internal override returns (int256 deltaInUnderlyingAssetValue) {
         uint256 currentExchangeRate = _getCurrentExchangeRate();
 
-        // Get the current balance of assets in the strategy
-        uint256 assetBalance = IERC20(asset).balanceOf(address(this));
+        // Get the current balance of assets in the strategy (not using totalSupply so that it goes to profit)
+        uint256 assetBalance = ITokenizedStrategy(address(this)).totalAssets();
 
         // Calculate the profit based on exchange rate difference
-        uint256 deltaExchangeRate = currentExchangeRate > _lastReportedExchangeRate
-            ? currentExchangeRate - _lastReportedExchangeRate
-            : 0; // Only capture positive yield
+        int256 deltaExchangeRate = int256(currentExchangeRate) - int256(_lastReportedExchangeRate);
 
-        uint256 profitInValue = (assetBalance * deltaExchangeRate) / ERC20(asset).decimals();
+        int256 deltaInValue = int256(assetBalance) * deltaExchangeRate;
 
-        uint256 profitInYieldVaultShares = (profitInValue * ERC20(asset).decimals()) / currentExchangeRate;
+        deltaInUnderlyingAssetValue = deltaInValue / int256(currentExchangeRate);
 
         _lastReportedExchangeRate = currentExchangeRate;
-
-        return profitInYieldVaultShares;
     }
 
     /**

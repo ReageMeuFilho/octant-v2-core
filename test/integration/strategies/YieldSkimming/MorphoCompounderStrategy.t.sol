@@ -619,7 +619,7 @@ contract MorphoCompounderStrategyTest is Test {
 
         // Second report: should revert
         vm.startPrank(keeper);
-        vm.expectRevert("healthCheck: profit limit exceeded");
+        vm.expectRevert("!profit");
         vault.report();
         vm.stopPrank();
 
