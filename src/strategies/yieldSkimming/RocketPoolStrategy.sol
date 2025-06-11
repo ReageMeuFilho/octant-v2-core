@@ -2,12 +2,13 @@
 pragma solidity ^0.8.25;
 
 // contracts
-import { BaseHealthCheck } from "src/strategies/periphery/BaseHealthCheck.sol";
+import { BaseYieldSkimmingHealthCheck } from "src/strategies/periphery/BaseYieldSkimmingHealthCheck.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 // interfaces
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
+import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
 
 interface IRocketPool {
     function getExchangeRate() external view returns (uint256);
@@ -18,7 +19,7 @@ interface IRocketPool {
  * @notice A strategy that manages deposits in a RocketPool yield source and captures yield
  * @dev This strategy tracks the value of deposits and captures yield as the price per share increases
  */
-contract RocketPoolStrategy is BaseHealthCheck {
+contract RocketPoolStrategy is BaseYieldSkimmingHealthCheck {
     using SafeERC20 for IERC20;
 
     /// @dev The exchange rate at the last harvest, scaled by 1e18
@@ -47,7 +48,7 @@ contract RocketPoolStrategy is BaseHealthCheck {
         address _donationAddress,
         address _tokenizedStrategyAddress
     )
-        BaseHealthCheck(
+        BaseYieldSkimmingHealthCheck(
             _asset, // shares address
             _name,
             _management,
@@ -59,16 +60,6 @@ contract RocketPoolStrategy is BaseHealthCheck {
     {
         // Initialize the exchange rate on setup
         _lastReportedExchangeRate = _getCurrentExchangeRate();
-    }
-
-    /**
-     * @notice Update the profit limit ratio
-     * @param _newProfitLimitRatio The new profit limit ratio
-     */
-    function updateProfitLimitRatio(uint256 _newProfitLimitRatio) external onlyManagement {
-        require(_profitLimitRatio > 0, "!zero profit");
-        require(_profitLimitRatio <= type(uint16).max, "!too high");
-        _profitLimitRatio = uint16(_newProfitLimitRatio);
     }
 
     /// @notice Sweep of non-asset ERC20 tokens to governance (onlyGovernance)
@@ -103,14 +94,6 @@ contract RocketPoolStrategy is BaseHealthCheck {
     }
 
     /**
-     * @notice Get the current profit limit ratio
-     * @return The profit limit ratio
-     */
-    function getProfitLimitRatio() public view returns (uint16) {
-        return _profitLimitRatio;
-    }
-
-    /**
      * @notice Deposits available funds into the yield vault
      * @param _amount Amount to deploy
      */
@@ -126,24 +109,6 @@ contract RocketPoolStrategy is BaseHealthCheck {
         // nothing to do here as assets are always held in the strategy
     }
 
-    function _executeHealthCheck(uint256 _profit) internal override {
-        if (!doHealthCheck) {
-            doHealthCheck = true;
-            return;
-        }
-
-        // Get the current total assets from the implementation.
-        uint256 currentTotalAssets = TokenizedStrategy.totalAssets();
-
-        if (_profit > 0) {
-            uint256 previousTotalAssets = currentTotalAssets - _profit;
-            require(
-                _profit <= (previousTotalAssets * _profitLimitRatio) / MAX_BPS,
-                "healthCheck: profit limit exceeded"
-            );
-        }
-    }
-
     /**
      * @notice Withdraws funds from the yield vault
      * @param _amount Amount to free
@@ -154,26 +119,25 @@ contract RocketPoolStrategy is BaseHealthCheck {
 
     /**
      * @notice Captures yield by calculating the increase in value based on exchange rate changes
-     * @return _totalAssets The current total assets of the strategy
+     * @return deltaInUnderlyingAssetValue The current delta of the strategy in underlying asset value
+     * @return absoluteDelta The current delta of the strategy (before change in exchange rate)
      */
-    function _harvestAndReport() internal override returns (uint256) {
+    function _harvestAndReport() internal override returns (int256 deltaInUnderlyingAssetValue, int256 absoluteDelta) {
         uint256 currentExchangeRate = _getCurrentExchangeRate();
 
-        // Get the current balance of assets in the strategy
-        uint256 assetBalance = IERC20(asset).balanceOf(address(this));
+        // Get the current balance of assets in the strategy (not using totalSupply so that it goes to profit)
+        uint256 assetBalance = ITokenizedStrategy(address(this)).totalAssets();
 
         // Calculate the profit based on exchange rate difference
-        uint256 deltaExchangeRate = currentExchangeRate > _lastReportedExchangeRate
-            ? currentExchangeRate - _lastReportedExchangeRate
-            : 0; // Only capture positive yield
+        int256 deltaExchangeRate = int256(currentExchangeRate) - int256(_lastReportedExchangeRate);
 
-        uint256 profitInValue = (assetBalance * deltaExchangeRate) / ERC20(asset).decimals();
+        int256 deltaInValue = int256(assetBalance) * deltaExchangeRate;
 
-        uint256 profitInYieldVaultShares = (profitInValue * ERC20(asset).decimals()) / currentExchangeRate;
+        absoluteDelta = deltaInValue / int256(_lastReportedExchangeRate);
+
+        deltaInUnderlyingAssetValue = deltaInValue / int256(currentExchangeRate);
 
         _lastReportedExchangeRate = currentExchangeRate;
-
-        return profitInYieldVaultShares;
     }
 
     /**
