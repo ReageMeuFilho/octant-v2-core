@@ -653,4 +653,368 @@ contract LidoStrategyTest is Test {
         (bool trigger, ) = IBaseStrategy(address(strategy)).tendTrigger();
         assertEq(trigger, false, "Tend trigger should always be false");
     }
+
+    /// @notice Test basic loss scenario with single user
+    function testHarvestWithLossLido() public {
+        // Set loss limit to allow 10% losses
+        vm.startPrank(management);
+        strategy.setLossLimitRatio(1000); // 10%
+        vm.stopPrank();
+
+        uint256 depositAmount = 100e18; // 100 WSTETH
+
+        // First deposit to create some donation shares for loss protection
+        vm.startPrank(user);
+        vault.deposit(depositAmount, user);
+        vm.stopPrank();
+
+        // Generate some profit first to create donation shares
+        uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
+        uint256 profitExchangeRate = (initialExchangeRate * 11) / 10; // 10% profit
+
+        vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(profitExchangeRate));
+
+        vm.startPrank(keeper);
+        vault.report(); // This creates donation shares for loss protection
+        vm.stopPrank();
+
+        vm.clearMockedCalls();
+
+        // Check donation address has shares for loss protection
+        uint256 donationSharesBefore = vault.balanceOf(donationAddress);
+        assertGt(donationSharesBefore, 0, "Donation address should have shares for loss protection");
+
+        // Check initial state before loss
+        uint256 totalAssetsBefore = vault.totalAssets();
+        uint256 userSharesBefore = vault.balanceOf(user);
+
+        // Simulate exchange rate decrease (5% loss from profit rate)
+        uint256 lossExchangeRate = (profitExchangeRate * 95) / 100;
+        vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(lossExchangeRate));
+
+        // Call report and capture the returned values
+        vm.startPrank(keeper);
+        (uint256 profit, uint256 loss) = vault.report();
+        vm.stopPrank();
+
+        // Clear mock to avoid interference with other tests
+        vm.clearMockedCalls();
+
+        // Assert loss and profit
+        assertEq(profit, 0, "Profit should be zero");
+        assertGt(loss, 0, "Loss should be positive");
+
+        // Check that donation shares were burned for loss protection
+        uint256 donationSharesAfter = vault.balanceOf(donationAddress);
+        assertLt(donationSharesAfter, donationSharesBefore, "Donation shares should be burned for loss protection");
+
+        // User shares should remain the same (loss protection in effect)
+        uint256 userSharesAfter = vault.balanceOf(user);
+        assertEq(userSharesAfter, userSharesBefore, "User shares should not change due to loss protection");
+
+        // Total assets should decrease by the loss amount
+        uint256 totalAssetsAfter = vault.totalAssets();
+        assertEq(totalAssetsAfter, totalAssetsBefore, "Total assets should be the same before and after loss");
+
+        // User should still be able to withdraw close to original deposit value
+        vm.startPrank(user);
+        uint256 assetsReceived = vault.redeem(userSharesAfter, user, user);
+        vm.stopPrank();
+
+        // Due to loss protection, user should receive close to their deposit adjusted for current exchange rate
+        assertApproxEqRel(
+            assetsReceived * lossExchangeRate,
+            depositAmount * initialExchangeRate,
+            0.01e18, // 1% tolerance for loss scenarios
+            "User should receive close to original deposit value due to loss protection"
+        );
+    }
+
+    /// @notice Test loss scenario with multiple users to verify fair loss handling
+    function testMultipleUserLossDistributionLido() public {
+        // Set loss limit to allow 20% losses
+        vm.startPrank(management);
+        strategy.setLossLimitRatio(2000); // 20%
+        vm.stopPrank();
+
+        TestState memory state;
+
+        // Setup users
+        state.user1 = user;
+        state.user2 = address(0x5678);
+        state.depositAmount1 = 1000e18; // 1000 WSTETH
+        state.depositAmount2 = 2000e18; // 2000 WSTETH
+
+        // Get initial exchange rate
+        state.initialExchangeRate = strategy.getLastReportedExchangeRate();
+
+        // First user deposits
+        vm.startPrank(state.user1);
+        vault.deposit(state.depositAmount1, state.user1);
+        vm.stopPrank();
+
+        // Generate some profit first to create donation shares for loss protection
+        state.newExchangeRate1 = (state.initialExchangeRate * 110) / 100; // 10% profit
+        vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(state.newExchangeRate1));
+
+        vm.startPrank(keeper);
+        vault.report(); // Creates donation shares
+        vm.stopPrank();
+        vm.clearMockedCalls();
+
+        // Second user deposits after profit generation
+        vm.startPrank(address(this));
+        airdrop(ERC20(WSTETH), state.user2, state.depositAmount2);
+        vm.stopPrank();
+
+        vm.startPrank(state.user2);
+        ERC20(WSTETH).approve(address(strategy), type(uint256).max);
+        vault.deposit(state.depositAmount2, state.user2);
+        vm.stopPrank();
+
+        // Check donation shares available for loss protection
+        uint256 donationSharesBefore = vault.balanceOf(donationAddress);
+        assertGt(donationSharesBefore, 0, "Should have donation shares for loss protection");
+
+        // Record user shares before loss
+        uint256 user1SharesBefore = vault.balanceOf(state.user1);
+        uint256 user2SharesBefore = vault.balanceOf(state.user2);
+
+        // Generate loss (20% decrease from profit rate)
+        state.newExchangeRate2 = (state.newExchangeRate1 * 8001) / 10000; // less than 20% loss
+        vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(state.newExchangeRate2));
+
+        // Report loss
+        vm.startPrank(keeper);
+        (uint256 profit, uint256 loss) = vault.report();
+        vm.stopPrank();
+        vm.clearMockedCalls();
+
+        // Verify loss was reported
+        assertEq(profit, 0, "Should have no profit");
+        assertGt(loss, 0, "Should have reported loss");
+
+        // Check that donation shares were burned for loss protection
+        uint256 donationSharesAfter = vault.balanceOf(donationAddress);
+        assertLt(donationSharesAfter, donationSharesBefore, "Donation shares should be burned for loss protection");
+
+        // User shares should remain unchanged due to loss protection
+        assertEq(vault.balanceOf(state.user1), user1SharesBefore, "User 1 shares should be protected");
+        assertEq(vault.balanceOf(state.user2), user2SharesBefore, "User 2 shares should be protected");
+
+        // Both users withdraw
+        vm.startPrank(state.user1);
+        state.user1Assets = vault.redeem(vault.balanceOf(state.user1), state.user1, state.user1);
+        vm.stopPrank();
+
+        vm.startPrank(state.user2);
+        state.user2Assets = vault.redeem(vault.balanceOf(state.user2), state.user2, state.user2);
+        vm.stopPrank();
+
+        // Users should receive their deposits adjusted for exchange rate changes with loss protection
+        assertApproxEqRel(
+            state.user1Assets * state.newExchangeRate2,
+            (state.depositAmount1 * state.initialExchangeRate * 8) / 10, // expect a 20 pr cent loss in value
+            0.1e18, // 0.1% tolerance for loss scenarios
+            "User 1 should receive deposit value with loss protection"
+        );
+
+        assertApproxEqRel(
+            state.user2Assets * state.newExchangeRate2,
+            (state.depositAmount2 * state.newExchangeRate1 * 8) / 10, // expect a 20 pr cent loss in value
+            0.1e18, // 0.1% tolerance for loss scenarios
+            "User 2 should receive deposit value with loss protection"
+        );
+    }
+
+    /// @notice Test loss scenario where loss exceeds available donation shares
+    function testLossExceedingDonationSharesLido() public {
+        // Set loss limit to allow 15% losses
+        vm.startPrank(management);
+        strategy.setLossLimitRatio(1500); // 15%
+        vm.stopPrank();
+
+        uint256 depositAmount = 1000e18; // 1000 WSTETH
+
+        // User deposits
+        vm.startPrank(user);
+        vault.deposit(depositAmount, user);
+        vm.stopPrank();
+
+        // Generate small profit to create minimal donation shares
+        uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
+        uint256 smallProfitRate = (initialExchangeRate * 1005) / 1000; // 0.5% profit
+        vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(smallProfitRate));
+
+        vm.startPrank(keeper);
+        vault.report(); // Creates small amount of donation shares
+        vm.stopPrank();
+        vm.clearMockedCalls();
+
+        uint256 donationSharesBefore = vault.balanceOf(donationAddress);
+        uint256 userSharesBefore = vault.balanceOf(user);
+
+        // Generate large loss (10% from initial rate)
+        uint256 largeLossRate = (initialExchangeRate * 90) / 100;
+        vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(largeLossRate));
+
+        vm.startPrank(keeper);
+        (uint256 profit, uint256 loss) = vault.report();
+        vm.stopPrank();
+        vm.clearMockedCalls();
+
+        // Verify loss was reported
+        assertEq(profit, 0, "Should have no profit");
+        assertGt(loss, 0, "Should have reported loss");
+
+        // All donation shares should be burned (limited by available balance)
+        uint256 donationSharesAfter = vault.balanceOf(donationAddress);
+        assertLt(donationSharesAfter, donationSharesBefore, "Some donation shares should be burned");
+
+        // User shares should remain the same (they don't get burned)
+        assertEq(vault.balanceOf(user), userSharesBefore, "User shares should not be burned");
+
+        // User should still be able to withdraw, but will receive less due to insufficient loss protection
+        vm.startPrank(user);
+        uint256 assetsReceived = vault.redeem(vault.balanceOf(user), user, user);
+        vm.stopPrank();
+
+        // User receives less than original deposit due to insufficient loss protection
+        assertLt(
+            assetsReceived * largeLossRate,
+            depositAmount * initialExchangeRate,
+            "User should receive less due to insufficient loss protection"
+        );
+    }
+
+    /// @notice Test consecutive loss scenarios
+    function testConsecutiveLossesLido() public {
+        // Set loss limit to allow 15% losses
+        vm.startPrank(management);
+        strategy.setLossLimitRatio(1500); // 15%
+        vm.stopPrank();
+
+        uint256 depositAmount = 1000e18; // 1000 WSTETH
+
+        // User deposits
+        vm.startPrank(user);
+        vault.deposit(depositAmount, user);
+        vm.stopPrank();
+
+        // Generate profit to create donation shares
+        uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
+        uint256 profitRate = (initialExchangeRate * 120) / 100; // 20% profit
+        vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(profitRate));
+
+        vm.startPrank(keeper);
+        vault.report(); // Creates donation shares
+        vm.stopPrank();
+        vm.clearMockedCalls();
+
+        uint256 donationSharesAfterProfit = vault.balanceOf(donationAddress);
+        assertGt(donationSharesAfterProfit, 0, "Should have donation shares after profit");
+
+        // First loss (5% from profit rate)
+        uint256 firstLossRate = (profitRate * 95) / 100;
+        vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(firstLossRate));
+
+        vm.startPrank(keeper);
+        (uint256 profit1, uint256 loss1) = vault.report();
+        vm.stopPrank();
+        vm.clearMockedCalls();
+
+        assertEq(profit1, 0, "Should have no profit in first loss");
+        assertGt(loss1, 0, "Should have loss in first report");
+
+        uint256 donationSharesAfterFirstLoss = vault.balanceOf(donationAddress);
+        assertLt(
+            donationSharesAfterFirstLoss,
+            donationSharesAfterProfit,
+            "Donation shares should decrease after first loss"
+        );
+
+        // Second consecutive loss (another 5% from current rate)
+        uint256 secondLossRate = (firstLossRate * 95) / 100;
+        vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(secondLossRate));
+
+        vm.startPrank(keeper);
+        (uint256 profit2, uint256 loss2) = vault.report();
+        vm.stopPrank();
+        vm.clearMockedCalls();
+
+        assertEq(profit2, 0, "Should have no profit in second loss");
+        assertGt(loss2, 0, "Should have loss in second report");
+
+        uint256 donationSharesAfterSecondLoss = vault.balanceOf(donationAddress);
+        assertLe(
+            donationSharesAfterSecondLoss,
+            donationSharesAfterFirstLoss,
+            "Donation shares should decrease or stay same after second loss"
+        );
+
+        // User should still be able to withdraw
+        vm.startPrank(user);
+        uint256 assetsReceived = vault.redeem(vault.balanceOf(user), user, user);
+        vm.stopPrank();
+
+        assertGt(assetsReceived, 0, "User should receive some assets");
+    }
+
+    /// @notice Test that loss protection works correctly with zero donation shares
+    function testLossWithZeroDonationSharesLido() public {
+        // Set loss limit to allow 10% losses
+        vm.startPrank(management);
+        strategy.setLossLimitRatio(1000); // 10%
+        vm.stopPrank();
+
+        uint256 depositAmount = 1000e18; // 1000 WSTETH
+
+        // User deposits without any prior profit generation
+        vm.startPrank(user);
+        vault.deposit(depositAmount, user);
+        vm.stopPrank();
+
+        // Verify no donation shares exist
+        uint256 donationSharesBefore = vault.balanceOf(donationAddress);
+        assertEq(donationSharesBefore, 0, "Should have no donation shares initially");
+
+        uint256 userSharesBefore = vault.balanceOf(user);
+        uint256 totalAssetsBefore = vault.totalAssets();
+
+        // Generate loss (5% decrease)
+        uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
+        uint256 lossRate = (initialExchangeRate * 95) / 100;
+        vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(lossRate));
+
+        vm.startPrank(keeper);
+        (uint256 profit, uint256 loss) = vault.report();
+        vm.stopPrank();
+        vm.clearMockedCalls();
+
+        // Verify loss was reported
+        assertEq(profit, 0, "Should have no profit");
+        assertGt(loss, 0, "Should have reported loss");
+
+        // Donation shares should remain zero (nothing to burn)
+        uint256 donationSharesAfter = vault.balanceOf(donationAddress);
+        assertEq(donationSharesAfter, 0, "Should still have no donation shares");
+
+        // User shares should remain unchanged
+        assertEq(vault.balanceOf(user), userSharesBefore, "User shares should not change");
+
+        // Total assets should decrease by loss
+        assertEq(vault.totalAssets(), totalAssetsBefore, "Total assets should be the same before and after loss");
+
+        // User withdrawal should work but receive reduced value
+        vm.startPrank(user);
+        uint256 assetsReceived = vault.redeem(vault.balanceOf(user), user, user);
+        vm.stopPrank();
+
+        // User receives less due to no loss protection
+        assertLt(
+            assetsReceived * lossRate,
+            depositAmount * initialExchangeRate,
+            "User should receive less due to no loss protection"
+        );
+    }
 }

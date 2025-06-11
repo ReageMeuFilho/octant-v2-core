@@ -5,6 +5,8 @@ import { BaseYieldSkimmingStrategy } from "src/core/BaseYieldSkimmingStrategy.so
 import { IBaseHealthCheck } from "src/strategies/interfaces/IBaseHealthCheck.sol";
 import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
 
+import { console } from "forge-std/console.sol";
+
 /**
  *   @title Base Yield Skimming Health Check
  *   @author Octant
@@ -128,38 +130,35 @@ abstract contract BaseYieldSkimmingHealthCheck is BaseYieldSkimmingStrategy, IBa
      * @return _delta New delta post report.
      */
     function harvestAndReport() external override onlySelf returns (int256 _delta) {
+        int256 absoluteDelta;
         // Let the strategy report.
-        _delta = _harvestAndReport();
+        (_delta, absoluteDelta) = _harvestAndReport();
 
         // Run the healthcheck on the amount returned.
-        _executeHealthCheck(_delta);
+        _executeHealthCheck(_delta, absoluteDelta);
     }
 
     /**
      * @dev To be called during a report to make sure the profit
      * or loss being recorded is within the acceptable bound.
      * @dev The profit is an int256 to handle both gains and losses.
-     * @param _delta The amount that will be reported.
+     * @param _absoluteDelta The absolute amount that will be used to calculate the profit or loss.
      */
-    function _executeHealthCheck(int256 _delta) internal virtual {
+    function _executeHealthCheck(int256, int256 _absoluteDelta) internal virtual {
         if (!doHealthCheck) {
             doHealthCheck = true;
             return;
         }
 
-        // Get current total assets
         uint256 currentTotalAssets = ITokenizedStrategy(address(this)).totalAssets();
 
-        if (_delta > 0) {
-            // Calculate previous total assets (before profit with current exchange rate)
-            uint256 previousTotalAssets = currentTotalAssets - uint256(_delta);
-
-            // Compare profit against previous total assets
-            require((uint256(_delta) <= (previousTotalAssets * uint256(_profitLimitRatio)) / MAX_BPS), "!profit");
-        } else if (_delta < 0) {
-            // For losses, we still compare against current total assets
-            // since the loss hasn't been deducted yet
-            require((uint256(-_delta) <= (currentTotalAssets * uint256(_lossLimitRatio)) / MAX_BPS), "!loss");
+        if (_absoluteDelta > 0) {
+            require(
+                (uint256(_absoluteDelta) <= (currentTotalAssets * uint256(_profitLimitRatio)) / MAX_BPS),
+                "!profit"
+            );
+        } else if (_absoluteDelta < 0) {
+            require((uint256(-_absoluteDelta) <= (currentTotalAssets * uint256(_lossLimitRatio)) / MAX_BPS), "!loss");
         }
     }
 }

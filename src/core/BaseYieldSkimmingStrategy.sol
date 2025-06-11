@@ -236,7 +236,9 @@ abstract contract BaseYieldSkimmingStrategy {
      * NOTE: Unlike the standard BaseStrategy, this YieldSkimmingStrategy variant
      * returns the DELTA (change in value, positive or negative) rather than totalAssets. This is
      * more efficient for strategies that maintain a stable principal and only
-     * need to report yield changes.
+     * need to report yield changes. We also return the absolute delta, which is the
+     * delta in value divided by the last reported exchange rate. This is useful for
+     * strategies health checks.
      *
      * Care should be taken when relying on oracles or swap values rather
      * than actual amounts as all Strategy profit/loss accounting will
@@ -249,7 +251,7 @@ abstract contract BaseYieldSkimmingStrategy {
      * @return _delta The change in value (positive for gains, negative for losses)
      * generated since the last report. This is an int256 to handle both directions.
      */
-    function _harvestAndReport() internal virtual returns (int256 _delta);
+    function _harvestAndReport() internal virtual returns (int256 _delta, int256 _absoluteDelta);
 
     /*//////////////////////////////////////////////////////////////
                     OPTIONAL TO OVERRIDE BY STRATEGIST
@@ -424,7 +426,9 @@ abstract contract BaseYieldSkimmingStrategy {
      * since the last report as an int256.
      */
     function harvestAndReport() external virtual onlySelf returns (int256) {
-        return _harvestAndReport();
+        int256 delta;
+        (delta, ) = _harvestAndReport();
+        return delta;
     }
 
     /**

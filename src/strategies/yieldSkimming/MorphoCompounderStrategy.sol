@@ -134,7 +134,7 @@ contract MorphoCompounderStrategy is BaseYieldSkimmingHealthCheck {
      * @notice Captures yield by calculating the increase in value based on exchange rate changes
      * @return deltaInUnderlyingAssetValue The current delta of the strategy
      */
-    function _harvestAndReport() internal override returns (int256 deltaInUnderlyingAssetValue) {
+    function _harvestAndReport() internal override returns (int256 deltaInUnderlyingAssetValue, int256 absoluteDelta) {
         uint256 currentExchangeRate = _getCurrentExchangeRate();
 
         // Get the current balance of assets in the strategy (not using totalSupply so that it goes to profit)
@@ -144,6 +144,8 @@ contract MorphoCompounderStrategy is BaseYieldSkimmingHealthCheck {
         int256 deltaExchangeRate = int256(currentExchangeRate) - int256(_lastReportedExchangeRate);
 
         int256 deltaInValue = int256(assetBalance) * deltaExchangeRate;
+
+        absoluteDelta = deltaInValue / int256(_lastReportedExchangeRate);
 
         deltaInUnderlyingAssetValue = deltaInValue / int256(currentExchangeRate);
 

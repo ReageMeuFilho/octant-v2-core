@@ -121,7 +121,10 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
      */
     function _handleDragonLossProtection(StrategyData storage S, uint256 loss) internal {
         // Can only burn up to available shares
-        uint256 sharesBurned = Math.min(_convertToShares(S, loss, Math.Rounding.Floor), S.balances[S.dragonRouter]);
+        uint256 sharesBurned = Math.min(
+            _convertToSharesFromReport(S, loss, Math.Rounding.Floor),
+            S.balances[S.dragonRouter]
+        );
 
         if (sharesBurned > 0) {
             // Burn shares from dragon router
