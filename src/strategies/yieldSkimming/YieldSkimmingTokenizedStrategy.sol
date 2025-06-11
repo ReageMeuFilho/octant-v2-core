@@ -9,7 +9,7 @@ import { TokenizedStrategy, Math } from "src/core/TokenizedStrategy.sol";
  * @title YieldSkimmingTokenizedStrategy
  * @author octant.finance
  * @notice A specialized version of TokenizedStrategy designed for yield-bearing tokens
- * like mETH whose value in ETH terms appreciates over time.
+ * like mETH whose value appreciates over time.
  * @dev This strategy implements a yield skimming mechanism by:
  *      - Recognizing appreciation of the underlying asset during report()
  *      - Diluting existing shares by minting new ones to dragonRouter
@@ -34,7 +34,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     function report() public override(TokenizedStrategy) returns (uint256 profit, uint256 loss) {
         StrategyData storage S = super._strategyStorage();
 
-        // Get the profit in mETH terms
+        // Get the delta
         int256 delta = IBaseYieldSkimmingStrategy(address(this)).harvestAndReport();
 
         address _dragonRouter = S.dragonRouter;
@@ -43,7 +43,6 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
 
         if (delta > 0) {
             // Mint shares based on the adjusted profit amount
-            // todo review the case where profit > totalAssets (currently not possible because of the health check)
             uint256 shares = _convertToSharesFromReport(S, uint256(delta), Math.Rounding.Floor);
             profit = uint256(delta);
             // mint the value
