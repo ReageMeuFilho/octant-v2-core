@@ -5,8 +5,6 @@ import { BaseYieldSkimmingStrategy } from "src/core/BaseYieldSkimmingStrategy.so
 import { IBaseHealthCheck } from "src/strategies/interfaces/IBaseHealthCheck.sol";
 import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
 
-import { console } from "forge-std/console.sol";
-
 /**
  *   @title Base Yield Skimming Health Check
  *   @author Octant
