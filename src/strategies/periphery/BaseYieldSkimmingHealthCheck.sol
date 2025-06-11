@@ -125,24 +125,24 @@ abstract contract BaseYieldSkimmingHealthCheck is BaseYieldSkimmingStrategy, IBa
 
     /**
      * @notice OVerrides the default {harvestAndReport} to include a healthcheck.
-     * @return _delta New delta post report.
+     * @return deltaAtNewRate New delta post report.
      */
-    function harvestAndReport() external override onlySelf returns (int256 _delta) {
-        int256 absoluteDelta;
+    function harvestAndReport() external override onlySelf returns (int256 deltaAtNewRate) {
+        int256 deltaAtOldRate;
         // Let the strategy report.
-        (_delta, absoluteDelta) = _harvestAndReport();
+        (deltaAtNewRate, deltaAtOldRate) = _harvestAndReport();
 
         // Run the healthcheck on the amount returned.
-        _executeHealthCheck(_delta, absoluteDelta);
+        _executeHealthCheck(deltaAtNewRate, deltaAtOldRate);
     }
 
     /**
      * @dev To be called during a report to make sure the profit
      * or loss being recorded is within the acceptable bound.
      * @dev The profit is an int256 to handle both gains and losses.
-     * @param _absoluteDelta The absolute amount that will be used to calculate the profit or loss.
+     * @param deltaAtOldRate The delta at the old exchange rate.
      */
-    function _executeHealthCheck(int256, int256 _absoluteDelta) internal virtual {
+    function _executeHealthCheck(int256, int256 deltaAtOldRate) internal virtual {
         if (!doHealthCheck) {
             doHealthCheck = true;
             return;
@@ -150,13 +150,13 @@ abstract contract BaseYieldSkimmingHealthCheck is BaseYieldSkimmingStrategy, IBa
 
         uint256 currentTotalAssets = ITokenizedStrategy(address(this)).totalAssets();
 
-        if (_absoluteDelta > 0) {
+        if (deltaAtOldRate > 0) {
             require(
-                (uint256(_absoluteDelta) <= (currentTotalAssets * uint256(_profitLimitRatio)) / MAX_BPS),
+                (uint256(deltaAtOldRate) <= (currentTotalAssets * uint256(_profitLimitRatio)) / MAX_BPS),
                 "!profit"
             );
-        } else if (_absoluteDelta < 0) {
-            require((uint256(-_absoluteDelta) <= (currentTotalAssets * uint256(_lossLimitRatio)) / MAX_BPS), "!loss");
+        } else if (deltaAtOldRate < 0) {
+            require((uint256(-deltaAtOldRate) <= (currentTotalAssets * uint256(_lossLimitRatio)) / MAX_BPS), "!loss");
         }
     }
 }

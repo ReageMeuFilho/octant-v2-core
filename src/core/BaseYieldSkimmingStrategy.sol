@@ -248,10 +248,12 @@ abstract contract BaseYieldSkimmingStrategy {
      * `TokenizedStrategy.isShutdown()` to decide if funds should be
      * redeployed or simply realize any profits/losses.
      *
-     * @return _delta The change in value (positive for gains, negative for losses)
-     * generated since the last report. This is an int256 to handle both directions.
+     * @return deltaAtNewRate The change in value (positive for gains, negative for losses)
+     * generated since the last report at the new exchange rate. This is an int256 to handle both directions.
+     * @return deltaAtOldRate The change in value (positive for gains, negative for losses)
+     * generated since the last report at the old exchange rate. This is an int256 to handle both directions.
      */
-    function _harvestAndReport() internal virtual returns (int256 _delta, int256 _absoluteDelta);
+    function _harvestAndReport() internal virtual returns (int256 deltaAtNewRate, int256 deltaAtOldRate);
 
     /*//////////////////////////////////////////////////////////////
                     OPTIONAL TO OVERRIDE BY STRATEGIST

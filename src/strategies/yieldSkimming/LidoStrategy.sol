@@ -111,9 +111,10 @@ contract LidoStrategy is BaseYieldSkimmingHealthCheck {
 
     /**
      * @notice Captures yield by calculating the increase in value based on exchange rate changes
-     * @return deltaInUnderlyingAssetValue The current delta of the strategy
+     * @return deltaAtNewRate The current delta of the strategy at the new exchange rate
+     * @return deltaAtOldRate The current delta of the strategy at the old exchange rate
      */
-    function _harvestAndReport() internal override returns (int256 deltaInUnderlyingAssetValue, int256 absoluteDelta) {
+    function _harvestAndReport() internal override returns (int256 deltaAtNewRate, int256 deltaAtOldRate) {
         uint256 currentExchangeRate = _getCurrentExchangeRate();
 
         // Get the current balance of assets in the strategy (not using totalSupply so that it goes to profit)
@@ -124,9 +125,9 @@ contract LidoStrategy is BaseYieldSkimmingHealthCheck {
 
         int256 deltaInValue = int256(assetBalance) * deltaExchangeRate;
 
-        absoluteDelta = deltaInValue / int256(_lastReportedExchangeRate);
+        deltaAtOldRate = deltaInValue / int256(_lastReportedExchangeRate);
 
-        deltaInUnderlyingAssetValue = deltaInValue / int256(currentExchangeRate);
+        deltaAtNewRate = deltaInValue / int256(currentExchangeRate);
 
         _lastReportedExchangeRate = currentExchangeRate;
     }
