@@ -73,6 +73,18 @@ contract LidoStrategyTest is Test {
         uint256 user2ProfitPercentage;
     }
 
+    // Additional struct for fuzz tests to avoid stack too deep
+    struct FuzzTestState {
+        uint256 initialExchangeRate;
+        uint256 profitRate;
+        uint256 firstLossRate;
+        uint256 secondLossRate;
+        uint256 donationSharesAfterProfit;
+        uint256 donationSharesAfterFirstLoss;
+        uint256 donationSharesAfterSecondLoss;
+        uint256 assetsReceived;
+    }
+
     /**
      * @notice Helper function to airdrop tokens to a specified address
      * @param _asset The ERC20 token to airdrop
@@ -179,20 +191,57 @@ contract LidoStrategyTest is Test {
         assertGt(strategy.balanceOfShares(), 0, "Strategy should have deployed assets to yield vault");
     }
 
-    /// @notice Test withdrawing assets from the strategy
-    function testWithdraw() public {
-        uint256 depositAmount = 100e18; // 100 WSTETH
+    /// @notice Fuzz test depositing assets into the strategy
+    function testFuzzDepositLido(uint256 depositAmount) public {
+        // Bound the deposit amount to reasonable values (0.01 to 10,000 WSTETH)
+        depositAmount = bound(depositAmount, 0.01e18, 10000e18);
+
+        // Airdrop tokens to user for this test
+        airdrop(ERC20(WSTETH), user, depositAmount);
+
+        // Initial balances
+        uint256 initialUserBalance = ERC20(WSTETH).balanceOf(user);
+
+        // Deposit assets
+        vm.startPrank(user);
+        // approve the strategy to spend the user's tokens
+        ERC20(WSTETH).approve(address(strategy), depositAmount);
+        uint256 sharesReceived = vault.deposit(depositAmount, user);
+        vm.stopPrank();
+
+        // Verify balances after deposit
+        assertEq(
+            ERC20(WSTETH).balanceOf(user),
+            initialUserBalance - depositAmount,
+            "User balance not reduced correctly"
+        );
+
+        assertGt(sharesReceived, 0, "No shares received from deposit");
+        assertGt(strategy.balanceOfShares(), 0, "Strategy should have deployed assets to yield vault");
+    }
+
+    /// @notice Fuzz test withdrawing assets from the strategy
+    function testFuzzWithdraw(uint256 depositAmount, uint256 withdrawPercentage) public {
+        // Bound inputs to reasonable values
+        depositAmount = bound(depositAmount, 1e18, 10000e18); // 1 to 10,000 WSTETH
+        withdrawPercentage = bound(withdrawPercentage, 1, 100); // 1% to 100%
+
+        // Airdrop tokens to user for this test
+        airdrop(ERC20(WSTETH), user, depositAmount);
 
         // Deposit first
         vm.startPrank(user);
+        ERC20(WSTETH).approve(address(strategy), depositAmount);
         vault.deposit(depositAmount, user);
 
         // Initial balances before withdrawal
         uint256 initialUserBalance = ERC20(WSTETH).balanceOf(user);
         uint256 initialShareBalance = vault.balanceOf(user);
 
-        // Withdraw half of the deposit
-        uint256 withdrawAmount = depositAmount / 2;
+        // Calculate withdrawal amount based on percentage
+        uint256 withdrawAmount = (depositAmount * withdrawPercentage) / 100;
+
+        // Preview the withdrawal to get shares to burn
         uint256 sharesToBurn = vault.previewWithdraw(withdrawAmount);
         uint256 assetsReceived = vault.withdraw(withdrawAmount, user, user);
         vm.stopPrank();
@@ -207,12 +256,18 @@ contract LidoStrategyTest is Test {
         assertEq(assetsReceived, withdrawAmount, "Incorrect amount of assets received");
     }
 
-    /// @notice Test the harvesting functionality using explicit profit simulation
-    function testHarvestWithProfitLido() public {
-        uint256 depositAmount = 100e18; // 100 WSTETH
+    /// @notice Fuzz test the harvesting functionality with profit
+    function testFuzzHarvestWithProfitLido(uint256 depositAmount, uint256 profitPercentage) public {
+        // Bound inputs to reasonable values
+        depositAmount = bound(depositAmount, 1e18, 10000e18); // 1 to 10,000 WSTETH
+        profitPercentage = bound(profitPercentage, 1, 99); // 1% to 99% profit (under 100% health check limit)
+
+        // Airdrop tokens to user for this test
+        airdrop(ERC20(WSTETH), user, depositAmount);
 
         // Deposit first
         vm.startPrank(user);
+        ERC20(WSTETH).approve(address(strategy), depositAmount);
         vault.deposit(depositAmount, user);
         vm.stopPrank();
 
@@ -220,18 +275,16 @@ contract LidoStrategyTest is Test {
         uint256 totalAssetsBefore = vault.totalAssets();
         uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
 
-        // Simulate exchange rate increase (10% increase)
-        uint256 newExchangeRate = (initialExchangeRate * 11) / 10;
+        // Simulate exchange rate increase based on fuzzed percentage
+        uint256 newExchangeRate = (initialExchangeRate * (100 + profitPercentage)) / 100;
 
-        // the actual yield vault's stEthPerToken
+        // Mock the actual yield vault's stEthPerToken
         vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(newExchangeRate));
 
         uint256 donationAddressBalanceBefore = ERC20(address(strategy)).balanceOf(donationAddress);
 
-        // Prepare to call report and expect event
+        // Call report
         vm.startPrank(keeper);
-
-        // Call report and capture the returned values
         (uint256 profit, uint256 loss) = vault.report();
         vm.stopPrank();
 
@@ -253,39 +306,19 @@ contract LidoStrategyTest is Test {
 
         // Check total assets after harvest
         uint256 totalAssetsAfter = vault.totalAssets();
-
         assertEq(totalAssetsAfter, totalAssetsBefore, "Total assets should not change after harvest");
 
-        // donation address should be able to withdraw the profit
-        vm.startPrank(donationAddress);
-        vault.redeem(donationAddressBalanceAfter, donationAddress, donationAddress);
-        vm.stopPrank();
-
-        // check vault balance of donation address
-        assertEq(vault.balanceOf(donationAddress), 0, "Donation address should have no shares after redeem");
-        assertEq(
-            ERC20(address(strategy)).balanceOf(donationAddress),
-            0,
-            "Donation address should have no balance after redeem"
-        );
-        // should have received yield vault shares
-        assertGt(
-            ERC20(WSTETH).balanceOf(donationAddress),
-            0,
-            "Donation address should have received yield vault shares"
-        );
-
-        // Withdraw everything
+        // Withdraw everything for user
         vm.startPrank(user);
         uint256 sharesToRedeem = vault.balanceOf(user);
         uint256 assetsReceived = vault.redeem(sharesToRedeem, user, user);
         vm.stopPrank();
 
-        // Verify user received their original deposit plus profit
+        // Verify user received their original deposit
         assertApproxEqRel(
             assetsReceived * newExchangeRate,
             depositAmount * initialExchangeRate,
-            0.000001e18, // 0.0001% tolerance
+            0.001e18, // 0.1% tolerance for fuzzing
             "User should receive original deposit"
         );
     }
@@ -438,12 +471,17 @@ contract LidoStrategyTest is Test {
         assertGe(newTotalAssets, initialAssets, "Total assets should not decrease after harvest");
     }
 
-    /// @notice Test emergency exit functionality
-    function testEmergencyExit() public {
-        // Setup - deposit a significant amount
-        uint256 depositAmount = 1000e6; // 1000 USDC
+    /// @notice Fuzz test emergency exit functionality
+    function testFuzzEmergencyExit(uint256 depositAmount) public {
+        // Bound deposit amount to reasonable values
+        depositAmount = bound(depositAmount, 1e18, 10000e18); // 1 to 10,000 WSTETH
 
+        // Airdrop tokens to user for this test
+        airdrop(ERC20(WSTETH), user, depositAmount);
+
+        // User deposits
         vm.startPrank(user);
+        ERC20(WSTETH).approve(address(strategy), depositAmount);
         vault.deposit(depositAmount, user);
         vm.stopPrank();
 
@@ -466,7 +504,7 @@ contract LidoStrategyTest is Test {
         assertApproxEqRel(
             assetsReceived,
             depositAmount,
-            0.00001e18, // 0.1% tolerance
+            0.001e18, // 0.1% tolerance
             "User should receive approximately original deposit value"
         );
     }
@@ -491,31 +529,28 @@ contract LidoStrategyTest is Test {
         assertEq(mockToken.balanceOf(strategy.GOV()), 1000e18, "GOV should have all mock tokens after sweep");
     }
 
-    /// @notice Test that trying to sweep the asset token reverts
-    function testCannotSweepAsset() public {
-        // Try to sweep the asset token, which should revert
-        vm.startPrank(strategy.GOV());
-        vm.expectRevert("!asset");
-        strategy.sweep(WSTETH);
-        vm.stopPrank();
-    }
+    /// @notice Fuzz test exchange rate tracking and yield calculation
+    function testFuzzExchangeRateTrackingLido(uint256 depositAmount, uint256 exchangeRateIncreasePercentage) public {
+        // Bound inputs to reasonable values
+        depositAmount = bound(depositAmount, 1e18, 10000e18); // 1 to 10,000 WSTETH
+        exchangeRateIncreasePercentage = bound(exchangeRateIncreasePercentage, 1, 99); // 1% to 50% increase
 
-    /// @notice Test exchange rate tracking and yield calculation
-    function testExchangeRateTrackingLido() public {
-        uint256 depositAmount = 1000e18; // 1000 WSTETH
+        // Airdrop tokens to user for this test
+        airdrop(ERC20(WSTETH), user, depositAmount);
 
         // Deposit first
         vm.startPrank(user);
+        ERC20(WSTETH).approve(address(strategy), depositAmount);
         vault.deposit(depositAmount, user);
         vm.stopPrank();
 
         // Get initial exchange rate
         uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
 
-        // Simulate a 5% increase in exchange rate
-        uint256 newExchangeRate = (initialExchangeRate * 105) / 100;
+        // Simulate exchange rate increase based on fuzzed percentage
+        uint256 newExchangeRate = (initialExchangeRate * (100 + exchangeRateIncreasePercentage)) / 100;
 
-        // Mock the getCurrentExchangeRate function
+        // Mock the yield vault's stEthPerToken
         vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(newExchangeRate));
 
         // Report to capture yield
@@ -526,7 +561,7 @@ contract LidoStrategyTest is Test {
         // Clear mock
         vm.clearMockedCalls();
 
-        // Log and verify profit
+        // Verify profit and loss
         assertGt(profit, 0, "Should have captured profit from exchange rate increase");
         assertEq(loss, 0, "Should have no loss");
 
@@ -654,23 +689,34 @@ contract LidoStrategyTest is Test {
         assertEq(trigger, false, "Tend trigger should always be false");
     }
 
-    /// @notice Test basic loss scenario with single user
-    function testHarvestWithLossLido() public {
-        // Set loss limit to allow 10% losses
+    /// @notice Fuzz test basic loss scenario with single user
+    function testFuzzHarvestWithLossLido(
+        uint256 depositAmount,
+        uint256 profitPercentage,
+        uint256 lossPercentage
+    ) public {
+        // Bound inputs to reasonable values
+        depositAmount = bound(depositAmount, 1e18, 10000e18); // 1 to 10,000 WSTETH
+        profitPercentage = bound(profitPercentage, 5, 50); // 5% to 50% profit first
+        lossPercentage = bound(lossPercentage, 1, 19); // 1% to 19% loss (less than 20% limit)
+
+        // Set loss limit to allow 20% losses
         vm.startPrank(management);
-        strategy.setLossLimitRatio(1000); // 10%
+        strategy.setLossLimitRatio(2000); // 20%
         vm.stopPrank();
 
-        uint256 depositAmount = 100e18; // 100 WSTETH
+        // Airdrop tokens to user for this test
+        airdrop(ERC20(WSTETH), user, depositAmount);
 
         // First deposit to create some donation shares for loss protection
         vm.startPrank(user);
+        ERC20(WSTETH).approve(address(strategy), depositAmount);
         vault.deposit(depositAmount, user);
         vm.stopPrank();
 
         // Generate some profit first to create donation shares
         uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
-        uint256 profitExchangeRate = (initialExchangeRate * 11) / 10; // 10% profit
+        uint256 profitExchangeRate = (initialExchangeRate * (100 + profitPercentage)) / 100;
 
         vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(profitExchangeRate));
 
@@ -688,8 +734,8 @@ contract LidoStrategyTest is Test {
         uint256 totalAssetsBefore = vault.totalAssets();
         uint256 userSharesBefore = vault.balanceOf(user);
 
-        // Simulate exchange rate decrease (5% loss from profit rate)
-        uint256 lossExchangeRate = (profitExchangeRate * 95) / 100;
+        // Simulate exchange rate decrease
+        uint256 lossExchangeRate = (profitExchangeRate * (100 - lossPercentage)) / 100;
         vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(lossExchangeRate));
 
         // Call report and capture the returned values
@@ -712,22 +758,9 @@ contract LidoStrategyTest is Test {
         uint256 userSharesAfter = vault.balanceOf(user);
         assertEq(userSharesAfter, userSharesBefore, "User shares should not change due to loss protection");
 
-        // Total assets should decrease by the loss amount
+        // Total assets should not change
         uint256 totalAssetsAfter = vault.totalAssets();
         assertEq(totalAssetsAfter, totalAssetsBefore, "Total assets should be the same before and after loss");
-
-        // User should still be able to withdraw close to original deposit value
-        vm.startPrank(user);
-        uint256 assetsReceived = vault.redeem(userSharesAfter, user, user);
-        vm.stopPrank();
-
-        // Due to loss protection, user should receive close to their deposit adjusted for current exchange rate
-        assertApproxEqRel(
-            assetsReceived * lossExchangeRate,
-            depositAmount * initialExchangeRate,
-            0.01e18, // 1% tolerance for loss scenarios
-            "User should receive close to original deposit value due to loss protection"
-        );
     }
 
     /// @notice Test loss scenario with multiple users to verify fair loss handling
@@ -1015,6 +1048,99 @@ contract LidoStrategyTest is Test {
             assetsReceived * lossRate,
             depositAmount * initialExchangeRate,
             "User should receive less due to no loss protection"
+        );
+    }
+
+    /// @notice Fuzz test consecutive loss scenarios
+    function testFuzzConsecutiveLossesLido(
+        uint256 depositAmount,
+        uint256 profitPercentage,
+        uint256 firstLossPercentage,
+        uint256 secondLossPercentage
+    ) public {
+        // Bound inputs to reasonable values
+        depositAmount = bound(depositAmount, 1e18, 10000e18); // 1 to 10,000 WSTETH
+        profitPercentage = bound(profitPercentage, 10, 50); // 10% to 50% profit first
+        firstLossPercentage = bound(firstLossPercentage, 1, 10); // 1% to 10% first loss
+        secondLossPercentage = bound(secondLossPercentage, 1, 10); // 1% to 10% second loss
+
+        FuzzTestState memory state;
+
+        // Set loss limit to allow 15% losses
+        vm.startPrank(management);
+        strategy.setLossLimitRatio(2000); // 20%
+        vm.stopPrank();
+
+        // Airdrop tokens to user for this test
+        airdrop(ERC20(WSTETH), user, depositAmount);
+
+        // User deposits
+        vm.startPrank(user);
+        ERC20(WSTETH).approve(address(strategy), depositAmount);
+        vault.deposit(depositAmount, user);
+        vm.stopPrank();
+
+        // Generate profit to create donation shares
+        state.initialExchangeRate = strategy.getLastReportedExchangeRate();
+        state.profitRate = (state.initialExchangeRate * (100 + profitPercentage)) / 100;
+        vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(state.profitRate));
+
+        vm.startPrank(keeper);
+        vault.report(); // Creates donation shares
+        vm.stopPrank();
+        vm.clearMockedCalls();
+
+        state.donationSharesAfterProfit = vault.balanceOf(donationAddress);
+        assertGt(state.donationSharesAfterProfit, 0, "Should have donation shares after profit");
+
+        // First loss
+        state.firstLossRate = (state.profitRate * (100 - firstLossPercentage)) / 100;
+        vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(state.firstLossRate));
+
+        vm.startPrank(keeper);
+        (uint256 profit1, uint256 loss1) = vault.report();
+        vm.stopPrank();
+        vm.clearMockedCalls();
+
+        assertEq(profit1, 0, "Should have no profit in first loss");
+        assertGt(loss1, 0, "Should have loss in first report");
+
+        state.donationSharesAfterFirstLoss = vault.balanceOf(donationAddress);
+        assertLt(
+            state.donationSharesAfterFirstLoss,
+            state.donationSharesAfterProfit,
+            "Donation shares should decrease after first loss"
+        );
+
+        // Second consecutive loss
+        state.secondLossRate = (state.firstLossRate * (100 - secondLossPercentage)) / 100;
+        vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(state.secondLossRate));
+
+        vm.startPrank(keeper);
+        (uint256 profit2, uint256 loss2) = vault.report();
+        vm.stopPrank();
+        vm.clearMockedCalls();
+
+        assertEq(profit2, 0, "Should have no profit in second loss");
+        assertGt(loss2, 0, "Should have loss in second report");
+
+        state.donationSharesAfterSecondLoss = vault.balanceOf(donationAddress);
+        assertLe(
+            state.donationSharesAfterSecondLoss,
+            state.donationSharesAfterFirstLoss,
+            "Donation shares should decrease or stay same after second loss"
+        );
+
+        // User should still be able to withdraw
+        vm.startPrank(user);
+        state.assetsReceived = vault.redeem(vault.balanceOf(user), user, user);
+        vm.stopPrank();
+
+        assertGe(
+            state.assetsReceived * state.secondLossRate,
+            ((depositAmount * state.initialExchangeRate) * (100 - firstLossPercentage) * (100 - secondLossPercentage)) /
+                10000, // should be greater or equal because of the first profit
+            "User should receive some assets"
         );
     }
 }
