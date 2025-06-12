@@ -24,11 +24,14 @@ contract UniswapV3Swapper {
     using SafeERC20 for ERC20;
 
     // Optional Variable to be set to not sell dust.
+    // slither-disable-next-line constable-states
     uint256 public minAmountToSell;
     // Defaults to WETH on mainnet.
+    // slither-disable-next-line immutable-states
     address public base = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
 
     // Defaults to Uniswap V3 router on mainnet.
+    // slither-disable-next-line constable-states
     address public router = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
 
     // Fees for the Uni V3 pools. Each fee should get set each way in

@@ -36,7 +36,7 @@ contract SkyCompounderStrategyFactory {
 
     event StrategyDeploy(address deployer, address donationAddress, address strategyAddress);
 
-    address usdsRewardAddress = 0x0650CAF159C5A49f711e8169D4336ECB9b950275;
+    address constant USDS_REWARD_ADDRESS = 0x0650CAF159C5A49f711e8169D4336ECB9b950275;
 
     /**
      * @notice Deploys a new SkyCompounder strategy for the Yield Donating Vault.
@@ -63,7 +63,7 @@ contract SkyCompounderStrategyFactory {
         bytes memory bytecode = abi.encodePacked(
             type(SkyCompounderStrategy).creationCode,
             abi.encode(
-                usdsRewardAddress,
+                USDS_REWARD_ADDRESS,
                 _name,
                 _management,
                 _keeper,
