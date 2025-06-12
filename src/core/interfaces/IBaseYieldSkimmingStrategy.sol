@@ -36,9 +36,9 @@ interface IBaseYieldSkimmingStrategy {
      * @dev Called by the TokenizedStrategy during report.
      * This can only be called after a report() delegateCall to the
      * TokenizedStrategy so msg.sender == address(this).
-     * @return The total value of all assets the strategy holds in terms of `asset`.
+     * @return deltaAtNewRate The delta at the new exchange rate.
      */
-    function harvestAndReport() external returns (int256);
+    function harvestAndReport() external returns (int256 deltaAtNewRate);
 
     /**
      * @notice Callback for the TokenizedStrategy to initiate a tend call.
