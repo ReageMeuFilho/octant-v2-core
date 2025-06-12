@@ -27,11 +27,30 @@ import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable
  * tokens that apply fees during transfers, are likely to not be supported as expected. If in doubt, we encourage you
  * to run tests before sending real value to this contract.
  */
-contract PaymentSplitter is Initializable, Context {
-    event PayeeAdded(address account, uint256 shares);
-    event PaymentReleased(address to, uint256 amount);
-    event ERC20PaymentReleased(IERC20 indexed token, address to, uint256 amount);
-    event PaymentReceived(address from, uint256 amount);
+contract PaymentSplitter is Context, Initializable {
+    struct TokenEpoch {
+        uint256 totalProfit; // Total profit accumulated
+        uint256 totalLoss; // Total loss accumulated
+        int256 netDistributable; // Profit - Loss (calculated at each recordProfit or recordLoss)
+        bool finalized;
+        mapping(address => bool) claimed;
+    }
+
+    struct Epoch {
+        uint256 startTimestamp;
+        uint256 endTimestamp;
+    }
+
+    // epoch state
+    uint256 public currentEpoch;
+    uint256 public constant EPOCH_DURATION = 7 days;
+    uint256 public constant FINALIZATION_DELAY = 1 hours; // Safety buffer
+    // epochsPerToken[epoch][token] -> TokenEpoch
+    mapping(uint256 => mapping(address => TokenEpoch)) public epochsPerToken;
+    // epochs[epoch] -> Epoch
+    mapping(uint256 => Epoch) public epochs;
+    // lastClaimedEpoch[account][token]
+    mapping(address => mapping(address => uint256)) public lastClaimedEpoch;
 
     uint256 private _totalShares;
     uint256 private _totalReleased;
@@ -43,6 +62,14 @@ contract PaymentSplitter is Initializable, Context {
     mapping(IERC20 => uint256) private _erc20TotalReleased;
     mapping(IERC20 => mapping(address => uint256)) private _erc20Released;
 
+    event PayeeAdded(address account, uint256 shares);
+    event PaymentReleased(address to, uint256 amount);
+    event ERC20PaymentReleased(IERC20 indexed token, address to, uint256 amount);
+    event PaymentReceived(address from, uint256 amount);
+    event EpochCreated(uint256 epoch);
+    event Reported(address indexed strategy, uint256 profit, uint256 loss);
+    event NetDistributableUpdated(uint256 epoch, int256 amount);
+
     /**
      * @dev Creates an instance of `PaymentSplitter` where each account in `payees` is assigned the number of shares at
      * the matching position in the `shares` array.
@@ -50,21 +77,8 @@ contract PaymentSplitter is Initializable, Context {
      * All addresses in `payees` must be non-zero. Both arrays must have the same non-zero length, and there must be no
      * duplicates in `payees`.
      */
-    constructor() payable {
+    constructor() {
         _disableInitializers();
-    }
-
-    /**
-     * @dev The Ether received will be logged with {PaymentReceived} events. Note that these events are not fully
-     * reliable: it's possible for a contract to receive Ether without triggering this function. This only affects the
-     * reliability of the events, and not the actual splitting of Ether.
-     *
-     * To learn more about this see the Solidity documentation for
-     * https://solidity.readthedocs.io/en/latest/contracts.html#fallback-function[fallback
-     * functions].
-     */
-    receive() external payable virtual {
-        emit PaymentReceived(_msgSender(), msg.value);
     }
 
     function initialize(address[] memory payees, uint256[] memory shares_) public payable initializer {
@@ -74,6 +88,12 @@ contract PaymentSplitter is Initializable, Context {
         for (uint256 i = 0; i < payees.length; i++) {
             _addPayee(payees[i], shares_[i]);
         }
+
+        // create the first epoch
+        currentEpoch = 1;
+        epochs[currentEpoch].startTimestamp = block.timestamp;
+        epochs[currentEpoch].endTimestamp = block.timestamp + EPOCH_DURATION;
+        emit EpochCreated(1);
     }
 
     /**
@@ -128,42 +148,75 @@ contract PaymentSplitter is Initializable, Context {
     }
 
     /**
-     * @dev Getter for the amount of payee's releasable Ether.
-     */
-    function releasable(address account) public view returns (uint256) {
-        uint256 totalReceived = address(this).balance + totalReleased();
-        return _pendingPayment(account, totalReceived, released(account));
-    }
-
-    /**
      * @dev Getter for the amount of payee's releasable `token` tokens. `token` should be the address of an
      * IERC20 contract.
      */
     function releasable(IERC20 token, address account) public view returns (uint256) {
-        uint256 totalReceived = token.balanceOf(address(this)) + totalReleased(token);
+        // fetch last claimed epoch for the token
+        uint256 lastClaimedEpochValue = lastClaimedEpoch[account][address(token)];
+        // if the last claimed epoch is the current epoch, return 0
+        if (lastClaimedEpochValue == currentEpoch) {
+            return 0;
+        }
+
+        // for each epoch between the last claimed epoch and the current epoch, add the net distributable to the total received
+        uint256 totalReceived = 0;
+        for (uint256 i = lastClaimedEpochValue + 1; i <= currentEpoch; i++) {
+            int256 netDistributable = epochsPerToken[i][address(token)].netDistributable;
+            if (netDistributable > 0) {
+                totalReceived += uint256(netDistributable);
+            }
+        }
+
         return _pendingPayment(account, totalReceived, released(token, account));
     }
 
     /**
-     * @dev Triggers a transfer to `account` of the amount of Ether they are owed, according to their percentage of the
-     * total shares and their previous withdrawals.
+     * @dev Record profit for the current epoch.
+     * @param amount The amount of profit to record.
      */
-    function release(address payable account) public virtual {
-        require(_shares[account] > 0, "PaymentSplitter: account has no shares");
+    function recordProfit(uint256 amount) public {
+        _shouldCreateNewEpoch();
+        require(currentEpoch > 0, "PaymentSplitter: no epoch");
+        epochsPerToken[currentEpoch][msg.sender].totalProfit += amount;
+        _updateNetDistributable(int256(amount));
+        emit Reported(msg.sender, amount, 0);
+    }
 
-        uint256 payment = releasable(account);
+    /**
+     * @dev Record loss for the current epoch.
+     * @param amount The amount of loss to record.
+     */
+    function recordLoss(uint256 amount) public returns (uint256) {
+        _shouldCreateNewEpoch();
+        require(currentEpoch > 0, "PaymentSplitter: no epoch");
+        epochsPerToken[currentEpoch][msg.sender].totalLoss += amount;
 
-        require(payment != 0, "PaymentSplitter: account is not due payment");
+        _updateNetDistributable(-int256(amount));
+        emit Reported(msg.sender, 0, amount);
 
-        // _totalReleased is the sum of all values in _released.
-        // If "_totalReleased += payment" does not overflow, then "_released[account] += payment" cannot overflow.
-        _totalReleased += payment;
-        unchecked {
-            _released[account] += payment;
+        // return the amount of shares that were burned (profit in the current epoch - amount of loss)
+        return epochsPerToken[currentEpoch][msg.sender].totalProfit - amount;
+    }
+
+    /**
+     * @dev Create a new epoch if the current epoch is over.
+     */
+    function _shouldCreateNewEpoch() private {
+        if (block.timestamp - epochs[currentEpoch].endTimestamp > EPOCH_DURATION) {
+            uint256 newEpoch = ++currentEpoch;
+            epochs[newEpoch].startTimestamp = block.timestamp;
+            epochs[newEpoch].endTimestamp = block.timestamp + EPOCH_DURATION;
+            emit EpochCreated(newEpoch);
         }
+    }
 
-        Address.sendValue(account, payment);
-        emit PaymentReleased(account, payment);
+    /**
+     * @dev Update the net distributable for the current epoch.
+     * @param amount The amount of vault shares to add or subtract to the net distributable for the current epoch.
+     */
+    function _updateNetDistributable(int256 amount) private {
+        epochsPerToken[currentEpoch][msg.sender].netDistributable += amount;
     }
 
     /**

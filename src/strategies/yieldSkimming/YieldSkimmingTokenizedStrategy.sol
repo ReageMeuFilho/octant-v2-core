@@ -4,6 +4,7 @@ pragma solidity >=0.8.25;
 import { IBaseYieldSkimmingStrategy } from "src/core/interfaces/IBaseYieldSkimmingStrategy.sol";
 import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
 import { TokenizedStrategy, Math } from "src/core/TokenizedStrategy.sol";
+import { IPaymentSplitter } from "src/interfaces/IPaymentSplitter.sol";
 
 /**
  * @title YieldSkimmingTokenizedStrategy
@@ -45,12 +46,16 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
             // Mint shares based on the adjusted profit amount
             uint256 shares = _convertToSharesFromReport(S, uint256(delta), Math.Rounding.Floor);
             profit = uint256(delta);
+            // record the profit to the payment splitter
+            IPaymentSplitter(_dragonRouter).recordProfit(profit);
             // mint the value
             _mint(S, _dragonRouter, shares);
         } else if (delta < 0) {
             profit = 0;
             loss = uint256(-delta);
-            _handleDragonLossProtection(S, loss);
+            // record the loss to the payment splitter and get the shares available to burn
+            uint256 sharesToBurn = IPaymentSplitter(_dragonRouter).recordLoss(loss);
+            _handleDragonLossProtection(S, sharesToBurn);
         }
 
         // Update the new total assets value
