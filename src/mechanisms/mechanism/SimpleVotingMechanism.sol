@@ -1,96 +1,161 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import { DistributionMechanism } from "../DistributionMechanism.sol";
+import { BaseAllocationMechanism, AllocationConfig } from "../BaseAllocationMechanism.sol";
+import { TokenizedAllocationMechanism } from "../TokenizedAllocationMechanism.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 /// @title Simple Voting Mechanism with Share Distribution
 /// @notice Implements a basic 1:1 voting mechanism where net votes directly convert to shares
-contract SimpleVotingMechanism is DistributionMechanism {
+/// @dev Follows the Yearn V3 pattern with minimal implementation surface
+contract SimpleVotingMechanism is BaseAllocationMechanism {
     constructor(
-        IERC20 _asset,
-        string memory _name,
-        string memory _symbol,
-        uint256 _votingDelay,
-        uint256 _votingPeriod,
-        uint256 _quorumShares,
-        uint256 _timelockDelay,
-        uint256 _gracePeriod,
-        uint256 _startBlock
-    )
-        DistributionMechanism(
-            _asset,
-            _name,
-            _symbol,
-            _votingDelay,
-            _votingPeriod,
-            _quorumShares,
-            _timelockDelay,
-            _gracePeriod,
-            _startBlock
-        )
-    {}
+        address _implementation,
+        AllocationConfig memory _config
+    ) BaseAllocationMechanism(_implementation, _config) {}
 
-    function _beforeProposeHook(address proposer) internal view override returns (bool) {
-        return _getStorage().votingPower[proposer] > 0;
-    }
+    // ---------- Internal Hook Implementations ----------
 
-    function _validateProposalHook(uint256 pid) internal view override returns (bool) {
-        return pid > 0 && pid <= _getStorage().proposalIdCounter;
-    }
-
+    /// @dev Allow all users to sign up
     function _beforeSignupHook(address) internal pure override returns (bool) {
         return true;
     }
 
-    function _getVotingPowerHook(address, uint256 deposit) internal pure override returns (uint256) {
-        return deposit;
+    /// @dev Only allow users with voting power to propose
+    function _beforeProposeHook(address proposer) internal view override returns (bool) {
+        return _getVotingPower(proposer) > 0;
     }
 
+    /// @notice Calculate voting power by converting from asset decimals to 18 decimals
+    function _getVotingPowerHook(address, uint256 deposit) internal view override returns (uint256) {
+        // Get asset decimals
+        uint8 assetDecimals = IERC20Metadata(address(asset)).decimals();
+
+        // Convert to 18 decimals for voting power
+        if (assetDecimals == 18) {
+            return deposit;
+        } else if (assetDecimals < 18) {
+            // Scale up: multiply by 10^(18 - assetDecimals)
+            uint256 scaleFactor = 10 ** (18 - assetDecimals);
+            return deposit * scaleFactor;
+        } else {
+            // Scale down: divide by 10^(assetDecimals - 18)
+            uint256 scaleFactor = 10 ** (assetDecimals - 18);
+            return deposit / scaleFactor;
+        }
+    }
+
+    /// @dev Validate proposal exists
+    function _validateProposalHook(uint256 pid) internal view override returns (bool) {
+        return _proposalExists(pid);
+    }
+
+    /// @dev Process vote by updating tallies and reducing voting power
     function _processVoteHook(
         uint256 pid,
         address,
-        VoteType choice,
+        TokenizedAllocationMechanism.VoteType choice,
         uint256 weight,
         uint256 oldPower
     ) internal override returns (uint256) {
-        BaseAllocationStorage storage s = _getStorage();
-        if (choice == VoteType.For) {
-            s.proposalVotes[pid].sharesFor += weight;
-        } else if (choice == VoteType.Against) {
-            s.proposalVotes[pid].sharesAgainst += weight;
+        // Get current vote tallies
+        (uint256 sharesFor, uint256 sharesAgainst, uint256 sharesAbstain) = _getVoteTally(pid);
+
+        // Update based on vote choice
+        if (choice == TokenizedAllocationMechanism.VoteType.For) {
+            sharesFor += weight;
+        } else if (choice == TokenizedAllocationMechanism.VoteType.Against) {
+            sharesAgainst += weight;
         } else {
-            s.proposalVotes[pid].sharesAbstain += weight;
+            sharesAbstain += weight;
         }
+
+        // Update storage via TokenizedAllocation
+        TokenizedAllocationMechanism(address(this)).updateVoteTally(pid, sharesFor, sharesAgainst, sharesAbstain);
+
+        // Return reduced voting power
         return oldPower - weight;
     }
 
+    /// @dev Check if proposal has enough net votes for quorum
     function _hasQuorumHook(uint256 pid) internal view override returns (bool) {
-        BaseAllocationStorage storage s = _getStorage();
-        uint256 forVotes = s.proposalVotes[pid].sharesFor;
-        uint256 againstVotes = s.proposalVotes[pid].sharesAgainst;
+        (uint256 forVotes, uint256 againstVotes, ) = _getVoteTally(pid);
         uint256 net = forVotes > againstVotes ? forVotes - againstVotes : 0;
-        return net >= quorumShares;
+        return net >= _getQuorumShares();
     }
 
-    function _beforeFinalizeVoteTallyHook() internal pure override returns (bool) {
-        return true;
-    }
-
-    function _getRecipientAddressHook(uint256 pid) internal view override returns (address) {
-        return _getStorage().proposals[pid].recipient;
-    }
-    function _convertVotesToShares(uint256 pid) internal view virtual override returns (uint256 sharesToMint) {
-        BaseAllocationStorage storage s = _getStorage();
-        ProposalVote storage votes = s.proposalVotes[pid];
+    /// @dev Simple net vote to shares conversion
+    function _convertVotesToShares(uint256 pid) internal view override returns (uint256 sharesToMint) {
+        (uint256 forVotes, uint256 againstVotes, ) = _getVoteTally(pid);
 
         // Calculate net votes (For - Against)
-        uint256 netVotes = votes.sharesFor > votes.sharesAgainst ? votes.sharesFor - votes.sharesAgainst : 0;
+        uint256 netVotes = forVotes > againstVotes ? forVotes - againstVotes : 0;
 
         if (netVotes == 0) return 0;
 
         // For now, return net votes directly as shares
         // In a real implementation, this would use the vault's conversion logic
         return netVotes;
+    }
+
+    /// @dev Allow finalization
+    function _beforeFinalizeVoteTallyHook() internal pure override returns (bool) {
+        return true;
+    }
+
+    /// @dev Get recipient address from proposal
+    function _getRecipientAddressHook(uint256 pid) internal view override returns (address) {
+        TokenizedAllocationMechanism.Proposal memory proposal = _getProposal(pid);
+        return proposal.recipient;
+    }
+
+    /// @dev Handle custom share distribution - returns false to use default minting
+    /// @return handled False to indicate default minting should be used
+    function _requestCustomDistributionHook(address, uint256) internal pure override returns (bool) {
+        // Return false to indicate we want to use the default share minting in TokenizedAllocationMechanism
+        // This allows the base implementation to handle the minting via _mint()
+        return false;
+    }
+
+    /// @dev Get available withdraw limit for share owner with timelock and grace period enforcement
+    /// @param shareOwner Address attempting to withdraw shares
+    /// @return availableLimit Amount of assets that can be withdrawn (0 if timelock active or expired)
+    function _availableWithdrawLimit(address shareOwner) internal view override returns (uint256) {
+        // Get the redeemable time for this share owner
+        uint256 redeemableTime = _getRedeemableAfter(shareOwner);
+
+        // If no redeemable time set, allow unlimited withdrawal (shouldn't happen in normal flow)
+        if (redeemableTime == 0) {
+            return type(uint256).max;
+        }
+
+        // Check if still in timelock period
+        if (block.timestamp < redeemableTime) {
+            return 0; // Cannot withdraw during timelock
+        }
+
+        // Check if grace period has expired
+        uint256 gracePeriod = _getGracePeriod();
+        if (block.timestamp > redeemableTime + gracePeriod) {
+            return 0; // Cannot withdraw after grace period expires
+        }
+
+        // Within valid redemption window - return max assets this user can withdraw
+        // Convert share balance to assets using current exchange rate
+        uint256 shareBalance = _tokenizedAllocation().balanceOf(shareOwner);
+        if (shareBalance == 0) {
+            return 0;
+        }
+
+        // Convert shares to assets - this gives the maximum assets withdrawable
+        return _tokenizedAllocation().convertToAssets(shareBalance);
+    }
+
+    /// @notice Calculate total assets for simple voting (just the contract balance)
+    function _calculateTotalAssetsHook() internal view override returns (uint256) {
+        // For simple voting, total assets is just the actual token balance
+        // This reflects all user deposits without any matching pools
+        return asset.balanceOf(address(this));
     }
 }

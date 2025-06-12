@@ -59,15 +59,16 @@ contract ProperQFTest is Test {
 
         uint256 expectedSqrt = qf.exposed_sqrt(contribution);
         uint256 expectedQuad = (expectedSqrt * expectedSqrt);
-        uint256 expectedLinear = (contribution);
+        // With default alpha = 1.0 (10000/10000), linearFunding = (1-α) × contribution = 0
+        uint256 expectedLinear = 0;
 
         assertEq(sumC, contribution, "sumContributions incorrect");
         assertEq(sumSR, expectedSqrt, "sumSquareRoots incorrect");
         assertEq(quadF, expectedQuad, "quadraticFunding incorrect");
         assertEq(linearF, expectedLinear, "linearFunding incorrect");
         assertEq(qf.totalQuadraticSum(), expectedQuad, "totalQuadraticSum incorrect");
-        assertEq(qf.totalLinearSum(), expectedLinear, "totalLinearSum incorrect");
-        assertEq(qf.totalFunding(), expectedQuad + expectedLinear, "totalFunding incorrect");
+        assertEq(qf.totalLinearSum(), contribution, "totalLinearSum incorrect");
+        assertEq(qf.totalFunding(), expectedQuad + contribution, "totalFunding incorrect");
     }
 
     function test_multiple_votes_same_project() public {
@@ -186,7 +187,8 @@ contract ProperQFTest is Test {
             assertEq(sumC1, contribution1, "Project 1 sumContributions incorrect");
             assertEq(sumSR1, qf.exposed_sqrt(contribution1), "Project 1 sumSquareRoots incorrect");
             assertEq(quadF1, expectedQuad1, "Project 1 quadraticFunding incorrect");
-            assertEq(linearF1, contribution1, "Project 1 linearFunding incorrect");
+            // With default alpha = 1.0, linearFunding = (1-α) × contribution = 0
+            assertEq(linearF1, 0, "Project 1 linearFunding incorrect");
         }
 
         // Check results for project 2
@@ -197,7 +199,8 @@ contract ProperQFTest is Test {
             assertEq(sumC2, contribution2, "Project 2 sumContributions incorrect");
             assertEq(sumSR2, qf.exposed_sqrt(contribution2), "Project 2 sumSquareRoots incorrect");
             assertEq(quadF2, expectedQuad2, "Project 2 quadraticFunding incorrect");
-            assertEq(linearF2, contribution2, "Project 2 linearFunding incorrect");
+            // With default alpha = 1.0, linearFunding = (1-α) × contribution = 0
+            assertEq(linearF2, 0, "Project 2 linearFunding incorrect");
         }
 
         // Check results for project 3
@@ -208,7 +211,8 @@ contract ProperQFTest is Test {
             assertEq(sumC3, contribution3, "Project 3 sumContributions incorrect");
             assertEq(sumSR3, qf.exposed_sqrt(contribution3), "Project 3 sumSquareRoots incorrect");
             assertEq(quadF3, expectedQuad3, "Project 3 quadraticFunding incorrect");
-            assertEq(linearF3, contribution3, "Project 3 linearFunding incorrect");
+            // With default alpha = 1.0, linearFunding = (1-α) × contribution = 0
+            assertEq(linearF3, 0, "Project 3 linearFunding incorrect");
         }
 
         // Check global totals
@@ -259,7 +263,8 @@ contract ProperQFTest is Test {
             assertEq(sumC1, expectedSumC1, "Project 1 sumContributions incorrect");
             assertEq(sumSR1, expectedSumSR1, "Project 1 sumSquareRoots incorrect");
             assertEq(quadF1, expectedQuad1, "Project 1 quadraticFunding incorrect");
-            assertEq(linearF1, expectedSumC1, "Project 1 linearFunding incorrect");
+            // With default alpha = 1.0, linearFunding = (1-α) × contribution = 0
+            assertEq(linearF1, 0, "Project 1 linearFunding incorrect");
         }
 
         // Check results for project 2
@@ -272,7 +277,8 @@ contract ProperQFTest is Test {
             assertEq(sumC2, expectedSumC2, "Project 2 sumContributions incorrect");
             assertEq(sumSR2, expectedSumSR2, "Project 2 sumSquareRoots incorrect");
             assertEq(quadF2, expectedQuad2, "Project 2 quadraticFunding incorrect");
-            assertEq(linearF2, expectedSumC2, "Project 2 linearFunding incorrect");
+            // With default alpha = 1.0, linearFunding = (1-α) × contribution = 0
+            assertEq(linearF2, 0, "Project 2 linearFunding incorrect");
         }
 
         // Check results for project 3
@@ -285,7 +291,8 @@ contract ProperQFTest is Test {
             assertEq(sumC3, expectedSumC3, "Project 3 sumContributions incorrect");
             assertEq(sumSR3, expectedSumSR3, "Project 3 sumSquareRoots incorrect");
             assertEq(quadF3, expectedQuad3, "Project 3 quadraticFunding incorrect");
-            assertEq(linearF3, expectedSumC3, "Project 3 linearFunding incorrect");
+            // With default alpha = 1.0, linearFunding = (1-α) × contribution = 0
+            assertEq(linearF3, 0, "Project 3 linearFunding incorrect");
         }
 
         // Check global totals
@@ -391,7 +398,8 @@ contract ProperQFTest is Test {
             assertEq(sumC, contribution);
             assertEq(sumSR, sqrtContribution);
             assertEq(quadraticFunding, sqrtContribution * sqrtContribution);
-            assertEq(linearFunding, contribution);
+            // With alpha = 1.0, linearFunding = (1-α) × contribution = 0
+            assertEq(linearFunding, 0);
         }
 
         // Change alpha to 0.6 (60/100)
@@ -409,8 +417,9 @@ contract ProperQFTest is Test {
             uint256 expectedQuadratic = (sqrtContribution * sqrtContribution * 60) / 100;
             assertEq(quadraticFunding, expectedQuadratic);
 
-            // linearFunding stays the same
-            assertEq(linearFunding, contribution);
+            // linearFunding should be (1-α) × contribution = 40% of contribution
+            uint256 expectedLinear = (contribution * 40) / 100;
+            assertEq(linearFunding, expectedLinear);
         }
     }
 
