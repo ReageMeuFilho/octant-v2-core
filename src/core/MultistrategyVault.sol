@@ -505,6 +505,7 @@ contract MultistrategyVault is IMultistrategyVault {
         );
 
         // Initialize process report variables with assessment results
+        // slither-disable-next-line uninitialized-local
         ProcessReportVars memory vars;
         vars.asset = assessment.asset;
         vars.totalAssets = assessment.totalAssets;
@@ -1487,6 +1488,7 @@ contract MultistrategyVault is IMultistrategyVault {
         uint256 maxLoss,
         address[] memory strategiesParam
     ) internal view returns (uint256) {
+        // slither-disable-next-line uninitialized-local
         MaxWithdrawVars memory vars;
 
         // Get the max amount for the owner if fully liquid
@@ -1692,6 +1694,7 @@ contract MultistrategyVault is IMultistrategyVault {
         }
 
         // Initialize our redemption state
+        // slither-disable-next-line uninitialized-local
         RedeemState memory state;
         state.requestedAssets = assets;
         state.currentTotalIdle = totalIdle_;

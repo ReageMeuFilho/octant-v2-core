@@ -192,6 +192,7 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
             scaledRewardRate = (_amount * SCALE_FACTOR) / rewardDuration;
         } else {
             uint256 _remainingReward = scaledRewardRate * (rewardEndTime - block.timestamp);
+            // slither-disable-next-line divide-before-multiply
             scaledRewardRate = (_remainingReward + _amount * SCALE_FACTOR) / rewardDuration;
         }
 
@@ -205,6 +206,7 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
         // this check is useful for preventing degenerate cases, it is not sufficient. Therefore, it is
         // critical that only safe reward notifier contracts are approved to call this method by the
         // admin.
+        // slither-disable-next-line divide-before-multiply
         if ((scaledRewardRate * rewardDuration) > (REWARD_TOKEN.balanceOf(address(this)) * SCALE_FACTOR))
             revert Staker__InsufficientRewardBalance();
 

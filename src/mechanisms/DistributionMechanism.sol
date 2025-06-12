@@ -447,6 +447,7 @@ abstract contract DistributionMechanism is BaseAllocationMechanism {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
         require(shares <= _maxRedeem(S, owner), "ERC4626: redeem more than max");
+        // slither-disable-next-line uninitialized-local
         uint256 assets;
         // Check for rounding error or 0 value.
         require((assets = _convertToAssets(S, shares, Math.Rounding.Floor)) != 0, "ZERO_ASSETS");
@@ -638,6 +639,7 @@ abstract contract DistributionMechanism is BaseAllocationMechanism {
         ERC20 _asset = S.asset;
 
         uint256 idle = _asset.balanceOf(address(this));
+        // slither-disable-next-line uninitialized-local
         uint256 loss;
         // Check if we need to withdraw funds.
         if (idle < assets) {
