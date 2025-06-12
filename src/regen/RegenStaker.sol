@@ -20,7 +20,6 @@ import { IERC20Staking } from "staker/interfaces/IERC20Staking.sol";
 import { Staker } from "staker/Staker.sol";
 import { StakerDelegateSurrogateVotes } from "staker/extensions/StakerDelegateSurrogateVotes.sol";
 import { StakerPermitAndStake } from "staker/extensions/StakerPermitAndStake.sol";
-import { StakerOnBehalf } from "staker/extensions/StakerOnBehalf.sol";
 import { IEarningPowerCalculator } from "staker/interfaces/IEarningPowerCalculator.sol";
 
 // Local Imports
@@ -29,48 +28,6 @@ import { IWhitelist } from "src/utils/IWhitelist.sol";
 import { IWhitelistedEarningPowerCalculator } from "src/regen/interfaces/IWhitelistedEarningPowerCalculator.sol";
 import { IFundingRound } from "src/regen/interfaces/IFundingRound.sol";
 
-// --- EIP-712 Specification for IFundingRound Implementations ---
-// To ensure security against replay attacks for the `signup` method,
-// any contract implementing the `IFundingRound` interface is expected to:
-//
-// 1. Be EIP-712 Compliant:
-//    The `IFundingRound` contract should have its own EIP-712 domain separator.
-//    This typically includes:
-//    - name: The name of the funding round contract (e.g., "SpecificFundingRound").
-//    - version: The version of the signing domain (e.g., "1").
-//    - chainId: The chainId of the network where the contract is deployed.
-//    - verifyingContract: The address of the `IFundingRound` contract itself.
-//
-// 2. Define a Typed Data Structure for Signup:
-//    The data signed by the user (e.g., `deposit.owner`) must include a nonce.
-//    Example structure (names can vary):
-//    /*
-//    struct FundingRoundSignupPayload {
-//        uint256 assets;        // The amount of tokens for signup
-//        address receiver;      // The address receiving voting power/shares
-//        uint256 nonce;         // The signer's current nonce for this action
-//    }
-//    */
-//
-// 3. Define the TYPEHASH for this Structure:
-//    This is `keccak256` of the EIP-712 struct definition string.
-//    Example:
-//    // bytes32 constant SIGNUP_PAYLOAD_TYPEHASH =
-//    //     keccak256("FundingRoundSignupPayload(uint256 assets,address receiver,uint256 nonce)");
-//
-// 4. Manage Nonces:
-//    The `IFundingRound` contract must maintain a nonce for each signer to prevent signature reuse.
-//    Example:
-//    // mapping(address => uint256) public userNonces;
-//    Upon successful processing of a `signup` call, the `IFundingRound` contract must:
-//    - Verify that the nonce in the signed payload matches `userNonces[signer]`.
-//    - Increment `userNonces[signer]`.
-//
-// 5. Signature Verification:
-//    The `signup` function will use `ecrecover` with the EIP-712 hash derived from
-//    its domain separator, the `SIGNUP_PAYLOAD_TYPEHASH`, and the specific
-//    `assets`, `receiver`, and expected `nonce` for the signer.
-
 /// @title RegenStaker
 /// @author [Golem Foundation](https://golem.foundation)
 /// @notice This contract is an extended version of the Staker contract by [ScopeLift](https://scopelift.co).
@@ -78,6 +35,8 @@ import { IFundingRound } from "src/regen/interfaces/IFundingRound.sol";
 /// @notice You can tax the rewards with a claim fee. If you don't want rewards to be taxable, set MAX_CLAIM_FEE to 0.
 /// @notice Earning power needs to be updated after deposit amount changes. Some changes are automatically triggering the update.
 /// @notice Earning power is updated via bumpEarningPower externally. This action is incentivized with a tip. Use maxBumpTip to set the maximum tip.
+/// @notice The admin can adjust the minimum stake amount. Existing deposits below a newly set threshold remain valid
+///         but will be restricted from certain operations (partial withdraw, stake increase below threshold) until brought above the threshold.
 contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndStake, Pausable, ReentrancyGuard {
     using SafeCast for uint256;
 
@@ -87,7 +46,7 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
     IWhitelist public stakerWhitelist;
     IWhitelist public contributionWhitelist;
     uint256 public minimumStakeAmount = 0;
-    uint256 public rewardDuration; // @notice The duration over which rewards are distributed. Overrides the base Staker's REWARD_DURATION.
+    uint256 public rewardDuration;
 
     event StakerWhitelistSet(IWhitelist indexed whitelist);
     event ContributionWhitelistSet(IWhitelist indexed whitelist);
@@ -98,6 +57,13 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
         address indexed fundingRound,
         uint256 amount
     );
+    event RewardCompounded(
+        DepositIdentifier indexed depositId,
+        address indexed user,
+        uint256 rewardAmount,
+        uint256 newBalance,
+        uint256 newEarningPower
+    );
 
     error NotWhitelisted(IWhitelist whitelist, address user);
     error CantAfford(uint256 requested, uint256 available);
@@ -107,6 +73,8 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
     error MinimumStakeAmountNotMet(uint256 expected, uint256 actual);
     error InvalidRewardDuration(uint256 rewardDuration);
     error CannotChangeRewardDurationDuringActiveReward();
+    error CompoundingNotSupported();
+    error CannotRaiseMinimumStakeAmountDuringActiveReward();
 
     modifier onlyWhitelistedIfWhitelistIsSet(IWhitelist _whitelist, address _user) {
         if (_whitelist != IWhitelist(address(0)) && !_whitelist.isWhitelisted(_user)) {
@@ -115,16 +83,16 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
         _;
     }
 
-    // @notice Constructor for the RegenStaker contract.
-    // @param _rewardsToken The token that will be used to reward contributors.
-    // @param _stakeToken The token that will be used to stake.
-    // @param _admin The address of the admin. TRUSTED.
-    // @param _stakerWhitelist The whitelist for stakers. If passed as address(0), a new Whitelist contract will be deployed.
-    // @param _contributionWhitelist The whitelist for contributors. If passed as address(0), a new Whitelist contract will be deployed.
-    // @param _earningPowerCalculator The earning power calculator.
-    // @param _maxBumpTip The maximum bump tip.
-    // @param _maxClaimFee The maximum claim fee. You can set fees between 0 and _maxClaimFee. _maxClaimFee cannot be changed after deployment.
-    // @param _rewardDuration The duration over which rewards are distributed. If 0, defaults to the base Staker's REWARD_DURATION (30 days).
+    /// @notice Constructor for the RegenStaker contract.
+    /// @param _rewardsToken The token that will be used to reward contributors.
+    /// @param _stakeToken The token that will be used to stake.
+    /// @param _admin The address of the admin. TRUSTED.
+    /// @param _stakerWhitelist The whitelist for stakers. If passed as address(0), a new Whitelist contract will be deployed.
+    /// @param _contributionWhitelist The whitelist for contributors. If passed as address(0), a new Whitelist contract will be deployed.
+    /// @param _earningPowerCalculator The earning power calculator.
+    /// @param _maxBumpTip The maximum bump tip.
+    /// @param _maxClaimFee The maximum claim fee. You can set fees between 0 and _maxClaimFee. _maxClaimFee cannot be changed after deployment.
+    /// @param _rewardDuration The duration over which rewards are distributed. If 0, defaults to the base Staker's REWARD_DURATION (30 days).
     constructor(
         IERC20 _rewardsToken,
         IERC20Staking _stakeToken,
@@ -184,8 +152,6 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
     function notifyRewardAmount(uint256 _amount) external override {
         if (!isRewardNotifier[msg.sender]) revert Staker__Unauthorized("not notifier", msg.sender);
 
-        // We checkpoint the accumulator without updating the timestamp at which it was updated,
-        // because that second operation will be done after updating the reward rate.
         rewardPerTokenAccumulatedCheckpoint = rewardPerTokenAccumulated();
 
         if (block.timestamp >= rewardEndTime) {
@@ -200,11 +166,6 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
 
         if ((scaledRewardRate / SCALE_FACTOR) == 0) revert Staker__InvalidRewardRate();
 
-        // This check cannot _guarantee_ sufficient rewards have been transferred to the contract,
-        // because it cannot isolate the unclaimed rewards owed to stakers left in the balance. While
-        // this check is useful for preventing degenerate cases, it is not sufficient. Therefore, it is
-        // critical that only safe reward notifier contracts are approved to call this method by the
-        // admin.
         if ((scaledRewardRate * rewardDuration) > (REWARD_TOKEN.balanceOf(address(this)) * SCALE_FACTOR))
             revert Staker__InsufficientRewardBalance();
 
@@ -250,7 +211,7 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
         _revertIfMinimumStakeAmountNotMet(_depositId);
     }
 
-    // @inheritdoc Staker
+    /// @inheritdoc Staker
     /// @notice Overrides to prevent staking more below the minimum stake amount.
     /// @notice Overrides to prevent staking more when the contract is paused.
     /// @notice Overrides to prevent staking more if the claimer is not whitelisted.
@@ -314,56 +275,7 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
         _revertIfMinimumStakeAmountNotMet(_depositId);
     }
 
-    /// @notice Sets the whitelist for the staker. If the whitelist is not set, the staking will be open to all users.
-    /// @notice For admin use only.
-    /// @param _stakerWhitelist The whitelist to set.
-    function setStakerWhitelist(Whitelist _stakerWhitelist) external {
-        _revertIfNotAdmin();
-        emit StakerWhitelistSet(_stakerWhitelist);
-        stakerWhitelist = _stakerWhitelist;
-    }
-
-    /// @notice Sets the whitelist for the contribution. If the whitelist is not set, the contribution will be open to all users.
-    /// @notice For admin use only.
-    /// @param _contributionWhitelist The whitelist to set.
-    function setContributionWhitelist(Whitelist _contributionWhitelist) external {
-        _revertIfNotAdmin();
-        emit ContributionWhitelistSet(_contributionWhitelist);
-        contributionWhitelist = _contributionWhitelist;
-    }
-
-    /// @notice Sets the minimum stake amount.
-    /// @notice For admin use only.
-    /// @param _minimumStakeAmount The minimum stake amount.
-    function setMinimumStakeAmount(uint256 _minimumStakeAmount) external {
-        _revertIfNotAdmin();
-        minimumStakeAmount = _minimumStakeAmount;
-    }
-
-    /// @notice Pauses the contract.
-    /// @notice For admin use only.
-    function pause() external whenNotPaused {
-        _revertIfNotAdmin();
-        _pause();
-    }
-
-    /// @notice Unpauses the contract.
-    /// @notice For admin use only.
-    function unpause() external whenPaused {
-        _revertIfNotAdmin();
-        _unpause();
-    }
-
-    /// @notice Reverts if the deposit is below the minimum stake amount.
-    /// @param _depositId The deposit identifier.
-    function _revertIfMinimumStakeAmountNotMet(DepositIdentifier _depositId) internal view {
-        Deposit storage deposit = deposits[_depositId];
-        if (deposit.balance < minimumStakeAmount && deposit.balance > 0) {
-            revert MinimumStakeAmountNotMet(minimumStakeAmount, deposit.balance);
-        }
-    }
-
-    // @inheritdoc Staker
+    /// @inheritdoc Staker
     /// @notice Overrides to prevent pushing the amount below the minimum stake amount.
     /// @notice Overrides to prevent withdrawing when the contract is paused.
     function withdraw(
@@ -387,8 +299,129 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
             revert Staker__Unauthorized("not claimer or owner", msg.sender);
         }
         uint256 payout = _claimReward(_depositId, deposit, msg.sender);
-        _revertIfMinimumStakeAmountNotMet(_depositId);
         return payout;
+    }
+
+    /// @notice Compounds rewards by claiming them and immediately restaking them into the same deposit.
+    /// @param _depositId The deposit identifier for which to compound rewards.
+    /// @return compoundedAmount The amount of rewards that were compounded into the deposit.
+    function compoundRewards(
+        DepositIdentifier _depositId
+    )
+        external
+        whenNotPaused
+        nonReentrant
+        onlyWhitelistedIfWhitelistIsSet(stakerWhitelist, msg.sender)
+        returns (uint256 compoundedAmount)
+    {
+        if (address(REWARD_TOKEN) != address(STAKE_TOKEN)) {
+            revert CompoundingNotSupported();
+        }
+
+        Deposit storage deposit = deposits[_depositId];
+
+        address depositOwner = deposit.owner;
+        address depositDelegatee = deposit.delegatee;
+        uint96 currentEarningPower = deposit.earningPower;
+
+        if (deposit.claimer != msg.sender && depositOwner != msg.sender) {
+            revert Staker__Unauthorized("not claimer or owner", msg.sender);
+        }
+
+        _checkpointGlobalReward();
+        _checkpointReward(deposit);
+
+        uint256 unclaimedAmount = deposit.scaledUnclaimedRewardCheckpoint / SCALE_FACTOR;
+        if (unclaimedAmount == 0) {
+            return 0;
+        }
+
+        ClaimFeeParameters memory feeParams = claimFeeParameters;
+        uint256 fee = feeParams.feeAmount;
+
+        if (fee > 0 && unclaimedAmount <= fee) {
+            return 0;
+        }
+
+        compoundedAmount = unclaimedAmount - fee;
+
+        uint256 newBalance = deposit.balance + compoundedAmount;
+        uint256 newEarningPower = earningPowerCalculator.getEarningPower(newBalance, depositOwner, depositDelegatee);
+
+        totalEarningPower = _calculateTotalEarningPower(currentEarningPower, newEarningPower, totalEarningPower);
+
+        unchecked {
+            totalStaked += compoundedAmount;
+            depositorTotalStaked[depositOwner] += compoundedAmount;
+        }
+
+        depositorTotalEarningPower[depositOwner] = _calculateTotalEarningPower(
+            currentEarningPower,
+            newEarningPower,
+            depositorTotalEarningPower[depositOwner]
+        );
+
+        deposit.balance = newBalance.toUint96();
+        deposit.earningPower = newEarningPower.toUint96();
+        deposit.scaledUnclaimedRewardCheckpoint = 0;
+
+        if (fee > 0) {
+            SafeERC20.safeTransfer(REWARD_TOKEN, feeParams.feeCollector, fee);
+        }
+
+        SafeERC20.safeTransfer(STAKE_TOKEN, address(surrogates(depositDelegatee)), compoundedAmount);
+
+        emit RewardCompounded(_depositId, msg.sender, compoundedAmount, newBalance, newEarningPower);
+
+        _revertIfMinimumStakeAmountNotMet(_depositId);
+
+        return compoundedAmount;
+    }
+
+    /// @notice Sets the whitelist for the staker. If the whitelist is not set, the staking will be open to all users.
+    /// @notice For admin use only.
+    /// @param _stakerWhitelist The whitelist to set.
+    function setStakerWhitelist(Whitelist _stakerWhitelist) external {
+        _revertIfNotAdmin();
+        emit StakerWhitelistSet(_stakerWhitelist);
+        stakerWhitelist = _stakerWhitelist;
+    }
+
+    /// @notice Sets the whitelist for the contribution. If the whitelist is not set, the contribution will be open to all users.
+    /// @notice For admin use only.
+    /// @param _contributionWhitelist The whitelist to set.
+    function setContributionWhitelist(Whitelist _contributionWhitelist) external {
+        _revertIfNotAdmin();
+        emit ContributionWhitelistSet(_contributionWhitelist);
+        contributionWhitelist = _contributionWhitelist;
+    }
+
+    /// @notice Sets the minimum stake amount.
+    /// @notice Existing deposits that fall below a newly set threshold are grandfathered and remain valid,
+    ///         but will be restricted from withdraw and stakeMore operations until brought above the threshold.
+    /// @notice For admin use only.
+    /// @param _minimumStakeAmount The minimum stake amount.
+    function setMinimumStakeAmount(uint256 _minimumStakeAmount) external {
+        _revertIfNotAdmin();
+        require(
+            _minimumStakeAmount <= minimumStakeAmount || block.timestamp >= rewardEndTime,
+            CannotRaiseMinimumStakeAmountDuringActiveReward()
+        );
+        minimumStakeAmount = _minimumStakeAmount;
+    }
+
+    /// @notice Pauses the contract.
+    /// @notice For admin use only.
+    function pause() external whenNotPaused {
+        _revertIfNotAdmin();
+        _pause();
+    }
+
+    /// @notice Unpauses the contract.
+    /// @notice For admin use only.
+    function unpause() external whenPaused {
+        _revertIfNotAdmin();
+        _unpause();
     }
 
     /// @notice Contributes to a funding round.
@@ -470,5 +503,16 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
         emit RewardContributed(_depositId, msg.sender, _fundingRoundAddress, amountContributedToFundingRound);
 
         return amountContributedToFundingRound;
+    }
+
+    /// @notice Reverts if the deposit is below the minimum stake amount.
+    /// @notice Deposits that become under-threshold due to admin raising the minimum are grandfathered
+    ///         but cannot perform withdraw or stakeMore operations until brought above the threshold.
+    /// @param _depositId The deposit identifier.
+    function _revertIfMinimumStakeAmountNotMet(DepositIdentifier _depositId) internal view {
+        Deposit storage deposit = deposits[_depositId];
+        if (deposit.balance < minimumStakeAmount && deposit.balance > 0) {
+            revert MinimumStakeAmountNotMet(minimumStakeAmount, deposit.balance);
+        }
     }
 }

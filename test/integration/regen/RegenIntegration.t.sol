@@ -620,38 +620,6 @@ contract RegenIntegrationTest is Test {
         assertFalse(regenStaker.paused());
     }
 
-    function testFuzz_ContinuousReward_SingleStaker_FullPeriod(
-        uint256 stakeAmountBase,
-        uint256 rewardAmountBase
-    ) public {
-        stakeAmountBase = bound(stakeAmountBase, 1, 100_000);
-        rewardAmountBase = bound(rewardAmountBase, regenStaker.rewardDuration(), MAX_REWARD_DURATION + 1_000_000_000);
-
-        address staker = makeAddr("staker");
-        whitelistUser(staker, true, false, true);
-
-        uint256 stakeAmount = getStakeAmount(stakeAmountBase);
-        uint256 rewardAmount = getRewardAmount(rewardAmountBase);
-
-        stakeToken.mint(staker, stakeAmount);
-        vm.startPrank(staker);
-        stakeToken.approve(address(regenStaker), stakeAmount);
-        Staker.DepositIdentifier depositId = regenStaker.stake(stakeAmount, staker);
-        vm.stopPrank();
-
-        rewardToken.mint(address(regenStaker), rewardAmount);
-        vm.prank(ADMIN);
-        regenStaker.notifyRewardAmount(rewardAmount);
-
-        vm.warp(block.timestamp + regenStaker.rewardDuration());
-
-        vm.startPrank(staker);
-        uint256 claimedAmount = regenStaker.claimReward(depositId);
-        vm.stopPrank();
-
-        assertApproxEqRel(claimedAmount, rewardAmount, ONE_MICRO);
-    }
-
     function testFuzz_ContinuousReward_SingleStaker_JoinsLate(uint256 joinTimePercent) public {
         uint256 minJoinTime = 1;
         uint256 maxJoinTime = 99;
@@ -686,107 +654,6 @@ contract RegenIntegrationTest is Test {
         uint256 expectedReward = (totalRewardAmount * timeStakedPercent) / 100;
 
         assertApproxEqRel(claimedAmount, expectedReward, ONE_MICRO);
-    }
-
-    function testFuzz_ContinuousReward_SingleStaker_ClaimsMidPeriod(uint256 firstClaimTimePercent) public {
-        uint256 minClaimTime = 10;
-        uint256 maxClaimTime = 90;
-        firstClaimTimePercent = bound(firstClaimTimePercent, minClaimTime, maxClaimTime);
-
-        address staker = makeAddr("staker");
-        whitelistUser(staker, true, false, true);
-
-        uint256 stakeAmount = getStakeAmount();
-        uint256 totalRewardAmount = getRewardAmount();
-
-        stakeToken.mint(staker, stakeAmount);
-        vm.startPrank(staker);
-        stakeToken.approve(address(regenStaker), stakeAmount);
-        Staker.DepositIdentifier depositId = regenStaker.stake(stakeAmount, staker);
-        vm.stopPrank();
-
-        rewardToken.mint(address(regenStaker), totalRewardAmount);
-        vm.prank(ADMIN);
-        regenStaker.notifyRewardAmount(totalRewardAmount);
-
-        uint256 firstClaimTime = (regenStaker.rewardDuration() * firstClaimTimePercent) / 100;
-        vm.warp(block.timestamp + firstClaimTime);
-
-        vm.startPrank(staker);
-        uint256 claimedAmount1 = regenStaker.claimReward(depositId);
-        vm.stopPrank();
-
-        uint256 expectedFirst = (totalRewardAmount * firstClaimTimePercent) / 100;
-        assertApproxEqRel(claimedAmount1, expectedFirst, ONE_MICRO);
-
-        uint256 remainingTime = regenStaker.rewardDuration() - firstClaimTime;
-        vm.warp(block.timestamp + remainingTime);
-
-        vm.startPrank(staker);
-        uint256 claimedAmount2 = regenStaker.claimReward(depositId);
-        vm.stopPrank();
-
-        uint256 remainingTimePercent = 100 - firstClaimTimePercent;
-        uint256 expectedSecond = (totalRewardAmount * remainingTimePercent) / 100;
-
-        assertApproxEqRel(claimedAmount2, expectedSecond, ONE_MICRO);
-        assertApproxEqRel(claimedAmount1 + claimedAmount2, totalRewardAmount, ONE_MICRO);
-    }
-
-    function testFuzz_ContinuousReward_TwoStakers_StaggeredEntry_ProRataShare(uint256 stakerBJoinTimePercent) public {
-        uint256 minJoinTime = 5;
-        uint256 maxJoinTime = 95;
-        stakerBJoinTimePercent = bound(stakerBJoinTimePercent, minJoinTime, maxJoinTime);
-
-        address stakerA = makeAddr("stakerA");
-        address stakerB = makeAddr("stakerB");
-
-        whitelistUser(stakerA, true, false, true);
-        whitelistUser(stakerB, true, false, true);
-
-        uint256 stakeAmount = getStakeAmount();
-        uint256 totalRewardAmount = getRewardAmount();
-
-        stakeToken.mint(stakerA, stakeAmount);
-        vm.startPrank(stakerA);
-        stakeToken.approve(address(regenStaker), stakeAmount);
-        Staker.DepositIdentifier depositIdA = regenStaker.stake(stakeAmount, stakerA);
-        vm.stopPrank();
-
-        rewardToken.mint(address(regenStaker), totalRewardAmount);
-        vm.prank(ADMIN);
-        regenStaker.notifyRewardAmount(totalRewardAmount);
-
-        uint256 stakerBJoinTime = (regenStaker.rewardDuration() * stakerBJoinTimePercent) / 100;
-        vm.warp(block.timestamp + stakerBJoinTime);
-
-        stakeToken.mint(stakerB, stakeAmount);
-        vm.startPrank(stakerB);
-        stakeToken.approve(address(regenStaker), stakeAmount);
-        Staker.DepositIdentifier depositIdB = regenStaker.stake(stakeAmount, stakerB);
-        vm.stopPrank();
-
-        uint256 remainingTime = regenStaker.rewardDuration() - stakerBJoinTime;
-        vm.warp(block.timestamp + remainingTime);
-
-        vm.startPrank(stakerA);
-        uint256 claimedA = regenStaker.claimReward(depositIdA);
-        vm.stopPrank();
-
-        vm.startPrank(stakerB);
-        uint256 claimedB = regenStaker.claimReward(depositIdB);
-        vm.stopPrank();
-
-        uint256 soloPhaseRewards = (totalRewardAmount * stakerBJoinTimePercent) / 100;
-        uint256 sharedPhasePercent = 100 - stakerBJoinTimePercent;
-        uint256 sharedPhaseRewards = (totalRewardAmount * sharedPhasePercent) / 100;
-
-        uint256 expectedA = soloPhaseRewards + (sharedPhaseRewards / 2);
-        uint256 expectedB = sharedPhaseRewards / 2;
-
-        assertApproxEqRel(claimedA, expectedA, ONE_MICRO);
-        assertApproxEqRel(claimedB, expectedB, ONE_MICRO);
-        assertApproxEqRel(claimedA + claimedB, totalRewardAmount, ONE_MICRO);
     }
 
     function testFuzz_ContinuousReward_TwoStakers_DifferentAmounts_ProRataShare(
@@ -1796,5 +1663,506 @@ contract RegenIntegrationTest is Test {
 
     function max(uint256 a, uint256 b) internal pure returns (uint256) {
         return a >= b ? a : b;
+    }
+
+    function testFuzz_CompoundRewards_RespectsMinimumStakeAmount(
+        uint256 minimumAmountBase,
+        uint256 stakeAmountBase,
+        uint256 rewardAmountBase
+    ) public {
+        minimumAmountBase = bound(minimumAmountBase, 10, 100);
+        stakeAmountBase = bound(stakeAmountBase, 1, minimumAmountBase - 1);
+        rewardAmountBase = bound(rewardAmountBase, 30 days, 100_000_000);
+
+        uint256 minimumAmount = getStakeAmount(minimumAmountBase);
+        uint256 stakeAmount = getStakeAmount(stakeAmountBase);
+        uint256 rewardAmount = getRewardAmount(rewardAmountBase);
+
+        vm.assume(stakeAmount < minimumAmount);
+
+        // Create a RegenStaker where reward and stake tokens are the same
+        MockERC20Staking sameToken = new MockERC20Staking(18);
+
+        vm.startPrank(ADMIN);
+        RegenStaker compoundRegenStaker = new RegenStaker(
+            IERC20(address(sameToken)),
+            IERC20Staking(address(sameToken)),
+            ADMIN,
+            stakerWhitelist,
+            contributorWhitelist,
+            calculator,
+            MAX_BUMP_TIP,
+            MAX_CLAIM_FEE,
+            0,
+            0
+        );
+        compoundRegenStaker.setRewardNotifier(ADMIN, true);
+        compoundRegenStaker.setMinimumStakeAmount(minimumAmount);
+        vm.stopPrank();
+
+        address user = makeAddr("user");
+        whitelistUser(user, true, false, true);
+
+        // Temporarily set minimum to 0 to allow initial stake
+        vm.prank(ADMIN);
+        compoundRegenStaker.setMinimumStakeAmount(0);
+
+        sameToken.mint(user, stakeAmount);
+        sameToken.mint(address(compoundRegenStaker), rewardAmount);
+
+        vm.startPrank(user);
+        sameToken.approve(address(compoundRegenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = compoundRegenStaker.stake(stakeAmount, user);
+        vm.stopPrank();
+
+        vm.prank(ADMIN);
+        compoundRegenStaker.notifyRewardAmount(rewardAmount);
+
+        vm.warp(block.timestamp + compoundRegenStaker.REWARD_DURATION() + 1);
+
+        // Reset minimum amount
+        vm.prank(ADMIN);
+        compoundRegenStaker.setMinimumStakeAmount(minimumAmount);
+
+        uint256 unclaimedBefore = compoundRegenStaker.unclaimedReward(depositId);
+        uint256 expectedNewBalance = stakeAmount + unclaimedBefore;
+
+        if (expectedNewBalance < minimumAmount) {
+            vm.prank(user);
+            vm.expectRevert(
+                abi.encodeWithSelector(RegenStaker.MinimumStakeAmountNotMet.selector, minimumAmount, expectedNewBalance)
+            );
+            compoundRegenStaker.compoundRewards(depositId);
+        } else {
+            vm.prank(user);
+            uint256 compoundedAmount = compoundRegenStaker.compoundRewards(depositId);
+            assertEq(compoundedAmount, unclaimedBefore);
+        }
+    }
+
+    function testFuzz_CompoundRewards_BasicFunctionality(
+        uint256 stakeAmountBase,
+        uint256 rewardAmountBase,
+        uint256 timeElapsedPercent
+    ) public {
+        stakeAmountBase = bound(stakeAmountBase, 1, 100_000);
+        rewardAmountBase = bound(rewardAmountBase, 30 days, MAX_REWARD_DURATION + 1_000_000_000);
+        timeElapsedPercent = bound(timeElapsedPercent, 1, 100);
+
+        MockERC20Staking sameToken = new MockERC20Staking(18);
+
+        vm.startPrank(ADMIN);
+        RegenStaker compoundRegenStaker = new RegenStaker(
+            IERC20(address(sameToken)),
+            IERC20Staking(address(sameToken)),
+            ADMIN,
+            stakerWhitelist,
+            contributorWhitelist,
+            calculator,
+            MAX_BUMP_TIP,
+            MAX_CLAIM_FEE,
+            0,
+            0
+        );
+        compoundRegenStaker.setRewardNotifier(ADMIN, true);
+        vm.stopPrank();
+
+        address user = makeAddr("user");
+        whitelistUser(user, true, false, true);
+
+        uint256 stakeAmount = getStakeAmount(stakeAmountBase);
+        uint256 rewardAmount = getRewardAmount(rewardAmountBase);
+
+        sameToken.mint(user, stakeAmount);
+        sameToken.mint(address(compoundRegenStaker), rewardAmount);
+
+        vm.startPrank(user);
+        sameToken.approve(address(compoundRegenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = compoundRegenStaker.stake(stakeAmount, user);
+        vm.stopPrank();
+
+        vm.prank(ADMIN);
+        compoundRegenStaker.notifyRewardAmount(rewardAmount);
+
+        uint256 timeElapsed = (compoundRegenStaker.REWARD_DURATION() * timeElapsedPercent) / 100;
+        vm.warp(block.timestamp + timeElapsed);
+
+        uint256 expectedReward = (rewardAmount * timeElapsedPercent) / 100;
+        uint256 unclaimedBefore = compoundRegenStaker.unclaimedReward(depositId);
+        (uint96 balanceBefore, , , , , , ) = compoundRegenStaker.deposits(depositId);
+
+        vm.prank(user);
+        uint256 compoundedAmount = compoundRegenStaker.compoundRewards(depositId);
+
+        assertEq(compoundedAmount, unclaimedBefore);
+        assertApproxEqRel(compoundedAmount, expectedReward, ONE_MICRO);
+
+        (uint96 balanceAfter, , , , , , ) = compoundRegenStaker.deposits(depositId);
+        assertEq(balanceAfter, balanceBefore + compoundedAmount);
+        assertEq(compoundRegenStaker.unclaimedReward(depositId), 0);
+    }
+
+    function testFuzz_CompoundRewards_WithVariableFees(
+        uint256 stakeAmountBase,
+        uint256 rewardAmountBase,
+        uint256 feeAmountBase
+    ) public {
+        stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
+        rewardAmountBase = bound(rewardAmountBase, 30 days, MAX_REWARD_DURATION + 1_000_000_000);
+        feeAmountBase = bound(feeAmountBase, 0, rewardAmountBase / 10);
+
+        MockERC20Staking sameToken = new MockERC20Staking(18);
+
+        vm.startPrank(ADMIN);
+        RegenStaker compoundRegenStaker = new RegenStaker(
+            IERC20(address(sameToken)),
+            IERC20Staking(address(sameToken)),
+            ADMIN,
+            stakerWhitelist,
+            contributorWhitelist,
+            calculator,
+            MAX_BUMP_TIP,
+            MAX_CLAIM_FEE,
+            0,
+            0
+        );
+        compoundRegenStaker.setRewardNotifier(ADMIN, true);
+        vm.stopPrank();
+
+        address user = makeAddr("user");
+        address feeCollector = makeAddr("feeCollector");
+        whitelistUser(user, true, false, true);
+
+        uint256 stakeAmount = getStakeAmount(stakeAmountBase);
+        uint256 rewardAmount = getRewardAmount(rewardAmountBase);
+        uint256 feeAmount = getRewardAmount(feeAmountBase);
+
+        feeAmount = bound(feeAmount, 0, MAX_CLAIM_FEE);
+
+        if (feeAmount > 0) {
+            vm.prank(ADMIN);
+            compoundRegenStaker.setClaimFeeParameters(
+                Staker.ClaimFeeParameters({ feeAmount: uint96(feeAmount), feeCollector: feeCollector })
+            );
+        }
+
+        sameToken.mint(user, stakeAmount);
+        sameToken.mint(address(compoundRegenStaker), rewardAmount);
+
+        vm.startPrank(user);
+        sameToken.approve(address(compoundRegenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = compoundRegenStaker.stake(stakeAmount, user);
+        vm.stopPrank();
+
+        vm.prank(ADMIN);
+        compoundRegenStaker.notifyRewardAmount(rewardAmount);
+
+        vm.warp(block.timestamp + compoundRegenStaker.REWARD_DURATION());
+
+        uint256 unclaimedBefore = compoundRegenStaker.unclaimedReward(depositId);
+        (uint96 balanceBefore, , , , , , ) = compoundRegenStaker.deposits(depositId);
+        uint256 feeCollectorBalanceBefore = sameToken.balanceOf(feeCollector);
+
+        if (unclaimedBefore < feeAmount) {
+            vm.prank(user);
+            uint256 compoundedAmount = compoundRegenStaker.compoundRewards(depositId);
+            assertEq(compoundedAmount, 0);
+        } else {
+            uint256 expectedCompounded = unclaimedBefore - feeAmount;
+
+            vm.prank(user);
+            uint256 compoundedAmount = compoundRegenStaker.compoundRewards(depositId);
+
+            assertEq(compoundedAmount, expectedCompounded);
+            (uint96 balanceAfter, , , , , , ) = compoundRegenStaker.deposits(depositId);
+            assertEq(balanceAfter, balanceBefore + expectedCompounded);
+
+            if (feeAmount > 0) {
+                assertEq(sameToken.balanceOf(feeCollector), feeCollectorBalanceBefore + feeAmount);
+            }
+        }
+    }
+
+    function testFuzz_CompoundRewards_MultipleCompounds(
+        uint256 stakeAmountBase,
+        uint256 rewardAmountBase,
+        uint256 compoundTimes
+    ) public {
+        stakeAmountBase = bound(stakeAmountBase, 10, 10_000);
+        rewardAmountBase = bound(rewardAmountBase, 30 days, MAX_REWARD_DURATION + 1_000_000_000);
+        compoundTimes = bound(compoundTimes, 2, 5);
+
+        MockERC20Staking sameToken = new MockERC20Staking(18);
+
+        vm.startPrank(ADMIN);
+        RegenStaker compoundRegenStaker = new RegenStaker(
+            IERC20(address(sameToken)),
+            IERC20Staking(address(sameToken)),
+            ADMIN,
+            stakerWhitelist,
+            contributorWhitelist,
+            calculator,
+            MAX_BUMP_TIP,
+            MAX_CLAIM_FEE,
+            0,
+            0
+        );
+        compoundRegenStaker.setRewardNotifier(ADMIN, true);
+        vm.stopPrank();
+
+        address user = makeAddr("user");
+        whitelistUser(user, true, false, true);
+
+        uint256 stakeAmount = getStakeAmount(stakeAmountBase);
+        uint256 rewardAmount = getRewardAmount(rewardAmountBase);
+
+        sameToken.mint(user, stakeAmount);
+        sameToken.mint(address(compoundRegenStaker), rewardAmount * compoundTimes);
+
+        vm.startPrank(user);
+        sameToken.approve(address(compoundRegenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = compoundRegenStaker.stake(stakeAmount, user);
+        vm.stopPrank();
+
+        uint256 totalCompounded = 0;
+        uint256 currentBalance = stakeAmount;
+
+        for (uint256 i = 0; i < compoundTimes; i++) {
+            vm.prank(ADMIN);
+            compoundRegenStaker.notifyRewardAmount(rewardAmount);
+
+            vm.warp(block.timestamp + compoundRegenStaker.REWARD_DURATION());
+
+            vm.prank(user);
+            uint256 compoundedAmount = compoundRegenStaker.compoundRewards(depositId);
+
+            totalCompounded += compoundedAmount;
+            currentBalance += compoundedAmount;
+
+            (uint96 balanceAfter, , , , , , ) = compoundRegenStaker.deposits(depositId);
+            assertEq(balanceAfter, currentBalance);
+            assertEq(compoundRegenStaker.unclaimedReward(depositId), 0);
+        }
+
+        assertGt(totalCompounded, 0);
+        assertGe(currentBalance, stakeAmount);
+    }
+
+    function testFuzz_CompoundRewards_MultipleUsers(
+        uint256 user1StakeBase,
+        uint256 user2StakeBase,
+        uint256 rewardAmountBase,
+        uint256 user2JoinTimePercent
+    ) public {
+        user1StakeBase = bound(user1StakeBase, 1, 10_000);
+        user2StakeBase = bound(user2StakeBase, 1, 10_000);
+        rewardAmountBase = bound(rewardAmountBase, 30 days, MAX_REWARD_DURATION + 1_000_000_000);
+        user2JoinTimePercent = bound(user2JoinTimePercent, 10, 90);
+
+        MockERC20Staking sameToken = new MockERC20Staking(18);
+
+        vm.startPrank(ADMIN);
+        RegenStaker compoundRegenStaker = new RegenStaker(
+            IERC20(address(sameToken)),
+            IERC20Staking(address(sameToken)),
+            ADMIN,
+            stakerWhitelist,
+            contributorWhitelist,
+            calculator,
+            MAX_BUMP_TIP,
+            MAX_CLAIM_FEE,
+            0,
+            0
+        );
+        compoundRegenStaker.setRewardNotifier(ADMIN, true);
+        vm.stopPrank();
+
+        address user1 = makeAddr("user1");
+        address user2 = makeAddr("user2");
+        whitelistUser(user1, true, false, true);
+        whitelistUser(user2, true, false, true);
+
+        uint256 user1Stake = getStakeAmount(user1StakeBase);
+        uint256 user2Stake = getStakeAmount(user2StakeBase);
+        uint256 rewardAmount = getRewardAmount(rewardAmountBase);
+
+        sameToken.mint(user1, user1Stake);
+        sameToken.mint(user2, user2Stake);
+        sameToken.mint(address(compoundRegenStaker), rewardAmount);
+
+        vm.startPrank(user1);
+        sameToken.approve(address(compoundRegenStaker), user1Stake);
+        Staker.DepositIdentifier depositId1 = compoundRegenStaker.stake(user1Stake, user1);
+        vm.stopPrank();
+
+        vm.prank(ADMIN);
+        compoundRegenStaker.notifyRewardAmount(rewardAmount);
+
+        vm.warp(block.timestamp + (compoundRegenStaker.REWARD_DURATION() * user2JoinTimePercent) / 100);
+
+        vm.startPrank(user2);
+        sameToken.approve(address(compoundRegenStaker), user2Stake);
+        Staker.DepositIdentifier depositId2 = compoundRegenStaker.stake(user2Stake, user2);
+        vm.stopPrank();
+
+        vm.warp(
+            block.timestamp +
+                compoundRegenStaker.REWARD_DURATION() -
+                (compoundRegenStaker.REWARD_DURATION() * user2JoinTimePercent) /
+                100
+        );
+
+        vm.prank(user1);
+        uint256 compounded1 = compoundRegenStaker.compoundRewards(depositId1);
+
+        vm.prank(user2);
+        uint256 compounded2 = compoundRegenStaker.compoundRewards(depositId2);
+
+        assertGt(compounded1, 0);
+        assertGt(compounded2, 0);
+
+        {
+            uint256 soloPhaseRewards = (rewardAmount * user2JoinTimePercent) / 100;
+            uint256 sharedPhaseRewards = (rewardAmount * (100 - user2JoinTimePercent)) / 100;
+            uint256 totalStake = user1Stake + user2Stake;
+
+            assertApproxEqRel(
+                compounded1,
+                soloPhaseRewards + (sharedPhaseRewards * user1Stake) / totalStake,
+                ONE_MICRO
+            );
+            assertApproxEqRel(compounded2, (sharedPhaseRewards * user2Stake) / totalStake, ONE_MICRO);
+        }
+
+        {
+            (uint96 balance1, , , , , , ) = compoundRegenStaker.deposits(depositId1);
+            (uint96 balance2, , , , , , ) = compoundRegenStaker.deposits(depositId2);
+
+            assertEq(balance1, user1Stake + compounded1);
+            assertEq(balance2, user2Stake + compounded2);
+        }
+    }
+
+    function testFuzz_CompoundRewards_MidPeriodVsFullPeriod(
+        uint256 stakeAmountBase,
+        uint256 rewardAmountBase,
+        uint256 compoundTimePercent
+    ) public {
+        stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
+        rewardAmountBase = bound(rewardAmountBase, 30 days, MAX_REWARD_DURATION + 1_000_000_000);
+        compoundTimePercent = bound(compoundTimePercent, 10, 90);
+
+        MockERC20Staking sameToken = new MockERC20Staking(18);
+
+        vm.startPrank(ADMIN);
+        RegenStaker compoundRegenStaker = new RegenStaker(
+            IERC20(address(sameToken)),
+            IERC20Staking(address(sameToken)),
+            ADMIN,
+            stakerWhitelist,
+            contributorWhitelist,
+            calculator,
+            MAX_BUMP_TIP,
+            MAX_CLAIM_FEE,
+            0,
+            0
+        );
+        compoundRegenStaker.setRewardNotifier(ADMIN, true);
+        vm.stopPrank();
+
+        address user = makeAddr("user");
+        whitelistUser(user, true, false, true);
+
+        uint256 stakeAmount = getStakeAmount(stakeAmountBase);
+        uint256 rewardAmount = getRewardAmount(rewardAmountBase);
+
+        sameToken.mint(user, stakeAmount);
+        sameToken.mint(address(compoundRegenStaker), rewardAmount);
+
+        vm.startPrank(user);
+        sameToken.approve(address(compoundRegenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = compoundRegenStaker.stake(stakeAmount, user);
+        vm.stopPrank();
+
+        vm.prank(ADMIN);
+        compoundRegenStaker.notifyRewardAmount(rewardAmount);
+
+        uint256 compoundTime = (compoundRegenStaker.REWARD_DURATION() * compoundTimePercent) / 100;
+        vm.warp(block.timestamp + compoundTime);
+
+        vm.prank(user);
+        uint256 firstCompound = compoundRegenStaker.compoundRewards(depositId);
+
+        uint256 expectedFirstReward = (rewardAmount * compoundTimePercent) / 100;
+        assertApproxEqRel(firstCompound, expectedFirstReward, ONE_MICRO);
+
+        (uint96 balanceAfterFirst, , , , , , ) = compoundRegenStaker.deposits(depositId);
+        assertEq(balanceAfterFirst, stakeAmount + firstCompound);
+
+        uint256 remainingTime = compoundRegenStaker.REWARD_DURATION() - compoundTime;
+        vm.warp(block.timestamp + remainingTime);
+
+        uint256 unclaimedAfterPeriod = compoundRegenStaker.unclaimedReward(depositId);
+        uint256 expectedRemainingReward = (rewardAmount * (100 - compoundTimePercent)) / 100;
+        assertApproxEqRel(unclaimedAfterPeriod, expectedRemainingReward, ONE_MICRO);
+    }
+
+    function testFuzz_CompoundRewards_DifferentTokenDecimals(
+        uint256 stakeAmountBase,
+        uint256 rewardAmountBase,
+        uint8 decimals
+    ) public {
+        stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
+        rewardAmountBase = bound(rewardAmountBase, 30 days, MAX_REWARD_DURATION + 1_000_000_000);
+        decimals = uint8(bound(decimals, 6, 18));
+
+        MockERC20Staking sameToken = new MockERC20Staking(decimals);
+
+        vm.startPrank(ADMIN);
+        RegenStaker compoundRegenStaker = new RegenStaker(
+            IERC20(address(sameToken)),
+            IERC20Staking(address(sameToken)),
+            ADMIN,
+            stakerWhitelist,
+            contributorWhitelist,
+            calculator,
+            MAX_BUMP_TIP,
+            MAX_CLAIM_FEE,
+            0,
+            0
+        );
+        compoundRegenStaker.setRewardNotifier(ADMIN, true);
+        vm.stopPrank();
+
+        address user = makeAddr("user");
+        whitelistUser(user, true, false, true);
+
+        uint256 stakeAmount = stakeAmountBase * (10 ** decimals);
+        uint256 rewardAmount = rewardAmountBase * (10 ** decimals);
+
+        sameToken.mint(user, stakeAmount);
+        sameToken.mint(address(compoundRegenStaker), rewardAmount);
+
+        vm.startPrank(user);
+        sameToken.approve(address(compoundRegenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = compoundRegenStaker.stake(stakeAmount, user);
+        vm.stopPrank();
+
+        vm.prank(ADMIN);
+        compoundRegenStaker.notifyRewardAmount(rewardAmount);
+
+        vm.warp(block.timestamp + compoundRegenStaker.REWARD_DURATION());
+
+        uint256 unclaimedBefore = compoundRegenStaker.unclaimedReward(depositId);
+        (uint96 balanceBefore, , , , , , ) = compoundRegenStaker.deposits(depositId);
+
+        vm.prank(user);
+        uint256 compoundedAmount = compoundRegenStaker.compoundRewards(depositId);
+
+        assertEq(compoundedAmount, unclaimedBefore);
+        assertApproxEqRel(compoundedAmount, rewardAmount, ONE_MICRO);
+
+        (uint96 balanceAfter, , , , , , ) = compoundRegenStaker.deposits(depositId);
+        assertEq(balanceAfter, balanceBefore + compoundedAmount);
     }
 }
