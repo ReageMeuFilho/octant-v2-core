@@ -25,12 +25,6 @@ contract RocketPoolStrategy is BaseYieldSkimmingHealthCheck {
     /// @dev The exchange rate at the last harvest, scaled by 1e18
     uint256 internal _lastReportedExchangeRate;
 
-    // Default profit limit to 100%. // todo create functions to update them (profit and loss)
-    uint16 private _profitLimitRatio = uint16(MAX_BPS);
-
-    // Defaults loss limit to 0.
-    uint16 private _lossLimitRatio;
-
     /// @notice yearn governance
     address public constant GOV = 0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52;
 
