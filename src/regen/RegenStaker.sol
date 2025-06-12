@@ -158,6 +158,7 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
             scaledRewardRate = (_amount * SCALE_FACTOR) / rewardDuration;
         } else {
             uint256 _remainingReward = scaledRewardRate * (rewardEndTime - block.timestamp);
+            // slither-disable-next-line divide-before-multiply
             scaledRewardRate = (_remainingReward + _amount * SCALE_FACTOR) / rewardDuration;
         }
 
@@ -166,6 +167,7 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
 
         if ((scaledRewardRate / SCALE_FACTOR) == 0) revert Staker__InvalidRewardRate();
 
+        // slither-disable-next-line divide-before-multiply
         if ((scaledRewardRate * rewardDuration) > (REWARD_TOKEN.balanceOf(address(this)) * SCALE_FACTOR))
             revert Staker__InsufficientRewardBalance();
 

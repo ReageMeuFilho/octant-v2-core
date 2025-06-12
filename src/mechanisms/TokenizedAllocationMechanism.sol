@@ -109,11 +109,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     /// @notice API version this TokenizedStrategy implements.
     string internal constant API_VERSION = "3.0.4";
 
-    /// @notice Value to set the `entered` flag to during a call.
-    uint8 internal constant ENTERED = 2;
-    /// @notice Value to set the `entered` flag to at the end of the call.
-    uint8 internal constant NOT_ENTERED = 1;
-
     /// @notice Used for calculations.
     uint256 internal constant MAX_BPS = 10_000;
 
@@ -807,6 +802,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         // Get the storage slot for all following calls.
         AllocationStorage storage S = _getStorage();
         require(shares <= _maxRedeem(S, shareOwner), "ERC4626: redeem more than max");
+        // slither-disable-next-line uninitialized-local
         uint256 assets;
         // Check for rounding error or 0 value.
         require((assets = _convertToAssets(S, shares, Math.Rounding.Floor)) != 0, "ZERO_ASSETS");
@@ -1033,6 +1029,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         ERC20 _asset = ERC20(address(S.asset));
 
         uint256 idle = _asset.balanceOf(address(this));
+        // slither-disable-next-line uninitialized-local
         uint256 loss;
         // Check if we need to withdraw funds.
         if (idle < assets) {
