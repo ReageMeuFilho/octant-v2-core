@@ -40,7 +40,6 @@ import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 
@@ -251,24 +250,6 @@ abstract contract DistributionMechanism is BaseAllocationMechanism {
     }
 
     /**
-     * @dev Prevents a contract from calling itself, directly or indirectly.
-     * Placed over all state changing functions for increased safety.
-     */
-    // modifier nonReentrant() {
-    //     StrategyData storage S = _strategyStorage();
-    //     // On the first call to nonReentrant, `entered` will be false (2)
-    //     require(S.entered != ENTERED, "ReentrancyGuard: reentrant call");
-
-    //     // Any calls to nonReentrant after this point will fail
-    //     S.entered = ENTERED;
-
-    //     _;
-
-    //     // Reset to false (1) once call has finished.
-    //     S.entered = NOT_ENTERED;
-    // }
-
-    /**
      * @notice Require a caller is `management`.
      * @dev Is left public so that it can be used by the Strategy.
      *
@@ -466,6 +447,7 @@ abstract contract DistributionMechanism is BaseAllocationMechanism {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
         require(shares <= _maxRedeem(S, owner), "ERC4626: redeem more than max");
+        // slither-disable-next-line uninitialized-local
         uint256 assets;
         // Check for rounding error or 0 value.
         require((assets = _convertToAssets(S, shares, Math.Rounding.Floor)) != 0, "ZERO_ASSETS");
@@ -657,6 +639,7 @@ abstract contract DistributionMechanism is BaseAllocationMechanism {
         ERC20 _asset = S.asset;
 
         uint256 idle = _asset.balanceOf(address(this));
+        // slither-disable-next-line uninitialized-local
         uint256 loss;
         // Check if we need to withdraw funds.
         if (idle < assets) {

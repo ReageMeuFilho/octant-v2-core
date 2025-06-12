@@ -64,6 +64,7 @@ contract UniswapV3Swapper {
      * @param _minAmountOut The min of `_to` to get out.
      * @return _amountOut The actual amount of `_to` that was swapped to
      */
+    // slither-disable-next-line uninitialized-state (set in strategy constructor)
     function _swapFrom(
         address _from,
         address _to,
@@ -120,6 +121,7 @@ contract UniswapV3Swapper {
      * @param _maxAmountFrom The max of `_from` we will swap.
      * @return _amountIn The actual amount of `_from` swapped.
      */
+    // slither-disable-next-line uninitialized-state (set in strategy constructor)
     function _swapTo(
         address _from,
         address _to,
