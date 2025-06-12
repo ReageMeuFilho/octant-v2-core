@@ -175,7 +175,7 @@ contract ProperQFSimulationTest is Test {
         qf.exposed_processVote(projectId, contribution, voteWeight);
 
         // Get initial funding distribution
-        (, , uint256 initialQuadratic, uint256 initialLinear) = qf.getTally(projectId);
+        (, , uint256 initialQuadratic, ) = qf.getTally(projectId);
 
         // Set alpha to 0.6
         qf.exposed_setAlpha(6000, 10000);
@@ -186,8 +186,10 @@ contract ProperQFSimulationTest is Test {
         // Verify that quadratic portion is 60% of what it was
         assertEq(newQuadratic, (initialQuadratic * 6000) / 10000, "Quadratic funding should be 60% of original");
 
-        // Linear portion should remain unchanged
-        assertEq(newLinear, initialLinear, "Linear funding should remain unchanged");
+        // Linear portion should now be 40% of the contribution (was 0% when alpha=1.0)
+        // With alpha=0.6, linear funding = (1-α) × contribution = 0.4 × contribution
+        uint256 expectedLinear = (contribution * 4000) / 10000; // 40% of contribution
+        assertEq(newLinear, expectedLinear, "Linear funding should be 40% of contribution when alpha=0.6");
     }
 
     function test_set_alpha_reverts() public {

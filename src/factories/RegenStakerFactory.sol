@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { CREATE3 } from "@solady/utils/CREATE3.sol";
+import { CREATE3 } from "lib/solady/src/utils/CREATE3.sol";
 import { RegenStaker } from "src/regen/RegenStaker.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC20Staking } from "staker/interfaces/IERC20Staking.sol";

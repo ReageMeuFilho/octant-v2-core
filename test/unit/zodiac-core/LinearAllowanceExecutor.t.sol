@@ -134,7 +134,8 @@ contract LinearAllowanceExecutorTest is Test {
         allowanceModule.setAllowance(address(executor), NATIVE_TOKEN, DRIP_RATE);
 
         // Advance time to accrue allowance
-        vm.warp(block.timestamp + 1 days);
+        skip(1 days);
+        vm.roll(1);
 
         // First transfer
         uint256 transferredAmount1 = executor.executeAllowanceTransfer(
@@ -148,7 +149,8 @@ contract LinearAllowanceExecutorTest is Test {
         allowanceModule.setAllowance(address(executor), NATIVE_TOKEN, DRIP_RATE * 2);
 
         // Advance time to accrue more allowance
-        vm.warp(block.timestamp + 1 days);
+        skip(1 days);
+        vm.roll(block.number + 1);
 
         // Second transfer
         uint256 transferredAmount2 = executor.executeAllowanceTransfer(

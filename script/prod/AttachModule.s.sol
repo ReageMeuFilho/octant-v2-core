@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Script.sol";
-import { BatchScript } from "forge-safe/src/BatchScript.sol";
+import { BatchScript } from "../helpers/BatchScript.sol";
 
 contract AttachModuleToSafe is Script, BatchScript {
     address safe;
