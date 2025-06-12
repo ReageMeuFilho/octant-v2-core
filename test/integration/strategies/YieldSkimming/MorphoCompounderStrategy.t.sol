@@ -668,11 +668,11 @@ contract MorphoCompounderStrategyTest is Test {
     // test change profit limit ratio
     function testChangeProfitLimitRatio() public {
         vm.startPrank(management);
-        strategy.updateProfitLimitRatio(5000);
+        strategy.setProfitLimitRatio(5000);
         vm.stopPrank();
 
         // check the profit limit ratio
-        assertEq(strategy.getProfitLimitRatio(), 5000);
+        assertEq(strategy.profitLimitRatio(), 5000);
     }
 
     function testSetDoHealthCheckToFalse() public {

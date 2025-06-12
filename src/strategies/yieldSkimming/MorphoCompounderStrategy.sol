@@ -4,9 +4,7 @@ pragma solidity ^0.8.25;
 import { BaseYieldSkimmingHealthCheck } from "src/strategies/periphery/BaseYieldSkimmingHealthCheck.sol";
 import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { WadRayMath } from "src/utils/libs/Maths/WadRay.sol";
 
 /**
  * @title MorphoCompounder
@@ -14,17 +12,10 @@ import { WadRayMath } from "src/utils/libs/Maths/WadRay.sol";
  * @dev This strategy tracks the value of deposits and captures yield as the price per share increases
  */
 contract MorphoCompounderStrategy is BaseYieldSkimmingHealthCheck {
-    using WadRayMath for uint256;
     using SafeERC20 for IERC20;
 
     /// @dev The exchange rate at the last harvest, scaled by 1e18
     uint256 internal _lastReportedExchangeRate;
-
-    // Default profit limit to 100%. // todo create functions to update them (profit and loss)
-    uint16 private _profitLimitRatio = uint16(MAX_BPS);
-
-    // Defaults loss limit to 0.
-    uint16 private _lossLimitRatio;
 
     /// @notice yearn governance
     address public constant GOV = 0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52;
@@ -57,16 +48,6 @@ contract MorphoCompounderStrategy is BaseYieldSkimmingHealthCheck {
         _lastReportedExchangeRate = _getCurrentExchangeRate();
     }
 
-    /**
-     * @notice Update the profit limit ratio
-     * @param _newProfitLimitRatio The new profit limit ratio
-     */
-    function updateProfitLimitRatio(uint256 _newProfitLimitRatio) external onlyManagement {
-        require(_profitLimitRatio > 0, "!zero profit");
-        require(_profitLimitRatio <= type(uint16).max, "!too high");
-        _profitLimitRatio = uint16(_newProfitLimitRatio);
-    }
-
     /// @notice Sweep of non-asset ERC20 tokens to governance (onlyGovernance)
     /// @param _token The ERC20 token to sweep
     function sweep(address _token) external onlyGovernance {
@@ -88,14 +69,6 @@ contract MorphoCompounderStrategy is BaseYieldSkimmingHealthCheck {
      */
     function balanceOfShares() public view returns (uint256) {
         return IERC20(asset).balanceOf(address(this));
-    }
-
-    /**
-     * @notice Get the current profit limit ratio
-     * @return The profit limit ratio
-     */
-    function getProfitLimitRatio() public view returns (uint16) {
-        return _profitLimitRatio;
     }
 
     /**
