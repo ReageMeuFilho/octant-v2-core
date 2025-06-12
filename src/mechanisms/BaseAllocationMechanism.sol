@@ -320,6 +320,7 @@ abstract contract BaseAllocationMechanism is ReentrancyGuard, Ownable, Pausable 
         BaseAllocationStorage storage s = _getStorage();
         if (s.votingPower[user] != 0) revert AlreadyRegistered(user);
         if (deposit > MAX_SAFE_VALUE) revert DepositTooLarge(deposit, MAX_SAFE_VALUE);
+        // slither-disable-next-line arbitrary-send-erc20
         if (deposit > 0) asset.safeTransferFrom(user, address(this), deposit);
         uint256 newPower = _getVotingPowerHook(user, deposit);
         if (newPower > MAX_SAFE_VALUE) revert VotingPowerTooLarge(newPower, MAX_SAFE_VALUE);

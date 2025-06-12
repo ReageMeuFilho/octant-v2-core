@@ -40,7 +40,6 @@ import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 
@@ -249,24 +248,6 @@ abstract contract DistributionMechanism is BaseAllocationMechanism {
         requireEmergencyAuthorized(msg.sender);
         _;
     }
-
-    /**
-     * @dev Prevents a contract from calling itself, directly or indirectly.
-     * Placed over all state changing functions for increased safety.
-     */
-    // modifier nonReentrant() {
-    //     StrategyData storage S = _strategyStorage();
-    //     // On the first call to nonReentrant, `entered` will be false (2)
-    //     require(S.entered != ENTERED, "ReentrancyGuard: reentrant call");
-
-    //     // Any calls to nonReentrant after this point will fail
-    //     S.entered = ENTERED;
-
-    //     _;
-
-    //     // Reset to false (1) once call has finished.
-    //     S.entered = NOT_ENTERED;
-    // }
 
     /**
      * @notice Require a caller is `management`.
