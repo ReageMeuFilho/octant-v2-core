@@ -20,7 +20,6 @@ import { IERC20Staking } from "staker/interfaces/IERC20Staking.sol";
 import { Staker } from "staker/Staker.sol";
 import { StakerDelegateSurrogateVotes } from "staker/extensions/StakerDelegateSurrogateVotes.sol";
 import { StakerPermitAndStake } from "staker/extensions/StakerPermitAndStake.sol";
-import { StakerOnBehalf } from "staker/extensions/StakerOnBehalf.sol";
 import { IEarningPowerCalculator } from "staker/interfaces/IEarningPowerCalculator.sol";
 
 // Local Imports
@@ -36,6 +35,8 @@ import { IFundingRound } from "src/regen/interfaces/IFundingRound.sol";
 /// @notice You can tax the rewards with a claim fee. If you don't want rewards to be taxable, set MAX_CLAIM_FEE to 0.
 /// @notice Earning power needs to be updated after deposit amount changes. Some changes are automatically triggering the update.
 /// @notice Earning power is updated via bumpEarningPower externally. This action is incentivized with a tip. Use maxBumpTip to set the maximum tip.
+/// @notice The admin can adjust the minimum stake amount. Existing deposits below a newly set threshold remain valid
+///         but will be restricted from certain operations (partial withdraw, stake increase below threshold) until brought above the threshold.
 contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndStake, Pausable, ReentrancyGuard {
     using SafeCast for uint256;
 
@@ -396,6 +397,8 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
     }
 
     /// @notice Sets the minimum stake amount.
+    /// @notice Existing deposits that fall below a newly set threshold are grandfathered and remain valid,
+    ///         but will be restricted from withdraw and stakeMore operations until brought above the threshold.
     /// @notice For admin use only.
     /// @param _minimumStakeAmount The minimum stake amount.
     function setMinimumStakeAmount(uint256 _minimumStakeAmount) external {
@@ -503,6 +506,8 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
     }
 
     /// @notice Reverts if the deposit is below the minimum stake amount.
+    /// @notice Deposits that become under-threshold due to admin raising the minimum are grandfathered
+    ///         but cannot perform withdraw or stakeMore operations until brought above the threshold.
     /// @param _depositId The deposit identifier.
     function _revertIfMinimumStakeAmountNotMet(DepositIdentifier _depositId) internal view {
         Deposit storage deposit = deposits[_depositId];
