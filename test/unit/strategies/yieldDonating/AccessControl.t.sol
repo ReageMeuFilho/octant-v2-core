@@ -326,9 +326,6 @@ contract AccessControlTest is Setup {
         // Skip cooldown period
         skip(7 days);
 
-        vm.expectEmit(true, true, false, false, address(strategy));
-        emit TokenizedStrategy.DragonRouterChangeFinalized(donationAddress, newRouter);
-
         vm.expectEmit(true, false, false, false, address(strategy));
         emit TokenizedStrategy.UpdateDragonRouter(newRouter);
 

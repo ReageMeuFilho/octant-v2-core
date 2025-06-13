@@ -60,11 +60,6 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
      */
     event PendingDragonRouterChange(address indexed newDragonRouter, uint256 effectiveTimestamp);
 
-    /**
-     * @notice Emitted when a pending dragon router change is finalized.
-     */
-    event DragonRouterChangeFinalized(address indexed oldDragonRouter, address indexed newDragonRouter);
-
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
     //////////////////////////////////////////////////////////////*/

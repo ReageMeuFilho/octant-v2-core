@@ -164,11 +164,6 @@ abstract contract TokenizedStrategy {
      */
     event PendingDragonRouterChange(address indexed newDragonRouter, uint256 effectiveTimestamp);
 
-    /**
-     * @notice Emitted when a pending dragon router change is finalized.
-     */
-    event DragonRouterChangeFinalized(address indexed oldDragonRouter, address indexed newDragonRouter);
-
     /*//////////////////////////////////////////////////////////////
                         STORAGE STRUCT
     //////////////////////////////////////////////////////////////*/
@@ -1228,12 +1223,10 @@ abstract contract TokenizedStrategy {
         require(S.pendingDragonRouter != address(0), "no pending change");
         require(block.timestamp >= S.dragonRouterChangeTimestamp + DRAGON_ROUTER_COOLDOWN, "cooldown not elapsed");
 
-        address oldDragonRouter = S.dragonRouter;
         S.dragonRouter = S.pendingDragonRouter;
         S.pendingDragonRouter = address(0);
         S.dragonRouterChangeTimestamp = 0;
 
-        emit DragonRouterChangeFinalized(oldDragonRouter, S.dragonRouter);
         emit UpdateDragonRouter(S.dragonRouter);
     }
 
