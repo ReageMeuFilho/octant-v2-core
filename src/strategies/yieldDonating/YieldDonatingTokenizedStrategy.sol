@@ -38,11 +38,22 @@ contract YieldDonatingTokenizedStrategy is TokenizedStrategy {
         uint256 oldTotalAssets = _totalAssets(S);
         address _dragonRouter = S.dragonRouter;
 
+        uint256 lossAmount = S.lossAmount;
+
         if (newTotalAssets > oldTotalAssets) {
             unchecked {
                 profit = newTotalAssets - oldTotalAssets;
             }
-            _mint(S, _dragonRouter, _convertToShares(S, profit, Math.Rounding.Floor));
+            if (profit > lossAmount) {
+                uint256 sharesToMint = _convertToSharesWithLoss(S, profit - lossAmount, Math.Rounding.Floor);
+
+                // update the loss amount
+                S.lossAmount = 0;
+                // mint the shares to the dragon router
+                _mint(S, _dragonRouter, sharesToMint);
+            } else {
+                S.lossAmount -= profit;
+            }
         } else {
             unchecked {
                 loss = oldTotalAssets - newTotalAssets;
@@ -67,17 +78,10 @@ contract YieldDonatingTokenizedStrategy is TokenizedStrategy {
      * @param loss The amount of loss in terms of asset to protect against
      *
      * This function calculates how many shares would be equivalent to the loss amount,
-     * then burns up to that amount of shares from dragonRouter, limited by the router's
-     * actual balance. This effectively socializes the loss among all shareholders by
-     * burning shares from the donation recipient rather than reducing the value of all shares.
+     * then adds it to the loss amount in the strategy storage.
+     * This way on the next profit we can mint the difference between the profit and the loss amount.
      */
     function _handleDragonLossProtection(StrategyData storage S, uint256 loss) internal {
-        // Can only burn up to available shares
-        uint256 sharesBurned = Math.min(_convertToShares(S, loss, Math.Rounding.Ceil), S.balances[S.dragonRouter]);
-
-        if (sharesBurned > 0) {
-            // Burn shares from dragon router
-            _burn(S, S.dragonRouter, sharesBurned);
-        }
+        S.lossAmount += loss;
     }
 }
