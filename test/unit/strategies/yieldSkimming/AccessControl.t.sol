@@ -201,7 +201,7 @@ contract AccessControlTest is Setup {
         vm.assume(_newRouter != address(0) && _newRouter != donationAddress);
 
         uint256 currentTime = block.timestamp;
-        uint256 expectedEffectiveTime = currentTime + 7 days;
+        uint256 expectedEffectiveTime = currentTime + 14 days;
 
         vm.expectEmit(true, false, false, true, address(strategy));
         emit TokenizedStrategy.PendingDragonRouterChange(_newRouter, expectedEffectiveTime);
@@ -259,7 +259,7 @@ contract AccessControlTest is Setup {
         strategy.setDragonRouter(newRouter);
 
         // Skip cooldown period
-        skip(7 days);
+        skip(14 days);
 
         vm.expectEmit(true, false, false, false, address(strategy));
         emit TokenizedStrategy.UpdateDragonRouter(newRouter);
@@ -279,7 +279,7 @@ contract AccessControlTest is Setup {
         vm.prank(management);
         strategy.setDragonRouter(newRouter);
 
-        skip(7 days);
+        skip(14 days);
 
         vm.prank(_caller);
         strategy.finalizeDragonRouterChange();
@@ -303,7 +303,7 @@ contract AccessControlTest is Setup {
         strategy.finalizeDragonRouterChange();
 
         // Try just before cooldown ends
-        skip(7 days - 1);
+        skip(14 days - 1);
         vm.expectRevert("cooldown not elapsed");
         strategy.finalizeDragonRouterChange();
 
@@ -321,7 +321,7 @@ contract AccessControlTest is Setup {
         _skipTime = bound(_skipTime, 0, 14 days);
         skip(_skipTime);
 
-        if (_skipTime < 7 days) {
+        if (_skipTime < 14 days) {
             vm.expectRevert("cooldown not elapsed");
             strategy.finalizeDragonRouterChange();
         } else {
@@ -390,7 +390,7 @@ contract AccessControlTest is Setup {
         strategy.setDragonRouter(newRouter);
 
         // Skip full cooldown period
-        skip(7 days + 1 hours);
+        skip(14 days + 1 hours);
 
         // Management can still cancel even after cooldown
         vm.prank(management);
@@ -402,7 +402,7 @@ contract AccessControlTest is Setup {
 
     function testFuzz_userWithdrawDuringCooldown(uint256 _amount, uint256 _skipTime) public {
         _amount = bound(_amount, minFuzzAmount, maxFuzzAmount);
-        _skipTime = bound(_skipTime, 0, 7 days - 1);
+        _skipTime = bound(_skipTime, 0, 14 days - 1);
         address newRouter = address(0x123);
 
         // Setup user with funds
@@ -469,7 +469,7 @@ contract AccessControlTest is Setup {
         // Change and finalize dragon router
         vm.prank(management);
         strategy.setDragonRouter(newRouter);
-        skip(7 days);
+        skip(14 days);
         strategy.finalizeDragonRouterChange();
 
         // Verify the change was finalized
@@ -516,7 +516,7 @@ contract AccessControlTest is Setup {
         vm.prank(management);
         strategy.setDragonRouter(router2);
 
-        skip(7 days);
+        skip(14 days);
 
         // Finalize should use the latest change
         strategy.finalizeDragonRouterChange();
@@ -539,7 +539,7 @@ contract AccessControlTest is Setup {
         vm.prank(management);
         strategy.setDragonRouter(router2);
 
-        skip(7 days);
+        skip(14 days);
 
         strategy.finalizeDragonRouterChange();
         assertEq(strategy.dragonRouter(), router2);
@@ -573,8 +573,8 @@ contract AccessControlTest is Setup {
     }
 
     function test_cooldownPeriodConstant() public pure {
-        // Verify cooldown period is 7 days (604800 seconds)
-        uint256 EXPECTED_COOLDOWN = 7 days;
-        assertEq(EXPECTED_COOLDOWN, 604800);
+        // Verify cooldown period is 14 days (604800 seconds)
+        uint256 EXPECTED_COOLDOWN = 14 days;
+        assertEq(EXPECTED_COOLDOWN, 1209600);
     }
 }

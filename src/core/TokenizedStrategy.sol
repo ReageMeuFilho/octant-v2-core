@@ -332,8 +332,8 @@ abstract contract TokenizedStrategy {
     /// @notice Used for calculations.
     uint256 internal constant MAX_BPS = 10_000;
 
-    /// @notice Cooldown period for dragon router changes (7 days).
-    uint256 internal constant DRAGON_ROUTER_COOLDOWN = 7 days;
+    /// @notice Cooldown period for dragon router changes (14 days).
+    uint256 internal constant DRAGON_ROUTER_COOLDOWN = 14 days;
 
     /**
      * @dev Custom storage slot that will be used to store the
