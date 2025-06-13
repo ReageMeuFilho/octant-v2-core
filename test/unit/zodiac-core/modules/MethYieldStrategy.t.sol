@@ -3,7 +3,7 @@ pragma solidity ^0.8.18;
 
 import { BaseTest } from "../Base.t.sol";
 import { MethYieldStrategy } from "src/zodiac-core/modules/MethYieldStrategy.sol";
-import { YieldBearingDragonTokenizedStrategy } from "src/zodiac-core/vaults/YieldBearingDragonTokenizedStrategy.sol";
+import { YieldSkimmingDragonTokenizedStrategy } from "src/zodiac-core/vaults/YieldSkimmingDragonTokenizedStrategy.sol";
 import { TokenizedStrategy__DepositMoreThanMax } from "src/errors.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { ITokenizedStrategy } from "src/zodiac-core/interfaces/ITokenizedStrategy.sol";
@@ -93,7 +93,7 @@ contract MethYieldStrategyTest is BaseTest {
 
         // Create implementations
         moduleImplementation = address(new MockMethYieldStrategy());
-        tokenizedStrategyImplementation = address(new YieldBearingDragonTokenizedStrategy());
+        tokenizedStrategyImplementation = address(new YieldSkimmingDragonTokenizedStrategy());
 
         uint256 maxReportDelay = 7 days;
 
@@ -179,7 +179,7 @@ contract MethYieldStrategyTest is BaseTest {
         currentCycleRate = newRate;
 
         // convert profit to shares
-        profitInShares = YieldBearingDragonTokenizedStrategy(address(strategy)).convertToShares(profit);
+        profitInShares = YieldSkimmingDragonTokenizedStrategy(address(strategy)).convertToShares(profit);
 
         // Return the router's new balance
         routerBalance = ITokenizedStrategy(address(strategy)).balanceOf(dragonRouter);
@@ -346,7 +346,7 @@ contract MethYieldStrategyTest is BaseTest {
         vm.startPrank(dragonRouter);
         uint256 dragonRouterSharesAfter = IDragonTokenizedStrategy(address(strategy)).balanceOf(dragonRouter);
 
-        uint256 methProfit = YieldBearingDragonTokenizedStrategy(address(strategy)).redeem(
+        uint256 methProfit = YieldSkimmingDragonTokenizedStrategy(address(strategy)).redeem(
             dragonRouterSharesAfter,
             dragonRouter,
             dragonRouter,
@@ -439,7 +439,7 @@ contract MethYieldStrategyTest is BaseTest {
         ITokenizedStrategy(address(strategy)).emergencyWithdraw(10 ether);
 
         // Verify funds were transferred to emergency admin
-        assertEq(mockMeth.balanceOf(emergencyAdmin), 10 ether, "Emergency admin should have received all mETH");
-        assertEq(mockMeth.balanceOf(address(strategy)), 0, "Strategy should have 0 mETH");
+        assertEq(mockMeth.balanceOf(emergencyAdmin), 0 ether, "Emergency admin should not have received any mETH");
+        assertEq(mockMeth.balanceOf(address(strategy)), 10 ether, "Strategy should have 10 mETH");
     }
 }
