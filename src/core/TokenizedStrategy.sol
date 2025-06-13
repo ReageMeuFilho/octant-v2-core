@@ -777,6 +777,23 @@ abstract contract TokenizedStrategy {
         return assets.mulDiv(totalSupply_, totalAssets_, _rounding);
     }
 
+    function _convertToSharesWithLoss(
+        StrategyData storage S,
+        uint256 assets,
+        Math.Rounding _rounding
+    ) internal view returns (uint256) {
+        // Saves an extra SLOAD if values are non-zero.
+        uint256 totalSupply_ = _totalSupply(S);
+        // If supply is 0, PPS = 1.
+        if (totalSupply_ == 0) return assets;
+
+        uint256 totalAssets_ = _totalAssets(S);
+        // If assets are 0 but supply is not PPS = 0.
+        if (totalAssets_ == 0) return 0;
+
+        return assets.mulDiv(totalSupply_, totalAssets_ + S.lossAmount, _rounding);
+    }
+
     /// @dev Internal implementation of {convertToAssets}.
     function _convertToAssets(
         StrategyData storage S,
