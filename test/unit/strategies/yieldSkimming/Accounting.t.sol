@@ -431,8 +431,9 @@ contract AccountingTest is Setup {
 
         assertEq(yieldSource.balanceOf(_address), _amount, "!balanceOf _address");
 
-        vm.prank(_address);
+        vm.startPrank(_address);
         strategy.deposit(type(uint256).max, _address);
+        vm.stopPrank();
 
         // Should just deposit the available amount.
         checkStrategyTotals(strategy, _amount, 0, _amount, _amount);

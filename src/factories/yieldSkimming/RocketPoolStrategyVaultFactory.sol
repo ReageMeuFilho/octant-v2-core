@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.25;
 
-import { CREATE3 } from "lib/solady/src/utils/CREATE3.sol";
-import { SkyCompounderStrategy } from "src/strategies/yieldDonating/SkyCompounderStrategy.sol";
+import { Create2 } from "@openzeppelin/contracts/utils/Create2.sol";
+import { RocketPoolStrategy } from "src/strategies/yieldSkimming/RocketPoolStrategy.sol";
 
-contract SkyCompounderStrategyFactory {
+contract RocketPoolStrategyVaultFactory {
     /**
      * @dev Struct to store information about a strategy.
      * @param deployerAddress The address of the deployer who created the strategy.
@@ -12,7 +12,6 @@ contract SkyCompounderStrategyFactory {
      * @param vaultTokenName The name of the vault token associated with the strategy.
      * @param donationAddress The address where donations from the strategy will be sent.
      */
-
     struct StrategyInfo {
         address deployerAddress;
         uint256 timestamp;
@@ -34,15 +33,20 @@ contract SkyCompounderStrategyFactory {
      */
     mapping(address => StrategyInfo[]) public strategies;
 
-    event StrategyDeploy(address deployer, address donationAddress, address strategyAddress);
+    address public constant R_ETH = 0xae78736Cd615f374D3085123A210448E74Fc6393;
 
-    address constant USDS_REWARD_ADDRESS = 0x0650CAF159C5A49f711e8169D4336ECB9b950275;
+    event StrategyDeploy(
+        address indexed deployer,
+        address indexed donationAddress,
+        address indexed strategyAddress,
+        string vaultTokenName
+    );
 
     /**
-     * @notice Deploys a new SkyCompounder strategy for the Yield Donating Vault.
-     * @dev This function uses CREATE3 to deploy a new strategy contract deterministically.
+     * @notice Deploys a new Lido strategy for the Yield Skimming Vault.
+     * @dev This function uses Create2 to deploy a new strategy contract deterministically.
      *      The strategy is initialized with the provided parameters, and its address is
-     *      returned upon successful deployment. The function emits a `UsdsStrategyDeploy` event.
+     *      returned upon successful deployment. The function emits a `RocketPoolStrategyDeploy` event.
      * @param _name The name of the vault token associated with the strategy.
      * @param _management The address of the management entity responsible for the strategy.
      * @param _keeper The address of the keeper responsible for maintaining the strategy.
@@ -61,20 +65,12 @@ contract SkyCompounderStrategyFactory {
         address _tokenizedStrategyAddress
     ) external returns (address strategyAddress) {
         bytes memory bytecode = abi.encodePacked(
-            type(SkyCompounderStrategy).creationCode,
-            abi.encode(
-                USDS_REWARD_ADDRESS,
-                _name,
-                _management,
-                _keeper,
-                _emergencyAdmin,
-                _donationAddress,
-                _tokenizedStrategyAddress
-            )
+            type(RocketPoolStrategy).creationCode,
+            abi.encode(R_ETH, _name, _management, _keeper, _emergencyAdmin, _donationAddress, _tokenizedStrategyAddress)
         );
 
-        strategyAddress = CREATE3.deployDeterministic(bytecode, _salt);
-        emit StrategyDeploy(msg.sender, _donationAddress, strategyAddress);
+        strategyAddress = Create2.deploy(0, _salt, bytecode);
+        emit StrategyDeploy(msg.sender, _donationAddress, strategyAddress, _name);
         StrategyInfo memory strategyInfo = StrategyInfo({
             deployerAddress: msg.sender,
             timestamp: block.timestamp,

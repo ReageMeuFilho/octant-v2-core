@@ -1,23 +1,25 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.25;
 
+// contracts
 import { BaseYieldSkimmingHealthCheck } from "src/strategies/periphery/BaseYieldSkimmingHealthCheck.sol";
-
-import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-interface IWstETH {
-    function stEthPerToken() external view returns (uint256);
+// interfaces
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
+
+interface IRocketPool {
+    function getExchangeRate() external view returns (uint256);
 }
 
 /**
- * @title LidoStrategy
- * @notice A strategy that manages deposits in a Lido yield source and captures yield
+ * @title RocketPool
+ * @notice A strategy that manages deposits in a RocketPool yield source and captures yield
  * @dev This strategy tracks the value of deposits and captures yield as the price per share increases
  */
-contract LidoStrategy is BaseYieldSkimmingHealthCheck {
+contract RocketPoolStrategy is BaseYieldSkimmingHealthCheck {
     using SafeERC20 for IERC20;
 
     /// @dev The exchange rate at the last harvest, scaled by 1e18
@@ -145,7 +147,7 @@ contract LidoStrategy is BaseYieldSkimmingHealthCheck {
      */
     function _getCurrentExchangeRate() internal view virtual returns (uint256) {
         // Call the pricePerShare function on the yield vault
-        return IWstETH(address(asset)).stEthPerToken();
+        return IRocketPool(address(asset)).getExchangeRate();
     }
 
     /**

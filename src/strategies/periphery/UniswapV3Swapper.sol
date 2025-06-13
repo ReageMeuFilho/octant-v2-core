@@ -24,11 +24,14 @@ contract UniswapV3Swapper {
     using SafeERC20 for ERC20;
 
     // Optional Variable to be set to not sell dust.
+    // slither-disable-next-line constable-states
     uint256 public minAmountToSell;
     // Defaults to WETH on mainnet.
+    // slither-disable-next-line immutable-states
     address public base = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
 
     // Defaults to Uniswap V3 router on mainnet.
+    // slither-disable-next-line constable-states
     address public router = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
 
     // Fees for the Uni V3 pools. Each fee should get set each way in
@@ -64,6 +67,7 @@ contract UniswapV3Swapper {
      * @param _minAmountOut The min of `_to` to get out.
      * @return _amountOut The actual amount of `_to` that was swapped to
      */
+    // slither-disable-next-line uninitialized-state (set in strategy constructor)
     function _swapFrom(
         address _from,
         address _to,
@@ -120,6 +124,7 @@ contract UniswapV3Swapper {
      * @param _maxAmountFrom The max of `_from` we will swap.
      * @return _amountIn The actual amount of `_from` swapped.
      */
+    // slither-disable-next-line uninitialized-state (set in strategy constructor)
     function _swapTo(
         address _from,
         address _to,

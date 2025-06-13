@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.25;
 
-import { IBaseStrategy } from "src/core/interfaces/IBaseStrategy.sol";
+import { IBaseYieldSkimmingStrategy } from "src/core/interfaces/IBaseYieldSkimmingStrategy.sol";
 import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
 import { TokenizedStrategy, Math } from "src/core/TokenizedStrategy.sol";
 
@@ -9,7 +9,7 @@ import { TokenizedStrategy, Math } from "src/core/TokenizedStrategy.sol";
  * @title YieldSkimmingTokenizedStrategy
  * @author octant.finance
  * @notice A specialized version of TokenizedStrategy designed for yield-bearing tokens
- * like mETH whose value in ETH terms appreciates over time.
+ * like mETH whose value appreciates over time.
  * @dev This strategy implements a yield skimming mechanism by:
  *      - Recognizing appreciation of the underlying asset during report()
  *      - Diluting existing shares by minting new ones to dragonRouter
@@ -34,28 +34,27 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     function report() public override(TokenizedStrategy) returns (uint256 profit, uint256 loss) {
         StrategyData storage S = super._strategyStorage();
 
-        // Get the profit in mETH terms
-        profit = IBaseStrategy(address(this)).harvestAndReport();
+        // Get the delta
+        int256 delta = IBaseYieldSkimmingStrategy(address(this)).harvestAndReport();
+
         address _dragonRouter = S.dragonRouter;
 
-        if (profit > 0) {
+        S.totalAssets = S.asset.balanceOf(address(this));
+
+        if (delta > 0) {
             // Mint shares based on the adjusted profit amount
-            // todo review the case where profit > totalAssets (reverts in _convertToSharesFromReport)
-            uint256 shares = _convertToSharesFromReport(S, profit, Math.Rounding.Floor);
+            uint256 shares = _convertToSharesFromReport(S, uint256(delta), Math.Rounding.Floor);
+            profit = uint256(delta);
             // mint the value
             _mint(S, _dragonRouter, shares);
-        }
-
-        uint256 newTotalAssets = S.asset.balanceOf(address(this));
-        uint256 oldTotalAssets = _totalAssets(S);
-        if (newTotalAssets < oldTotalAssets) {
-            loss = oldTotalAssets - newTotalAssets;
+        } else if (delta < 0) {
+            profit = 0;
+            loss = uint256(-delta);
             _handleDragonLossProtection(S, loss);
         }
 
         // Update the new total assets value
         S.lastReport = uint96(block.timestamp);
-        S.totalAssets = newTotalAssets;
 
         emit Reported(profit, loss);
 
@@ -122,7 +121,10 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
      */
     function _handleDragonLossProtection(StrategyData storage S, uint256 loss) internal {
         // Can only burn up to available shares
-        uint256 sharesBurned = Math.min(_convertToShares(S, loss, Math.Rounding.Floor), S.balances[S.dragonRouter]);
+        uint256 sharesBurned = Math.min(
+            _convertToSharesFromReport(S, loss, Math.Rounding.Floor),
+            S.balances[S.dragonRouter]
+        );
 
         if (sharesBurned > 0) {
             // Burn shares from dragon router

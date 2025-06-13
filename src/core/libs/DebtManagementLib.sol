@@ -47,6 +47,7 @@ library DebtManagementLib {
         result.newTotalDebt = totalDebt;
 
         // Initialize calculation variables
+        // slither-disable-next-line uninitialized-local
         UpdateDebtVars memory vars;
         vars.currentDebt = strategies[strategy].currentDebt;
         vars.newDebt = targetDebt;

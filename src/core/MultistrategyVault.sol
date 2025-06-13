@@ -505,6 +505,7 @@ contract MultistrategyVault is IMultistrategyVault {
         );
 
         // Initialize process report variables with assessment results
+        // slither-disable-next-line uninitialized-local
         ProcessReportVars memory vars;
         vars.asset = assessment.asset;
         vars.totalAssets = assessment.totalAssets;
@@ -551,6 +552,7 @@ contract MultistrategyVault is IMultistrategyVault {
         // Pull refunds
         if (vars.totalRefunds > 0) {
             // Transfer the refunded amount of asset to the vault
+            // slither-disable-next-line arbitrary-send-erc20
             ERC20SafeLib.safeTransferFrom(asset, accountant, address(this), vars.totalRefunds);
             // Update storage to increase total assets
             totalIdle_ += vars.totalRefunds;
@@ -1398,6 +1400,7 @@ contract MultistrategyVault is IMultistrategyVault {
 
         uint256 numerator = shares * _totalAssets();
         uint256 amount = numerator / supply;
+        // slither-disable-next-line weak-prng
         if (rounding == Rounding.ROUND_UP && numerator % supply != 0) {
             amount += 1;
         }
@@ -1429,6 +1432,7 @@ contract MultistrategyVault is IMultistrategyVault {
 
         uint256 numerator = assets * supply;
         uint256 sharesAmount = numerator / totalAssetsAmount;
+        // slither-disable-next-line weak-prng
         if (rounding == Rounding.ROUND_UP && numerator % totalAssetsAmount != 0) {
             sharesAmount += 1;
         }
@@ -1484,6 +1488,7 @@ contract MultistrategyVault is IMultistrategyVault {
         uint256 maxLoss,
         address[] memory strategiesParam
     ) internal view returns (uint256) {
+        // slither-disable-next-line uninitialized-local
         MaxWithdrawVars memory vars;
 
         // Get the max amount for the owner if fully liquid
@@ -1619,6 +1624,7 @@ contract MultistrategyVault is IMultistrategyVault {
         uint256 usersShareOfLoss = assetsNeeded - numerator / strategyCurrentDebt;
 
         // Always round up.
+        // slither-disable-next-line weak-prng
         if (numerator % strategyCurrentDebt != 0) {
             usersShareOfLoss += 1;
         }
@@ -1688,6 +1694,7 @@ contract MultistrategyVault is IMultistrategyVault {
         }
 
         // Initialize our redemption state
+        // slither-disable-next-line uninitialized-local
         RedeemState memory state;
         state.requestedAssets = assets;
         state.currentTotalIdle = totalIdle_;
