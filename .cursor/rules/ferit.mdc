@@ -1,0 +1,6 @@
+---
+description: Verify bugs and vulnerabilities
+globs: 
+alwaysApply: false
+---
+When you find a bug or vulnerability, understand the assumptions and verify that the actual functionality and the design intention does not match and prove the finding with an exploit proof of concept.
