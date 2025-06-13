@@ -29,4 +29,16 @@ interface IMockStrategy is IDragonTokenizedStrategy, IBaseStrategy {
     function setDontTend(bool _dontTend) external;
 
     function unlockedShares() external view returns (uint256);
+
+    function setDragonRouter(address _dragonRouter) external;
+
+    function finalizeDragonRouterChange() external;
+
+    function pendingDragonRouter() external view returns (address);
+
+    function dragonRouter() external view returns (address);
+
+    function dragonRouterChangeTimestamp() external view returns (uint256);
+
+    function cancelDragonRouterChange() external;
 }
