@@ -28,13 +28,9 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
     mapping(address => mapping(address => mapping(address => LinearAllowance))) public allowances; // safe -> delegate -> token -> allowance
 
     /// @inheritdoc ILinearAllowanceSingleton
-<<<<<<< HEAD
-    function setAllowance(address delegate, address token, uint192 dripRatePerDay) external {
-=======
-    function setAllowance(address delegate, address token, uint128 dripRatePerDay) external {
+    function setAllowance(address delegate, address token, uint128 dripRatePerDay) external nonReentrant {
         if (delegate == address(0)) revert InvalidDelegate();
         
->>>>>>> c311eb0 (feat(security): add zero address validation for allowance module)
         // Cache storage struct in memory to save gas
         LinearAllowance memory a = allowances[msg.sender][delegate][token];
 
@@ -99,6 +95,73 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
 
         uint256 transferAmount = 0;
 
+
+        // Calculate transfer amount based on available allowance and safe balance
+        uint160 transferAmount = _calculateTransferAmount(safe, token, a);
+
+        // Handle zero-amount transfers with specific error types
+        _validateTransferAmount(transferAmount, a, safe, token);
+
+        // Update bookkeeping and write to storage BEFORE external calls (effects)
+        a.totalSpent += transferAmount;
+        a.totalUnspent -= transferAmount;
+        allowances[safe][msg.sender][token] = a;
+
+        // Execute transfer and verify actual amount transferred
+        uint256 actualTransferred = _executeAndVerifyTransfer(safe, token, to, transferAmount);
+
+        // Handle non-compliant tokens and precision loss: verify actual transfer occurred
+        if (actualTransferred == 0) {
+            revert NoAmountToTransfer();
+        }
+
+        emit AllowanceTransferred(safe, msg.sender, token, to, transferAmount);
+
+        return transferAmount;
+    }
+
+    /// @notice Calculate the transfer amount based on allowance and safe balance
+    /// @param safe The safe address
+    /// @param token The token address
+    /// @param a The current allowance data
+    /// @return transferAmount The amount to transfer
+    function _calculateTransferAmount(
+        address safe,
+        address token,
+        LinearAllowance memory a
+    ) internal view returns (uint160 transferAmount) {
+        uint256 safeBalance = _getTokenBalance(safe, token);
+        transferAmount = a.totalUnspent <= safeBalance.toUint160() ? a.totalUnspent : safeBalance.toUint160();
+    }
+
+    /// @notice Validate that the transfer amount is valid
+    /// @param transferAmount The amount to transfer
+    /// @param a The current allowance data
+    /// @param safe The safe address (source of allowance)
+    /// @param token The token address
+    function _validateTransferAmount(
+        uint160 transferAmount, 
+        LinearAllowance memory a, 
+        address safe, 
+        address token
+    ) internal view {
+        if (transferAmount == 0) {
+            //slither-disable-next-line incorrect-equality
+            if (a.totalUnspent == 0 && a.dripRatePerDay == 0) {
+                // True no allowance case: no drip rate set
+                revert NoAllowanceToTransfer(safe, msg.sender, token);
+            } else {
+                // Precision loss or insufficient balance case
+                revert NoAmountToTransfer();
+            }
+        }
+    }
+
+    /// @notice Get the token balance of a safe
+    /// @param safe The safe address
+    /// @param token The token address (use NATIVE_TOKEN for ETH)
+    /// @return balance The token balance
+    function _getTokenBalance(address safe, address token) internal view returns (uint256 balance) {
         if (token == NATIVE_TOKEN) {
             // For ETH transfers, get the minimum of totalUnspent and safe balance
             uint256 safeBalance = address(safe).balance;
@@ -115,8 +178,8 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
                 );
                 if (!success) revert TransferFailed(safe, msg.sender, token);
             }
+            balance = address(safe).balance;
         } else {
-            // For ERC20 transfers
             try IERC20(token).balanceOf(safe) returns (uint256 tokenBalance) {
                 transferAmount = a.totalUnspent <= tokenBalance ? a.totalUnspent : tokenBalance;
 
@@ -127,21 +190,64 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
                     bool success = ISafe(payable(safe)).execTransactionFromModule(token, 0, data, Enum.Operation.Call);
                     if (!success) revert TransferFailed(safe, msg.sender, token);
                 }
+                balance = tokenBalance;
             } catch {
                 revert TransferFailed(safe, msg.sender, token);
             }
         }
+    }
 
-        // Update bookkeeping in memory
-        a.totalSpent += transferAmount;
-        a.totalUnspent -= transferAmount;
+    /// @notice Execute transfer and verify the actual amount transferred
+    /// @param safe The safe address
+    /// @param token The token address
+    /// @param to The recipient address
+    /// @param transferAmount The amount to transfer
+    /// @return actualTransferred The actual amount transferred
+    function _executeAndVerifyTransfer(
+        address safe,
+        address token,
+        address to,
+        uint160 transferAmount
+    ) internal returns (uint256 actualTransferred) {
+        // Get balance before transfer
+        uint256 balanceBefore = _getTokenBalance(safe, token);
+        
+        // Execute transfer via Safe
+        bool success = _executeTransfer(safe, token, to, transferAmount);
+        if (!success) {
+            revert TransferFailed(safe, msg.sender, token);
+        }
+        
+        // Get balance after transfer and calculate actual transferred amount
+        uint256 balanceAfter = _getTokenBalance(safe, token);
+        actualTransferred = balanceBefore - balanceAfter;
+    }
 
-        // Write back to storage once
-        allowances[safe][msg.sender][token] = a;
-
-        emit AllowanceTransferred(safe, msg.sender, token, to, transferAmount);
-
-        return transferAmount;
+    /// @notice Execute a transfer via the Safe module
+    /// @param safe The safe address
+    /// @param token The token address
+    /// @param to The recipient address
+    /// @param amount The amount to transfer
+    /// @return success Whether the transfer was successful
+    function _executeTransfer(
+        address safe,
+        address token,
+        address to,
+        uint160 amount
+    ) internal returns (bool success) {
+        if (token == NATIVE_TOKEN) {
+            // Execute ETH transfer via Safe
+            success = ISafe(payable(safe)).execTransactionFromModule(
+                to,
+                amount,
+                "",
+                Enum.Operation.Call
+            );
+        } else {
+            // Execute ERC20 transfer via Safe
+            bytes memory data = abi.encodeWithSelector(IERC20.transfer.selector, to, amount);
+            success = ISafe(payable(safe)).execTransactionFromModule(token, 0, data, Enum.Operation.Call);
+        }
     }
 
     /// @inheritdoc ILinearAllowanceSingleton
@@ -177,7 +283,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
 
         uint256 timeElapsed = block.timestamp - allowance.lastBookedAtInSeconds;
 
-        return allowance.totalUnspent + ((timeElapsed * allowance.dripRatePerDay).toUint160() / 1 days);
+        return allowance.totalUnspent + ((allowance.dripRatePerDay * timeElapsed) / 1 days);
     }
 
     function _updateAllowance(LinearAllowance memory a) internal view returns (LinearAllowance memory) {

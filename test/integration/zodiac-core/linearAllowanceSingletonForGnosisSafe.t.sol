@@ -995,9 +995,109 @@ contract TestLinearAllowanceIntegration is Test {
         assertGt(transferred, 0, "Should have transferred some amount to valid recipient");
         assertEq(validRecipient.balance, transferred, "Recipient should have received the transferred amount");
     }
+
+    /// @notice Test precision loss protection - small drip rates over short time should revert instead of losing accrued allowance
+    function testPrecisionLossProtection_SmallDripRateShortTime() public {
+        address delegate = makeAddr("delegate");
+        address testRecipient = makeAddr("testRecipient");
+        
+        // Set very small drip rate (1 wei per day)
+        vm.prank(address(safeImpl));
+        allowanceModule.setAllowance(delegate, NATIVE_TOKEN, 1);
+        
+        // Wait only 1 second (much less than 1 day)
+        vm.warp(block.timestamp + 1);
+        
+        // Attempt to transfer should revert with NoAmountToTransfer due to precision loss
+        // The calculation results in 0 due to (1 * 1) / 86400 = 0, so totalUnspent becomes 0
+        vm.prank(delegate);
+        vm.expectRevert(ILinearAllowanceSingleton.NoAmountToTransfer.selector);
+        allowanceModule.executeAllowanceTransfer(address(safeImpl), NATIVE_TOKEN, payable(testRecipient));
+    }
+
+    /// @notice Test griefing protection - prevent attackers from forcing zero transfers that consume accrued time
+    function testGriefingProtection_PreventZeroTransferAttacks() public {
+        address victim = makeAddr("victim");
+        address testRecipient = makeAddr("testRecipient");
+        
+        // Set up a small allowance for victim
+        vm.prank(address(safeImpl));
+        allowanceModule.setAllowance(victim, NATIVE_TOKEN, 1000); // 1000 wei per day
+        
+        // Wait a short time to accrue small amount
+        vm.warp(block.timestamp + 60); // 1 minute
+        
+        // Calculate expected accrued amount (should be less than 1 due to precision loss)
+        uint256 expectedAccrued = uint256(1000 * 60) / uint256(1 days); // Should be 0 due to integer division
+        assertEq(expectedAccrued, 0, "Should have zero accrued due to precision loss");
+        
+        // Attacker tries to grief by executing transfer (this should revert due to precision loss)
+        vm.prank(victim);
+        vm.expectRevert(ILinearAllowanceSingleton.NoAmountToTransfer.selector);
+        allowanceModule.executeAllowanceTransfer(address(safeImpl), NATIVE_TOKEN, payable(testRecipient));
+    }
+
+    /// @notice Test that legitimate transfers still work after adding zero transfer protection
+    function testPrecisionLossProtection_LegitimateTransfersStillWork() public {
+        address delegate = makeAddr("delegate");
+        address testRecipient = makeAddr("testRecipient");
+        
+        // Set reasonable drip rate (1 ether per day)
+        vm.prank(address(safeImpl));
+        allowanceModule.setAllowance(delegate, NATIVE_TOKEN, 1 ether);
+        
+        // Wait sufficient time to accrue meaningful amount
+        vm.warp(block.timestamp + 1 hours); // 1 hour should give 1 ether / 24 = ~0.042 ether
+        
+        // Transfer should work normally
+        vm.prank(delegate);
+        uint256 transferred = allowanceModule.executeAllowanceTransfer(address(safeImpl), NATIVE_TOKEN, payable(testRecipient));
+        
+        // Verify transfer worked
+        assertGt(transferred, 0, "Should have transferred meaningful amount");
+        assertEq(testRecipient.balance, transferred, "Recipient should have received the transferred amount");
+    }
+
+    /// @notice Test edge case where balance is insufficient but allowance exists
+    function testPrecisionLossProtection_InsufficientBalanceStillReverts() public {
+        address delegate = makeAddr("delegate");
+        address testRecipient = makeAddr("testRecipient");
+        
+        // Create a safe with very low ETH balance
+        address lowBalanceSafe = makeAddr("lowBalanceSafe");
+        vm.deal(lowBalanceSafe, 0); // No ETH
+        
+        // Set up allowance from low balance safe (this will work as it doesn't check balance)
+        vm.prank(lowBalanceSafe);
+        allowanceModule.setAllowance(delegate, NATIVE_TOKEN, 1 ether);
+        
+        // Wait for allowance to accrue
+        vm.warp(block.timestamp + 1 days);
+        
+        // Attempt transfer should revert due to zero transfer amount (no balance available)
+        vm.prank(delegate);
+        vm.expectRevert(ILinearAllowanceSingleton.NoAmountToTransfer.selector);
+        allowanceModule.executeAllowanceTransfer(lowBalanceSafe, NATIVE_TOKEN, payable(testRecipient));
+    }
 }
 
 // Helper contracts
+
+contract MockNonCompliantToken {
+    // This token implements balanceOf but transfer() doesn't actually transfer tokens
+    // Simulates a non-compliant token that returns true but doesn't move funds
+    
+    mapping(address => uint256) public balanceOf;
+    
+    function setBalance(address account, uint256 amount) external {
+        balanceOf[account] = amount;
+    }
+    
+    function transfer(address, uint256) external pure returns (bool) {
+        // Non-compliant: returns true but doesn't actually transfer
+        return true;
+    }
+}
 
 contract MockFailingSafe {
     // Always returns false for execTransactionFromModule
