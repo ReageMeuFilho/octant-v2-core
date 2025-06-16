@@ -941,6 +941,60 @@ contract TestLinearAllowanceIntegration is Test {
                 abi.encodePacked(r, s, v)
             );
     }
+
+    /// @notice Test zero address validation in setAllowance function
+    function testZeroAddressValidation_SetAllowanceRejectsZeroDelegate() public {
+        vm.prank(address(safeImpl));
+        vm.expectRevert(ILinearAllowanceSingleton.InvalidDelegate.selector);
+        allowanceModule.setAllowance(address(0), NATIVE_TOKEN, 1 ether);
+    }
+
+    /// @notice Test zero address validation in emergencyRevokeAllowance function
+    function testZeroAddressValidation_EmergencyRevokeRejectsZeroDelegate() public {
+        vm.prank(address(safeImpl));
+        vm.expectRevert(ILinearAllowanceSingleton.InvalidDelegate.selector);
+        allowanceModule.emergencyRevokeAllowance(address(0), NATIVE_TOKEN);
+    }
+
+    /// @notice Test zero address validation in executeAllowanceTransfer function
+    function testZeroAddressValidation_ExecuteTransferRejectsZeroRecipient() public {
+        // First set up a valid allowance
+        vm.prank(address(safeImpl));
+        allowanceModule.setAllowance(address(this), NATIVE_TOKEN, 1 ether);
+        
+        // Attempt to transfer to zero address should fail
+        vm.expectRevert(ILinearAllowanceSingleton.InvalidRecipient.selector);
+        allowanceModule.executeAllowanceTransfer(address(safeImpl), NATIVE_TOKEN, payable(address(0)));
+    }
+
+    /// @notice Test that valid addresses still work after adding validation
+    function testZeroAddressValidation_ValidAddressesStillWork() public {
+        address validDelegate = makeAddr("validDelegate");
+        address validRecipient = makeAddr("validRecipient");
+        
+        // Set allowance with valid delegate should work
+        vm.prank(address(safeImpl));
+        allowanceModule.setAllowance(validDelegate, NATIVE_TOKEN, 1 ether);
+        
+        // Emergency revoke with valid delegate should work
+        vm.prank(address(safeImpl));
+        allowanceModule.emergencyRevokeAllowance(validDelegate, NATIVE_TOKEN);
+        
+        // Set allowance again for transfer test
+        vm.prank(address(safeImpl));
+        allowanceModule.setAllowance(validDelegate, NATIVE_TOKEN, 1 ether);
+        
+        // Wait for some time to accrue allowance
+        vm.warp(block.timestamp + 1 days);
+        
+        // Transfer to valid recipient should work
+        vm.prank(validDelegate);
+        uint256 transferred = allowanceModule.executeAllowanceTransfer(address(safeImpl), NATIVE_TOKEN, payable(validRecipient));
+        
+        // Verify transfer worked
+        assertGt(transferred, 0, "Should have transferred some amount to valid recipient");
+        assertEq(validRecipient.balance, transferred, "Recipient should have received the transferred amount");
+    }
 }
 
 // Helper contracts

@@ -28,7 +28,13 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
     mapping(address => mapping(address => mapping(address => LinearAllowance))) public allowances; // safe -> delegate -> token -> allowance
 
     /// @inheritdoc ILinearAllowanceSingleton
+<<<<<<< HEAD
     function setAllowance(address delegate, address token, uint192 dripRatePerDay) external {
+=======
+    function setAllowance(address delegate, address token, uint128 dripRatePerDay) external {
+        if (delegate == address(0)) revert InvalidDelegate();
+        
+>>>>>>> c311eb0 (feat(security): add zero address validation for allowance module)
         // Cache storage struct in memory to save gas
         LinearAllowance memory a = allowances[msg.sender][delegate][token];
 
@@ -44,6 +50,8 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
 
     /// @inheritdoc ILinearAllowanceSingleton
     function emergencyRevokeAllowance(address delegate, address token) external {
+        if (delegate == address(0)) revert InvalidDelegate();
+        
         // Cache storage struct in memory to save gas
         LinearAllowance memory a = allowances[msg.sender][delegate][token];
 
@@ -79,6 +87,8 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
         address token,
         address payable to
     ) external nonReentrant returns (uint256) {
+        if (to == address(0)) revert InvalidRecipient();
+        
         // Cache storage in memory (single SLOAD)
         LinearAllowance memory a = allowances[safe][msg.sender][token];
 
