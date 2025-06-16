@@ -43,6 +43,36 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
     }
 
     /// @inheritdoc ILinearAllowanceSingleton
+    function emergencyRevokeAllowance(address delegate, address token) external {
+        // Cache storage struct in memory to save gas
+        LinearAllowance memory a = allowances[msg.sender][delegate][token];
+
+        // Calculate the amount that would have been cleared (for event emission)
+        // This includes both existing unspent amount and any newly accrued amount
+        uint256 clearedAmount = 0;
+        if (a.lastBookedAtInSeconds != 0) {
+            uint256 timeElapsed = block.timestamp - a.lastBookedAtInSeconds;
+            // Calculate total amount that would be available (existing + newly accrued)
+            clearedAmount = a.totalUnspent + ((a.dripRatePerDay * timeElapsed) / 1 days);
+        } else {
+            // If never initialized, only clear existing unspent (should be 0)
+            clearedAmount = a.totalUnspent;
+        }
+
+        // Emergency revocation: immediately zero drip rate and clear all unspent amounts
+        // This provides true incident response capability for compromised delegates
+        a.dripRatePerDay = 0;
+        a.totalUnspent = 0;
+        a.lastBookedAtInSeconds = block.timestamp.toUint32();
+        // TODO: should we keep the totalSpent?
+
+        // Write back to storage once
+        allowances[msg.sender][delegate][token] = a;
+
+        emit AllowanceEmergencyRevoked(msg.sender, delegate, token, clearedAmount);
+    }
+
+    /// @inheritdoc ILinearAllowanceSingleton
     /// @param safe The address of the safe which is the source of the allowance
     function executeAllowanceTransfer(
         address safe,
