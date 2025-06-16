@@ -373,6 +373,131 @@ contract TestLinearAllowanceIntegration is Test {
         assertEq(updatedAllowance.totalSpent, 0, "Total spent should remain unchanged");
     }
 
+    function testEmergencyRevokeAllowanceVsNormalRevoke() public {
+        // Setup: Create two identical scenarios to compare normal vs emergency revocation
+        uint128 dripRate = 100 ether;
+        address safeAddress = address(safeImpl);
+        
+        // Create two separate executors for comparison
+        LinearAllowanceExecutorTestHarness normalExecutor = new LinearAllowanceExecutorTestHarness();
+        LinearAllowanceExecutorTestHarness emergencyExecutor = new LinearAllowanceExecutorTestHarness();
+
+        // Set identical allowances for both executors
+        vm.startPrank(safeAddress);
+        allowanceModule.setAllowance(address(normalExecutor), NATIVE_TOKEN, dripRate);
+        allowanceModule.setAllowance(address(emergencyExecutor), NATIVE_TOKEN, dripRate);
+        vm.stopPrank();
+
+        // Advance time to accrue allowance (24 hours = 100 ETH each)
+        vm.warp(block.timestamp + 1 days);
+
+        // Verify both have identical unspent allowances
+        uint256 normalUnspentBefore = allowanceModule.getTotalUnspent(safeAddress, address(normalExecutor), NATIVE_TOKEN);
+        uint256 emergencyUnspentBefore = allowanceModule.getTotalUnspent(safeAddress, address(emergencyExecutor), NATIVE_TOKEN);
+        
+        assertEq(normalUnspentBefore, dripRate, "Normal executor should have accrued full daily allowance");
+        assertEq(emergencyUnspentBefore, dripRate, "Emergency executor should have accrued full daily allowance");
+        assertEq(normalUnspentBefore, emergencyUnspentBefore, "Both executors should have identical allowances");
+
+        // Test 1: Normal revocation (setAllowance to 0) - preserves accrued amounts
+        vm.prank(safeAddress);
+        allowanceModule.setAllowance(address(normalExecutor), NATIVE_TOKEN, 0);
+
+        // Test 2: Emergency revocation - clears everything
+        vm.expectEmit(true, true, true, true);
+        emit ILinearAllowanceSingleton.AllowanceEmergencyRevoked(safeAddress, address(emergencyExecutor), NATIVE_TOKEN, dripRate);
+        
+        vm.prank(safeAddress);
+        allowanceModule.emergencyRevokeAllowance(address(emergencyExecutor), NATIVE_TOKEN);
+
+        // Verify the critical difference:
+        // Normal revocation preserves accrued allowance
+        uint256 normalUnspentAfter = allowanceModule.getTotalUnspent(safeAddress, address(normalExecutor), NATIVE_TOKEN);
+        assertEq(normalUnspentAfter, dripRate, "Normal revocation should preserve accrued allowance");
+
+        // Emergency revocation clears everything
+        uint256 emergencyUnspentAfter = allowanceModule.getTotalUnspent(safeAddress, address(emergencyExecutor), NATIVE_TOKEN);
+        assertEq(emergencyUnspentAfter, 0, "Emergency revocation should clear all allowance");
+
+        // Verify both have drip rate set to 0 (check via getTotalUnspent behavior)
+
+        // Advance time to ensure no further accrual for either
+        vm.warp(block.timestamp + 1 days);
+
+        assertEq(
+            allowanceModule.getTotalUnspent(safeAddress, address(normalExecutor), NATIVE_TOKEN),
+            dripRate,
+            "Normal revocation should not accrue new allowance but preserve old"
+        );
+        
+        assertEq(
+            allowanceModule.getTotalUnspent(safeAddress, address(emergencyExecutor), NATIVE_TOKEN),
+            0,
+            "Emergency revocation should remain at zero with no accrual"
+        );
+
+        // Demonstrate the security issue: normal revocation allows fund extraction
+        normalExecutor.executeAllowanceTransfer(allowanceModule, safeAddress, NATIVE_TOKEN);
+        uint256 normalBalance = address(normalExecutor).balance;
+        assertEq(normalBalance, dripRate, "Compromised delegate can still withdraw after normal revocation");
+
+        // Emergency revocation prevents any withdrawal
+        vm.expectRevert();
+        emergencyExecutor.executeAllowanceTransfer(allowanceModule, safeAddress, NATIVE_TOKEN);
+        
+        assertEq(address(emergencyExecutor).balance, 0, "Emergency revocation prevents any withdrawal");
+    }
+
+    function testEmergencyRevokeWithPartialUnspentAndAccrual() public {
+        uint128 dripRate = 50 ether;
+        address safeAddress = address(safeImpl);
+        LinearAllowanceExecutorTestHarness executor = new LinearAllowanceExecutorTestHarness();
+
+        // Set allowance and let some accrue
+        vm.prank(safeAddress);
+        allowanceModule.setAllowance(address(executor), NATIVE_TOKEN, dripRate);
+
+        // Advance time to accrue 25 ETH (12 hours at 50 ETH/day)
+        vm.warp(block.timestamp + 12 hours);
+
+        // Partially withdraw some allowance
+        uint256 partialWithdraw = 10 ether;
+        vm.deal(safeAddress, partialWithdraw); // Limit safe balance to force partial withdrawal
+        executor.executeAllowanceTransfer(allowanceModule, safeAddress, NATIVE_TOKEN);
+
+        // Advance time to accrue more (another 12 hours = 25 ETH more)
+        vm.warp(block.timestamp + 12 hours);
+
+        // Get the actual unspent amount at this point (whatever it is)
+        uint256 actualUnspentBeforeRevoke = allowanceModule.getTotalUnspent(safeAddress, address(executor), NATIVE_TOKEN);
+        
+        // Verify we have some unspent allowance to clear
+        assertGt(actualUnspentBeforeRevoke, 0, "Should have some unspent allowance before emergency revocation");
+
+        // Emergency revoke should clear the full amount
+        vm.expectEmit(true, true, true, true);
+        emit ILinearAllowanceSingleton.AllowanceEmergencyRevoked(safeAddress, address(executor), NATIVE_TOKEN, actualUnspentBeforeRevoke);
+        
+        vm.prank(safeAddress);
+        allowanceModule.emergencyRevokeAllowance(address(executor), NATIVE_TOKEN);
+
+        // Verify everything is cleared
+        assertEq(
+            allowanceModule.getTotalUnspent(safeAddress, address(executor), NATIVE_TOKEN),
+            0,
+            "All allowance should be cleared after emergency revocation"
+        );
+
+        // Verify the allowance data shows proper state
+        (uint128 dripRateAfter, uint160 totalUnspentAfter, uint192 totalSpentAfter, uint32 lastBookedAfter) = 
+            allowanceModule.getTokenAllowanceData(safeAddress, address(executor), NATIVE_TOKEN);
+        
+        assertEq(dripRateAfter, 0, "Drip rate should be zero");
+        assertEq(totalUnspentAfter, 0, "Total unspent should be zero");
+        assertEq(totalSpentAfter, partialWithdraw, "Total spent should preserve audit trail");
+        assertEq(lastBookedAfter, uint32(block.timestamp), "Last booked should be updated to current time");
+    }
+
     // Helper for Safe transactions (necessary due to Safe's complex transaction execution)
     function execSafeTransaction(
         address to,
