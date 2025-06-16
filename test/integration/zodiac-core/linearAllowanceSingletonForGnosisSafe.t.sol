@@ -7,7 +7,7 @@ import "lib/safe-smart-account/contracts/proxies/SafeProxy.sol";
 import { LinearAllowanceSingletonForGnosisSafeWrapper } from "test/wrappers/LinearAllowanceSingletonForGnosisSafeWrapper.sol";
 import { NATIVE_TOKEN } from "src/constants.sol";
 import "lib/safe-smart-account/contracts/libraries/Enum.sol";
-import { LinearAllowanceExecutor } from "src/zodiac-core/LinearAllowanceExecutor.sol";
+import { LinearAllowanceExecutorTestHarness } from "test/mocks/zodiac-core/LinearAllowanceExecutorTestHarness.sol";
 import "openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import { ILinearAllowanceSingleton } from "src/zodiac-core/interfaces/ILinearAllowanceSingleton.sol";
 
@@ -24,7 +24,7 @@ contract TestLinearAllowanceIntegration is Test {
     SafeProxyFactory internal safeProxyFactory;
     Safe internal singleton;
     LinearAllowanceSingletonForGnosisSafeWrapper internal allowanceModule;
-    LinearAllowanceExecutor public allowanceExecutor;
+    LinearAllowanceExecutorTestHarness public allowanceExecutor;
     address internal recipient = makeAddr("recipient");
     address internal safe = makeAddr("safe");
 
@@ -54,7 +54,7 @@ contract TestLinearAllowanceIntegration is Test {
 
         // Deploy DelegateContract
         vm.startPrank(delegateContractOwner);
-        allowanceExecutor = new LinearAllowanceExecutor();
+        allowanceExecutor = new LinearAllowanceExecutorTestHarness();
         vm.stopPrank();
     }
 
@@ -281,7 +281,7 @@ contract TestLinearAllowanceIntegration is Test {
         vm.deal(address(failingSafe), 100 ether);
 
         // Create a delegate (executor) that we'll use
-        LinearAllowanceExecutor executor = new LinearAllowanceExecutor();
+        LinearAllowanceExecutorTestHarness executor = new LinearAllowanceExecutorTestHarness();
 
         // Set allowance for ETH (using address(0) as native token)
         vm.prank(address(failingSafe));
@@ -308,7 +308,7 @@ contract TestLinearAllowanceIntegration is Test {
         TestERC20 testToken = new TestERC20(100 ether);
 
         // Create a delegate (executor) that we'll use
-        LinearAllowanceExecutor executor = new LinearAllowanceExecutor();
+        LinearAllowanceExecutorTestHarness executor = new LinearAllowanceExecutorTestHarness();
 
         // Create an allowance
         vm.prank(address(safe));
