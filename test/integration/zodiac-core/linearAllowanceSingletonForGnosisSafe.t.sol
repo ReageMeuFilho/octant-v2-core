@@ -59,13 +59,13 @@ contract TestLinearAllowanceIntegration is Test {
     }
 
     // Test ETH allowance with both full and partial withdrawals
-    function testAllowanceWithETH(uint128 dripRatePerDay, uint256 daysElapsed, uint256 safeBalance) public {
+    function testAllowanceWithETH(uint192 dripRatePerDay, uint256 daysElapsed, uint256 safeBalance) public {
         // Constrain inputs to reasonable values
         vm.assume(dripRatePerDay > 0 ether);
         daysElapsed = uint32(bound(daysElapsed, 1, 365 * 20));
 
         // Calculate expected allowance
-        uint160 expectedAllowance = uint160(dripRatePerDay) * uint160(daysElapsed);
+        uint256 expectedAllowance = uint256(dripRatePerDay) * uint256(daysElapsed);
 
         // Constrain safeBalance to ensure we test both partial and full withdrawals
         safeBalance = bound(safeBalance, expectedAllowance / 2, expectedAllowance * 2);
@@ -83,7 +83,7 @@ contract TestLinearAllowanceIntegration is Test {
 
         // Set up allowance
         vm.prank(safeAddress);
-        allowanceModule.setAllowance(executorAddress, NATIVE_TOKEN, uint128(dripRatePerDay));
+        allowanceModule.setAllowance(executorAddress, NATIVE_TOKEN, uint192(dripRatePerDay));
 
         // Advance time to accrue allowance
         vm.warp(block.timestamp + daysElapsed * 1 days);
@@ -111,7 +111,7 @@ contract TestLinearAllowanceIntegration is Test {
         );
 
         // Verify allowance bookkeeping
-        (, uint160 totalUnspent, , ) = allowanceModule.getTokenAllowanceData(
+        (, uint256 totalUnspent, , ) = allowanceModule.getTokenAllowanceData(
             safeAddress,
             executorAddress,
             NATIVE_TOKEN
@@ -145,13 +145,13 @@ contract TestLinearAllowanceIntegration is Test {
     }
 
     // Test ERC20 allowance with both full and partial withdrawals
-    function testAllowanceWithERC20(uint128 dripRatePerDay, uint256 daysElapsed, uint256 tokenSupply) public {
+    function testAllowanceWithERC20(uint192 dripRatePerDay, uint256 daysElapsed, uint256 tokenSupply) public {
         // Constrain inputs to reasonable values
         vm.assume(dripRatePerDay > 0 ether);
         daysElapsed = uint32(bound(daysElapsed, 1, 365 * 20));
 
         // Calculate expected allowance
-        uint160 expectedAllowance = uint160(dripRatePerDay) * uint160(daysElapsed);
+        uint256 expectedAllowance = uint256(dripRatePerDay) * uint256(daysElapsed);
 
         // Constrain tokenSupply to ensure we test both partial and full withdrawals
         tokenSupply = bound(tokenSupply, expectedAllowance / 2, expectedAllowance * 2);
@@ -170,7 +170,7 @@ contract TestLinearAllowanceIntegration is Test {
 
         // Set up allowance
         vm.prank(safeAddress);
-        allowanceModule.setAllowance(executorAddress, address(token), uint128(dripRatePerDay));
+        allowanceModule.setAllowance(executorAddress, address(token), uint192(dripRatePerDay));
 
         // Advance time to accrue allowance
         vm.warp(block.timestamp + daysElapsed * 1 days);
@@ -198,7 +198,7 @@ contract TestLinearAllowanceIntegration is Test {
         );
 
         // Verify allowance bookkeeping
-        (, uint160 totalUnspent, , ) = allowanceModule.getTokenAllowanceData(
+        (, uint256 totalUnspent, , ) = allowanceModule.getTokenAllowanceData(
             safeAddress,
             executorAddress,
             address(token)
@@ -254,7 +254,7 @@ contract TestLinearAllowanceIntegration is Test {
 
         // Prank as the failing safe to set allowance
         vm.prank(address(failingSafe));
-        allowanceModule.setAllowance(address(allowanceExecutor), address(token), uint128(100 ether));
+        allowanceModule.setAllowance(address(allowanceExecutor), address(token), uint192(100 ether));
 
         // Need to wait for allowance to accumulate
         vm.warp(block.timestamp + 1 days);
@@ -285,7 +285,7 @@ contract TestLinearAllowanceIntegration is Test {
 
         // Set allowance for ETH (using address(0) as native token)
         vm.prank(address(failingSafe));
-        allowanceModule.setAllowance(address(executor), address(0), uint128(100 ether));
+        allowanceModule.setAllowance(address(executor), address(0), uint192(100 ether));
 
         // Wait for allowance to accumulate
         vm.warp(block.timestamp + 1 days);
@@ -312,17 +312,17 @@ contract TestLinearAllowanceIntegration is Test {
 
         // Create an allowance
         vm.prank(address(safe));
-        allowanceModule.setAllowance(address(executor), address(testToken), uint128(100 ether));
+        allowanceModule.setAllowance(address(executor), address(testToken), uint192(100 ether));
 
         // Fast forward time
         vm.warp(block.timestamp + 1 days);
 
         // Call setAllowance again which invokes _updateAllowance
         vm.prank(address(safe));
-        allowanceModule.setAllowance(address(executor), address(testToken), uint128(200 ether));
+        allowanceModule.setAllowance(address(executor), address(testToken), uint192(200 ether));
 
         // Verify the allowance was updated correctly
-        (uint128 dripRate, uint160 unspent, , uint32 lastBooked) = allowanceModule.getTokenAllowanceData(
+        (uint192 dripRate, uint256 unspent, , uint64 lastBooked) = allowanceModule.getTokenAllowanceData(
             address(safe),
             address(executor),
             address(testToken)
@@ -353,11 +353,10 @@ contract TestLinearAllowanceIntegration is Test {
 
         // Create a LinearAllowance struct with safe values
         ILinearAllowanceSingleton.LinearAllowance memory allowance = ILinearAllowanceSingleton.LinearAllowance({
-            dripRatePerDay: uint128(dripRate),
-            totalUnspent: uint160(0),
-            totalSpent: uint192(0),
-            // Set a more recent timestamp to avoid large time differences
-            lastBookedAtInSeconds: uint32(block.timestamp - 1 hours) // Use 1 hour instead of 1 day
+            dripRatePerDay: uint192(dripRate),
+            lastBookedAtInSeconds: uint64(block.timestamp - 1 hours), // Use 1 hour instead of 1 day
+            totalUnspent: uint256(0),
+            totalSpent: uint256(0)
         });
 
         // Call the exposed function
@@ -368,8 +367,8 @@ contract TestLinearAllowanceIntegration is Test {
 
         // Verify the return value
         assertEq(updatedAllowance.dripRatePerDay, dripRate);
-        assertEq(updatedAllowance.totalUnspent, uint160(expectedUnspent));
-        assertEq(updatedAllowance.lastBookedAtInSeconds, uint32(block.timestamp));
+        assertEq(updatedAllowance.totalUnspent, uint256(expectedUnspent));
+        assertEq(updatedAllowance.lastBookedAtInSeconds, uint64(block.timestamp));
         assertEq(updatedAllowance.totalSpent, 0, "Total spent should remain unchanged");
     }
 

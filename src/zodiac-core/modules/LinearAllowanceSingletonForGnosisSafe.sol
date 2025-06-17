@@ -23,11 +23,12 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
     using SafeCast for uint256;
     using SafeCast for uint160;
     using SafeCast for uint32;
+    using SafeCast for uint64;
 
     mapping(address => mapping(address => mapping(address => LinearAllowance))) public allowances; // safe -> delegate -> token -> allowance
 
     /// @inheritdoc ILinearAllowanceSingleton
-    function setAllowance(address delegate, address token, uint128 dripRatePerDay) external {
+    function setAllowance(address delegate, address token, uint192 dripRatePerDay) external {
         // Cache storage struct in memory to save gas
         LinearAllowance memory a = allowances[msg.sender][delegate][token];
 
@@ -56,12 +57,12 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
         //slither-disable-next-line incorrect-equality
         if (a.totalUnspent == 0) revert NoAllowanceToTransfer(safe, msg.sender, token);
 
-        uint160 transferAmount = 0;
+        uint256 transferAmount = 0;
 
         if (token == NATIVE_TOKEN) {
             // For ETH transfers, get the minimum of totalUnspent and safe balance
             uint256 safeBalance = address(safe).balance;
-            transferAmount = a.totalUnspent <= safeBalance.toUint160() ? a.totalUnspent : safeBalance.toUint160();
+            transferAmount = a.totalUnspent <= safeBalance ? a.totalUnspent : safeBalance;
 
             if (transferAmount > 0) {
                 // False positive: marked nonReentrant
@@ -77,7 +78,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
         } else {
             // For ERC20 transfers
             try IERC20(token).balanceOf(safe) returns (uint256 tokenBalance) {
-                transferAmount = a.totalUnspent <= tokenBalance.toUint160() ? a.totalUnspent : tokenBalance.toUint160();
+                transferAmount = a.totalUnspent <= tokenBalance ? a.totalUnspent : tokenBalance;
 
                 if (transferAmount > 0) {
                     bytes memory data = abi.encodeWithSelector(IERC20.transfer.selector, to, transferAmount);
@@ -112,7 +113,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
     )
         public
         view
-        returns (uint128 dripRatePerDay, uint160 totalUnspent, uint192 totalSpent, uint32 lastBookedAtInSeconds)
+        returns (uint192 dripRatePerDay, uint256 totalUnspent, uint256 totalSpent, uint64 lastBookedAtInSeconds)
     {
         LinearAllowance memory allowance = allowances[safe][delegate][token];
         return (
@@ -143,10 +144,10 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
         if (a.lastBookedAtInSeconds != 0) {
             uint256 timeElapsed = block.timestamp - a.lastBookedAtInSeconds;
             //slither-disable-next-line incorrect-equality
-            a.totalUnspent += (timeElapsed * a.dripRatePerDay).toUint160() / 1 days;
+            a.totalUnspent += (timeElapsed * a.dripRatePerDay) / 1 days;
         }
 
-        a.lastBookedAtInSeconds = block.timestamp.toUint32();
+        a.lastBookedAtInSeconds = block.timestamp.toUint64();
         return a;
     }
 }

@@ -5,12 +5,11 @@ pragma solidity ^0.8.0;
 /// @notice Interface for a module that allows to delegate spending allowances with linear accrual
 interface ILinearAllowanceSingleton {
     /// @notice Structure defining an allowance with linear accrual
-    /// @dev Packed struct to use storage slots efficiently
     struct LinearAllowance {
-        uint128 dripRatePerDay; // Max value is 3.40e+38 approximately.
-        uint160 totalUnspent; // Max value is 1.46e+48 approximately.
-        uint192 totalSpent; // Max value is 6.27e+57 approximately
-        uint32 lastBookedAtInSeconds; // Overflows in 2106.
+        uint192 dripRatePerDay;
+        uint64 lastBookedAtInSeconds;
+        uint256 totalUnspent;
+        uint256 totalSpent;
     }
 
     /// @notice Emitted when an allowance is set for a delegate
@@ -50,7 +49,7 @@ interface ILinearAllowanceSingleton {
     /// @param delegate The delegate to set the allowance for
     /// @param token The token to set the allowance for. Use NATIVE_TOKEN for ETH
     /// @param dripRatePerDay The drip rate per day for the allowance
-    function setAllowance(address delegate, address token, uint128 dripRatePerDay) external;
+    function setAllowance(address delegate, address token, uint192 dripRatePerDay) external;
 
     /// @notice Execute a transfer of the allowance
     /// @dev msg.sender is the delegate
@@ -75,7 +74,7 @@ interface ILinearAllowanceSingleton {
     )
         external
         view
-        returns (uint128 dripRatePerDay, uint160 totalUnspent, uint192 totalSpent, uint32 lastBookedAtInSeconds);
+        returns (uint192 dripRatePerDay, uint256 totalUnspent, uint256 totalSpent, uint64 lastBookedAtInSeconds);
 
     /// @notice Get the total unspent allowance for a token as of now
     /// @param source The address of the source of the allowance
