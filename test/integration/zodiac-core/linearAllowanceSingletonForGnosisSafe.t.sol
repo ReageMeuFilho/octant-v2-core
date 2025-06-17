@@ -943,6 +943,136 @@ contract TestLinearAllowanceIntegration is Test {
         emit log_string("SECURE: Gradual allowance increase attacks blocked");
     }
 
+    function testGetMaxWithdrawableAmount(
+        uint128 dripRatePerDay,
+        uint32 timeElapsed,
+        uint256 ethBalance,
+        uint256 tokenBalance
+    ) public {
+        // Constrain inputs to reasonable values
+        vm.assume(dripRatePerDay > 0 && dripRatePerDay <= 1000 ether); // Up to 1000 ETH per day
+        vm.assume(timeElapsed > 0 && timeElapsed <= 365 days); // Up to 1 year
+        vm.assume(ethBalance <= 10000 ether); // Reasonable ETH balance
+        vm.assume(tokenBalance <= 10000 ether && tokenBalance > 0); // Reasonable token balance
+
+        address safeAddress = address(safeImpl);
+        address executorAddress = address(allowanceExecutor);
+
+        // Calculate expected allowance based on inputs
+        uint256 expectedAllowance = (uint256(dripRatePerDay) * timeElapsed) / 1 days;
+
+        // Test with ETH
+        vm.startPrank(safeAddress);
+        allowanceModule.setAllowance(executorAddress, NATIVE_TOKEN, dripRatePerDay);
+        vm.stopPrank();
+
+        // Advance time to accrue allowance
+        vm.warp(block.timestamp + timeElapsed);
+
+        // Set safe ETH balance
+        vm.deal(safeAddress, ethBalance);
+
+        uint256 totalUnspentEth = allowanceModule.getTotalUnspent(safeAddress, executorAddress, NATIVE_TOKEN);
+        uint256 maxWithdrawableEth = allowanceModule.getMaxWithdrawableAmount(
+            safeAddress,
+            executorAddress,
+            NATIVE_TOKEN
+        );
+
+        // Verify total unspent matches expected allowance
+        assertEq(totalUnspentEth, expectedAllowance, "Total unspent ETH should match expected allowance");
+
+        // Verify max withdrawable is minimum of allowance and balance
+        uint256 expectedMaxEth = expectedAllowance <= ethBalance ? expectedAllowance : ethBalance;
+        assertEq(maxWithdrawableEth, expectedMaxEth, "Max withdrawable ETH should be min(allowance, balance)");
+
+        // Test with ERC20 token
+        TestERC20 token = new TestERC20(tokenBalance * 2); // Create with more than needed
+
+        // Set allowance for token (using same parameters)
+        vm.startPrank(safeAddress);
+        allowanceModule.setAllowance(executorAddress, address(token), dripRatePerDay);
+        vm.stopPrank();
+
+        // Advance time again to accrue same allowance for token
+        vm.warp(block.timestamp + timeElapsed);
+
+        // Transfer tokens to safe
+        token.transfer(safeAddress, tokenBalance);
+
+        uint256 totalUnspentToken = allowanceModule.getTotalUnspent(safeAddress, executorAddress, address(token));
+        uint256 maxWithdrawableToken = allowanceModule.getMaxWithdrawableAmount(
+            safeAddress,
+            executorAddress,
+            address(token)
+        );
+
+        // Verify total unspent matches expected allowance
+        assertEq(totalUnspentToken, expectedAllowance, "Total unspent tokens should match expected allowance");
+
+        // Verify max withdrawable is minimum of allowance and balance
+        uint256 expectedMaxToken = expectedAllowance <= tokenBalance ? expectedAllowance : tokenBalance;
+        assertEq(maxWithdrawableToken, expectedMaxToken, "Max withdrawable tokens should be min(allowance, balance)");
+
+        // Edge case: Test with zero allowance
+        uint256 maxWithdrawableZero = allowanceModule.getMaxWithdrawableAmount(
+            safeAddress,
+            address(0x123),
+            NATIVE_TOKEN
+        );
+        assertEq(maxWithdrawableZero, 0, "Max withdrawable should be 0 for uninitialized allowance");
+    }
+
+    function testLinearAllowanceExecutorPreviewFunctions(
+        uint128 dripRatePerDay,
+        uint32 timeElapsed,
+        uint256 safeBalance
+    ) public {
+        // Constrain inputs to reasonable values
+        vm.assume(dripRatePerDay > 0 && dripRatePerDay <= 500 ether); // Up to 500 ETH per day
+        vm.assume(timeElapsed > 0 && timeElapsed <= 180 days); // Up to 6 months
+        vm.assume(safeBalance <= 5000 ether); // Reasonable safe balance
+
+        address safeAddress = address(safeImpl);
+
+        // Calculate expected allowance
+        uint256 expectedAllowance = (uint256(dripRatePerDay) * timeElapsed) / 1 days;
+
+        // Set allowance
+        vm.prank(safeAddress);
+        allowanceModule.setAllowance(address(allowanceExecutor), NATIVE_TOKEN, dripRatePerDay);
+
+        // Advance time to accrue allowance
+        vm.warp(block.timestamp + timeElapsed);
+
+        // Set safe balance
+        vm.deal(safeAddress, safeBalance);
+
+        // Test preview functions through LinearAllowanceExecutor
+        uint256 totalUnspent = allowanceExecutor.getTotalUnspent(allowanceModule, safeAddress, NATIVE_TOKEN);
+        uint256 maxWithdrawable = allowanceExecutor.getMaxWithdrawableAmount(
+            allowanceModule,
+            safeAddress,
+            NATIVE_TOKEN
+        );
+
+        // Verify total unspent matches expected allowance
+        assertEq(totalUnspent, expectedAllowance, "Executor should see correct total unspent allowance");
+
+        // Verify max withdrawable is minimum of allowance and balance
+        uint256 expectedMaxWithdrawable = expectedAllowance <= safeBalance ? expectedAllowance : safeBalance;
+        assertEq(maxWithdrawable, expectedMaxWithdrawable, "Executor should see correct max withdrawable amount");
+
+        // Execute the transfer to verify the preview was accurate (only if there's something to withdraw)
+        if (maxWithdrawable > 0) {
+            uint256 balanceBefore = address(allowanceExecutor).balance;
+            allowanceExecutor.executeAllowanceTransfer(allowanceModule, safeAddress, NATIVE_TOKEN);
+            uint256 balanceAfter = address(allowanceExecutor).balance;
+
+            assertEq(balanceAfter - balanceBefore, maxWithdrawable, "Actual transfer should match preview");
+        }
+    }
+
     // Helper for Safe transactions (necessary due to Safe's complex transaction execution)
     function execSafeTransaction(
         address to,

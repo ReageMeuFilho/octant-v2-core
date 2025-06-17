@@ -54,4 +54,17 @@ abstract contract LinearAllowanceExecutor {
     /// @param amount The amount to withdraw from this contract's balance
     /// @param to The destination address to send the withdrawn funds
     function withdraw(address token, uint256 amount, address payable to) external virtual {}
+
+    // @notice Get the maximum withdrawable amount for a token, considering both allowance and Safe balance.
+    /// @param allowanceModule The allowance module to use.
+    /// @param safe The address of the safe.
+    /// @param token The address of the token.
+    /// @return maxWithdrawableAmount The maximum amount that can be withdrawn.
+    function getMaxWithdrawableAmount(
+        LinearAllowanceSingletonForGnosisSafe allowanceModule,
+        address safe,
+        address token
+    ) external view returns (uint256) {
+        return allowanceModule.getMaxWithdrawableAmount(safe, address(this), token);
+    }
 }

@@ -155,6 +155,30 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
         return allowance.totalUnspent + ((allowance.dripRatePerDay * timeElapsed) / 1 days);
     }
 
+    /// @inheritdoc ILinearAllowanceSingleton
+    /// @param safe The address of the safe which is the source of the allowance
+    function getMaxWithdrawableAmount(address safe, address delegate, address token) public view returns (uint256) {
+        // Get current total unspent allowance
+        uint256 totalUnspent = getTotalUnspent(safe, delegate, token);
+
+        // If no allowance, return 0
+        if (totalUnspent == 0) return 0;
+
+        if (token == NATIVE_TOKEN) {
+            // For ETH transfers, get the minimum of totalUnspent and safe balance
+            uint256 safeBalance = address(safe).balance;
+            return totalUnspent <= safeBalance ? totalUnspent : safeBalance;
+        } else {
+            // For ERC20 transfers
+            try IERC20(token).balanceOf(safe) returns (uint256 tokenBalance) {
+                return totalUnspent <= tokenBalance ? totalUnspent : tokenBalance;
+            } catch {
+                // If balance call fails, return 0 to indicate no withdrawal possible
+                return 0;
+            }
+        }
+    }
+
     function _updateAllowance(LinearAllowance memory a) internal view returns (LinearAllowance memory) {
         if (a.lastBookedAtInSeconds != 0) {
             uint256 timeElapsed = block.timestamp - a.lastBookedAtInSeconds;

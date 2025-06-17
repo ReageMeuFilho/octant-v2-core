@@ -95,4 +95,11 @@ interface ILinearAllowanceSingleton {
     /// @param token The address of the token
     /// @return The total unspent allowance as of now
     function getTotalUnspent(address source, address delegate, address token) external view returns (uint256);
+
+    /// @notice Get the maximum withdrawable amount for a token, considering both allowance and Safe balance
+    /// @param source The address of the source of the allowance (Safe)
+    /// @param delegate The address of the delegate
+    /// @param token The address of the token. Use NATIVE_TOKEN for ETH
+    /// @return The maximum amount that can be withdrawn, which is min(allowance, Safe balance)
+    function getMaxWithdrawableAmount(address source, address delegate, address token) external view returns (uint256);
 }
