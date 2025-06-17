@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -28,7 +28,9 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
     mapping(address => mapping(address => mapping(address => LinearAllowance))) public allowances; // safe -> delegate -> token -> allowance
 
     /// @inheritdoc ILinearAllowanceSingleton
-    function setAllowance(address delegate, address token, uint192 dripRatePerDay) external {
+    function setAllowance(address delegate, address token, uint192 dripRatePerDay) external nonReentrant {
+        if (delegate == address(0)) revert AddressZeroForArgument("delegate");
+
         // Cache storage struct in memory to save gas
         LinearAllowance memory a = allowances[msg.sender][delegate][token];
 
@@ -43,85 +45,98 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
     }
 
     /// @inheritdoc ILinearAllowanceSingleton
+    function emergencyRevokeAllowance(address delegate, address token) external nonReentrant {
+        if (delegate == address(0)) revert AddressZeroForArgument("delegate");
+
+        LinearAllowance memory allowance = allowances[msg.sender][delegate][token];
+        allowance = _updateAllowance(allowance);
+
+        emit AllowanceEmergencyRevoked(msg.sender, delegate, token, allowance.totalUnspent);
+
+        allowance.dripRatePerDay = 0;
+        allowance.totalUnspent = 0;
+
+        allowances[msg.sender][delegate][token] = allowance;
+    }
+
+    /// @inheritdoc ILinearAllowanceSingleton
     /// @param safe The address of the safe which is the source of the allowance
     function executeAllowanceTransfer(
         address safe,
         address token,
         address payable to
     ) external nonReentrant returns (uint256) {
+        if (safe == address(0)) revert AddressZeroForArgument("safe");
+        if (to == address(0)) revert AddressZeroForArgument("to");
+
         // Cache storage in memory (single SLOAD)
         LinearAllowance memory a = allowances[safe][msg.sender][token];
 
         // Update cached memory values
         a = _updateAllowance(a);
-        //slither-disable-next-line incorrect-equality
         if (a.totalUnspent == 0) revert NoAllowanceToTransfer(safe, msg.sender, token);
 
-        uint256 transferAmount = 0;
+        // Calculate transfer amount based on available allowance and safe balance
+        uint256 transferAmount = _calculateTransferAmount(safe, token, a);
+        if (transferAmount == 0) revert ZeroTransfer(safe, msg.sender, token);
 
-        if (token == NATIVE_TOKEN) {
-            // For ETH transfers, get the minimum of totalUnspent and safe balance
-            uint256 safeBalance = address(safe).balance;
-            transferAmount = a.totalUnspent <= safeBalance ? a.totalUnspent : safeBalance;
-
-            if (transferAmount > 0) {
-                // False positive: marked nonReentrant
-                //slither-disable-next-line reentrancy-no-eth
-                bool success = ISafe(payable(safe)).execTransactionFromModule(
-                    to,
-                    transferAmount,
-                    "",
-                    Enum.Operation.Call
-                );
-                if (!success) revert TransferFailed(safe, msg.sender, token);
-            }
-        } else {
-            // For ERC20 transfers
-            try IERC20(token).balanceOf(safe) returns (uint256 tokenBalance) {
-                transferAmount = a.totalUnspent <= tokenBalance ? a.totalUnspent : tokenBalance;
-
-                if (transferAmount > 0) {
-                    bytes memory data = abi.encodeWithSelector(IERC20.transfer.selector, to, transferAmount);
-                    // False positive: marked nonReentrant
-                    //slither-disable-next-line reentrancy-no-eth
-                    bool success = ISafe(payable(safe)).execTransactionFromModule(token, 0, data, Enum.Operation.Call);
-                    if (!success) revert TransferFailed(safe, msg.sender, token);
-                }
-            } catch {
-                revert TransferFailed(safe, msg.sender, token);
-            }
-        }
-
-        // Update bookkeeping in memory
+        // Update bookkeeping and write to storage BEFORE external calls (effects)
         a.totalSpent += transferAmount;
         a.totalUnspent -= transferAmount;
-
-        // Write back to storage once
         allowances[safe][msg.sender][token] = a;
+
+        _executeTransfer(safe, token, to, transferAmount);
 
         emit AllowanceTransferred(safe, msg.sender, token, to, transferAmount);
 
         return transferAmount;
     }
 
-    /// @inheritdoc ILinearAllowanceSingleton
-    /// @param safe The address of the safe which is the source of the allowance
-    function getTokenAllowanceData(
+    /// @notice Calculate the transfer amount based on allowance and safe balance
+    /// @param safe The safe address
+    /// @param token The token address
+    /// @param a The current allowance data
+    /// @return transferAmount The amount to transfer
+    function _calculateTransferAmount(
         address safe,
-        address delegate,
-        address token
-    )
-        public
-        view
-        returns (uint192 dripRatePerDay, uint256 totalUnspent, uint256 totalSpent, uint64 lastBookedAtInSeconds)
-    {
-        LinearAllowance memory allowance = allowances[safe][delegate][token];
-        return (
-            allowance.dripRatePerDay,
-            allowance.totalUnspent,
-            allowance.totalSpent,
-            allowance.lastBookedAtInSeconds
-        );
+        address token,
+        LinearAllowance memory a
+    ) internal view returns (uint256 transferAmount) {
+        uint256 safeBalance = _getTokenBalance(safe, token);
+        transferAmount = a.totalUnspent <= safeBalance ? a.totalUnspent : safeBalance;
+    }
+
+    /// @notice Get the token balance of a safe
+    /// @param safe The safe address
+    /// @param token The token address (use NATIVE_TOKEN for ETH)
+    /// @return balance The token balance
+    function _getTokenBalance(address safe, address token) internal view returns (uint256 balance) {
+        if (token == NATIVE_TOKEN) {
+            balance = address(safe).balance;
+        } else {
+            balance = IERC20(token).balanceOf(safe);
+        }
+    }
+
+    function _executeTransfer(address safe, address token, address to, uint256 amount) internal {
+        uint256 balanceBefore = _getTokenBalance(to, token);
+
+        bool success;
+        if (token == NATIVE_TOKEN) {
+            success = ISafe(payable(safe)).execTransactionFromModule(to, amount, "", Enum.Operation.Call);
+        } else {
+            bytes memory data = abi.encodeWithSelector(IERC20.transfer.selector, to, amount);
+            success = ISafe(payable(safe)).execTransactionFromModule(token, 0, data, Enum.Operation.Call);
+        }
+
+        if (!success) {
+            revert TransferFailed(safe, msg.sender, token);
+        }
+
+        uint256 balanceAfter = _getTokenBalance(to, token);
+        if (balanceAfter <= balanceBefore) {
+            revert TransferFailed(safe, msg.sender, token);
+        }
     }
 
     /// @inheritdoc ILinearAllowanceSingleton
