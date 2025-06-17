@@ -177,7 +177,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
 
         uint256 timeElapsed = block.timestamp - allowance.lastBookedAtInSeconds;
 
-        return allowance.totalUnspent + ((allowance.dripRatePerDay * timeElapsed) / 1 days);
+        return allowance.totalUnspent + ((timeElapsed * allowance.dripRatePerDay).toUint160() / 1 days);
     }
 
     function _updateAllowance(LinearAllowance memory a) internal view returns (LinearAllowance memory) {
