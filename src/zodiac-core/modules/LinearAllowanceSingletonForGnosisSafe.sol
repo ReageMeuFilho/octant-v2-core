@@ -25,30 +25,37 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
     using SafeCast for uint32;
     using SafeCast for uint64;
 
-    mapping(address => mapping(address => mapping(address => LinearAllowance))) public allowances; // safe -> delegate -> token -> allowance
+    mapping(address => mapping(address => mapping(address => LinearAllowance))) internal _allowances; // safe -> delegate -> token -> allowance
 
     /// @inheritdoc ILinearAllowanceSingleton
-    function setAllowance(address delegate, address token, uint192 dripRatePerDay) external nonReentrant {
-        if (delegate == address(0)) revert AddressZeroForArgument("delegate");
+    function setAllowance(address delegate, address token, uint192 dripRatePerDay) external {
+        _setAllowance(msg.sender, delegate, token, dripRatePerDay);
+    }
 
-        // Cache storage struct in memory to save gas
-        LinearAllowance memory a = allowances[msg.sender][delegate][token];
+    /// @notice Set multiple allowances in a single transaction
+    /// @param delegates Array of delegate addresses
+    /// @param tokens Array of token addresses
+    /// @param dripRatesPerDay Array of drip rates per day
+    function setAllowances(
+        address[] calldata delegates,
+        address[] calldata tokens,
+        uint192[] calldata dripRatesPerDay
+    ) external {
+        uint256 length = delegates.length;
+        if (length != tokens.length || length != dripRatesPerDay.length) {
+            revert("Array lengths must match");
+        }
 
-        // Update cached memory values
-        a = _updateAllowance(a);
-        a.dripRatePerDay = dripRatePerDay;
-
-        // Write back to storage once
-        allowances[msg.sender][delegate][token] = a;
-
-        emit AllowanceSet(msg.sender, delegate, token, dripRatePerDay);
+        for (uint256 i = 0; i < length; i++) {
+            _setAllowance(msg.sender, delegates[i], tokens[i], dripRatesPerDay[i]);
+        }
     }
 
     /// @inheritdoc ILinearAllowanceSingleton
     function emergencyRevokeAllowance(address delegate, address token) external nonReentrant {
         if (delegate == address(0)) revert AddressZeroForArgument("delegate");
 
-        LinearAllowance memory allowance = allowances[msg.sender][delegate][token];
+        LinearAllowance memory allowance = _allowances[msg.sender][delegate][token];
         allowance = _updateAllowance(allowance);
 
         emit AllowanceEmergencyRevoked(msg.sender, delegate, token, allowance.totalUnspent);
@@ -56,7 +63,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
         allowance.dripRatePerDay = 0;
         allowance.totalUnspent = 0;
 
-        allowances[msg.sender][delegate][token] = allowance;
+        _allowances[msg.sender][delegate][token] = allowance;
     }
 
     /// @inheritdoc ILinearAllowanceSingleton
@@ -66,84 +73,57 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
         address token,
         address payable to
     ) external nonReentrant returns (uint256) {
-        if (safe == address(0)) revert AddressZeroForArgument("safe");
-        if (to == address(0)) revert AddressZeroForArgument("to");
-
-        // Cache storage in memory (single SLOAD)
-        LinearAllowance memory a = allowances[safe][msg.sender][token];
-
-        // Update cached memory values
-        a = _updateAllowance(a);
-        if (a.totalUnspent == 0) revert NoAllowanceToTransfer(safe, msg.sender, token);
-
-        // Calculate transfer amount based on available allowance and safe balance
-        uint256 transferAmount = _calculateTransferAmount(safe, token, a);
-        if (transferAmount == 0) revert ZeroTransfer(safe, msg.sender, token);
-
-        // Update bookkeeping and write to storage BEFORE external calls (effects)
-        a.totalSpent += transferAmount;
-        a.totalUnspent -= transferAmount;
-        allowances[safe][msg.sender][token] = a;
-
-        _executeTransfer(safe, token, to, transferAmount);
-
-        emit AllowanceTransferred(safe, msg.sender, token, to, transferAmount);
-
-        return transferAmount;
+        return _executeAllowanceTransfer(safe, msg.sender, token, to);
     }
 
-    /// @notice Calculate the transfer amount based on allowance and safe balance
-    /// @param safe The safe address
-    /// @param token The token address
-    /// @param a The current allowance data
-    /// @return transferAmount The amount to transfer
-    function _calculateTransferAmount(
-        address safe,
-        address token,
-        LinearAllowance memory a
-    ) internal view returns (uint256 transferAmount) {
-        uint256 safeBalance = _getTokenBalance(safe, token);
-        transferAmount = a.totalUnspent <= safeBalance ? a.totalUnspent : safeBalance;
+    /// @notice Execute multiple allowance transfers in a single transaction
+    /// @param safes Array of safe addresses that are the source of allowances
+    /// @param tokens Array of token addresses to transfer
+    /// @param tos Array of recipient addresses
+    /// @return transferAmounts Array of amounts transferred for each operation
+    function executeAllowanceTransfers(
+        address[] calldata safes,
+        address[] calldata tokens,
+        address[] calldata tos
+    ) external nonReentrant returns (uint256[] memory transferAmounts) {
+        uint256 length = safes.length;
+        if (length != tokens.length || length != tos.length) {
+            revert("Array lengths must match");
+        }
+
+        transferAmounts = new uint256[](length);
+
+        for (uint256 i = 0; i < length; i++) {
+            transferAmounts[i] = _executeAllowanceTransfer(safes[i], msg.sender, tokens[i], payable(tos[i]));
+        }
+
+        return transferAmounts;
     }
 
-    /// @notice Get the token balance of a safe
-    /// @param safe The safe address
-    /// @param token The token address (use NATIVE_TOKEN for ETH)
-    /// @return balance The token balance
-    function _getTokenBalance(address safe, address token) internal view returns (uint256 balance) {
-        if (token == NATIVE_TOKEN) {
-            balance = address(safe).balance;
-        } else {
-            balance = IERC20(token).balanceOf(safe);
-        }
-    }
-
-    function _executeTransfer(address safe, address token, address to, uint256 amount) internal {
-        uint256 balanceBefore = _getTokenBalance(to, token);
-
-        bool success;
-        if (token == NATIVE_TOKEN) {
-            success = ISafe(payable(safe)).execTransactionFromModule(to, amount, "", Enum.Operation.Call);
-        } else {
-            bytes memory data = abi.encodeWithSelector(IERC20.transfer.selector, to, amount);
-            success = ISafe(payable(safe)).execTransactionFromModule(token, 0, data, Enum.Operation.Call);
-        }
-
-        if (!success) {
-            revert TransferFailed(safe, msg.sender, token);
-        }
-
-        uint256 balanceAfter = _getTokenBalance(to, token);
-        if (balanceAfter <= balanceBefore) {
-            revert TransferFailed(safe, msg.sender, token);
-        }
+    /// @inheritdoc ILinearAllowanceSingleton
+    function getTokenAllowanceData(
+        address source,
+        address delegate,
+        address token
+    )
+        external
+        view
+        returns (uint192 dripRatePerDay, uint256 totalUnspent, uint256 totalSpent, uint64 lastBookedAtInSeconds)
+    {
+        LinearAllowance memory allowance = _allowances[source][delegate][token];
+        return (
+            allowance.dripRatePerDay,
+            allowance.totalUnspent,
+            allowance.totalSpent,
+            allowance.lastBookedAtInSeconds
+        );
     }
 
     /// @inheritdoc ILinearAllowanceSingleton
     /// @param safe The address of the safe which is the source of the allowance
     function getTotalUnspent(address safe, address delegate, address token) public view returns (uint256) {
         // Cache the storage value in memory (single SLOAD)
-        LinearAllowance memory allowance = allowances[safe][delegate][token];
+        LinearAllowance memory allowance = _allowances[safe][delegate][token];
 
         // Handle uninitialized allowance (lastBookedAtInSeconds == 0)
         if (allowance.lastBookedAtInSeconds == 0) {
@@ -177,6 +157,111 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
                 return 0;
             }
         }
+    }
+
+    /// @notice Get the token balance of a safe
+    /// @param safe The safe address
+    /// @param token The token address (use NATIVE_TOKEN for ETH)
+    /// @return balance The token balance
+    function _getTokenBalance(address safe, address token) internal view returns (uint256 balance) {
+        if (token == NATIVE_TOKEN) {
+            balance = address(safe).balance;
+        } else {
+            balance = IERC20(token).balanceOf(safe);
+        }
+    }
+
+    /// @notice Execute a transfer from the safe to the recipient
+    /// @param safe The safe address executing the transfer
+    /// @param delegate The delegate executing the transfer (for error reporting)
+    /// @param token The token address to transfer
+    /// @param to The recipient address
+    /// @param amount The amount to transfer
+    function _executeTransfer(address safe, address delegate, address token, address to, uint256 amount) internal {
+        bool success;
+        if (token == NATIVE_TOKEN) {
+            success = ISafe(payable(safe)).execTransactionFromModule(to, amount, "", Enum.Operation.Call);
+        } else {
+            bytes memory data = abi.encodeWithSelector(IERC20.transfer.selector, to, amount);
+            success = ISafe(payable(safe)).execTransactionFromModule(token, 0, data, Enum.Operation.Call);
+        }
+
+        if (!success) {
+            revert TransferFailed(safe, delegate, token);
+        }
+    }
+
+    /// @notice Calculate the transfer amount based on allowance and safe balance
+    /// @param safe The safe address
+    /// @param token The token address
+    /// @param a The current allowance data
+    /// @return transferAmount The amount to transfer
+    function _calculateTransferAmount(
+        address safe,
+        address token,
+        LinearAllowance memory a
+    ) internal view returns (uint256 transferAmount) {
+        uint256 safeBalance = _getTokenBalance(safe, token);
+        transferAmount = a.totalUnspent <= safeBalance ? a.totalUnspent : safeBalance;
+    }
+
+    /// @notice Internal function to set a single allowance
+    /// @param safe The safe address that is setting the allowance
+    /// @param delegate The delegate address receiving the allowance
+    /// @param token The token address for the allowance
+    /// @param dripRatePerDay The drip rate per day for the allowance
+    function _setAllowance(address safe, address delegate, address token, uint192 dripRatePerDay) internal {
+        // Cache storage struct in memory to save gas
+        if (delegate == address(0)) revert AddressZeroForArgument("delegate");
+        LinearAllowance memory a = _allowances[safe][delegate][token];
+
+        // Update cached memory values
+        a = _updateAllowance(a);
+        a.dripRatePerDay = dripRatePerDay;
+
+        // Write back to storage once
+        _allowances[safe][delegate][token] = a;
+
+        emit AllowanceSet(safe, delegate, token, dripRatePerDay);
+    }
+
+    /// @notice Internal function to execute a single allowance transfer
+    /// @param safe The safe address that is the source of the allowance
+    /// @param delegate The delegate address executing the transfer
+    /// @param token The token address to transfer
+    /// @param to The recipient address
+    /// @return transferAmount The amount transferred
+    function _executeAllowanceTransfer(
+        address safe,
+        address delegate,
+        address token,
+        address payable to
+    ) internal returns (uint256 transferAmount) {
+        if (safe == address(0)) revert AddressZeroForArgument("safe");
+        if (to == address(0)) revert AddressZeroForArgument("to");
+
+        // Cache storage in memory (single SLOAD)
+        LinearAllowance memory a = _allowances[safe][delegate][token];
+
+        // Update cached memory values
+        a = _updateAllowance(a);
+        if (a.totalUnspent == 0) revert NoAllowanceToTransfer(safe, delegate, token);
+
+        // Calculate transfer amount based on available allowance and safe balance
+        transferAmount = _calculateTransferAmount(safe, token, a);
+        if (transferAmount == 0) revert ZeroTransfer(safe, delegate, token);
+
+        // Update bookkeeping and write to storage BEFORE external calls (effects)
+        a.totalSpent += transferAmount;
+        a.totalUnspent -= transferAmount;
+        _allowances[safe][delegate][token] = a;
+
+        // Execute the transfer
+        _executeTransfer(safe, delegate, token, to, transferAmount);
+
+        emit AllowanceTransferred(safe, delegate, token, to, transferAmount);
+
+        return transferAmount;
     }
 
     function _updateAllowance(LinearAllowance memory a) internal view returns (LinearAllowance memory) {

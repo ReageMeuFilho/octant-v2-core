@@ -30,12 +30,26 @@ abstract contract LinearAllowanceExecutor {
         return allowanceModule.executeAllowanceTransfer(safe, token, payable(address(this)));
     }
 
-    /// @notice Get the total unspent allowance for a token that this contract can claim
-    /// @dev This is a view function that calculates the current available allowance without executing a transfer
-    /// @param allowanceModule The allowance module contract to query
-    /// @param safe The address of the Safe that holds the allowance funds
-    /// @param token The address of the token to check allowance for
-    /// @return totalAllowanceAsOfNow The total unspent allowance available for immediate transfer
+    // @notice Execute a batch of transfers of the allowance.
+    /// @param allowanceModule The allowance module to use.
+    /// @param safes The addresses of the safes that are the source of the allowance.
+    /// @param tokens The addresses of the tokens to transfer.
+    /// @param tos The addresses of the beneficiaries.
+    /// @return transferAmounts The amounts transferred for each operation.
+    function executeAllowanceTransfers(
+        LinearAllowanceSingletonForGnosisSafe allowanceModule,
+        address[] calldata safes,
+        address[] calldata tokens,
+        address[] calldata tos
+    ) external returns (uint256[] memory transferAmounts) {
+        return allowanceModule.executeAllowanceTransfers(safes, tokens, tos);
+    }
+
+    // @notice Get the total unspent allowance for a token.
+    /// @param allowanceModule The allowance module to use.
+    /// @param safe The address of the safe.
+    /// @param token The address of the token.
+    /// @return totalAllowanceAsOfNow The total unspent allowance as of now.
     function getTotalUnspent(
         LinearAllowanceSingletonForGnosisSafe allowanceModule,
         address safe,

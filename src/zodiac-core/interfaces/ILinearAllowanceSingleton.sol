@@ -80,6 +80,15 @@ interface ILinearAllowanceSingleton {
     /// @param delegate The delegate whose allowance should be emergency revoked
     /// @param token The token for which to revoke the allowance. Use NATIVE_TOKEN for ETH
     function emergencyRevokeAllowance(address delegate, address token) external;
+    /// @notice Set multiple allowances in a single transaction
+    /// @param delegates Array of delegate addresses
+    /// @param tokens Array of token addresses
+    /// @param dripRatesPerDay Array of drip rates per day
+    function setAllowances(
+        address[] calldata delegates,
+        address[] calldata tokens,
+        uint192[] calldata dripRatesPerDay
+    ) external;
 
     /// @notice Execute a transfer of the allowance
     /// @dev msg.sender is the delegate
@@ -88,6 +97,34 @@ interface ILinearAllowanceSingleton {
     /// @param to The address of the beneficiary
     /// @return The amount that was actually transferred
     function executeAllowanceTransfer(address source, address token, address payable to) external returns (uint256);
+
+    /// @notice Execute a batch of transfers of the allowance
+    /// @dev msg.sender is the delegate
+    /// @param safes The addresses of the safes that are the source of the allowance
+    /// @param tokens The addresses of the tokens to transfer
+    /// @param tos The addresses of the beneficiaries
+    function executeAllowanceTransfers(
+        address[] calldata safes,
+        address[] calldata tokens,
+        address[] calldata tos
+    ) external returns (uint256[] memory transferAmounts);
+
+    /// @notice Get the allowance data for a token
+    /// @param source The address of the source of the allowance
+    /// @param delegate The address of the delegate
+    /// @param token The address of the token
+    /// @return dripRatePerDay The drip rate per day
+    /// @return totalUnspent The total unspent allowance
+    /// @return totalSpent The total spent allowance
+    /// @return lastBookedAtInSeconds The last booked timestamp in seconds
+    function getTokenAllowanceData(
+        address source,
+        address delegate,
+        address token
+    )
+        external
+        view
+        returns (uint192 dripRatePerDay, uint256 totalUnspent, uint256 totalSpent, uint64 lastBookedAtInSeconds);
 
     /// @notice Get the total unspent allowance for a token as of now
     /// @param source The address of the source of the allowance
