@@ -368,7 +368,7 @@ contract TestLinearAllowanceIntegration is Test {
         // Verify the return value
         assertEq(updatedAllowance.dripRatePerDay, dripRate);
         assertEq(updatedAllowance.totalUnspent, uint256(expectedUnspent));
-        assertEq(updatedAllowance.lastBookedAtInSeconds, uint32(block.timestamp));
+        assertEq(updatedAllowance.lastBookedAtInSeconds, uint64(block.timestamp));
         assertEq(updatedAllowance.totalSpent, 0, "Total spent should remain unchanged");
     }
 
