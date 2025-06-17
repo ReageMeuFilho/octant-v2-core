@@ -6,7 +6,7 @@ import { LinearAllowanceSingletonForGnosisSafe } from "src/zodiac-core/modules/L
 /// @title LinearAllowanceExecutor
 /// @notice Abstract base contract for executing linear allowance transfers from Gnosis Safe modules
 /// @dev This contract provides the core functionality for interacting with LinearAllowanceSingletonForGnosisSafe
-/// while leaving withdrawal mechanisms to be implemented by derived contracts. The contract can receive 
+/// while leaving withdrawal mechanisms to be implemented by derived contracts. The contract can receive
 /// both ETH and ERC20 tokens from allowance transfers, but the specific withdrawal logic must be defined
 /// by inheriting contracts to ensure proper access control and business logic implementation.
 abstract contract LinearAllowanceExecutor {
@@ -33,7 +33,7 @@ abstract contract LinearAllowanceExecutor {
     /// @notice Get the total unspent allowance for a token that this contract can claim
     /// @dev This is a view function that calculates the current available allowance without executing a transfer
     /// @param allowanceModule The allowance module contract to query
-    /// @param safe The address of the Safe that holds the allowance funds  
+    /// @param safe The address of the Safe that holds the allowance funds
     /// @param token The address of the token to check allowance for
     /// @return totalAllowanceAsOfNow The total unspent allowance available for immediate transfer
     function getTotalUnspent(
@@ -53,7 +53,5 @@ abstract contract LinearAllowanceExecutor {
     /// @param token The address of the token to withdraw (use NATIVE_TOKEN for ETH)
     /// @param amount The amount to withdraw from this contract's balance
     /// @param to The destination address to send the withdrawn funds
-    function withdraw(address token, uint256 amount, address payable to) external virtual {
-        
-    }
+    function withdraw(address token, uint256 amount, address payable to) external virtual {}
 }
