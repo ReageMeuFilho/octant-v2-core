@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -29,7 +29,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
 
     /// @inheritdoc ILinearAllowanceSingleton
     function setAllowance(address delegate, address token, uint192 dripRatePerDay) external nonReentrant {
-        if (delegate == address(0)) revert InvalidDelegate();
+        if (delegate == address(0)) revert AddressZeroForArgument("delegate");
 
         // Cache storage struct in memory to save gas
         LinearAllowance memory a = allowances[msg.sender][delegate][token];
@@ -45,35 +45,18 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
     }
 
     /// @inheritdoc ILinearAllowanceSingleton
-    function emergencyRevokeAllowance(address delegate, address token) external {
-        if (delegate == address(0)) revert InvalidDelegate();
+    function emergencyRevokeAllowance(address delegate, address token) external nonReentrant {
+        if (delegate == address(0)) revert AddressZeroForArgument("delegate");
 
-        // Cache storage struct in memory to save gas
-        LinearAllowance memory a = allowances[msg.sender][delegate][token];
+        LinearAllowance memory allowance = allowances[msg.sender][delegate][token];
+        allowance = _updateAllowance(allowance);
 
-        // Calculate the amount that would have been cleared (for event emission)
-        // This includes both existing unspent amount and any newly accrued amount
-        uint256 clearedAmount = 0;
-        if (a.lastBookedAtInSeconds != 0) {
-            uint256 timeElapsed = block.timestamp - a.lastBookedAtInSeconds;
-            // Calculate total amount that would be available (existing + newly accrued)
-            clearedAmount = a.totalUnspent + ((a.dripRatePerDay * timeElapsed) / 1 days);
-        } else {
-            // If never initialized, only clear existing unspent (should be 0)
-            clearedAmount = a.totalUnspent;
-        }
+        emit AllowanceEmergencyRevoked(msg.sender, delegate, token, allowance.totalUnspent);
 
-        // Emergency revocation: immediately zero drip rate and clear all unspent amounts
-        // This provides true incident response capability for compromised delegates
-        a.dripRatePerDay = 0;
-        a.totalUnspent = 0;
-        a.lastBookedAtInSeconds = block.timestamp.toUint32();
-        // TODO: should we keep the totalSpent?
+        allowance.dripRatePerDay = 0;
+        allowance.totalUnspent = 0;
 
-        // Write back to storage once
-        allowances[msg.sender][delegate][token] = a;
-
-        emit AllowanceEmergencyRevoked(msg.sender, delegate, token, clearedAmount);
+        allowances[msg.sender][delegate][token] = allowance;
     }
 
     /// @inheritdoc ILinearAllowanceSingleton
@@ -83,34 +66,26 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
         address token,
         address payable to
     ) external nonReentrant returns (uint256) {
-        if (to == address(0)) revert InvalidRecipient();
+        if (safe == address(0)) revert AddressZeroForArgument("safe");
+        if (to == address(0)) revert AddressZeroForArgument("to");
 
         // Cache storage in memory (single SLOAD)
         LinearAllowance memory a = allowances[safe][msg.sender][token];
 
         // Update cached memory values
         a = _updateAllowance(a);
-        //slither-disable-next-line incorrect-equality
         if (a.totalUnspent == 0) revert NoAllowanceToTransfer(safe, msg.sender, token);
 
         // Calculate transfer amount based on available allowance and safe balance
         uint256 transferAmount = _calculateTransferAmount(safe, token, a);
-
-        // Handle zero-amount transfers with specific error types
-        _validateTransferAmount(transferAmount, a, safe, token);
+        if (transferAmount == 0) revert ZeroTransfer(safe, msg.sender, token);
 
         // Update bookkeeping and write to storage BEFORE external calls (effects)
         a.totalSpent += transferAmount;
         a.totalUnspent -= transferAmount;
         allowances[safe][msg.sender][token] = a;
 
-        // Execute transfer and verify actual amount transferred
-        uint256 actualTransferred = _executeAndVerifyTransfer(safe, token, to, transferAmount);
-
-        // Handle non-compliant tokens and precision loss: verify actual transfer occurred
-        if (actualTransferred == 0) {
-            revert NoAmountToTransfer();
-        }
+        _executeTransfer(safe, token, to, transferAmount);
 
         emit AllowanceTransferred(safe, msg.sender, token, to, transferAmount);
 
@@ -131,29 +106,6 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
         transferAmount = a.totalUnspent <= safeBalance ? a.totalUnspent : safeBalance;
     }
 
-    /// @notice Validate that the transfer amount is valid
-    /// @param transferAmount The amount to transfer
-    /// @param a The current allowance data
-    /// @param safe The safe address (source of allowance)
-    /// @param token The token address
-    function _validateTransferAmount(
-        uint256 transferAmount,
-        LinearAllowance memory a,
-        address safe,
-        address token
-    ) internal view {
-        if (transferAmount == 0) {
-            //slither-disable-next-line incorrect-equality
-            if (a.totalUnspent == 0 && a.dripRatePerDay == 0) {
-                // True no allowance case: no drip rate set
-                revert NoAllowanceToTransfer(safe, msg.sender, token);
-            } else {
-                // Precision loss or insufficient balance case
-                revert NoAmountToTransfer();
-            }
-        }
-    }
-
     /// @notice Get the token balance of a safe
     /// @param safe The safe address
     /// @param token The token address (use NATIVE_TOKEN for ETH)
@@ -166,67 +118,25 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
         }
     }
 
-    /// @notice Execute transfer and verify the actual amount transferred
-    /// @param safe The safe address
-    /// @param token The token address
-    /// @param to The recipient address
-    /// @param transferAmount The amount to transfer
-    /// @return actualTransferred The actual amount transferred
-    function _executeAndVerifyTransfer(
-        address safe,
-        address token,
-        address to,
-        uint256 transferAmount
-    ) internal returns (uint256 actualTransferred) {
-        // Get balance before transfer
-        uint256 balanceBefore = _getTokenBalance(safe, token);
+    function _executeTransfer(address safe, address token, address to, uint256 amount) internal {
+        uint256 balanceBefore = _getTokenBalance(to, token);
 
-        // Execute transfer via Safe
-        bool success = _executeTransfer(safe, token, to, transferAmount);
+        bool success;
+        if (token == NATIVE_TOKEN) {
+            success = ISafe(payable(safe)).execTransactionFromModule(to, amount, "", Enum.Operation.Call);
+        } else {
+            bytes memory data = abi.encodeWithSelector(IERC20.transfer.selector, to, amount);
+            success = ISafe(payable(safe)).execTransactionFromModule(token, 0, data, Enum.Operation.Call);
+        }
+
         if (!success) {
             revert TransferFailed(safe, msg.sender, token);
         }
 
-        // Get balance after transfer and calculate actual transferred amount
-        uint256 balanceAfter = _getTokenBalance(safe, token);
-        actualTransferred = balanceBefore - balanceAfter;
-    }
-
-    /// @notice Execute a transfer via the Safe module
-    /// @param safe The safe address
-    /// @param token The token address
-    /// @param to The recipient address
-    /// @param amount The amount to transfer
-    /// @return success Whether the transfer was successful
-    function _executeTransfer(address safe, address token, address to, uint256 amount) internal returns (bool success) {
-        if (token == NATIVE_TOKEN) {
-            // Execute ETH transfer via Safe
-            success = ISafe(payable(safe)).execTransactionFromModule(to, amount, "", Enum.Operation.Call);
-        } else {
-            // Execute ERC20 transfer via Safe
-            bytes memory data = abi.encodeWithSelector(IERC20.transfer.selector, to, amount);
-            success = ISafe(payable(safe)).execTransactionFromModule(token, 0, data, Enum.Operation.Call);
+        uint256 balanceAfter = _getTokenBalance(to, token);
+        if (balanceAfter <= balanceBefore) {
+            revert TransferFailed(safe, msg.sender, token);
         }
-    }
-
-    /// @inheritdoc ILinearAllowanceSingleton
-    /// @param safe The address of the safe which is the source of the allowance
-    function getTokenAllowanceData(
-        address safe,
-        address delegate,
-        address token
-    )
-        public
-        view
-        returns (uint192 dripRatePerDay, uint256 totalUnspent, uint256 totalSpent, uint64 lastBookedAtInSeconds)
-    {
-        LinearAllowance memory allowance = allowances[safe][delegate][token];
-        return (
-            allowance.dripRatePerDay,
-            allowance.totalUnspent,
-            allowance.totalSpent,
-            allowance.lastBookedAtInSeconds
-        );
     }
 
     /// @inheritdoc ILinearAllowanceSingleton

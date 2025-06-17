@@ -57,14 +57,15 @@ interface ILinearAllowanceSingleton {
     /// @param token The token being transferred
     error TransferFailed(address source, address delegate, address token);
 
-    /// @notice Error thrown when trying to set allowance for zero address delegate
-    error InvalidDelegate();
+    /// @notice Error thrown when a transfer is attempted with zero amount
+    /// @param source The address of the source of the allowance
+    /// @param delegate The delegate attempting the transfer
+    /// @param token The token being transferred
+    error ZeroTransfer(address source, address delegate, address token);
 
-    /// @notice Error thrown when trying to transfer to zero address
-    error InvalidRecipient();
-
-    /// @notice Error thrown when trying to transfer zero amount
-    error NoAmountToTransfer();
+    /// @notice Error thrown when an argument is the zero address
+    /// @param argumentName The name of the argument
+    error AddressZeroForArgument(string argumentName);
 
     /// @notice Set the allowance for a delegate. To revoke, set dripRatePerDay to 0. Revoking will not cancel any unspent allowance.
     /// @param delegate The delegate to set the allowance for
@@ -87,23 +88,6 @@ interface ILinearAllowanceSingleton {
     /// @param to The address of the beneficiary
     /// @return The amount that was actually transferred
     function executeAllowanceTransfer(address source, address token, address payable to) external returns (uint256);
-
-    /// @notice Get the allowance data for a token
-    /// @param source The address of the source of the allowance
-    /// @param delegate The address of the delegate
-    /// @param token The address of the token
-    /// @return dripRatePerDay The drip rate per day
-    /// @return totalUnspent The total unspent allowance
-    /// @return totalSpent The total spent allowance
-    /// @return lastBookedAtInSeconds The last booked timestamp in seconds
-    function getTokenAllowanceData(
-        address source,
-        address delegate,
-        address token
-    )
-        external
-        view
-        returns (uint192 dripRatePerDay, uint256 totalUnspent, uint256 totalSpent, uint64 lastBookedAtInSeconds);
 
     /// @notice Get the total unspent allowance for a token as of now
     /// @param source The address of the source of the allowance
