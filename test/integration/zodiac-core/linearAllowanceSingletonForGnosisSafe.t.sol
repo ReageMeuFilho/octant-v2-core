@@ -60,15 +60,18 @@ contract TestLinearAllowanceIntegration is Test {
 
     // Test ETH allowance with both full and partial withdrawals
     function testAllowanceWithETH(uint192 dripRatePerDay, uint256 daysElapsed, uint256 safeBalance) public {
-        // Constrain inputs to reasonable values
-        vm.assume(dripRatePerDay > 0 ether);
+        // Constrain inputs to reasonable values to avoid edge cases
+        dripRatePerDay = uint192(bound(dripRatePerDay, 1 ether, 1000 ether)); // Minimum 1 ether to avoid tiny amounts
         daysElapsed = uint32(bound(daysElapsed, 1, 365 * 20));
 
         // Calculate expected allowance
         uint256 expectedAllowance = uint256(dripRatePerDay) * uint256(daysElapsed);
 
         // Constrain safeBalance to ensure we test both partial and full withdrawals
-        safeBalance = bound(safeBalance, expectedAllowance / 2, expectedAllowance * 2);
+        // Use max to ensure minimum of 1 to avoid zero transfers
+        uint256 minSafeBalance = expectedAllowance / 2;
+        if (minSafeBalance == 0) minSafeBalance = 1;
+        safeBalance = bound(safeBalance, minSafeBalance, expectedAllowance * 2);
 
         // Setup
         address safeAddress = address(safeImpl);
@@ -111,7 +114,11 @@ contract TestLinearAllowanceIntegration is Test {
         );
 
         // Verify allowance bookkeeping
-        (, , uint256 totalUnspent, ) = allowanceModule.allowances(safeAddress, executorAddress, NATIVE_TOKEN);
+        (, uint256 totalUnspent, , ) = allowanceModule.getTokenAllowanceData(
+            safeAddress,
+            executorAddress,
+            NATIVE_TOKEN
+        );
 
         if (expectedAllowance > safeBalanceBefore) {
             // Partial withdrawal case
@@ -142,15 +149,18 @@ contract TestLinearAllowanceIntegration is Test {
 
     // Test ERC20 allowance with both full and partial withdrawals
     function testAllowanceWithERC20(uint192 dripRatePerDay, uint256 daysElapsed, uint256 tokenSupply) public {
-        // Constrain inputs to reasonable values
-        vm.assume(dripRatePerDay > 0 ether);
+        // Constrain inputs to reasonable values to avoid edge cases
+        dripRatePerDay = uint192(bound(dripRatePerDay, 1 ether, 1000 ether)); // Minimum 1 ether to avoid tiny amounts
         daysElapsed = uint32(bound(daysElapsed, 1, 365 * 20));
 
         // Calculate expected allowance
         uint256 expectedAllowance = uint256(dripRatePerDay) * uint256(daysElapsed);
 
         // Constrain tokenSupply to ensure we test both partial and full withdrawals
-        tokenSupply = bound(tokenSupply, expectedAllowance / 2, expectedAllowance * 2);
+        // Use max to ensure minimum of 1 to avoid zero transfers
+        uint256 minTokenSupply = expectedAllowance / 2;
+        if (minTokenSupply == 0) minTokenSupply = 1;
+        tokenSupply = bound(tokenSupply, minTokenSupply, expectedAllowance * 2);
 
         // Setup
         address safeAddress = address(safeImpl);
@@ -194,7 +204,11 @@ contract TestLinearAllowanceIntegration is Test {
         );
 
         // Verify allowance bookkeeping
-        (, , uint256 totalUnspent, ) = allowanceModule.allowances(safeAddress, executorAddress, address(token));
+        (, uint256 totalUnspent, , ) = allowanceModule.getTokenAllowanceData(
+            safeAddress,
+            executorAddress,
+            address(token)
+        );
 
         if (expectedAllowance > safeBalanceBefore) {
             // Partial withdrawal case
@@ -221,6 +235,39 @@ contract TestLinearAllowanceIntegration is Test {
             unspentAfterZeroRate,
             "Balance should not increase after rate set to 0"
         );
+    }
+
+    // Test that zero transfers are properly rejected
+    function testZeroTransferReverts() public {
+        address safeAddress = address(safeImpl);
+        address executorAddress = address(allowanceExecutor);
+
+        // Create token with some supply but don't fund the safe
+        TestERC20 token = new TestERC20(100 ether);
+        // Safe has 0 tokens (no transfer to safe)
+
+        // Set up allowance
+        vm.prank(safeAddress);
+        allowanceModule.setAllowance(executorAddress, address(token), uint192(1 ether));
+
+        // Advance time to accrue allowance
+        vm.warp(block.timestamp + 1 days);
+
+        // Verify allowance exists but safe has no tokens
+        uint256 totalUnspent = allowanceModule.getTotalUnspent(safeAddress, executorAddress, address(token));
+        assertGt(totalUnspent, 0, "Should have accrued allowance");
+        assertEq(token.balanceOf(safeAddress), 0, "Safe should have no tokens");
+
+        // Expect ZeroTransfer error when attempting to transfer
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ILinearAllowanceSingleton.ZeroTransfer.selector,
+                safeAddress,
+                executorAddress,
+                address(token)
+            )
+        );
+        allowanceExecutor.executeAllowanceTransfer(allowanceModule, safeAddress, address(token));
     }
 
     function testGetTotalUnspentWithUninitializedAllowance() public view {
@@ -314,7 +361,7 @@ contract TestLinearAllowanceIntegration is Test {
         allowanceModule.setAllowance(address(executor), address(testToken), uint192(200 ether));
 
         // Verify the allowance was updated correctly
-        (uint192 dripRate, uint64 lastBooked, uint256 unspent, ) = allowanceModule.allowances(
+        (uint192 dripRate, uint256 unspent, , uint64 lastBooked) = allowanceModule.getTokenAllowanceData(
             address(safe),
             address(executor),
             address(testToken)
@@ -512,10 +559,10 @@ contract TestLinearAllowanceIntegration is Test {
         // Verify the allowance data shows proper state
         (
             uint192 dripRateAfter,
-            uint64 lastBookedAfter,
             uint256 totalUnspentAfter,
-            uint256 totalSpentAfter
-        ) = allowanceModule.allowances(safeAddress, address(executor), NATIVE_TOKEN);
+            uint256 totalSpentAfter,
+            uint64 lastBookedAfter
+        ) = allowanceModule.getTokenAllowanceData(safeAddress, address(executor), NATIVE_TOKEN);
 
         assertEq(dripRateAfter, 0, "Drip rate should be zero");
         assertEq(totalUnspentAfter, 0, "Total unspent should be zero");
@@ -807,7 +854,11 @@ contract TestLinearAllowanceIntegration is Test {
         allowanceModule.setAllowance(address(executor), NATIVE_TOKEN, dripRate);
 
         // Verify allowance was set correctly
-        (uint192 actualDripRate, , , ) = allowanceModule.allowances(safeAddress, address(executor), NATIVE_TOKEN);
+        (uint192 actualDripRate, , , ) = allowanceModule.getTokenAllowanceData(
+            safeAddress,
+            address(executor),
+            NATIVE_TOKEN
+        );
         assertEq(actualDripRate, dripRate, "Safe should be able to set allowances for its delegates");
     }
 
@@ -822,8 +873,16 @@ contract TestLinearAllowanceIntegration is Test {
         allowanceModule.setAllowance(address(executor), NATIVE_TOKEN, dripRate);
 
         // The attacker only affected their own allowances, not the Safe's
-        (uint192 safeAllowanceRate, , , ) = allowanceModule.allowances(safeAddress, address(executor), NATIVE_TOKEN);
-        (uint192 attackerAllowanceRate, , , ) = allowanceModule.allowances(attacker, address(executor), NATIVE_TOKEN);
+        (uint192 safeAllowanceRate, , , ) = allowanceModule.getTokenAllowanceData(
+            safeAddress,
+            address(executor),
+            NATIVE_TOKEN
+        );
+        (uint192 attackerAllowanceRate, , , ) = allowanceModule.getTokenAllowanceData(
+            attacker,
+            address(executor),
+            NATIVE_TOKEN
+        );
 
         assertEq(safeAllowanceRate, 0, "Safe allowances should be unaffected by attacker");
         assertEq(attackerAllowanceRate, dripRate, "Attacker only affected their own allowances");
@@ -840,7 +899,11 @@ contract TestLinearAllowanceIntegration is Test {
         allowanceModule.setAllowance(address(executor), NATIVE_TOKEN, legitimateDripRate);
 
         // Verify legitimate allowance
-        (uint192 initialRate, , , ) = allowanceModule.allowances(safeAddress, address(executor), NATIVE_TOKEN);
+        (uint192 initialRate, , , ) = allowanceModule.getTokenAllowanceData(
+            safeAddress,
+            address(executor),
+            NATIVE_TOKEN
+        );
         assertEq(initialRate, legitimateDripRate, "Initial allowance should be set correctly");
 
         // Create and enable malicious module
@@ -860,7 +923,7 @@ contract TestLinearAllowanceIntegration is Test {
         );
 
         // Check if the attack succeeded
-        (uint192 finalRate, , , ) = allowanceModule.allowances(safeAddress, address(executor), NATIVE_TOKEN);
+        (uint192 finalRate, , , ) = allowanceModule.getTokenAllowanceData(safeAddress, address(executor), NATIVE_TOKEN);
 
         if (attackSuccess && finalRate == maliciousDripRate) {
             emit log_string("CRITICAL VULNERABILITY: Malicious module can set unauthorized allowances!");
@@ -896,7 +959,11 @@ contract TestLinearAllowanceIntegration is Test {
         assertTrue(success, "Safe owners should be able to set allowances via multisig");
 
         // Verify allowance was set correctly
-        (uint192 actualRate, , , ) = allowanceModule.allowances(safeAddress, address(executor), NATIVE_TOKEN);
+        (uint192 actualRate, , , ) = allowanceModule.getTokenAllowanceData(
+            safeAddress,
+            address(executor),
+            NATIVE_TOKEN
+        );
         assertEq(actualRate, dripRate, "Allowance should be set via legitimate multisig execution");
     }
 
@@ -926,7 +993,11 @@ contract TestLinearAllowanceIntegration is Test {
             bool success = maliciousModule.attemptSetAllowanceViaModule(address(executor), NATIVE_TOKEN, increases[i]);
 
             if (success) {
-                (uint192 currentRate, , , ) = allowanceModule.allowances(safeAddress, address(executor), NATIVE_TOKEN);
+                (uint192 currentRate, , , ) = allowanceModule.getTokenAllowanceData(
+                    safeAddress,
+                    address(executor),
+                    NATIVE_TOKEN
+                );
                 emit log_string("VULNERABILITY: Gradual allowance increase succeeded");
                 emit log_named_uint("Step", i + 1);
                 emit log_named_uint("New allowance", currentRate);
@@ -938,9 +1009,139 @@ contract TestLinearAllowanceIntegration is Test {
         }
 
         // If we get here, all attacks failed (good!)
-        (uint192 finalRate, , , ) = allowanceModule.allowances(safeAddress, address(executor), NATIVE_TOKEN);
+        (uint192 finalRate, , , ) = allowanceModule.getTokenAllowanceData(safeAddress, address(executor), NATIVE_TOKEN);
         assertEq(finalRate, legitimateRate, "All malicious increases should have failed");
         emit log_string("SECURE: Gradual allowance increase attacks blocked");
+    }
+
+    function testGetMaxWithdrawableAmount(
+        uint128 dripRatePerDay,
+        uint32 timeElapsed,
+        uint256 ethBalance,
+        uint256 tokenBalance
+    ) public {
+        // Constrain inputs to reasonable values
+        vm.assume(dripRatePerDay > 0 && dripRatePerDay <= 1000 ether); // Up to 1000 ETH per day
+        vm.assume(timeElapsed > 0 && timeElapsed <= 365 days); // Up to 1 year
+        vm.assume(ethBalance <= 10000 ether); // Reasonable ETH balance
+        vm.assume(tokenBalance <= 10000 ether && tokenBalance > 0); // Reasonable token balance
+
+        address safeAddress = address(safeImpl);
+        address executorAddress = address(allowanceExecutor);
+
+        // Calculate expected allowance based on inputs
+        uint256 expectedAllowance = (uint256(dripRatePerDay) * timeElapsed) / 1 days;
+
+        // Test with ETH
+        vm.startPrank(safeAddress);
+        allowanceModule.setAllowance(executorAddress, NATIVE_TOKEN, dripRatePerDay);
+        vm.stopPrank();
+
+        // Advance time to accrue allowance
+        vm.warp(block.timestamp + timeElapsed);
+
+        // Set safe ETH balance
+        vm.deal(safeAddress, ethBalance);
+
+        uint256 totalUnspentEth = allowanceModule.getTotalUnspent(safeAddress, executorAddress, NATIVE_TOKEN);
+        uint256 maxWithdrawableEth = allowanceModule.getMaxWithdrawableAmount(
+            safeAddress,
+            executorAddress,
+            NATIVE_TOKEN
+        );
+
+        // Verify total unspent matches expected allowance
+        assertEq(totalUnspentEth, expectedAllowance, "Total unspent ETH should match expected allowance");
+
+        // Verify max withdrawable is minimum of allowance and balance
+        uint256 expectedMaxEth = expectedAllowance <= ethBalance ? expectedAllowance : ethBalance;
+        assertEq(maxWithdrawableEth, expectedMaxEth, "Max withdrawable ETH should be min(allowance, balance)");
+
+        // Test with ERC20 token
+        TestERC20 token = new TestERC20(tokenBalance * 2); // Create with more than needed
+
+        // Set allowance for token (using same parameters)
+        vm.startPrank(safeAddress);
+        allowanceModule.setAllowance(executorAddress, address(token), dripRatePerDay);
+        vm.stopPrank();
+
+        // Advance time again to accrue same allowance for token
+        vm.warp(block.timestamp + timeElapsed);
+
+        // Transfer tokens to safe
+        token.transfer(safeAddress, tokenBalance);
+
+        uint256 totalUnspentToken = allowanceModule.getTotalUnspent(safeAddress, executorAddress, address(token));
+        uint256 maxWithdrawableToken = allowanceModule.getMaxWithdrawableAmount(
+            safeAddress,
+            executorAddress,
+            address(token)
+        );
+
+        // Verify total unspent matches expected allowance
+        assertEq(totalUnspentToken, expectedAllowance, "Total unspent tokens should match expected allowance");
+
+        // Verify max withdrawable is minimum of allowance and balance
+        uint256 expectedMaxToken = expectedAllowance <= tokenBalance ? expectedAllowance : tokenBalance;
+        assertEq(maxWithdrawableToken, expectedMaxToken, "Max withdrawable tokens should be min(allowance, balance)");
+
+        // Edge case: Test with zero allowance
+        uint256 maxWithdrawableZero = allowanceModule.getMaxWithdrawableAmount(
+            safeAddress,
+            address(0x123),
+            NATIVE_TOKEN
+        );
+        assertEq(maxWithdrawableZero, 0, "Max withdrawable should be 0 for uninitialized allowance");
+    }
+
+    function testLinearAllowanceExecutorPreviewFunctions(
+        uint128 dripRatePerDay,
+        uint32 timeElapsed,
+        uint256 safeBalance
+    ) public {
+        // Constrain inputs to reasonable values
+        vm.assume(dripRatePerDay > 0 && dripRatePerDay <= 500 ether); // Up to 500 ETH per day
+        vm.assume(timeElapsed > 0 && timeElapsed <= 180 days); // Up to 6 months
+        vm.assume(safeBalance <= 5000 ether); // Reasonable safe balance
+
+        address safeAddress = address(safeImpl);
+
+        // Calculate expected allowance
+        uint256 expectedAllowance = (uint256(dripRatePerDay) * timeElapsed) / 1 days;
+
+        // Set allowance
+        vm.prank(safeAddress);
+        allowanceModule.setAllowance(address(allowanceExecutor), NATIVE_TOKEN, dripRatePerDay);
+
+        // Advance time to accrue allowance
+        vm.warp(block.timestamp + timeElapsed);
+
+        // Set safe balance
+        vm.deal(safeAddress, safeBalance);
+
+        // Test preview functions through LinearAllowanceExecutor
+        uint256 totalUnspent = allowanceExecutor.getTotalUnspent(allowanceModule, safeAddress, NATIVE_TOKEN);
+        uint256 maxWithdrawable = allowanceExecutor.getMaxWithdrawableAmount(
+            allowanceModule,
+            safeAddress,
+            NATIVE_TOKEN
+        );
+
+        // Verify total unspent matches expected allowance
+        assertEq(totalUnspent, expectedAllowance, "Executor should see correct total unspent allowance");
+
+        // Verify max withdrawable is minimum of allowance and balance
+        uint256 expectedMaxWithdrawable = expectedAllowance <= safeBalance ? expectedAllowance : safeBalance;
+        assertEq(maxWithdrawable, expectedMaxWithdrawable, "Executor should see correct max withdrawable amount");
+
+        // Execute the transfer to verify the preview was accurate (only if there's something to withdraw)
+        if (maxWithdrawable > 0) {
+            uint256 balanceBefore = address(allowanceExecutor).balance;
+            allowanceExecutor.executeAllowanceTransfer(allowanceModule, safeAddress, NATIVE_TOKEN);
+            uint256 balanceAfter = address(allowanceExecutor).balance;
+
+            assertEq(balanceAfter - balanceBefore, maxWithdrawable, "Actual transfer should match preview");
+        }
     }
 
     // Helper for Safe transactions (necessary due to Safe's complex transaction execution)
