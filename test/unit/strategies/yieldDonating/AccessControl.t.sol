@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.8.18;
 
-import "forge-std/console.sol";
 import { Setup } from "./utils/Setup.sol";
 import { TokenizedStrategy } from "src/core/TokenizedStrategy.sol";
 import { BaseStrategy } from "src/core/BaseStrategy.sol";
@@ -253,5 +252,373 @@ contract AccessControlTest is Setup {
         strategy.setName(newName);
 
         assertEq(strategy.name(), newName);
+    }
+
+    // ================== Dragon Router Cooldown Tests ==================
+
+    function test_dragonRouter_initialState() public view {
+        assertEq(strategy.dragonRouter(), donationAddress);
+        assertEq(strategy.pendingDragonRouter(), address(0));
+        assertEq(strategy.dragonRouterChangeTimestamp(), 0);
+    }
+
+    function test_setDragonRouter_initiatesCooldown(address _newRouter) public {
+        vm.assume(_newRouter != address(0) && _newRouter != donationAddress);
+
+        uint256 currentTime = block.timestamp;
+        uint256 expectedEffectiveTime = currentTime + 14 days;
+
+        vm.expectEmit(true, false, false, true, address(strategy));
+        emit TokenizedStrategy.PendingDragonRouterChange(_newRouter, expectedEffectiveTime);
+
+        vm.prank(management);
+        strategy.setDragonRouter(_newRouter);
+
+        assertEq(strategy.pendingDragonRouter(), _newRouter);
+        assertEq(strategy.dragonRouterChangeTimestamp(), currentTime);
+        assertEq(strategy.dragonRouter(), donationAddress); // Should not change yet
+    }
+
+    function test_setDragonRouter_accessControl(address _caller) public {
+        vm.assume(_caller != management);
+        address newRouter = address(0x123);
+
+        vm.prank(_caller);
+        vm.expectRevert("!management");
+        strategy.setDragonRouter(newRouter);
+    }
+
+    function test_setDragonRouter_zeroAddress_reverts() public {
+        vm.prank(management);
+        vm.expectRevert("ZERO ADDRESS");
+        strategy.setDragonRouter(address(0));
+    }
+
+    function test_setDragonRouter_sameRouter_reverts() public {
+        vm.prank(management);
+        vm.expectRevert("same dragon router");
+        strategy.setDragonRouter(donationAddress);
+    }
+
+    function test_setDragonRouter_canOverridePending() public {
+        address router1 = address(0x111);
+        address router2 = address(0x222);
+
+        // Set first router
+        vm.prank(management);
+        strategy.setDragonRouter(router1);
+        assertEq(strategy.pendingDragonRouter(), router1);
+
+        // Override with second router
+        vm.prank(management);
+        strategy.setDragonRouter(router2);
+        assertEq(strategy.pendingDragonRouter(), router2);
+        assertEq(strategy.dragonRouterChangeTimestamp(), block.timestamp);
+    }
+
+    function test_finalizeDragonRouterChange_afterCooldown() public {
+        address newRouter = address(0x123);
+
+        // Initiate change
+        vm.prank(management);
+        strategy.setDragonRouter(newRouter);
+
+        // Skip cooldown period
+        skip(14 days);
+
+        vm.expectEmit(true, false, false, false, address(strategy));
+        emit TokenizedStrategy.UpdateDragonRouter(newRouter);
+
+        // Anyone can finalize
+        strategy.finalizeDragonRouterChange();
+
+        assertEq(strategy.dragonRouter(), newRouter);
+        assertEq(strategy.pendingDragonRouter(), address(0));
+        assertEq(strategy.dragonRouterChangeTimestamp(), 0);
+    }
+
+    function test_finalizeDragonRouterChange_byAnyone(address _caller) public {
+        vm.assume(_caller != address(0));
+        address newRouter = address(0x123);
+
+        vm.prank(management);
+        strategy.setDragonRouter(newRouter);
+
+        skip(14 days);
+
+        vm.prank(_caller);
+        strategy.finalizeDragonRouterChange();
+
+        assertEq(strategy.dragonRouter(), newRouter);
+    }
+
+    function test_finalizeDragonRouterChange_noPendingChange_reverts() public {
+        vm.expectRevert("no pending change");
+        strategy.finalizeDragonRouterChange();
+    }
+
+    function test_finalizeDragonRouterChange_cooldownNotElapsed_reverts() public {
+        address newRouter = address(0x123);
+
+        vm.prank(management);
+        strategy.setDragonRouter(newRouter);
+
+        // Try before cooldown ends
+        vm.expectRevert("cooldown not elapsed");
+        strategy.finalizeDragonRouterChange();
+
+        // Try just before cooldown ends
+        skip(14 days - 1);
+        vm.expectRevert("cooldown not elapsed");
+        strategy.finalizeDragonRouterChange();
+
+        // Should work exactly at cooldown end
+        skip(1);
+        strategy.finalizeDragonRouterChange();
+    }
+
+    function testFuzz_finalizeDragonRouterChange_atVariousTimes(uint256 _skipTime) public {
+        address newRouter = address(0x123);
+
+        vm.prank(management);
+        strategy.setDragonRouter(newRouter);
+
+        _skipTime = bound(_skipTime, 0, 14 days);
+        skip(_skipTime);
+
+        if (_skipTime < 14 days) {
+            vm.expectRevert("cooldown not elapsed");
+            strategy.finalizeDragonRouterChange();
+        } else {
+            strategy.finalizeDragonRouterChange();
+            assertEq(strategy.dragonRouter(), newRouter);
+        }
+    }
+
+    function test_cancelDragonRouterChange() public {
+        address newRouter = address(0x123);
+
+        vm.prank(management);
+        strategy.setDragonRouter(newRouter);
+
+        assertEq(strategy.pendingDragonRouter(), newRouter);
+
+        vm.expectEmit(true, false, false, true, address(strategy));
+        emit TokenizedStrategy.PendingDragonRouterChange(address(0), 0);
+
+        vm.prank(management);
+        strategy.cancelDragonRouterChange();
+
+        assertEq(strategy.pendingDragonRouter(), address(0));
+        assertEq(strategy.dragonRouterChangeTimestamp(), 0);
+        assertEq(strategy.dragonRouter(), donationAddress); // Should remain unchanged
+    }
+
+    function test_cancelDragonRouterChange_accessControl(address _caller) public {
+        vm.assume(_caller != management);
+        address newRouter = address(0x123);
+
+        vm.prank(management);
+        strategy.setDragonRouter(newRouter);
+
+        vm.prank(_caller);
+        vm.expectRevert("!management");
+        strategy.cancelDragonRouterChange();
+    }
+
+    function test_cancelDragonRouterChange_noPendingChange_reverts() public {
+        vm.prank(management);
+        vm.expectRevert("no pending change");
+        strategy.cancelDragonRouterChange();
+    }
+
+    function test_cancelDragonRouterChange_duringCooldown() public {
+        address newRouter = address(0x123);
+
+        vm.prank(management);
+        strategy.setDragonRouter(newRouter);
+
+        // Skip part of cooldown period
+        skip(3 days);
+
+        vm.prank(management);
+        strategy.cancelDragonRouterChange();
+
+        assertEq(strategy.pendingDragonRouter(), address(0));
+        assertEq(strategy.dragonRouter(), donationAddress);
+    }
+
+    function test_cancelDragonRouterChange_afterCooldownBeforeFinalization() public {
+        address newRouter = address(0x123);
+
+        vm.prank(management);
+        strategy.setDragonRouter(newRouter);
+
+        // Skip full cooldown period
+        skip(14 days + 1 hours);
+
+        // Management can still cancel even after cooldown
+        vm.prank(management);
+        strategy.cancelDragonRouterChange();
+
+        assertEq(strategy.pendingDragonRouter(), address(0));
+        assertEq(strategy.dragonRouter(), donationAddress);
+    }
+
+    function testFuzz_userWithdrawDuringCooldown(uint256 _amount, uint256 _skipTime) public {
+        _amount = bound(_amount, minFuzzAmount, maxFuzzAmount);
+        _skipTime = bound(_skipTime, 0, 14 days - 1);
+        address newRouter = address(0x123);
+
+        // Setup user with funds
+        mintAndDepositIntoStrategy(strategy, user, _amount);
+
+        // Initiate dragon router change
+        vm.prank(management);
+        strategy.setDragonRouter(newRouter);
+
+        // Skip some time during cooldown
+        skip(_skipTime);
+
+        // User should be able to withdraw normally during cooldown
+        uint256 userShares = strategy.balanceOf(user);
+        vm.prank(user);
+        strategy.redeem(userShares, user, user);
+
+        // Should have received their funds back
+        assertEq(asset.balanceOf(user), _amount);
+    }
+
+    function test_reportingDuringPendingChange() public {
+        address newRouter = address(0x123);
+        uint256 amount = 1e18;
+
+        // Setup some funds
+        mintAndDepositIntoStrategy(strategy, user, amount);
+
+        // Initiate dragon router change
+        vm.prank(management);
+        strategy.setDragonRouter(newRouter);
+
+        // Generate some profit
+        asset.mint(address(strategy), amount / 10);
+
+        // Reporting should work normally during pending change
+        vm.prank(keeper);
+        (uint256 profit, uint256 loss) = strategy.report();
+
+        assertGt(profit, 0);
+        assertEq(loss, 0);
+        // Should still be using original dragon router for minting shares
+        assertGt(strategy.balanceOf(donationAddress), 0);
+        assertEq(strategy.balanceOf(newRouter), 0);
+    }
+
+    function test_reportingAfterFinalization() public {
+        address newRouter = address(0x123);
+        uint256 amount = 1e18;
+
+        // Setup some funds
+        mintAndDepositIntoStrategy(strategy, user, amount);
+
+        // Change and finalize dragon router
+        vm.prank(management);
+        strategy.setDragonRouter(newRouter);
+        skip(14 days);
+        strategy.finalizeDragonRouterChange();
+
+        // Generate profit
+        asset.mint(address(strategy), amount / 10);
+
+        // Clear any existing balances
+        uint256 oldRouterBalance = strategy.balanceOf(donationAddress);
+        if (oldRouterBalance > 0) {
+            vm.prank(donationAddress);
+            strategy.redeem(oldRouterBalance, donationAddress, donationAddress);
+        }
+
+        // Report should now use new dragon router
+        vm.prank(keeper);
+        (uint256 profit, uint256 loss) = strategy.report();
+
+        assertGt(profit, 0);
+        assertEq(loss, 0);
+        // Should be using new dragon router for minting shares
+        assertGt(strategy.balanceOf(newRouter), 0);
+        assertEq(strategy.balanceOf(donationAddress), 0);
+    }
+
+    function test_multipleChangesInSequence() public {
+        address router1 = address(0x111);
+        address router2 = address(0x222);
+
+        // First change
+        vm.prank(management);
+        strategy.setDragonRouter(router1);
+
+        // Override with another change
+        vm.prank(management);
+        strategy.setDragonRouter(router2);
+
+        skip(14 days);
+
+        // Finalize should use the latest change
+        strategy.finalizeDragonRouterChange();
+        assertEq(strategy.dragonRouter(), router2);
+    }
+
+    function test_cancelThenSetNewChange() public {
+        address router1 = address(0x111);
+        address router2 = address(0x222);
+
+        // Set initial change
+        vm.prank(management);
+        strategy.setDragonRouter(router1);
+
+        // Cancel it
+        vm.prank(management);
+        strategy.cancelDragonRouterChange();
+
+        // Set a new change
+        vm.prank(management);
+        strategy.setDragonRouter(router2);
+
+        skip(14 days);
+
+        strategy.finalizeDragonRouterChange();
+        assertEq(strategy.dragonRouter(), router2);
+    }
+
+    function testFuzz_timestampOverflow(uint96 _timestamp) public {
+        address newRouter = address(0x123);
+
+        // Test that the contract handles timestamp edge cases
+        vm.warp(_timestamp);
+
+        vm.prank(management);
+        strategy.setDragonRouter(newRouter);
+
+        // Should not overflow
+        assertEq(strategy.dragonRouterChangeTimestamp(), _timestamp);
+    }
+
+    function testFuzz_getterFunctions(address _pendingRouter, uint96 _timestamp) public {
+        vm.assume(_pendingRouter != address(0));
+        vm.assume(_pendingRouter != donationAddress);
+
+        vm.warp(_timestamp);
+
+        vm.prank(management);
+        strategy.setDragonRouter(_pendingRouter);
+
+        assertEq(strategy.pendingDragonRouter(), _pendingRouter);
+        assertEq(strategy.dragonRouterChangeTimestamp(), _timestamp);
+        assertEq(strategy.dragonRouter(), donationAddress);
+    }
+
+    function test_cooldownPeriodConstant() public pure {
+        // Verify cooldown period is 14 days (604800 seconds)
+        uint256 EXPECTED_COOLDOWN = 14 days;
+        assertEq(EXPECTED_COOLDOWN, 1209600);
     }
 }

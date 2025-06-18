@@ -55,6 +55,11 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
      */
     event UpdateDragonRouter(address indexed newDragonRouter);
 
+    /**
+     * @notice Emitted when a pending dragon router change is initiated.
+     */
+    event PendingDragonRouterChange(address indexed newDragonRouter, uint256 effectiveTimestamp);
+
     /*//////////////////////////////////////////////////////////////
                             INITIALIZATION
     //////////////////////////////////////////////////////////////*/
@@ -208,6 +213,18 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
     function dragonRouter() external view returns (address);
 
     /**
+     * @notice Get the pending dragon router address if any.
+     * @return Address of the pending dragon router
+     */
+    function pendingDragonRouter() external view returns (address);
+
+    /**
+     * @notice Get the timestamp when dragon router change was initiated.
+     * @return Timestamp of the dragon router change initiation
+     */
+    function dragonRouterChangeTimestamp() external view returns (uint256);
+
+    /**
      * @notice The timestamp of the last time protocol fees were charged.
      * @return The last report.
      */
@@ -247,10 +264,20 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
     function setEmergencyAdmin(address _emergencyAdmin) external;
 
     /**
-     * @notice Sets a new dragon router address to receive minted shares from yield.
-     * @param _dragonRouter New address to set `dragonRouter` to.
+     * @notice Initiates a change to a new dragon router address with a cooldown period.
+     * @param _dragonRouter New address to set as pending `dragonRouter`.
      */
     function setDragonRouter(address _dragonRouter) external;
+
+    /**
+     * @notice Finalizes the dragon router change after the cooldown period.
+     */
+    function finalizeDragonRouterChange() external;
+
+    /**
+     * @notice Cancels a pending dragon router change.
+     */
+    function cancelDragonRouterChange() external;
 
     /**
      * @notice Updates the name for the strategy.

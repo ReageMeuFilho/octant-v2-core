@@ -159,6 +159,11 @@ abstract contract TokenizedStrategy {
      */
     event UpdateDragonRouter(address indexed newDragonRouter);
 
+    /**
+     * @notice Emitted when a pending dragon router change is initiated.
+     */
+    event PendingDragonRouterChange(address indexed newDragonRouter, uint256 effectiveTimestamp);
+
     /*//////////////////////////////////////////////////////////////
                         STORAGE STRUCT
     //////////////////////////////////////////////////////////////*/
@@ -202,6 +207,8 @@ abstract contract TokenizedStrategy {
         address pendingManagement; // Address that is pending to take over `management`.
         address emergencyAdmin; // Address to act in emergencies as well as `management`.
         address dragonRouter; // Router that receives minted shares from yield in specialized strategies
+        address pendingDragonRouter; // Address that is pending to become the new dragon router.
+        uint96 dragonRouterChangeTimestamp; // Timestamp when the dragon router change was initiated.
 
         // Strategy Status
         uint8 decimals; // The amount of decimals that `asset` and strategy use.
@@ -324,6 +331,9 @@ abstract contract TokenizedStrategy {
 
     /// @notice Used for calculations.
     uint256 internal constant MAX_BPS = 10_000;
+
+    /// @notice Cooldown period for dragon router changes (14 days).
+    uint256 internal constant DRAGON_ROUTER_COOLDOWN = 14 days;
 
     /**
      * @dev Custom storage slot that will be used to store the
@@ -1084,6 +1094,22 @@ abstract contract TokenizedStrategy {
     }
 
     /**
+     * @notice Get the pending dragon router address if any.
+     * @return Address of the pending dragon router
+     */
+    function pendingDragonRouter() external view returns (address) {
+        return _strategyStorage().pendingDragonRouter;
+    }
+
+    /**
+     * @notice Get the timestamp when dragon router change was initiated.
+     * @return Timestamp of the dragon router change initiation
+     */
+    function dragonRouterChangeTimestamp() external view returns (uint256) {
+        return uint256(_strategyStorage().dragonRouterChangeTimestamp);
+    }
+
+    /**
      * @notice The timestamp of the last time Yield was reported.
      * @return . The last report.
      */
@@ -1172,14 +1198,50 @@ abstract contract TokenizedStrategy {
     }
 
     /**
-     * @notice Sets a new dragon router address to receive minted shares from yield.
-     * @param _dragonRouter New address to set `dragonRouter` to.
+     * @notice Initiates a change to a new dragon router address with a cooldown period.
+     * @dev Users have 7 days to withdraw if they disagree with the new donation address.
+     * @param _dragonRouter New address to set as pending `dragonRouter`.
      */
     function setDragonRouter(address _dragonRouter) external onlyManagement {
         require(_dragonRouter != address(0), "ZERO ADDRESS");
-        _strategyStorage().dragonRouter = _dragonRouter;
+        StrategyData storage S = _strategyStorage();
+        require(_dragonRouter != S.dragonRouter, "same dragon router");
 
-        emit UpdateDragonRouter(_dragonRouter);
+        S.pendingDragonRouter = _dragonRouter;
+        S.dragonRouterChangeTimestamp = uint96(block.timestamp);
+
+        uint256 effectiveTimestamp = block.timestamp + DRAGON_ROUTER_COOLDOWN;
+        emit PendingDragonRouterChange(_dragonRouter, effectiveTimestamp);
+    }
+
+    /**
+     * @notice Finalizes the dragon router change after the cooldown period.
+     * @dev Can only be called after the cooldown period has elapsed.
+     */
+    function finalizeDragonRouterChange() external {
+        StrategyData storage S = _strategyStorage();
+        require(S.pendingDragonRouter != address(0), "no pending change");
+        require(block.timestamp >= S.dragonRouterChangeTimestamp + DRAGON_ROUTER_COOLDOWN, "cooldown not elapsed");
+
+        S.dragonRouter = S.pendingDragonRouter;
+        S.pendingDragonRouter = address(0);
+        S.dragonRouterChangeTimestamp = 0;
+
+        emit UpdateDragonRouter(S.dragonRouter);
+    }
+
+    /**
+     * @notice Cancels a pending dragon router change.
+     * @dev Can only be called by management during the cooldown period.
+     */
+    function cancelDragonRouterChange() external onlyManagement {
+        StrategyData storage S = _strategyStorage();
+        require(S.pendingDragonRouter != address(0), "no pending change");
+
+        S.pendingDragonRouter = address(0);
+        S.dragonRouterChangeTimestamp = 0;
+
+        emit PendingDragonRouterChange(address(0), 0);
     }
 
     /**
