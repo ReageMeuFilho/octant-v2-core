@@ -5,6 +5,7 @@ import "forge-std/console.sol";
 import { Setup } from "./utils/Setup.sol";
 import { TokenizedStrategy } from "src/core/TokenizedStrategy.sol";
 import { BaseStrategy } from "src/core/BaseStrategy.sol";
+import { BaseStrategy__NotSelf } from "src/errors.sol";
 
 contract AccessControlTest is Setup {
     function setUp() public override {
@@ -198,12 +199,12 @@ contract AccessControlTest is Setup {
 
         // doesn't work from random address
         vm.prank(_address);
-        vm.expectRevert(BaseStrategy.NotSelf.selector);
+        vm.expectRevert(BaseStrategy__NotSelf.selector);
         strategy.harvestAndReport();
 
         // doesn't work from management either
         vm.prank(management);
-        vm.expectRevert(BaseStrategy.NotSelf.selector);
+        vm.expectRevert(BaseStrategy__NotSelf.selector);
         strategy.harvestAndReport();
 
         vm.prank(address(strategy));

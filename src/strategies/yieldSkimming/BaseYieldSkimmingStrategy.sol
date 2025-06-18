@@ -1,75 +1,60 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.25;
 
-import { DragonBaseStrategy } from "src/zodiac-core/vaults/DragonBaseStrategy.sol";
-import { YieldSkimmingHarvestReporter } from "src/zodiac-core/mixins/YieldSkimmingHarvestReporter.sol";
-import { IERC4626Payable } from "src/zodiac-core/interfaces/IERC4626Payable.sol";
-import { IMantleStaking } from "src/zodiac-core/interfaces/IMantleStaking.sol";
-import { ITokenizedStrategy } from "src/zodiac-core/interfaces/ITokenizedStrategy.sol";
-import { IMethYieldStrategy } from "src/zodiac-core/interfaces/IMethYieldStrategy.sol";
+import { BaseYieldSkimmingHealthCheck } from "src/strategies/periphery/BaseYieldSkimmingHealthCheck.sol";
+import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
- * @title MethYieldStrategy
- * @notice A strategy that manages mETH (Mantle liquid staked ETH) and captures yield from its appreciation
- * @dev This strategy tracks the ETH value of mETH deposits and captures yield as mETH appreciates in value.
- *      The strategy works with YieldSkimmingDragonTokenizedStrategy to properly handle the yield accounting.
+ * @title BaseYieldSkimmingStrategy
+ * @notice Abstract base contract for yield skimming strategies that track exchange rate changes
+ * @dev This contract provides common logic for strategies that capture yield from appreciating assets.
+ *      Derived contracts only need to implement _getCurrentExchangeRate() for their specific yield source.
  */
-contract MethYieldStrategy is DragonBaseStrategy, YieldSkimmingHarvestReporter, IMethYieldStrategy {
+abstract contract BaseYieldSkimmingStrategy is BaseYieldSkimmingHealthCheck {
     using SafeERC20 for IERC20;
 
-    /// @dev The Mantle staking contract that provides exchange rate information
-    IMantleStaking public immutable MANTLE_STAKING = IMantleStaking(0xe3cBd06D7dadB3F4e6557bAb7EdD924CD1489E8f);
-
-    /// @dev The ETH value of 1 mETH at the last harvest, scaled by 1e18
+    /// @dev The exchange rate at the last harvest, scaled by 1e18
     uint256 internal _lastReportedExchangeRate;
 
-    /// @dev Initialize function, will be triggered when a new proxy is deployed
-    /// @param initializeParams Parameters of initialization encoded
-    function setUp(bytes memory initializeParams) public override initializer {
-        (address _owner, bytes memory data) = abi.decode(initializeParams, (address, bytes));
+    /// @notice yearn governance
+    address public constant GOV = 0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52;
 
-        (
-            address _tokenizedStrategyImplementation,
-            address _management,
-            address _keeper,
-            address _dragonRouter,
-            uint256 _maxReportDelay,
-            address _regenGovernance,
-            address _mETH
-        ) = abi.decode(data, (address, address, address, address, uint256, address, address));
-        // Effects
-        __Ownable_init(msg.sender);
-        string memory _name = "Octant mETH Yield Strategy";
-
-        setAvatar(_owner);
-        setTarget(_owner);
-        transferOwnership(_owner);
-
-        // Initialize the exchange rate on setup
-        _lastReportedExchangeRate = _getCurrentExchangeRate();
-
-        // Interactions
-        __BaseStrategy_init(
-            _tokenizedStrategyImplementation,
-            _mETH,
-            _owner,
-            _management,
-            _keeper,
-            _dragonRouter,
-            _maxReportDelay,
-            _name,
-            _regenGovernance
-        );
+    modifier onlyGovernance() {
+        require(msg.sender == GOV, "!gov");
+        _;
     }
 
-    /**
-     * @inheritdoc IMethYieldStrategy
-     */
-    function getLastReportedExchangeRate() public view returns (uint256) {
-        return _lastReportedExchangeRate;
+    constructor(
+        address _asset,
+        string memory _name,
+        address _management,
+        address _keeper,
+        address _emergencyAdmin,
+        address _donationAddress,
+        address _tokenizedStrategyAddress
+    )
+        BaseYieldSkimmingHealthCheck(
+            _asset, // shares address
+            _name,
+            _management,
+            _keeper,
+            _emergencyAdmin,
+            _donationAddress,
+            _tokenizedStrategyAddress
+        )
+    {
+        // Initialize the exchange rate on setup
+        _lastReportedExchangeRate = _getCurrentExchangeRate();
+    }
+
+    /// @notice Sweep of non-asset ERC20 tokens to governance (onlyGovernance)
+    /// @param _token The ERC20 token to sweep
+    function sweep(address _token) external onlyGovernance {
+        require(_token != address(asset), "!asset");
+        IERC20(_token).safeTransfer(GOV, IERC20(_token).balanceOf(address(this)));
     }
 
     /**
@@ -86,6 +71,14 @@ contract MethYieldStrategy is DragonBaseStrategy, YieldSkimmingHarvestReporter, 
      */
     function balanceOfShares() public view returns (uint256) {
         return IERC20(asset).balanceOf(address(this));
+    }
+
+    /**
+     * @notice Returns the last reported exchange rate
+     * @return The last reported exchange rate
+     */
+    function getLastReportedExchangeRate() public view returns (uint256) {
+        return _lastReportedExchangeRate;
     }
 
     /**
@@ -154,12 +147,10 @@ contract MethYieldStrategy is DragonBaseStrategy, YieldSkimmingHarvestReporter, 
 
     /**
      * @notice Gets the current exchange rate from the yield vault
-     * @return The current price per share
+     * @dev This function must be implemented by derived contracts to return the current exchange rate
+     * @return The current price per share/exchange rate
      */
-    function _getCurrentExchangeRate() internal view virtual returns (uint256) {
-        // Calculate the exchange rate by determining how much ETH 1e18 mETH is worth
-        return MANTLE_STAKING.mETHToETH(1e18);
-    }
+    function _getCurrentExchangeRate() internal view virtual returns (uint256);
 
     /**
      * @notice Always returns false as no tending is needed
