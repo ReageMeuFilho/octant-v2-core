@@ -73,13 +73,6 @@ interface ILinearAllowanceSingleton {
     /// @param dripRatePerDay The drip rate per day for the allowance
     function setAllowance(address delegate, address token, uint192 dripRatePerDay) external;
 
-    /// @notice Emergency revocation that immediately zeros drip rate AND clears all accrued unspent allowance
-    /// @dev This function provides immediate incident response capability for compromised delegates.
-    /// Unlike setAllowance(delegate, token, 0) which preserves accrued amounts, this function
-    /// completely revokes access by clearing both future accrual and existing unspent balances.
-    /// @param delegate The delegate whose allowance should be emergency revoked
-    /// @param token The token for which to revoke the allowance. Use NATIVE_TOKEN for ETH
-    function emergencyRevokeAllowance(address delegate, address token) external;
     /// @notice Set multiple allowances in a single transaction
     /// @param delegates Array of delegate addresses
     /// @param tokens Array of token addresses
@@ -89,6 +82,14 @@ interface ILinearAllowanceSingleton {
         address[] calldata tokens,
         uint192[] calldata dripRatesPerDay
     ) external;
+
+    /// @notice Emergency revocation that immediately zeros drip rate AND clears all accrued unspent allowance
+    /// @dev This function provides immediate incident response capability for compromised delegates.
+    /// Unlike setAllowance(delegate, token, 0) which preserves accrued amounts, this function
+    /// completely revokes access by clearing both future accrual and existing unspent balances.
+    /// @param delegate The delegate whose allowance should be emergency revoked
+    /// @param token The token for which to revoke the allowance. Use NATIVE_TOKEN for ETH
+    function emergencyRevokeAllowance(address delegate, address token) external;
 
     /// @notice Execute a transfer of the allowance
     /// @dev msg.sender is the delegate

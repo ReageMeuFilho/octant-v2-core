@@ -25,7 +25,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
     using SafeCast for uint32;
     using SafeCast for uint64;
 
-    mapping(address => mapping(address => mapping(address => LinearAllowance))) internal _allowances; // safe -> delegate -> token -> allowance
+    mapping(address => mapping(address => mapping(address => LinearAllowance))) public allowances; // safe -> delegate -> token -> allowance
 
     /// @inheritdoc ILinearAllowanceSingleton
     function setAllowance(address delegate, address token, uint192 dripRatePerDay) external {
@@ -55,7 +55,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
     function emergencyRevokeAllowance(address delegate, address token) external nonReentrant {
         if (delegate == address(0)) revert AddressZeroForArgument("delegate");
 
-        LinearAllowance memory allowance = _allowances[msg.sender][delegate][token];
+        LinearAllowance memory allowance = allowances[msg.sender][delegate][token];
         allowance = _updateAllowance(allowance);
 
         emit AllowanceEmergencyRevoked(msg.sender, delegate, token, allowance.totalUnspent);
@@ -63,7 +63,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
         allowance.dripRatePerDay = 0;
         allowance.totalUnspent = 0;
 
-        _allowances[msg.sender][delegate][token] = allowance;
+        allowances[msg.sender][delegate][token] = allowance;
     }
 
     /// @inheritdoc ILinearAllowanceSingleton
@@ -110,7 +110,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
         view
         returns (uint192 dripRatePerDay, uint256 totalUnspent, uint256 totalSpent, uint64 lastBookedAtInSeconds)
     {
-        LinearAllowance memory allowance = _allowances[source][delegate][token];
+        LinearAllowance memory allowance = allowances[source][delegate][token];
         return (
             allowance.dripRatePerDay,
             allowance.totalUnspent,
@@ -123,7 +123,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
     /// @param safe The address of the safe which is the source of the allowance
     function getTotalUnspent(address safe, address delegate, address token) public view returns (uint256) {
         // Cache the storage value in memory (single SLOAD)
-        LinearAllowance memory allowance = _allowances[safe][delegate][token];
+        LinearAllowance memory allowance = allowances[safe][delegate][token];
 
         // Handle uninitialized allowance (lastBookedAtInSeconds == 0)
         if (allowance.lastBookedAtInSeconds == 0) {
@@ -213,14 +213,14 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
     function _setAllowance(address safe, address delegate, address token, uint192 dripRatePerDay) internal {
         // Cache storage struct in memory to save gas
         if (delegate == address(0)) revert AddressZeroForArgument("delegate");
-        LinearAllowance memory a = _allowances[safe][delegate][token];
+        LinearAllowance memory a = allowances[safe][delegate][token];
 
         // Update cached memory values
         a = _updateAllowance(a);
         a.dripRatePerDay = dripRatePerDay;
 
         // Write back to storage once
-        _allowances[safe][delegate][token] = a;
+        allowances[safe][delegate][token] = a;
 
         emit AllowanceSet(safe, delegate, token, dripRatePerDay);
     }
@@ -241,7 +241,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
         if (to == address(0)) revert AddressZeroForArgument("to");
 
         // Cache storage in memory (single SLOAD)
-        LinearAllowance memory a = _allowances[safe][delegate][token];
+        LinearAllowance memory a = allowances[safe][delegate][token];
 
         // Update cached memory values
         a = _updateAllowance(a);
@@ -254,7 +254,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
         // Update bookkeeping and write to storage BEFORE external calls (effects)
         a.totalSpent += transferAmount;
         a.totalUnspent -= transferAmount;
-        _allowances[safe][delegate][token] = a;
+        allowances[safe][delegate][token] = a;
 
         // Execute the transfer
         _executeTransfer(safe, delegate, token, to, transferAmount);
