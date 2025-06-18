@@ -5,6 +5,7 @@ import { BaseYieldSkimmingHealthCheck } from "src/strategies/periphery/BaseYield
 import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
  * @title MorphoCompounder
@@ -119,9 +120,19 @@ contract MorphoCompounderStrategy is BaseYieldSkimmingHealthCheck {
 
         int256 deltaInValue = int256(assetBalance) * deltaExchangeRate;
 
-        deltaAtOldRate = deltaInValue / int256(_lastReportedExchangeRate);
-
-        deltaAtNewRate = deltaInValue / int256(currentExchangeRate);
+        // Use high-precision division to avoid precision loss for small yields
+        if (deltaInValue >= 0) {
+            // For positive yields, use mulDiv with rounding up to preserve small yields
+            deltaAtOldRate = int256(
+                Math.mulDiv(uint256(deltaInValue), 1, _lastReportedExchangeRate, Math.Rounding.Ceil)
+            );
+            deltaAtNewRate = int256(Math.mulDiv(uint256(deltaInValue), 1, currentExchangeRate, Math.Rounding.Ceil));
+        } else if (deltaInValue < 0) {
+            // For losses, use mulDiv with rounding down (more conservative for losses)
+            uint256 absDeltaInValue = uint256(-deltaInValue);
+            deltaAtOldRate = -int256(Math.mulDiv(absDeltaInValue, 1, _lastReportedExchangeRate, Math.Rounding.Floor));
+            deltaAtNewRate = -int256(Math.mulDiv(absDeltaInValue, 1, currentExchangeRate, Math.Rounding.Floor));
+        }
 
         _lastReportedExchangeRate = currentExchangeRate;
     }
