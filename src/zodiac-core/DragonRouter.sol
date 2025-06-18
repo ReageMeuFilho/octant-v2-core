@@ -242,6 +242,43 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
         emit SplitClaimed(msg.sender, _user, _strategy, _amount);
     }
 
+    /**
+     * @inheritdoc IDragonRouter
+     */
+    function balanceOf(address _user, address _strategy) public view returns (uint256) {
+        UserData memory _userData = userData[_user][_strategy];
+
+        return _userData.assets + _claimableAssets(_userData, _strategy);
+    }
+
+    /**
+     * @notice Emergency withdraw function for accumulated allowance funds
+     * @dev Only admin can withdraw funds. Supports both ETH and ERC20 tokens.
+     * @param token The address of the token to withdraw (use NATIVE_TOKEN for ETH)
+     * @param amount The amount to withdraw from this contract's balance
+     * @param to The destination address to send the withdrawn funds
+     */
+    function withdraw(
+        address token,
+        uint256 amount,
+        address payable to
+    ) external override onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(to != address(0), "DragonRouter: cannot withdraw to zero address");
+
+        if (token == NATIVE_TOKEN) {
+            require(address(this).balance >= amount, "DragonRouter: insufficient ETH balance");
+            //slither-disable-next-line arbitrary-send-eth
+            (bool success, ) = to.call{ value: amount }("");
+            require(success, "DragonRouter: ETH transfer failed");
+        } else {
+            IERC20 tokenContract = IERC20(token);
+            uint256 contractBalance = tokenContract.balanceOf(address(this));
+            require(contractBalance >= amount, "DragonRouter: insufficient token balance");
+            //slither-disable-next-line arbitrary-send-erc20
+            tokenContract.safeTransfer(to, amount);
+        }
+    }
+
     /*//////////////////////////////////////////////////////////////
                             INITIALIZER
     //////////////////////////////////////////////////////////////*/
@@ -283,15 +320,6 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
         _grantRole(DEFAULT_ADMIN_ROLE, _owner);
         _grantRole(GOVERNANCE_ROLE, _governance);
         _grantRole(REGEN_GOVERNANCE_ROLE, _regen_governance);
-    }
-
-    /**
-     * @inheritdoc IDragonRouter
-     */
-    function balanceOf(address _user, address _strategy) public view returns (uint256) {
-        UserData memory _userData = userData[_user][_strategy];
-
-        return _userData.assets + _claimableAssets(_userData, _strategy);
     }
 
     /*//////////////////////////////////////////////////////////////

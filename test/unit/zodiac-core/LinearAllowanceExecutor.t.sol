@@ -3,14 +3,14 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 import { LinearAllowanceExecutorTestHarness } from "test/mocks/zodiac-core/LinearAllowanceExecutorTestHarness.sol";
-import { LinearAllowanceSingletonForGnosisSafeWrapper } from "test/wrappers/LinearAllowanceSingletonForGnosisSafeWrapper.sol";
+import { LinearAllowanceSingletonForGnosisSafe } from "src/zodiac-core/modules/LinearAllowanceSingletonForGnosisSafe.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MockSafe } from "test/mocks/zodiac-core/MockSafe.sol";
 import { NATIVE_TOKEN } from "src/constants.sol";
 
 contract LinearAllowanceExecutorTest is Test {
     LinearAllowanceExecutorTestHarness public executor;
-    LinearAllowanceSingletonForGnosisSafeWrapper public allowanceModule;
+    LinearAllowanceSingletonForGnosisSafe public allowanceModule;
     MockSafe public mockSafe;
     MockERC20 public mockToken;
 
@@ -19,7 +19,7 @@ contract LinearAllowanceExecutorTest is Test {
     function setUp() public {
         // Deploy contracts
         executor = new LinearAllowanceExecutorTestHarness();
-        allowanceModule = new LinearAllowanceSingletonForGnosisSafeWrapper();
+        allowanceModule = new LinearAllowanceSingletonForGnosisSafe();
         mockSafe = new MockSafe();
         mockToken = new MockERC20(18);
 
