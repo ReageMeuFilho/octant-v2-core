@@ -3,8 +3,9 @@ pragma solidity >=0.8.18;
 
 import { MockYieldSource } from "../MockYieldSource.sol";
 import { BaseStrategy, ERC20 } from "src/core/BaseStrategy.sol";
+import { StandardHarvestReporter } from "src/zodiac-core/mixins/StandardHarvestReporter.sol";
 
-contract MockStrategy is BaseStrategy {
+contract MockStrategy is BaseStrategy, StandardHarvestReporter {
     address public yieldSource;
     bool public trigger;
     bool public managed;

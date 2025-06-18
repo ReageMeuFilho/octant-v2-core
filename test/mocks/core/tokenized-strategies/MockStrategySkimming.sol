@@ -7,8 +7,9 @@ import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
 import { console2 } from "forge-std/console2.sol";
 import { MockYieldSourceSkimming } from "./MockYieldSourceSkimming.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { StandardHarvestReporter } from "src/zodiac-core/mixins/StandardHarvestReporter.sol";
 
-contract MockStrategySkimming is BaseStrategy {
+contract MockStrategySkimming is BaseStrategy, StandardHarvestReporter {
     address public yieldSource;
     bool public trigger;
     bool public managed;

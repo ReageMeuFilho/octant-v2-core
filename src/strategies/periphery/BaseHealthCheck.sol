@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import { BaseStrategy } from "src/core/BaseStrategy.sol";
 import { IBaseHealthCheck } from "src/strategies/interfaces/IBaseHealthCheck.sol";
+import { StandardHarvestReporter } from "src/zodiac-core/mixins/StandardHarvestReporter.sol";
 
 /**
  *   @title Base Health Check
@@ -23,7 +24,7 @@ import { IBaseHealthCheck } from "src/strategies/interfaces/IBaseHealthCheck.sol
  *   losses, but rather can make sure manual intervention is
  *   needed before reporting an unexpected loss or profit.
  */
-abstract contract BaseHealthCheck is BaseStrategy, IBaseHealthCheck {
+abstract contract BaseHealthCheck is BaseStrategy, StandardHarvestReporter, IBaseHealthCheck {
     // Can be used to determine if a healthcheck should be called.
     // Defaults to true;
     bool public doHealthCheck = true;

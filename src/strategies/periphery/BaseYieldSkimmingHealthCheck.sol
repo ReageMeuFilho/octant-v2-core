@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { BaseYieldSkimmingStrategy } from "src/core/BaseYieldSkimmingStrategy.sol";
+import { BaseStrategy } from "src/core/BaseStrategy.sol";
 import { IBaseHealthCheck } from "src/strategies/interfaces/IBaseHealthCheck.sol";
 import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
+import { YieldSkimmingHarvestReporter } from "src/zodiac-core/mixins/YieldSkimmingHarvestReporter.sol";
 
 /**
  *   @title Base Yield Skimming Health Check
@@ -24,7 +25,7 @@ import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
  *   losses, but rather can make sure manual intervention is
  *   needed before reporting an unexpected loss or profit.
  */
-abstract contract BaseYieldSkimmingHealthCheck is BaseYieldSkimmingStrategy, IBaseHealthCheck {
+abstract contract BaseYieldSkimmingHealthCheck is BaseStrategy, YieldSkimmingHarvestReporter, IBaseHealthCheck {
     // Can be used to determine if a healthcheck should be called.
     // Defaults to true;
     bool public doHealthCheck = true;
@@ -45,17 +46,7 @@ abstract contract BaseYieldSkimmingHealthCheck is BaseYieldSkimmingStrategy, IBa
         address _emergencyAdmin,
         address _donationAddress,
         address _tokenizedStrategyAddress
-    )
-        BaseYieldSkimmingStrategy(
-            _asset,
-            _name,
-            _management,
-            _keeper,
-            _emergencyAdmin,
-            _donationAddress,
-            _tokenizedStrategyAddress
-        )
-    {}
+    ) BaseStrategy(_asset, _name, _management, _keeper, _emergencyAdmin, _donationAddress, _tokenizedStrategyAddress) {}
 
     /**
      * @notice Returns the current profit limit ratio.

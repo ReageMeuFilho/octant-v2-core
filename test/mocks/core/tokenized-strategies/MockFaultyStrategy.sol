@@ -3,12 +3,13 @@ pragma solidity >=0.8.18;
 
 import { MockYieldSource } from "../MockYieldSource.sol";
 import { BaseStrategy, ERC20 } from "src/core/BaseStrategy.sol";
+import { StandardHarvestReporter } from "src/zodiac-core/mixins/StandardHarvestReporter.sol";
 
 interface IPappa {
     function callBack(uint256 _pps, uint256 _convertAmountToShares, uint256 _convertAmountToAssets) external;
 }
 
-contract MockFaultyStrategy is BaseStrategy {
+contract MockFaultyStrategy is BaseStrategy, StandardHarvestReporter {
     address public yieldSource;
     bool public dontTend;
     address public pappa;
