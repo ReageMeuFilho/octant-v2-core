@@ -3,9 +3,10 @@ pragma solidity >=0.8.18;
 
 import { MockYieldSource } from "../core/MockYieldSource.sol";
 import { DragonBaseStrategy, ERC20 } from "src/zodiac-core/vaults/DragonBaseStrategy.sol";
+import { StandardHarvestReporter } from "src/zodiac-core/mixins/StandardHarvestReporter.sol";
 import { Module } from "zodiac/core/Module.sol";
 
-contract MockStrategy is Module, DragonBaseStrategy {
+contract MockStrategy is Module, DragonBaseStrategy, StandardHarvestReporter {
     address public yieldSource;
     bool public trigger;
     bool public managed;

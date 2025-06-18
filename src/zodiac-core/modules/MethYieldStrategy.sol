@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.25;
 
-import { DragonBaseYieldSkimmingStrategy } from "src/zodiac-core/vaults/DragonBaseYieldSkimmingStrategy.sol";
+import { DragonBaseStrategy } from "src/zodiac-core/vaults/DragonBaseStrategy.sol";
+import { YieldSkimmingHarvestReporter } from "src/zodiac-core/mixins/YieldSkimmingHarvestReporter.sol";
 import { IERC4626Payable } from "src/zodiac-core/interfaces/IERC4626Payable.sol";
 import { IMantleStaking } from "src/zodiac-core/interfaces/IMantleStaking.sol";
 import { ITokenizedStrategy } from "src/zodiac-core/interfaces/ITokenizedStrategy.sol";
@@ -16,7 +17,7 @@ import { BaseYieldSkimmingHealthCheck } from "src/strategies/periphery/BaseYield
  * @dev This strategy tracks the ETH value of mETH deposits and captures yield as mETH appreciates in value.
  *      The strategy works with YieldSkimmingDragonTokenizedStrategy to properly handle the yield accounting.
  */
-contract MethYieldStrategy is DragonBaseYieldSkimmingStrategy, IMethYieldStrategy {
+contract MethYieldStrategy is DragonBaseStrategy, IMethYieldStrategy, YieldSkimmingHarvestReporter {
     using SafeERC20 for IERC20;
 
     /// @dev The Mantle staking contract that provides exchange rate information

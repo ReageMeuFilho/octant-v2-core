@@ -1,21 +1,21 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.25;
 
-import { DragonTokenizedYieldSkimmingStrategy } from "src/zodiac-core/vaults/DragonTokenizedYieldSkimmingStrategy.sol";
+import { DragonTokenizedStrategy } from "src/zodiac-core/vaults/DragonTokenizedStrategy.sol";
 import { ITokenizedStrategy } from "src/zodiac-core/interfaces/ITokenizedStrategy.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { IBaseYieldSkimmingStrategy } from "src/core/interfaces/IBaseYieldSkimmingStrategy.sol";
 
 /**
  * @title YieldSkimmingDragonTokenizedStrategy
- * @notice A specialized version of DragonTokenizedYieldSkimmingStrategy designed for yield-bearing tokens
+ * @notice A specialized version of DragonTokenizedStrategy designed for yield-bearing tokens
  * like mETH whose value in ETH terms appreciates over time.
  */
-contract YieldSkimmingDragonTokenizedStrategy is DragonTokenizedYieldSkimmingStrategy {
+contract YieldSkimmingDragonTokenizedStrategy is DragonTokenizedStrategy {
     using Math for uint256;
 
     /**
-     * @inheritdoc DragonTokenizedYieldSkimmingStrategy
+     * @inheritdoc DragonTokenizedStrategy
      * @dev Overrides report to handle asset appreciation in yield-bearing tokens.
      * This implementation specifically:
      * 1. Calls harvestAndReport to get profit in the asset's terms
@@ -26,7 +26,7 @@ contract YieldSkimmingDragonTokenizedStrategy is DragonTokenizedYieldSkimmingStr
      * This approach works well for assets like LSTs (Liquid Staking Tokens) that
      * continuously appreciate in value.
      */
-    function report() public override(DragonTokenizedYieldSkimmingStrategy) returns (uint256 profit, uint256 loss) {
+    function report() public override(DragonTokenizedStrategy) returns (uint256 profit, uint256 loss) {
         StrategyData storage S = super._strategyStorage();
 
         // Get the delta

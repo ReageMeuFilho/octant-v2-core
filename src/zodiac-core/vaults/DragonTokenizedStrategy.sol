@@ -473,7 +473,7 @@ contract DragonTokenizedStrategy is IDragonTokenizedStrategy, TokenizedStrategy 
      * @dev Internal function to handle loss protection for dragon principal
      * @param loss The amount of loss to protect against
      */
-    function _handleDragonLossProtection(StrategyData storage S, uint256 loss) internal {
+    function _handleDragonLossProtection(StrategyData storage S, uint256 loss) internal virtual {
         // Can only burn up to available shares
         uint256 sharesBurned = Math.min(_convertToShares(S, loss, Math.Rounding.Floor), S.balances[S.dragonRouter]);
 
