@@ -14,7 +14,7 @@ contract LinearAllowanceExecutorTest is Test {
     MockSafe public mockSafe;
     MockERC20 public mockToken;
 
-    uint128 constant DRIP_RATE = 1 ether; // 1 token per day
+    uint192 constant DRIP_RATE = 1 ether; // 1 token per day
 
     function setUp() public {
         // Deploy contracts

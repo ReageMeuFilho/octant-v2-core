@@ -28,23 +28,23 @@ contract LinearAllowanceExecutorTestHarness is LinearAllowanceExecutor, Ownable 
     function withdraw(address token, uint256 amount, address payable to) external override onlyOwner {
         // Validate destination address to prevent accidental burns
         require(to != address(0), "LinearAllowanceExecutorTestHarness: cannot withdraw to zero address");
-        
+
         // Handle ETH withdrawal
         if (token == NATIVE_TOKEN) {
             // Check contract has sufficient ETH balance
             require(address(this).balance >= amount, "LinearAllowanceExecutorTestHarness: insufficient ETH balance");
-            
+
             // Transfer ETH to destination
-            (bool success, ) = to.call{value: amount}("");
+            (bool success, ) = to.call{ value: amount }("");
             require(success, "LinearAllowanceExecutorTestHarness: ETH transfer failed");
         } else {
             // Handle ERC20 token withdrawal
             IERC20 tokenContract = IERC20(token);
-            
+
             // Check contract has sufficient token balance
             uint256 contractBalance = tokenContract.balanceOf(address(this));
             require(contractBalance >= amount, "LinearAllowanceExecutorTestHarness: insufficient token balance");
-            
+
             // Transfer tokens to destination
             bool success = tokenContract.transfer(to, amount);
             require(success, "LinearAllowanceExecutorTestHarness: token transfer failed");
@@ -64,4 +64,4 @@ contract LinearAllowanceExecutorTestHarness is LinearAllowanceExecutor, Ownable 
             return IERC20(token).balanceOf(address(this));
         }
     }
-} 
+}
