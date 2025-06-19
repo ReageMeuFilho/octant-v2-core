@@ -106,14 +106,14 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
     }
 
     /// @notice Get the token balance of a safe
-    /// @param safe The safe address
+    /// @param account The account address
     /// @param token The token address (use NATIVE_TOKEN for ETH)
     /// @return balance The token balance
-    function getSafeBalance(address safe, address token) public view returns (uint256 balance) {
+    function getBalance(address account, address token) public view returns (uint256 balance) {
         if (token == NATIVE_TOKEN) {
-            balance = address(safe).balance;
+            balance = address(account).balance;
         } else {
-            balance = IERC20(token).balanceOf(safe);
+            balance = IERC20(token).balanceOf(account);
         }
     }
 
@@ -123,7 +123,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
         uint256 totalUnspent = getTotalUnspent(safe, delegate, token);
         if (totalUnspent == 0) return 0;
 
-        uint256 safeBalance = getSafeBalance(safe, token);
+        uint256 safeBalance = getBalance(safe, token);
 
         return totalUnspent <= safeBalance ? totalUnspent : safeBalance;
     }
@@ -203,23 +203,24 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
     }
 
     /// @notice Execute a transfer from the safe to the recipient
+    /// @dev Uses beneficiary balance to check if the transfer was successful; fee-charging tokens are not supported.
     /// @param safe The safe address executing the transfer
     /// @param delegate The delegate executing the transfer (for error reporting)
     /// @param token The token address to transfer
     /// @param to The recipient address
     /// @param amount The amount to transfer
     function _executeTransfer(address safe, address delegate, address token, address to, uint256 amount) internal {
-        bool success;
+        uint256 beneficiaryPreBalance = getBalance(to, token);
+
         if (token == NATIVE_TOKEN) {
-            success = ISafe(payable(safe)).execTransactionFromModule(to, amount, "", Enum.Operation.Call);
+            ISafe(payable(safe)).execTransactionFromModule(to, amount, "", Enum.Operation.Call);
         } else {
             bytes memory data = abi.encodeWithSelector(IERC20.transfer.selector, to, amount);
-            success = ISafe(payable(safe)).execTransactionFromModule(token, 0, data, Enum.Operation.Call);
+            ISafe(payable(safe)).execTransactionFromModule(token, 0, data, Enum.Operation.Call);
         }
 
-        if (!success) {
-            revert TransferFailed(safe, delegate, token);
-        }
+        uint256 beneficiaryPostBalance = getBalance(to, token);
+        require(beneficiaryPostBalance - beneficiaryPreBalance >= amount, TransferFailed(safe, delegate, token));
     }
 
     function _calculateCurrentAllowance(LinearAllowance memory a) internal view returns (LinearAllowance memory) {
