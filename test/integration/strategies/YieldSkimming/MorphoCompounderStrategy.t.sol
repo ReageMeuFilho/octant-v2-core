@@ -14,7 +14,7 @@ import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
 import { YieldSkimmingTokenizedStrategy } from "src/strategies/yieldSkimming/YieldSkimmingTokenizedStrategy.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import { MorphoCompounderWrapper } from "test/wrappers/MorphoCompounderWrapper.sol";
-import { IBaseYieldSkimmingStrategy } from "src/core/interfaces/IBaseYieldSkimmingStrategy.sol";
+import { IYieldSkimmingStrategy } from "src/strategies/yieldSkimming/IYieldSkimmingStrategy.sol";
 import { IBaseStrategy } from "src/core/interfaces/IBaseStrategy.sol";
 import { WadRayMath } from "src/utils/libs/Maths/WadRay.sol";
 
@@ -277,7 +277,7 @@ contract MorphoCompounderStrategyTest is Test {
 
         // Check initial state
         uint256 totalAssetsBefore = vault.totalAssets();
-        uint256 initialExchangeRate = IBaseYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
+        uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
 
         // Simulate exchange rate increase based on fuzzed percentage
         uint256 newExchangeRate = (initialExchangeRate * (100 + profitPercentage)) / 100;
@@ -344,7 +344,7 @@ contract MorphoCompounderStrategyTest is Test {
         state.depositAmount2 = 2000e18; // 2000 WETH
 
         // Get initial exchange rate
-        state.initialExchangeRate = IBaseYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
+        state.initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
 
         vm.startPrank(state.user1);
         vault.deposit(state.depositAmount1, state.user1);
@@ -458,7 +458,7 @@ contract MorphoCompounderStrategyTest is Test {
 
         // Capture initial state
         uint256 initialAssets = vault.totalAssets();
-        uint256 initialExchangeRate = IBaseYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
+        uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
 
         // Call report as keeper (which internally calls _harvestAndReport)
         vm.startPrank(keeper);
@@ -466,7 +466,7 @@ contract MorphoCompounderStrategyTest is Test {
         vm.stopPrank();
 
         // Get new exchange rate and total assets
-        uint256 newExchangeRate = IBaseYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
+        uint256 newExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         uint256 newTotalAssets = vault.totalAssets();
 
         // mock pricePerShare to be 1.1x the initial exchange rate
@@ -558,7 +558,7 @@ contract MorphoCompounderStrategyTest is Test {
         vm.stopPrank();
 
         // Get initial exchange rate
-        uint256 initialExchangeRate = IBaseYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
+        uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
 
         // Simulate exchange rate increase based on fuzzed percentage
         uint256 newExchangeRate = (initialExchangeRate * (100 + exchangeRateIncreasePercentage)) / 100;
@@ -579,7 +579,7 @@ contract MorphoCompounderStrategyTest is Test {
         assertEq(loss, 0, "Should have no loss");
 
         // Verify exchange rate was updated
-        uint256 updatedExchangeRate = IBaseYieldSkimmingStrategy(address(strategy)).getLastRateRay().rayToWad();
+        uint256 updatedExchangeRate = IYieldSkimmingStrategy(address(strategy)).getLastRateRay().rayToWad();
 
         assertApproxEqRel(
             updatedExchangeRate,
@@ -591,7 +591,7 @@ contract MorphoCompounderStrategyTest is Test {
 
     /// @notice Test getting the last reported exchange rate
     function testgetCurrentExchangeRate() public view {
-        uint256 rate = IBaseYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
+        uint256 rate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         assertGt(rate, 0, "Exchange rate should be initialized and greater than zero");
     }
 
@@ -646,7 +646,7 @@ contract MorphoCompounderStrategyTest is Test {
         vm.stopPrank();
 
         // Mock a 10x exchange rate
-        uint256 initialExchangeRate = IBaseYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
+        uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         uint256 newExchangeRate = (initialExchangeRate * 7) / 3; // 233%
         vm.mockCall(WETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(newExchangeRate));
 
@@ -669,7 +669,7 @@ contract MorphoCompounderStrategyTest is Test {
         assertEq(strategy.doHealthCheck(), false);
 
         // old exchange rate
-        uint256 initialExchangeRate = IBaseYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
+        uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
 
         // make a 10 time profit (should revert when doHealthCheck is true but not when it is false)
         vm.mockCall(WETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(initialExchangeRate * 10));
@@ -734,7 +734,7 @@ contract MorphoCompounderStrategyTest is Test {
         vm.stopPrank();
 
         // Generate some profit first to create donation shares
-        uint256 initialExchangeRate = IBaseYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
+        uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         uint256 profitExchangeRate = (initialExchangeRate * (100 + profitPercentage)) / 100;
 
         vm.mockCall(WETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(profitExchangeRate));
@@ -798,7 +798,7 @@ contract MorphoCompounderStrategyTest is Test {
         state.depositAmount2 = 2000e18; // 2000 WETH
 
         // Get initial exchange rate
-        state.initialExchangeRate = IBaseYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
+        state.initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
 
         // First user deposits
         vm.startPrank(state.user1);
@@ -894,7 +894,7 @@ contract MorphoCompounderStrategyTest is Test {
         vm.stopPrank();
 
         // Generate small profit to create minimal donation shares
-        uint256 initialExchangeRate = IBaseYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
+        uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         uint256 smallProfitRate = (initialExchangeRate * 1005) / 1000; // 0.5% profit
         vm.mockCall(WETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(smallProfitRate));
 
@@ -954,7 +954,7 @@ contract MorphoCompounderStrategyTest is Test {
         vm.stopPrank();
 
         // Generate profit to create donation shares
-        uint256 initialExchangeRate = IBaseYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
+        uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         uint256 profitRate = (initialExchangeRate * 120) / 100; // 20% profit
         vm.mockCall(WETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(profitRate));
 
@@ -1034,7 +1034,7 @@ contract MorphoCompounderStrategyTest is Test {
         uint256 totalAssetsBefore = vault.totalAssets();
 
         // Generate loss (5% decrease)
-        uint256 initialExchangeRate = IBaseYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
+        uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         uint256 lossRate = (initialExchangeRate * 95) / 100;
         vm.mockCall(WETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(lossRate));
 
@@ -1100,7 +1100,7 @@ contract MorphoCompounderStrategyTest is Test {
         vm.stopPrank();
 
         // Generate profit to create donation shares
-        state.initialExchangeRate = IBaseYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
+        state.initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         state.profitRate = (state.initialExchangeRate * (100 + profitPercentage)) / 100;
         vm.mockCall(WETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(state.profitRate));
 

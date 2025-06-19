@@ -5,7 +5,7 @@ import { BaseStrategy } from "src/core/BaseStrategy.sol";
 import { IBaseHealthCheck } from "src/strategies/interfaces/IBaseHealthCheck.sol";
 import { WadRayMath } from "src/utils/libs/Maths/WadRay.sol";
 import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
-import { IBaseYieldSkimmingStrategy } from "src/core/interfaces/IBaseYieldSkimmingStrategy.sol";
+import { IYieldSkimmingStrategy } from "src/strategies/yieldSkimming/IYieldSkimmingStrategy.sol";
 
 /**
  *   @title Base Yield Skimming Health Check
@@ -141,7 +141,7 @@ abstract contract BaseYieldSkimmingHealthCheck is BaseStrategy, IBaseHealthCheck
         // new total assets is the total assets at the new rate
         _newTotalAssets =
             (ITokenizedStrategy(address(this)).totalAssets() *
-                IBaseYieldSkimmingStrategy(address(this)).getCurrentExchangeRate()) /
+                IYieldSkimmingStrategy(address(this)).getCurrentExchangeRate()) /
             1e18;
 
         if (_newTotalAssets > currentTotalAssets) {

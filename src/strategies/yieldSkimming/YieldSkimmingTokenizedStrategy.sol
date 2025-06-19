@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.18;
 
-import { IBaseYieldSkimmingStrategy } from "src/core/interfaces/IBaseYieldSkimmingStrategy.sol";
+import { IBaseStrategy } from "src/core/interfaces/IBaseStrategy.sol";
 import { TokenizedStrategy, Math } from "src/core/TokenizedStrategy.sol";
 import { WadRayMath } from "src/utils/libs/Maths/WadRay.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -57,7 +57,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
 
         uint256 rateNow = _currentRateRay();
 
-        IBaseYieldSkimmingStrategy(address(this)).harvestAndReport();
+        IBaseStrategy(address(this)).harvestAndReport();
 
         uint256 totalETH = S.asset.balanceOf(address(this)).mulDiv(rateNow, WadRayMath.RAY); // asset → ETH
         uint256 supply = _totalSupply(S); // shares denom. in ETH
