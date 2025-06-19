@@ -1,4 +1,5 @@
 yarn format
 yarn lint
+.venv/bin/slither . --exclude-dependencies --filter-paths \"test\"
 yarn test
 yarn lint:commits
