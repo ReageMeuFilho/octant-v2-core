@@ -24,7 +24,10 @@ interface IBaseYieldSkimmingStrategy {
      */
     function deployFunds(uint256 _amount) external;
 
+    // todo move somewhere else
     function getCurrentExchangeRate() external view returns (uint256);
+
+    function getLastRateRay() external view returns (uint256);
 
     /**
      * @notice Callback for the Strategy to free funds during withdrawal.
