@@ -20,9 +20,6 @@ interface IWstETH {
 contract LidoStrategy is BaseYieldSkimmingHealthCheck {
     using SafeERC20 for IERC20;
 
-    /// @dev The exchange rate at the last harvest, scaled by 1e18
-    uint256 internal _lastReportedExchangeRate;
-
     /// @notice yearn governance
     address public constant GOV = 0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52;
 
@@ -49,10 +46,7 @@ contract LidoStrategy is BaseYieldSkimmingHealthCheck {
             _donationAddress,
             _tokenizedStrategyAddress
         )
-    {
-        // Initialize the exchange rate on setup
-        _lastReportedExchangeRate = _getCurrentExchangeRate();
-    }
+    {}
 
     /// @notice Sweep of non-asset ERC20 tokens to governance (onlyGovernance)
     /// @param _token The ERC20 token to sweep
@@ -75,14 +69,6 @@ contract LidoStrategy is BaseYieldSkimmingHealthCheck {
      */
     function balanceOfShares() public view returns (uint256) {
         return IERC20(asset).balanceOf(address(this));
-    }
-
-    /**
-     * @notice Returns the last reported exchange rate
-     * @return The last reported exchange rate
-     */
-    function getLastReportedExchangeRate() public view returns (uint256) {
-        return _lastReportedExchangeRate;
     }
 
     /**
@@ -111,26 +97,9 @@ contract LidoStrategy is BaseYieldSkimmingHealthCheck {
 
     /**
      * @notice Captures yield by calculating the increase in value based on exchange rate changes
-     * @return deltaAtNewRate The current delta of the strategy at the new exchange rate
-     * @return deltaAtOldRate The current delta of the strategy at the old exchange rate
+     * @return _totalAssets The current total assets of the strategy
      */
-    function _harvestAndReport() internal override returns (int256 deltaAtNewRate, int256 deltaAtOldRate) {
-        uint256 currentExchangeRate = _getCurrentExchangeRate();
-
-        // Get the current balance of assets in the strategy (not using totalSupply so that it goes to profit)
-        uint256 assetBalance = ITokenizedStrategy(address(this)).totalAssets();
-
-        // Calculate the profit based on exchange rate difference
-        int256 deltaExchangeRate = int256(currentExchangeRate) - int256(_lastReportedExchangeRate);
-
-        int256 deltaInValue = int256(assetBalance) * deltaExchangeRate;
-
-        deltaAtOldRate = deltaInValue / int256(_lastReportedExchangeRate);
-
-        deltaAtNewRate = deltaInValue / int256(currentExchangeRate);
-
-        _lastReportedExchangeRate = currentExchangeRate;
-    }
+    function _harvestAndReport() internal override returns (uint256 _totalAssets) {}
 
     /**
      * @notice No tending needed
@@ -138,6 +107,11 @@ contract LidoStrategy is BaseYieldSkimmingHealthCheck {
     function _tend(uint256 /*_idle*/) internal override {
         // No action needed
     }
+
+    // function getCurrentExchangeRate() public view returns (uint256) {
+
+    //     return _getCurrentExchangeRate();
+    // }
 
     /**
      * @notice Gets the current exchange rate from the yield vault
