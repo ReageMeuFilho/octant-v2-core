@@ -2,7 +2,6 @@
 pragma solidity ^0.8.18;
 
 import { IBaseYieldSkimmingStrategy } from "src/core/interfaces/IBaseYieldSkimmingStrategy.sol";
-import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
 import { TokenizedStrategy, Math } from "src/core/TokenizedStrategy.sol";
 import { WadRayMath } from "src/utils/libs/Maths/WadRay.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -40,26 +39,6 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
 
     /// @dev Event emitted when harvest is performed
     event Harvest(address indexed caller, uint256 currentRate);
-
-    /**
-     * @dev Initialize the strategy with the current exchange rate
-     * @dev This should be called during strategy setup
-     */
-    function _initializeExchangeRate() internal {
-        _strategyStorageExchangeRate().lastRateRay = _currentRateRay();
-    }
-
-    function initialize(
-        address _asset,
-        string memory _name,
-        address _management,
-        address _keeper,
-        address _emergencyAdmin,
-        address _dragonRouter
-    ) public virtual override {
-        super.initialize(_asset, _name, _management, _keeper, _emergencyAdmin, _dragonRouter);
-        _strategyStorageExchangeRate().lastRateRay = _currentRateRay();
-    }
 
     /**
      * @inheritdoc TokenizedStrategy
@@ -117,8 +96,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
      * @return The current exchange rate in RAY format (1e27)
      */
     function _currentRateRay() internal view virtual returns (uint256) {
-        // uint256 exchangeRate = IExchangeRate(address(this)).getCurrentExchangeRate();
-        uint256 exchangeRate = _getCurrentExchangeRate();
+        uint256 exchangeRate = IExchangeRate(address(this)).getCurrentExchangeRate();
 
         return exchangeRate.wadToRay(); // Convert from WAD (1e18) to RAY (1e27)
     }
@@ -134,6 +112,31 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         Math.Rounding
     ) internal view virtual override returns (uint256) {
         return (assets * _currentRateRay()) / WadRayMath.RAY;
+    }
+
+    /**
+     * @dev Get the last reported exchange rate
+     * @return The last exchange rate in RAY format
+     */
+    function getLastRateRay() external view returns (uint256) {
+        return _strategyStorageExchangeRate().lastRateRay;
+    }
+
+    /**
+     * @dev Get the current exchange rate
+     * @return The current exchange rate in RAY format
+     */
+    function getCurrentRateRay() external view returns (uint256) {
+        return _currentRateRay();
+    }
+
+    function _strategyStorageExchangeRate() internal pure returns (ExchangeRate storage S) {
+        // Since STORAGE_SLOT is a constant, we have to put a variable
+        // on the stack to access it from an inline assembly block.
+        bytes32 slot = EXCHANGE_RATE_STORAGE_SLOT;
+        assembly {
+            S.slot := slot
+        }
     }
 
     /**
@@ -153,41 +156,6 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         if (sharesBurned > 0) {
             // Burn shares from dragon router
             _burn(S, S.dragonRouter, sharesBurned);
-        }
-    }
-
-    /**
-     * @dev Get the last reported exchange rate
-     * @return The last exchange rate in RAY format
-     */
-    function getLastRateRay() external view returns (uint256) {
-        return _strategyStorageExchangeRate().lastRateRay;
-    }
-
-    /**
-     * @dev Get the current exchange rate
-     * @return The current exchange rate in RAY format
-     */
-    function getCurrentRateRay() external view returns (uint256) {
-        return _currentRateRay();
-    }
-
-    /**
-     * @dev Implementation of IExchangeRate interface
-     * @return The current exchange rate in WAD format (1e18)
-     * @dev This function should be overridden by specific strategy implementations
-     * to return the appropriate exchange rate for their underlying asset
-     */
-    function getCurrentExchangeRate() external view returns (uint256) {
-        return _currentRateRay().rayToWad();
-    }
-
-    function _strategyStorageExchangeRate() internal pure returns (ExchangeRate storage S) {
-        // Since STORAGE_SLOT is a constant, we have to put a variable
-        // on the stack to access it from an inline assembly block.
-        bytes32 slot = EXCHANGE_RATE_STORAGE_SLOT;
-        assembly {
-            S.slot := slot
         }
     }
 }

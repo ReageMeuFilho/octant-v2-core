@@ -24,6 +24,8 @@ interface IBaseYieldSkimmingStrategy {
      */
     function deployFunds(uint256 _amount) external;
 
+    function getCurrentExchangeRate() external view returns (uint256);
+
     /**
      * @notice Callback for the Strategy to free funds during withdrawal.
      * @dev Called by the TokenizedStrategy during withdraw or redeem.

@@ -2,10 +2,7 @@
 pragma solidity ^0.8.25;
 
 import { BaseYieldSkimmingHealthCheck } from "src/strategies/periphery/BaseYieldSkimmingHealthCheck.sol";
-
-import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 interface IWstETH {
@@ -108,10 +105,9 @@ contract LidoStrategy is BaseYieldSkimmingHealthCheck {
         // No action needed
     }
 
-    // function getCurrentExchangeRate() public view returns (uint256) {
-
-    //     return _getCurrentExchangeRate();
-    // }
+    function getCurrentExchangeRate() public view returns (uint256) {
+        return _getCurrentExchangeRate();
+    }
 
     /**
      * @notice Gets the current exchange rate from the yield vault
