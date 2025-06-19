@@ -119,19 +119,18 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     bytes32 private constant ALLOCATION_STORAGE_SLOT = bytes32(uint256(keccak256("tokenized.allocation.storage")) - 1);
 
     /// @notice EIP712 Domain separator typehash per EIP-2612
-    bytes32 private constant TYPE_HASH = keccak256(
-        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
-    );
+    bytes32 private constant TYPE_HASH =
+        keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
 
     /// @notice Signup typehash for EIP712 structured data
-    bytes32 private constant SIGNUP_TYPEHASH = keccak256(
-        "Signup(address user,uint256 deposit,uint256 nonce,uint256 deadline)"
-    );
+    bytes32 private constant SIGNUP_TYPEHASH =
+        keccak256("Signup(address user,uint256 deposit,uint256 nonce,uint256 deadline)");
 
     /// @notice CastVote typehash for EIP712 structured data
-    bytes32 private constant CAST_VOTE_TYPEHASH = keccak256(
-        "CastVote(address voter,uint256 proposalId,uint8 choice,uint256 weight,uint256 nonce,uint256 deadline)"
-    );
+    bytes32 private constant CAST_VOTE_TYPEHASH =
+        keccak256(
+            "CastVote(address voter,uint256 proposalId,uint8 choice,uint256 weight,uint256 nonce,uint256 deadline)"
+        );
 
     /// @notice EIP712 version for domain separator
     string private constant EIP712_VERSION = "1";
@@ -303,15 +302,16 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
 
     /// @dev Computes the domain separator
     function _computeDomainSeparator(AllocationStorage storage s) private view returns (bytes32) {
-        return keccak256(
-            abi.encode(
-                TYPE_HASH,
-                keccak256(bytes(s.name)),
-                keccak256(bytes(EIP712_VERSION)),
-                block.chainid,
-                address(this)
-            )
-        );
+        return
+            keccak256(
+                abi.encode(
+                    TYPE_HASH,
+                    keccak256(bytes(s.name)),
+                    keccak256(bytes(EIP712_VERSION)),
+                    block.chainid,
+                    address(this)
+                )
+            );
     }
 
     // ---------- Modifiers ----------
@@ -485,27 +485,25 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     ) external nonReentrant whenNotPaused onlyInitialized {
         // Check deadline
         if (block.timestamp > deadline) revert ExpiredSignature(deadline, block.timestamp);
-        
+
         AllocationStorage storage stor = _getStorage();
-        
+
         // Get current nonce and increment
         uint256 currentNonce = stor.nonces[user];
-        
+
         // Build struct hash
-        bytes32 structHash = keccak256(
-            abi.encode(SIGNUP_TYPEHASH, user, deposit, currentNonce, deadline)
-        );
-        
+        bytes32 structHash = keccak256(abi.encode(SIGNUP_TYPEHASH, user, deposit, currentNonce, deadline));
+
         // Recover signer
         address recoveredAddress = _recover(structHash, v, r, s);
         if (recoveredAddress == address(0)) revert InvalidSignature();
         if (recoveredAddress != user) revert InvalidSigner(recoveredAddress, user);
-        
+
         // Increment nonce
         unchecked {
             stor.nonces[user] = currentNonce + 1;
         }
-        
+
         // Execute signup logic
         _executeSignup(user, deposit);
     }
@@ -513,7 +511,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     /// @dev Internal signup execution logic
     function _executeSignup(address user, uint256 deposit) private {
         AllocationStorage storage s = _getStorage();
-        
+
         // Call hook for validation via interface (Yearn V3 pattern)
         if (!IBaseAllocationStrategy(address(this)).beforeSignupHook(user)) {
             revert RegistrationBlocked(user);
@@ -535,15 +533,8 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     }
 
     /// @dev Recovers signer address from signature
-    function _recover(
-        bytes32 structHash,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) private view returns (address) {
-        bytes32 digest = keccak256(
-            abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR(), structHash)
-        );
+    function _recover(bytes32 structHash, uint8 v, bytes32 r, bytes32 s) private view returns (address) {
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR(), structHash));
         return ecrecover(digest, v, r, s);
     }
 
@@ -613,38 +604,33 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     ) external nonReentrant whenNotPaused onlyInitialized {
         // Check deadline
         if (block.timestamp > deadline) revert ExpiredSignature(deadline, block.timestamp);
-        
+
         AllocationStorage storage stor = _getStorage();
-        
+
         // Get current nonce and increment
         uint256 currentNonce = stor.nonces[voter];
-        
+
         // Build struct hash
         bytes32 structHash = keccak256(
             abi.encode(CAST_VOTE_TYPEHASH, voter, pid, uint8(choice), weight, currentNonce, deadline)
         );
-        
+
         // Recover signer
         address recoveredAddress = _recover(structHash, v, r, s);
         if (recoveredAddress == address(0)) revert InvalidSignature();
         if (recoveredAddress != voter) revert InvalidSigner(recoveredAddress, voter);
-        
+
         // Increment nonce
         unchecked {
             stor.nonces[voter] = currentNonce + 1;
         }
-        
+
         // Execute vote logic
         _executeCastVote(voter, pid, choice, weight);
     }
 
     /// @dev Internal vote execution logic
-    function _executeCastVote(
-        address voter,
-        uint256 pid,
-        VoteType choice,
-        uint256 weight
-    ) private {
+    function _executeCastVote(address voter, uint256 pid, VoteType choice, uint256 weight) private {
         AllocationStorage storage s = _getStorage();
 
         // Validate proposal
