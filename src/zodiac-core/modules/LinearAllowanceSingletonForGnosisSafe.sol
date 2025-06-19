@@ -18,17 +18,15 @@ interface ISafe {
 }
 
 /// @title LinearAllowanceSingletonForGnosisSafe
+/// @author [Golem Foundation](https://golem.foundation)
 /// @notice See ILinearAllowanceSingletonForGnosisSafe
 contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, ReentrancyGuard {
     using SafeCast for uint256;
-    using SafeCast for uint160;
-    using SafeCast for uint32;
-    using SafeCast for uint64;
 
     mapping(address => mapping(address => mapping(address => LinearAllowance))) public allowances; // safe -> delegate -> token -> allowance
 
     /// @inheritdoc ILinearAllowanceSingleton
-    function setAllowance(address delegate, address token, uint192 dripRatePerDay) external {
+    function setAllowance(address delegate, address token, uint192 dripRatePerDay) external nonReentrant {
         _setAllowance(msg.sender, delegate, token, dripRatePerDay);
     }
 
@@ -40,11 +38,12 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
         address[] calldata delegates,
         address[] calldata tokens,
         uint192[] calldata dripRatesPerDay
-    ) external {
+    ) external nonReentrant {
         uint256 length = delegates.length;
-        if (length != tokens.length || length != dripRatesPerDay.length) {
-            revert("Array lengths must match");
-        }
+        require(
+            length == tokens.length && length == dripRatesPerDay.length,
+            ArrayLengthsMismatch(length, tokens.length)
+        );
 
         for (uint256 i = 0; i < length; i++) {
             _setAllowance(msg.sender, delegates[i], tokens[i], dripRatesPerDay[i]);
@@ -52,18 +51,18 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
     }
 
     /// @inheritdoc ILinearAllowanceSingleton
-    function emergencyRevokeAllowance(address delegate, address token) external nonReentrant {
-        if (delegate == address(0)) revert AddressZeroForArgument("delegate");
+    function revokeAllowance(address delegate, address token) external nonReentrant {
+        _revokeAllowance(msg.sender, delegate, token);
+    }
 
-        LinearAllowance memory allowance = allowances[msg.sender][delegate][token];
-        allowance = _updateAllowance(allowance);
+    /// @inheritdoc ILinearAllowanceSingleton
+    function revokeAllowances(address[] calldata delegates, address[] calldata tokens) external nonReentrant {
+        uint256 length = delegates.length;
+        require(length == tokens.length, ArrayLengthsMismatch(delegates.length, tokens.length));
 
-        emit AllowanceEmergencyRevoked(msg.sender, delegate, token, allowance.totalUnspent);
-
-        allowance.dripRatePerDay = 0;
-        allowance.totalUnspent = 0;
-
-        allowances[msg.sender][delegate][token] = allowance;
+        for (uint256 i = 0; i < length; i++) {
+            _revokeAllowance(msg.sender, delegates[i], tokens[i]);
+        }
     }
 
     /// @inheritdoc ILinearAllowanceSingleton
@@ -87,9 +86,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
         address[] calldata tos
     ) external nonReentrant returns (uint256[] memory transferAmounts) {
         uint256 length = safes.length;
-        if (length != tokens.length || length != tos.length) {
-            revert("Array lengths must match");
-        }
+        require(length == tokens.length && length == tos.length, ArrayLengthsMismatch(length, tokens.length));
 
         transferAmounts = new uint256[](length);
 
@@ -101,74 +98,108 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
     }
 
     /// @inheritdoc ILinearAllowanceSingleton
-    function getTokenAllowanceData(
-        address source,
-        address delegate,
-        address token
-    )
-        external
-        view
-        returns (uint192 dripRatePerDay, uint256 totalUnspent, uint256 totalSpent, uint64 lastBookedAtInSeconds)
-    {
-        LinearAllowance memory allowance = allowances[source][delegate][token];
-        return (
-            allowance.dripRatePerDay,
-            allowance.totalUnspent,
-            allowance.totalSpent,
-            allowance.lastBookedAtInSeconds
-        );
-    }
-
-    /// @inheritdoc ILinearAllowanceSingleton
     /// @param safe The address of the safe which is the source of the allowance
     function getTotalUnspent(address safe, address delegate, address token) public view returns (uint256) {
-        // Cache the storage value in memory (single SLOAD)
         LinearAllowance memory allowance = allowances[safe][delegate][token];
-
-        // Handle uninitialized allowance (lastBookedAtInSeconds == 0)
-        if (allowance.lastBookedAtInSeconds == 0) {
-            return 0;
-        }
-
-        uint256 timeElapsed = block.timestamp - allowance.lastBookedAtInSeconds;
-
-        return allowance.totalUnspent + ((allowance.dripRatePerDay * timeElapsed) / 1 days);
-    }
-
-    /// @inheritdoc ILinearAllowanceSingleton
-    /// @param safe The address of the safe which is the source of the allowance
-    function getMaxWithdrawableAmount(address safe, address delegate, address token) public view returns (uint256) {
-        // Get current total unspent allowance
-        uint256 totalUnspent = getTotalUnspent(safe, delegate, token);
-
-        // If no allowance, return 0
-        if (totalUnspent == 0) return 0;
-
-        if (token == NATIVE_TOKEN) {
-            // For ETH transfers, get the minimum of totalUnspent and safe balance
-            uint256 safeBalance = address(safe).balance;
-            return totalUnspent <= safeBalance ? totalUnspent : safeBalance;
-        } else {
-            // For ERC20 transfers
-            try IERC20(token).balanceOf(safe) returns (uint256 tokenBalance) {
-                return totalUnspent <= tokenBalance ? totalUnspent : tokenBalance;
-            } catch {
-                // If balance call fails, return 0 to indicate no withdrawal possible
-                return 0;
-            }
-        }
+        uint256 newAccrued = _calculateNewAccrued(allowance);
+        return allowance.totalUnspent + newAccrued;
     }
 
     /// @notice Get the token balance of a safe
     /// @param safe The safe address
     /// @param token The token address (use NATIVE_TOKEN for ETH)
     /// @return balance The token balance
-    function _getTokenBalance(address safe, address token) internal view returns (uint256 balance) {
+    function getSafeBalance(address safe, address token) public view returns (uint256 balance) {
         if (token == NATIVE_TOKEN) {
             balance = address(safe).balance;
         } else {
             balance = IERC20(token).balanceOf(safe);
         }
+    }
+
+    /// @inheritdoc ILinearAllowanceSingleton
+    /// @param safe The address of the safe which is the source of the allowance
+    function getMaxWithdrawableAmount(address safe, address delegate, address token) public view returns (uint256) {
+        uint256 totalUnspent = getTotalUnspent(safe, delegate, token);
+        if (totalUnspent == 0) return 0;
+
+        uint256 safeBalance = getSafeBalance(safe, token);
+
+        return totalUnspent <= safeBalance ? totalUnspent : safeBalance;
+    }
+
+    /// @notice Internal function to set a single allowance
+    /// @param safe The safe address that is setting the allowance
+    /// @param delegate The delegate address receiving the allowance
+    /// @param token The token address for the allowance
+    /// @param dripRatePerDay The drip rate per day for the allowance
+    function _setAllowance(address safe, address delegate, address token, uint192 dripRatePerDay) internal {
+        // Cache storage struct in memory to save gas
+        if (delegate == address(0)) revert AddressZeroForArgument("delegate");
+        LinearAllowance memory a = allowances[safe][delegate][token];
+
+        a = _calculateCurrentAllowance(a);
+        a.dripRatePerDay = dripRatePerDay;
+
+        allowances[safe][delegate][token] = a;
+
+        emit AllowanceSet(safe, delegate, token, dripRatePerDay);
+    }
+
+    /// @notice Internal function to revoke a single allowance
+    /// @param safe The safe address that is revoking the allowance
+    /// @param delegate The delegate address whose allowance is being revoked
+    /// @param token The token address for the allowance
+    function _revokeAllowance(address safe, address delegate, address token) internal {
+        if (delegate == address(0)) revert AddressZeroForArgument("delegate");
+
+        LinearAllowance memory allowance = allowances[safe][delegate][token];
+        allowance = _calculateCurrentAllowance(allowance);
+
+        emit AllowanceRevoked(safe, delegate, token, allowance.totalUnspent);
+
+        allowance.dripRatePerDay = 0;
+        allowance.totalUnspent = 0;
+
+        allowances[safe][delegate][token] = allowance;
+    }
+
+    /// @notice Internal function to execute a single allowance transfer
+    /// @param safe The safe address that is the source of the allowance
+    /// @param delegate The delegate address executing the transfer
+    /// @param token The token address to transfer
+    /// @param to The recipient address
+    /// @return transferAmount The amount transferred
+    function _executeAllowanceTransfer(
+        address safe,
+        address delegate,
+        address token,
+        address payable to
+    ) internal returns (uint256 transferAmount) {
+        if (safe == address(0)) revert AddressZeroForArgument("safe");
+        if (to == address(0)) revert AddressZeroForArgument("to");
+
+        // Cache storage in memory (single SLOAD)
+        LinearAllowance memory a = allowances[safe][delegate][token];
+
+        // Calculate current allowance values
+        a = _calculateCurrentAllowance(a);
+        if (a.totalUnspent == 0) revert NoAllowanceToTransfer(safe, delegate, token);
+
+        // Calculate transfer amount based on available allowance and safe balance
+        transferAmount = getMaxWithdrawableAmount(safe, delegate, token);
+        if (transferAmount == 0) revert ZeroTransfer(safe, delegate, token);
+
+        // Update bookkeeping and write to storage BEFORE external calls (effects)
+        a.totalSpent += transferAmount;
+        a.totalUnspent -= transferAmount;
+        allowances[safe][delegate][token] = a;
+
+        emit AllowanceTransferred(safe, delegate, token, to, transferAmount);
+
+        _executeTransfer(safe, delegate, token, to, transferAmount);
+
+        return transferAmount;
     }
 
     /// @notice Execute a transfer from the safe to the recipient
@@ -191,87 +222,27 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
         }
     }
 
-    /// @notice Calculate the transfer amount based on allowance and safe balance
-    /// @param safe The safe address
-    /// @param token The token address
-    /// @param a The current allowance data
-    /// @return transferAmount The amount to transfer
-    function _calculateTransferAmount(
-        address safe,
-        address token,
-        LinearAllowance memory a
-    ) internal view returns (uint256 transferAmount) {
-        uint256 safeBalance = _getTokenBalance(safe, token);
-        transferAmount = a.totalUnspent <= safeBalance ? a.totalUnspent : safeBalance;
-    }
+    function _calculateCurrentAllowance(LinearAllowance memory a) internal view returns (LinearAllowance memory) {
+        uint256 newAccrued = _calculateNewAccrued(a);
 
-    /// @notice Internal function to set a single allowance
-    /// @param safe The safe address that is setting the allowance
-    /// @param delegate The delegate address receiving the allowance
-    /// @param token The token address for the allowance
-    /// @param dripRatePerDay The drip rate per day for the allowance
-    function _setAllowance(address safe, address delegate, address token, uint192 dripRatePerDay) internal {
-        // Cache storage struct in memory to save gas
-        if (delegate == address(0)) revert AddressZeroForArgument("delegate");
-        LinearAllowance memory a = allowances[safe][delegate][token];
-
-        // Update cached memory values
-        a = _updateAllowance(a);
-        a.dripRatePerDay = dripRatePerDay;
-
-        // Write back to storage once
-        allowances[safe][delegate][token] = a;
-
-        emit AllowanceSet(safe, delegate, token, dripRatePerDay);
-    }
-
-    /// @notice Internal function to execute a single allowance transfer
-    /// @param safe The safe address that is the source of the allowance
-    /// @param delegate The delegate address executing the transfer
-    /// @param token The token address to transfer
-    /// @param to The recipient address
-    /// @return transferAmount The amount transferred
-    function _executeAllowanceTransfer(
-        address safe,
-        address delegate,
-        address token,
-        address payable to
-    ) internal returns (uint256 transferAmount) {
-        if (safe == address(0)) revert AddressZeroForArgument("safe");
-        if (to == address(0)) revert AddressZeroForArgument("to");
-
-        // Cache storage in memory (single SLOAD)
-        LinearAllowance memory a = allowances[safe][delegate][token];
-
-        // Update cached memory values
-        a = _updateAllowance(a);
-        if (a.totalUnspent == 0) revert NoAllowanceToTransfer(safe, delegate, token);
-
-        // Calculate transfer amount based on available allowance and safe balance
-        transferAmount = _calculateTransferAmount(safe, token, a);
-        if (transferAmount == 0) revert ZeroTransfer(safe, delegate, token);
-
-        // Update bookkeeping and write to storage BEFORE external calls (effects)
-        a.totalSpent += transferAmount;
-        a.totalUnspent -= transferAmount;
-        allowances[safe][delegate][token] = a;
-
-        // Execute the transfer
-        _executeTransfer(safe, delegate, token, to, transferAmount);
-
-        emit AllowanceTransferred(safe, delegate, token, to, transferAmount);
-
-        return transferAmount;
-    }
-
-    function _updateAllowance(LinearAllowance memory a) internal view returns (LinearAllowance memory) {
-        if (a.lastBookedAtInSeconds != 0) {
-            uint256 timeElapsed = block.timestamp - a.lastBookedAtInSeconds;
-            //slither-disable-next-line incorrect-equality
-            a.totalUnspent += (timeElapsed * a.dripRatePerDay) / 1 days;
+        if (a.lastBookedAtInSeconds == 0) {
+            a.lastBookedAtInSeconds = block.timestamp.toUint64();
+        } else if (newAccrued > 0) {
+            a.totalUnspent += newAccrued;
+            a.lastBookedAtInSeconds = block.timestamp.toUint64();
         }
 
-        a.lastBookedAtInSeconds = block.timestamp.toUint64();
         return a;
+    }
+
+    function _calculateNewAccrued(LinearAllowance memory allowance) internal view returns (uint256) {
+        if (allowance.lastBookedAtInSeconds == 0) {
+            return 0;
+        }
+
+        uint256 timeElapsed = block.timestamp - allowance.lastBookedAtInSeconds;
+        uint256 newAccrued = (timeElapsed * allowance.dripRatePerDay) / 1 days;
+
+        return newAccrued > 0 ? newAccrued : 0;
     }
 }

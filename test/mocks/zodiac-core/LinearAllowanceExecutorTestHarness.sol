@@ -18,6 +18,10 @@ contract LinearAllowanceExecutorTestHarness is LinearAllowanceExecutor, Ownable 
     /// during contract deployment. This ensures immediate access control setup.
     constructor() Ownable(msg.sender) {}
 
+    /// @notice Enables the contract to receive ETH transfers from allowance executions
+    /// @dev Required for ETH allowance transfers to succeed when this contract is the recipient
+    receive() external payable override {}
+
     /// @notice Withdraw accumulated funds from this contract (owner only)
     /// @dev Implements the abstract withdraw function with owner-only access control.
     /// Supports both ETH and ERC20 token withdrawals with proper balance validation.

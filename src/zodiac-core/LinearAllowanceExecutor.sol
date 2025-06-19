@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import { LinearAllowanceSingletonForGnosisSafe } from "src/zodiac-core/modules/LinearAllowanceSingletonForGnosisSafe.sol";
 
 /// @title LinearAllowanceExecutor
+/// @author [Golem Foundation](https://golem.foundation)
 /// @notice Abstract base contract for executing linear allowance transfers from Gnosis Safe modules
 /// @dev This contract provides the core functionality for interacting with LinearAllowanceSingletonForGnosisSafe
 /// while leaving withdrawal mechanisms to be implemented by derived contracts. The contract can receive
@@ -12,7 +13,7 @@ import { LinearAllowanceSingletonForGnosisSafe } from "src/zodiac-core/modules/L
 abstract contract LinearAllowanceExecutor {
     /// @notice Enables the contract to receive ETH transfers from allowance executions
     /// @dev Required for ETH allowance transfers to succeed when this contract is the recipient
-    receive() external payable virtual {}
+    receive() external payable virtual;
 
     /// @notice Execute a transfer of the allowance from a Safe to this contract
     /// @dev This function calls the allowance module to transfer available allowance to this contract.
@@ -30,26 +31,30 @@ abstract contract LinearAllowanceExecutor {
         return allowanceModule.executeAllowanceTransfer(safe, token, payable(address(this)));
     }
 
-    // @notice Execute a batch of transfers of the allowance.
-    /// @param allowanceModule The allowance module to use.
-    /// @param safes The addresses of the safes that are the source of the allowance.
-    /// @param tokens The addresses of the tokens to transfer.
-    /// @param tos The addresses of the beneficiaries.
-    /// @return transferAmounts The amounts transferred for each operation.
+    /// @notice Execute a batch of allowance transfers from multiple Safes to this contract
+    /// @dev All transfers are sent to this contract (address(this)) for security purposes.
+    /// This prevents parameter injection attacks that could redirect funds to arbitrary addresses.
+    /// @param allowanceModule The allowance module contract to interact with
+    /// @param safes Array of Safe addresses that are the source of the allowances
+    /// @param tokens Array of token addresses to transfer (use NATIVE_TOKEN for ETH)
+    /// @return transferAmounts Array of amounts transferred for each operation
     function executeAllowanceTransfers(
         LinearAllowanceSingletonForGnosisSafe allowanceModule,
         address[] calldata safes,
-        address[] calldata tokens,
-        address[] calldata tos
+        address[] calldata tokens
     ) external returns (uint256[] memory transferAmounts) {
+        address[] memory tos = new address[](safes.length);
+        for (uint256 i = 0; i < safes.length; i++) {
+            tos[i] = address(this);
+        }
         return allowanceModule.executeAllowanceTransfers(safes, tokens, tos);
     }
 
-    // @notice Get the total unspent allowance for a token.
-    /// @param allowanceModule The allowance module to use.
-    /// @param safe The address of the safe.
-    /// @param token The address of the token.
-    /// @return totalAllowanceAsOfNow The total unspent allowance as of now.
+    /// @notice Get the total unspent allowance for a token
+    /// @param allowanceModule The allowance module to use
+    /// @param safe The address of the safe
+    /// @param token The address of the token
+    /// @return totalAllowanceAsOfNow The total unspent allowance as of now
     function getTotalUnspent(
         LinearAllowanceSingletonForGnosisSafe allowanceModule,
         address safe,
@@ -67,13 +72,13 @@ abstract contract LinearAllowanceExecutor {
     /// @param token The address of the token to withdraw (use NATIVE_TOKEN for ETH)
     /// @param amount The amount to withdraw from this contract's balance
     /// @param to The destination address to send the withdrawn funds
-    function withdraw(address token, uint256 amount, address payable to) external virtual {}
+    function withdraw(address token, uint256 amount, address payable to) external virtual;
 
-    // @notice Get the maximum withdrawable amount for a token, considering both allowance and Safe balance.
-    /// @param allowanceModule The allowance module to use.
-    /// @param safe The address of the safe.
-    /// @param token The address of the token.
-    /// @return maxWithdrawableAmount The maximum amount that can be withdrawn.
+    /// @notice Get the maximum withdrawable amount for a token, considering both allowance and Safe balance
+    /// @param allowanceModule The allowance module to use
+    /// @param safe The address of the safe
+    /// @param token The address of the token
+    /// @return maxWithdrawableAmount The maximum amount that can be withdrawn
     function getMaxWithdrawableAmount(
         LinearAllowanceSingletonForGnosisSafe allowanceModule,
         address safe,

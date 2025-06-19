@@ -4,7 +4,7 @@ import "forge-std/Test.sol";
 import "lib/safe-smart-account/contracts/Safe.sol";
 import "lib/safe-smart-account/contracts/proxies/SafeProxyFactory.sol";
 import "lib/safe-smart-account/contracts/proxies/SafeProxy.sol";
-import { LinearAllowanceSingletonForGnosisSafeWrapper } from "test/wrappers/LinearAllowanceSingletonForGnosisSafeWrapper.sol";
+import { LinearAllowanceSingletonForGnosisSafe } from "src/zodiac-core/modules/LinearAllowanceSingletonForGnosisSafe.sol";
 import { NATIVE_TOKEN } from "src/constants.sol";
 import "lib/safe-smart-account/contracts/libraries/Enum.sol";
 import { LinearAllowanceExecutorTestHarness } from "test/mocks/zodiac-core/LinearAllowanceExecutorTestHarness.sol";
@@ -23,14 +23,14 @@ contract TestLinearAllowanceIntegration is Test {
     Safe internal safeImpl;
     SafeProxyFactory internal safeProxyFactory;
     Safe internal singleton;
-    LinearAllowanceSingletonForGnosisSafeWrapper internal allowanceModule;
+    LinearAllowanceSingletonForGnosisSafe internal allowanceModule;
     LinearAllowanceExecutorTestHarness public allowanceExecutor;
     address internal recipient = makeAddr("recipient");
     address internal safe = makeAddr("safe");
 
     function setUp() public {
         // Deploy module
-        allowanceModule = new LinearAllowanceSingletonForGnosisSafeWrapper();
+        allowanceModule = new LinearAllowanceSingletonForGnosisSafe();
         // Deploy Safe infrastructure
         safeProxyFactory = new SafeProxyFactory();
         singleton = new Safe();
@@ -114,11 +114,7 @@ contract TestLinearAllowanceIntegration is Test {
         );
 
         // Verify allowance bookkeeping
-        (, uint256 totalUnspent, , ) = allowanceModule.getTokenAllowanceData(
-            safeAddress,
-            executorAddress,
-            NATIVE_TOKEN
-        );
+        (, , uint256 totalUnspent, ) = allowanceModule.allowances(safeAddress, executorAddress, NATIVE_TOKEN);
 
         if (expectedAllowance > safeBalanceBefore) {
             // Partial withdrawal case
@@ -204,11 +200,7 @@ contract TestLinearAllowanceIntegration is Test {
         );
 
         // Verify allowance bookkeeping
-        (, uint256 totalUnspent, , ) = allowanceModule.getTokenAllowanceData(
-            safeAddress,
-            executorAddress,
-            address(token)
-        );
+        (, , uint256 totalUnspent, ) = allowanceModule.allowances(safeAddress, executorAddress, address(token));
 
         if (expectedAllowance > safeBalanceBefore) {
             // Partial withdrawal case
@@ -361,7 +353,7 @@ contract TestLinearAllowanceIntegration is Test {
         allowanceModule.setAllowance(address(executor), address(testToken), uint192(200 ether));
 
         // Verify the allowance was updated correctly
-        (uint192 dripRate, uint256 unspent, , uint64 lastBooked) = allowanceModule.getTokenAllowanceData(
+        (uint192 dripRate, uint64 lastBooked, uint256 unspent, ) = allowanceModule.allowances(
             address(safe),
             address(executor),
             address(testToken)
@@ -381,37 +373,7 @@ contract TestLinearAllowanceIntegration is Test {
         assertEq(unspentAmount, 100 ether);
     }
 
-    function testUpdateAllowanceReturnExplicitly() public {
-        // Deploy the wrapper contract
-        LinearAllowanceSingletonForGnosisSafeWrapper wrapper = new LinearAllowanceSingletonForGnosisSafeWrapper();
-
-        // move up 1 week to avoid underflow
-        vm.warp(block.timestamp + 1 weeks);
-
-        uint256 dripRate = 1 ether;
-
-        // Create a LinearAllowance struct with safe values
-        ILinearAllowanceSingleton.LinearAllowance memory allowance = ILinearAllowanceSingleton.LinearAllowance({
-            dripRatePerDay: uint192(dripRate),
-            lastBookedAtInSeconds: uint64(block.timestamp - 1 hours), // Use 1 hour instead of 1 day
-            totalUnspent: uint256(0),
-            totalSpent: uint256(0)
-        });
-
-        // Call the exposed function
-        ILinearAllowanceSingleton.LinearAllowance memory updatedAllowance = wrapper.exposeUpdateAllowance(allowance);
-
-        // Calculate expected unspent amount (1 ETH per day, for 1 hour = 1/24 ETH)
-        uint256 expectedUnspent = (dripRate * 1 hours) / 1 days;
-
-        // Verify the return value
-        assertEq(updatedAllowance.dripRatePerDay, dripRate);
-        assertEq(updatedAllowance.totalUnspent, uint256(expectedUnspent));
-        assertEq(updatedAllowance.lastBookedAtInSeconds, uint64(block.timestamp));
-        assertEq(updatedAllowance.totalSpent, 0, "Total spent should remain unchanged");
-    }
-
-    function testEmergencyRevokeAllowanceVsNormalRevoke() public {
+    function testRevokeAllowanceVsNormalRevoke() public {
         // Setup: Create two identical scenarios to compare normal vs emergency revocation
         uint128 dripRate = 100 ether;
         address safeAddress = address(safeImpl);
@@ -451,7 +413,7 @@ contract TestLinearAllowanceIntegration is Test {
 
         // Test 2: Emergency revocation - clears everything
         vm.expectEmit(true, true, true, true);
-        emit ILinearAllowanceSingleton.AllowanceEmergencyRevoked(
+        emit ILinearAllowanceSingleton.AllowanceRevoked(
             safeAddress,
             address(emergencyExecutor),
             NATIVE_TOKEN,
@@ -459,7 +421,7 @@ contract TestLinearAllowanceIntegration is Test {
         );
 
         vm.prank(safeAddress);
-        allowanceModule.emergencyRevokeAllowance(address(emergencyExecutor), NATIVE_TOKEN);
+        allowanceModule.revokeAllowance(address(emergencyExecutor), NATIVE_TOKEN);
 
         // Verify the critical difference:
         // Normal revocation preserves accrued allowance
@@ -507,7 +469,7 @@ contract TestLinearAllowanceIntegration is Test {
         assertEq(address(emergencyExecutor).balance, 0, "Emergency revocation prevents any withdrawal");
     }
 
-    function testEmergencyRevokeWithPartialUnspentAndAccrual() public {
+    function testRevokeWithPartialUnspentAndAccrual() public {
         uint128 dripRate = 50 ether;
         address safeAddress = address(safeImpl);
         LinearAllowanceExecutorTestHarness executor = new LinearAllowanceExecutorTestHarness();
@@ -537,9 +499,9 @@ contract TestLinearAllowanceIntegration is Test {
         // Verify we have some unspent allowance to clear
         assertGt(actualUnspentBeforeRevoke, 0, "Should have some unspent allowance before emergency revocation");
 
-        // Emergency revoke should clear the full amount
+        // Revoke should clear the full amount
         vm.expectEmit(true, true, true, true);
-        emit ILinearAllowanceSingleton.AllowanceEmergencyRevoked(
+        emit ILinearAllowanceSingleton.AllowanceRevoked(
             safeAddress,
             address(executor),
             NATIVE_TOKEN,
@@ -547,7 +509,7 @@ contract TestLinearAllowanceIntegration is Test {
         );
 
         vm.prank(safeAddress);
-        allowanceModule.emergencyRevokeAllowance(address(executor), NATIVE_TOKEN);
+        allowanceModule.revokeAllowance(address(executor), NATIVE_TOKEN);
 
         // Verify everything is cleared
         assertEq(
@@ -559,10 +521,10 @@ contract TestLinearAllowanceIntegration is Test {
         // Verify the allowance data shows proper state
         (
             uint192 dripRateAfter,
+            uint64 lastBookedAfter,
             uint256 totalUnspentAfter,
-            uint256 totalSpentAfter,
-            uint64 lastBookedAfter
-        ) = allowanceModule.getTokenAllowanceData(safeAddress, address(executor), NATIVE_TOKEN);
+            uint256 totalSpentAfter
+        ) = allowanceModule.allowances(safeAddress, address(executor), NATIVE_TOKEN);
 
         assertEq(dripRateAfter, 0, "Drip rate should be zero");
         assertEq(totalUnspentAfter, 0, "Total unspent should be zero");
@@ -572,7 +534,7 @@ contract TestLinearAllowanceIntegration is Test {
 
     // ==================== ACCESS CONTROL SECURITY TESTS ====================
 
-    function testEmergencyRevokeAccessControl_OnlySafeCanRevokeItsOwnAllowances() public {
+    function testRevokeAccessControl_OnlySafeCanRevokeItsOwnAllowances() public {
         uint128 dripRate = 100 ether;
         address safeAddress = address(safeImpl);
         LinearAllowanceExecutorTestHarness executor = new LinearAllowanceExecutorTestHarness();
@@ -588,15 +550,15 @@ contract TestLinearAllowanceIntegration is Test {
         uint256 unspentBefore = allowanceModule.getTotalUnspent(safeAddress, address(executor), NATIVE_TOKEN);
         assertEq(unspentBefore, dripRate, "Allowance should have accrued");
 
-        // ✅ TEST: Safe itself can emergency revoke its own allowances
+        // ✅ TEST: Safe itself can revoke its own allowances
         vm.prank(safeAddress);
-        allowanceModule.emergencyRevokeAllowance(address(executor), NATIVE_TOKEN);
+        allowanceModule.revokeAllowance(address(executor), NATIVE_TOKEN);
 
         uint256 unspentAfter = allowanceModule.getTotalUnspent(safeAddress, address(executor), NATIVE_TOKEN);
-        assertEq(unspentAfter, 0, "Safe should be able to emergency revoke its own allowances");
+        assertEq(unspentAfter, 0, "Safe should be able to revoke its own allowances");
     }
 
-    function testEmergencyRevokeAccessControl_AttackerCannotRevokeOtherSafesAllowances() public {
+    function testRevokeAccessControl_AttackerCannotRevokeOtherSafesAllowances() public {
         uint128 dripRate = 100 ether;
         address safeAddress = address(safeImpl);
         address attacker = makeAddr("attacker");
@@ -613,9 +575,9 @@ contract TestLinearAllowanceIntegration is Test {
         uint256 unspentBefore = allowanceModule.getTotalUnspent(safeAddress, address(executor), NATIVE_TOKEN);
         assertEq(unspentBefore, dripRate, "Allowance should have accrued");
 
-        // ❌ TEST: Attacker tries to emergency revoke the safe's allowances
+        // ❌ TEST: Attacker tries to revoke the safe's allowances
         vm.prank(attacker);
-        allowanceModule.emergencyRevokeAllowance(address(executor), NATIVE_TOKEN);
+        allowanceModule.revokeAllowance(address(executor), NATIVE_TOKEN);
 
         // The safe's allowances should be completely unaffected
         uint256 unspentAfter = allowanceModule.getTotalUnspent(safeAddress, address(executor), NATIVE_TOKEN);
@@ -626,7 +588,7 @@ contract TestLinearAllowanceIntegration is Test {
         assertEq(attackerUnspent, 0, "Attacker should have no allowances to begin with");
     }
 
-    function testEmergencyRevokeAccessControl_RandomAddressCannotAffectOthers() public {
+    function testRevokeAccessControl_RandomAddressCannotAffectOthers() public {
         uint128 dripRate = 100 ether;
         address safeAddress = address(safeImpl);
         address randomUser = makeAddr("randomUser");
@@ -650,13 +612,13 @@ contract TestLinearAllowanceIntegration is Test {
         assertEq(safeUnspentBefore, dripRate, "Safe allowance should have accrued");
         assertEq(randomUnspentBefore, dripRate / 2, "Random user allowance should have accrued");
 
-        // Random user emergency revokes their own allowance (should work)
+        // Random user revokes their own allowance (should work)
         vm.prank(randomUser);
-        allowanceModule.emergencyRevokeAllowance(address(executor), NATIVE_TOKEN);
+        allowanceModule.revokeAllowance(address(executor), NATIVE_TOKEN);
 
-        // Another user tries to emergency revoke safe's allowance (should not work)
+        // Another user tries to revoke safe's allowance (should not work)
         vm.prank(anotherUser);
-        allowanceModule.emergencyRevokeAllowance(address(executor), NATIVE_TOKEN);
+        allowanceModule.revokeAllowance(address(executor), NATIVE_TOKEN);
 
         // Verify results
         uint256 safeUnspentAfter = allowanceModule.getTotalUnspent(safeAddress, address(executor), NATIVE_TOKEN);
@@ -668,7 +630,7 @@ contract TestLinearAllowanceIntegration is Test {
         assertEq(anotherUnspentAfter, 0, "Another user should have no allowances (had none to revoke)");
     }
 
-    function testEmergencyRevokeAccessControl_SafeOwnersCanRevokeViaMultisig() public {
+    function testRevokeAccessControl_SafeOwnersCanRevokeViaMultisig() public {
         uint128 dripRate = 100 ether;
         address safeAddress = address(safeImpl);
         LinearAllowanceExecutorTestHarness executor = new LinearAllowanceExecutorTestHarness();
@@ -684,22 +646,22 @@ contract TestLinearAllowanceIntegration is Test {
         uint256 unspentBefore = allowanceModule.getTotalUnspent(safeAddress, address(executor), NATIVE_TOKEN);
         assertEq(unspentBefore, dripRate, "Allowance should have accrued");
 
-        // ✅ TEST: Safe owners can emergency revoke via Safe's execTransaction mechanism
-        bytes memory emergencyRevokeData = abi.encodeWithSelector(
-            allowanceModule.emergencyRevokeAllowance.selector,
+        // ✅ TEST: Safe owners can revoke via Safe's execTransaction mechanism
+        bytes memory revokeData = abi.encodeWithSelector(
+            allowanceModule.revokeAllowance.selector,
             address(executor),
             NATIVE_TOKEN
         );
 
-        bool success = execSafeTransaction(address(allowanceModule), 0, emergencyRevokeData, 1);
-        assertTrue(success, "Safe owners should be able to execute emergency revoke via multisig");
+        bool success = execSafeTransaction(address(allowanceModule), 0, revokeData, 1);
+        assertTrue(success, "Safe owners should be able to execute revoke via multisig");
 
         // Verify revocation worked
         uint256 unspentAfter = allowanceModule.getTotalUnspent(safeAddress, address(executor), NATIVE_TOKEN);
-        assertEq(unspentAfter, 0, "Emergency revocation via multisig should clear allowances");
+        assertEq(unspentAfter, 0, "Revocation via multisig should clear allowances");
     }
 
-    function testEmergencyRevokeAccessControl_NonOwnerCannotExecuteViaSafe() public {
+    function testRevokeAccessControl_NonOwnerCannotExecuteViaSafe() public {
         uint128 dripRate = 100 ether;
         address safeAddress = address(safeImpl);
         address nonOwner = makeAddr("nonOwner");
@@ -716,10 +678,10 @@ contract TestLinearAllowanceIntegration is Test {
         uint256 unspentBefore = allowanceModule.getTotalUnspent(safeAddress, address(executor), NATIVE_TOKEN);
         assertEq(unspentBefore, dripRate, "Allowance should have accrued");
 
-        // ❌ TEST: Non-owner tries to execute emergency revoke via Safe
+        // ❌ TEST: Non-owner tries to execute revoke via Safe
         // This should fail because they can't meet the Safe's signature threshold
-        bytes memory emergencyRevokeData = abi.encodeWithSelector(
-            allowanceModule.emergencyRevokeAllowance.selector,
+        bytes memory revokeData = abi.encodeWithSelector(
+            allowanceModule.revokeAllowance.selector,
             address(executor),
             NATIVE_TOKEN
         );
@@ -731,7 +693,7 @@ contract TestLinearAllowanceIntegration is Test {
         safeImpl.execTransaction(
             address(allowanceModule),
             0,
-            emergencyRevokeData,
+            revokeData,
             Enum.Operation.Call,
             100_000,
             0,
@@ -747,7 +709,7 @@ contract TestLinearAllowanceIntegration is Test {
         assertEq(unspentAfter, dripRate, "Non-owner should not be able to affect Safe's allowances");
     }
 
-    function testEmergencyRevokeAccessControl_EventEmissionSecurity() public {
+    function testRevokeAccessControl_EventEmissionSecurity() public {
         uint128 dripRate = 100 ether;
         address safeAddress = address(safeImpl);
         address attacker = makeAddr("attacker");
@@ -761,19 +723,19 @@ contract TestLinearAllowanceIntegration is Test {
         vm.warp(block.timestamp + 1 days);
 
         // ❌ TEST: Attacker cannot emit misleading events for other safes
-        // When attacker calls emergency revoke, event should show attacker's address, not safe's
+        // When attacker calls revoke, event should show attacker's address, not safe's
         vm.expectEmit(true, true, true, true);
-        emit ILinearAllowanceSingleton.AllowanceEmergencyRevoked(attacker, address(executor), NATIVE_TOKEN, 0);
+        emit ILinearAllowanceSingleton.AllowanceRevoked(attacker, address(executor), NATIVE_TOKEN, 0);
 
         vm.prank(attacker);
-        allowanceModule.emergencyRevokeAllowance(address(executor), NATIVE_TOKEN);
+        allowanceModule.revokeAllowance(address(executor), NATIVE_TOKEN);
 
         // Safe's allowance should be unaffected
         uint256 safeUnspent = allowanceModule.getTotalUnspent(safeAddress, address(executor), NATIVE_TOKEN);
         assertEq(safeUnspent, dripRate, "Safe allowance should be unaffected by attacker's call");
     }
 
-    function testEmergencyRevokeAccessControl_MaliciousModuleCannotAbuseFunction() public {
+    function testRevokeAccessControl_MaliciousModuleCannotAbuseFunction() public {
         uint128 dripRate = 100 ether;
         address safeAddress = address(safeImpl);
         LinearAllowanceExecutorTestHarness executor = new LinearAllowanceExecutorTestHarness();
@@ -785,7 +747,7 @@ contract TestLinearAllowanceIntegration is Test {
         // Advance time to accrue allowance
         vm.warp(block.timestamp + 1 days);
 
-        // Create a malicious module that tries to call emergencyRevokeAllowance
+        // Create a malicious module that tries to call revokeAllowance
         MaliciousModule maliciousModule = new MaliciousModule(allowanceModule);
 
         // Enable the malicious module on the Safe (simulating a compromised module scenario)
@@ -803,18 +765,18 @@ contract TestLinearAllowanceIntegration is Test {
         uint256 unspentBefore = allowanceModule.getTotalUnspent(safeAddress, address(executor), NATIVE_TOKEN);
         assertEq(unspentBefore, dripRate, "Allowance should exist before malicious module attack");
 
-        // ❌ TEST: Malicious module tries to call emergencyRevokeAllowance on behalf of Safe
+        // ❌ TEST: Malicious module tries to call revokeAllowance on behalf of Safe
         // This SHOULD work because the module can call execTransactionFromModule,
         // which means malicious modules are a real threat vector!
-        maliciousModule.attemptEmergencyRevoke(address(executor), NATIVE_TOKEN);
+        maliciousModule.attemptRevoke(address(executor), NATIVE_TOKEN);
 
         // Check if the malicious module was able to affect the allowances
         uint256 unspentAfter = allowanceModule.getTotalUnspent(safeAddress, address(executor), NATIVE_TOKEN);
 
         if (unspentAfter == 0) {
-            // If this happens, it means malicious modules CAN call emergency revoke
+            // If this happens, it means malicious modules CAN call revoke
             // This would be a significant finding that we need to address
-            emit log_string("WARNING: Malicious module was able to emergency revoke allowances!");
+            emit log_string("WARNING: Malicious module was able to revoke allowances!");
             emit log_string("This demonstrates that module access control is a critical concern");
         } else {
             // If allowances are preserved, the current access control model is sufficient
@@ -826,7 +788,7 @@ contract TestLinearAllowanceIntegration is Test {
         }
 
         // Additional test: Try via execTransactionFromModule
-        bool moduleSuccess = maliciousModule.attemptEmergencyRevokeViaModule(address(executor), NATIVE_TOKEN);
+        bool moduleSuccess = maliciousModule.attemptRevokeViaModule(address(executor), NATIVE_TOKEN);
 
         uint256 unspentAfterModuleAttempt = allowanceModule.getTotalUnspent(
             safeAddress,
@@ -835,10 +797,10 @@ contract TestLinearAllowanceIntegration is Test {
         );
 
         if (moduleSuccess && unspentAfterModuleAttempt == 0) {
-            emit log_string("CRITICAL: Malicious module can emergency revoke via execTransactionFromModule!");
+            emit log_string("CRITICAL: Malicious module can revoke via execTransactionFromModule!");
             // This would indicate we need additional access controls
         } else {
-            emit log_string("GOOD: Malicious modules cannot abuse emergency revocation");
+            emit log_string("GOOD: Malicious modules cannot abuse revocation");
         }
     }
 
@@ -854,11 +816,7 @@ contract TestLinearAllowanceIntegration is Test {
         allowanceModule.setAllowance(address(executor), NATIVE_TOKEN, dripRate);
 
         // Verify allowance was set correctly
-        (uint192 actualDripRate, , , ) = allowanceModule.getTokenAllowanceData(
-            safeAddress,
-            address(executor),
-            NATIVE_TOKEN
-        );
+        (uint192 actualDripRate, , , ) = allowanceModule.allowances(safeAddress, address(executor), NATIVE_TOKEN);
         assertEq(actualDripRate, dripRate, "Safe should be able to set allowances for its delegates");
     }
 
@@ -873,16 +831,8 @@ contract TestLinearAllowanceIntegration is Test {
         allowanceModule.setAllowance(address(executor), NATIVE_TOKEN, dripRate);
 
         // The attacker only affected their own allowances, not the Safe's
-        (uint192 safeAllowanceRate, , , ) = allowanceModule.getTokenAllowanceData(
-            safeAddress,
-            address(executor),
-            NATIVE_TOKEN
-        );
-        (uint192 attackerAllowanceRate, , , ) = allowanceModule.getTokenAllowanceData(
-            attacker,
-            address(executor),
-            NATIVE_TOKEN
-        );
+        (uint192 safeAllowanceRate, , , ) = allowanceModule.allowances(safeAddress, address(executor), NATIVE_TOKEN);
+        (uint192 attackerAllowanceRate, , , ) = allowanceModule.allowances(attacker, address(executor), NATIVE_TOKEN);
 
         assertEq(safeAllowanceRate, 0, "Safe allowances should be unaffected by attacker");
         assertEq(attackerAllowanceRate, dripRate, "Attacker only affected their own allowances");
@@ -899,11 +849,7 @@ contract TestLinearAllowanceIntegration is Test {
         allowanceModule.setAllowance(address(executor), NATIVE_TOKEN, legitimateDripRate);
 
         // Verify legitimate allowance
-        (uint192 initialRate, , , ) = allowanceModule.getTokenAllowanceData(
-            safeAddress,
-            address(executor),
-            NATIVE_TOKEN
-        );
+        (uint192 initialRate, , , ) = allowanceModule.allowances(safeAddress, address(executor), NATIVE_TOKEN);
         assertEq(initialRate, legitimateDripRate, "Initial allowance should be set correctly");
 
         // Create and enable malicious module
@@ -923,7 +869,7 @@ contract TestLinearAllowanceIntegration is Test {
         );
 
         // Check if the attack succeeded
-        (uint192 finalRate, , , ) = allowanceModule.getTokenAllowanceData(safeAddress, address(executor), NATIVE_TOKEN);
+        (uint192 finalRate, , , ) = allowanceModule.allowances(safeAddress, address(executor), NATIVE_TOKEN);
 
         if (attackSuccess && finalRate == maliciousDripRate) {
             emit log_string("CRITICAL VULNERABILITY: Malicious module can set unauthorized allowances!");
@@ -959,11 +905,7 @@ contract TestLinearAllowanceIntegration is Test {
         assertTrue(success, "Safe owners should be able to set allowances via multisig");
 
         // Verify allowance was set correctly
-        (uint192 actualRate, , , ) = allowanceModule.getTokenAllowanceData(
-            safeAddress,
-            address(executor),
-            NATIVE_TOKEN
-        );
+        (uint192 actualRate, , , ) = allowanceModule.allowances(safeAddress, address(executor), NATIVE_TOKEN);
         assertEq(actualRate, dripRate, "Allowance should be set via legitimate multisig execution");
     }
 
@@ -993,11 +935,7 @@ contract TestLinearAllowanceIntegration is Test {
             bool success = maliciousModule.attemptSetAllowanceViaModule(address(executor), NATIVE_TOKEN, increases[i]);
 
             if (success) {
-                (uint192 currentRate, , , ) = allowanceModule.getTokenAllowanceData(
-                    safeAddress,
-                    address(executor),
-                    NATIVE_TOKEN
-                );
+                (uint192 currentRate, , , ) = allowanceModule.allowances(safeAddress, address(executor), NATIVE_TOKEN);
                 emit log_string("VULNERABILITY: Gradual allowance increase succeeded");
                 emit log_named_uint("Step", i + 1);
                 emit log_named_uint("New allowance", currentRate);
@@ -1009,9 +947,106 @@ contract TestLinearAllowanceIntegration is Test {
         }
 
         // If we get here, all attacks failed (good!)
-        (uint192 finalRate, , , ) = allowanceModule.getTokenAllowanceData(safeAddress, address(executor), NATIVE_TOKEN);
+        (uint192 finalRate, , , ) = allowanceModule.allowances(safeAddress, address(executor), NATIVE_TOKEN);
         assertEq(finalRate, legitimateRate, "All malicious increases should have failed");
         emit log_string("SECURE: Gradual allowance increase attacks blocked");
+    }
+
+    function testRevokeAllowances() public {
+        uint128 dripRate = 100 ether;
+        address safeAddress = address(safeImpl);
+
+        // Create multiple executors
+        LinearAllowanceExecutorTestHarness executor1 = new LinearAllowanceExecutorTestHarness();
+        LinearAllowanceExecutorTestHarness executor2 = new LinearAllowanceExecutorTestHarness();
+        LinearAllowanceExecutorTestHarness executor3 = new LinearAllowanceExecutorTestHarness();
+
+        // Setup multiple allowances
+        vm.startPrank(safeAddress);
+        allowanceModule.setAllowance(address(executor1), NATIVE_TOKEN, dripRate);
+        allowanceModule.setAllowance(address(executor2), NATIVE_TOKEN, dripRate);
+        allowanceModule.setAllowance(address(executor3), NATIVE_TOKEN, dripRate);
+        vm.stopPrank();
+
+        // Advance time to accrue allowances
+        vm.warp(block.timestamp + 1 days);
+
+        // Verify all allowances exist
+        uint256 unspent1Before = allowanceModule.getTotalUnspent(safeAddress, address(executor1), NATIVE_TOKEN);
+        uint256 unspent2Before = allowanceModule.getTotalUnspent(safeAddress, address(executor2), NATIVE_TOKEN);
+        uint256 unspent3Before = allowanceModule.getTotalUnspent(safeAddress, address(executor3), NATIVE_TOKEN);
+
+        assertEq(unspent1Before, dripRate, "Executor1 should have accrued allowance");
+        assertEq(unspent2Before, dripRate, "Executor2 should have accrued allowance");
+        assertEq(unspent3Before, dripRate, "Executor3 should have accrued allowance");
+
+        // Prepare arrays for batch revocation
+        address[] memory delegates = new address[](3);
+        address[] memory tokens = new address[](3);
+        delegates[0] = address(executor1);
+        delegates[1] = address(executor2);
+        delegates[2] = address(executor3);
+        tokens[0] = NATIVE_TOKEN;
+        tokens[1] = NATIVE_TOKEN;
+        tokens[2] = NATIVE_TOKEN;
+
+        // Test array length mismatch validation
+        address[] memory wrongLengthTokens = new address[](2);
+        wrongLengthTokens[0] = NATIVE_TOKEN;
+        wrongLengthTokens[1] = NATIVE_TOKEN;
+
+        vm.prank(safeAddress);
+        vm.expectRevert(abi.encodeWithSelector(ILinearAllowanceSingleton.ArrayLengthsMismatch.selector, 3, 2));
+        allowanceModule.revokeAllowances(delegates, wrongLengthTokens);
+
+        // Test zero address validation
+        delegates[1] = address(0);
+        vm.prank(safeAddress);
+        vm.expectRevert(abi.encodeWithSelector(ILinearAllowanceSingleton.AddressZeroForArgument.selector, "delegate"));
+        allowanceModule.revokeAllowances(delegates, tokens);
+
+        // Fix the address for successful test
+        delegates[1] = address(executor2);
+
+        // Expect events for all revocations
+        vm.expectEmit(true, true, true, true);
+        emit ILinearAllowanceSingleton.AllowanceRevoked(safeAddress, address(executor1), NATIVE_TOKEN, dripRate);
+        vm.expectEmit(true, true, true, true);
+        emit ILinearAllowanceSingleton.AllowanceRevoked(safeAddress, address(executor2), NATIVE_TOKEN, dripRate);
+        vm.expectEmit(true, true, true, true);
+        emit ILinearAllowanceSingleton.AllowanceRevoked(safeAddress, address(executor3), NATIVE_TOKEN, dripRate);
+
+        // Execute batch revocation
+        vm.prank(safeAddress);
+        allowanceModule.revokeAllowances(delegates, tokens);
+
+        // Verify all allowances are cleared
+        uint256 unspent1After = allowanceModule.getTotalUnspent(safeAddress, address(executor1), NATIVE_TOKEN);
+        uint256 unspent2After = allowanceModule.getTotalUnspent(safeAddress, address(executor2), NATIVE_TOKEN);
+        uint256 unspent3After = allowanceModule.getTotalUnspent(safeAddress, address(executor3), NATIVE_TOKEN);
+
+        assertEq(unspent1After, 0, "Executor1 allowance should be cleared");
+        assertEq(unspent2After, 0, "Executor2 allowance should be cleared");
+        assertEq(unspent3After, 0, "Executor3 allowance should be cleared");
+
+        // Verify drip rates are set to 0
+        (uint192 dripRate1, , , ) = allowanceModule.allowances(safeAddress, address(executor1), NATIVE_TOKEN);
+        (uint192 dripRate2, , , ) = allowanceModule.allowances(safeAddress, address(executor2), NATIVE_TOKEN);
+        (uint192 dripRate3, , , ) = allowanceModule.allowances(safeAddress, address(executor3), NATIVE_TOKEN);
+
+        assertEq(dripRate1, 0, "Executor1 drip rate should be zero");
+        assertEq(dripRate2, 0, "Executor2 drip rate should be zero");
+        assertEq(dripRate3, 0, "Executor3 drip rate should be zero");
+
+        // Verify attempts to withdraw now fail
+        vm.expectRevert();
+        executor1.executeAllowanceTransfer(allowanceModule, safeAddress, NATIVE_TOKEN);
+
+        vm.expectRevert();
+        executor2.executeAllowanceTransfer(allowanceModule, safeAddress, NATIVE_TOKEN);
+
+        vm.expectRevert();
+        executor3.executeAllowanceTransfer(allowanceModule, safeAddress, NATIVE_TOKEN);
     }
 
     function testGetMaxWithdrawableAmount(
@@ -1187,11 +1222,11 @@ contract TestLinearAllowanceIntegration is Test {
         allowanceModule.setAllowance(address(0), NATIVE_TOKEN, 1 ether);
     }
 
-    /// @notice Test zero address validation in emergencyRevokeAllowance function
-    function testZeroAddressValidation_EmergencyRevokeRejectsZeroDelegate() public {
+    /// @notice Test zero address validation in revokeAllowance function
+    function testZeroAddressValidation_RevokeRejectsZeroDelegate() public {
         vm.prank(address(safeImpl));
         vm.expectRevert(abi.encodeWithSelector(ILinearAllowanceSingleton.AddressZeroForArgument.selector, "delegate"));
-        allowanceModule.emergencyRevokeAllowance(address(0), NATIVE_TOKEN);
+        allowanceModule.revokeAllowance(address(0), NATIVE_TOKEN);
     }
 
     /// @notice Test zero address validation in executeAllowanceTransfer function
@@ -1214,9 +1249,9 @@ contract TestLinearAllowanceIntegration is Test {
         vm.prank(address(safeImpl));
         allowanceModule.setAllowance(validDelegate, NATIVE_TOKEN, 1 ether);
 
-        // Emergency revoke with valid delegate should work
+        // Revoke with valid delegate should work
         vm.prank(address(safeImpl));
-        allowanceModule.emergencyRevokeAllowance(validDelegate, NATIVE_TOKEN);
+        allowanceModule.revokeAllowance(validDelegate, NATIVE_TOKEN);
 
         // Set allowance again for transfer test
         vm.prank(address(safeImpl));
@@ -1403,10 +1438,10 @@ contract ContractThatRejectsETH {
 
 // Malicious module for testing access control
 contract MaliciousModule {
-    LinearAllowanceSingletonForGnosisSafeWrapper public allowanceModule;
+    LinearAllowanceSingletonForGnosisSafe public allowanceModule;
     address public safe;
 
-    constructor(LinearAllowanceSingletonForGnosisSafeWrapper _allowanceModule) {
+    constructor(LinearAllowanceSingletonForGnosisSafe _allowanceModule) {
         allowanceModule = _allowanceModule;
     }
 
@@ -1421,8 +1456,8 @@ contract MaliciousModule {
     }
 
     // Direct call attempt (should fail - modules can't directly call arbitrary contracts as the Safe)
-    function attemptEmergencyRevoke(address delegate, address token) external {
-        try allowanceModule.emergencyRevokeAllowance(delegate, token) {
+    function attemptRevoke(address delegate, address token) external {
+        try allowanceModule.revokeAllowance(delegate, token) {
             // This should fail because msg.sender is this module, not the safe
         } catch {
             // Expected to fail
@@ -1430,8 +1465,8 @@ contract MaliciousModule {
     }
 
     // Attempt via execTransactionFromModule (this is the concerning vector)
-    function attemptEmergencyRevokeViaModule(address delegate, address token) external returns (bool) {
-        bytes memory data = abi.encodeWithSelector(allowanceModule.emergencyRevokeAllowance.selector, delegate, token);
+    function attemptRevokeViaModule(address delegate, address token) external returns (bool) {
+        bytes memory data = abi.encodeWithSelector(allowanceModule.revokeAllowance.selector, delegate, token);
 
         try
             Safe(payable(safe)).execTransactionFromModule(address(allowanceModule), 0, data, Enum.Operation.Call)
@@ -1445,10 +1480,10 @@ contract MaliciousModule {
 
 // Malicious module specifically for testing setAllowance access control
 contract MaliciousModuleForSetAllowance {
-    LinearAllowanceSingletonForGnosisSafeWrapper public allowanceModule;
+    LinearAllowanceSingletonForGnosisSafe public allowanceModule;
     address public safe;
 
-    constructor(LinearAllowanceSingletonForGnosisSafeWrapper _allowanceModule) {
+    constructor(LinearAllowanceSingletonForGnosisSafe _allowanceModule) {
         allowanceModule = _allowanceModule;
     }
 
