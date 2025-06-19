@@ -203,8 +203,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
     }
 
     /// @notice Execute a transfer from the safe to the recipient
-    /// @dev We are using beneficiary balance to check if the transfer was successful.
-    /// @dev Tokens with a transfer fee will not be able to be transferred using this method.
+    /// @dev Uses beneficiary balance to check if the transfer was successful; fee-charging tokens are not supported.
     /// @param safe The safe address executing the transfer
     /// @param delegate The delegate executing the transfer (for error reporting)
     /// @param token The token address to transfer
