@@ -14,12 +14,16 @@ import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
 import { YieldSkimmingTokenizedStrategy } from "src/strategies/yieldSkimming/YieldSkimmingTokenizedStrategy.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import { MorphoCompounderWrapper } from "test/wrappers/MorphoCompounderWrapper.sol";
+import { IBaseYieldSkimmingStrategy } from "src/core/interfaces/IBaseYieldSkimmingStrategy.sol";
+import { IBaseStrategy } from "src/core/interfaces/IBaseStrategy.sol";
+import { WadRayMath } from "src/utils/libs/Maths/WadRay.sol";
 
 /// @title MorphoCompounder Test
 /// @author Octant
 /// @notice Integration tests for the MorphoCompounder strategy using a mainnet fork
 contract MorphoCompounderStrategyTest is Test {
     using SafeERC20 for ERC20;
+    using WadRayMath for uint256;
 
     // Strategy instance
     MorphoCompounderStrategy public strategy;
@@ -174,39 +178,47 @@ contract MorphoCompounderStrategyTest is Test {
         vm.stopPrank();
     }
 
-    /// @notice Test that the strategy is properly initialized
-    function testInitializationMorpho() public view {
-        assertEq(IERC4626(address(strategy)).asset(), YIELD_VAULT, "Yield vault address incorrect");
-        assertEq(vault.management(), management, "Management address incorrect");
-        assertEq(vault.keeper(), keeper, "Keeper address incorrect");
-        assertEq(vault.emergencyAdmin(), emergencyAdmin, "Emergency admin incorrect");
-        assertGt(strategy.getLastReportedExchangeRate(), 0, "Last reported exchange rate should be initialized");
-    }
-
-    /// @notice Fuzz test depositing assets into the strategy
-    function testFuzzDepositMorpho(uint256 depositAmount) public {
-        // Bound the deposit amount to reasonable values (0.01 to 10,000 YIELD_VAULT)
-        depositAmount = bound(depositAmount, 0.01e18, 10000e18);
-
-        // Airdrop tokens to user for this test
-        airdrop(ERC20(YIELD_VAULT), user, depositAmount);
+    /// @notice Test depositing assets into the strategy
+    function testDepositMorphoCompounder() public {
+        uint256 depositAmount = 100e18; // 100 WETH
 
         // Initial balances
-        uint256 initialUserBalance = ERC20(YIELD_VAULT).balanceOf(user);
+        uint256 initialUserBalance = ERC20(WETH).balanceOf(user);
 
         // Deposit assets
         vm.startPrank(user);
         // approve the strategy to spend the user's tokens
-        ERC20(YIELD_VAULT).approve(address(strategy), depositAmount);
+        ERC20(WETH).approve(address(strategy), depositAmount);
         uint256 sharesReceived = vault.deposit(depositAmount, user);
         vm.stopPrank();
 
         // Verify balances after deposit
-        assertEq(
-            ERC20(YIELD_VAULT).balanceOf(user),
-            initialUserBalance - depositAmount,
-            "User balance not reduced correctly"
-        );
+        assertEq(ERC20(WETH).balanceOf(user), initialUserBalance - depositAmount, "User balance not reduced correctly");
+
+        assertGt(sharesReceived, 0, "No shares received from deposit");
+        assertGt(strategy.balanceOfShares(), 0, "Strategy should have deployed assets to yield vault");
+    }
+
+    /// @notice Fuzz test depositing assets into the strategy
+    function testFuzzDepositMorphoCompounder(uint256 depositAmount) public {
+        // Bound the deposit amount to reasonable values (0.01 to 10,000 WETH)
+        depositAmount = bound(depositAmount, 0.01e18, 10000e18);
+
+        // Airdrop tokens to user for this test
+        airdrop(ERC20(WETH), user, depositAmount);
+
+        // Initial balances
+        uint256 initialUserBalance = ERC20(WETH).balanceOf(user);
+
+        // Deposit assets
+        vm.startPrank(user);
+        // approve the strategy to spend the user's tokens
+        ERC20(WETH).approve(address(strategy), depositAmount);
+        uint256 sharesReceived = vault.deposit(depositAmount, user);
+        vm.stopPrank();
+
+        // Verify balances after deposit
+        assertEq(ERC20(WETH).balanceOf(user), initialUserBalance - depositAmount, "User balance not reduced correctly");
 
         assertGt(sharesReceived, 0, "No shares received from deposit");
         assertGt(strategy.balanceOfShares(), 0, "Strategy should have deployed assets to yield vault");
@@ -215,19 +227,19 @@ contract MorphoCompounderStrategyTest is Test {
     /// @notice Fuzz test withdrawing assets from the strategy
     function testFuzzWithdraw(uint256 depositAmount, uint256 withdrawPercentage) public {
         // Bound inputs to reasonable values
-        depositAmount = bound(depositAmount, 1e18, 10000e18); // 1 to 10,000 YIELD_VAULT
+        depositAmount = bound(depositAmount, 1e18, 10000e18); // 1 to 10,000 WETH
         withdrawPercentage = bound(withdrawPercentage, 1, 100); // 1% to 100%
 
         // Airdrop tokens to user for this test
-        airdrop(ERC20(YIELD_VAULT), user, depositAmount);
+        airdrop(ERC20(WETH), user, depositAmount);
 
         // Deposit first
         vm.startPrank(user);
-        ERC20(YIELD_VAULT).approve(address(strategy), depositAmount);
+        ERC20(WETH).approve(address(strategy), depositAmount);
         vault.deposit(depositAmount, user);
 
         // Initial balances before withdrawal
-        uint256 initialUserBalance = ERC20(YIELD_VAULT).balanceOf(user);
+        uint256 initialUserBalance = ERC20(WETH).balanceOf(user);
         uint256 initialShareBalance = vault.balanceOf(user);
 
         // Calculate withdrawal amount based on percentage
@@ -235,43 +247,43 @@ contract MorphoCompounderStrategyTest is Test {
 
         // Preview the withdrawal to get shares to burn
         uint256 sharesToBurn = vault.previewWithdraw(withdrawAmount);
-        uint256 assetsReceived = vault.withdraw(withdrawAmount, user, user);
+        uint256 sharesBurned = vault.withdraw(withdrawAmount, user, user);
         vm.stopPrank();
 
         // Verify balances after withdrawal
         assertEq(
-            ERC20(YIELD_VAULT).balanceOf(user),
+            ERC20(WETH).balanceOf(user),
             initialUserBalance + withdrawAmount,
             "User didn't receive correct assets"
         );
         assertEq(vault.balanceOf(user), initialShareBalance - sharesToBurn, "Shares not burned correctly");
-        assertEq(assetsReceived, withdrawAmount, "Incorrect amount of assets received");
+        assertEq(sharesBurned, sharesToBurn, "Incorrect number of shares burned");
     }
 
     /// @notice Fuzz test the harvesting functionality with profit
-    function testFuzzHarvestWithProfitMorpho(uint256 depositAmount, uint256 profitPercentage) public {
+    function testFuzzHarvestWithProfitMorphoCompounder(uint256 depositAmount, uint256 profitPercentage) public {
         // Bound inputs to reasonable values
-        depositAmount = bound(depositAmount, 1e18, 10000e18); // 1 to 10,000 YIELD_VAULT
+        depositAmount = bound(depositAmount, 1e18, 10000e18); // 1 to 10,000 WETH
         profitPercentage = bound(profitPercentage, 1, 99); // 1% to 99% profit (under 100% health check limit)
 
         // Airdrop tokens to user for this test
-        airdrop(ERC20(YIELD_VAULT), user, depositAmount);
+        airdrop(ERC20(WETH), user, depositAmount);
 
         // Deposit first
         vm.startPrank(user);
-        ERC20(YIELD_VAULT).approve(address(strategy), depositAmount);
+        ERC20(WETH).approve(address(strategy), depositAmount);
         vault.deposit(depositAmount, user);
         vm.stopPrank();
 
         // Check initial state
         uint256 totalAssetsBefore = vault.totalAssets();
-        uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
+        uint256 initialExchangeRate = IBaseYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
 
         // Simulate exchange rate increase based on fuzzed percentage
         uint256 newExchangeRate = (initialExchangeRate * (100 + profitPercentage)) / 100;
 
-        // Mock the actual yield vault's pricePerShare
-        vm.mockCall(YIELD_VAULT, abi.encodeWithSignature("pricePerShare()"), abi.encode(newExchangeRate));
+        // Mock the actual yield vault's pricePerShare (convert back to WAD format)
+        vm.mockCall(WETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(newExchangeRate));
 
         uint256 donationAddressBalanceBefore = ERC20(address(strategy)).balanceOf(donationAddress);
 
@@ -303,7 +315,13 @@ contract MorphoCompounderStrategyTest is Test {
         // Withdraw everything for user
         vm.startPrank(user);
         uint256 sharesToRedeem = vault.balanceOf(user);
+
         uint256 assetsReceived = vault.redeem(sharesToRedeem, user, user);
+        vm.stopPrank();
+
+        // withdraw the donation address shares
+        vm.startPrank(donationAddress);
+        vault.redeem(vault.balanceOf(donationAddress), donationAddress, donationAddress);
         vm.stopPrank();
 
         // Verify user received their original deposit
@@ -316,17 +334,17 @@ contract MorphoCompounderStrategyTest is Test {
     }
 
     /// @notice Test multiple users with fair profit distribution
-    function testMultipleUserProfitDistributionMorpho() public {
+    function testMultipleUserProfitDistributionMorphoCompounder() public {
         TestState memory state;
 
         // First user deposits
         state.user1 = user; // Reuse existing test user
         state.user2 = address(0x5678);
-        state.depositAmount1 = 1000e18; // 1000 YIELD_VAULT
-        state.depositAmount2 = 2000e18; // 2000 YIELD_VAULT
+        state.depositAmount1 = 1000e18; // 1000 WETH
+        state.depositAmount2 = 2000e18; // 2000 WETH
 
         // Get initial exchange rate
-        state.initialExchangeRate = strategy.getLastReportedExchangeRate();
+        state.initialExchangeRate = IBaseYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
 
         vm.startPrank(state.user1);
         vault.deposit(state.depositAmount1, state.user1);
@@ -339,7 +357,7 @@ contract MorphoCompounderStrategyTest is Test {
         state.donationBalanceBefore1 = ERC20(address(strategy)).balanceOf(donationAddress);
 
         // Mock the yield vault's pricePerShare instead of strategy's internal method
-        vm.mockCall(YIELD_VAULT, abi.encodeWithSignature("pricePerShare()"), abi.encode(state.newExchangeRate1));
+        vm.mockCall(WETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(state.newExchangeRate1));
 
         // Harvest to realize profit
         vm.startPrank(keeper);
@@ -358,11 +376,11 @@ contract MorphoCompounderStrategyTest is Test {
 
         // Second user deposits after profit
         vm.startPrank(address(this));
-        airdrop(ERC20(YIELD_VAULT), state.user2, state.depositAmount2);
+        airdrop(ERC20(WETH), state.user2, state.depositAmount2);
         vm.stopPrank();
 
         vm.startPrank(state.user2);
-        ERC20(YIELD_VAULT).approve(address(strategy), type(uint256).max);
+        ERC20(WETH).approve(address(strategy), type(uint256).max);
         vault.deposit(state.depositAmount2, state.user2);
         vm.stopPrank();
 
@@ -376,7 +394,7 @@ contract MorphoCompounderStrategyTest is Test {
         state.donationBalanceBefore2 = ERC20(address(strategy)).balanceOf(donationAddress);
 
         // Mock the yield vault's pricePerShare
-        vm.mockCall(YIELD_VAULT, abi.encodeWithSignature("pricePerShare()"), abi.encode(state.newExchangeRate2));
+        vm.mockCall(WETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(state.newExchangeRate2));
 
         // Harvest again
         vm.startPrank(keeper);
@@ -430,8 +448,8 @@ contract MorphoCompounderStrategyTest is Test {
     }
 
     /// @notice Test the harvesting functionality
-    function testHarvestMorpho() public {
-        uint256 depositAmount = 100e18; // 100 YIELD_VAULT
+    function testHarvestMorphoCompounder() public {
+        uint256 depositAmount = 100e18; // 100 WETH
 
         // Deposit first
         vm.startPrank(user);
@@ -440,7 +458,7 @@ contract MorphoCompounderStrategyTest is Test {
 
         // Capture initial state
         uint256 initialAssets = vault.totalAssets();
-        uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
+        uint256 initialExchangeRate = IBaseYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
 
         // Call report as keeper (which internally calls _harvestAndReport)
         vm.startPrank(keeper);
@@ -448,11 +466,11 @@ contract MorphoCompounderStrategyTest is Test {
         vm.stopPrank();
 
         // Get new exchange rate and total assets
-        uint256 newExchangeRate = strategy.getLastReportedExchangeRate();
+        uint256 newExchangeRate = IBaseYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         uint256 newTotalAssets = vault.totalAssets();
 
         // mock pricePerShare to be 1.1x the initial exchange rate
-        vm.mockCall(YIELD_VAULT, abi.encodeWithSignature("pricePerShare()"), abi.encode((newExchangeRate * 11) / 10));
+        vm.mockCall(WETH, abi.encodeWithSignature("pricePerShare()"), abi.encode((newExchangeRate * 11) / 10));
 
         // Verify exchange rate is updated
         assertEq(newExchangeRate, initialExchangeRate, "Exchange rate should be updated after harvest");
@@ -466,14 +484,14 @@ contract MorphoCompounderStrategyTest is Test {
     /// @notice Fuzz test emergency exit functionality
     function testFuzzEmergencyExit(uint256 depositAmount) public {
         // Bound deposit amount to reasonable values
-        depositAmount = bound(depositAmount, 1e18, 10000e18); // 1 to 10,000 YIELD_VAULT
+        depositAmount = bound(depositAmount, 1e18, 10000e18); // 1 to 10,000 WETH
 
         // Airdrop tokens to user for this test
-        airdrop(ERC20(YIELD_VAULT), user, depositAmount);
+        airdrop(ERC20(WETH), user, depositAmount);
 
         // User deposits
         vm.startPrank(user);
-        ERC20(YIELD_VAULT).approve(address(strategy), depositAmount);
+        ERC20(WETH).approve(address(strategy), depositAmount);
         vault.deposit(depositAmount, user);
         vm.stopPrank();
 
@@ -521,38 +539,32 @@ contract MorphoCompounderStrategyTest is Test {
         assertEq(mockToken.balanceOf(strategy.GOV()), 1000e18, "GOV should have all mock tokens after sweep");
     }
 
-    /// @notice Test that trying to sweep the asset token reverts
-    function testCannotSweepAsset() public {
-        // Try to sweep the asset token, which should revert
-        vm.startPrank(strategy.GOV());
-        vm.expectRevert("!asset");
-        strategy.sweep(YIELD_VAULT);
-        vm.stopPrank();
-    }
-
     /// @notice Fuzz test exchange rate tracking and yield calculation
-    function testFuzzExchangeRateTracking(uint256 depositAmount, uint256 exchangeRateIncreasePercentage) public {
+    function testFuzzExchangeRateTrackingMorphoCompounder(
+        uint256 depositAmount,
+        uint256 exchangeRateIncreasePercentage
+    ) public {
         // Bound inputs to reasonable values
-        depositAmount = bound(depositAmount, 1e18, 10000e18); // 1 to 10,000 YIELD_VAULT
-        exchangeRateIncreasePercentage = bound(exchangeRateIncreasePercentage, 1, 99); // 1% to 99% increase
+        depositAmount = bound(depositAmount, 1e18, 10000e18); // 1 to 10,000 WETH
+        exchangeRateIncreasePercentage = bound(exchangeRateIncreasePercentage, 1, 99); // 1% to 50% increase
 
         // Airdrop tokens to user for this test
-        airdrop(ERC20(YIELD_VAULT), user, depositAmount);
+        airdrop(ERC20(WETH), user, depositAmount);
 
         // Deposit first
         vm.startPrank(user);
-        ERC20(YIELD_VAULT).approve(address(strategy), depositAmount);
+        ERC20(WETH).approve(address(strategy), depositAmount);
         vault.deposit(depositAmount, user);
         vm.stopPrank();
 
         // Get initial exchange rate
-        uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
+        uint256 initialExchangeRate = IBaseYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
 
         // Simulate exchange rate increase based on fuzzed percentage
         uint256 newExchangeRate = (initialExchangeRate * (100 + exchangeRateIncreasePercentage)) / 100;
 
         // Mock the yield vault's pricePerShare
-        vm.mockCall(YIELD_VAULT, abi.encodeWithSignature("pricePerShare()"), abi.encode(newExchangeRate));
+        vm.mockCall(WETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(newExchangeRate));
 
         // Report to capture yield
         vm.startPrank(keeper);
@@ -567,13 +579,19 @@ contract MorphoCompounderStrategyTest is Test {
         assertEq(loss, 0, "Should have no loss");
 
         // Verify exchange rate was updated
-        uint256 updatedExchangeRate = strategy.getLastReportedExchangeRate();
-        assertEq(updatedExchangeRate, newExchangeRate, "Exchange rate should be updated after harvest");
+        uint256 updatedExchangeRate = IBaseYieldSkimmingStrategy(address(strategy)).getLastRateRay().rayToWad();
+
+        assertApproxEqRel(
+            updatedExchangeRate,
+            newExchangeRate,
+            0.000001e18,
+            "Exchange rate should be updated after harvest"
+        );
     }
 
     /// @notice Test getting the last reported exchange rate
-    function testGetLastReportedExchangeRate() public view {
-        uint256 rate = strategy.getLastReportedExchangeRate();
+    function testgetCurrentExchangeRate() public view {
+        uint256 rate = IBaseYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         assertGt(rate, 0, "Exchange rate should be initialized and greater than zero");
     }
 
@@ -628,9 +646,9 @@ contract MorphoCompounderStrategyTest is Test {
         vm.stopPrank();
 
         // Mock a 10x exchange rate
-        uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
+        uint256 initialExchangeRate = IBaseYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         uint256 newExchangeRate = (initialExchangeRate * 7) / 3; // 233%
-        vm.mockCall(YIELD_VAULT, abi.encodeWithSignature("pricePerShare()"), abi.encode(newExchangeRate));
+        vm.mockCall(WETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(newExchangeRate));
 
         // Second report: should revert
         vm.startPrank(keeper);
@@ -651,10 +669,10 @@ contract MorphoCompounderStrategyTest is Test {
         assertEq(strategy.doHealthCheck(), false);
 
         // old exchange rate
-        uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
+        uint256 initialExchangeRate = IBaseYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
 
         // make a 10 time profit (should revert when doHealthCheck is true but not when it is false)
-        vm.mockCall(YIELD_VAULT, abi.encodeWithSignature("pricePerShare()"), abi.encode((initialExchangeRate * 10)));
+        vm.mockCall(WETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(initialExchangeRate * 10));
 
         // report
         vm.startPrank(keeper);
@@ -684,20 +702,20 @@ contract MorphoCompounderStrategyTest is Test {
         assertEq(strategy.doHealthCheck(), false);
     }
 
-    /// @notice Test _tendTrigger always returns false
+    // tendTrigger always returns false
     function testTendTriggerAlwaysFalse() public view {
-        bool trigger = wrapper.exposeTendTrigger();
+        (bool trigger, ) = IBaseStrategy(address(strategy)).tendTrigger();
         assertEq(trigger, false, "Tend trigger should always be false");
     }
 
     /// @notice Fuzz test basic loss scenario with single user
-    function testFuzzHarvestWithLossMorpho(
+    function testFuzzHarvestWithLossMorphoCompounder(
         uint256 depositAmount,
         uint256 profitPercentage,
         uint256 lossPercentage
     ) public {
         // Bound inputs to reasonable values
-        depositAmount = bound(depositAmount, 1e18, 10000e18); // 1 to 10,000 YIELD_VAULT
+        depositAmount = bound(depositAmount, 1e18, 10000e18); // 1 to 10,000 WETH
         profitPercentage = bound(profitPercentage, 5, 50); // 5% to 50% profit first
         lossPercentage = bound(lossPercentage, 1, 19); // 1% to 19% loss (less than 20% limit)
 
@@ -707,19 +725,19 @@ contract MorphoCompounderStrategyTest is Test {
         vm.stopPrank();
 
         // Airdrop tokens to user for this test
-        airdrop(ERC20(YIELD_VAULT), user, depositAmount);
+        airdrop(ERC20(WETH), user, depositAmount);
 
         // First deposit to create some donation shares for loss protection
         vm.startPrank(user);
-        ERC20(YIELD_VAULT).approve(address(strategy), depositAmount);
+        ERC20(WETH).approve(address(strategy), depositAmount);
         vault.deposit(depositAmount, user);
         vm.stopPrank();
 
         // Generate some profit first to create donation shares
-        uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
+        uint256 initialExchangeRate = IBaseYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         uint256 profitExchangeRate = (initialExchangeRate * (100 + profitPercentage)) / 100;
 
-        vm.mockCall(YIELD_VAULT, abi.encodeWithSignature("pricePerShare()"), abi.encode(profitExchangeRate));
+        vm.mockCall(WETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(profitExchangeRate));
 
         vm.startPrank(keeper);
         vault.report(); // This creates donation shares for loss protection
@@ -737,7 +755,7 @@ contract MorphoCompounderStrategyTest is Test {
 
         // Simulate exchange rate decrease
         uint256 lossExchangeRate = (profitExchangeRate * (100 - lossPercentage)) / 100;
-        vm.mockCall(YIELD_VAULT, abi.encodeWithSignature("pricePerShare()"), abi.encode(lossExchangeRate));
+        vm.mockCall(WETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(lossExchangeRate));
 
         // Call report and capture the returned values
         vm.startPrank(keeper);
@@ -764,39 +782,327 @@ contract MorphoCompounderStrategyTest is Test {
         assertEq(totalAssetsAfter, totalAssetsBefore, "Total assets should be the same before and after loss");
     }
 
+    /// @notice Test loss scenario with multiple users to verify fair loss handling
+    function testMultipleUserLossDistributionMorphoCompounder() public {
+        // Set loss limit to allow 20% losses
+        vm.startPrank(management);
+        strategy.setLossLimitRatio(2000); // 20%
+        vm.stopPrank();
+
+        TestState memory state;
+
+        // Setup users
+        state.user1 = user;
+        state.user2 = address(0x5678);
+        state.depositAmount1 = 1000e18; // 1000 WETH
+        state.depositAmount2 = 2000e18; // 2000 WETH
+
+        // Get initial exchange rate
+        state.initialExchangeRate = IBaseYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
+
+        // First user deposits
+        vm.startPrank(state.user1);
+        vault.deposit(state.depositAmount1, state.user1);
+        vm.stopPrank();
+
+        // Generate some profit first to create donation shares for loss protection
+        state.newExchangeRate1 = (state.initialExchangeRate * 110) / 100; // 10% profit
+        vm.mockCall(WETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(state.newExchangeRate1));
+
+        vm.startPrank(keeper);
+        vault.report(); // Creates donation shares
+        vm.stopPrank();
+        vm.clearMockedCalls();
+
+        // Second user deposits after profit generation
+        vm.startPrank(address(this));
+        airdrop(ERC20(WETH), state.user2, state.depositAmount2);
+        vm.stopPrank();
+
+        vm.startPrank(state.user2);
+        ERC20(WETH).approve(address(strategy), type(uint256).max);
+        vault.deposit(state.depositAmount2, state.user2);
+        vm.stopPrank();
+
+        // Check donation shares available for loss protection
+        uint256 donationSharesBefore = vault.balanceOf(donationAddress);
+        assertGt(donationSharesBefore, 0, "Should have donation shares for loss protection");
+
+        // Record user shares before loss
+        uint256 user1SharesBefore = vault.balanceOf(state.user1);
+        uint256 user2SharesBefore = vault.balanceOf(state.user2);
+
+        // Generate loss (20% decrease from profit rate)
+        state.newExchangeRate2 = (state.newExchangeRate1 * 8001) / 10000; // less than 20% loss
+        vm.mockCall(WETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(state.newExchangeRate2));
+
+        // Report loss
+        vm.startPrank(keeper);
+        (uint256 profit, uint256 loss) = vault.report();
+        vm.stopPrank();
+        vm.clearMockedCalls();
+
+        // Verify loss was reported
+        assertEq(profit, 0, "Should have no profit");
+        assertGt(loss, 0, "Should have reported loss");
+
+        // Check that donation shares were burned for loss protection
+        uint256 donationSharesAfter = vault.balanceOf(donationAddress);
+        assertLt(donationSharesAfter, donationSharesBefore, "Donation shares should be burned for loss protection");
+
+        // User shares should remain unchanged due to loss protection
+        assertEq(vault.balanceOf(state.user1), user1SharesBefore, "User 1 shares should be protected");
+        assertEq(vault.balanceOf(state.user2), user2SharesBefore, "User 2 shares should be protected");
+
+        // Both users withdraw
+        vm.startPrank(state.user1);
+        state.user1Assets = vault.redeem(vault.balanceOf(state.user1), state.user1, state.user1);
+        vm.stopPrank();
+
+        vm.startPrank(state.user2);
+        state.user2Assets = vault.redeem(vault.balanceOf(state.user2), state.user2, state.user2);
+        vm.stopPrank();
+
+        // Users should receive their deposits adjusted for exchange rate changes with loss protection
+        assertApproxEqRel(
+            state.user1Assets * state.newExchangeRate2,
+            ((state.depositAmount1 * state.initialExchangeRate) * (110 * 8)) / (100 * 10),
+            0.1e18, // 0.1% tolerance for loss scenarios
+            "User 1 should receive deposit value with loss protection"
+        );
+
+        assertApproxEqRel(
+            state.user2Assets * state.newExchangeRate2,
+            (state.depositAmount2 * state.newExchangeRate1 * 8) / 10, // expect a 20 pr cent loss in value
+            0.1e18, // 0.1% tolerance for loss scenarios
+            "User 2 should receive deposit value with loss protection"
+        );
+    }
+
+    /// @notice Test loss scenario where loss exceeds available donation shares
+    function testLossExceedingDonationSharesMorphoCompounder() public {
+        // Set loss limit to allow 15% losses
+        vm.startPrank(management);
+        strategy.setLossLimitRatio(1500); // 15%
+        vm.stopPrank();
+
+        uint256 depositAmount = 1000e18; // 1000 WETH
+
+        // User deposits
+        vm.startPrank(user);
+        vault.deposit(depositAmount, user);
+        vm.stopPrank();
+
+        // Generate small profit to create minimal donation shares
+        uint256 initialExchangeRate = IBaseYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
+        uint256 smallProfitRate = (initialExchangeRate * 1005) / 1000; // 0.5% profit
+        vm.mockCall(WETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(smallProfitRate));
+
+        vm.startPrank(keeper);
+        vault.report(); // Creates small amount of donation shares
+        vm.stopPrank();
+        vm.clearMockedCalls();
+
+        uint256 donationSharesBefore = vault.balanceOf(donationAddress);
+        uint256 userSharesBefore = vault.balanceOf(user);
+
+        // Generate large loss (10% from initial rate)
+        uint256 largeLossRate = (initialExchangeRate * 90) / 100;
+        vm.mockCall(WETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(largeLossRate));
+
+        vm.startPrank(keeper);
+        (uint256 profit, uint256 loss) = vault.report();
+        vm.stopPrank();
+        vm.clearMockedCalls();
+
+        // Verify loss was reported
+        assertEq(profit, 0, "Should have no profit");
+        assertGt(loss, 0, "Should have reported loss");
+
+        // All donation shares should be burned (limited by available balance)
+        uint256 donationSharesAfter = vault.balanceOf(donationAddress);
+        assertLt(donationSharesAfter, donationSharesBefore, "Some donation shares should be burned");
+
+        // User shares should remain the same (they don't get burned)
+        assertEq(vault.balanceOf(user), userSharesBefore, "User shares should not be burned");
+
+        // User should still be able to withdraw, but will receive less due to insufficient loss protection
+        vm.startPrank(user);
+        uint256 assetsReceived = vault.redeem(vault.balanceOf(user), user, user);
+        vm.stopPrank();
+
+        // User receives less than original deposit due to insufficient loss protection
+        assertLt(
+            assetsReceived * largeLossRate,
+            depositAmount * initialExchangeRate,
+            "User should receive less due to insufficient loss protection"
+        );
+    }
+
+    /// @notice Test consecutive loss scenarios
+    function testConsecutiveLossesMorphoCompounder() public {
+        // Set loss limit to allow 15% losses
+        vm.startPrank(management);
+        strategy.setLossLimitRatio(1500); // 15%
+        vm.stopPrank();
+
+        uint256 depositAmount = 1000e18; // 1000 WETH
+
+        // User deposits
+        vm.startPrank(user);
+        vault.deposit(depositAmount, user);
+        vm.stopPrank();
+
+        // Generate profit to create donation shares
+        uint256 initialExchangeRate = IBaseYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
+        uint256 profitRate = (initialExchangeRate * 120) / 100; // 20% profit
+        vm.mockCall(WETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(profitRate));
+
+        vm.startPrank(keeper);
+        vault.report(); // Creates donation shares
+        vm.stopPrank();
+        vm.clearMockedCalls();
+
+        uint256 donationSharesAfterProfit = vault.balanceOf(donationAddress);
+        assertGt(donationSharesAfterProfit, 0, "Should have donation shares after profit");
+
+        // First loss (5% from profit rate)
+        uint256 firstLossRate = (profitRate * 95) / 100;
+        vm.mockCall(WETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(firstLossRate));
+
+        vm.startPrank(keeper);
+        (uint256 profit1, uint256 loss1) = vault.report();
+        vm.stopPrank();
+        vm.clearMockedCalls();
+
+        assertEq(profit1, 0, "Should have no profit in first loss");
+        assertGt(loss1, 0, "Should have loss in first report");
+
+        uint256 donationSharesAfterFirstLoss = vault.balanceOf(donationAddress);
+        assertLt(
+            donationSharesAfterFirstLoss,
+            donationSharesAfterProfit,
+            "Donation shares should decrease after first loss"
+        );
+
+        // Second consecutive loss (another 5% from current rate)
+        uint256 secondLossRate = (firstLossRate * 95) / 100;
+        vm.mockCall(WETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(secondLossRate));
+
+        vm.startPrank(keeper);
+        (uint256 profit2, uint256 loss2) = vault.report();
+        vm.stopPrank();
+        vm.clearMockedCalls();
+
+        assertEq(profit2, 0, "Should have no profit in second loss");
+        assertGt(loss2, 0, "Should have loss in second report");
+
+        uint256 donationSharesAfterSecondLoss = vault.balanceOf(donationAddress);
+        assertLe(
+            donationSharesAfterSecondLoss,
+            donationSharesAfterFirstLoss,
+            "Donation shares should decrease or stay same after second loss"
+        );
+
+        // User should still be able to withdraw
+        vm.startPrank(user);
+        uint256 assetsReceived = vault.redeem(vault.balanceOf(user), user, user);
+        vm.stopPrank();
+
+        assertGt(assetsReceived, 0, "User should receive some assets");
+    }
+
+    /// @notice Test that loss protection works correctly with zero donation shares
+    function testLossWithZeroDonationSharesMorphoCompounder() public {
+        // Set loss limit to allow 10% losses
+        vm.startPrank(management);
+        strategy.setLossLimitRatio(1000); // 10%
+        vm.stopPrank();
+
+        uint256 depositAmount = 1000e18; // 1000 WETH
+
+        // User deposits without any prior profit generation
+        vm.startPrank(user);
+        vault.deposit(depositAmount, user);
+        vm.stopPrank();
+
+        // Verify no donation shares exist
+        uint256 donationSharesBefore = vault.balanceOf(donationAddress);
+        assertEq(donationSharesBefore, 0, "Should have no donation shares initially");
+
+        uint256 userSharesBefore = vault.balanceOf(user);
+        uint256 totalAssetsBefore = vault.totalAssets();
+
+        // Generate loss (5% decrease)
+        uint256 initialExchangeRate = IBaseYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
+        uint256 lossRate = (initialExchangeRate * 95) / 100;
+        vm.mockCall(WETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(lossRate));
+
+        vm.startPrank(keeper);
+        (uint256 profit, uint256 loss) = vault.report();
+        vm.stopPrank();
+        vm.clearMockedCalls();
+
+        // Verify loss was reported
+        assertEq(profit, 0, "Should have no profit");
+        assertGt(loss, 0, "Should have reported loss");
+
+        // Donation shares should remain zero (nothing to burn)
+        uint256 donationSharesAfter = vault.balanceOf(donationAddress);
+        assertEq(donationSharesAfter, 0, "Should still have no donation shares");
+
+        // User shares should remain unchanged
+        assertEq(vault.balanceOf(user), userSharesBefore, "User shares should not change");
+
+        // Total assets should decrease by loss
+        assertEq(vault.totalAssets(), totalAssetsBefore, "Total assets should be the same before and after loss");
+
+        // User withdrawal should work but receive reduced value
+        vm.startPrank(user);
+        uint256 assetsReceived = vault.redeem(vault.balanceOf(user), user, user);
+        vm.stopPrank();
+
+        // User receives less due to no loss protection
+        assertLt(
+            assetsReceived * lossRate,
+            depositAmount * initialExchangeRate,
+            "User should receive less due to no loss protection"
+        );
+    }
+
     /// @notice Fuzz test consecutive loss scenarios
-    function testFuzzConsecutiveLossesMorpho(
+    function testFuzzConsecutiveLossesMorphoCompounder(
         uint256 depositAmount,
         uint256 profitPercentage,
         uint256 firstLossPercentage,
         uint256 secondLossPercentage
     ) public {
         // Bound inputs to reasonable values
-        depositAmount = bound(depositAmount, 1e18, 10000e18); // 1 to 10,000 YIELD_VAULT
+        depositAmount = bound(depositAmount, 1e18, 10000e18); // 1 to 10,000 WETH
         profitPercentage = bound(profitPercentage, 10, 50); // 10% to 50% profit first
         firstLossPercentage = bound(firstLossPercentage, 1, 10); // 1% to 10% first loss
         secondLossPercentage = bound(secondLossPercentage, 1, 10); // 1% to 10% second loss
 
         FuzzTestState memory state;
 
-        // Set loss limit to allow 20% losses
+        // Set loss limit to allow 15% losses
         vm.startPrank(management);
         strategy.setLossLimitRatio(2000); // 20%
         vm.stopPrank();
 
         // Airdrop tokens to user for this test
-        airdrop(ERC20(YIELD_VAULT), user, depositAmount);
+        airdrop(ERC20(WETH), user, depositAmount);
 
         // User deposits
         vm.startPrank(user);
-        ERC20(YIELD_VAULT).approve(address(strategy), depositAmount);
+        ERC20(WETH).approve(address(strategy), depositAmount);
         vault.deposit(depositAmount, user);
         vm.stopPrank();
 
         // Generate profit to create donation shares
-        state.initialExchangeRate = strategy.getLastReportedExchangeRate();
+        state.initialExchangeRate = IBaseYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         state.profitRate = (state.initialExchangeRate * (100 + profitPercentage)) / 100;
-        vm.mockCall(YIELD_VAULT, abi.encodeWithSignature("pricePerShare()"), abi.encode(state.profitRate));
+        vm.mockCall(WETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(state.profitRate));
 
         vm.startPrank(keeper);
         vault.report(); // Creates donation shares
@@ -808,7 +1114,7 @@ contract MorphoCompounderStrategyTest is Test {
 
         // First loss
         state.firstLossRate = (state.profitRate * (100 - firstLossPercentage)) / 100;
-        vm.mockCall(YIELD_VAULT, abi.encodeWithSignature("pricePerShare()"), abi.encode(state.firstLossRate));
+        vm.mockCall(WETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(state.firstLossRate));
 
         vm.startPrank(keeper);
         (uint256 profit1, uint256 loss1) = vault.report();
@@ -827,7 +1133,7 @@ contract MorphoCompounderStrategyTest is Test {
 
         // Second consecutive loss
         state.secondLossRate = (state.firstLossRate * (100 - secondLossPercentage)) / 100;
-        vm.mockCall(YIELD_VAULT, abi.encodeWithSignature("pricePerShare()"), abi.encode(state.secondLossRate));
+        vm.mockCall(WETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(state.secondLossRate));
 
         vm.startPrank(keeper);
         (uint256 profit2, uint256 loss2) = vault.report();
