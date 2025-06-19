@@ -26,7 +26,7 @@ import { IEarningPowerCalculator } from "staker/interfaces/IEarningPowerCalculat
 import { Whitelist } from "src/utils/Whitelist.sol";
 import { IWhitelist } from "src/utils/IWhitelist.sol";
 import { IWhitelistedEarningPowerCalculator } from "src/regen/interfaces/IWhitelistedEarningPowerCalculator.sol";
-import { IFundingRound } from "src/regen/interfaces/IFundingRound.sol";
+import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocationMechanism.sol";
 
 /// @title RegenStaker
 /// @author [Golem Foundation](https://golem.foundation)
@@ -492,7 +492,7 @@ contract RegenStaker is Staker, StakerDelegateSurrogateVotes, StakerPermitAndSta
 
         SafeERC20.safeIncreaseAllowance(REWARD_TOKEN, _fundingRoundAddress, amountContributedToFundingRound);
         require(
-            IFundingRound(_fundingRoundAddress).signup(amountContributedToFundingRound, _votingDelegatee, _signature) >
+            TokenizedAllocationMechanism(_fundingRoundAddress).signup(amountContributedToFundingRound, _votingDelegatee, _signature) >
                 0,
             FundingRoundSignUpFailed(
                 _fundingRoundAddress,
