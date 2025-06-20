@@ -5,14 +5,7 @@ import { IBaseStrategy } from "src/core/interfaces/IBaseStrategy.sol";
 import { TokenizedStrategy, Math } from "src/core/TokenizedStrategy.sol";
 import { WadRayMath } from "src/utils/libs/Maths/WadRay.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
-
-interface IExchangeRate {
-    function getCurrentExchangeRate() external view returns (uint256);
-}
-
-interface IWstETH {
-    function stEthPerToken() external view returns (uint256);
-}
+import { IYieldSkimmingStrategy } from "src/strategies/yieldSkimming/IYieldSkimmingStrategy.sol";
 
 /**
  * @title YieldSkimmingTokenizedStrategy
@@ -52,7 +45,13 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
      *
      * This approach maintains PPS ≈ 1 by diluting/concentrating shares based on yield.
      */
-    function report() public override(TokenizedStrategy) returns (uint256 profit, uint256 loss) {
+    function report()
+        public
+        override(TokenizedStrategy)
+        nonReentrant
+        onlyKeepers
+        returns (uint256 profit, uint256 loss)
+    {
         StrategyData storage S = super._strategyStorage();
 
         uint256 rateNow = _currentRateRay();
@@ -96,14 +95,9 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
      * @return The current exchange rate in RAY format (1e27)
      */
     function _currentRateRay() internal view virtual returns (uint256) {
-        uint256 exchangeRate = IExchangeRate(address(this)).getCurrentExchangeRate();
+        uint256 exchangeRate = IYieldSkimmingStrategy(address(this)).getCurrentExchangeRate();
 
         return exchangeRate.wadToRay(); // Convert from WAD (1e18) to RAY (1e27)
-    }
-
-    function _getCurrentExchangeRate() internal view virtual returns (uint256) {
-        address assetAddress = address(_strategyStorage().asset);
-        return IWstETH(assetAddress).stEthPerToken();
     }
 
     function _convertToShares(
