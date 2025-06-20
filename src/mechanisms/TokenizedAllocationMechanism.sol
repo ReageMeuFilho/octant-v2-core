@@ -102,6 +102,9 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     error NotInitialized();
     error AlreadyInitialized();
     error PausedError();
+    error ExpiredSignature(uint256 deadline, uint256 currentTime);
+    error InvalidSignature();
+    error InvalidSigner(address recovered, address expected);
 
     /// @notice Maximum safe value for mathematical operations
     uint256 public constant MAX_SAFE_VALUE = type(uint128).max;
@@ -114,6 +117,23 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
 
     /// @notice Storage slot for allocation mechanism data (EIP-1967 pattern)
     bytes32 private constant ALLOCATION_STORAGE_SLOT = bytes32(uint256(keccak256("tokenized.allocation.storage")) - 1);
+
+    /// @notice EIP712 Domain separator typehash per EIP-2612
+    bytes32 private constant TYPE_HASH =
+        keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+
+    /// @notice Signup typehash for EIP712 structured data
+    bytes32 private constant SIGNUP_TYPEHASH =
+        keccak256("Signup(address user,uint256 deposit,uint256 nonce,uint256 deadline)");
+
+    /// @notice CastVote typehash for EIP712 structured data
+    bytes32 private constant CAST_VOTE_TYPEHASH =
+        keccak256(
+            "CastVote(address voter,uint256 proposalId,uint8 choice,uint256 weight,uint256 nonce,uint256 deadline)"
+        );
+
+    /// @notice EIP712 version for domain separator
+    string private constant EIP712_VERSION = "1";
 
     /// @notice Vote types: Against, For, Abstain
     enum VoteType {
@@ -193,6 +213,9 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         mapping(address => uint256) votingPower;
         mapping(address => uint256) redeemableAfter;
         mapping(uint256 => uint256) proposalShares;
+        // EIP712 storage
+        bytes32 domainSeparator; // Cached domain separator
+        uint256 initialChainId; // Chain ID at deployment for fork protection
     }
 
     // ---------- Storage Access for Hooks ----------
@@ -265,6 +288,30 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         assembly {
             s.slot := slot
         }
+    }
+
+    /// @notice Returns the domain separator, updating it if chain ID changed (fork protection)
+    function DOMAIN_SEPARATOR() public view returns (bytes32) {
+        AllocationStorage storage s = _getStorage();
+        if (block.chainid == s.initialChainId) {
+            return s.domainSeparator;
+        } else {
+            return _computeDomainSeparator(s);
+        }
+    }
+
+    /// @dev Computes the domain separator
+    function _computeDomainSeparator(AllocationStorage storage s) private view returns (bytes32) {
+        return
+            keccak256(
+                abi.encode(
+                    TYPE_HASH,
+                    keccak256(bytes(s.name)),
+                    keccak256(bytes(EIP712_VERSION)),
+                    block.chainid,
+                    address(this)
+                )
+            );
     }
 
     // ---------- Modifiers ----------
@@ -406,6 +453,10 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         s.startBlock = _startBlock;
         s.initialized = true;
 
+        // Initialize EIP712 domain separator
+        s.initialChainId = block.chainid;
+        s.domainSeparator = _computeDomainSeparator(s);
+
         emit OwnershipTransferred(address(0), _owner);
     }
 
@@ -414,7 +465,51 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     /// @notice Register to gain voting power by depositing underlying tokens
     /// @param deposit Amount of underlying to deposit (may be zero)
     function signup(uint256 deposit) external nonReentrant whenNotPaused onlyInitialized {
-        address user = msg.sender;
+        _executeSignup(msg.sender, deposit);
+    }
+
+    /// @notice Register with voting power using EIP-2612 style signature
+    /// @param user Address of the user signing up
+    /// @param deposit Amount of underlying to deposit
+    /// @param deadline Expiration timestamp for the signature
+    /// @param v Signature parameter
+    /// @param r Signature parameter
+    /// @param s Signature parameter
+    function signupWithSignature(
+        address user,
+        uint256 deposit,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external nonReentrant whenNotPaused onlyInitialized {
+        // Check deadline
+        if (block.timestamp > deadline) revert ExpiredSignature(deadline, block.timestamp);
+
+        AllocationStorage storage stor = _getStorage();
+
+        // Get current nonce and increment
+        uint256 currentNonce = stor.nonces[user];
+
+        // Build struct hash
+        bytes32 structHash = keccak256(abi.encode(SIGNUP_TYPEHASH, user, deposit, currentNonce, deadline));
+
+        // Recover signer
+        address recoveredAddress = _recover(structHash, v, r, s);
+        if (recoveredAddress == address(0)) revert InvalidSignature();
+        if (recoveredAddress != user) revert InvalidSigner(recoveredAddress, user);
+
+        // Increment nonce
+        unchecked {
+            stor.nonces[user] = currentNonce + 1;
+        }
+
+        // Execute signup logic
+        _executeSignup(user, deposit);
+    }
+
+    /// @dev Internal signup execution logic
+    function _executeSignup(address user, uint256 deposit) private {
         AllocationStorage storage s = _getStorage();
 
         // Call hook for validation via interface (Yearn V3 pattern)
@@ -435,6 +530,12 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
 
         s.votingPower[user] = newPower;
         emit UserRegistered(user, newPower);
+    }
+
+    /// @dev Recovers signer address from signature
+    function _recover(bytes32 structHash, uint8 v, bytes32 r, bytes32 s) private view returns (address) {
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR(), structHash));
+        return ecrecover(digest, v, r, s);
     }
 
     // ---------- Proposal Creation ----------
@@ -479,6 +580,57 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         VoteType choice,
         uint256 weight
     ) external nonReentrant whenNotPaused onlyInitialized {
+        _executeCastVote(msg.sender, pid, choice, weight);
+    }
+
+    /// @notice Cast vote using EIP-2612 style signature
+    /// @param voter Address of the voter
+    /// @param pid Proposal ID
+    /// @param choice Vote choice (Against, For, Abstain)
+    /// @param weight Voting weight to use
+    /// @param deadline Expiration timestamp for the signature
+    /// @param v Signature parameter
+    /// @param r Signature parameter
+    /// @param s Signature parameter
+    function castVoteWithSignature(
+        address voter,
+        uint256 pid,
+        VoteType choice,
+        uint256 weight,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external nonReentrant whenNotPaused onlyInitialized {
+        // Check deadline
+        if (block.timestamp > deadline) revert ExpiredSignature(deadline, block.timestamp);
+
+        AllocationStorage storage stor = _getStorage();
+
+        // Get current nonce and increment
+        uint256 currentNonce = stor.nonces[voter];
+
+        // Build struct hash
+        bytes32 structHash = keccak256(
+            abi.encode(CAST_VOTE_TYPEHASH, voter, pid, uint8(choice), weight, currentNonce, deadline)
+        );
+
+        // Recover signer
+        address recoveredAddress = _recover(structHash, v, r, s);
+        if (recoveredAddress == address(0)) revert InvalidSignature();
+        if (recoveredAddress != voter) revert InvalidSigner(recoveredAddress, voter);
+
+        // Increment nonce
+        unchecked {
+            stor.nonces[voter] = currentNonce + 1;
+        }
+
+        // Execute vote logic
+        _executeCastVote(voter, pid, choice, weight);
+    }
+
+    /// @dev Internal vote execution logic
+    function _executeCastVote(address voter, uint256 pid, VoteType choice, uint256 weight) private {
         AllocationStorage storage s = _getStorage();
 
         // Validate proposal
@@ -496,9 +648,9 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
                 s.startBlock + s.votingDelay + s.votingPeriod
             );
 
-        if (s.hasVoted[pid][msg.sender]) revert AlreadyVoted(msg.sender, pid);
+        if (s.hasVoted[pid][voter]) revert AlreadyVoted(voter, pid);
 
-        uint256 oldPower = s.votingPower[msg.sender];
+        uint256 oldPower = s.votingPower[voter];
         if (weight == 0) revert InvalidWeight(weight, oldPower);
         if (weight > MAX_SAFE_VALUE) revert WeightTooLarge(weight, MAX_SAFE_VALUE);
 
@@ -506,16 +658,16 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         // The hook will revert with InsufficientVotingPowerForQuadraticCost if weight^2 > oldPower
         uint256 newPower = IBaseAllocationStrategy(address(this)).processVoteHook(
             pid,
-            msg.sender,
+            voter,
             uint8(choice),
             weight,
             oldPower
         );
         if (newPower > oldPower) revert PowerIncreased(oldPower, newPower);
 
-        s.votingPower[msg.sender] = newPower;
-        s.hasVoted[pid][msg.sender] = true;
-        emit VotesCast(msg.sender, pid, weight);
+        s.votingPower[voter] = newPower;
+        s.hasVoted[pid][voter] = true;
+        emit VotesCast(voter, pid, weight);
     }
 
     // ---------- Vote Tally Finalization ----------
@@ -716,6 +868,13 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
 
     function gracePeriod() external view onlyInitialized returns (uint256) {
         return _getStorage().gracePeriod;
+    }
+
+    /// @notice Returns the current nonce for an address
+    /// @param account The address to check
+    /// @return The current nonce
+    function nonces(address account) external view returns (uint256) {
+        return _getStorage().nonces[account];
     }
 
     // ---------- Emergency Functions ----------
