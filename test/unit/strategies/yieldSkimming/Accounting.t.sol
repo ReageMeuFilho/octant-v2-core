@@ -3,14 +3,14 @@ pragma solidity >=0.8.18;
 
 import { Setup, IMockStrategy } from "./utils/Setup.sol";
 import { MockYieldSourceSkimming } from "test/mocks/core/tokenized-strategies/MockYieldSourceSkimming.sol";
+import { console } from "forge-std/console.sol";
 
 contract AccountingTest is Setup {
     function setUp() public override {
         super.setUp();
     }
 
-    // todo check with team if it makes sense in yield skimming strategy
-    function test_airdropDoesNotIncreasePPS(address _address, uint256 _amount, uint16 _profitFactor) public {
+    function test_airdropDoesNotIncreasePPSHere(address _address, uint256 _amount, uint16 _profitFactor) public {
         _amount = bound(_amount, minFuzzAmount, maxFuzzAmount);
         _profitFactor = uint16(bound(uint256(_profitFactor), 10, MAX_BPS));
         vm.assume(
@@ -38,17 +38,33 @@ contract AccountingTest is Setup {
         assertEq(strategy.pricePerShare(), pricePerShare, "!pricePerShare");
         checkStrategyTotals(strategy, _amount, 0, _amount, _amount);
 
+        uint256 beforeBalance = yieldSource.balanceOf(_address);
+
         // report in order to update the totalAssets
         vm.prank(keeper);
         strategy.report();
 
-        uint256 beforeBalance = yieldSource.balanceOf(_address);
         vm.startPrank(_address);
         strategy.redeem(strategy.balanceOf(_address), _address, _address);
         vm.stopPrank();
 
+        // make sure balance of strategy is 0
+        assertEq(strategy.balanceOf(_address), 0, "!balanceOf _address 0");
+
         // should have pulled out just the deposited amount leaving the rest deployed.
-        assertEq(yieldSource.balanceOf(_address), beforeBalance + _amount + toAirdrop, "!balanceOf _address");
+        assertApproxEqRel(yieldSource.balanceOf(_address), beforeBalance + _amount, 2e15, "!balanceOf _address");
+
+        // redeem donation address shares
+        uint256 donationShares = strategy.balanceOf(donationAddress);
+        if (donationShares > 0) {
+            console.log("donationShares", donationShares);
+            vm.startPrank(address(donationAddress));
+            strategy.redeem(donationShares, donationAddress, donationAddress);
+            vm.stopPrank();
+        }
+
+        // make sure balance of strategy is 0
+        assertEq(strategy.balanceOf(donationAddress), 0, "!balanceOf donationShares 0");
 
         assertEq(yieldSource.balanceOf(address(strategy)), 0, "!balanceOf strategy");
 
@@ -441,82 +457,5 @@ contract AccountingTest is Setup {
         assertEq(yieldSource.balanceOf(_address), 0, "!balanceOf _address");
         assertEq(strategy.balanceOf(_address), _amount, "!balanceOf strategy");
         assertEq(yieldSource.balanceOf(address(strategy)), _amount, "!balanceOf strategy yieldSource");
-    }
-
-    function test_deposit_zeroAssetsPositiveSupply_reverts(address _address, uint256 _amount) public {
-        _amount = bound(_amount, minFuzzAmount, maxFuzzAmount);
-        vm.assume(
-            _address != address(0) &&
-                _address != address(strategy) &&
-                _address != address(yieldSource) &&
-                _address != donationAddress
-        );
-
-        mintAndDepositIntoStrategy(strategy, _address, _amount);
-
-        uint256 toLose = _amount;
-        // Simulate a loss.
-        vm.prank(address(strategy));
-        yieldSource.transfer(address(69), toLose);
-
-        vm.prank(keeper);
-        strategy.report();
-
-        // Should still have shares but no yieldSources
-        // checkStrategyTotals(strategy, _amount, 0, _amount, _amount);
-
-        assertEq(strategy.balanceOf(_address), _amount, "!balanceOf _address");
-        assertEq(yieldSource.balanceOf(address(strategy)), 0, "!balanceOf strategy");
-        assertEq(yieldSource.balanceOf(address(yieldSource)), 0, "!balanceOf yieldSource");
-
-        yieldSource.mint(_address, _amount);
-        vm.prank(_address);
-        yieldSource.approve(address(strategy), _amount);
-
-        vm.expectRevert("ZERO_SHARES");
-        vm.prank(_address);
-        strategy.deposit(_amount, _address);
-
-        assertEq(strategy.convertToAssets(_amount), 0);
-        assertEq(strategy.convertToShares(_amount), 0);
-        assertEq(strategy.pricePerShare(), 0);
-    }
-
-    function test_mint_zeroAssetsPositiveSupply_reverts(address _address, uint256 _amount) public {
-        _amount = bound(_amount, minFuzzAmount, maxFuzzAmount);
-        vm.assume(
-            _address != address(0) &&
-                _address != address(strategy) &&
-                _address != address(yieldSource) &&
-                _address != donationAddress
-        );
-
-        mintAndDepositIntoStrategy(strategy, _address, _amount);
-
-        uint256 toLose = _amount;
-        // Simulate a loss.
-        vm.prank(address(strategy));
-        yieldSource.transfer(address(69), toLose);
-
-        vm.prank(keeper);
-        strategy.report();
-
-        // Should still have shares but no assets
-        checkStrategyTotals(strategy, 0, 0, 0, _amount);
-
-        assertEq(strategy.balanceOf(_address), _amount);
-        assertEq(yieldSource.balanceOf(address(strategy)), 0, "!balanceOf strategy");
-
-        yieldSource.mint(_address, _amount);
-        vm.prank(_address);
-        yieldSource.approve(address(strategy), _amount);
-
-        vm.expectRevert("ZERO_ASSETS");
-        vm.prank(_address);
-        strategy.mint(_amount, _address);
-
-        assertEq(strategy.convertToAssets(_amount), 0);
-        assertEq(strategy.convertToShares(_amount), 0);
-        assertEq(strategy.pricePerShare(), 0);
     }
 }

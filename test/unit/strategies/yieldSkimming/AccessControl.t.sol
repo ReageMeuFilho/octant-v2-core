@@ -139,8 +139,9 @@ contract AccessControlTest is Setup {
         // assure the deposit worked correctly
         assertEq(yieldSource.balanceOf(address(strategy)), _amount);
 
-        // works from random address (should not revert)
+        // works only from keeper
         vm.prank(_address);
+        vm.expectRevert("!keeper");
         strategy.report();
 
         // if test fails, it means the strategy reverted, which is not expected

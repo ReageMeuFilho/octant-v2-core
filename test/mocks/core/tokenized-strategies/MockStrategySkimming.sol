@@ -48,6 +48,10 @@ contract MockStrategySkimming is BaseStrategy {
         ERC20(_asset).approve(_yieldSource, type(uint256).max);
     }
 
+    function getCurrentExchangeRate() public pure returns (uint256) {
+        return 1e18;
+    }
+
     function _deployFunds(uint256 _amount) internal override {}
 
     function _freeFunds(uint256 /*_amount*/) internal override {}

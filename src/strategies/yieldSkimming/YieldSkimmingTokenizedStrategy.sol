@@ -58,7 +58,15 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
 
         IBaseStrategy(address(this)).harvestAndReport();
 
-        uint256 totalETH = S.asset.balanceOf(address(this)).mulDiv(rateNow, WadRayMath.RAY); // asset → ETH
+        uint256 totalAssetsBalance = S.asset.balanceOf(address(this));
+        uint256 currentTotalAssets = _totalAssets(S);
+
+        if (totalAssetsBalance != currentTotalAssets) {
+            // update total assets
+            S.totalAssets = totalAssetsBalance;
+        }
+
+        uint256 totalETH = totalAssetsBalance.mulDiv(rateNow, WadRayMath.RAY); // asset → ETH
         uint256 supply = _totalSupply(S); // shares denom. in ETH
 
         if (totalETH > supply) {
