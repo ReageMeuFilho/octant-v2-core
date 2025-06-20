@@ -20,11 +20,10 @@ contract RegenEarningPowerCalculator is IWhitelistedEarningPowerCalculator, Owna
         emit WhitelistSet(_whitelist);
     }
 
-    // @notice Returns the earning power of a staker
-    // @param stakedAmount The amount of staked tokens
-    // @param staker The address of the staker
-    // @param _delegatee The address of the delegatee
-    // @return The earning power of the staker
+    /// @notice Returns the earning power of a staker
+    /// @param stakedAmount The amount of staked tokens
+    /// @param staker The address of the staker
+    /// @return The earning power of the staker
     function getEarningPower(
         uint256 stakedAmount,
         address staker,
@@ -36,12 +35,12 @@ contract RegenEarningPowerCalculator is IWhitelistedEarningPowerCalculator, Owna
         return Math.min(stakedAmount, uint256(type(uint96).max));
     }
 
-    // @notice Returns the new earning power of a staker
-    // @param stakedAmount The amount of staked tokens
-    // @param staker The address of the staker
-    // @param _delegatee The address of the delegatee
-    // @param oldEarningPower The old earning power of the staker
-    // @return The new earning power of the staker and a boolean indicating if the staker qualifies for a bump
+    /// @notice Returns the new earning power of a staker
+    /// @param stakedAmount The amount of staked tokens
+    /// @param staker The address of the staker
+    /// @param oldEarningPower The old earning power of the staker
+    /// @return newCalculatedEarningPower The new earning power of the staker
+    /// @return qualifiesForBump Boolean indicating if the staker qualifies for a bump
     function getNewEarningPower(
         uint256 stakedAmount,
         address staker,
@@ -57,16 +56,16 @@ contract RegenEarningPowerCalculator is IWhitelistedEarningPowerCalculator, Owna
         qualifiesForBump = newCalculatedEarningPower != oldEarningPower;
     }
 
-    // @notice Sets the whitelist for the earning power calculator. Setting the whitelist to address(0) will allow all addresses to be eligible for earning power.
-    // @param _whitelist The whitelist to set
+    /// @notice Sets the whitelist for the earning power calculator. Setting the whitelist to address(0) will allow all addresses to be eligible for earning power.
+    /// @param _whitelist The whitelist to set
     function setWhitelist(IWhitelist _whitelist) public override onlyOwner {
         whitelist = _whitelist;
         emit WhitelistSet(_whitelist);
     }
 
-    // @notice Returns true if the contract implements the interface
-    // @param interfaceId The interface ID to check
-    // @return True if the contract implements the interface, false otherwise
+    /// @notice Returns true if the contract implements the interface
+    /// @param interfaceId The interface ID to check
+    /// @return True if the contract implements the interface, false otherwise
     function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165, IERC165) returns (bool) {
         return
             interfaceId == type(IWhitelistedEarningPowerCalculator).interfaceId || super.supportsInterface(interfaceId);
