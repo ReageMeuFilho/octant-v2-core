@@ -252,8 +252,8 @@ contract RocketPoolStrategyTest is Test {
         // Simulate exchange rate increase based on fuzzed percentage
         uint256 newExchangeRate = (initialExchangeRate * (100 + profitPercentage)) / 100;
 
-        // Mock the actual yield vault's pricePerShare (convert back to WAD format)
-        vm.mockCall(R_ETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(newExchangeRate));
+        // Mock the actual yield vault's getExchangeRate (convert back to WAD format)
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(newExchangeRate));
 
         uint256 donationAddressBalanceBefore = ERC20(address(strategy)).balanceOf(donationAddress);
 
@@ -326,8 +326,8 @@ contract RocketPoolStrategyTest is Test {
         // Check donation address balance before harvest
         state.donationBalanceBefore1 = ERC20(address(strategy)).balanceOf(donationAddress);
 
-        // Mock the yield vault's pricePerShare instead of strategy's internal method
-        vm.mockCall(R_ETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(state.newExchangeRate1));
+        // Mock the yield vault's getExchangeRate instead of strategy's internal method
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(state.newExchangeRate1));
 
         // Harvest to realize profit
         vm.startPrank(keeper);
@@ -363,8 +363,8 @@ contract RocketPoolStrategyTest is Test {
         // Check donation address balance before second harvest
         state.donationBalanceBefore2 = ERC20(address(strategy)).balanceOf(donationAddress);
 
-        // Mock the yield vault's pricePerShare
-        vm.mockCall(R_ETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(state.newExchangeRate2));
+        // Mock the yield vault's getExchangeRate
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(state.newExchangeRate2));
 
         // Harvest again
         vm.startPrank(keeper);
@@ -439,8 +439,8 @@ contract RocketPoolStrategyTest is Test {
         uint256 newExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         uint256 newTotalAssets = vault.totalAssets();
 
-        // mock pricePerShare to be 1.1x the initial exchange rate
-        vm.mockCall(R_ETH, abi.encodeWithSignature("pricePerShare()"), abi.encode((newExchangeRate * 11) / 10));
+        // mock getExchangeRate to be 1.1x the initial exchange rate
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode((newExchangeRate * 11) / 10));
 
         // Verify exchange rate is updated
         assertEq(newExchangeRate, initialExchangeRate, "Exchange rate should be updated after harvest");
@@ -530,8 +530,8 @@ contract RocketPoolStrategyTest is Test {
         // Simulate exchange rate increase based on fuzzed percentage
         uint256 newExchangeRate = (initialExchangeRate * (100 + exchangeRateIncreasePercentage)) / 100;
 
-        // Mock the yield vault's pricePerShare
-        vm.mockCall(R_ETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(newExchangeRate));
+        // Mock the yield vault's getExchangeRate
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(newExchangeRate));
 
         // Report to capture yield
         vm.startPrank(keeper);
@@ -615,7 +615,7 @@ contract RocketPoolStrategyTest is Test {
         // Mock a 10x exchange rate
         uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         uint256 newExchangeRate = (initialExchangeRate * 7) / 3; // 233%
-        vm.mockCall(R_ETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(newExchangeRate));
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(newExchangeRate));
 
         // Second report: should revert
         vm.startPrank(keeper);
@@ -639,7 +639,7 @@ contract RocketPoolStrategyTest is Test {
         uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
 
         // make a 10 time profit (should revert when doHealthCheck is true but not when it is false)
-        vm.mockCall(R_ETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(initialExchangeRate * 10));
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(initialExchangeRate * 10));
 
         // report
         vm.startPrank(keeper);
@@ -704,7 +704,7 @@ contract RocketPoolStrategyTest is Test {
         uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         uint256 profitExchangeRate = (initialExchangeRate * (100 + profitPercentage)) / 100;
 
-        vm.mockCall(R_ETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(profitExchangeRate));
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(profitExchangeRate));
 
         vm.startPrank(keeper);
         vault.report(); // This creates donation shares for loss protection
@@ -722,7 +722,7 @@ contract RocketPoolStrategyTest is Test {
 
         // Simulate exchange rate decrease
         uint256 lossExchangeRate = (profitExchangeRate * (100 - lossPercentage)) / 100;
-        vm.mockCall(R_ETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(lossExchangeRate));
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(lossExchangeRate));
 
         // Call report and capture the returned values
         vm.startPrank(keeper);
@@ -774,7 +774,7 @@ contract RocketPoolStrategyTest is Test {
 
         // Generate some profit first to create donation shares for loss protection
         state.newExchangeRate1 = (state.initialExchangeRate * 110) / 100; // 10% profit
-        vm.mockCall(R_ETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(state.newExchangeRate1));
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(state.newExchangeRate1));
 
         vm.startPrank(keeper);
         vault.report(); // Creates donation shares
@@ -801,7 +801,7 @@ contract RocketPoolStrategyTest is Test {
 
         // Generate loss (20% decrease from profit rate)
         state.newExchangeRate2 = (state.newExchangeRate1 * 8001) / 10000; // less than 20% loss
-        vm.mockCall(R_ETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(state.newExchangeRate2));
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(state.newExchangeRate2));
 
         // Report loss
         vm.startPrank(keeper);
@@ -863,7 +863,7 @@ contract RocketPoolStrategyTest is Test {
         // Generate small profit to create minimal donation shares
         uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         uint256 smallProfitRate = (initialExchangeRate * 1005) / 1000; // 0.5% profit
-        vm.mockCall(R_ETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(smallProfitRate));
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(smallProfitRate));
 
         vm.startPrank(keeper);
         vault.report(); // Creates small amount of donation shares
@@ -875,7 +875,7 @@ contract RocketPoolStrategyTest is Test {
 
         // Generate large loss (10% from initial rate)
         uint256 largeLossRate = (initialExchangeRate * 90) / 100;
-        vm.mockCall(R_ETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(largeLossRate));
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(largeLossRate));
 
         vm.startPrank(keeper);
         (uint256 profit, uint256 loss) = vault.report();
@@ -923,7 +923,7 @@ contract RocketPoolStrategyTest is Test {
         // Generate profit to create donation shares
         uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         uint256 profitRate = (initialExchangeRate * 120) / 100; // 20% profit
-        vm.mockCall(R_ETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(profitRate));
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(profitRate));
 
         vm.startPrank(keeper);
         vault.report(); // Creates donation shares
@@ -935,7 +935,7 @@ contract RocketPoolStrategyTest is Test {
 
         // First loss (5% from profit rate)
         uint256 firstLossRate = (profitRate * 95) / 100;
-        vm.mockCall(R_ETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(firstLossRate));
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(firstLossRate));
 
         vm.startPrank(keeper);
         (uint256 profit1, uint256 loss1) = vault.report();
@@ -954,7 +954,7 @@ contract RocketPoolStrategyTest is Test {
 
         // Second consecutive loss (another 5% from current rate)
         uint256 secondLossRate = (firstLossRate * 95) / 100;
-        vm.mockCall(R_ETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(secondLossRate));
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(secondLossRate));
 
         vm.startPrank(keeper);
         (uint256 profit2, uint256 loss2) = vault.report();
@@ -1003,7 +1003,7 @@ contract RocketPoolStrategyTest is Test {
         // Generate loss (5% decrease)
         uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         uint256 lossRate = (initialExchangeRate * 95) / 100;
-        vm.mockCall(R_ETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(lossRate));
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(lossRate));
 
         vm.startPrank(keeper);
         (uint256 profit, uint256 loss) = vault.report();
@@ -1069,7 +1069,7 @@ contract RocketPoolStrategyTest is Test {
         // Generate profit to create donation shares
         state.initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         state.profitRate = (state.initialExchangeRate * (100 + profitPercentage)) / 100;
-        vm.mockCall(R_ETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(state.profitRate));
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(state.profitRate));
 
         vm.startPrank(keeper);
         vault.report(); // Creates donation shares
@@ -1081,7 +1081,7 @@ contract RocketPoolStrategyTest is Test {
 
         // First loss
         state.firstLossRate = (state.profitRate * (100 - firstLossPercentage)) / 100;
-        vm.mockCall(R_ETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(state.firstLossRate));
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(state.firstLossRate));
 
         vm.startPrank(keeper);
         (uint256 profit1, uint256 loss1) = vault.report();
@@ -1100,7 +1100,7 @@ contract RocketPoolStrategyTest is Test {
 
         // Second consecutive loss
         state.secondLossRate = (state.firstLossRate * (100 - secondLossPercentage)) / 100;
-        vm.mockCall(R_ETH, abi.encodeWithSignature("pricePerShare()"), abi.encode(state.secondLossRate));
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(state.secondLossRate));
 
         vm.startPrank(keeper);
         (uint256 profit2, uint256 loss2) = vault.report();
