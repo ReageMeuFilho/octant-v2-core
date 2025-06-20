@@ -5,4 +5,6 @@ interface IYieldSkimmingStrategy {
     function getCurrentExchangeRate() external view returns (uint256);
 
     function getLastRateRay() external view returns (uint256);
+
+    function decimalsOfExchangeRate() external view returns (uint256);
 }

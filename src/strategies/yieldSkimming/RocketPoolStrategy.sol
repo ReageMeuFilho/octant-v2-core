@@ -34,6 +34,14 @@ contract RocketPoolStrategy is BaseYieldSkimmingStrategy {
     {}
 
     /**
+     * @notice Returns the decimals of the exchange rate
+     * @return The decimals of the exchange rate
+     */
+    function decimalsOfExchangeRate() public pure override returns (uint256) {
+        return 18;
+    }
+
+    /**
      * @notice Gets the current exchange rate from the yield vault
      * @return The current price per share
      */

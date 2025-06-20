@@ -3,7 +3,6 @@ pragma solidity ^0.8.0;
 
 import { BaseStrategy } from "src/core/BaseStrategy.sol";
 import { IBaseHealthCheck } from "src/strategies/interfaces/IBaseHealthCheck.sol";
-import { WadRayMath } from "src/utils/libs/Maths/WadRay.sol";
 import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
 import { IYieldSkimmingStrategy } from "src/strategies/yieldSkimming/IYieldSkimmingStrategy.sol";
 
@@ -142,7 +141,7 @@ abstract contract BaseYieldSkimmingHealthCheck is BaseStrategy, IBaseHealthCheck
         _newTotalAssets =
             (ITokenizedStrategy(address(this)).totalAssets() *
                 IYieldSkimmingStrategy(address(this)).getCurrentExchangeRate()) /
-            1e18;
+            10 ** IYieldSkimmingStrategy(address(this)).decimalsOfExchangeRate();
 
         if (_newTotalAssets > currentTotalAssets) {
             require(
