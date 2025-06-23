@@ -15,65 +15,9 @@ import { MockERC20Staking } from "test/mocks/MockERC20Staking.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocationMechanism.sol";
-
-/// @notice Simple mock allocation mechanism for testing RegenStaker contribute function
-contract MockAllocationMechanism {
-    IERC20 public immutable asset;
-    mapping(address => uint256) public votingPower;
-    mapping(address => uint256) public nonces;
-
-    // EIP-2612 constants
-    bytes32 private constant TYPE_HASH =
-        keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
-    bytes32 private constant SIGNUP_TYPEHASH =
-        keccak256("Signup(address user,uint256 deposit,uint256 nonce,uint256 deadline)");
-    string private constant EIP712_VERSION = "1";
-
-    constructor(IERC20 _asset) {
-        asset = _asset;
-    }
-
-    function DOMAIN_SEPARATOR() public view returns (bytes32) {
-        return
-            keccak256(
-                abi.encode(
-                    TYPE_HASH,
-                    keccak256(bytes("Mock Allocation")),
-                    keccak256(bytes(EIP712_VERSION)),
-                    block.chainid,
-                    address(this)
-                )
-            );
-    }
-
-    function signupWithSignature(
-        address user,
-        uint256 deposit,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) external {
-        require(block.timestamp <= deadline, "Expired signature");
-
-        // Verify signature
-        bytes32 structHash = keccak256(abi.encode(SIGNUP_TYPEHASH, user, deposit, nonces[user], deadline));
-        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR(), structHash));
-        address recovered = ecrecover(digest, v, r, s);
-        require(recovered == user, "Invalid signature");
-
-        // Increment nonce
-        nonces[user]++;
-
-        // Transfer tokens from sender (RegenStaker) to this contract
-        if (deposit > 0) {
-            asset.transferFrom(msg.sender, address(this), deposit);
-        }
-
-        // Give voting power to the user
-        votingPower[user] = deposit;
-    }
-}
+import { SimpleVotingMechanism } from "src/mechanisms/mechanism/SimpleVotingMechanism.sol";
+import { AllocationMechanismFactory } from "src/mechanisms/AllocationMechanismFactory.sol";
+import { AllocationConfig } from "src/mechanisms/BaseAllocationMechanism.sol";
 
 /**
  * @title RegenIntegrationTest
@@ -89,6 +33,7 @@ contract RegenIntegrationTest is Test {
     Whitelist earningPowerWhitelist;
     MockERC20 rewardToken;
     MockERC20Staking stakeToken;
+    AllocationMechanismFactory allocationFactory;
 
     uint256 public constant REWARD_AMOUNT_BASE = 30_000_000;
     uint256 public constant STAKE_AMOUNT_BASE = 1_000;
@@ -158,6 +103,8 @@ contract RegenIntegrationTest is Test {
         earningPowerWhitelist = new Whitelist();
 
         calculator = new RegenEarningPowerCalculator(ADMIN, earningPowerWhitelist);
+
+        allocationFactory = new AllocationMechanismFactory();
 
         regenStaker = new RegenStaker(
             IERC20(address(rewardToken)),
@@ -575,7 +522,7 @@ contract RegenIntegrationTest is Test {
 
         uint256 contributorPrivateKey = uint256(keccak256(abi.encodePacked("contributor")));
         address contributor = vm.addr(contributorPrivateKey);
-        address mockAllocationMechanism = _deployMockAllocationMechanism();
+        address allocationMechanism = _deployAllocationMechanism();
 
         whitelistUser(contributor, true, true, true);
 
@@ -595,15 +542,15 @@ contract RegenIntegrationTest is Test {
         regenStaker.pause();
         assertTrue(regenStaker.paused());
 
-        uint256 nonce = MockAllocationMechanism(mockAllocationMechanism).nonces(contributor);
+        uint256 nonce = TokenizedAllocationMechanism(allocationMechanism).nonces(contributor);
         uint256 deadline = block.timestamp + 1 hours;
 
-        bytes32 digest = _getSignupDigest(mockAllocationMechanism, contributor, contributeAmount, nonce, deadline);
+        bytes32 digest = _getSignupDigest(allocationMechanism, contributor, contributeAmount, nonce, deadline);
         (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, contributorPrivateKey);
 
         vm.startPrank(contributor);
         vm.expectRevert(abi.encodeWithSelector(Pausable.EnforcedPause.selector));
-        regenStaker.contribute(depositId, mockAllocationMechanism, contributor, contributeAmount, deadline, v, r, s);
+        regenStaker.contribute(depositId, allocationMechanism, contributor, contributeAmount, deadline, v, r, s);
         vm.stopPrank();
 
         vm.prank(ADMIN);
@@ -2198,7 +2145,7 @@ contract RegenIntegrationTest is Test {
         uint256 deadline
     ) internal view returns (bytes32) {
         bytes32 structHash = keccak256(abi.encode(SIGNUP_TYPEHASH, user, deposit, nonce, deadline));
-        bytes32 domainSeparator = MockAllocationMechanism(allocationMechanism).DOMAIN_SEPARATOR();
+        bytes32 domainSeparator = TokenizedAllocationMechanism(allocationMechanism).DOMAIN_SEPARATOR();
         return keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
     }
 
@@ -2206,10 +2153,21 @@ contract RegenIntegrationTest is Test {
         (v, r, s) = vm.sign(privateKey, digest);
     }
 
-    function _deployMockAllocationMechanism() internal returns (address) {
-        // Deploy a simple mock that implements the interface RegenStaker expects
-        MockAllocationMechanism mock = new MockAllocationMechanism(IERC20(address(rewardToken)));
-        return address(mock);
+    function _deployAllocationMechanism() internal returns (address) {
+        AllocationConfig memory config = AllocationConfig({
+            asset: IERC20(address(rewardToken)),
+            name: "Test Allocation",
+            symbol: "TEST",
+            votingDelay: 1,
+            votingPeriod: 1000,
+            quorumShares: 1e18,
+            timelockDelay: 1 days,
+            gracePeriod: 7 days,
+            startBlock: block.number + 1,
+            owner: address(0) // Will be set by factory
+        });
+
+        return allocationFactory.deploySimpleVotingMechanism(config);
     }
 
     // ============ Contribute Function Tests ============
@@ -2220,7 +2178,10 @@ contract RegenIntegrationTest is Test {
         uint256 rewardAmount = getRewardAmount(10000);
         uint256 contributeAmount = getRewardAmount(100); // Use a smaller, more realistic amount
 
-        address mockAllocationMechanism = _deployMockAllocationMechanism();
+        address allocationMechanism = _deployAllocationMechanism();
+
+        // Advance to allow signup (startBlock + votingDelay period)
+        vm.roll(block.number + 5);
 
         whitelistUser(alice, true, true, true);
 
@@ -2242,19 +2203,23 @@ contract RegenIntegrationTest is Test {
         uint256 unclaimedBefore = regenStaker.unclaimedReward(depositId);
         assertGt(unclaimedBefore, contributeAmount, "Alice should have sufficient unclaimed rewards");
 
-        // Create EIP-2612 signature for MockAllocationMechanism
-        uint256 nonce = MockAllocationMechanism(mockAllocationMechanism).nonces(alice);
+        // Create EIP-2612 signature for TokenizedAllocationMechanism
+        uint256 nonce = TokenizedAllocationMechanism(allocationMechanism).nonces(alice);
         uint256 deadline = block.timestamp + 1 hours;
         uint256 netContribution = contributeAmount; // No fees in this test
 
-        bytes32 digest = _getSignupDigest(mockAllocationMechanism, alice, netContribution, nonce, deadline);
+        bytes32 digest = _getSignupDigest(allocationMechanism, alice, netContribution, nonce, deadline);
         (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, ALICE_PRIVATE_KEY);
 
+        // Give Alice tokens and approve for the expected flow
+        rewardToken.mint(alice, netContribution);
+        vm.startPrank(alice);
+        rewardToken.approve(allocationMechanism, netContribution);
+
         // Call contribute function
-        vm.prank(alice);
         uint256 actualContribution = regenStaker.contribute(
             depositId,
-            mockAllocationMechanism,
+            allocationMechanism,
             alice, // voting delegatee
             contributeAmount,
             deadline,
@@ -2262,6 +2227,7 @@ contract RegenIntegrationTest is Test {
             r,
             s
         );
+        vm.stopPrank();
 
         // Verify results
         assertEq(actualContribution, contributeAmount, "Contribution amount should match");
@@ -2271,15 +2237,17 @@ contract RegenIntegrationTest is Test {
 
         // Verify the allocation mechanism received the contribution
         assertEq(
-            rewardToken.balanceOf(mockAllocationMechanism),
+            rewardToken.balanceOf(allocationMechanism),
             contributeAmount,
             "Allocation mechanism should receive tokens"
         );
 
         // Verify alice has voting power in the allocation mechanism
+        // SimpleVotingMechanism scales voting power to 18 decimals
+        uint256 expectedVotingPower = netContribution * (10 ** (18 - rewardTokenDecimals));
         assertEq(
-            MockAllocationMechanism(mockAllocationMechanism).votingPower(alice),
-            netContribution,
+            TokenizedAllocationMechanism(allocationMechanism).votingPower(alice),
+            expectedVotingPower,
             "Alice should have voting power"
         );
     }
@@ -2301,7 +2269,10 @@ contract RegenIntegrationTest is Test {
 
         uint256 netContribution = contributeAmount - feeAmount;
 
-        address mockAllocationMechanism = _deployMockAllocationMechanism();
+        address allocationMechanism = _deployAllocationMechanism();
+
+        // Advance to allow signup (startBlock + votingDelay period)
+        vm.roll(block.number + 5);
 
         whitelistUser(alice, true, true, true);
 
@@ -2320,19 +2291,23 @@ contract RegenIntegrationTest is Test {
         vm.warp(block.timestamp + regenStaker.rewardDuration());
 
         // Create signature for the net contribution (after fees)
-        uint256 nonce = MockAllocationMechanism(mockAllocationMechanism).nonces(alice);
+        uint256 nonce = TokenizedAllocationMechanism(allocationMechanism).nonces(alice);
         uint256 deadline = block.timestamp + 1 hours;
 
-        bytes32 digest = _getSignupDigest(mockAllocationMechanism, alice, netContribution, nonce, deadline);
+        bytes32 digest = _getSignupDigest(allocationMechanism, alice, netContribution, nonce, deadline);
         (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, ALICE_PRIVATE_KEY);
+
+        // Give Alice tokens and approve for the expected flow
+        rewardToken.mint(alice, netContribution);
+        vm.startPrank(alice);
+        rewardToken.approve(allocationMechanism, netContribution);
 
         uint256 feeCollectorBalanceBefore = rewardToken.balanceOf(feeCollector);
 
         // Call contribute function
-        vm.prank(alice);
         uint256 actualContribution = regenStaker.contribute(
             depositId,
-            mockAllocationMechanism,
+            allocationMechanism,
             alice,
             contributeAmount,
             deadline,
@@ -2340,6 +2315,7 @@ contract RegenIntegrationTest is Test {
             r,
             s
         );
+        vm.stopPrank();
 
         // Verify results
         assertEq(actualContribution, netContribution, "Net contribution should exclude fees");
@@ -2349,13 +2325,15 @@ contract RegenIntegrationTest is Test {
             "Fee collector should receive fees"
         );
         assertEq(
-            rewardToken.balanceOf(mockAllocationMechanism),
+            rewardToken.balanceOf(allocationMechanism),
             netContribution,
             "Allocation mechanism should receive net amount"
         );
+        // SimpleVotingMechanism scales voting power to 18 decimals
+        uint256 expectedVotingPower = netContribution * (10 ** (18 - rewardTokenDecimals));
         assertEq(
-            MockAllocationMechanism(mockAllocationMechanism).votingPower(alice),
-            netContribution,
+            TokenizedAllocationMechanism(allocationMechanism).votingPower(alice),
+            expectedVotingPower,
             "Voting power should be net amount"
         );
     }
@@ -2365,7 +2343,10 @@ contract RegenIntegrationTest is Test {
         uint256 rewardAmount = getRewardAmount(1000); // Larger reward amount to avoid InvalidRewardRate
         uint256 contributeAmount = getRewardAmount(2000); // Try to contribute more than available
 
-        address mockAllocationMechanism = _deployMockAllocationMechanism();
+        address allocationMechanism = _deployAllocationMechanism();
+
+        // Advance to allow signup (startBlock + votingDelay period)
+        vm.roll(block.number + 5);
 
         whitelistUser(alice, true, true, true);
 
@@ -2386,16 +2367,21 @@ contract RegenIntegrationTest is Test {
         uint256 unclaimedAmount = regenStaker.unclaimedReward(depositId);
 
         // Create signature
-        uint256 nonce = TokenizedAllocationMechanism(mockAllocationMechanism).nonces(alice);
+        uint256 nonce = TokenizedAllocationMechanism(allocationMechanism).nonces(alice);
         uint256 deadline = block.timestamp + 1 hours;
 
-        bytes32 digest = _getSignupDigest(mockAllocationMechanism, alice, contributeAmount, nonce, deadline);
+        bytes32 digest = _getSignupDigest(allocationMechanism, alice, contributeAmount, nonce, deadline);
         (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, ALICE_PRIVATE_KEY);
 
+        // Give Alice tokens and approve for the expected flow
+        rewardToken.mint(alice, contributeAmount);
+        vm.startPrank(alice);
+        rewardToken.approve(allocationMechanism, contributeAmount);
+
         // Should revert with CantAfford
-        vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(RegenStaker.CantAfford.selector, contributeAmount, unclaimedAmount));
-        regenStaker.contribute(depositId, mockAllocationMechanism, alice, contributeAmount, deadline, v, r, s);
+        regenStaker.contribute(depositId, allocationMechanism, alice, contributeAmount, deadline, v, r, s);
+        vm.stopPrank();
     }
 
     function test_Contribute_WithSignature_RevertIfNotWhitelisted() public {
@@ -2403,7 +2389,10 @@ contract RegenIntegrationTest is Test {
         uint256 rewardAmount = getRewardAmount(10000);
         uint256 contributeAmount = getRewardAmount(100);
 
-        address mockAllocationMechanism = _deployMockAllocationMechanism();
+        address allocationMechanism = _deployAllocationMechanism();
+
+        // Advance to allow signup (startBlock + votingDelay period)
+        vm.roll(block.number + 5);
 
         // Don't whitelist alice for contribution (only for staking)
         whitelistUser(alice, true, false, true);
@@ -2423,18 +2412,22 @@ contract RegenIntegrationTest is Test {
         vm.warp(block.timestamp + regenStaker.rewardDuration());
 
         // Create signature
-        uint256 nonce = TokenizedAllocationMechanism(mockAllocationMechanism).nonces(alice);
+        uint256 nonce = TokenizedAllocationMechanism(allocationMechanism).nonces(alice);
         uint256 deadline = block.timestamp + 1 hours;
 
-        bytes32 digest = _getSignupDigest(mockAllocationMechanism, alice, contributeAmount, nonce, deadline);
+        bytes32 digest = _getSignupDigest(allocationMechanism, alice, contributeAmount, nonce, deadline);
         (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, ALICE_PRIVATE_KEY);
 
-        // Should revert with NotWhitelisted
+        // Give Alice tokens and approve for the expected flow
+        rewardToken.mint(alice, contributeAmount);
         vm.startPrank(alice);
+        rewardToken.approve(allocationMechanism, contributeAmount);
+
+        // Should revert with NotWhitelisted
         vm.expectRevert(
             abi.encodeWithSelector(RegenStaker.NotWhitelisted.selector, regenStaker.contributionWhitelist(), alice)
         );
-        regenStaker.contribute(depositId, mockAllocationMechanism, alice, contributeAmount, deadline, v, r, s);
+        regenStaker.contribute(depositId, allocationMechanism, alice, contributeAmount, deadline, v, r, s);
         vm.stopPrank();
     }
 
@@ -2443,7 +2436,10 @@ contract RegenIntegrationTest is Test {
         uint256 rewardAmount = getRewardAmount(10000);
         uint256 contributeAmount = getRewardAmount(100);
 
-        address mockAllocationMechanism = _deployMockAllocationMechanism();
+        address allocationMechanism = _deployAllocationMechanism();
+
+        // Advance to allow signup (startBlock + votingDelay period)
+        vm.roll(block.number + 5);
 
         whitelistUser(alice, true, true, true);
 
@@ -2466,16 +2462,21 @@ contract RegenIntegrationTest is Test {
         regenStaker.pause();
 
         // Create signature
-        uint256 nonce = TokenizedAllocationMechanism(mockAllocationMechanism).nonces(alice);
+        uint256 nonce = TokenizedAllocationMechanism(allocationMechanism).nonces(alice);
         uint256 deadline = block.timestamp + 1 hours;
 
-        bytes32 digest = _getSignupDigest(mockAllocationMechanism, alice, contributeAmount, nonce, deadline);
+        bytes32 digest = _getSignupDigest(allocationMechanism, alice, contributeAmount, nonce, deadline);
         (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, ALICE_PRIVATE_KEY);
 
+        // Give Alice tokens and approve for the expected flow
+        rewardToken.mint(alice, contributeAmount);
+        vm.startPrank(alice);
+        rewardToken.approve(allocationMechanism, contributeAmount);
+
         // Should revert with EnforcedPause
-        vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(Pausable.EnforcedPause.selector));
-        regenStaker.contribute(depositId, mockAllocationMechanism, alice, contributeAmount, deadline, v, r, s);
+        regenStaker.contribute(depositId, allocationMechanism, alice, contributeAmount, deadline, v, r, s);
+        vm.stopPrank();
     }
 
     function test_Contribute_WithSignature_ExpiredDeadline() public {
@@ -2483,7 +2484,10 @@ contract RegenIntegrationTest is Test {
         uint256 rewardAmount = getRewardAmount(10000);
         uint256 contributeAmount = getRewardAmount(100);
 
-        address mockAllocationMechanism = _deployMockAllocationMechanism();
+        address allocationMechanism = _deployAllocationMechanism();
+
+        // Advance to allow signup (startBlock + votingDelay period)
+        vm.roll(block.number + 5);
 
         whitelistUser(alice, true, true, true);
 
@@ -2502,15 +2506,20 @@ contract RegenIntegrationTest is Test {
         vm.warp(block.timestamp + regenStaker.rewardDuration());
 
         // Create signature with expired deadline
-        uint256 nonce = TokenizedAllocationMechanism(mockAllocationMechanism).nonces(alice);
+        uint256 nonce = TokenizedAllocationMechanism(allocationMechanism).nonces(alice);
         uint256 deadline = block.timestamp - 1; // Expired
 
-        bytes32 digest = _getSignupDigest(mockAllocationMechanism, alice, contributeAmount, nonce, deadline);
+        bytes32 digest = _getSignupDigest(allocationMechanism, alice, contributeAmount, nonce, deadline);
         (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, ALICE_PRIVATE_KEY);
 
+        // Give Alice tokens and approve for the expected flow
+        rewardToken.mint(alice, contributeAmount);
+        vm.startPrank(alice);
+        rewardToken.approve(allocationMechanism, contributeAmount);
+
         // Should revert with ExpiredSignature from TokenizedAllocationMechanism
-        vm.prank(alice);
         vm.expectRevert(); // The exact error will be from TokenizedAllocationMechanism
-        regenStaker.contribute(depositId, mockAllocationMechanism, alice, contributeAmount, deadline, v, r, s);
+        regenStaker.contribute(depositId, allocationMechanism, alice, contributeAmount, deadline, v, r, s);
+        vm.stopPrank();
     }
 }
