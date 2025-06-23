@@ -89,6 +89,7 @@ contract RegenStaker is
     error CompoundingNotSupported();
     error CannotRaiseMinimumStakeAmountDuringActiveReward();
     error ZeroOperation();
+    error NoOperation();
 
     modifier onlyWhitelistedIfWhitelistIsSet(IWhitelist _whitelist, address _user) {
         if (_whitelist != IWhitelist(address(0)) && !_whitelist.isWhitelisted(_user)) {
@@ -185,6 +186,7 @@ contract RegenStaker is
     /// @notice For admin use only.
     /// @param _stakerWhitelist The whitelist to set.
     function setStakerWhitelist(Whitelist _stakerWhitelist) external {
+        require(stakerWhitelist != _stakerWhitelist, NoOperation());
         _revertIfNotAdmin();
         emit StakerWhitelistSet(_stakerWhitelist);
         stakerWhitelist = _stakerWhitelist;
@@ -194,6 +196,7 @@ contract RegenStaker is
     /// @notice For admin use only.
     /// @param _contributionWhitelist The whitelist to set.
     function setContributionWhitelist(Whitelist _contributionWhitelist) external {
+        require(contributionWhitelist != _contributionWhitelist, NoOperation());
         _revertIfNotAdmin();
         emit ContributionWhitelistSet(_contributionWhitelist);
         contributionWhitelist = _contributionWhitelist;
