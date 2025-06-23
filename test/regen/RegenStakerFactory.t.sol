@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import { Test } from "forge-std/Test.sol";
 import { console } from "forge-std/console.sol";
 import { RegenStakerFactory } from "src/factories/RegenStakerFactory.sol";
-import { RegenStaker } from "src/regen/RegenStaker.sol";
+import { ProxyableRegenStaker } from "src/regen/ProxyableRegenStaker.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC20Staking } from "staker/interfaces/IERC20Staking.sol";
 import { IWhitelist } from "src/utils/IWhitelist.sol";
@@ -16,6 +16,7 @@ import { MockEarningPowerCalculator } from "test/mocks/MockEarningPowerCalculato
 
 contract RegenStakerFactoryTest is Test {
     RegenStakerFactory public factory;
+    ProxyableRegenStaker public implementation;
 
     IERC20 public rewardsToken;
     IERC20Staking public stakeToken;
@@ -49,7 +50,8 @@ contract RegenStakerFactoryTest is Test {
         contributionWhitelist = new Whitelist();
         allocationMechanismWhitelist = new Whitelist();
 
-        factory = new RegenStakerFactory();
+        implementation = new ProxyableRegenStaker();
+        factory = new RegenStakerFactory(address(implementation));
 
         vm.label(address(factory), "RegenStakerFactory");
         vm.label(address(rewardsToken), "RewardsToken");
@@ -57,10 +59,6 @@ contract RegenStakerFactoryTest is Test {
         vm.label(admin, "Admin");
         vm.label(deployer1, "Deployer1");
         vm.label(deployer2, "Deployer2");
-    }
-
-    function getRegenStakerBytecode() internal pure returns (bytes memory) {
-        return type(RegenStaker).creationCode;
     }
 
     function testCreateStaker() public {
@@ -87,16 +85,15 @@ contract RegenStakerFactoryTest is Test {
                 minimumStakeAmount: MINIMUM_STAKE_AMOUNT,
                 rewardDuration: REWARD_DURATION
             }),
-            salt,
-            getRegenStakerBytecode()
+            salt
         );
         vm.stopPrank();
 
         assertTrue(stakerAddress != address(0), "Staker address should not be zero");
 
-        RegenStaker staker = RegenStaker(stakerAddress);
-        assertEq(address(staker.REWARD_TOKEN()), address(rewardsToken), "Rewards token should be set correctly");
-        assertEq(address(staker.STAKE_TOKEN()), address(stakeToken), "Stake token should be set correctly");
+        ProxyableRegenStaker staker = ProxyableRegenStaker(stakerAddress);
+        assertEq(address(staker.getRewardToken()), address(rewardsToken), "Rewards token should be set correctly");
+        assertEq(address(staker.getStakeToken()), address(stakeToken), "Stake token should be set correctly");
         assertEq(staker.minimumStakeAmount(), MINIMUM_STAKE_AMOUNT, "Minimum stake amount should be set correctly");
     }
 
@@ -119,8 +116,7 @@ contract RegenStakerFactoryTest is Test {
                 minimumStakeAmount: MINIMUM_STAKE_AMOUNT,
                 rewardDuration: REWARD_DURATION
             }),
-            salt1,
-            getRegenStakerBytecode()
+            salt1
         );
 
         address secondStaker = factory.createStaker(
@@ -137,8 +133,7 @@ contract RegenStakerFactoryTest is Test {
                 minimumStakeAmount: MINIMUM_STAKE_AMOUNT + 50e18,
                 rewardDuration: REWARD_DURATION
             }),
-            salt2,
-            getRegenStakerBytecode()
+            salt2
         );
         vm.stopPrank();
 
@@ -164,8 +159,7 @@ contract RegenStakerFactoryTest is Test {
                 minimumStakeAmount: MINIMUM_STAKE_AMOUNT,
                 rewardDuration: REWARD_DURATION
             }),
-            salt1,
-            getRegenStakerBytecode()
+            salt1
         );
 
         vm.prank(deployer2);
@@ -183,8 +177,7 @@ contract RegenStakerFactoryTest is Test {
                 minimumStakeAmount: MINIMUM_STAKE_AMOUNT,
                 rewardDuration: REWARD_DURATION
             }),
-            salt2,
-            getRegenStakerBytecode()
+            salt2
         );
 
         assertTrue(staker1 != staker2, "Stakers should have different addresses");
@@ -211,8 +204,7 @@ contract RegenStakerFactoryTest is Test {
                 minimumStakeAmount: MINIMUM_STAKE_AMOUNT,
                 rewardDuration: REWARD_DURATION
             }),
-            salt,
-            getRegenStakerBytecode()
+            salt
         );
 
         assertEq(predictedAddress, actualAddress, "Predicted address should match actual address");
@@ -236,13 +228,12 @@ contract RegenStakerFactoryTest is Test {
                 minimumStakeAmount: MINIMUM_STAKE_AMOUNT,
                 rewardDuration: REWARD_DURATION
             }),
-            salt,
-            getRegenStakerBytecode()
+            salt
         );
 
         assertTrue(stakerAddress != address(0), "Staker should be created with null whitelists");
 
-        RegenStaker staker = RegenStaker(stakerAddress);
+        ProxyableRegenStaker staker = ProxyableRegenStaker(stakerAddress);
         assertEq(
             address(staker.stakerWhitelist()),
             address(0),

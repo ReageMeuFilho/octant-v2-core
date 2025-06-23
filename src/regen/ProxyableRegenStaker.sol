@@ -9,6 +9,7 @@ pragma solidity ^0.8.0;
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 import { EIP712 } from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
 // Staker Library Imports
 import { IERC20Staking } from "staker/interfaces/IERC20Staking.sol";
@@ -22,9 +23,10 @@ import { Whitelist } from "src/utils/Whitelist.sol";
 import { IWhitelist } from "src/utils/IWhitelist.sol";
 import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocationMechanism.sol";
 
-/// @title RegenStaker
+/// @title ProxyableRegenStaker
 /// @author [Golem Foundation](https://golem.foundation)
-/// @notice This contract is an extended version of the Staker contract by [ScopeLift](https://scopelift.co).
+/// @notice This contract is a proxy-compatible version of RegenStaker designed for minimal proxy pattern
+/// @notice Uses storage variables for reward token, stake token, and max claim fee instead of immutable variables
 /// @notice The reward duration can be configured by the admin, overriding the base Staker's constant value.
 /// @notice You can tax the rewards with a claim fee. If you don't want rewards to be taxable, set MAX_CLAIM_FEE to 0.
 /// @notice Earning power needs to be updated after deposit amount changes. Some changes are automatically triggering the update.
@@ -34,13 +36,15 @@ import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocation
 /// @dev SCALE_FACTOR (1e36) is inherited from base Staker and used to minimize precision loss in reward calculations by scaling up values before division.
 /// @dev Earning power is capped at uint96.max (~7.9e28) to prevent overflow in reward calculations while still supporting extremely large values.
 /// @dev This contract uses the surrogate pattern from base Staker: tokens are transferred to surrogate contracts that delegate voting power to the designated delegatee.
-contract RegenStaker is
+/// @dev Storage variables replace immutable variables from base Staker to enable proxy compatibility
+contract ProxyableRegenStaker is
     Staker,
     StakerDelegateSurrogateVotes,
     StakerPermitAndStake,
     StakerOnBehalf,
     Pausable,
-    ReentrancyGuard
+    ReentrancyGuard,
+    Initializable
 {
     using SafeCast for uint256;
 
@@ -52,7 +56,12 @@ contract RegenStaker is
     IWhitelist public contributionWhitelist;
     IWhitelist public allocationMechanismWhitelist;
 
-    uint256 public minimumStakeAmount = 0;
+    uint256 public minimumStakeAmount;
+
+    // Storage variables to replace immutable variables from base Staker
+    IERC20 private rewardTokenStorage;
+    IERC20 private stakeTokenStorage;
+    uint256 private maxClaimFeeStorage;
 
     event StakerWhitelistSet(IWhitelist indexed whitelist);
     event ContributionWhitelistSet(IWhitelist indexed whitelist);
@@ -91,39 +100,64 @@ contract RegenStaker is
         _;
     }
 
-    /// @notice Constructor for the RegenStaker contract.
-    /// @param _rewardsToken The token that will be used to reward contributors.
+    /// @notice Constructor for the implementation contract (master copy)
+    /// @dev This sets placeholder values for immutable variables in the implementation
+    /// @dev Real values are set via storage variables when creating clones
+    constructor()
+        Staker(
+            IERC20(address(1)), // non-zero placeholder to avoid immutable assignment error
+            IERC20Staking(address(1)), // non-zero placeholder to avoid immutable assignment error
+            IEarningPowerCalculator(address(1)), // non-zero placeholder to avoid immutable assignment error
+            0, // placeholder maxBumpTip
+            address(1) // non-zero placeholder admin
+        )
+        StakerPermitAndStake(IERC20Staking(address(1))) // non-zero placeholder
+        StakerDelegateSurrogateVotes(IERC20Staking(address(1))) // non-zero placeholder
+        EIP712("ProxyableRegenStaker", "1")
+    {
+        _disableInitializers();
+    }
+
+    /// @notice Initialize the proxy instance
+    /// @param _rewardToken The token that will be used to reward contributors.
     /// @param _stakeToken The token that will be used to stake.
+    /// @param _maxClaimFee The maximum claim fee.
     /// @param _admin The address of the admin. TRUSTED.
     /// @param _stakerWhitelist The whitelist for stakers. Can be address(0) to disable whitelisting.
     /// @param _contributionWhitelist The whitelist for contributors. Can be address(0) to disable whitelisting.
     /// @param _allocationMechanismWhitelist The whitelist for allocation mechanisms.
     /// @param _earningPowerCalculator The earning power calculator.
     /// @param _maxBumpTip The maximum bump tip.
-    /// @param _maxClaimFee The maximum claim fee. You can set fees between 0 and _maxClaimFee. _maxClaimFee cannot be changed after deployment.
+    /// @param _minimumStakeAmount The minimum stake amount.
     /// @param _rewardDuration The duration over which rewards are distributed.
-    constructor(
-        IERC20 _rewardsToken,
-        IERC20Staking _stakeToken,
+    function initialize(
+        IERC20 _rewardToken,
+        IERC20 _stakeToken,
+        uint256 _maxClaimFee,
         address _admin,
         IWhitelist _stakerWhitelist,
         IWhitelist _contributionWhitelist,
         IWhitelist _allocationMechanismWhitelist,
         IEarningPowerCalculator _earningPowerCalculator,
         uint256 _maxBumpTip,
-        uint256 _maxClaimFee,
         uint256 _minimumStakeAmount,
         uint256 _rewardDuration
-    )
-        Staker(_rewardsToken, _stakeToken, _earningPowerCalculator, _maxBumpTip, _admin)
-        StakerPermitAndStake(_stakeToken)
-        StakerDelegateSurrogateVotes(_stakeToken)
-        EIP712("RegenStaker", "1")
-    {
+    ) external initializer {
         require(
             _rewardDuration >= MIN_REWARD_DURATION && _rewardDuration <= MAX_REWARD_DURATION,
             InvalidRewardDuration(_rewardDuration)
         );
+
+        // Set storage variables that replace immutable variables
+        rewardTokenStorage = _rewardToken;
+        stakeTokenStorage = _stakeToken;
+        maxClaimFeeStorage = _maxClaimFee;
+
+        // Initialize parent contracts
+        _setAdmin(_admin);
+        _setMaxBumpTip(_maxBumpTip);
+        _setEarningPowerCalculator(address(_earningPowerCalculator));
+
         rewardDuration = _rewardDuration;
         emit RewardDurationSet(_rewardDuration);
 
@@ -131,9 +165,46 @@ contract RegenStaker is
         contributionWhitelist = _contributionWhitelist;
         allocationMechanismWhitelist = _allocationMechanismWhitelist;
 
-        MAX_CLAIM_FEE = _maxClaimFee;
         _setClaimFeeParameters(ClaimFeeParameters({ feeAmount: 0, feeCollector: address(0) }));
         minimumStakeAmount = _minimumStakeAmount;
+    }
+
+    /// @notice Get the reward token from storage
+    /// @dev Returns the proxy's reward token, overriding base Staker's immutable version
+    function getRewardToken() public view returns (IERC20) {
+        return rewardTokenStorage;
+    }
+
+    /// @notice Get the stake token from storage
+    /// @dev Returns the proxy's stake token, overriding base Staker's immutable version
+    function getStakeToken() public view returns (IERC20) {
+        return stakeTokenStorage;
+    }
+
+    /// @notice Get the max claim fee from storage
+    /// @dev Returns the proxy's max claim fee, overriding base Staker's immutable version
+    function getMaxClaimFee() public view returns (uint256) {
+        return maxClaimFeeStorage;
+    }
+
+    /// @notice Override to use storage variable for max claim fee validation
+    function _setClaimFeeParameters(ClaimFeeParameters memory _params) internal override {
+        if (_params.feeAmount > getMaxClaimFee() || (_params.feeCollector == address(0) && _params.feeAmount > 0))
+            revert Staker__InvalidClaimFeeParameters();
+
+        emit ClaimFeeParametersSet(
+            claimFeeParameters.feeAmount,
+            _params.feeAmount,
+            claimFeeParameters.feeCollector,
+            _params.feeCollector
+        );
+
+        claimFeeParameters = _params;
+    }
+
+    /// @notice Override to use storage variable for stake token transfers
+    function _stakeTokenSafeTransferFrom(address _from, address _to, uint256 _value) internal override {
+        SafeERC20.safeTransferFrom(getStakeToken(), _from, _to, _value);
     }
 
     /// @notice Sets the reward duration for future reward notifications
@@ -172,7 +243,7 @@ contract RegenStaker is
         if (scaledRewardRate < SCALE_FACTOR) revert Staker__InvalidRewardRate();
 
         // slither-disable-next-line divide-before-multiply
-        if ((scaledRewardRate * rewardDuration) > (REWARD_TOKEN.balanceOf(address(this)) * SCALE_FACTOR))
+        if ((scaledRewardRate * rewardDuration) > (getRewardToken().balanceOf(address(this)) * SCALE_FACTOR))
             revert Staker__InsufficientRewardBalance();
 
         emit RewardNotified(_amount, msg.sender);
@@ -253,7 +324,7 @@ contract RegenStaker is
         onlyWhitelistedIfWhitelistIsSet(stakerWhitelist, msg.sender)
         returns (uint256 compoundedAmount)
     {
-        if (address(REWARD_TOKEN) != address(STAKE_TOKEN)) {
+        if (address(getRewardToken()) != address(getStakeToken())) {
             revert CompoundingNotSupported();
         }
 
@@ -276,7 +347,7 @@ contract RegenStaker is
         uint256 fee = feeParams.feeAmount;
 
         if (unclaimedAmount < fee) {
-            return 0; // Not enough to pay fee
+            return 0;
         }
 
         compoundedAmount = unclaimedAmount - fee;
@@ -293,10 +364,10 @@ contract RegenStaker is
         deposit.scaledUnclaimedRewardCheckpoint = 0;
 
         if (fee > 0) {
-            SafeERC20.safeTransfer(REWARD_TOKEN, feeParams.feeCollector, fee);
+            SafeERC20.safeTransfer(getRewardToken(), feeParams.feeCollector, fee);
         }
 
-        SafeERC20.safeTransfer(STAKE_TOKEN, address(surrogates(depositDelegatee)), compoundedAmount);
+        SafeERC20.safeTransfer(getStakeToken(), address(surrogates(depositDelegatee)), compoundedAmount);
 
         emit RewardCompounded(_depositId, msg.sender, compoundedAmount, newBalance, newEarningPower);
 
@@ -370,7 +441,7 @@ contract RegenStaker is
 
         emit RewardClaimed(_depositId, msg.sender, amountContributedToAllocationMechanism, deposit.earningPower);
 
-        SafeERC20.forceApprove(REWARD_TOKEN, _allocationMechanismAddress, amountContributedToAllocationMechanism);
+        SafeERC20.forceApprove(getRewardToken(), _allocationMechanismAddress, amountContributedToAllocationMechanism);
 
         emit RewardContributed(
             _depositId,
@@ -388,10 +459,10 @@ contract RegenStaker is
             _s
         );
 
-        SafeERC20.forceApprove(REWARD_TOKEN, _allocationMechanismAddress, 0);
+        SafeERC20.forceApprove(getRewardToken(), _allocationMechanismAddress, 0);
 
         if (fee > 0) {
-            SafeERC20.safeTransfer(REWARD_TOKEN, claimFeeParameters.feeCollector, fee);
+            SafeERC20.safeTransfer(getRewardToken(), claimFeeParameters.feeCollector, fee);
         }
 
         return amountContributedToAllocationMechanism;
@@ -471,14 +542,48 @@ contract RegenStaker is
     }
 
     /// @inheritdoc Staker
-    /// @notice Overrides to prevent pushing the amount below the minimum stake amount.
+    /// @notice Overrides to use storage variables and prevent pushing amount below minimum stake
     /// @notice Overrides to prevent claiming when the contract is paused.
     function _claimReward(
         DepositIdentifier _depositId,
         Deposit storage deposit,
         address _claimer
     ) internal override whenNotPaused nonReentrant returns (uint256) {
-        uint256 _payout = super._claimReward(_depositId, deposit, _claimer);
+        _checkpointGlobalReward();
+        _checkpointReward(deposit);
+
+        uint256 _reward = deposit.scaledUnclaimedRewardCheckpoint / SCALE_FACTOR;
+        uint256 _feeAmount = claimFeeParameters.feeAmount;
+
+        // Intentionally reverts due to overflow if unclaimed rewards are less than fee.
+        uint256 _payout = _reward - _feeAmount;
+        if (_payout == 0) return 0;
+
+        // retain sub-wei dust that would be left due to the precision loss
+        // slither-disable-next-line divide-before-multiply
+        deposit.scaledUnclaimedRewardCheckpoint = deposit.scaledUnclaimedRewardCheckpoint - (_reward * SCALE_FACTOR);
+
+        uint256 _newEarningPower = earningPowerCalculator.getEarningPower(
+            deposit.balance,
+            deposit.owner,
+            deposit.delegatee
+        );
+
+        emit RewardClaimed(_depositId, _claimer, _payout, _newEarningPower);
+
+        totalEarningPower = _calculateTotalEarningPower(deposit.earningPower, _newEarningPower, totalEarningPower);
+        depositorTotalEarningPower[deposit.owner] = _calculateTotalEarningPower(
+            deposit.earningPower,
+            _newEarningPower,
+            depositorTotalEarningPower[deposit.owner]
+        );
+        deposit.earningPower = _newEarningPower.toUint96();
+
+        SafeERC20.safeTransfer(getRewardToken(), _claimer, _payout);
+        if (_feeAmount > 0) {
+            SafeERC20.safeTransfer(getRewardToken(), claimFeeParameters.feeCollector, _feeAmount);
+        }
+
         _revertIfMinimumStakeAmountNotMet(_depositId);
         return _payout;
     }
