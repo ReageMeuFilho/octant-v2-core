@@ -97,25 +97,6 @@ contract RegenStaker is
         _;
     }
 
-    /// @notice Internal helper to initialize a whitelist, deploying a new one if needed
-    /// @param _whitelist The whitelist address, or address(0) to deploy a new one
-    /// @param _type The type of whitelist for event emission
-    /// @param _admin The admin address to transfer ownership to
-    /// @return The initialized whitelist contract
-    function _initializeWhitelist(
-        IWhitelist _whitelist,
-        string memory _type,
-        address _admin
-    ) private returns (IWhitelist) {
-        if (address(_whitelist) == address(0)) {
-            Whitelist newWhitelist = new Whitelist();
-            emit WhitelistDeployed(address(newWhitelist), _type);
-            Ownable(address(newWhitelist)).transferOwnership(_admin);
-            return newWhitelist;
-        }
-        return _whitelist;
-    }
-
     /// @notice Constructor for the RegenStaker contract.
     /// @param _rewardsToken The token that will be used to reward contributors.
     /// @param _stakeToken The token that will be used to stake.
@@ -150,8 +131,8 @@ contract RegenStaker is
         rewardDuration = _rewardDuration;
         emit RewardDurationSet(_rewardDuration);
 
-        stakerWhitelist = _initializeWhitelist(_stakerWhitelist, "staker", _admin);
-        contributionWhitelist = _initializeWhitelist(_contributionWhitelist, "contribution", _admin);
+        stakerWhitelist = _stakerWhitelist;
+        contributionWhitelist = _contributionWhitelist;
 
         MAX_CLAIM_FEE = _maxClaimFee;
         _setClaimFeeParameters(ClaimFeeParameters({ feeAmount: 0, feeCollector: address(0) }));
