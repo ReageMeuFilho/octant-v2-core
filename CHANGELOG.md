@@ -1,5 +1,39 @@
 
 
+## [0.3.0-develop.1](https://github.com/golemfoundation/octant-v2-core/compare/v0.3.0-develop.0...v0.3.0-develop.1) (2025-06-23)
+
+
+### Features
+
+* **allowance:** add abstract executor with test implementation ([e15ae52](https://github.com/golemfoundation/octant-v2-core/commit/e15ae523395f4f6b2b38a553a38edcd3cfe9d05c))
+* **allowance:** add abstract executor with test implementation ([ac14cf4](https://github.com/golemfoundation/octant-v2-core/commit/ac14cf48463c541d5eb39640c2873a2f420e5e91))
+* **allowance:** add emergency revoke allowance functionality ([ee6011f](https://github.com/golemfoundation/octant-v2-core/commit/ee6011f39e23fc54c036077e5321a450691aa806))
+* **allowance:** add emergency revoke allowance functionality ([24c13c1](https://github.com/golemfoundation/octant-v2-core/commit/24c13c16119216a34b7e47c0d3776daf684af79c))
+* **auth:** add EIP712 signature support for signup and voting ([b3d28f0](https://github.com/golemfoundation/octant-v2-core/commit/b3d28f0f3d5119709da1b4e2acac80d4d908176e))
+* create BaseYieldSkimmingHealthCheck ([a12a6a5](https://github.com/golemfoundation/octant-v2-core/commit/a12a6a51b4026e3a77b61aed8e0853d1e32a597e))
+* create BaseYieldSkimmingStrategy ([d424a39](https://github.com/golemfoundation/octant-v2-core/commit/d424a39e2155f235c8d1e4501085849df121899f))
+* create batch functions in LinearAllowanceSingletonForGnosisSafe ([afce643](https://github.com/golemfoundation/octant-v2-core/commit/afce643ce4a409045b562663cb4e8a45a6a0af2c))
+* create getMaxWithdrawableAmount() in LinearAllowanceSingletonForGnosisSafe ([86f7c74](https://github.com/golemfoundation/octant-v2-core/commit/86f7c7491ea34f62d88d16a422d92797687ecf39))
+* create RocketPoolStrategy ([d9b80ed](https://github.com/golemfoundation/octant-v2-core/commit/d9b80edc84ec5b881a0117db1a87fdda3649e915))
+* create RocketPoolStrategyVaultFactory ([317ee74](https://github.com/golemfoundation/octant-v2-core/commit/317ee74ae16dc5b7e8b419e6ba74f0be9c5b23e6))
+* **husky:** add slither check ([3e3b45b](https://github.com/golemfoundation/octant-v2-core/commit/3e3b45b28b63afd33c2455cddcbaa7da645e85e1))
+* introduce 2 steps donationAddress change ([3804d4a](https://github.com/golemfoundation/octant-v2-core/commit/3804d4a61b586f0aaa72d050b8794c70b608d2c6))
+* **mechanisms:** implement tokenized allocation pattern using Yearn V3 style proxy ([61f0740](https://github.com/golemfoundation/octant-v2-core/commit/61f074060b274284ce77c669627b16a9116ff48b))
+* **regen:** compounding ([8bdf9cd](https://github.com/golemfoundation/octant-v2-core/commit/8bdf9cde2da773254952adf047eaff6d58814c80))
+* **security:** add zero address validation for allowance module ([19663f4](https://github.com/golemfoundation/octant-v2-core/commit/19663f470eb82714579da8e75d42aa229c361d60))
+
+
+### Bug Fixes
+
+* **allowance:** check post condition of beneficiary as a signal of success ([595ee3f](https://github.com/golemfoundation/octant-v2-core/commit/595ee3f8e2ccc5d21a1be2fa45ab2c589f3dc994))
+* **allowance:** fix all the findings and more, refactor and cleanup ([877efef](https://github.com/golemfoundation/octant-v2-core/commit/877efef01398400869bbdbce1eadc269a9b11f9f))
+* **allowance:** handle uint160 overflow in drip rate calculation ([da33177](https://github.com/golemfoundation/octant-v2-core/commit/da33177c64605ad4a12b2ee00fab9744e8803e74))
+* **allowance:** linter ([87f497a](https://github.com/golemfoundation/octant-v2-core/commit/87f497a193267c5d0e13da3844d64500430c03ef))
+* **allowance:** prevent precision loss and zero transfer exploits ([f0e86e4](https://github.com/golemfoundation/octant-v2-core/commit/f0e86e4ad0766a0593bc82caeaa0846b02c71755))
+* **allowance:** rebase issues about data types ([d4a21d8](https://github.com/golemfoundation/octant-v2-core/commit/d4a21d8ece020f474411cde77b7224223c339d77))
+* **allowance:** struct packing and drip rate ceiling ([dc7be4c](https://github.com/golemfoundation/octant-v2-core/commit/dc7be4ce1e35a5c79e511a62cdcf47fa93700ca7))
+* **test:** cast to correct type ([fd3caf9](https://github.com/golemfoundation/octant-v2-core/commit/fd3caf925b98a0fafe0712efe616f35ae89865bd))
+
 ## [0.3.0-develop.0](https://github.com/golemfoundation/octant-v2-core/compare/v0.2.5-develop.0...v0.3.0-develop.0) (2025-06-11)
 
 
