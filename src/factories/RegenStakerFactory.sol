@@ -23,20 +23,21 @@ contract RegenStakerFactory {
     event StakerDeploy(address indexed deployer, address indexed admin, address indexed stakerAddress, bytes32 salt);
 
     function createStaker(CreateStakerParams calldata p, bytes32 s, bytes calldata code) external returns (address a) {
+        bytes memory constructorParams = abi.encode(
+            p.rewardsToken,
+            p.stakeToken,
+            p.admin,
+            p.stakerWhitelist,
+            p.contributionWhitelist,
+            p.earningPowerCalculator,
+            p.maxBumpTip,
+            p.maxClaimFee,
+            p.minimumStakeAmount,
+            p.rewardDuration
+        );
+
         a = CREATE3.deployDeterministic(
-            abi.encode(
-                code,
-                p.rewardsToken,
-                p.stakeToken,
-                p.admin,
-                p.stakerWhitelist,
-                p.contributionWhitelist,
-                p.earningPowerCalculator,
-                p.maxBumpTip,
-                p.maxClaimFee,
-                p.minimumStakeAmount,
-                p.rewardDuration
-            ),
+            bytes.concat(code, constructorParams),
             keccak256(abi.encodePacked(s, msg.sender))
         );
         emit StakerDeploy(msg.sender, p.admin, a, s);
