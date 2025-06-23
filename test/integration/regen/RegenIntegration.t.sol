@@ -30,6 +30,7 @@ contract RegenIntegrationTest is Test {
     RegenEarningPowerCalculator calculator;
     Whitelist stakerWhitelist;
     Whitelist contributorWhitelist;
+    Whitelist allocationMechanismWhitelist;
     Whitelist earningPowerWhitelist;
     MockERC20 rewardToken;
     MockERC20Staking stakeToken;
@@ -88,6 +89,11 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
     }
 
+    function whitelistAllocationMechanism(address allocationMechanism) internal {
+        vm.prank(ADMIN);
+        allocationMechanismWhitelist.addToWhitelist(allocationMechanism);
+    }
+
     function setUp() public virtual {
         rewardTokenDecimals = uint8(bound(vm.randomUint(), 6, 18));
         stakeTokenDecimals = uint8(bound(vm.randomUint(), 6, 18));
@@ -100,6 +106,7 @@ contract RegenIntegrationTest is Test {
 
         stakerWhitelist = new Whitelist();
         contributorWhitelist = new Whitelist();
+        allocationMechanismWhitelist = new Whitelist();
         earningPowerWhitelist = new Whitelist();
 
         calculator = new RegenEarningPowerCalculator(ADMIN, earningPowerWhitelist);
@@ -112,7 +119,7 @@ contract RegenIntegrationTest is Test {
             ADMIN,
             stakerWhitelist,
             contributorWhitelist,
-            stakerWhitelist,
+            allocationMechanismWhitelist,
             calculator,
             MAX_BUMP_TIP,
             MAX_CLAIM_FEE,
@@ -143,7 +150,7 @@ contract RegenIntegrationTest is Test {
             ADMIN,
             IWhitelist(address(0)),
             IWhitelist(address(0)),
-            stakerWhitelist,
+            allocationMechanismWhitelist,
             calculator,
             tipAmount,
             feeAmount,
@@ -194,7 +201,7 @@ contract RegenIntegrationTest is Test {
             ADMIN,
             providedStakerWhitelist,
             providedContributorWhitelist,
-            stakerWhitelist,
+            allocationMechanismWhitelist,
             calculator,
             tipAmount,
             feeAmount,
@@ -1614,7 +1621,7 @@ contract RegenIntegrationTest is Test {
             ADMIN,
             stakerWhitelist,
             contributorWhitelist,
-            stakerWhitelist,
+            allocationMechanismWhitelist,
             calculator,
             MAX_BUMP_TIP,
             MAX_CLAIM_FEE,
@@ -1683,7 +1690,7 @@ contract RegenIntegrationTest is Test {
             ADMIN,
             stakerWhitelist,
             contributorWhitelist,
-            stakerWhitelist,
+            allocationMechanismWhitelist,
             calculator,
             MAX_BUMP_TIP,
             MAX_CLAIM_FEE,
@@ -1748,7 +1755,7 @@ contract RegenIntegrationTest is Test {
             ADMIN,
             stakerWhitelist,
             contributorWhitelist,
-            stakerWhitelist,
+            allocationMechanismWhitelist,
             calculator,
             MAX_BUMP_TIP,
             MAX_CLAIM_FEE,
@@ -1830,7 +1837,7 @@ contract RegenIntegrationTest is Test {
             ADMIN,
             stakerWhitelist,
             contributorWhitelist,
-            stakerWhitelist,
+            allocationMechanismWhitelist,
             calculator,
             MAX_BUMP_TIP,
             MAX_CLAIM_FEE,
@@ -1898,7 +1905,7 @@ contract RegenIntegrationTest is Test {
             ADMIN,
             stakerWhitelist,
             contributorWhitelist,
-            stakerWhitelist,
+            allocationMechanismWhitelist,
             calculator,
             MAX_BUMP_TIP,
             MAX_CLAIM_FEE,
@@ -2011,7 +2018,7 @@ contract RegenIntegrationTest is Test {
             ADMIN,
             stakerWhitelist,
             contributorWhitelist,
-            stakerWhitelist,
+            allocationMechanismWhitelist,
             calculator,
             MAX_BUMP_TIP,
             MAX_CLAIM_FEE,
@@ -2080,7 +2087,7 @@ contract RegenIntegrationTest is Test {
             ADMIN,
             stakerWhitelist,
             contributorWhitelist,
-            stakerWhitelist,
+            allocationMechanismWhitelist,
             calculator,
             MAX_BUMP_TIP,
             MAX_CLAIM_FEE,
@@ -2167,7 +2174,9 @@ contract RegenIntegrationTest is Test {
             owner: address(0) // Will be set by factory
         });
 
-        return allocationFactory.deploySimpleVotingMechanism(config);
+        address allocationMechanism = allocationFactory.deploySimpleVotingMechanism(config);
+        whitelistAllocationMechanism(allocationMechanism);
+        return allocationMechanism;
     }
 
     // ============ Contribute Function Tests ============
@@ -2521,5 +2530,72 @@ contract RegenIntegrationTest is Test {
         vm.expectRevert(); // The exact error will be from TokenizedAllocationMechanism
         regenStaker.contribute(depositId, allocationMechanism, alice, contributeAmount, deadline, v, r, s);
         vm.stopPrank();
+    }
+
+    function test_Contribute_WithSignature_RevertIfAllocationMechanismNotWhitelisted() public {
+        uint256 stakeAmount = getStakeAmount(1000);
+        uint256 rewardAmount = getRewardAmount(10000);
+        uint256 contributeAmount = getRewardAmount(100);
+
+        // Deploy allocation mechanism but don't whitelist it
+        AllocationConfig memory config = AllocationConfig({
+            asset: IERC20(address(rewardToken)),
+            name: "Test Allocation",
+            symbol: "TEST",
+            votingDelay: 1,
+            votingPeriod: 1000,
+            quorumShares: 1e18,
+            timelockDelay: 1 days,
+            gracePeriod: 7 days,
+            startBlock: block.number + 1,
+            owner: address(0)
+        });
+        address allocationMechanism = allocationFactory.deploySimpleVotingMechanism(config);
+
+        // Advance to allow signup (startBlock + votingDelay period)
+        vm.roll(block.number + 5);
+
+        whitelistUser(alice, true, true, true);
+
+        // Fund and stake
+        stakeToken.mint(alice, stakeAmount);
+        rewardToken.mint(address(regenStaker), rewardAmount);
+
+        vm.startPrank(alice);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = regenStaker.stake(stakeAmount, alice);
+        vm.stopPrank();
+
+        // Notify rewards
+        vm.prank(ADMIN);
+        regenStaker.notifyRewardAmount(rewardAmount);
+        vm.warp(block.timestamp + regenStaker.rewardDuration());
+
+        // Create signature
+        uint256 nonce = TokenizedAllocationMechanism(allocationMechanism).nonces(alice);
+        uint256 deadline = block.timestamp + 1 hours;
+
+        bytes32 digest = _getSignupDigest(allocationMechanism, alice, contributeAmount, nonce, deadline);
+        (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, ALICE_PRIVATE_KEY);
+
+        // Give Alice tokens and approve for the expected flow
+        rewardToken.mint(alice, contributeAmount);
+        vm.startPrank(alice);
+        rewardToken.approve(allocationMechanism, contributeAmount);
+
+        // Should revert with NotWhitelisted for allocation mechanism
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RegenStaker.NotWhitelisted.selector,
+                regenStaker.allocationMechanismWhitelist(),
+                allocationMechanism
+            )
+        );
+        regenStaker.contribute(depositId, allocationMechanism, alice, contributeAmount, deadline, v, r, s);
+        vm.stopPrank();
+    }
+
+    function test_AllocationMechanismWhitelistIsSet() public view {
+        assertEq(address(regenStaker.allocationMechanismWhitelist()), address(allocationMechanismWhitelist));
     }
 }
