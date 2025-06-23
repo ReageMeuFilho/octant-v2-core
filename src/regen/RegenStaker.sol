@@ -6,11 +6,9 @@
 pragma solidity ^0.8.0;
 
 // OpenZeppelin Imports
-import { IERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 import { EIP712 } from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
 // Staker Library Imports
 import { IERC20Staking } from "staker/interfaces/IERC20Staking.sol";
@@ -22,7 +20,6 @@ import { StakerPermitAndStake } from "staker/extensions/StakerPermitAndStake.sol
 // Local Imports
 import { Whitelist } from "src/utils/Whitelist.sol";
 import { IWhitelist } from "src/utils/IWhitelist.sol";
-import { IWhitelistedEarningPowerCalculator } from "src/regen/interfaces/IWhitelistedEarningPowerCalculator.sol";
 import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocationMechanism.sol";
 
 /// @title RegenStaker
