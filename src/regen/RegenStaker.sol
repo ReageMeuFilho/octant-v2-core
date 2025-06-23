@@ -47,7 +47,7 @@ contract RegenStaker is
 {
     using SafeCast for uint256;
 
-    uint256 public constant MIN_REWARD_DURATION = 30 days;
+    uint256 public constant MIN_REWARD_DURATION = 7 days;
     uint256 public rewardDuration;
     uint256 public constant MAX_REWARD_DURATION = 3000 days;
 
