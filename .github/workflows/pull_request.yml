@@ -20,7 +20,7 @@ jobs:
     name: Check formatting
     runs-on: general
     container:
-      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:3e595e3d
+      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:4fafbd60
       credentials:
         username: _json_key_base64
         password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
@@ -39,7 +39,7 @@ jobs:
     name: Run linter
     runs-on: general
     container:
-      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:3e595e3d
+      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:4fafbd60
       credentials:
         username: _json_key_base64
         password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
@@ -58,7 +58,7 @@ jobs:
     name: Lint commits
     runs-on: general
     container:
-      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:3e595e3d
+      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:4fafbd60
       credentials:
         username: _json_key_base64
         password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
@@ -77,7 +77,7 @@ jobs:
     runs-on: general
     continue-on-error: true
     container:
-      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:3e595e3d
+      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:4fafbd60
       credentials:
         username: _json_key_base64
         password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}

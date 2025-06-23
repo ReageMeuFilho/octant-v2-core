@@ -13,7 +13,7 @@
   "homepage": "https://github.com/golemfoundation/octant-v2-core#readme",
   "engines": {
     "npm": "please-use-yarn",
-    "node": ">=22.0.0"
+    "node": ">=22.16.0"
   },
   "files": [
     "out",
