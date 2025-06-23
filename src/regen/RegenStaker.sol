@@ -262,7 +262,7 @@ contract RegenStaker is
         ClaimFeeParameters memory feeParams = claimFeeParameters;
         uint256 fee = feeParams.feeAmount;
 
-        if (fee > 0 && unclaimedAmount < fee) {
+        if (unclaimedAmount < fee) {
             return 0; // Not enough to pay fee
         }
 
