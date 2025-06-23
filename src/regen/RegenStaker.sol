@@ -388,6 +388,8 @@ contract RegenStaker is
             _s
         );
 
+        SafeERC20.forceApprove(REWARD_TOKEN, _allocationMechanismAddress, 0);
+
         if (fee > 0) {
             SafeERC20.safeTransfer(REWARD_TOKEN, claimFeeParameters.feeCollector, fee);
         }
@@ -499,18 +501,6 @@ contract RegenStaker is
         address _newClaimer
     ) internal override nonReentrant {
         super._alterClaimer(deposit, _depositId, _newClaimer);
-    }
-
-    /// @notice Resets the allowance for a given token and spender to zero if it's currently non-zero.
-    /// @dev This is a security measure to prevent allowance accumulation and ensure clean state before/after external calls.
-    /// @dev Only resets if current allowance > 0 to save gas when already zero.
-    /// @param token The token contract address.
-    /// @param spender The spender address to reset allowance for.
-    function _resetAllowance(address token, address spender) private {
-        uint256 allowance = IERC20(token).allowance(address(this), spender);
-        if (allowance > 0) {
-            SafeERC20.safeDecreaseAllowance(IERC20(token), spender, allowance);
-        }
     }
 
     /// @notice Reverts if the deposit is below the minimum stake amount.
