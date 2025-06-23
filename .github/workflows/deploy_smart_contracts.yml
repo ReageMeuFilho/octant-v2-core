@@ -69,7 +69,7 @@ jobs:
       - deploy-contract
     runs-on: general
     container:
-      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:3e595e3d
+      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:4fafbd60
       credentials:
         username: _json_key_base64
         password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
