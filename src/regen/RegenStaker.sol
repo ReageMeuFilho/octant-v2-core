@@ -176,8 +176,6 @@ contract RegenStaker is
     /// @notice Overrides to use the custom reward duration
     /// @notice Changing the reward duration will not affect the rate of the rewards unless this function is called.
     function notifyRewardAmount(uint256 _amount) external override {
-        require(_amount > 0, ZeroOperation());
-
         if (!isRewardNotifier[msg.sender]) revert Staker__Unauthorized("not notifier", msg.sender);
 
         rewardPerTokenAccumulatedCheckpoint = rewardPerTokenAccumulated();
