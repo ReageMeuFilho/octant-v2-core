@@ -341,6 +341,10 @@ contract RegenStaker is
     {
         require(_amount > 0, ZeroOperation());
         _revertIfAddressZero(_allocationMechanismAddress);
+        require(
+            allocationMechanismWhitelist.isWhitelisted(_allocationMechanismAddress),
+            NotWhitelisted(allocationMechanismWhitelist, _allocationMechanismAddress)
+        );
 
         Deposit storage deposit = deposits[_depositId];
         if (deposit.claimer != msg.sender && deposit.owner != msg.sender) {
