@@ -92,7 +92,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         _strategyStorageExchangeRate().lastRateRay = rateNow;
         S.lastReport = uint96(block.timestamp);
 
-        emit Harvest(msg.sender, rateNow);
+        emit Harvest(msg.sender, rateNow.rayToWad());
         emit Reported(profit, loss);
 
         return (profit, loss);
