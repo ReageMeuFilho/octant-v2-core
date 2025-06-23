@@ -5,6 +5,7 @@ import "forge-std/Test.sol";
 import { RegenStaker } from "src/regen/RegenStaker.sol";
 import { RegenEarningPowerCalculator } from "src/regen/RegenEarningPowerCalculator.sol";
 import { Whitelist } from "src/utils/Whitelist.sol";
+import { IWhitelist } from "src/utils/IWhitelist.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC20Staking } from "lib/staker/src/interfaces/IERC20Staking.sol";
 import { IWhitelistedEarningPowerCalculator } from "src/regen/interfaces/IWhitelistedEarningPowerCalculator.sol";
@@ -163,6 +164,7 @@ contract RegenIntegrationTest is Test {
             ADMIN,
             stakerWhitelist,
             contributorWhitelist,
+            stakerWhitelist,
             calculator,
             MAX_BUMP_TIP,
             MAX_CLAIM_FEE,
@@ -191,8 +193,9 @@ contract RegenIntegrationTest is Test {
             IERC20(address(rewardToken)),
             IERC20Staking(address(stakeToken)),
             ADMIN,
-            Whitelist(address(0)),
-            Whitelist(address(0)),
+            IWhitelist(address(0)),
+            IWhitelist(address(0)),
+            stakerWhitelist,
             calculator,
             tipAmount,
             feeAmount,
@@ -208,11 +211,8 @@ contract RegenIntegrationTest is Test {
         assertEq(localRegenStaker.MAX_CLAIM_FEE(), feeAmount);
         assertEq(localRegenStaker.minimumStakeAmount(), minimumStakeAmount);
 
-        assertTrue(address(localRegenStaker.stakerWhitelist()) != address(0));
-        assertTrue(address(localRegenStaker.contributionWhitelist()) != address(0));
-
-        assertEq(Ownable(address(localRegenStaker.stakerWhitelist())).owner(), address(ADMIN));
-        assertEq(Ownable(address(localRegenStaker.contributionWhitelist())).owner(), address(ADMIN));
+        assertEq(address(localRegenStaker.stakerWhitelist()), address(0));
+        assertEq(address(localRegenStaker.contributionWhitelist()), address(0));
 
         (uint96 initialFeeAmount, address initialFeeCollector) = localRegenStaker.claimFeeParameters();
         assertEq(initialFeeAmount, 0);
@@ -246,6 +246,7 @@ contract RegenIntegrationTest is Test {
             ADMIN,
             providedStakerWhitelist,
             providedContributorWhitelist,
+            stakerWhitelist,
             calculator,
             tipAmount,
             feeAmount,
@@ -1394,8 +1395,9 @@ contract RegenIntegrationTest is Test {
             IERC20(address(rewardToken)),
             IERC20Staking(address(stakeToken)),
             ADMIN,
-            Whitelist(address(0)),
-            Whitelist(address(0)),
+            IWhitelist(address(0)),
+            IWhitelist(address(0)),
+            stakerWhitelist,
             calculator,
             MAX_BUMP_TIP,
             MAX_CLAIM_FEE,
@@ -1414,8 +1416,9 @@ contract RegenIntegrationTest is Test {
             IERC20(address(rewardToken)),
             IERC20Staking(address(stakeToken)),
             ADMIN,
-            Whitelist(address(0)),
-            Whitelist(address(0)),
+            IWhitelist(address(0)),
+            IWhitelist(address(0)),
+            stakerWhitelist,
             calculator,
             MAX_BUMP_TIP,
             MAX_CLAIM_FEE,
@@ -1663,6 +1666,7 @@ contract RegenIntegrationTest is Test {
             ADMIN,
             stakerWhitelist,
             contributorWhitelist,
+            stakerWhitelist,
             calculator,
             MAX_BUMP_TIP,
             MAX_CLAIM_FEE,
@@ -1731,6 +1735,7 @@ contract RegenIntegrationTest is Test {
             ADMIN,
             stakerWhitelist,
             contributorWhitelist,
+            stakerWhitelist,
             calculator,
             MAX_BUMP_TIP,
             MAX_CLAIM_FEE,
@@ -1793,6 +1798,7 @@ contract RegenIntegrationTest is Test {
             ADMIN,
             stakerWhitelist,
             contributorWhitelist,
+            stakerWhitelist,
             calculator,
             MAX_BUMP_TIP,
             MAX_CLAIM_FEE,
@@ -1874,6 +1880,7 @@ contract RegenIntegrationTest is Test {
             ADMIN,
             stakerWhitelist,
             contributorWhitelist,
+            stakerWhitelist,
             calculator,
             MAX_BUMP_TIP,
             MAX_CLAIM_FEE,
@@ -1941,6 +1948,7 @@ contract RegenIntegrationTest is Test {
             ADMIN,
             stakerWhitelist,
             contributorWhitelist,
+            stakerWhitelist,
             calculator,
             MAX_BUMP_TIP,
             MAX_CLAIM_FEE,
@@ -2034,6 +2042,7 @@ contract RegenIntegrationTest is Test {
             ADMIN,
             stakerWhitelist,
             contributorWhitelist,
+            stakerWhitelist,
             calculator,
             MAX_BUMP_TIP,
             MAX_CLAIM_FEE,
@@ -2098,6 +2107,7 @@ contract RegenIntegrationTest is Test {
             ADMIN,
             stakerWhitelist,
             contributorWhitelist,
+            stakerWhitelist,
             calculator,
             MAX_BUMP_TIP,
             MAX_CLAIM_FEE,

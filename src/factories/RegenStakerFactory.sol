@@ -13,6 +13,7 @@ contract RegenStakerFactory {
         address admin;
         IWhitelist stakerWhitelist;
         IWhitelist contributionWhitelist;
+        IWhitelist allocationMechanismWhitelist;
         IEarningPowerCalculator earningPowerCalculator;
         uint256 maxBumpTip;
         uint256 maxClaimFee;
@@ -29,6 +30,7 @@ contract RegenStakerFactory {
             p.admin,
             p.stakerWhitelist,
             p.contributionWhitelist,
+            p.allocationMechanismWhitelist,
             p.earningPowerCalculator,
             p.maxBumpTip,
             p.maxClaimFee,

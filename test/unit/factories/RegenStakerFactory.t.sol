@@ -27,6 +27,7 @@ contract RegenStakerFactoryTest is Test {
 
     IWhitelist public stakerWhitelist;
     IWhitelist public contributionWhitelist;
+    IWhitelist public allocationMechanismWhitelist;
 
     uint256 public constant MAX_BUMP_TIP = 1000e18;
     uint256 public constant MAX_CLAIM_FEE = 500;
@@ -46,6 +47,7 @@ contract RegenStakerFactoryTest is Test {
 
         stakerWhitelist = new Whitelist();
         contributionWhitelist = new Whitelist();
+        allocationMechanismWhitelist = new Whitelist();
 
         factory = new RegenStakerFactory();
 
@@ -77,6 +79,7 @@ contract RegenStakerFactoryTest is Test {
                 admin: admin,
                 stakerWhitelist: stakerWhitelist,
                 contributionWhitelist: contributionWhitelist,
+                allocationMechanismWhitelist: allocationMechanismWhitelist,
                 earningPowerCalculator: earningPowerCalculator,
                 maxBumpTip: MAX_BUMP_TIP,
                 maxClaimFee: MAX_CLAIM_FEE,
@@ -108,6 +111,7 @@ contract RegenStakerFactoryTest is Test {
                 admin: admin,
                 stakerWhitelist: stakerWhitelist,
                 contributionWhitelist: contributionWhitelist,
+                allocationMechanismWhitelist: allocationMechanismWhitelist,
                 earningPowerCalculator: earningPowerCalculator,
                 maxBumpTip: MAX_BUMP_TIP,
                 maxClaimFee: MAX_CLAIM_FEE,
@@ -125,6 +129,7 @@ contract RegenStakerFactoryTest is Test {
                 admin: admin,
                 stakerWhitelist: stakerWhitelist,
                 contributionWhitelist: contributionWhitelist,
+                allocationMechanismWhitelist: allocationMechanismWhitelist,
                 earningPowerCalculator: earningPowerCalculator,
                 maxBumpTip: MAX_BUMP_TIP + 100,
                 maxClaimFee: MAX_CLAIM_FEE + 50,
@@ -151,6 +156,7 @@ contract RegenStakerFactoryTest is Test {
                 admin: admin,
                 stakerWhitelist: stakerWhitelist,
                 contributionWhitelist: contributionWhitelist,
+                allocationMechanismWhitelist: allocationMechanismWhitelist,
                 earningPowerCalculator: earningPowerCalculator,
                 maxBumpTip: MAX_BUMP_TIP,
                 maxClaimFee: MAX_CLAIM_FEE,
@@ -169,6 +175,7 @@ contract RegenStakerFactoryTest is Test {
                 admin: admin,
                 stakerWhitelist: stakerWhitelist,
                 contributionWhitelist: contributionWhitelist,
+                allocationMechanismWhitelist: allocationMechanismWhitelist,
                 earningPowerCalculator: earningPowerCalculator,
                 maxBumpTip: MAX_BUMP_TIP,
                 maxClaimFee: MAX_CLAIM_FEE,
@@ -196,6 +203,7 @@ contract RegenStakerFactoryTest is Test {
                 admin: admin,
                 stakerWhitelist: stakerWhitelist,
                 contributionWhitelist: contributionWhitelist,
+                allocationMechanismWhitelist: allocationMechanismWhitelist,
                 earningPowerCalculator: earningPowerCalculator,
                 maxBumpTip: MAX_BUMP_TIP,
                 maxClaimFee: MAX_CLAIM_FEE,
@@ -220,6 +228,7 @@ contract RegenStakerFactoryTest is Test {
                 admin: admin,
                 stakerWhitelist: IWhitelist(address(0)),
                 contributionWhitelist: IWhitelist(address(0)),
+                allocationMechanismWhitelist: allocationMechanismWhitelist,
                 earningPowerCalculator: earningPowerCalculator,
                 maxBumpTip: MAX_BUMP_TIP,
                 maxClaimFee: MAX_CLAIM_FEE,
@@ -233,13 +242,15 @@ contract RegenStakerFactoryTest is Test {
         assertTrue(stakerAddress != address(0), "Staker should be created with null whitelists");
 
         RegenStaker staker = RegenStaker(stakerAddress);
-        assertTrue(
-            address(staker.stakerWhitelist()) != address(0),
-            "Staker whitelist should be deployed automatically"
+        assertEq(
+            address(staker.stakerWhitelist()),
+            address(0),
+            "Staker whitelist should be null when address(0) is passed"
         );
-        assertTrue(
-            address(staker.contributionWhitelist()) != address(0),
-            "Contribution whitelist should be deployed automatically"
+        assertEq(
+            address(staker.contributionWhitelist()),
+            address(0),
+            "Contribution whitelist should be null when address(0) is passed"
         );
     }
 }

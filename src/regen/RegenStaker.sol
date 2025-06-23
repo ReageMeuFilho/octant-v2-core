@@ -53,11 +53,13 @@ contract RegenStaker is
 
     IWhitelist public stakerWhitelist;
     IWhitelist public contributionWhitelist;
+    IWhitelist public allocationMechanismWhitelist;
 
     uint256 public minimumStakeAmount = 0;
 
     event StakerWhitelistSet(IWhitelist indexed whitelist);
     event ContributionWhitelistSet(IWhitelist indexed whitelist);
+    event AllocationMechanismWhitelistSet(IWhitelist indexed whitelist);
     event RewardDurationSet(uint256 newDuration);
     event RewardContributed(
         DepositIdentifier indexed depositId,
@@ -73,16 +75,9 @@ contract RegenStaker is
         uint256 newEarningPower
     );
     event MinimumStakeAmountSet(uint256 newMinimumStakeAmount);
-    event WhitelistDeployed(address indexed whitelist, string whitelistType);
 
     error NotWhitelisted(IWhitelist whitelist, address user);
     error CantAfford(uint256 requested, uint256 available);
-    error AllocationMechanismSignUpFailed(
-        address allocationMechanism,
-        address contributor,
-        uint256 amount,
-        address votingDelegatee
-    );
     error MinimumStakeAmountNotMet(uint256 expected, uint256 actual);
     error InvalidRewardDuration(uint256 rewardDuration);
     error CannotChangeRewardDurationDuringActiveReward();
@@ -90,6 +85,7 @@ contract RegenStaker is
     error CannotRaiseMinimumStakeAmountDuringActiveReward();
     error ZeroOperation();
     error NoOperation();
+    error DisablingAllocationMechanismWhitelistNotAllowed();
 
     modifier onlyWhitelistedIfWhitelistIsSet(IWhitelist _whitelist, address _user) {
         if (_whitelist != IWhitelist(address(0)) && !_whitelist.isWhitelisted(_user)) {
@@ -102,18 +98,20 @@ contract RegenStaker is
     /// @param _rewardsToken The token that will be used to reward contributors.
     /// @param _stakeToken The token that will be used to stake.
     /// @param _admin The address of the admin. TRUSTED.
-    /// @param _stakerWhitelist The whitelist for stakers. If passed as address(0), a new Whitelist contract will be deployed.
-    /// @param _contributionWhitelist The whitelist for contributors. If passed as address(0), a new Whitelist contract will be deployed.
+    /// @param _stakerWhitelist The whitelist for stakers. Can be address(0) to disable whitelisting.
+    /// @param _contributionWhitelist The whitelist for contributors. Can be address(0) to disable whitelisting.
+    /// @param _allocationMechanismWhitelist The whitelist for allocation mechanisms.
     /// @param _earningPowerCalculator The earning power calculator.
     /// @param _maxBumpTip The maximum bump tip.
     /// @param _maxClaimFee The maximum claim fee. You can set fees between 0 and _maxClaimFee. _maxClaimFee cannot be changed after deployment.
-    /// @param _rewardDuration The duration over which rewards are distributed. If 0, defaults to the base Staker's REWARD_DURATION (30 days).
+    /// @param _rewardDuration The duration over which rewards are distributed.
     constructor(
         IERC20 _rewardsToken,
         IERC20Staking _stakeToken,
         address _admin,
         IWhitelist _stakerWhitelist,
         IWhitelist _contributionWhitelist,
+        IWhitelist _allocationMechanismWhitelist,
         IEarningPowerCalculator _earningPowerCalculator,
         uint256 _maxBumpTip,
         uint256 _maxClaimFee,
@@ -134,6 +132,7 @@ contract RegenStaker is
 
         stakerWhitelist = _stakerWhitelist;
         contributionWhitelist = _contributionWhitelist;
+        allocationMechanismWhitelist = _allocationMechanismWhitelist;
 
         MAX_CLAIM_FEE = _maxClaimFee;
         _setClaimFeeParameters(ClaimFeeParameters({ feeAmount: 0, feeCollector: address(0) }));
@@ -200,6 +199,20 @@ contract RegenStaker is
         _revertIfNotAdmin();
         emit ContributionWhitelistSet(_contributionWhitelist);
         contributionWhitelist = _contributionWhitelist;
+    }
+
+    /// @notice Sets the whitelist for the allocation mechanism. If the whitelist is not set, the allocation mechanism will be open to all users.
+    /// @notice For admin use only.
+    /// @param _allocationMechanismWhitelist The whitelist to set.
+    function setAllocationMechanismWhitelist(Whitelist _allocationMechanismWhitelist) external {
+        require(allocationMechanismWhitelist != _allocationMechanismWhitelist, NoOperation());
+        require(
+            address(_allocationMechanismWhitelist) != address(0),
+            DisablingAllocationMechanismWhitelistNotAllowed()
+        );
+        _revertIfNotAdmin();
+        emit AllocationMechanismWhitelistSet(_allocationMechanismWhitelist);
+        allocationMechanismWhitelist = _allocationMechanismWhitelist;
     }
 
     /// @notice Sets the minimum stake amount.
@@ -356,19 +369,14 @@ contract RegenStaker is
 
         emit RewardClaimed(_depositId, msg.sender, amountContributedToAllocationMechanism, deposit.earningPower);
 
-        if (fee > 0) {
-            SafeERC20.safeTransfer(REWARD_TOKEN, claimFeeParameters.feeCollector, fee);
-        }
+        SafeERC20.forceApprove(REWARD_TOKEN, _allocationMechanismAddress, amountContributedToAllocationMechanism);
 
-        _resetAllowance(address(REWARD_TOKEN), _allocationMechanismAddress);
-        SafeERC20.safeIncreaseAllowance(
-            REWARD_TOKEN,
+        emit RewardContributed(
+            _depositId,
+            msg.sender,
             _allocationMechanismAddress,
             amountContributedToAllocationMechanism
         );
-
-        uint256 balanceBeforeRewardToken = REWARD_TOKEN.balanceOf(address(this));
-        uint256 balanceBeforeStakeToken = STAKE_TOKEN.balanceOf(address(this));
 
         TokenizedAllocationMechanism(_allocationMechanismAddress).signupWithSignature(
             _votingDelegatee,
@@ -379,27 +387,9 @@ contract RegenStaker is
             _s
         );
 
-        uint256 balanceAfterRewardToken = REWARD_TOKEN.balanceOf(address(this));
-        if (balanceBeforeRewardToken - balanceAfterRewardToken != amountContributedToAllocationMechanism) {
-            revert AllocationMechanismSignUpFailed(
-                _allocationMechanismAddress,
-                msg.sender,
-                amountContributedToAllocationMechanism,
-                _votingDelegatee
-            );
+        if (fee > 0) {
+            SafeERC20.safeTransfer(REWARD_TOKEN, claimFeeParameters.feeCollector, fee);
         }
-
-        uint256 balanceAfterStakeToken = STAKE_TOKEN.balanceOf(address(this));
-        assert(balanceAfterStakeToken == balanceBeforeStakeToken);
-
-        _resetAllowance(address(REWARD_TOKEN), _allocationMechanismAddress);
-
-        emit RewardContributed(
-            _depositId,
-            msg.sender,
-            _allocationMechanismAddress,
-            amountContributedToAllocationMechanism
-        );
 
         return amountContributedToAllocationMechanism;
     }
