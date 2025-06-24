@@ -153,7 +153,7 @@ contract RegenStaker is
     /// @inheritdoc Staker
     /// @notice Overrides to use the custom reward duration
     /// @notice Changing the reward duration will not affect the rate of the rewards unless this function is called.
-    function notifyRewardAmount(uint256 _amount) external override {
+    function notifyRewardAmount(uint256 _amount) external virtual override {
         if (!isRewardNotifier[msg.sender]) revert Staker__Unauthorized("not notifier", msg.sender);
 
         rewardPerTokenAccumulatedCheckpoint = rewardPerTokenAccumulated();
@@ -248,6 +248,7 @@ contract RegenStaker is
         DepositIdentifier _depositId
     )
         external
+        virtual
         whenNotPaused
         nonReentrant
         onlyWhitelistedIfWhitelistIsSet(stakerWhitelist, msg.sender)
@@ -334,6 +335,7 @@ contract RegenStaker is
         bytes32 _s
     )
         public
+        virtual
         whenNotPaused
         nonReentrant
         onlyWhitelistedIfWhitelistIsSet(contributionWhitelist, msg.sender)
@@ -404,7 +406,7 @@ contract RegenStaker is
     function _updateEarningPower(
         Deposit storage deposit,
         uint256 newBalance
-    ) private returns (uint256 newEarningPower) {
+    ) internal returns (uint256 newEarningPower) {
         newEarningPower = earningPowerCalculator.getEarningPower(newBalance, deposit.owner, deposit.delegatee);
 
         totalEarningPower = _calculateTotalEarningPower(deposit.earningPower, newEarningPower, totalEarningPower);
@@ -477,7 +479,7 @@ contract RegenStaker is
         DepositIdentifier _depositId,
         Deposit storage deposit,
         address _claimer
-    ) internal override whenNotPaused nonReentrant returns (uint256) {
+    ) internal virtual override whenNotPaused nonReentrant returns (uint256) {
         uint256 _payout = super._claimReward(_depositId, deposit, _claimer);
         _revertIfMinimumStakeAmountNotMet(_depositId);
         return _payout;
