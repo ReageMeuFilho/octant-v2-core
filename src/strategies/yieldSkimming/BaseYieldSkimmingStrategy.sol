@@ -14,13 +14,6 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 abstract contract BaseYieldSkimmingStrategy is BaseYieldSkimmingHealthCheck {
     using SafeERC20 for IERC20;
 
-    /// @notice yearn governance
-    address public constant GOV = 0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52;
-
-    modifier onlyGovernance() {
-        require(msg.sender == GOV, "!gov");
-        _;
-    }
 
     constructor(
         address _asset,
@@ -42,12 +35,6 @@ abstract contract BaseYieldSkimmingStrategy is BaseYieldSkimmingHealthCheck {
         )
     {}
 
-    /// @notice Sweep of non-asset ERC20 tokens to governance (onlyGovernance)
-    /// @param _token The ERC20 token to sweep
-    function sweep(address _token) external onlyGovernance {
-        require(_token != address(asset), "!asset");
-        IERC20(_token).safeTransfer(GOV, IERC20(_token).balanceOf(address(this)));
-    }
 
     /**
      * @notice Get the current balance of the asset

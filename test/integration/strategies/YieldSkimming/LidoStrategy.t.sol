@@ -522,26 +522,6 @@ contract LidoStrategyTest is Test {
         );
     }
 
-    /// @notice Test the sweep function for non-asset ERC20 tokens
-    function testSweep() public {
-        // Create a mock token that we'll sweep
-        MockERC20 mockToken = new MockERC20(18);
-        mockToken.mint(address(strategy), 1000e18);
-
-        // Verify token balance in strategy
-        assertEq(mockToken.balanceOf(address(strategy)), 1000e18, "Strategy should have mock tokens");
-        assertEq(mockToken.balanceOf(strategy.GOV()), 0, "GOV should have no mock tokens initially");
-
-        // Call sweep function
-        vm.startPrank(strategy.GOV());
-        strategy.sweep(address(mockToken));
-        vm.stopPrank();
-
-        // Verify tokens were swept to governance
-        assertEq(mockToken.balanceOf(address(strategy)), 0, "Strategy should have no mock tokens after sweep");
-        assertEq(mockToken.balanceOf(strategy.GOV()), 1000e18, "GOV should have all mock tokens after sweep");
-    }
-
     /// @notice Fuzz test exchange rate tracking and yield calculation
     function testFuzzExchangeRateTrackingLido(uint256 depositAmount, uint256 exchangeRateIncreasePercentage) public {
         // Bound inputs to reasonable values
@@ -607,30 +587,6 @@ contract LidoStrategyTest is Test {
 
         assertEq(assetBalance, sharesBalance, "Asset and shares balance should match for this strategy");
         assertGt(assetBalance, 0, "Asset balance should be greater than zero after deposit");
-    }
-
-    /// @notice Test sweep function for unauthorized access
-    function testSweepUnauthorized() public {
-        MockERC20 mockToken = new MockERC20(18);
-        mockToken.mint(address(strategy), 1000e18);
-
-        // Try to sweep as a non-governance address
-        vm.startPrank(user);
-        vm.expectRevert();
-        strategy.sweep(address(mockToken));
-        vm.stopPrank();
-    }
-
-    /// @notice Test onlyGovernance modifier
-    function testOnlyGovernanceModifier() public {
-        // Try to call sweep as a non-governance address
-        MockERC20 mockToken = new MockERC20(18);
-        mockToken.mint(address(strategy), 1000e18);
-
-        vm.startPrank(user);
-        vm.expectRevert();
-        strategy.sweep(address(mockToken));
-        vm.stopPrank();
     }
 
     /// @notice Test health check for profit limit exceeded
