@@ -147,10 +147,6 @@ contract SkyCompounderStrategy is BaseHealthCheck, UniswapV3Swapper, ISkyCompoun
         return type(uint256).max;
     }
 
-    function availableWithdrawLimit(address /*_owner*/) public view override returns (uint256) {
-        return balanceOfAsset() + balanceOfStake(); // Liquid + staked tokens
-    }
-
     function balanceOfAsset() public view returns (uint256) {
         return asset.balanceOf(address(this));
     }
