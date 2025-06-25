@@ -10,5 +10,6 @@ openzeppelin-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
 solady-test/=dependencies/solady-0.1.21/test
 solady/=dependencies/solady-0.1.21/src
 solmate/=dependencies/solmate-6.8.0/
+staker/=dependencies/staker-1.0.1/src/
 surl/=dependencies/surl-0.0.0/src/
 zodiac/=dependencies/gnosisguild-zodiac-4.1.1/contracts/

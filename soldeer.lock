@@ -38,6 +38,12 @@ checksum = "e3ec0f0182cb3bbedecf8a0bcc39897266534a795ec732b2b03dafa285d78a5b"
 integrity = "a22e5a352de0231f671ee8adf5667bbe83c50012670083987bd1099a69feb429"
 
 [[dependencies]]
+name = "staker"
+version = "1.0.1"
+git = "https://github.com/withtally/staker"
+rev = "b5b6f98daf53cf1d678ab3cc219223890b5cda3b"
+
+[[dependencies]]
 name = "surl"
 version = "0.0.0"
 git = "https://github.com/memester-xyz/surl"

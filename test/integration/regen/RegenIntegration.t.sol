@@ -7,9 +7,9 @@ import { RegenEarningPowerCalculator } from "src/regen/RegenEarningPowerCalculat
 import { Whitelist } from "src/utils/Whitelist.sol";
 import { IWhitelist } from "src/utils/IWhitelist.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IERC20Staking } from "lib/staker/src/interfaces/IERC20Staking.sol";
+import { IERC20Staking } from "staker/interfaces/IERC20Staking.sol";
 import { IWhitelistedEarningPowerCalculator } from "src/regen/interfaces/IWhitelistedEarningPowerCalculator.sol";
-import { Staker } from "lib/staker/src/Staker.sol";
+import { Staker } from "staker/Staker.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MockERC20Staking } from "test/mocks/MockERC20Staking.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
