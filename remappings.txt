@@ -1,8 +1,9 @@
-@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
-openzeppelin-contracts/contracts/=lib/openzeppelin-contracts/contracts/
-@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
-openzeppelin-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
-safe-smart-account/contracts/common/=lib/safe-smart-account/contracts/libraries/
-safe-smart-account/contracts/=lib/safe-smart-account/contracts/
-@tokenized-strategy-periphery=lib/tokenized-strategy-periphery/src
 @gnosis.pm/safe-contracts/contracts/common=lib/safe-smart-account/contracts/libraries/
+@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
+@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
+@tokenized-strategy-periphery=lib/tokenized-strategy-periphery/src
+forge-std/=dependencies/forge-std-1.9.7/src
+openzeppelin-contracts/contracts/=lib/openzeppelin-contracts/contracts/
+openzeppelin-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
+safe-smart-account/contracts/=lib/safe-smart-account/contracts/
+safe-smart-account/contracts/common/=lib/safe-smart-account/contracts/libraries/

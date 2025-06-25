@@ -1,17 +1,15 @@
+# IDE
+.idea/
+
 .DS_Store
 reports/
 lcov.info
 gasreport.txt
 
-# IDE
-.idea/
-.cursor/
-
 # Compiler files
 cache/
 out/
 coverage/
-reports/
 ci/contract_addresses.txt
 
 # Ignore broadcast logs
@@ -32,6 +30,7 @@ node_modules/
 .direnv/
 
 # cursor files
+.cursor/
 .specstory/
 
 # Yarn files
@@ -44,4 +43,7 @@ node_modules/
 !.yarn/versions
 
 output.json
+
+# Soldeer
+/dependencies
 
