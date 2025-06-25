@@ -67,7 +67,7 @@ contract RegenStakerFactoryTest is Test {
         bytes32 salt = keccak256("TEST_STAKER_SALT");
 
         vm.startPrank(deployer1);
-        address predictedAddress = factory.predictStakerAddress(salt);
+        address predictedAddress = factory.predictStakerAddress(salt, deployer1);
 
         vm.expectEmit(true, true, true, true);
         emit StakerDeploy(deployer1, admin, predictedAddress, salt);
@@ -193,7 +193,7 @@ contract RegenStakerFactoryTest is Test {
         bytes32 salt = keccak256("DETERMINISTIC_SALT");
 
         vm.prank(deployer1);
-        address predictedAddress = factory.predictStakerAddress(salt);
+        address predictedAddress = factory.predictStakerAddress(salt, deployer1);
 
         vm.prank(deployer1);
         address actualAddress = factory.createStaker(

@@ -23,29 +23,33 @@ contract RegenStakerFactory {
 
     event StakerDeploy(address indexed deployer, address indexed admin, address indexed stakerAddress, bytes32 salt);
 
-    function createStaker(CreateStakerParams calldata p, bytes32 s, bytes calldata code) external returns (address a) {
+    function createStaker(
+        CreateStakerParams calldata params,
+        bytes32 salt,
+        bytes calldata code
+    ) external returns (address stakerAddress) {
         bytes memory constructorParams = abi.encode(
-            p.rewardsToken,
-            p.stakeToken,
-            p.admin,
-            p.stakerWhitelist,
-            p.contributionWhitelist,
-            p.allocationMechanismWhitelist,
-            p.earningPowerCalculator,
-            p.maxBumpTip,
-            p.maxClaimFee,
-            p.minimumStakeAmount,
-            p.rewardDuration
+            params.rewardsToken,
+            params.stakeToken,
+            params.admin,
+            params.stakerWhitelist,
+            params.contributionWhitelist,
+            params.allocationMechanismWhitelist,
+            params.earningPowerCalculator,
+            params.maxBumpTip,
+            params.maxClaimFee,
+            params.minimumStakeAmount,
+            params.rewardDuration
         );
 
-        a = CREATE3.deployDeterministic(
+        stakerAddress = CREATE3.deployDeterministic(
             bytes.concat(code, constructorParams),
-            keccak256(abi.encodePacked(s, msg.sender))
+            keccak256(abi.encodePacked(salt, msg.sender))
         );
-        emit StakerDeploy(msg.sender, p.admin, a, s);
+        emit StakerDeploy(msg.sender, params.admin, stakerAddress, salt);
     }
 
-    function predictStakerAddress(bytes32 s) external view returns (address) {
-        return CREATE3.predictDeterministicAddress(keccak256(abi.encodePacked(s, msg.sender)));
+    function predictStakerAddress(bytes32 salt, address deployer) external view returns (address) {
+        return CREATE3.predictDeterministicAddress(keccak256(abi.encodePacked(salt, deployer)));
     }
 }
