@@ -8,7 +8,7 @@ import { LinearAllowanceSingletonForGnosisSafe } from "src/zodiac-core/modules/L
 import { NATIVE_TOKEN } from "src/constants.sol";
 import "lib/safe-smart-account/contracts/libraries/Enum.sol";
 import { LinearAllowanceExecutorTestHarness } from "test/mocks/zodiac-core/LinearAllowanceExecutorTestHarness.sol";
-import "openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { ILinearAllowanceSingleton } from "src/zodiac-core/interfaces/ILinearAllowanceSingleton.sol";
 
 contract TestERC20 is ERC20 {
