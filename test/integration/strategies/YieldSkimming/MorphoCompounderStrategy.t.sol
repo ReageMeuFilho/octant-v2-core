@@ -490,7 +490,7 @@ contract MorphoCompounderStrategyTest is Test {
         vm.stopPrank();
 
         uint256 assetBalance = strategy.balanceOfAsset();
-        uint256 sharesBalance = strategy.balanceOfShares();
+        uint256 sharesBalance = strategy.balanceOfAsset();
 
         assertEq(assetBalance, sharesBalance, "Asset and shares balance should match for this strategy");
         assertGt(assetBalance, 0, "Asset balance should be greater than zero after deposit");

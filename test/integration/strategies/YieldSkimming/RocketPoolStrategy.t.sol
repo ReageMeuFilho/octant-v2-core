@@ -191,7 +191,7 @@ contract RocketPoolStrategyTest is Test {
         );
 
         assertGt(sharesReceived, 0, "No shares received from deposit");
-        assertGt(strategy.balanceOfShares(), 0, "Strategy should have deployed assets to yield vault");
+        assertGt(strategy.balanceOfAsset(), 0, "Strategy should have deployed assets to yield vault");
     }
 
     /// @notice Fuzz test withdrawing assets from the strategy
@@ -546,7 +546,7 @@ contract RocketPoolStrategyTest is Test {
         vm.stopPrank();
 
         uint256 assetBalance = strategy.balanceOfAsset();
-        uint256 sharesBalance = strategy.balanceOfShares();
+        uint256 sharesBalance = strategy.balanceOfAsset();
 
         assertEq(assetBalance, sharesBalance, "Asset and shares balance should match for this strategy");
         assertGt(assetBalance, 0, "Asset balance should be greater than zero after deposit");

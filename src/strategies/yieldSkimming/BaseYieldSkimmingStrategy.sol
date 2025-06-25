@@ -44,14 +44,6 @@ abstract contract BaseYieldSkimmingStrategy is BaseYieldSkimmingHealthCheck {
     }
 
     /**
-     * @notice Get the current balance of shares in the yield vault
-     * @return The yield vault share balance
-     */
-    function balanceOfShares() public view returns (uint256) {
-        return IERC20(asset).balanceOf(address(this));
-    }
-
-    /**
      * @notice Deposits available funds into the yield vault
      * @param _amount Amount to deploy
      */
