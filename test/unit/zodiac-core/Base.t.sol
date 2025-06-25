@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import { TestPlus } from "lib/solady/test/utils/TestPlus.sol";
+import { TestPlus } from "solady-test/utils/TestPlus.sol";
 import { ModuleProxyFactory } from "src/zodiac-core/ModuleProxyFactory.sol";
 import { SplitChecker } from "src/zodiac-core/SplitChecker.sol";
 import { DragonRouter } from "src/zodiac-core/DragonRouter.sol";

@@ -3,8 +3,8 @@ pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
 import { FixedPointMathLib } from "solady/utils/FixedPointMathLib.sol";
-import { TestPlus } from "lib/solady/test/utils/TestPlus.sol";
-import { WETH } from "lib/solady/src/tokens/WETH.sol";
+import { TestPlus } from "solady-test/utils/TestPlus.sol";
+import { WETH } from "solady/tokens/WETH.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import "../../../../script/deploy/DeployTrader.sol";
 import { HelperConfig } from "../../../../script/helpers/HelperConfig.s.sol";

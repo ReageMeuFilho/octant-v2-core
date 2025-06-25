@@ -2,7 +2,7 @@
 pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
-import { TestPlus } from "lib/solady/test/utils/TestPlus.sol";
+import { TestPlus } from "solady-test/utils/TestPlus.sol";
 import "src/utils/routers-transformers/Trader.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 import { HelperConfig } from "script/helpers/HelperConfig.s.sol";
