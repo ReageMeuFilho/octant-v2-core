@@ -32,6 +32,10 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
 
     /// @dev Event emitted when harvest is performed
     event Harvest(address indexed caller, uint256 currentRate);
+    
+    /// @dev Events for donation tracking
+    event DonationMinted(address indexed dragonRouter, uint256 amount, uint256 exchangeRate);
+    event DonationBurned(address indexed dragonRouter, uint256 amount, uint256 exchangeRate);
 
     /**
      * @inheritdoc TokenizedStrategy
@@ -71,6 +75,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         if (totalETH > supply) {
             uint256 profitAmount = totalETH - supply; // positive yield
             _mint(S, S.dragonRouter, profitAmount); // Invariant B: PPS↦1
+            emit DonationMinted(S.dragonRouter, profitAmount, rateNow.rayToWad());
             profit = profitAmount;
             loss = 0;
         } else if (totalETH < supply) {
@@ -78,7 +83,10 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
             uint256 lossAmount = supply - totalETH;
             uint256 dragonRouterBal = S.balances[S.dragonRouter];
             uint256 burnAmt = lossAmount > dragonRouterBal ? dragonRouterBal : lossAmount;
-            if (burnAmt > 0) _burn(S, S.dragonRouter, burnAmt);
+            if (burnAmt > 0) {
+                _burn(S, S.dragonRouter, burnAmt);
+                emit DonationBurned(S.dragonRouter, burnAmt, rateNow.rayToWad());
+            }
             // residual loss (if any) will lower PPS < 1
             profit = 0;
             loss = lossAmount;
