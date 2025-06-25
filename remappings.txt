@@ -4,9 +4,9 @@
 @tokenized-strategy-periphery=lib/tokenized-strategy-periphery/src
 abdk-libraries-solidity/=dependencies/abdk-libraries-solidity-3.2/
 forge-std/=dependencies/forge-std-1.9.7/src
-zodiac/=dependencies/gnosisguild-zodiac-4.1.1/contracts/
 openzeppelin-contracts/contracts/=lib/openzeppelin-contracts/contracts/
 openzeppelin-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
 solady-test/=dependencies/solady-0.1.21/test
 solady/=dependencies/solady-0.1.21/src
+solmate/=dependencies/solmate-6.8.0/
 zodiac/=dependencies/gnosisguild-zodiac-4.1.1/contracts/

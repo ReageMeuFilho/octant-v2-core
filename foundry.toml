@@ -45,9 +45,10 @@ mainnet = "${TEST_RPC_URL}"
 remappings_version = false
 
 [dependencies]
-forge-std = ">=1.9.7"
-solady = { version = "0.1.21", git = "https://github.com/vectorized/solady", tag = "v0.1.21" }
 abdk-libraries-solidity = { version = "3.2", git = "https://github.com/abdk-consulting/abdk-libraries-solidity", tag = "v3.2" }
+forge-std = ">=1.9.7"
 gnosisguild-zodiac = "4.1.1"
+solady = { version = "0.1.21", git = "https://github.com/vectorized/solady", tag = "v0.1.21" }
+solmate = "6.8.0"
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
