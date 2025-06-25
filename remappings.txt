@@ -3,6 +3,7 @@
 @openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
 @tokenized-strategy-periphery=lib/tokenized-strategy-periphery/src
 abdk-libraries-solidity/=dependencies/abdk-libraries-solidity-3.2/
+erc4626-tests/=dependencies/erc4626-tests-0.0.0/
 forge-std/=dependencies/forge-std-1.9.7/src
 openzeppelin-contracts/contracts/=lib/openzeppelin-contracts/contracts/
 openzeppelin-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/

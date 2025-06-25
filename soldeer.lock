@@ -5,6 +5,12 @@ git = "https://github.com/abdk-consulting/abdk-libraries-solidity"
 rev = "5e1e7c11b35f8313d3f7ce11c1b86320d7c0b554"
 
 [[dependencies]]
+name = "erc4626-tests"
+version = "0.0.0"
+git = "https://github.com/a16z/erc4626-tests"
+rev = "232ff9ba8194e406967f52ecc5cb52ed764209e9"
+
+[[dependencies]]
 name = "forge-std"
 version = "1.9.7"
 url = "https://soldeer-revisions.s3.amazonaws.com/forge-std/1_9_7_28-04-2025_15:55:08_forge-std-1.9.zip"
