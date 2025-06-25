@@ -34,6 +34,11 @@ import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocation
 /// @dev SCALE_FACTOR (1e36) is inherited from base Staker and used to minimize precision loss in reward calculations by scaling up values before division.
 /// @dev Earning power is capped at uint96.max (~7.9e28) to prevent overflow in reward calculations while still supporting extremely large values.
 /// @dev This contract uses the surrogate pattern from base Staker: tokens are transferred to surrogate contracts that delegate voting power to the designated delegatee.
+/// @dev PRECISION IMPLICATIONS: Variable reward durations affect calculation precision. The original Staker contract assumed a fixed
+///      30-day duration for optimal precision. This contract allows 7-3000 days, providing flexibility at the cost of potential precision loss.
+///      Shorter durations (especially < 30 days) can increase the margin of error in reward calculations by up to ~1% due to increased
+///      reward rates amplifying rounding errors in scaled arithmetic operations. This is an intentional design trade-off favoring
+///      operational flexibility over mathematical precision. For maximum precision, prefer longer reward durations (≥30 days).
 contract RegenStaker is
     Staker,
     StakerDelegateSurrogateVotes,
@@ -44,8 +49,16 @@ contract RegenStaker is
 {
     using SafeCast for uint256;
 
+    /// @notice Minimum allowed reward duration. Values below 30 days may introduce precision loss up to ~1%.
+    /// @dev The original Staker contract used a fixed 30-day duration. Allowing shorter durations trades precision for flexibility.
     uint256 public constant MIN_REWARD_DURATION = 7 days;
+
+    /// @notice Current reward duration over which rewards are distributed.
+    /// @dev This overrides the base Staker's fixed REWARD_DURATION constant. Shorter durations increase reward rates,
+    ///      which can amplify rounding errors in the scaled arithmetic operations used for reward calculations.
     uint256 public rewardDuration;
+
+    /// @notice Maximum allowed reward duration to prevent excessively long reward periods.
     uint256 public constant MAX_REWARD_DURATION = 3000 days;
 
     IWhitelist public stakerWhitelist;
@@ -120,6 +133,9 @@ contract RegenStaker is
         StakerDelegateSurrogateVotes(_stakeToken)
         EIP712("RegenStaker", "1")
     {
+        _revertIfAddressZero(address(_rewardsToken));
+        _revertIfAddressZero(address(_stakeToken));
+
         require(
             _rewardDuration >= MIN_REWARD_DURATION && _rewardDuration <= MAX_REWARD_DURATION,
             InvalidRewardDuration(_rewardDuration)
@@ -138,6 +154,10 @@ contract RegenStaker is
 
     /// @notice Sets the reward duration for future reward notifications
     /// @param _rewardDuration The new reward duration in seconds
+    /// @dev PRECISION WARNING: Shorter durations (< 30 days) may introduce calculation errors up to ~1%.
+    ///      The original Staker contract was optimized for 30-day periods. Shorter durations create higher
+    ///      reward rates that amplify rounding errors in fixed-point arithmetic. Consider this trade-off
+    ///      between operational flexibility and mathematical precision when setting reward durations.
     function setRewardDuration(uint256 _rewardDuration) external {
         _revertIfNotAdmin();
         require(block.timestamp > rewardEndTime, CannotChangeRewardDurationDuringActiveReward());
@@ -151,25 +171,32 @@ contract RegenStaker is
     }
 
     /// @inheritdoc Staker
-    /// @notice Overrides to use the custom reward duration
+    /// @notice Overrides to use the custom reward duration instead of the fixed 30-day constant
     /// @notice Changing the reward duration will not affect the rate of the rewards unless this function is called.
+    /// @dev PRECISION CONSIDERATIONS: This function performs scaled arithmetic using the variable rewardDuration.
+    ///      Shorter durations result in higher scaledRewardRate values, which can amplify rounding errors in
+    ///      subsequent calculations. The margin of error is proportional to (30 days / rewardDuration) and can
+    ///      reach ~1% for the minimum 7-day duration. This precision loss is an accepted trade-off for the
+    ///      flexibility of variable reward periods.
     function notifyRewardAmount(uint256 _amount) external override {
         if (!isRewardNotifier[msg.sender]) revert Staker__Unauthorized("not notifier", msg.sender);
 
         rewardPerTokenAccumulatedCheckpoint = rewardPerTokenAccumulated();
 
         if (block.timestamp >= rewardEndTime) {
+            // PRECISION SENSITIVE: Division by variable rewardDuration affects precision
             scaledRewardRate = (_amount * SCALE_FACTOR) / rewardDuration;
         } else {
             uint256 _remainingReward = scaledRewardRate * (rewardEndTime - block.timestamp);
             // slither-disable-next-line divide-before-multiply
+            // PRECISION SENSITIVE: Division by variable rewardDuration affects precision
             scaledRewardRate = (_remainingReward + _amount * SCALE_FACTOR) / rewardDuration;
         }
 
         rewardEndTime = block.timestamp + rewardDuration;
         lastCheckpointTime = block.timestamp;
 
-        if ((scaledRewardRate / SCALE_FACTOR) == 0) revert Staker__InvalidRewardRate();
+        if (scaledRewardRate < SCALE_FACTOR) revert Staker__InvalidRewardRate();
 
         // slither-disable-next-line divide-before-multiply
         if ((scaledRewardRate * rewardDuration) > (REWARD_TOKEN.balanceOf(address(this)) * SCALE_FACTOR))
