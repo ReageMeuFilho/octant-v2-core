@@ -11,7 +11,7 @@ import { Safe } from "lib/safe-smart-account/contracts/Safe.sol";
 import { SafeProxy } from "lib/safe-smart-account/contracts/proxies/SafeProxy.sol";
 import { SafeProxyFactory } from "lib/safe-smart-account/contracts/proxies/SafeProxyFactory.sol";
 import { Enum } from "lib/safe-smart-account/contracts/libraries/Enum.sol";
-import { Hats } from "lib/hats-protocol/src/Hats.sol";
+import { Hats } from "hats-protocol/Hats.sol";
 import { DragonHatter } from "src/utils/hats/DragonHatter.sol";
 import { SimpleEligibilityAndToggle } from "src/utils/hats/SimpleEligibilityAndToggle.sol";
 import { DragonRouter } from "src/zodiac-core/DragonRouter.sol";

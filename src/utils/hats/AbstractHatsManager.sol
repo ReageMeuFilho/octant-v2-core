@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import { IHats } from "lib/hats-protocol/src/Interfaces/IHats.sol";
+import { IHats } from "hats-protocol/Interfaces/IHats.sol";
 import { IHatsEligibility } from "src/utils/hats/interfaces/IHatsEligibility.sol";
 import { IHatsToggle } from "src/utils/hats/interfaces/IHatsToggle.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";

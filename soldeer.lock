@@ -37,6 +37,12 @@ checksum = "2dd7afecc00cf9a3726a5c49186cb56b2d747a521c8eaa8ec4c5caa2c9ef3946"
 integrity = "75b8ae4192d22cbd83ced3faef669c2b0ec6bb70da521ee785cd3c44e9b90c7e"
 
 [[dependencies]]
+name = "hats-protocol"
+version = "1.0"
+git = "https://github.com/hats-protocol/hats-protocol"
+rev = "9d1275f29d390344e81d0e0561f868ab6b0e1257"
+
+[[dependencies]]
 name = "kontrol-cheatcodes"
 version = "v0.0.1"
 url = "https://soldeer-revisions.s3.amazonaws.com/kontrol-cheatcodes/v0_0_1_09-10-2024_14:58:17_src.zip"
@@ -48,6 +54,12 @@ name = "solady"
 version = "0.1.21"
 git = "https://github.com/vectorized/solady"
 rev = "6da40ac63da5657d6c4d3ce3e3a99bc5862dda53"
+
+[[dependencies]]
+name = "solbase"
+version = "0.0.0"
+git = "https://github.com/sol-dao/solbase"
+rev = "e12d00b9ff196667e3199d61971907510948583b"
 
 [[dependencies]]
 name = "solmate"
