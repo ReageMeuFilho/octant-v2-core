@@ -5,6 +5,7 @@
 abdk-libraries-solidity/=dependencies/abdk-libraries-solidity-3.2/
 erc4626-tests/=dependencies/erc4626-tests-0.0.0/
 forge-std/=dependencies/forge-std-1.9.7/src
+kontrol-cheatcodes/=dependencies/kontrol-cheatcodes-v0.0.1/
 openzeppelin-contracts/contracts/=lib/openzeppelin-contracts/contracts/
 openzeppelin-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
 solady-test/=dependencies/solady-0.1.21/test

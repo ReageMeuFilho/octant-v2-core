@@ -25,6 +25,13 @@ checksum = "2dd7afecc00cf9a3726a5c49186cb56b2d747a521c8eaa8ec4c5caa2c9ef3946"
 integrity = "75b8ae4192d22cbd83ced3faef669c2b0ec6bb70da521ee785cd3c44e9b90c7e"
 
 [[dependencies]]
+name = "kontrol-cheatcodes"
+version = "v0.0.1"
+url = "https://soldeer-revisions.s3.amazonaws.com/kontrol-cheatcodes/v0_0_1_09-10-2024_14:58:17_src.zip"
+checksum = "d922504d621d8f04011bcb7f963394616916fbf56247b1f9fec84b274d2f6d23"
+integrity = "62e433b52a322dc7d9eba1b75b5dda15d922bb22bd4d9a362b534bb76d286936"
+
+[[dependencies]]
 name = "solady"
 version = "0.1.21"
 git = "https://github.com/vectorized/solady"

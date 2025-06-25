@@ -48,6 +48,7 @@ abdk-libraries-solidity = { version = "3.2", git = "https://github.com/abdk-cons
 erc4626-tests = { version = "0.0.0", git = "https://github.com/a16z/erc4626-tests", rev = "232ff9ba8194e406967f52ecc5cb52ed764209e9" }
 forge-std = ">=1.9.7"
 gnosisguild-zodiac = "4.1.1"
+kontrol-cheatcodes = "v0.0.1"
 solady = { version = "0.1.21", git = "https://github.com/vectorized/solady", tag = "v0.1.21" }
 solmate = "6.8.0"
 staker = { version = "1.0.1", git = "https://github.com/withtally/staker", tag = "v1.0.1" }
