@@ -214,6 +214,9 @@ abstract contract TokenizedStrategy {
         uint8 decimals; // The amount of decimals that `asset` and strategy use.
         uint8 entered; // To prevent reentrancy. Use uint8 for gas savings.
         bool shutdown; // Bool that can be used to stop deposits into the strategy.
+        
+        // Loss tracking for yield strategies
+        uint256 lossAmount; // Accumulated losses to offset against future profits
     }
 
     /*//////////////////////////////////////////////////////////////

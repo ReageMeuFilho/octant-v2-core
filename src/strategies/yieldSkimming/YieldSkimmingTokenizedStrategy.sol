@@ -32,7 +32,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
 
     /// @dev Event emitted when harvest is performed
     event Harvest(address indexed caller, uint256 currentRate);
-    
+
     /// @dev Events for donation tracking
     event DonationMinted(address indexed dragonRouter, uint256 amount, uint256 exchangeRate);
     event DonationBurned(address indexed dragonRouter, uint256 amount, uint256 exchangeRate);
@@ -74,19 +74,25 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
 
         if (totalETH > supply) {
             uint256 profitAmount = totalETH - supply; // positive yield
-            _mint(S, S.dragonRouter, profitAmount); // Invariant B: PPS↦1
-            emit DonationMinted(S.dragonRouter, profitAmount, rateNow.rayToWad());
+            uint256 lossAmount = S.lossAmount;
+
+            if (profitAmount > lossAmount) {
+                // Profit exceeds accumulated losses, mint shares for net profit
+                uint256 sharesToMint = _convertToShares(S, profitAmount - lossAmount, Math.Rounding.Floor);
+
+                S.lossAmount = 0; // Clear accumulated losses
+                _mint(S, S.dragonRouter, sharesToMint);
+                emit DonationMinted(S.dragonRouter, sharesToMint, rateNow.rayToWad());
+            } else {
+                // Profit doesn't exceed losses, reduce accumulated loss
+                S.lossAmount -= profitAmount;
+            }
             profit = profitAmount;
             loss = 0;
         } else if (totalETH < supply) {
-            // Rare: negative yield (slash). Burn dragon router shares first.
+            // Rare: negative yield (slash). Use loss protection mechanism.
             uint256 lossAmount = supply - totalETH;
-            uint256 dragonRouterBal = S.balances[S.dragonRouter];
-            uint256 burnAmt = lossAmount > dragonRouterBal ? dragonRouterBal : lossAmount;
-            if (burnAmt > 0) {
-                _burn(S, S.dragonRouter, burnAmt);
-                emit DonationBurned(S.dragonRouter, burnAmt, rateNow.rayToWad());
-            }
+            _handleDragonLossProtection(S, lossAmount, rateNow);
             // residual loss (if any) will lower PPS < 1
             profit = 0;
             loss = lossAmount;
@@ -152,19 +158,18 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
      * @dev Internal function to handle loss protection for dragon principal
      * @param S Storage struct pointer to access strategy's storage variables
      * @param loss The amount of loss in terms of asset to protect against
+     * @param rateNow The current exchange rate for event emission
      *
-     * This function calculates how many shares would be equivalent to the loss amount,
-     * then burns up to that amount of shares from dragonRouter, limited by the router's
-     * actual balance. This effectively socializes the loss among all shareholders by
-     * burning shares from the donation recipient rather than reducing the value of all shares.
+     * This function accumulates losses in the strategy storage. When future profits occur,
+     * they will first offset accumulated losses before minting new shares to dragonRouter.
+     * This approach provides better accounting and ensures losses are properly tracked
+     * across multiple reporting periods.
      */
-    function _handleDragonLossProtection(StrategyData storage S, uint256 loss) internal {
-        // Can only burn up to available shares
-        uint256 sharesBurned = Math.min(_convertToShares(S, loss, Math.Rounding.Floor), S.balances[S.dragonRouter]);
+    function _handleDragonLossProtection(StrategyData storage S, uint256 loss, uint256 rateNow) internal {
+        // Accumulate loss for future offset against profits
+        S.lossAmount += loss;
 
-        if (sharesBurned > 0) {
-            // Burn shares from dragon router
-            _burn(S, S.dragonRouter, sharesBurned);
-        }
+        // Emit event for transparency (even though no shares are burned immediately)
+        emit DonationBurned(S.dragonRouter, 0, rateNow.rayToWad());
     }
 }

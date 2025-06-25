@@ -72,7 +72,7 @@ abstract contract BaseYieldSkimmingStrategy is BaseYieldSkimmingHealthCheck {
      * @return _totalAssets The current total assets of the strategy
      */
     function _harvestAndReport() internal view override returns (uint256 _totalAssets) {
-        // fetch total assets from the tokenized strategy
+        // Return the actual balance of assets held by this strategy
         _totalAssets = IERC4626(address(this)).totalAssets();
     }
 

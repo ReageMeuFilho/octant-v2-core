@@ -17,7 +17,7 @@ contract MockStrategySkimming is BaseStrategy {
     address public yieldSourceSkimming;
 
     // Track the last reported total assets to calculate profit
-    uint256 private lastReportedPPS;
+    uint256 private lastReportedPPS = 1e18;
 
     constructor(
         address _yieldSource,
@@ -48,30 +48,20 @@ contract MockStrategySkimming is BaseStrategy {
         ERC20(_asset).approve(_yieldSource, type(uint256).max);
     }
 
-    function getCurrentExchangeRate() public pure returns (uint256) {
-        return 1e18;
+    function getCurrentExchangeRate() public view returns (uint256) {
+        return lastReportedPPS;
+    }
+
+    function updateExchangeRate(uint256 _newRate) public {
+        lastReportedPPS = _newRate;
     }
 
     function _deployFunds(uint256 _amount) internal override {}
 
     function _freeFunds(uint256 /*_amount*/) internal override {}
 
-    function _harvestAndReport() internal override returns (uint256) {
-        uint256 currentPPS = MockYieldSourceSkimming(yieldSourceSkimming).pricePerShare();
-
-        // Get the total assets controlled by the strategy (not just idle balance)
-        uint256 totalAssets = ERC20(yieldSourceSkimming).balanceOf(address(this));
-
-        // Calculate the profit based on exchange rate difference
-        uint256 deltaExchangeRate = currentPPS > lastReportedPPS ? currentPPS - lastReportedPPS : 0; // Only capture positive yield
-
-        // Calculate profit with better precision handling
-        // profit = totalAssets * (deltaExchangeRate / currentPPS)
-        uint256 profitInYieldVaultShares = (totalAssets * deltaExchangeRate) / currentPPS;
-
-        lastReportedPPS = currentPPS;
-
-        return profitInYieldVaultShares;
+    function _harvestAndReport() internal view override returns (uint256) {
+        return ITokenizedStrategy(address(this)).totalAssets();
     }
 
     function _tend(uint256 /*_idle*/) internal override {}
