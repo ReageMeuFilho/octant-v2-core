@@ -12,6 +12,13 @@ checksum = "8d9e0a885fa8ee6429a4d344aeb6799119f6a94c7c4fe6f188df79b0dce294ba"
 integrity = "9e60fdba82bc374df80db7f2951faff6467b9091873004a3d314cf0c084b3c7d"
 
 [[dependencies]]
+name = "gnosisguild-zodiac"
+version = "4.1.1"
+url = "https://soldeer-revisions.s3.amazonaws.com/gnosisguild-zodiac/4_1_1_09-04-2025_08:22:21_gnosisguild-zodiac-4.1.zip"
+checksum = "2dd7afecc00cf9a3726a5c49186cb56b2d747a521c8eaa8ec4c5caa2c9ef3946"
+integrity = "75b8ae4192d22cbd83ced3faef669c2b0ec6bb70da521ee785cd3c44e9b90c7e"
+
+[[dependencies]]
 name = "solady"
 version = "0.1.21"
 git = "https://github.com/vectorized/solady"
