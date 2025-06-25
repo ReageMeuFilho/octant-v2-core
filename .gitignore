@@ -5,6 +5,7 @@ gasreport.txt
 
 # IDE
 .idea/
+.cursor/
 
 # Compiler files
 cache/
