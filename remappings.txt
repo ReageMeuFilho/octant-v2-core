@@ -1,7 +1,7 @@
 @gnosis.pm/safe-contracts/contracts/common=lib/safe-smart-account/contracts/libraries/
 @openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
 @openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
-@tokenized-strategy-periphery=lib/tokenized-strategy-periphery/src
+@tokenized-strategy-periphery/=dependencies/tokenized-strategy-periphery-3.0.2/src
 abdk-libraries-solidity/=dependencies/abdk-libraries-solidity-3.2/
 erc4626-tests/=dependencies/erc4626-tests-0.0.0/
 forge-std/=dependencies/forge-std-1.9.7/src
@@ -13,4 +13,5 @@ solady/=dependencies/solady-0.1.21/src
 solmate/=dependencies/solmate-6.8.0/
 staker/=dependencies/staker-1.0.1/src/
 surl/=dependencies/surl-0.0.0/src/
+tokenized-strategy/=dependencies/tokenized-strategy-3.0.4/
 zodiac/=dependencies/gnosisguild-zodiac-4.1.1/contracts/

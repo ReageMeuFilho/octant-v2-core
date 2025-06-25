@@ -1,4 +1,10 @@
 [[dependencies]]
+name = "@tokenized-strategy-periphery"
+version = "3.0.2"
+git = "https://github.com/yearn/tokenized-strategy-periphery"
+rev = "d732e918b208a9b2c33c71ea0ea9e8eb880cfc6e"
+
+[[dependencies]]
 name = "abdk-libraries-solidity"
 version = "3.2"
 git = "https://github.com/abdk-consulting/abdk-libraries-solidity"
@@ -55,3 +61,15 @@ name = "surl"
 version = "0.0.0"
 git = "https://github.com/memester-xyz/surl"
 rev = "5f92a5260c8e0198ca3ee6a16255d6cda4e0887a"
+
+[[dependencies]]
+name = "tokenized-strategy"
+version = "3.0.4"
+git = "https://github.com/yearn/tokenized-strategy"
+rev = "82806289f967590c4efbf6bc3d237e4e7f0a0966"
+
+[[dependencies]]
+name = "tokenized-strategy-periphery"
+version = "3.0.2"
+git = "https://github.com/yearn/tokenized-strategy-periphery"
+rev = "d732e918b208a9b2c33c71ea0ea9e8eb880cfc6e"
