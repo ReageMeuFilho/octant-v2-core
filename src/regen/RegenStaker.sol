@@ -133,6 +133,9 @@ contract RegenStaker is
         StakerDelegateSurrogateVotes(_stakeToken)
         EIP712("RegenStaker", "1")
     {
+        _revertIfAddressZero(address(_rewardsToken));
+        _revertIfAddressZero(address(_stakeToken));
+
         require(
             _rewardDuration >= MIN_REWARD_DURATION && _rewardDuration <= MAX_REWARD_DURATION,
             InvalidRewardDuration(_rewardDuration)
