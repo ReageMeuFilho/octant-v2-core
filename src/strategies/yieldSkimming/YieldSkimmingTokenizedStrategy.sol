@@ -56,10 +56,9 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
 
         uint256 rateNow = _currentRateRay();
 
-        IBaseStrategy(address(this)).harvestAndReport();
+        uint256 currentTotalAssets = IBaseStrategy(address(this)).harvestAndReport();
 
         uint256 totalAssetsBalance = S.asset.balanceOf(address(this));
-        uint256 currentTotalAssets = _totalAssets(S);
 
         if (totalAssetsBalance != currentTotalAssets) {
             // update total assets

@@ -4,6 +4,7 @@ pragma solidity ^0.8.25;
 import { BaseYieldSkimmingHealthCheck } from "src/strategies/periphery/BaseYieldSkimmingHealthCheck.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
 /**
  * @title BaseYieldSkimmingStrategy
@@ -13,7 +14,6 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
  */
 abstract contract BaseYieldSkimmingStrategy is BaseYieldSkimmingHealthCheck {
     using SafeERC20 for IERC20;
-
 
     constructor(
         address _asset,
@@ -34,7 +34,6 @@ abstract contract BaseYieldSkimmingStrategy is BaseYieldSkimmingHealthCheck {
             _tokenizedStrategyAddress
         )
     {}
-
 
     /**
      * @notice Get the current balance of the asset
@@ -80,7 +79,10 @@ abstract contract BaseYieldSkimmingStrategy is BaseYieldSkimmingHealthCheck {
      * @notice Captures yield by calculating the increase in value based on exchange rate changes
      * @return _totalAssets The current total assets of the strategy
      */
-    function _harvestAndReport() internal override returns (uint256 _totalAssets) {}
+    function _harvestAndReport() internal view override returns (uint256 _totalAssets) {
+        // fetch total assets from the tokenized strategy
+        _totalAssets = IERC4626(address(this)).totalAssets();
+    }
 
     /**
      * @notice No tending needed

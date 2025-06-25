@@ -139,8 +139,7 @@ abstract contract BaseYieldSkimmingHealthCheck is BaseStrategy, IBaseHealthCheck
 
         // new total assets is the total assets at the new rate
         _newTotalAssets =
-            (ITokenizedStrategy(address(this)).totalAssets() *
-                IYieldSkimmingStrategy(address(this)).getCurrentExchangeRate()) /
+            (_newTotalAssets * IYieldSkimmingStrategy(address(this)).getCurrentExchangeRate()) /
             10 ** IYieldSkimmingStrategy(address(this)).decimalsOfExchangeRate();
 
         if (_newTotalAssets > currentTotalAssets) {
