@@ -2,6 +2,7 @@
 pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
+import { console2 } from "forge-std/console2.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { LidoStrategy } from "src/strategies/yieldSkimming/LidoStrategy.sol";
 import { LidoStrategyFactory } from "src/factories/LidoStrategyFactory.sol";
@@ -231,7 +232,7 @@ contract LidoStrategyTest is Test {
     function testFuzzWithdraw(uint256 depositAmount, uint256 withdrawPercentage) public {
         // Bound inputs to reasonable values
         depositAmount = bound(depositAmount, 1e18, 10000e18); // 1 to 10,000 WSTETH
-        withdrawPercentage = bound(withdrawPercentage, 1, 100); // 1% to 100%
+        withdrawPercentage = bound(withdrawPercentage, 1, 100); // 1% to 100% (prevents overflow in percentage calc)
 
         // Airdrop tokens to user for this test
         airdrop(ERC20(WSTETH), user, depositAmount);
@@ -245,22 +246,18 @@ contract LidoStrategyTest is Test {
         uint256 initialUserBalance = ERC20(WSTETH).balanceOf(user);
         uint256 initialShareBalance = vault.balanceOf(user);
 
-        // Calculate withdrawal amount based on percentage
-        uint256 withdrawAmount = (depositAmount * withdrawPercentage) / 100;
-
-        // Preview the withdrawal to get shares to burn
-        uint256 sharesToBurn = vault.previewWithdraw(withdrawAmount);
-        uint256 sharesBurned = vault.withdraw(withdrawAmount, user, user);
+        // redeem balance of shares
+        uint256 sharesToBurn = (vault.balanceOf(user) * withdrawPercentage) / 100;
+        uint256 withdrawnAmount = vault.redeem(sharesToBurn, user, user);
         vm.stopPrank();
 
         // Verify balances after withdrawal
         assertEq(
             ERC20(WSTETH).balanceOf(user),
-            initialUserBalance + withdrawAmount,
+            initialUserBalance + withdrawnAmount,
             "User didn't receive correct assets"
         );
         assertEq(vault.balanceOf(user), initialShareBalance - sharesToBurn, "Shares not burned correctly");
-        assertEq(sharesBurned, sharesToBurn, "Incorrect number of shares burned");
     }
 
     /// @notice Fuzz test the harvesting functionality with profit

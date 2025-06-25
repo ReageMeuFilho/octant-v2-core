@@ -110,9 +110,9 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     function _convertToShares(
         StrategyData storage,
         uint256 assets,
-        Math.Rounding
+        Math.Rounding rounding
     ) internal view virtual override returns (uint256) {
-        return (assets * _currentRateRay()) / WadRayMath.RAY;
+        return assets.mulDiv(_currentRateRay(), WadRayMath.RAY, rounding);
     }
 
     /**
