@@ -73,8 +73,8 @@ contract MorphoCompounderStrategy is BaseHealthCheck {
     }
 
     function _emergencyWithdraw(uint256 _amount) internal override {
-        _amount = _min(_amount, IERC4626(compounderVault).balanceOf(address(this)));
-        _amount = _min(_amount, IERC4626(compounderVault).maxWithdraw(address(this)));
+        uint256 maxWithdrawableAssets = IERC4626(compounderVault).maxWithdraw(address(this));
+        _amount = _min(_amount, maxWithdrawableAssets);
         _freeFunds(_amount);
     }
 
