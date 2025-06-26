@@ -10,6 +10,7 @@ import { DeployHatsProtocol } from "script/deploy/DeployHatsProtocol.sol";
 import { DeployLinearAllowanceSingletonForGnosisSafe } from "script/deploy/DeployLinearAllowanceSingletonForGnosisSafe.sol";
 import { DeployMockStrategy } from "script/deploy/DeployMockStrategy.sol";
 import { DeployModuleProxyFactory } from "script/deploy/DeployModuleProxyFactory.sol";
+import { DeployPaymentSplitterFactory } from "script/deploy/DeployPaymentSplitterFactory.sol";
 
 /**
  * @title DeployProtocol
@@ -24,6 +25,7 @@ contract DeployProtocol is Script {
     DeployDragonRouter public deployDragonRouter;
     DeployMockStrategy public deployMockStrategy;
     DeployHatsProtocol public deployHatsProtocol;
+    DeployPaymentSplitterFactory public deployPaymentSplitterFactory;
 
     // Deployed contract addresses
     address public moduleProxyFactoryAddress;
@@ -35,6 +37,7 @@ contract DeployProtocol is Script {
     address public mockTokenAddress;
     address public mockYieldSourceAddress;
     address public hatsAddress;
+    address public paymentSplitterFactoryAddress;
 
     error DeploymentFailed();
 
@@ -46,6 +49,7 @@ contract DeployProtocol is Script {
         deployDragonRouter = new DeployDragonRouter();
         deployMockStrategy = new DeployMockStrategy(msg.sender, msg.sender, msg.sender);
         deployHatsProtocol = new DeployHatsProtocol();
+        deployPaymentSplitterFactory = new DeployPaymentSplitterFactory();
     }
 
     function run() public {
@@ -87,6 +91,10 @@ contract DeployProtocol is Script {
         deployHatsProtocol.deploy();
         hatsAddress = address(deployHatsProtocol.hats());
 
+        // Deploy Payment Splitter Factory
+        deployPaymentSplitterFactory.deploy();
+        paymentSplitterFactoryAddress = address(deployPaymentSplitterFactory.paymentSplitterFactory());
+
         // Log deployment addresses
         console2.log("\nDeployment Summary:");
         console2.log("------------------");
@@ -101,6 +109,7 @@ contract DeployProtocol is Script {
         console2.log("Linear Allowance Singleton:", linearAllowanceSingletonForGnosisSafeAddress);
         console2.log("Hats contract:             ", hatsAddress);
         console2.log("DragonHatter:              ", address(deployHatsProtocol.dragonHatter()));
+        console2.log("Payment Splitter Factory:  ", paymentSplitterFactoryAddress);
         console2.log("------------------");
         console2.log("Top Hat ID:                ", vm.toString(deployHatsProtocol.topHatId()));
         console2.log("Autonomous Admin Hat ID:   ", vm.toString(deployHatsProtocol.autonomousAdminHatId()));
@@ -144,6 +153,10 @@ contract DeployProtocol is Script {
                 "LINEAR_ALLOWANCE_SINGLETON_FOR_GNOSIS_SAFE_ADDRESS=",
                 vm.toString(linearAllowanceSingletonForGnosisSafeAddress)
             )
+        );
+        vm.writeLine(
+            contractAddressFilename,
+            string.concat("PAYMENT_SPLITTER_FACTORY_ADDRESS=", vm.toString(paymentSplitterFactoryAddress))
         );
         vm.writeLine(contractAddressFilename, string.concat("HATS_ADDRESS=", vm.toString(hatsAddress)));
         vm.writeLine(
