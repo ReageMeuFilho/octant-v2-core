@@ -26,6 +26,7 @@
     "kontrol.toml"
   ],
   "scripts": {
+    "postinstall": "forge soldeer install",
     "format": "prettier --config .prettierrc --plugin=prettier-plugin-solidity '{script,src,test,verification}/**/*.sol' -w",
     "format:check": "prettier --config .prettierrc --plugin=prettier-plugin-solidity '{script,src,test,verification}/**/*.sol' -c",
     "lint": "solhint './{src,scripts,test}/**/*.sol'",
@@ -52,7 +53,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@openzeppelin/upgrades-core": "^1.41.0",
     "dotenv": "^16.5.0"
   },
   "devDependencies": {
