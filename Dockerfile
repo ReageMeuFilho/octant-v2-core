@@ -1,4 +1,4 @@
-ARG NODE_VERSION=22
+ARG NODE_VERSION=22.16.0
 
 FROM node:$NODE_VERSION AS builder
 
@@ -9,16 +9,20 @@ RUN /root/.foundry/bin/foundryup -i stable \
     && strip /root/.foundry/bin/*
 
 WORKDIR /app
-COPY package.json yarn.lock .yarnrc.yml ./
+COPY package.json yarn.lock .yarnrc.yml foundry.toml soldeer.lock ./
 RUN corepack enable && corepack install
-RUN yarn install --immutable
+RUN PATH="$PATH:/root/.foundry/bin" yarn install --immutable
 
 COPY ./ ./
-RUN git submodule update --init --recursive
+
+# TODO TEMP - to be removed after fixing safe compilation issue
+RUN rm -Rf test/ script/
+# </TODO TEMP>
+
 RUN PATH="$PATH:/root/.foundry/bin" yarn build
 
 # Removed files we don't want to copy to destination container
-RUN rm -rf .git .gitmodules .yarn
+RUN rm -rf .yarn
 
 FROM node:$NODE_VERSION-slim AS deploy
 
@@ -41,3 +45,8 @@ RUN forge build --offline
 
 ENTRYPOINT [ "/usr/local/bin/yarn" ]
 CMD [ "deploy:tenderly" ]
+
+# TODO TEMP - to be removed after fixing safe compilation issue
+COPY /test /app/test/
+COPY /script /app/script/
+# </TODO TEMP>

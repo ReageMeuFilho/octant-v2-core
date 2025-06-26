@@ -141,12 +141,12 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: __local
-          file: __local/docker/Dockerfile
+          file: __local/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/ci/core:buildcache
-          cache-to: type=registry,ref=${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/ci/core:buildcache,mode=max
+          cache-from: type=registry,ref=${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/cache:core
+          cache-to: type=registry,ref=${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/cache:core,mode=max
 
   # Technically we don't need to build step is done during the docker build
   build:
@@ -225,7 +225,7 @@ jobs:
           cd /app
           
           # Comment out problematic lines
-          sed -i.bak '201,209s/^/\/\/ /' lib/hats-protocol/src/Hats.sol
+          sed -i.bak '197,205s/^/\/\/ /' dependencies/hats-protocol-1.0/src/Hats.sol
           
           # Create markdown report header
           echo "# Code Coverage Report for src/ files" > src_coverage.md
