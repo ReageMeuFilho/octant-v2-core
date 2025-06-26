@@ -9,7 +9,7 @@ import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import { IMockStrategy } from "test/mocks/zodiac-core/IMockStrategy.sol";
-import { MorphoCompounderStrategyVaultFactory } from "src/factories/yieldDonating/MorphoCompounderStrategyVaultFactory.sol";
+import { MorphoCompounderStrategyFactory } from "src/factories/yieldDonating/MorphoCompounderStrategyFactory.sol";
 import { YieldDonatingTokenizedStrategy } from "src/strategies/yieldDonating/YieldDonatingTokenizedStrategy.sol";
 
 /// @title MorphoCompounder Yield Donating Test
@@ -26,7 +26,7 @@ contract MorphoCompounderDonatingStrategyTest is Test {
     address public keeper;
     address public emergencyAdmin;
     address public donationAddress;
-    MorphoCompounderStrategyVaultFactory public factory;
+    MorphoCompounderStrategyFactory public factory;
     string public strategyName = "MorphoCompounder Donating Strategy";
 
     // Test user
@@ -70,8 +70,8 @@ contract MorphoCompounderDonatingStrategyTest is Test {
         emergencyAdmin = address(0x3);
         donationAddress = address(0x4);
 
-        // MorphoCompounderStrategyVaultFactory
-        factory = new MorphoCompounderStrategyVaultFactory{
+        // MorphoCompounderStrategyFactory
+        factory = new MorphoCompounderStrategyFactory{
             salt: keccak256("OCT_MORPHO_COMPOUNDER_STRATEGY_VAULT_FACTORY_V1")
         }();
 

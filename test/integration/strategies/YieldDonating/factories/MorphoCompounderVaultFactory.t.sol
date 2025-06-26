@@ -5,7 +5,7 @@ import { Test } from "forge-std/Test.sol";
 import { console } from "forge-std/console.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MorphoCompounderStrategy } from "src/strategies/yieldDonating/MorphoCompounderStrategy.sol";
-import { MorphoCompounderStrategyVaultFactory } from "src/factories/yieldDonating/MorphoCompounderStrategyVaultFactory.sol";
+import {MorphoCompounderStrategyFactory} from "src/factories/yieldDonating/MorphoCompounderStrategyFactory.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { YieldDonatingTokenizedStrategy } from "src/strategies/yieldDonating/YieldDonatingTokenizedStrategy.sol";
@@ -14,13 +14,13 @@ import { CREATE3 } from "lib/solady/src/utils/CREATE3.sol";
 
 /// @title MorphoCompounderVaultFactory Test (Yield Donating)
 /// @author Octant
-/// @notice Integration tests for the MorphoCompounderStrategyVaultFactory (yield donating version) using a mainnet fork
+/// @notice Integration tests for the MorphoCompounderStrategyFactory (yield donating version) using a mainnet fork
 contract MorphoCompounderDonatingVaultFactoryTest is Test {
     using SafeERC20 for ERC20;
 
     // Factory for creating strategies
     YieldDonatingTokenizedStrategy public tokenizedStrategy;
-    MorphoCompounderStrategyVaultFactory public factory;
+    MorphoCompounderStrategyFactory public factory;
     YieldDonatingTokenizedStrategy public implementation;
 
     // Strategy parameters
@@ -58,7 +58,7 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
         donationAddress = address(0x4);
 
         // Deploy factory
-        factory = new MorphoCompounderStrategyVaultFactory();
+        factory = new MorphoCompounderStrategyFactory();
 
         // Label addresses for better trace outputs
         vm.label(address(factory), "MorphoCompounderDonatingVaultFactory");
@@ -81,7 +81,7 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
         // Create a strategy and check events
         vm.startPrank(management);
         vm.expectEmit(true, true, true, false); // Check first 3 indexed params, ignore the non-indexed timestamp
-        emit MorphoCompounderStrategyVaultFactory.StrategyDeploy(
+        emit MorphoCompounderStrategyFactory.StrategyDeploy(
             management,
             donationAddress,
             expectedStrategyAddress,
@@ -233,7 +233,7 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
         vm.stopPrank();
 
         // Create a new factory
-        MorphoCompounderStrategyVaultFactory newFactory = new MorphoCompounderStrategyVaultFactory();
+        MorphoCompounderStrategyFactory newFactory = new MorphoCompounderStrategyFactory();
 
         // Create a strategy with the same salt but from a different factory
         vm.startPrank(management);

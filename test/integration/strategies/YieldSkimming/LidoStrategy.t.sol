@@ -4,7 +4,7 @@ pragma solidity ^0.8.25;
 import { Test } from "forge-std/Test.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { LidoStrategy } from "src/strategies/yieldSkimming/LidoStrategy.sol";
-import { LidoStrategyVaultFactory } from "src/factories/LidoStrategyVaultFactory.sol";
+import { LidoStrategyFactory } from "src/factories/LidoStrategyFactory.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
@@ -24,7 +24,7 @@ contract LidoStrategyTest is Test {
 
     // Factory for creating strategies
     YieldSkimmingTokenizedStrategy tokenizedStrategy;
-    LidoStrategyVaultFactory public factory;
+    LidoStrategyFactory public factory;
 
     // Strategy parameters
     address public management;
@@ -118,7 +118,7 @@ contract LidoStrategyTest is Test {
         donationAddress = address(0x4);
 
         // Deploy factory
-        factory = new LidoStrategyVaultFactory();
+        factory = new LidoStrategyFactory();
 
         // Deploy strategy using the factory's createStrategy method
         vm.startPrank(management);

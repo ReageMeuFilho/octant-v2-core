@@ -2,9 +2,9 @@
 pragma solidity >=0.8.25;
 
 import { CREATE3 } from "lib/solady/src/utils/CREATE3.sol";
-import { LidoStrategy } from "src/strategies/yieldSkimming/LidoStrategy.sol";
+import { MorphoCompounderStrategy } from "src/strategies/yieldSkimming/MorphoCompounderStrategy.sol";
 
-contract LidoStrategyVaultFactory {
+contract MorphoCompounderStrategyFactory {
     /**
      * @dev Struct to store information about a strategy.
      * @param deployerAddress The address of the deployer who created the strategy.
@@ -33,7 +33,7 @@ contract LidoStrategyVaultFactory {
      */
     mapping(address => StrategyInfo[]) public strategies;
 
-    address public constant WSTETH = 0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0;
+    address public constant YS_USDC = 0x074134A2784F4F66b6ceD6f68849382990Ff3215;
 
     event StrategyDeploy(
         address indexed deployer,
@@ -43,10 +43,10 @@ contract LidoStrategyVaultFactory {
     );
 
     /**
-     * @notice Deploys a new Lido strategy for the Yield Skimming Vault.
+     * @notice Deploys a new MorphoCompounder strategy for the Yield Skimming Vault.
      * @dev This function uses CREATE3 to deploy a new strategy contract deterministically.
      *      The strategy is initialized with the provided parameters, and its address is
-     *      returned upon successful deployment. The function emits a `LidoStrategyDeploy` event.
+     *      returned upon successful deployment. The function emits a `MorphoStrategyDeploy` event.
      * @param _name The name of the vault token associated with the strategy.
      * @param _management The address of the management entity responsible for the strategy.
      * @param _keeper The address of the keeper responsible for maintaining the strategy.
@@ -65,9 +65,9 @@ contract LidoStrategyVaultFactory {
         address _tokenizedStrategyAddress
     ) external returns (address strategyAddress) {
         bytes memory bytecode = abi.encodePacked(
-            type(LidoStrategy).creationCode,
+            type(MorphoCompounderStrategy).creationCode,
             abi.encode(
-                WSTETH,
+                YS_USDC,
                 _name,
                 _management,
                 _keeper,

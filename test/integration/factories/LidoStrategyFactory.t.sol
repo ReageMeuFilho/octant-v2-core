@@ -5,22 +5,22 @@ import { Test } from "forge-std/Test.sol";
 import { console } from "forge-std/console.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { LidoStrategy } from "src/strategies/yieldSkimming/LidoStrategy.sol";
-import { LidoStrategyVaultFactory } from "src/factories/LidoStrategyVaultFactory.sol";
+import { LidoStrategyFactory } from "src/factories/LidoStrategyFactory.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { YieldSkimmingTokenizedStrategy } from "src/strategies/yieldSkimming/YieldSkimmingTokenizedStrategy.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import { CREATE3 } from "lib/solady/src/utils/CREATE3.sol";
 
-/// @title LidoVaultFactory Test
+/// @title LidoStrategyFactory Test
 /// @author Octant
 /// @notice Integration tests for the LidoVaultFactory using a mainnet fork
-contract LidoStrategyVaultFactoryTest is Test {
+contract LidoStrategyFactoryTest is Test {
     using SafeERC20 for ERC20;
 
     // Factory for creating strategies
     YieldSkimmingTokenizedStrategy public tokenizedStrategy;
-    LidoStrategyVaultFactory public factory;
+    LidoStrategyFactory public factory;
 
     // Strategy parameters
     address public management;
@@ -57,7 +57,7 @@ contract LidoStrategyVaultFactoryTest is Test {
         donationAddress = address(0x4);
 
         // Deploy factory
-        factory = new LidoStrategyVaultFactory();
+        factory = new LidoStrategyFactory();
 
         // Label addresses for better trace outputs
         vm.label(address(factory), "LidoVaultFactory");
@@ -79,7 +79,7 @@ contract LidoStrategyVaultFactoryTest is Test {
         // Create a strategy and check events
         vm.startPrank(management);
         vm.expectEmit(true, true, true, false); // Check first 3 indexed params, ignore the non-indexed timestamp
-        emit LidoStrategyVaultFactory.StrategyDeploy(
+        emit LidoStrategyFactory.StrategyDeploy(
             management,
             donationAddress,
             expectedStrategyAddress,
@@ -225,7 +225,7 @@ contract LidoStrategyVaultFactoryTest is Test {
         vm.stopPrank();
 
         // Create a new factory
-        LidoStrategyVaultFactory newFactory = new LidoStrategyVaultFactory();
+        LidoStrategyFactory newFactory = new LidoStrategyFactory();
 
         // Create a strategy with the same salt but from a different factory
         vm.startPrank(management);

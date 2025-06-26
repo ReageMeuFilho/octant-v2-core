@@ -5,22 +5,22 @@ import { Test } from "forge-std/Test.sol";
 import { console } from "forge-std/console.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MorphoCompounderStrategy } from "src/strategies/yieldSkimming/MorphoCompounderStrategy.sol";
-import { MorphoCompounderStrategyVaultFactory } from "src/factories/MorphoCompounderStrategyVaultFactory.sol";
+import { MorphoCompounderStrategyFactory } from "src/factories/MorphoCompounderStrategyFactory.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { YieldSkimmingTokenizedStrategy } from "src/strategies/yieldSkimming/YieldSkimmingTokenizedStrategy.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import { CREATE3 } from "lib/solady/src/utils/CREATE3.sol";
 
-/// @title MorphoCompounderVaultFactory Test
+/// @title MorphoCompounderStrategyFactory Test
 /// @author Octant
-/// @notice Integration tests for the MorphoCompounderVaultFactory using a mainnet fork
-contract MorphoCompounderVaultFactoryTest is Test {
+/// @notice Integration tests for the MorphoCompounderFactory using a mainnet fork
+contract MorphoCompounderStrategyFactoryTest is Test {
     using SafeERC20 for ERC20;
 
     // Factory for creating strategies
     YieldSkimmingTokenizedStrategy public tokenizedStrategy;
-    MorphoCompounderStrategyVaultFactory public factory;
+    MorphoCompounderStrategyFactory public factory;
     YieldSkimmingTokenizedStrategy public implementation;
 
     // Strategy parameters
@@ -57,10 +57,10 @@ contract MorphoCompounderVaultFactoryTest is Test {
         donationAddress = address(0x4);
 
         // Deploy factory
-        factory = new MorphoCompounderStrategyVaultFactory();
+        factory = new MorphoCompounderStrategyFactory();
 
         // Label addresses for better trace outputs
-        vm.label(address(factory), "MorphoCompounderVaultFactory");
+        vm.label(address(factory), "MorphoCompounderFactory");
         vm.label(YIELD_VAULT, "Morpho Yield Vault");
         vm.label(TOKENIZED_STRATEGY_ADDRESS, "TokenizedStrategy");
         vm.label(management, "Management");
@@ -79,7 +79,7 @@ contract MorphoCompounderVaultFactoryTest is Test {
         // Create a strategy and check events
         vm.startPrank(management);
         vm.expectEmit(true, true, true, false); // Check first 3 indexed params, ignore the non-indexed timestamp
-        emit MorphoCompounderStrategyVaultFactory.StrategyDeploy(
+        emit MorphoCompounderStrategyFactory.StrategyDeploy(
             management,
             donationAddress,
             expectedStrategyAddress,
@@ -225,7 +225,7 @@ contract MorphoCompounderVaultFactoryTest is Test {
         vm.stopPrank();
 
         // Create a new factory
-        MorphoCompounderStrategyVaultFactory newFactory = new MorphoCompounderStrategyVaultFactory();
+        MorphoCompounderStrategyFactory newFactory = new MorphoCompounderStrategyFactory();
 
         // Create a strategy with the same salt but from a different factory
         vm.startPrank(management);
