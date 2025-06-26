@@ -2,7 +2,7 @@
 pragma solidity ^0.8.17;
 
 import { ERC20 } from "solady/tokens/ERC20.sol";
-import { ISwapRouter } from "../uniswap/ISwapRouter.sol";
+import { ISwapRouter } from "src/utils/vendor/uniswap/ISwapRouter.sol";
 import { WETH } from "solady/tokens/WETH.sol";
 import { QuoteParams } from "./LibQuotes.sol";
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
