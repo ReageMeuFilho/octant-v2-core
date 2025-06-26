@@ -160,6 +160,7 @@ contract RegenStaker is
     ///      between operational flexibility and mathematical precision when setting reward durations.
     function setRewardDuration(uint256 _rewardDuration) external {
         _revertIfNotAdmin();
+        require(rewardDuration != _rewardDuration, NoOperation());
         require(block.timestamp > rewardEndTime, CannotChangeRewardDurationDuringActiveReward());
         require(
             _rewardDuration >= MIN_REWARD_DURATION && _rewardDuration <= MAX_REWARD_DURATION,
@@ -311,10 +312,8 @@ contract RegenStaker is
         uint256 newBalance = deposit.balance + compoundedAmount;
         uint256 newEarningPower = _updateEarningPower(deposit, newBalance);
 
-        unchecked {
-            totalStaked += compoundedAmount;
-            depositorTotalStaked[depositOwner] += compoundedAmount;
-        }
+        totalStaked += compoundedAmount;
+        depositorTotalStaked[depositOwner] += compoundedAmount;
 
         deposit.balance = newBalance.toUint96();
         deposit.scaledUnclaimedRewardCheckpoint = 0;
@@ -506,7 +505,6 @@ contract RegenStaker is
         address _claimer
     ) internal override whenNotPaused nonReentrant returns (uint256) {
         uint256 _payout = super._claimReward(_depositId, deposit, _claimer);
-        _revertIfMinimumStakeAmountNotMet(_depositId);
         return _payout;
     }
 
