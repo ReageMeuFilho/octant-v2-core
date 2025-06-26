@@ -160,12 +160,12 @@ contract RegenStaker is
     ///      between operational flexibility and mathematical precision when setting reward durations.
     function setRewardDuration(uint256 _rewardDuration) external {
         _revertIfNotAdmin();
-        require(rewardDuration != _rewardDuration, NoOperation());
         require(block.timestamp > rewardEndTime, CannotChangeRewardDurationDuringActiveReward());
         require(
             _rewardDuration >= MIN_REWARD_DURATION && _rewardDuration <= MAX_REWARD_DURATION,
             InvalidRewardDuration(_rewardDuration)
         );
+        require(rewardDuration != _rewardDuration, NoOperation());
 
         emit RewardDurationSet(_rewardDuration);
         rewardDuration = _rewardDuration;
