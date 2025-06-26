@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "lib/safe-smart-account/contracts/Safe.sol";
-import "lib/safe-smart-account/contracts/proxies/SafeProxy.sol";
-import "lib/safe-smart-account/contracts/proxies/SafeProxyFactory.sol";
+import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
+import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxy.sol";
+import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
 import "forge-std/Script.sol";
 
 import { MockStrategy } from "../../test/mocks/zodiac-core/MockStrategy2.sol";

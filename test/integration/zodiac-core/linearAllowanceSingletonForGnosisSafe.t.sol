@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.8.0 <0.9.0;
 import "forge-std/Test.sol";
-import "lib/safe-smart-account/contracts/Safe.sol";
-import "lib/safe-smart-account/contracts/proxies/SafeProxyFactory.sol";
-import "lib/safe-smart-account/contracts/proxies/SafeProxy.sol";
+import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
+import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
+import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxy.sol";
 import { LinearAllowanceSingletonForGnosisSafe } from "src/zodiac-core/modules/LinearAllowanceSingletonForGnosisSafe.sol";
 import { NATIVE_TOKEN } from "src/constants.sol";
-import "lib/safe-smart-account/contracts/libraries/Enum.sol";
+import "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 import { LinearAllowanceExecutorTestHarness } from "test/mocks/zodiac-core/LinearAllowanceExecutorTestHarness.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { ILinearAllowanceSingleton } from "src/zodiac-core/interfaces/ILinearAllowanceSingleton.sol";

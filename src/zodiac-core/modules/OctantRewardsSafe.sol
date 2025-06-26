@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import { Module } from "zodiac/core/Module.sol";
-import { Enum } from "lib/safe-smart-account/contracts/libraries/Enum.sol";
+import { Enum } from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 import { Unauthorized } from "src/errors.sol";
 
 error OctantRewardsSafe__YieldNotInRange(uint256 yield, uint256 maxYield);

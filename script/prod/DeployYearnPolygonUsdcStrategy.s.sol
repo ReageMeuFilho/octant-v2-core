@@ -3,9 +3,9 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Script.sol";
 
-import "lib/safe-smart-account/contracts/Safe.sol";
-import "lib/safe-smart-account/contracts/proxies/SafeProxy.sol";
-import "lib/safe-smart-account/contracts/proxies/SafeProxyFactory.sol";
+import "@gnosis.pm/safe-contracts/contracts/Safe.sol";
+import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxy.sol";
+import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
 
 import { YearnPolygonUsdcStrategy } from "src/zodiac-core/modules/YearnPolygonUsdcStrategy.sol";
 import { DragonTokenizedStrategy } from "src/zodiac-core/vaults/DragonTokenizedStrategy.sol";

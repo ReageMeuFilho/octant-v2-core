@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { Module } from "zodiac/core/Module.sol";
-import { Enum } from "lib/safe-smart-account/contracts/libraries/Enum.sol";
+import { Enum } from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 import { ERC4626Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 
 contract MockVaultModule is Module, ERC4626Upgradeable {
