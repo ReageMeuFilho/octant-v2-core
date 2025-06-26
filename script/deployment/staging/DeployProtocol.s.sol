@@ -13,6 +13,7 @@ import { DeployModuleProxyFactory } from "script/deploy/DeployModuleProxyFactory
 import { DeployPaymentSplitterFactory } from "script/deploy/DeployPaymentSplitterFactory.sol";
 import { DeploySkyCompounderStrategyFactory } from "script/deploy/DeploySkyCompounderStrategyFactory.sol";
 import { DeployMorphoCompounderStrategyFactory } from "script/deploy/DeployMorphoCompounderStrategyFactory.sol";
+import { DeployRegenStakerFactory } from "script/deploy/DeployRegenStakerFactory.sol";
 
 /**
  * @title DeployProtocol
@@ -30,6 +31,7 @@ contract DeployProtocol is Script {
     DeployPaymentSplitterFactory public deployPaymentSplitterFactory;
     DeploySkyCompounderStrategyFactory public deploySkyCompounderStrategyFactory;
     DeployMorphoCompounderStrategyFactory public deployMorphoCompounderStrategyFactory;
+    DeployRegenStakerFactory public deployRegenStakerFactory;
 
     // Deployed contract addresses
     address public moduleProxyFactoryAddress;
@@ -44,6 +46,7 @@ contract DeployProtocol is Script {
     address public paymentSplitterFactoryAddress;
     address public skyCompounderStrategyFactoryAddress;
     address public morphoCompounderStrategyFactoryAddress;
+    address public regenStakerFactoryAddress;
 
     error DeploymentFailed();
 
@@ -58,6 +61,7 @@ contract DeployProtocol is Script {
         deployPaymentSplitterFactory = new DeployPaymentSplitterFactory();
         deploySkyCompounderStrategyFactory = new DeploySkyCompounderStrategyFactory();
         deployMorphoCompounderStrategyFactory = new DeployMorphoCompounderStrategyFactory();
+        deployRegenStakerFactory = new DeployRegenStakerFactory();
     }
 
     function run() public {
@@ -111,6 +115,10 @@ contract DeployProtocol is Script {
             deployMorphoCompounderStrategyFactory.morphoCompounderStrategyFactory()
         );
 
+        // Deploy Regen Staker Factory
+        deployRegenStakerFactory.deploy();
+        regenStakerFactoryAddress = address(deployRegenStakerFactory.regenStakerFactory());
+
         // Log deployment addresses
         console2.log("\nDeployment Summary:");
         console2.log("------------------");
@@ -128,6 +136,7 @@ contract DeployProtocol is Script {
         console2.log("Payment Splitter Factory:                 ", paymentSplitterFactoryAddress);
         console2.log("Sky Compounder Strategy Factory:          ", skyCompounderStrategyFactoryAddress);
         console2.log("Morpho Compounder Strategy Vault Factory: ", morphoCompounderStrategyFactoryAddress);
+        console2.log("Regen Staker Factory:                     ", regenStakerFactoryAddress);
         console2.log("------------------");
         console2.log("Top Hat ID:                ", vm.toString(deployHatsProtocol.topHatId()));
         console2.log("Autonomous Admin Hat ID:   ", vm.toString(deployHatsProtocol.autonomousAdminHatId()));
@@ -183,6 +192,10 @@ contract DeployProtocol is Script {
         vm.writeLine(
             contractAddressFilename,
             string.concat("MORPHO_COMPOUNDER_STRATEGY_FACTORY_ADDRESS=", vm.toString(morphoCompounderStrategyFactoryAddress))
+        );
+        vm.writeLine(
+            contractAddressFilename,
+            string.concat("REGEN_STAKER_FACTORY_ADDRESS=", vm.toString(regenStakerFactoryAddress))
         );
         vm.writeLine(contractAddressFilename, string.concat("HATS_ADDRESS=", vm.toString(hatsAddress)));
         vm.writeLine(
