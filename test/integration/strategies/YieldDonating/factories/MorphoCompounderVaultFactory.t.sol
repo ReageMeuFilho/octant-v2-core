@@ -5,7 +5,7 @@ import { Test } from "forge-std/Test.sol";
 import { console } from "forge-std/console.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MorphoCompounderStrategy } from "src/strategies/yieldDonating/MorphoCompounderStrategy.sol";
-import {MorphoCompounderStrategyFactory} from "src/factories/yieldDonating/MorphoCompounderStrategyFactory.sol";
+import { MorphoCompounderStrategyFactory } from "src/factories/yieldDonating/MorphoCompounderStrategyFactory.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { YieldDonatingTokenizedStrategy } from "src/strategies/yieldDonating/YieldDonatingTokenizedStrategy.sol";

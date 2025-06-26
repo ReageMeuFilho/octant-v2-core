@@ -5,7 +5,7 @@ import { Test } from "forge-std/Test.sol";
 import { console } from "forge-std/console.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { RocketPoolStrategy } from "src/strategies/yieldSkimming/RocketPoolStrategy.sol";
-import {RocketPoolStrategyFactory} from "src/factories/yieldSkimming/RocketPoolStrategyFactory.sol";
+import { RocketPoolStrategyFactory } from "src/factories/yieldSkimming/RocketPoolStrategyFactory.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { YieldSkimmingTokenizedStrategy } from "src/strategies/yieldSkimming/YieldSkimmingTokenizedStrategy.sol";

@@ -109,7 +109,9 @@ contract DeployProtocol is Script {
 
         // Deploy Compounder Strategy Factories
         deploySkyCompounderStrategyFactory.deploy();
-        skyCompounderStrategyFactoryAddress = address(deploySkyCompounderStrategyFactory.skyCompounderStrategyFactory());
+        skyCompounderStrategyFactoryAddress = address(
+            deploySkyCompounderStrategyFactory.skyCompounderStrategyFactory()
+        );
         deployMorphoCompounderStrategyFactory.deploy();
         morphoCompounderStrategyFactoryAddress = address(
             deployMorphoCompounderStrategyFactory.morphoCompounderStrategyFactory()
@@ -191,7 +193,10 @@ contract DeployProtocol is Script {
         );
         vm.writeLine(
             contractAddressFilename,
-            string.concat("MORPHO_COMPOUNDER_STRATEGY_FACTORY_ADDRESS=", vm.toString(morphoCompounderStrategyFactoryAddress))
+            string.concat(
+                "MORPHO_COMPOUNDER_STRATEGY_FACTORY_ADDRESS=",
+                vm.toString(morphoCompounderStrategyFactoryAddress)
+            )
         );
         vm.writeLine(
             contractAddressFilename,

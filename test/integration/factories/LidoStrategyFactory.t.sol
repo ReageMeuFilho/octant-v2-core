@@ -79,12 +79,7 @@ contract LidoStrategyFactoryTest is Test {
         // Create a strategy and check events
         vm.startPrank(management);
         vm.expectEmit(true, true, true, false); // Check first 3 indexed params, ignore the non-indexed timestamp
-        emit LidoStrategyFactory.StrategyDeploy(
-            management,
-            donationAddress,
-            expectedStrategyAddress,
-            vaultSharesName
-        ); // We can't predict the exact address
+        emit LidoStrategyFactory.StrategyDeploy(management, donationAddress, expectedStrategyAddress, vaultSharesName); // We can't predict the exact address
 
         address strategyAddress = factory.createStrategy(
             vaultSharesName,
