@@ -165,6 +165,7 @@ contract RegenStaker is
             _rewardDuration >= MIN_REWARD_DURATION && _rewardDuration <= MAX_REWARD_DURATION,
             InvalidRewardDuration(_rewardDuration)
         );
+        require(rewardDuration != _rewardDuration, NoOperation());
 
         emit RewardDurationSet(_rewardDuration);
         rewardDuration = _rewardDuration;
@@ -311,10 +312,8 @@ contract RegenStaker is
         uint256 newBalance = deposit.balance + compoundedAmount;
         uint256 newEarningPower = _updateEarningPower(deposit, newBalance);
 
-        unchecked {
-            totalStaked += compoundedAmount;
-            depositorTotalStaked[depositOwner] += compoundedAmount;
-        }
+        totalStaked += compoundedAmount;
+        depositorTotalStaked[depositOwner] += compoundedAmount;
 
         deposit.balance = newBalance.toUint96();
         deposit.scaledUnclaimedRewardCheckpoint = 0;
@@ -506,7 +505,6 @@ contract RegenStaker is
         address _claimer
     ) internal override whenNotPaused nonReentrant returns (uint256) {
         uint256 _payout = super._claimReward(_depositId, deposit, _claimer);
-        _revertIfMinimumStakeAmountNotMet(_depositId);
         return _payout;
     }
 

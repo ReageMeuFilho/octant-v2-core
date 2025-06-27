@@ -1276,6 +1276,10 @@ contract RegenIntegrationTest is Test {
     function testFuzz_SetRewardDuration(uint256 newDuration) public {
         newDuration = bound(newDuration, MIN_REWARD_DURATION, MAX_REWARD_DURATION);
 
+        // current duration
+        uint256 currentDuration = regenStaker.rewardDuration();
+        vm.assume(newDuration != currentDuration);
+
         vm.prank(ADMIN);
         vm.expectEmit(true, true, true, true);
         emit RegenStaker.RewardDurationSet(newDuration);
@@ -1553,6 +1557,9 @@ contract RegenIntegrationTest is Test {
         secondDurationDays = bound(secondDurationDays, 30, 60);
         uint256 firstDuration = firstDurationDays * 1 days;
         uint256 secondDuration = secondDurationDays * 1 days;
+
+        vm.assume(firstDuration != secondDuration);
+
         rewardAmountBase = bound(rewardAmountBase, max(firstDuration, secondDuration), 100_000_000);
 
         vm.prank(ADMIN);
