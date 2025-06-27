@@ -31,15 +31,15 @@ contract RegenStakerFactory {
         bytes memory constructorParams = abi.encode(
             params.rewardsToken,
             params.stakeToken,
-            params.admin,
-            params.stakerWhitelist,
-            params.contributionWhitelist,
-            params.allocationMechanismWhitelist,
             params.earningPowerCalculator,
             params.maxBumpTip,
+            params.admin,
+            params.rewardDuration,
             params.maxClaimFee,
             params.minimumStakeAmount,
-            params.rewardDuration
+            params.stakerWhitelist,
+            params.contributionWhitelist,
+            params.allocationMechanismWhitelist
         );
 
         stakerAddress = CREATE3.deployDeterministic(
