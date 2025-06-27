@@ -1,5 +1,23 @@
 
 
+## [0.4.0-develop.0](https://github.com/golemfoundation/octant-v2-core/compare/v0.3.0-develop.1...v0.4.0-develop.0) (2025-06-27)
+
+
+### Features
+
+* **regen:** enhance factory for vanity address generation and document precision implications ([c433d8b](https://github.com/golemfoundation/octant-v2-core/commit/c433d8ba56c173ce97dd9804f41dab8f6ca040fe))
+* **strategies:** add availableWithdrawLimit to SkyCompounderStrategy ([8d553c5](https://github.com/golemfoundation/octant-v2-core/commit/8d553c53b9f015f4e1cad2b9e420f61bdc1c5fd9))
+
+
+### Bug Fixes
+
+* **regen:** check if allocation mechanism is whitelisted ([93a15b0](https://github.com/golemfoundation/octant-v2-core/commit/93a15b0bc0b463c32b48e90e0f6cff919dffb02a))
+* **regen:** don't avoid zero amount for notify reward ([5420356](https://github.com/golemfoundation/octant-v2-core/commit/54203561ca7bcd7701b688e3e3131cfe64be68c8))
+* **regen:** don't start whitelists enabled ([a4f350b](https://github.com/golemfoundation/octant-v2-core/commit/a4f350bbca2faab420e8d90ebc2b3524a6fff205))
+* **regen:** factory ([a2209c6](https://github.com/golemfoundation/octant-v2-core/commit/a2209c6e1e5bd9c20e12291ffb1dc4453612a845))
+* **strategies:** correct type mismatch in MorphoCompounderStrategy emergency withdraw ([d062222](https://github.com/golemfoundation/octant-v2-core/commit/d06222282c7deef4e3d758f29a7ee0e213aabfe4))
+* **strategies:** improve loss protection rounding in YieldDonatingTokenizedStrategy ([5be1def](https://github.com/golemfoundation/octant-v2-core/commit/5be1def7497ed6f48f8f01c39841388f0f9abfb4))
+
 ## [0.3.0-develop.1](https://github.com/golemfoundation/octant-v2-core/compare/v0.3.0-develop.0...v0.3.0-develop.1) (2025-06-23)
 
 
