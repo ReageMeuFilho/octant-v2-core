@@ -321,14 +321,25 @@ contract LidoStrategyTest is Test {
 
         // withdraw the donation address shares
         vm.startPrank(donationAddress);
-        vault.redeem(vault.balanceOf(donationAddress), donationAddress, donationAddress);
+        uint256 donationAssetsReceived = vault.redeem(
+            vault.balanceOf(donationAddress),
+            donationAddress,
+            donationAddress
+        );
         vm.stopPrank();
+
+        assertApproxEqRel(
+            donationAssetsReceived,
+            (depositAmount * profitPercentage) / (100 + profitPercentage),
+            0.1e16,
+            "Donation address should have received profit"
+        );
 
         // Verify user received their original deposit
         assertApproxEqRel(
             assetsReceived * newExchangeRate,
             depositAmount * initialExchangeRate,
-            0.001e18, // 0.1% tolerance for fuzzing
+            0.1e16, // 0.1% tolerance for fuzzing
             "User should receive original deposit"
         );
     }

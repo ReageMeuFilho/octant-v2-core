@@ -439,6 +439,7 @@ contract AccountingTest is Setup {
     function test_maxUintDeposit_depositsBalance(address _address, uint256 _amount) public {
         _amount = bound(_amount, minFuzzAmount, maxFuzzAmount);
         vm.assume(_address != address(0) && _address != address(strategy) && _address != address(yieldSource));
+        vm.assume(yieldSource.balanceOf(_address) == 0);
 
         yieldSource.mint(_address, _amount);
 
@@ -499,121 +500,6 @@ contract AccountingTest is Setup {
     }
 
     /**
-     * @notice Test that stored losses are offset against future profits in yield skimming
-     */
-    function test_lossProtection_offsetsAgainstFutureProfits(
-        uint256 _amount,
-        uint16 _lossFactor,
-        uint16 _profitFactor
-    ) public {
-        _amount = bound(_amount, minFuzzAmount, maxFuzzAmount);
-        _lossFactor = uint16(bound(uint256(_lossFactor), 10, MAX_BPS / 2)); // Max 50% loss
-        _profitFactor = uint16(bound(uint256(_profitFactor), 10, MAX_BPS)); // Up to 100% profit
-
-        // Setup initial deposit
-        mintAndDepositIntoStrategy(strategy, user, _amount);
-
-        // Simulate a loss by decreasing the exchange rate
-        uint256 currentRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
-        uint256 lossRate = currentRate - (currentRate * _lossFactor) / MAX_BPS;
-
-        // update the exchange rate
-        MockStrategySkimming(address(strategy)).updateExchangeRate(lossRate);
-
-        // Report the loss
-        vm.prank(keeper);
-        (uint256 lossProfit, uint256 reportedLoss) = strategy.report();
-        assertEq(lossProfit, 0, "Should report no profit on loss");
-        assertGt(reportedLoss, 0, "Should report some loss");
-
-        uint256 donationSharesAfterLoss = strategy.balanceOf(donationAddress);
-
-        // Clear the loss mock first
-        vm.clearMockedCalls();
-
-        // Now simulate profit by increasing the exchange rate beyond original
-        uint256 profitRate = currentRate + (currentRate * _profitFactor) / MAX_BPS;
-
-        // update the exchange rate
-        MockStrategySkimming(address(strategy)).updateExchangeRate(profitRate);
-
-        // Report the profit
-        vm.prank(keeper);
-        (uint256 reportedProfit, uint256 profitLoss) = strategy.report();
-        assertGt(reportedProfit, 0, "Should report some profit");
-        assertEq(profitLoss, 0, "Should report no loss on profit");
-
-        uint256 donationSharesAfterProfit = strategy.balanceOf(donationAddress);
-
-        if (reportedProfit > reportedLoss) {
-            // If profit exceeds loss, donation address should get shares for the net profit
-            assertGt(
-                donationSharesAfterProfit,
-                donationSharesAfterLoss,
-                "Donation shares should increase when profit exceeds loss"
-            );
-        } else {
-            // If profit doesn't exceed loss, no shares should be minted
-            assertEq(
-                donationSharesAfterProfit,
-                donationSharesAfterLoss,
-                "No shares should be minted when profit doesn't exceed stored loss"
-            );
-        }
-
-        // Clear the mock
-        vm.clearMockedCalls();
-    }
-
-    /**
-     * @notice Test multiple loss/profit cycles in yield skimming
-     */
-    function test_lossProtection_multipleCycles(uint256 _amount) public {
-        _amount = bound(_amount, minFuzzAmount, maxFuzzAmount / 10); // Smaller amounts for multiple cycles
-
-        // Setup initial deposit
-        mintAndDepositIntoStrategy(strategy, user, _amount);
-
-        uint256 cumulativeLoss = 0;
-        uint256 cumulativeProfit = 0;
-
-        // Cycle 1: Loss (exchange rate decrease)
-        uint256 currentRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
-        uint256 loss1 = 10; // 10% loss
-        uint256 lossRate = currentRate - (currentRate * loss1) / MAX_BPS;
-        MockStrategySkimming(address(strategy)).updateExchangeRate(lossRate);
-        vm.prank(keeper);
-        strategy.report();
-        cumulativeLoss += loss1;
-
-        // Cycle 2: Small profit (less than accumulated loss)
-        uint256 profit1 = 5; // 5% profit
-        uint256 profitRate = currentRate + (currentRate * profit1) / MAX_BPS;
-        MockStrategySkimming(address(strategy)).updateExchangeRate(profitRate);
-        vm.prank(keeper);
-        strategy.report();
-        cumulativeProfit += profit1;
-
-        uint256 donationSharesAfterPartialRecovery = strategy.balanceOf(donationAddress);
-        assertEq(donationSharesAfterPartialRecovery, 0, "No shares should be minted until losses are fully offset");
-
-        // Cycle 3: Larger profit (exceeds remaining loss)
-        uint256 profit2 = 20; // 20% profit
-        uint256 profitRate2 = currentRate + (currentRate * profit2) / MAX_BPS;
-        MockStrategySkimming(address(strategy)).updateExchangeRate(profitRate2);
-        vm.prank(keeper);
-        strategy.report();
-        cumulativeProfit += profit2;
-
-        uint256 donationSharesAfterFullRecovery = strategy.balanceOf(donationAddress);
-
-        if (cumulativeProfit > cumulativeLoss) {
-            // Should now have shares for the net profit
-            assertGt(donationSharesAfterFullRecovery, 0, "Should have shares after profit exceeds total losses");
-        }
-    }
-
-    /**
      * @notice Test withdraw behavior during stored losses in yield skimming
      */
     function test_lossProtection_withdrawDuringStoredLoss(uint256 _amount, uint16 _lossFactor) public {
@@ -657,9 +543,8 @@ contract AccountingTest is Setup {
         // Setup initial deposit
         mintAndDepositIntoStrategy(strategy, user, _amount);
 
-        // Simulate total loss (100% - exchange rate goes to 0)
-        vm.prank(address(strategy));
-        yieldSource.transfer(address(69), _amount);
+        // mock the exchange rate to 0
+        MockStrategySkimming(address(strategy)).updateExchangeRate(0);
 
         // Report the loss
         vm.prank(keeper);
@@ -667,12 +552,6 @@ contract AccountingTest is Setup {
 
         assertEq(profit, 0, "Should report no profit");
         assertEq(loss, _amount, "Should report total loss");
-        assertEq(strategy.totalAssets(), 0, "Should have no assets left");
         assertEq(strategy.balanceOf(donationAddress), 0, "Donation address should have no shares");
-
-        // Even with total loss, PPS calculation should handle gracefully
-        // (may be 0 or undefined, but shouldn't revert)
-        uint256 pps = strategy.pricePerShare();
-        assertEq(pps, 0, "PPS should be 0 when no assets remain");
     }
 }

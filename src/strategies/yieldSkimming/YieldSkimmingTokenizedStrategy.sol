@@ -6,6 +6,8 @@ import { TokenizedStrategy, Math } from "src/core/TokenizedStrategy.sol";
 import { WadRayMath } from "src/utils/libs/Maths/WadRay.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { IYieldSkimmingStrategy } from "src/strategies/yieldSkimming/IYieldSkimmingStrategy.sol";
+import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title YieldSkimmingTokenizedStrategy
@@ -21,14 +23,15 @@ import { IYieldSkimmingStrategy } from "src/strategies/yieldSkimming/IYieldSkimm
 contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     using Math for uint256;
     using WadRayMath for uint256;
+    using SafeERC20 for ERC20;
 
     /// @dev The exchange rate at the last harvest, scaled by RAY (1e27)
-    struct ExchangeRate {
+    struct YieldSkimmingStorage {
         uint256 lastRateRay;
     }
 
     // exchange rate storage slot
-    bytes32 private constant EXCHANGE_RATE_STORAGE_SLOT = keccak256("octant.yieldSkimming.exchangeRate");
+    bytes32 private constant YIELD_SKIMMING_STORAGE_SLOT = keccak256("octant.yieldSkimming.exchangeRate");
 
     /// @dev Event emitted when harvest is performed
     event Harvest(address indexed caller, uint256 currentRate);
@@ -58,12 +61,15 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     {
         StrategyData storage S = super._strategyStorage();
 
+        uint256 lastLossRate = _strategyYieldSkimmingStorage().lastRateRay;
+
         uint256 rateNow = _currentRateRay();
 
         uint256 currentTotalAssets = IBaseStrategy(address(this)).harvestAndReport();
 
         uint256 totalAssetsBalance = S.asset.balanceOf(address(this));
 
+        // airdropping tokens to the strategy results in profit to the dragon router
         if (totalAssetsBalance != currentTotalAssets) {
             // update total assets
             S.totalAssets = totalAssetsBalance;
@@ -73,42 +79,60 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         uint256 supply = _totalSupply(S); // shares denom. in ETH
 
         if (totalETH > supply) {
-            uint256 profitAmount = totalETH - supply; // positive yield
-            uint256 lossAmount = S.lossAmount;
+            profit = totalETH - supply; // positive yield
 
-            if (profitAmount > lossAmount) {
-                // Profit exceeds accumulated losses, mint shares for net profit
-                uint256 sharesToMint = _convertToShares(S, profitAmount - lossAmount, Math.Rounding.Floor);
+            _mint(S, S.dragonRouter, profit);
 
-                S.lossAmount = 0; // Clear accumulated losses
-                _mint(S, S.dragonRouter, sharesToMint);
-                emit DonationMinted(S.dragonRouter, sharesToMint, rateNow.rayToWad());
-            } else {
-                // Profit doesn't exceed losses, reduce accumulated loss
-                S.lossAmount -= profitAmount;
-            }
-            profit = profitAmount;
-            loss = 0;
-        } else if (totalETH < supply) {
+            // set last lost rate back to 0
+            _strategyYieldSkimmingStorage().lastRateRay = 0;
+
+            emit DonationMinted(S.dragonRouter, profit, rateNow.rayToWad());
+            // do not burn shares if the rate is the same as the last rate
+        } else if (totalETH < supply && rateNow < lastLossRate) {
             // Rare: negative yield (slash). Use loss protection mechanism.
-            uint256 lossAmount = supply - totalETH;
-            _handleDragonLossProtection(S, lossAmount, rateNow);
-            // residual loss (if any) will lower PPS < 1
-            profit = 0;
-            loss = lossAmount;
+            loss = supply - totalETH;
+            _handleDragonLossProtection(S, loss);
         } else {
             // No change
             profit = 0;
             loss = 0;
         }
 
-        _strategyStorageExchangeRate().lastRateRay = rateNow;
         S.lastReport = uint96(block.timestamp);
+        _strategyYieldSkimmingStorage().lastRateRay = rateNow;
 
         emit Harvest(msg.sender, rateNow.rayToWad());
-        emit Reported(profit, loss);
 
-        return (profit, loss);
+        uint256 profitInAssets = rateNow == 0 ? 0 : profit.mulDiv(WadRayMath.RAY, rateNow);
+
+        // if the rate is 0, we need to use the total assets balance as the loss
+        uint256 lossInAssets = rateNow == 0 ? totalAssetsBalance : loss.mulDiv(WadRayMath.RAY, rateNow);
+        emit Reported(profitInAssets, lossInAssets);
+
+        return (profitInAssets, lossInAssets);
+    }
+
+    function _deposit(StrategyData storage S, address receiver, uint256 assets, uint256 shares) internal override {
+        // tracking the last rate ray for the first deposit
+        if (_strategyYieldSkimmingStorage().lastRateRay == 0) {
+            _strategyYieldSkimmingStorage().lastRateRay = _currentRateRay();
+        }
+        // Cache storage variables used more than once.
+        ERC20 _asset = S.asset;
+
+        // Need to transfer before minting or ERC777s could reenter.
+        _asset.safeTransferFrom(msg.sender, address(this), assets);
+
+        // We can deploy the full loose balance currently held.
+        IBaseStrategy(address(this)).deployFunds(_asset.balanceOf(address(this)));
+
+        // Adjust total Assets.
+        S.totalAssets += assets;
+
+        // mint shares
+        _mint(S, receiver, shares);
+
+        emit Deposit(msg.sender, receiver, assets, shares);
     }
 
     /**
@@ -134,7 +158,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
      * @return The last exchange rate in RAY format
      */
     function getLastRateRay() external view returns (uint256) {
-        return _strategyStorageExchangeRate().lastRateRay;
+        return _strategyYieldSkimmingStorage().lastRateRay;
     }
 
     /**
@@ -145,31 +169,28 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         return _currentRateRay();
     }
 
-    function _strategyStorageExchangeRate() internal pure returns (ExchangeRate storage S) {
+    function _strategyYieldSkimmingStorage() internal pure returns (YieldSkimmingStorage storage S) {
         // Since STORAGE_SLOT is a constant, we have to put a variable
         // on the stack to access it from an inline assembly block.
-        bytes32 slot = EXCHANGE_RATE_STORAGE_SLOT;
+        bytes32 slot = YIELD_SKIMMING_STORAGE_SLOT;
         assembly {
             S.slot := slot
         }
     }
 
     /**
-     * @dev Internal function to handle loss protection for dragon principal
-     * @param S Storage struct pointer to access strategy's storage variables
-     * @param loss The amount of loss in terms of asset to protect against
-     * @param rateNow The current exchange rate for event emission
-     *
-     * This function accumulates losses in the strategy storage. When future profits occur,
-     * they will first offset accumulated losses before minting new shares to dragonRouter.
-     * This approach provides better accounting and ensures losses are properly tracked
-     * across multiple reporting periods.
+     * This function calculates how many shares would be equivalent to the loss amount,
+     * then burns up to that amount of shares from dragonRouter, limited by the router's
+     * actual balance. This effectively socializes the loss among all shareholders by
+     * burning shares from the donation recipient rather than reducing the value of all shares.
      */
-    function _handleDragonLossProtection(StrategyData storage S, uint256 loss, uint256 rateNow) internal {
-        // Accumulate loss for future offset against profits
-        S.lossAmount += loss;
+    function _handleDragonLossProtection(StrategyData storage S, uint256 loss) internal {
+        // Can only burn up to available shares
+        uint256 sharesBurned = Math.min(loss, S.balances[S.dragonRouter]);
 
-        // Emit event for transparency (even though no shares are burned immediately)
-        emit DonationBurned(S.dragonRouter, 0, rateNow.rayToWad());
+        if (sharesBurned > 0) {
+            // Burn shares from dragon router
+            _burn(S, S.dragonRouter, sharesBurned);
+        }
     }
 }

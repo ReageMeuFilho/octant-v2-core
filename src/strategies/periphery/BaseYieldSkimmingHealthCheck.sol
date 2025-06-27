@@ -5,6 +5,7 @@ import { BaseStrategy } from "src/core/BaseStrategy.sol";
 import { IBaseHealthCheck } from "src/strategies/interfaces/IBaseHealthCheck.sol";
 import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
 import { IYieldSkimmingStrategy } from "src/strategies/yieldSkimming/IYieldSkimmingStrategy.sol";
+import { WadRayMath } from "src/utils/libs/Maths/WadRay.sol";
 
 /**
  *   @title Base Yield Skimming Health Check
@@ -24,6 +25,7 @@ import { IYieldSkimmingStrategy } from "src/strategies/yieldSkimming/IYieldSkimm
  *   needed before reporting an unexpected loss or profit.
  */
 abstract contract BaseYieldSkimmingHealthCheck is BaseStrategy, IBaseHealthCheck {
+    using WadRayMath for uint256;
     // Can be used to determine if a healthcheck should be called.
     // Defaults to true;
     bool public doHealthCheck = true;
@@ -128,28 +130,24 @@ abstract contract BaseYieldSkimmingHealthCheck is BaseStrategy, IBaseHealthCheck
      * @dev To be called during a report to make sure the profit
      * or loss being recorded is within the acceptable bound.
      */
-    function _executeHealthCheck(uint256 _newTotalAssets) internal virtual {
+    function _executeHealthCheck(uint256 /*_newTotalAssets*/) internal virtual {
         if (!doHealthCheck) {
             doHealthCheck = true;
             return;
         }
 
-        // Get the current total assets from the implementation.
-        uint256 currentTotalAssets = ITokenizedStrategy(address(this)).totalSupply();
+        uint256 currentExchangeRate = IYieldSkimmingStrategy(address(this)).getLastRateRay().rayToWad();
+        uint256 newExchangeRate = IYieldSkimmingStrategy(address(this)).getCurrentExchangeRate();
 
-        // new total assets is the total assets at the new rate
-        _newTotalAssets =
-            (_newTotalAssets * IYieldSkimmingStrategy(address(this)).getCurrentExchangeRate()) /
-            10 ** IYieldSkimmingStrategy(address(this)).decimalsOfExchangeRate();
-
-        if (_newTotalAssets > currentTotalAssets) {
+        if (currentExchangeRate < newExchangeRate) {
             require(
-                ((_newTotalAssets - currentTotalAssets) <= (currentTotalAssets * uint256(_profitLimitRatio)) / MAX_BPS),
+                ((newExchangeRate - currentExchangeRate) <=
+                    (currentExchangeRate * uint256(_profitLimitRatio)) / MAX_BPS),
                 "!profit"
             );
-        } else if (currentTotalAssets > _newTotalAssets) {
+        } else if (currentExchangeRate > newExchangeRate) {
             require(
-                (currentTotalAssets - _newTotalAssets <= ((currentTotalAssets * uint256(_lossLimitRatio)) / MAX_BPS)),
+                ((currentExchangeRate - newExchangeRate) <= (currentExchangeRate * uint256(_lossLimitRatio)) / MAX_BPS),
                 "!loss"
             );
         }
