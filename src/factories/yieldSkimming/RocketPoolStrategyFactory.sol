@@ -4,7 +4,7 @@ pragma solidity >=0.8.25;
 import { Create2 } from "@openzeppelin/contracts/utils/Create2.sol";
 import { RocketPoolStrategy } from "src/strategies/yieldSkimming/RocketPoolStrategy.sol";
 
-contract RocketPoolStrategyVaultFactory {
+contract RocketPoolStrategyFactory {
     /**
      * @dev Struct to store information about a strategy.
      * @param deployerAddress The address of the deployer who created the strategy.

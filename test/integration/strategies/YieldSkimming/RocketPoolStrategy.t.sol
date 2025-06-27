@@ -4,7 +4,7 @@ pragma solidity ^0.8.25;
 import { Test } from "forge-std/Test.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { RocketPoolStrategy } from "src/strategies/yieldSkimming/RocketPoolStrategy.sol";
-import { RocketPoolStrategyVaultFactory } from "src/factories/yieldSkimming/RocketPoolStrategyVaultFactory.sol";
+import { RocketPoolStrategyFactory } from "src/factories/yieldSkimming/RocketPoolStrategyFactory.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
@@ -24,7 +24,7 @@ contract RocketPoolStrategyTest is Test {
 
     // Factory for creating strategies
     YieldSkimmingTokenizedStrategy public tokenizedStrategy;
-    RocketPoolStrategyVaultFactory public factory;
+    RocketPoolStrategyFactory public factory;
 
     // Strategy parameters
     address public management;
@@ -123,7 +123,7 @@ contract RocketPoolStrategyTest is Test {
         donationAddress = address(0x4);
 
         // Deploy factory
-        factory = new RocketPoolStrategyVaultFactory();
+        factory = new RocketPoolStrategyFactory();
 
         // Deploy strategy using the factory's createStrategy method
         vm.startPrank(management);

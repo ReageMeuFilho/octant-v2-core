@@ -12,6 +12,10 @@ The DeployProtocol script handles the sequential deployment of:
 4. Dragon Router
 5. Mock Strategy (for testing)
 6. Hats Protocol & Dragon Hatter
+7. Payment Splitter Factory
+8. Sky Compounder Strategy Factory
+9. Morpho Compounder Strategy Factory
+10. Regen Staker Factory
 
 ## Prerequisites
 

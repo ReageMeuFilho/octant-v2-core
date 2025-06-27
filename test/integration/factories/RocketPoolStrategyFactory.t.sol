@@ -5,22 +5,22 @@ import { Test } from "forge-std/Test.sol";
 import { console } from "forge-std/console.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { RocketPoolStrategy } from "src/strategies/yieldSkimming/RocketPoolStrategy.sol";
-import { RocketPoolStrategyVaultFactory } from "src/factories/yieldSkimming/RocketPoolStrategyVaultFactory.sol";
+import { RocketPoolStrategyFactory } from "src/factories/yieldSkimming/RocketPoolStrategyFactory.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { YieldSkimmingTokenizedStrategy } from "src/strategies/yieldSkimming/YieldSkimmingTokenizedStrategy.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import { Create2 } from "@openzeppelin/contracts/utils/Create2.sol";
 
-/// @title RocketPoolVaultFactory Test
+/// @title RocketPoolFactory Test
 /// @author Octant
 /// @notice Integration tests for the RocketPoolVaultFactory using a mainnet fork
-contract RocketPoolStrategyVaultFactoryTest is Test {
+contract RocketPoolStrategyFactoryTest is Test {
     using SafeERC20 for ERC20;
 
     // Factory for creating strategies
     YieldSkimmingTokenizedStrategy public tokenizedStrategy;
-    RocketPoolStrategyVaultFactory public factory;
+    RocketPoolStrategyFactory public factory;
 
     // Strategy parameters
     address public management;
@@ -59,7 +59,7 @@ contract RocketPoolStrategyVaultFactoryTest is Test {
         donationAddress = address(0x4);
 
         // Deploy factory
-        factory = new RocketPoolStrategyVaultFactory();
+        factory = new RocketPoolStrategyFactory();
 
         // Label addresses for better trace outputs
         vm.label(address(factory), "RocketPoolVaultFactory");
@@ -95,7 +95,7 @@ contract RocketPoolStrategyVaultFactoryTest is Test {
         // Create a strategy and check events
         vm.startPrank(management);
         vm.expectEmit(true, true, true, false); // Check first 3 indexed params, ignore the non-indexed timestamp
-        emit RocketPoolStrategyVaultFactory.StrategyDeploy(
+        emit RocketPoolStrategyFactory.StrategyDeploy(
             management,
             donationAddress,
             expectedStrategyAddress,
@@ -237,13 +237,13 @@ contract RocketPoolStrategyVaultFactoryTest is Test {
 
         // Deploy multiple factories
         for (uint i = 0; i < 3; i++) {
-            factories[i] = address(new RocketPoolStrategyVaultFactory());
+            factories[i] = address(new RocketPoolStrategyFactory());
         }
 
         // Create strategies with same salt from different factories
         for (uint i = 0; i <= factoryIndex; i++) {
             vm.startPrank(management);
-            strategyAddresses[i] = RocketPoolStrategyVaultFactory(factories[i]).createStrategy(
+            strategyAddresses[i] = RocketPoolStrategyFactory(factories[i]).createStrategy(
                 vaultSharesName,
                 management,
                 keeper,
@@ -267,7 +267,7 @@ contract RocketPoolStrategyVaultFactoryTest is Test {
         bytes32 differentSalt = keccak256(abi.encodePacked(strategySalt, "DIFFERENT"));
 
         vm.startPrank(management);
-        address differentSaltAddress = RocketPoolStrategyVaultFactory(factories[0]).createStrategy(
+        address differentSaltAddress = RocketPoolStrategyFactory(factories[0]).createStrategy(
             vaultSharesName,
             management,
             keeper,

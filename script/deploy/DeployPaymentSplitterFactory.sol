@@ -8,6 +8,10 @@ import { PaymentSplitterFactory } from "src/factories/PaymentSplitterFactory.sol
 contract DeployPaymentSplitterFactory is Script {
     PaymentSplitterFactory public paymentSplitterFactory;
 
+    function deploy() public virtual {
+        run();
+    }
+
     function run() public returns (PaymentSplitterFactory) {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);

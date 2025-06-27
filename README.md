@@ -98,8 +98,8 @@ Yield-generating strategy contracts:
 
 #### Factory Contracts (`src/factories/`)
 Deployment and creation contracts:
-- **LidoStrategyVaultFactory.sol**: Factory for Lido strategy vaults
-- **MorphoCompounderStrategyVaultFactory.sol**: Factory for Morpho strategy vaults
+- **LidoStrategyFactory.sol**: Factory for Lido strategy vaults
+- **MorphoCompounderStrategyFactory.sol**: Factory for Morpho strategy vaults
 - **MultistrategyVaultFactory.sol**: Factory for core multistrategy vaults
 - **PaymentSplitterFactory.sol**: Factory for payment splitter contracts
 - **SkyCompounderStrategyFactory.sol**: Factory for Sky strategy contracts

@@ -10,6 +10,10 @@ import { DeployHatsProtocol } from "script/deploy/DeployHatsProtocol.sol";
 import { DeployLinearAllowanceSingletonForGnosisSafe } from "script/deploy/DeployLinearAllowanceSingletonForGnosisSafe.sol";
 import { DeployMockStrategy } from "script/deploy/DeployMockStrategy.sol";
 import { DeployModuleProxyFactory } from "script/deploy/DeployModuleProxyFactory.sol";
+import { DeployPaymentSplitterFactory } from "script/deploy/DeployPaymentSplitterFactory.sol";
+import { DeploySkyCompounderStrategyFactory } from "script/deploy/DeploySkyCompounderStrategyFactory.sol";
+import { DeployMorphoCompounderStrategyFactory } from "script/deploy/DeployMorphoCompounderStrategyFactory.sol";
+import { DeployRegenStakerFactory } from "script/deploy/DeployRegenStakerFactory.sol";
 
 /**
  * @title DeployProtocol
@@ -24,6 +28,10 @@ contract DeployProtocol is Script {
     DeployDragonRouter public deployDragonRouter;
     DeployMockStrategy public deployMockStrategy;
     DeployHatsProtocol public deployHatsProtocol;
+    DeployPaymentSplitterFactory public deployPaymentSplitterFactory;
+    DeploySkyCompounderStrategyFactory public deploySkyCompounderStrategyFactory;
+    DeployMorphoCompounderStrategyFactory public deployMorphoCompounderStrategyFactory;
+    DeployRegenStakerFactory public deployRegenStakerFactory;
 
     // Deployed contract addresses
     address public moduleProxyFactoryAddress;
@@ -35,6 +43,10 @@ contract DeployProtocol is Script {
     address public mockTokenAddress;
     address public mockYieldSourceAddress;
     address public hatsAddress;
+    address public paymentSplitterFactoryAddress;
+    address public skyCompounderStrategyFactoryAddress;
+    address public morphoCompounderStrategyFactoryAddress;
+    address public regenStakerFactoryAddress;
 
     error DeploymentFailed();
 
@@ -46,6 +58,10 @@ contract DeployProtocol is Script {
         deployDragonRouter = new DeployDragonRouter();
         deployMockStrategy = new DeployMockStrategy(msg.sender, msg.sender, msg.sender);
         deployHatsProtocol = new DeployHatsProtocol();
+        deployPaymentSplitterFactory = new DeployPaymentSplitterFactory();
+        deploySkyCompounderStrategyFactory = new DeploySkyCompounderStrategyFactory();
+        deployMorphoCompounderStrategyFactory = new DeployMorphoCompounderStrategyFactory();
+        deployRegenStakerFactory = new DeployRegenStakerFactory();
     }
 
     function run() public {
@@ -87,20 +103,42 @@ contract DeployProtocol is Script {
         deployHatsProtocol.deploy();
         hatsAddress = address(deployHatsProtocol.hats());
 
+        // Deploy Payment Splitter Factory
+        deployPaymentSplitterFactory.deploy();
+        paymentSplitterFactoryAddress = address(deployPaymentSplitterFactory.paymentSplitterFactory());
+
+        // Deploy Compounder Strategy Factories
+        deploySkyCompounderStrategyFactory.deploy();
+        skyCompounderStrategyFactoryAddress = address(
+            deploySkyCompounderStrategyFactory.skyCompounderStrategyFactory()
+        );
+        deployMorphoCompounderStrategyFactory.deploy();
+        morphoCompounderStrategyFactoryAddress = address(
+            deployMorphoCompounderStrategyFactory.morphoCompounderStrategyFactory()
+        );
+
+        // Deploy Regen Staker Factory
+        deployRegenStakerFactory.deploy();
+        regenStakerFactoryAddress = address(deployRegenStakerFactory.regenStakerFactory());
+
         // Log deployment addresses
         console2.log("\nDeployment Summary:");
         console2.log("------------------");
-        console2.log("Starting block:            ", startingBlock);
-        console2.log("Module Proxy Factory:      ", moduleProxyFactoryAddress);
-        console2.log("Dragon Tokenized Strategy: ", dragonTokenizedStrategyAddress);
-        console2.log("Dragon Router:             ", dragonRouterAddress);
-        console2.log("Split Checker:             ", splitCheckerAddress);
-        console2.log("Mock Strategy Singleton:   ", mockStrategySingletonAddress);
-        console2.log("Mock token:                ", mockTokenAddress);
-        console2.log("Mock yield source:         ", mockYieldSourceAddress);
-        console2.log("Linear Allowance Singleton:", linearAllowanceSingletonForGnosisSafeAddress);
-        console2.log("Hats contract:             ", hatsAddress);
-        console2.log("DragonHatter:              ", address(deployHatsProtocol.dragonHatter()));
+        console2.log("Starting block:                           ", startingBlock);
+        console2.log("Module Proxy Factory:                     ", moduleProxyFactoryAddress);
+        console2.log("Dragon Tokenized Strategy:                ", dragonTokenizedStrategyAddress);
+        console2.log("Dragon Router:                            ", dragonRouterAddress);
+        console2.log("Split Checker:                            ", splitCheckerAddress);
+        console2.log("Mock Strategy Singleton:                  ", mockStrategySingletonAddress);
+        console2.log("Mock token:                               ", mockTokenAddress);
+        console2.log("Mock yield source:                        ", mockYieldSourceAddress);
+        console2.log("Linear Allowance Singleton:               ", linearAllowanceSingletonForGnosisSafeAddress);
+        console2.log("Hats contract:                            ", hatsAddress);
+        console2.log("DragonHatter:                             ", address(deployHatsProtocol.dragonHatter()));
+        console2.log("Payment Splitter Factory:                 ", paymentSplitterFactoryAddress);
+        console2.log("Sky Compounder Strategy Factory:          ", skyCompounderStrategyFactoryAddress);
+        console2.log("Morpho Compounder Strategy Vault Factory: ", morphoCompounderStrategyFactoryAddress);
+        console2.log("Regen Staker Factory:                     ", regenStakerFactoryAddress);
         console2.log("------------------");
         console2.log("Top Hat ID:                ", vm.toString(deployHatsProtocol.topHatId()));
         console2.log("Autonomous Admin Hat ID:   ", vm.toString(deployHatsProtocol.autonomousAdminHatId()));
@@ -144,6 +182,25 @@ contract DeployProtocol is Script {
                 "LINEAR_ALLOWANCE_SINGLETON_FOR_GNOSIS_SAFE_ADDRESS=",
                 vm.toString(linearAllowanceSingletonForGnosisSafeAddress)
             )
+        );
+        vm.writeLine(
+            contractAddressFilename,
+            string.concat("PAYMENT_SPLITTER_FACTORY_ADDRESS=", vm.toString(paymentSplitterFactoryAddress))
+        );
+        vm.writeLine(
+            contractAddressFilename,
+            string.concat("SKY_COMPOUNDER_STRATEGY_FACTORY_ADDRESS=", vm.toString(skyCompounderStrategyFactoryAddress))
+        );
+        vm.writeLine(
+            contractAddressFilename,
+            string.concat(
+                "MORPHO_COMPOUNDER_STRATEGY_FACTORY_ADDRESS=",
+                vm.toString(morphoCompounderStrategyFactoryAddress)
+            )
+        );
+        vm.writeLine(
+            contractAddressFilename,
+            string.concat("REGEN_STAKER_FACTORY_ADDRESS=", vm.toString(regenStakerFactoryAddress))
         );
         vm.writeLine(contractAddressFilename, string.concat("HATS_ADDRESS=", vm.toString(hatsAddress)));
         vm.writeLine(

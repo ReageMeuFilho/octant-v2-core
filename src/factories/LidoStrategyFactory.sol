@@ -2,9 +2,9 @@
 pragma solidity >=0.8.25;
 
 import { CREATE3 } from "lib/solady/src/utils/CREATE3.sol";
-import { MorphoCompounderStrategy } from "src/strategies/yieldDonating/MorphoCompounderStrategy.sol";
+import { LidoStrategy } from "src/strategies/yieldSkimming/LidoStrategy.sol";
 
-contract MorphoCompounderStrategyVaultFactory {
+contract LidoStrategyFactory {
     /**
      * @dev Struct to store information about a strategy.
      * @param deployerAddress The address of the deployer who created the strategy.
@@ -33,7 +33,7 @@ contract MorphoCompounderStrategyVaultFactory {
      */
     mapping(address => StrategyInfo[]) public strategies;
 
-    address public constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+    address public constant WSTETH = 0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0;
 
     event StrategyDeploy(
         address indexed deployer,
@@ -43,10 +43,10 @@ contract MorphoCompounderStrategyVaultFactory {
     );
 
     /**
-     * @notice Deploys a new MorphoCompounder strategy for the Yield Skimming Vault.
+     * @notice Deploys a new Lido strategy for the Yield Skimming Vault.
      * @dev This function uses CREATE3 to deploy a new strategy contract deterministically.
      *      The strategy is initialized with the provided parameters, and its address is
-     *      returned upon successful deployment. The function emits a `MorphoStrategyDeploy` event.
+     *      returned upon successful deployment. The function emits a `LidoStrategyDeploy` event.
      * @param _name The name of the vault token associated with the strategy.
      * @param _management The address of the management entity responsible for the strategy.
      * @param _keeper The address of the keeper responsible for maintaining the strategy.
@@ -56,7 +56,6 @@ contract MorphoCompounderStrategyVaultFactory {
      * @return strategyAddress The address of the newly deployed strategy contract.
      */
     function createStrategy(
-        address _compounderVault,
         string memory _name,
         address _management,
         address _keeper,
@@ -66,10 +65,9 @@ contract MorphoCompounderStrategyVaultFactory {
         address _tokenizedStrategyAddress
     ) external returns (address strategyAddress) {
         bytes memory bytecode = abi.encodePacked(
-            type(MorphoCompounderStrategy).creationCode,
+            type(LidoStrategy).creationCode,
             abi.encode(
-                _compounderVault,
-                USDC,
+                WSTETH,
                 _name,
                 _management,
                 _keeper,
