@@ -86,8 +86,104 @@ contract QuadraticVotingAccountingAuditTest is Test {
         uint256 proposal2Funding;
     }
 
+    // Enhanced test context for stack optimization
+    struct TestContext {
+        // Alpha calculations
+        uint256 constrainedAlphaNumerator;
+        uint256 constrainedAlphaDenominator;
+        uint256 requiredMatchingPool;
+        
+        // Funding calculations
+        uint256 expectedProject1Funding;
+        uint256 expectedProject2Funding;
+        uint256 totalQuadraticSum;
+        uint256 totalLinearSum;
+        
+        // Asset tracking
+        uint256 totalUserDeposits;
+        uint256 totalAssets;
+        uint256 totalShares;
+        uint256 matchingPoolNeeded;
+        uint256 totalAssetsNeeded;
+        
+        // Redemption tracking
+        uint256 recipient1Shares;
+        uint256 recipient2Shares;
+        uint256 recipient3Shares;
+        uint256 recipient1Assets;
+        uint256 recipient2Assets;
+        uint256 recipient3Assets;
+        uint256 expectedTotalAssets;
+        
+        // Proposal IDs and test state
+        uint256 pid1;
+        uint256 pid2;
+        uint256 pid3;
+        uint256 startBlock;
+        uint256 queueTimestamp;
+        uint256 expectedRedeemableTime;
+        
+        // Expected funding and calculations
+        uint256 expectedFundingPerProposal;
+        uint256 expectedRemainingPower;
+        uint256 expectedAssetsPerRecipient;
+        
+        // Asset distribution verification
+        uint256 totalAssetsDistributed;
+        uint256 totalSharesRedeemed;
+        
+        // Final state tracking
+        uint256 mechanismBalanceBefore;
+        uint256 recipient1BalanceBefore;
+        uint256 recipient2BalanceBefore;
+        uint256 recipient1ActualShares;
+        uint256 recipient2ActualShares;
+    }
+
+    // Storage-based test context for stack optimization
+    TestContext internal currentTestCtx;
+
     function _tokenized(address _mechanism) internal pure returns (TokenizedAllocationMechanism) {
         return TokenizedAllocationMechanism(_mechanism);
+    }
+
+    /// @notice Clear test context for fresh initialization
+    function _clearTestContext() internal {
+        delete currentTestCtx.constrainedAlphaNumerator;
+        delete currentTestCtx.constrainedAlphaDenominator;
+        delete currentTestCtx.requiredMatchingPool;
+        delete currentTestCtx.expectedProject1Funding;
+        delete currentTestCtx.expectedProject2Funding;
+        delete currentTestCtx.totalQuadraticSum;
+        delete currentTestCtx.totalLinearSum;
+        delete currentTestCtx.totalUserDeposits;
+        delete currentTestCtx.totalAssets;
+        delete currentTestCtx.totalShares;
+        delete currentTestCtx.matchingPoolNeeded;
+        delete currentTestCtx.totalAssetsNeeded;
+        delete currentTestCtx.recipient1Shares;
+        delete currentTestCtx.recipient2Shares;
+        delete currentTestCtx.recipient3Shares;
+        delete currentTestCtx.recipient1Assets;
+        delete currentTestCtx.recipient2Assets;
+        delete currentTestCtx.recipient3Assets;
+        delete currentTestCtx.expectedTotalAssets;
+        delete currentTestCtx.pid1;
+        delete currentTestCtx.pid2;
+        delete currentTestCtx.pid3;
+        delete currentTestCtx.startBlock;
+        delete currentTestCtx.queueTimestamp;
+        delete currentTestCtx.expectedRedeemableTime;
+        delete currentTestCtx.expectedFundingPerProposal;
+        delete currentTestCtx.expectedRemainingPower;
+        delete currentTestCtx.expectedAssetsPerRecipient;
+        delete currentTestCtx.totalAssetsDistributed;
+        delete currentTestCtx.totalSharesRedeemed;
+        delete currentTestCtx.mechanismBalanceBefore;
+        delete currentTestCtx.recipient1BalanceBefore;
+        delete currentTestCtx.recipient2BalanceBefore;
+        delete currentTestCtx.recipient1ActualShares;
+        delete currentTestCtx.recipient2ActualShares;
     }
 
     function setUp() public {
@@ -212,8 +308,10 @@ contract QuadraticVotingAccountingAuditTest is Test {
 
     /// @notice Complete end-to-end accounting audit test
     function testCompleteAccountingAudit_ThreeVotersTwoProposals() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // Clear and initialize test context
+        _clearTestContext();
+        currentTestCtx.startBlock = _tokenized(address(mechanism)).startBlock();
+        vm.roll(currentTestCtx.startBlock - 1);
 
         // ==================== PHASE 1: INITIAL STATE ====================
         AccountingState memory initialState = _captureAccountingState(0, 0);
@@ -259,12 +357,12 @@ contract QuadraticVotingAccountingAuditTest is Test {
         console.log("=== PHASE 3: PROPOSAL CREATION ===");
 
         vm.prank(alice);
-        uint256 pid1 = _tokenized(address(mechanism)).propose(recipient1, "Project Alpha - Renewable Energy");
+        currentTestCtx.pid1 = _tokenized(address(mechanism)).propose(recipient1, "Project Alpha - Renewable Energy");
 
         vm.prank(bob);
-        uint256 pid2 = _tokenized(address(mechanism)).propose(recipient2, "Project Beta - Education Platform");
+        currentTestCtx.pid2 = _tokenized(address(mechanism)).propose(recipient2, "Project Beta - Education Platform");
 
-        AccountingState memory postProposalState = _captureAccountingState(pid1, pid2);
+        AccountingState memory postProposalState = _captureAccountingState(currentTestCtx.pid1, currentTestCtx.pid2);
         _logAccountingState("POST_PROPOSAL", postProposalState);
         _verifyAccountingInvariants(postProposalState, "POST_PROPOSAL");
 
@@ -282,7 +380,7 @@ contract QuadraticVotingAccountingAuditTest is Test {
 
         // ==================== PHASE 4: VOTING PHASE ====================
         console.log("=== PHASE 4: VOTING PHASE ===");
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.roll(currentTestCtx.startBlock + VOTING_DELAY + 1);
 
         // All three users vote on both proposals with same weight (20)
         console.log("Vote weight:", VOTE_WEIGHT);
@@ -290,80 +388,79 @@ contract QuadraticVotingAccountingAuditTest is Test {
 
         // Alice votes
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, VOTE_WEIGHT);
+        _tokenized(address(mechanism)).castVote(currentTestCtx.pid1, TokenizedAllocationMechanism.VoteType.For, VOTE_WEIGHT);
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, VOTE_WEIGHT);
+        _tokenized(address(mechanism)).castVote(currentTestCtx.pid2, TokenizedAllocationMechanism.VoteType.For, VOTE_WEIGHT);
 
         // Bob votes
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, VOTE_WEIGHT);
+        _tokenized(address(mechanism)).castVote(currentTestCtx.pid1, TokenizedAllocationMechanism.VoteType.For, VOTE_WEIGHT);
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, VOTE_WEIGHT);
+        _tokenized(address(mechanism)).castVote(currentTestCtx.pid2, TokenizedAllocationMechanism.VoteType.For, VOTE_WEIGHT);
 
         // Charlie votes
         vm.prank(charlie);
-        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, VOTE_WEIGHT);
+        _tokenized(address(mechanism)).castVote(currentTestCtx.pid1, TokenizedAllocationMechanism.VoteType.For, VOTE_WEIGHT);
         vm.prank(charlie);
-        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, VOTE_WEIGHT);
+        _tokenized(address(mechanism)).castVote(currentTestCtx.pid2, TokenizedAllocationMechanism.VoteType.For, VOTE_WEIGHT);
 
-        AccountingState memory postVotingState = _captureAccountingState(pid1, pid2);
+        AccountingState memory postVotingState = _captureAccountingState(currentTestCtx.pid1, currentTestCtx.pid2);
         _logAccountingState("POST_VOTING", postVotingState);
         _verifyAccountingInvariants(postVotingState, "POST_VOTING");
 
-        // Verify voting power consumption
-        uint256 expectedRemainingPower = USER_DEPOSIT - (VOTE_COST * 2); // Each user votes twice
-        assertEq(postVotingState.aliceVotingPower, expectedRemainingPower, "Alice voting power incorrectly consumed");
-        assertEq(postVotingState.bobVotingPower, expectedRemainingPower, "Bob voting power incorrectly consumed");
+        // Store expected values in test context
+        currentTestCtx.expectedRemainingPower = USER_DEPOSIT - (VOTE_COST * 2); // Each user votes twice
+        assertEq(postVotingState.aliceVotingPower, currentTestCtx.expectedRemainingPower, "Alice voting power incorrectly consumed");
+        assertEq(postVotingState.bobVotingPower, currentTestCtx.expectedRemainingPower, "Bob voting power incorrectly consumed");
         assertEq(
             postVotingState.charlieVotingPower,
-            expectedRemainingPower,
+            currentTestCtx.expectedRemainingPower,
             "Charlie voting power incorrectly consumed"
         );
 
         // Verify proposal funding calculation
         // Each proposal: 3 users × weight 20 = total weight 60
         // QuadraticFunding: α × (60)² + (1-α) × contributions = 1 × 3600 + 0 × 1200 = 3600
-        uint256 expectedFundingPerProposal = 3600;
-        assertEq(postVotingState.proposal1Funding, expectedFundingPerProposal, "Proposal 1 funding should be 3600");
-        assertEq(postVotingState.proposal2Funding, expectedFundingPerProposal, "Proposal 2 funding should be 3600");
+        currentTestCtx.expectedFundingPerProposal = 3600;
+        assertEq(postVotingState.proposal1Funding, currentTestCtx.expectedFundingPerProposal, "Proposal 1 funding should be 3600");
+        assertEq(postVotingState.proposal2Funding, currentTestCtx.expectedFundingPerProposal, "Proposal 2 funding should be 3600");
 
         // ==================== PHASE 4.5: ADD MATCHING POOL FOR 1:1 RATIO ====================
         console.log("=== PHASE 4.5: ADD MATCHING POOL FOR 1:1 RATIO ===");
 
-        // Calculate matching pool needed using ProperQF formula
-        // Total shares that will be issued = totalQuadraticSum across all proposals
-        uint256 totalQuadraticSum = mechanism.totalQuadraticSum(); // Should be 7200 (3600 × 2)
-        uint256 totalLinearSum = mechanism.totalLinearSum(); // Should be 2400 (1200 × 2)
+        // Calculate matching pool needed using ProperQF formula and store in test context
+        currentTestCtx.totalQuadraticSum = mechanism.totalQuadraticSum(); // Should be 7200 (3600 × 2)
+        currentTestCtx.totalLinearSum = mechanism.totalLinearSum(); // Should be 2400 (1200 × 2)
         uint256 currentAssets = postVotingState.totalMechanismAssets; // User deposits = totalLinearSum
 
         // For alpha = 1: matching pool = totalQuadraticSum - totalLinearSum
-        uint256 matchingPoolNeeded = (totalQuadraticSum - totalLinearSum) * 1 ether;
-        uint256 totalAssetsNeeded = totalQuadraticSum * 1 ether; // For 1:1 ratio
+        currentTestCtx.matchingPoolNeeded = (currentTestCtx.totalQuadraticSum - currentTestCtx.totalLinearSum) * 1 ether;
+        currentTestCtx.totalAssetsNeeded = currentTestCtx.totalQuadraticSum * 1 ether; // For 1:1 ratio
 
-        console.log("Total quadratic sum:", totalQuadraticSum);
-        console.log("Total linear sum:", totalLinearSum);
+        console.log("Total quadratic sum:", currentTestCtx.totalQuadraticSum);
+        console.log("Total linear sum:", currentTestCtx.totalLinearSum);
         console.log("Current assets (user deposits):", currentAssets);
-        console.log("Matching pool needed:", matchingPoolNeeded);
-        console.log("Total assets needed:", totalAssetsNeeded);
+        console.log("Matching pool needed:", currentTestCtx.matchingPoolNeeded);
+        console.log("Total assets needed:", currentTestCtx.totalAssetsNeeded);
 
         // Add the exact matching pool needed for 1:1 ratio
-        token.mint(address(this), matchingPoolNeeded);
-        token.transfer(address(mechanism), matchingPoolNeeded);
+        token.mint(address(this), currentTestCtx.matchingPoolNeeded);
+        token.transfer(address(mechanism), currentTestCtx.matchingPoolNeeded);
 
         // ==================== PHASE 5: FINALIZATION ====================
         console.log("=== PHASE 5: FINALIZATION ===");
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.roll(currentTestCtx.startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
 
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
 
-        AccountingState memory postFinalizationState = _captureAccountingState(pid1, pid2);
+        AccountingState memory postFinalizationState = _captureAccountingState(currentTestCtx.pid1, currentTestCtx.pid2);
         _logAccountingState("POST_FINALIZATION", postFinalizationState);
         _verifyAccountingInvariants(postFinalizationState, "POST_FINALIZATION");
 
         // Verify finalization preserves general asset state (may capture total differently)
         assertTrue(
-            postFinalizationState.totalMechanismAssets >= totalAssetsNeeded,
+            postFinalizationState.totalMechanismAssets >= currentTestCtx.totalAssetsNeeded,
             "Finalization should preserve at least the expected assets"
         );
         assertEq(postFinalizationState.totalSharesSupply, 0, "No shares should be minted until queuing");
@@ -371,20 +468,20 @@ contract QuadraticVotingAccountingAuditTest is Test {
         // ==================== PHASE 6: PROPOSAL QUEUING ====================
         console.log("=== PHASE 6: PROPOSAL QUEUING ===");
 
-        uint256 queueTimestamp = block.timestamp;
+        currentTestCtx.queueTimestamp = block.timestamp;
 
-        (bool success1, ) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", pid1));
+        (bool success1, ) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", currentTestCtx.pid1));
         require(success1, "Queue proposal 1 failed");
 
-        (bool success2, ) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", pid2));
+        (bool success2, ) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", currentTestCtx.pid2));
         require(success2, "Queue proposal 2 failed");
 
-        AccountingState memory postQueueingState = _captureAccountingState(pid1, pid2);
+        AccountingState memory postQueueingState = _captureAccountingState(currentTestCtx.pid1, currentTestCtx.pid2);
         _logAccountingState("POST_QUEUING", postQueueingState);
         _verifyAccountingInvariants(postQueueingState, "POST_QUEUING");
 
         // Verify share minting - should be exact with alpha = 1
-        uint256 expectedSharesPerRecipient = expectedFundingPerProposal; // 3600 shares per recipient
+        uint256 expectedSharesPerRecipient = currentTestCtx.expectedFundingPerProposal; // 3600 shares per recipient
         assertEq(
             postQueueingState.recipient1Shares,
             expectedSharesPerRecipient,
@@ -402,15 +499,15 @@ contract QuadraticVotingAccountingAuditTest is Test {
         );
 
         // Verify timelock setup
-        uint256 expectedRedeemableTime = queueTimestamp + TIMELOCK_DELAY;
+        currentTestCtx.expectedRedeemableTime = currentTestCtx.queueTimestamp + TIMELOCK_DELAY;
         assertEq(
             _tokenized(address(mechanism)).redeemableAfter(recipient1),
-            expectedRedeemableTime,
+            currentTestCtx.expectedRedeemableTime,
             "Recipient1 timelock incorrect"
         );
         assertEq(
             _tokenized(address(mechanism)).redeemableAfter(recipient2),
-            expectedRedeemableTime,
+            currentTestCtx.expectedRedeemableTime,
             "Recipient2 timelock incorrect"
         );
 
@@ -418,86 +515,86 @@ contract QuadraticVotingAccountingAuditTest is Test {
         console.log("=== PHASE 7: SHARE REDEMPTION ===");
 
         // Fast forward past timelock
-        vm.warp(expectedRedeemableTime + 100);
+        vm.warp(currentTestCtx.expectedRedeemableTime + 100);
 
-        // Calculate expected redemption amounts based on actual values
-        uint256 totalAssets = postQueueingState.totalMechanismAssets;
-        uint256 totalShares = postQueueingState.totalSharesSupply;
-        uint256 expectedAssetsPerRecipient = (expectedSharesPerRecipient * totalAssets) / totalShares;
+        // Calculate expected redemption amounts based on actual values and store in test context
+        currentTestCtx.totalAssets = postQueueingState.totalMechanismAssets;
+        currentTestCtx.totalShares = postQueueingState.totalSharesSupply;
+        currentTestCtx.expectedAssetsPerRecipient = (expectedSharesPerRecipient * currentTestCtx.totalAssets) / currentTestCtx.totalShares;
 
-        console.log("Post-queuing total assets:", totalAssets);
-        console.log("Post-queuing total shares:", totalShares);
-        console.log("Actual ratio. Assets per recipient:", expectedAssetsPerRecipient);
+        console.log("Post-queuing total assets:", currentTestCtx.totalAssets);
+        console.log("Post-queuing total shares:", currentTestCtx.totalShares);
+        console.log("Actual ratio. Assets per recipient:", currentTestCtx.expectedAssetsPerRecipient);
 
         // For exact verification, total assets should equal exactly what the mechanism calculated
         // The mechanism already determined the optimal asset allocation during finalization
         console.log("Exact ratio verification:");
 
-        console.log("Expected assets per recipient:", expectedAssetsPerRecipient);
+        console.log("Expected assets per recipient:", currentTestCtx.expectedAssetsPerRecipient);
         console.log("Shares per recipient:", expectedSharesPerRecipient);
-        console.log("Total assets:", totalAssets);
-        console.log("Total shares:", totalShares);
+        console.log("Total assets:", currentTestCtx.totalAssets);
+        console.log("Total shares:", currentTestCtx.totalShares);
 
-        // Recipient1 redemption - use actual shares received
-        uint256 recipient1BalanceBefore = token.balanceOf(recipient1);
-        uint256 mechanismBalanceBefore = token.balanceOf(address(mechanism));
-        uint256 recipient1ActualShares = postQueueingState.recipient1Shares;
+        // Recipient1 redemption - use actual shares received and store in test context
+        currentTestCtx.recipient1BalanceBefore = token.balanceOf(recipient1);
+        currentTestCtx.mechanismBalanceBefore = token.balanceOf(address(mechanism));
+        currentTestCtx.recipient1ActualShares = postQueueingState.recipient1Shares;
 
         vm.prank(recipient1);
-        uint256 recipient1AssetsReceived = _tokenized(address(mechanism)).redeem(
-            recipient1ActualShares,
+        currentTestCtx.recipient1Assets = _tokenized(address(mechanism)).redeem(
+            currentTestCtx.recipient1ActualShares,
             recipient1,
             recipient1
         );
 
-        AccountingState memory postRedemption1State = _captureAccountingState(pid1, pid2);
+        AccountingState memory postRedemption1State = _captureAccountingState(currentTestCtx.pid1, currentTestCtx.pid2);
         _logAccountingState("POST_REDEMPTION_1", postRedemption1State);
 
         // Verify recipient1 redemption accounting - exact proportional calculation
-        uint256 expectedRecipient1Assets = (recipient1ActualShares * totalAssets) / totalShares;
+        uint256 expectedRecipient1Assets = (currentTestCtx.recipient1ActualShares * currentTestCtx.totalAssets) / currentTestCtx.totalShares;
         assertEq(
-            recipient1AssetsReceived,
+            currentTestCtx.recipient1Assets,
             expectedRecipient1Assets,
             "Recipient1 assets must equal exact proportional share"
         );
         assertEq(
             token.balanceOf(recipient1),
-            recipient1BalanceBefore + recipient1AssetsReceived,
+            currentTestCtx.recipient1BalanceBefore + currentTestCtx.recipient1Assets,
             "Recipient1 token balance incorrect"
         );
         assertEq(
             token.balanceOf(address(mechanism)),
-            mechanismBalanceBefore - recipient1AssetsReceived,
+            currentTestCtx.mechanismBalanceBefore - currentTestCtx.recipient1Assets,
             "Mechanism token balance incorrect after redemption1"
         );
         assertEq(postRedemption1State.recipient1Shares, 0, "Recipient1 should have no shares left");
 
-        // Recipient2 redemption - use actual shares received
-        uint256 recipient2BalanceBefore = token.balanceOf(recipient2);
-        mechanismBalanceBefore = token.balanceOf(address(mechanism));
-        uint256 recipient2ActualShares = postRedemption1State.recipient2Shares;
+        // Recipient2 redemption - use actual shares received and store in test context
+        currentTestCtx.recipient2BalanceBefore = token.balanceOf(recipient2);
+        currentTestCtx.mechanismBalanceBefore = token.balanceOf(address(mechanism));
+        currentTestCtx.recipient2ActualShares = postRedemption1State.recipient2Shares;
 
         vm.prank(recipient2);
-        uint256 recipient2AssetsReceived = _tokenized(address(mechanism)).redeem(
-            recipient2ActualShares,
+        currentTestCtx.recipient2Assets = _tokenized(address(mechanism)).redeem(
+            currentTestCtx.recipient2ActualShares,
             recipient2,
             recipient2
         );
 
-        AccountingState memory finalState = _captureAccountingState(pid1, pid2);
+        AccountingState memory finalState = _captureAccountingState(currentTestCtx.pid1, currentTestCtx.pid2);
         _logAccountingState("FINAL", finalState);
         _verifyAccountingInvariants(finalState, "FINAL");
 
         // Verify recipient2 redemption accounting - exact proportional calculation
-        uint256 expectedRecipient2Assets = (recipient2ActualShares * totalAssets) / totalShares;
+        uint256 expectedRecipient2Assets = (currentTestCtx.recipient2ActualShares * currentTestCtx.totalAssets) / currentTestCtx.totalShares;
         assertEq(
-            recipient2AssetsReceived,
+            currentTestCtx.recipient2Assets,
             expectedRecipient2Assets,
             "Recipient2 assets must equal exact proportional share"
         );
         assertEq(
             token.balanceOf(recipient2),
-            recipient2BalanceBefore + recipient2AssetsReceived,
+            currentTestCtx.recipient2BalanceBefore + currentTestCtx.recipient2Assets,
             "Recipient2 token balance incorrect"
         );
         assertEq(finalState.recipient2Shares, 0, "Recipient2 should have no shares left");
@@ -506,17 +603,17 @@ contract QuadraticVotingAccountingAuditTest is Test {
         // ==================== PHASE 8: FINAL VERIFICATION ====================
         console.log("=== PHASE 8: FINAL VERIFICATION ===");
 
-        // Verify good shares:asset ratio achieved
-        uint256 totalAssetsDistributed = recipient1AssetsReceived + recipient2AssetsReceived;
-        uint256 totalSharesRedeemed = recipient1ActualShares + recipient2ActualShares;
+        // Verify good shares:asset ratio achieved using test context
+        currentTestCtx.totalAssetsDistributed = currentTestCtx.recipient1Assets + currentTestCtx.recipient2Assets;
+        currentTestCtx.totalSharesRedeemed = currentTestCtx.recipient1ActualShares + currentTestCtx.recipient2ActualShares;
 
-        console.log("Total assets distributed:", totalAssetsDistributed);
-        console.log("Total shares redeemed:", totalSharesRedeemed);
+        console.log("Total assets distributed:", currentTestCtx.totalAssetsDistributed);
+        console.log("Total shares redeemed:", currentTestCtx.totalSharesRedeemed);
         console.log("EXACT accounting achieved!");
 
         // Verify exact asset conservation - all assets distributed, none lost
-        assertEq(totalAssetsDistributed, totalAssets, "All assets must be distributed exactly");
-        assertEq(totalSharesRedeemed, totalShares, "All shares must be redeemed exactly");
+        assertEq(currentTestCtx.totalAssetsDistributed, currentTestCtx.totalAssets, "All assets must be distributed exactly");
+        assertEq(currentTestCtx.totalSharesRedeemed, currentTestCtx.totalShares, "All shares must be redeemed exactly");
 
         // Verify mechanism is completely clean - exact zero balances
         assertEq(finalState.totalSharesSupply, 0, "Mechanism must have exactly zero shares remaining");
@@ -524,15 +621,15 @@ contract QuadraticVotingAccountingAuditTest is Test {
 
         // Verify exact equal distribution (both proposals had identical votes)
         assertEq(
-            recipient1AssetsReceived,
-            recipient2AssetsReceived,
+            currentTestCtx.recipient1Assets,
+            currentTestCtx.recipient2Assets,
             "Equal votes must result in exactly equal distribution"
         );
 
         console.log("=== ACCOUNTING AUDIT COMPLETE ===");
-        console.log("Total assets distributed:", totalAssetsDistributed);
-        console.log("Recipient1 received:     ", recipient1AssetsReceived);
-        console.log("Recipient2 received:     ", recipient2AssetsReceived);
+        console.log("Total assets distributed:", currentTestCtx.totalAssetsDistributed);
+        console.log("Recipient1 received:     ", currentTestCtx.recipient1Assets);
+        console.log("Recipient2 received:     ", currentTestCtx.recipient2Assets);
         console.log("Mechanism dust remaining:", token.balanceOf(address(mechanism)));
         console.log("SUCCESS: Alpha=1 approach with dynamic matching pool achieved EXACT accounting!");
     }
@@ -601,36 +698,19 @@ contract QuadraticVotingAccountingAuditTest is Test {
         // ==================== CALCULATE OPTIMAL ALPHA ====================
         console.log("=== CALCULATING OPTIMAL ALPHA ===");
 
-        // Get the quadratic funding values after voting
-        uint256 totalQuadraticSum = mechanism.totalQuadraticSum();
-        uint256 totalLinearSum = mechanism.totalLinearSum();
+        // Initialize test context with proposal IDs
+        currentTestCtx.pid1 = pid1;
+        currentTestCtx.pid2 = pid2;
 
-        console.log("Total quadratic sum:", totalQuadraticSum);
-        console.log("Total linear sum:", totalLinearSum);
-
-        // Calculate required matching pool for alpha = 1: matching_pool = totalQuadraticSum - totalLinearSum
-        uint256 quadraticMinusLinear = totalQuadraticSum - totalLinearSum;
-
-        console.log("Quadratic - Linear:", quadraticMinusLinear);
-
-        // Demonstrate the capital constraint formula:
-        // If we had a smaller budget, we'd calculate: alpha = budget / (totalQuadraticSum - totalLinearSum)
-        uint256 smallerBudget = (quadraticMinusLinear * 500) / 1000; // 50% of ideal budget
-        uint256 constrainedAlphaDenominator = quadraticMinusLinear;
-        uint256 constrainedAlphaNumerator = smallerBudget;
-
-        uint256 requiredMatchingPool = (totalQuadraticSum * (constrainedAlphaNumerator)) / constrainedAlphaDenominator;
-
-        console.log("Example: If budget was", smallerBudget, "shares");
-        console.log("Then alpha would be:", constrainedAlphaNumerator, "/", constrainedAlphaDenominator);
-        console.log("Alpha percentage:", (constrainedAlphaNumerator * 10000) / constrainedAlphaDenominator, "/ 10000");
+        // Use helper function to calculate alpha parameters and avoid stack issues
+        _calculateOptimalAlphaParams(currentTestCtx);
 
         // For this test, use the exact matching pool needed for alpha = 1
-        token.mint(address(this), requiredMatchingPool);
-        token.transfer(address(mechanism), requiredMatchingPool);
+        token.mint(address(this), currentTestCtx.requiredMatchingPool);
+        token.transfer(address(mechanism), currentTestCtx.requiredMatchingPool);
 
         // Update the mechanism's alpha to the optimal value
-        mechanism.setAlpha(constrainedAlphaNumerator, constrainedAlphaDenominator);
+        mechanism.setAlpha(currentTestCtx.constrainedAlphaNumerator, currentTestCtx.constrainedAlphaDenominator);
         // Note: This requires the mechanism to be deployed with the correct alpha initially
         // For this test, we'll verify the calculation instead
 
@@ -640,32 +720,8 @@ contract QuadraticVotingAccountingAuditTest is Test {
         // ==================== VERIFY OPTIMAL FUNDING ====================
         console.log("=== VERIFYING OPTIMAL FUNDING ===");
 
-        // With optimal alpha, verify the funding calculations using getTally() from ProperQF
-        (, , uint256 project1QuadraticFunding, uint256 project1LinearFunding) = mechanism.getTally(pid1);
-        (, , uint256 project2QuadraticFunding, uint256 project2LinearFunding) = mechanism.getTally(pid2);
-
-        uint256 project1Funding = project1QuadraticFunding + project1LinearFunding;
-        uint256 project2Funding = project2QuadraticFunding + project2LinearFunding;
-
-        console.log("Project 1 funding:", project1Funding);
-        console.log("Project 2 funding:", project2Funding);
-
-        // Calculate expected funding with constrained alpha
-        // For alpha = constrainedAlphaNumerator/constrainedAlphaDenominator: funding = α × quadratic + (1-α) × linear
-        // Project 1: α × (60)² + (1-α) × 1250
-        // Project 2: α × (27)² + (1-α) × 369
-        uint256 project1QuadraticComponent = (60 * 60 * constrainedAlphaNumerator) / constrainedAlphaDenominator;
-        uint256 project1LinearComponent = (1250 * (constrainedAlphaDenominator - constrainedAlphaNumerator)) /
-            constrainedAlphaDenominator;
-        uint256 expectedProject1Funding = project1QuadraticComponent + project1LinearComponent;
-
-        uint256 project2QuadraticComponent = (27 * 27 * constrainedAlphaNumerator) / constrainedAlphaDenominator;
-        uint256 project2LinearComponent = (369 * (constrainedAlphaDenominator - constrainedAlphaNumerator)) /
-            constrainedAlphaDenominator;
-        uint256 expectedProject2Funding = project2QuadraticComponent + project2LinearComponent;
-
-        assertEq(project1Funding, expectedProject1Funding, "Project 1 funding should match quadratic calculation");
-        assertEq(project2Funding, expectedProject2Funding, "Project 2 funding should match quadratic calculation");
+        // Use helper function to verify funding calculations and avoid stack issues
+        _verifyConstrainedFunding(currentTestCtx);
 
         // Queue proposals
         (bool success1, ) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", pid1));
@@ -679,39 +735,41 @@ contract QuadraticVotingAccountingAuditTest is Test {
 
         AccountingState memory finalState = _captureAccountingState(pid1, pid2);
 
-        uint256 totalUserDeposits = USER_DEPOSIT * 3; // 3000 ether
-        uint256 totalAssets = totalUserDeposits + requiredMatchingPool;
-        uint256 totalShares = finalState.totalSharesSupply;
+        // Store values in test context
+        currentTestCtx.totalUserDeposits = USER_DEPOSIT * 3; // 3000 ether
+        currentTestCtx.totalAssets = currentTestCtx.totalUserDeposits + currentTestCtx.requiredMatchingPool;
+        currentTestCtx.totalShares = finalState.totalSharesSupply;
 
-        console.log("Total user deposits:", totalUserDeposits);
-        console.log("Required matching pool:", requiredMatchingPool);
-        console.log("Total assets:", totalAssets);
-        console.log("Total shares issued:", totalShares);
+        console.log("Total user deposits:", currentTestCtx.totalUserDeposits);
+        console.log("Required matching pool:", currentTestCtx.requiredMatchingPool);
+        console.log("Total assets:", currentTestCtx.totalAssets);
+        console.log("Total shares issued:", currentTestCtx.totalShares);
 
         // Verify the capital constraint worked
         assertEq(
             finalState.totalMechanismAssets,
-            totalAssets,
+            currentTestCtx.totalAssets,
             "Total assets should equal user deposits + required matching pool"
         );
         assertEq(
-            totalShares,
-            expectedProject1Funding + expectedProject2Funding,
+            currentTestCtx.totalShares,
+            currentTestCtx.expectedProject1Funding + currentTestCtx.expectedProject2Funding,
             "Total shares should equal sum of project funding"
         );
 
         // Fast forward and redeem
         vm.warp(block.timestamp + TIMELOCK_DELAY + 100);
 
-        uint256 recipient1Shares = finalState.recipient1Shares;
-        uint256 recipient2Shares = finalState.recipient2Shares;
+        // Store shares in test context
+        currentTestCtx.recipient1Shares = finalState.recipient1Shares;
+        currentTestCtx.recipient2Shares = finalState.recipient2Shares;
 
         // Complete redemption pattern: redeem all shares properly handling ERC4626 rounding
-        uint256 recipient1Assets = 0;
+        currentTestCtx.recipient1Assets = 0;
         uint256 recipient1MaxRedeem = _tokenized(address(mechanism)).maxRedeem(recipient1);
         if (recipient1MaxRedeem > 0) {
             vm.prank(recipient1);
-            recipient1Assets += _tokenized(address(mechanism)).redeem(recipient1MaxRedeem, recipient1, recipient1);
+            currentTestCtx.recipient1Assets += _tokenized(address(mechanism)).redeem(recipient1MaxRedeem, recipient1, recipient1);
         }
 
         // Handle any remaining shares due to rounding
@@ -720,15 +778,15 @@ contract QuadraticVotingAccountingAuditTest is Test {
             uint256 recipient1MaxRedeem2 = _tokenized(address(mechanism)).maxRedeem(recipient1);
             if (recipient1MaxRedeem2 > 0) {
                 vm.prank(recipient1);
-                recipient1Assets += _tokenized(address(mechanism)).redeem(recipient1MaxRedeem2, recipient1, recipient1);
+                currentTestCtx.recipient1Assets += _tokenized(address(mechanism)).redeem(recipient1MaxRedeem2, recipient1, recipient1);
             }
         }
 
-        uint256 recipient2Assets = 0;
+        currentTestCtx.recipient2Assets = 0;
         uint256 recipient2MaxRedeem = _tokenized(address(mechanism)).maxRedeem(recipient2);
         if (recipient2MaxRedeem > 0) {
             vm.prank(recipient2);
-            recipient2Assets += _tokenized(address(mechanism)).redeem(recipient2MaxRedeem, recipient2, recipient2);
+            currentTestCtx.recipient2Assets += _tokenized(address(mechanism)).redeem(recipient2MaxRedeem, recipient2, recipient2);
         }
 
         // Handle any remaining shares due to rounding
@@ -737,20 +795,20 @@ contract QuadraticVotingAccountingAuditTest is Test {
             uint256 recipient2MaxRedeem2 = _tokenized(address(mechanism)).maxRedeem(recipient2);
             if (recipient2MaxRedeem2 > 0) {
                 vm.prank(recipient2);
-                recipient2Assets += _tokenized(address(mechanism)).redeem(recipient2MaxRedeem2, recipient2, recipient2);
+                currentTestCtx.recipient2Assets += _tokenized(address(mechanism)).redeem(recipient2MaxRedeem2, recipient2, recipient2);
             }
         }
 
         // Verify exact proportional distribution based on actual shares redeemed
-        uint256 totalActualSharesRedeemed = recipient1Shares -
+        uint256 totalActualSharesRedeemed = currentTestCtx.recipient1Shares -
             _tokenized(address(mechanism)).balanceOf(recipient1) +
-            recipient2Shares -
+            currentTestCtx.recipient2Shares -
             _tokenized(address(mechanism)).balanceOf(recipient2);
-        uint256 expectedTotalAssets = (totalActualSharesRedeemed * totalAssets) / totalShares;
+        currentTestCtx.expectedTotalAssets = (totalActualSharesRedeemed * currentTestCtx.totalAssets) / currentTestCtx.totalShares;
 
         // Verify complete asset distribution - should be exact with proper redemption
-        uint256 totalAssetsRedeemed = recipient1Assets + recipient2Assets;
-        assertEq(totalAssetsRedeemed, expectedTotalAssets, "All redeemable assets must be distributed exactly");
+        uint256 totalAssetsRedeemed = currentTestCtx.recipient1Assets + currentTestCtx.recipient2Assets;
+        assertEq(totalAssetsRedeemed, currentTestCtx.expectedTotalAssets, "All redeemable assets must be distributed exactly");
 
         // Both recipients should have redeemed all or nearly all their shares
         assertTrue(
@@ -763,60 +821,13 @@ contract QuadraticVotingAccountingAuditTest is Test {
         );
 
         // CRITICAL: Investigate precision loss - this is real money
-        uint256 remainingAssets = token.balanceOf(address(mechanism));
-        uint256 remainingShares = _tokenized(address(mechanism)).totalSupply();
-
-        console.log("=== PRECISION LOSS INVESTIGATION ===");
-        console.log("Final remaining assets:", remainingAssets);
-        console.log("Final remaining shares:", remainingShares);
-        console.log("Total original assets:", totalAssets);
-        console.log("Total original shares:", totalShares);
-        console.log("Recipient1 final shares:", _tokenized(address(mechanism)).balanceOf(recipient1));
-        console.log("Recipient2 final shares:", _tokenized(address(mechanism)).balanceOf(recipient2));
-        console.log("Assets redeemed by recipient1:", recipient1Assets);
-        console.log("Assets redeemed by recipient2:", recipient2Assets);
-        console.log("Total assets redeemed:", recipient1Assets + recipient2Assets);
-        console.log("Assets that should have been redeemed:", expectedTotalAssets);
-
-        if (remainingAssets > 0) {
-            console.log("PRECISION LOSS DETECTED:");
-            console.log("- Amount trapped:", remainingAssets);
-            console.log("- Percentage of total:", (remainingAssets * 10000) / totalAssets, "basis points");
-            console.log("- Exchange rate at time of issue: totalAssets/totalShares =", totalAssets, "/", totalShares);
-            if (remainingShares > 0) {
-                console.log(
-                    "- Current exchange rate: remainingAssets/remainingShares =",
-                    remainingAssets,
-                    "/",
-                    remainingShares
-                );
-            }
-        }
-
-        // ANALYSIS: Determine if this is acceptable dust or a real bug
-        if (remainingAssets > 0) {
-            uint256 basisPoints = (remainingAssets * 10000) / totalAssets;
-            console.log("Basis points trapped:", basisPoints);
-
-            // More than 10 basis points (0.1%) is unacceptable for a production system
-            assertTrue(basisPoints <= 10, "CRITICAL: More than 0.1% of assets trapped - this is a systemic issue");
-
-            // But let's also check if the issue is in our test setup vs the mechanism itself
-            console.log("DEBUG: Investigating whether this is test setup or mechanism issue");
-            console.log("Total shares minted should equal totalQuadraticSum:", totalShares);
-            console.log("Actual totalQuadraticSum from mechanism:", totalQuadraticSum);
-
-            // If shares don't equal quadratic sum, the issue is in share minting
-            if (totalShares != totalQuadraticSum) {
-                console.log("BUG FOUND: Share minting doesn't match quadratic funding calculation");
-            }
-        }
+        _investigatePrecisionLoss(currentTestCtx);
 
         console.log("=== CAPITAL CONSTRAINED AUDIT COMPLETE ===");
-        console.log("Project 1 received:", recipient1Assets, "ether");
-        console.log("Project 2 received:", recipient2Assets, "ether");
-        console.log("Recipient 1 shares:", recipient1Shares);
-        console.log("Recipient 2 shares:", recipient2Shares);
+        console.log("Project 1 received:", currentTestCtx.recipient1Assets, "ether");
+        console.log("Project 2 received:", currentTestCtx.recipient2Assets, "ether");
+        console.log("Recipient 1 shares:", currentTestCtx.recipient1Shares);
+        console.log("Recipient 2 shares:", currentTestCtx.recipient2Shares);
         console.log("SUCCESS: Capital-constrained scenario achieved exact accounting!");
     }
 
@@ -825,9 +836,10 @@ contract QuadraticVotingAccountingAuditTest is Test {
     function testSymmetricVoting_TwoVotersThreeProjects() public {
         console.log("=== SYMMETRIC VOTING AUDIT: 2 VOTERS, 3 PROJECTS ===");
 
-        // Roll to start block for clean state
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // Clear and initialize test context
+        _clearTestContext();
+        currentTestCtx.startBlock = _tokenized(address(mechanism)).startBlock();
+        vm.roll(currentTestCtx.startBlock - 1);
 
         // === SETUP PHASE ===
         console.log("=== SETUP PHASE ===");
@@ -850,17 +862,17 @@ contract QuadraticVotingAccountingAuditTest is Test {
         _tokenized(address(mechanism)).signup(USER_DEPOSIT);
         vm.stopPrank();
 
-        // Create three proposals
+        // Create three proposals and store in test context
         vm.prank(alice);
-        uint256 pid1 = _tokenized(address(mechanism)).propose(recipient1, "Education Initiative");
+        currentTestCtx.pid1 = _tokenized(address(mechanism)).propose(recipient1, "Education Initiative");
 
         vm.prank(bob);
-        uint256 pid2 = _tokenized(address(mechanism)).propose(recipient2, "Healthcare Project");
+        currentTestCtx.pid2 = _tokenized(address(mechanism)).propose(recipient2, "Healthcare Project");
 
         vm.prank(alice);
-        uint256 pid3 = _tokenized(address(mechanism)).propose(recipient3, "Climate Action");
+        currentTestCtx.pid3 = _tokenized(address(mechanism)).propose(recipient3, "Climate Action");
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.roll(currentTestCtx.startBlock + VOTING_DELAY + 1);
 
         // === SYMMETRIC VOTING PATTERN ===
         console.log("=== VOTING PATTERNS ===");
@@ -871,34 +883,35 @@ contract QuadraticVotingAccountingAuditTest is Test {
 
         // Alice votes the same amount (20) for each project
         vm.startPrank(alice);
-        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, 20); // Cost: 400
-        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 20); // Cost: 400
-        _tokenized(address(mechanism)).castVote(pid3, TokenizedAllocationMechanism.VoteType.For, 20); // Cost: 400
+        _tokenized(address(mechanism)).castVote(currentTestCtx.pid1, TokenizedAllocationMechanism.VoteType.For, 20); // Cost: 400
+        _tokenized(address(mechanism)).castVote(currentTestCtx.pid2, TokenizedAllocationMechanism.VoteType.For, 20); // Cost: 400
+        _tokenized(address(mechanism)).castVote(currentTestCtx.pid3, TokenizedAllocationMechanism.VoteType.For, 20); // Cost: 400
         vm.stopPrank();
 
         // Bob votes the same amount (15) for each project
         vm.startPrank(bob);
-        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, 15); // Cost: 225
-        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 15); // Cost: 225
-        _tokenized(address(mechanism)).castVote(pid3, TokenizedAllocationMechanism.VoteType.For, 15); // Cost: 225
+        _tokenized(address(mechanism)).castVote(currentTestCtx.pid1, TokenizedAllocationMechanism.VoteType.For, 15); // Cost: 225
+        _tokenized(address(mechanism)).castVote(currentTestCtx.pid2, TokenizedAllocationMechanism.VoteType.For, 15); // Cost: 225
+        _tokenized(address(mechanism)).castVote(currentTestCtx.pid3, TokenizedAllocationMechanism.VoteType.For, 15); // Cost: 225
         vm.stopPrank();
 
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.roll(currentTestCtx.startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
 
         // === QUADRATIC FUNDING CALCULATIONS ===
         console.log("=== VERIFYING QUADRATIC FUNDING ===");
 
         // Get funding for each project using getTally()
-        (, , uint256 p1QuadraticFunding, uint256 p1LinearFunding) = mechanism.getTally(pid1);
-        (, , uint256 p2QuadraticFunding, uint256 p2LinearFunding) = mechanism.getTally(pid2);
-        (, , uint256 p3QuadraticFunding, uint256 p3LinearFunding) = mechanism.getTally(pid3);
+        (, , uint256 p1QuadraticFunding, uint256 p1LinearFunding) = mechanism.getTally(currentTestCtx.pid1);
+        (, , uint256 p2QuadraticFunding, uint256 p2LinearFunding) = mechanism.getTally(currentTestCtx.pid2);
+        (, , uint256 p3QuadraticFunding, uint256 p3LinearFunding) = mechanism.getTally(currentTestCtx.pid3);
 
-        uint256 project1Funding = p1QuadraticFunding + p1LinearFunding;
-        uint256 project2Funding = p2QuadraticFunding + p2LinearFunding;
+        currentTestCtx.expectedProject1Funding = p1QuadraticFunding + p1LinearFunding;
+        currentTestCtx.expectedProject2Funding = p2QuadraticFunding + p2LinearFunding;
+        // For symmetric test, project3 funding equals project1 funding
         uint256 project3Funding = p3QuadraticFunding + p3LinearFunding;
 
-        console.log("Project 1 funding:", project1Funding);
-        console.log("Project 2 funding:", project2Funding);
+        console.log("Project 1 funding:", currentTestCtx.expectedProject1Funding);
+        console.log("Project 2 funding:", currentTestCtx.expectedProject2Funding);
         console.log("Project 3 funding:", project3Funding);
 
         // Expected calculations with alpha = 1.0 (default):
@@ -907,64 +920,170 @@ contract QuadraticVotingAccountingAuditTest is Test {
         // Linear funding per project: 400 + 225 = 625
         // Total per project: 1225 + 0 = 1225 (since alpha=1, linear component is 0)
 
-        assertEq(project1Funding, 1225, "Project 1 should have symmetric funding");
-        assertEq(project2Funding, 1225, "Project 2 should have symmetric funding");
+        assertEq(currentTestCtx.expectedProject1Funding, 1225, "Project 1 should have symmetric funding");
+        assertEq(currentTestCtx.expectedProject2Funding, 1225, "Project 2 should have symmetric funding");
         assertEq(project3Funding, 1225, "Project 3 should have symmetric funding");
 
         // Verify symmetry: all projects should have identical funding
-        assertEq(project1Funding, project2Funding, "Projects 1 and 2 should have equal funding");
-        assertEq(project2Funding, project3Funding, "Projects 2 and 3 should have equal funding");
+        assertEq(currentTestCtx.expectedProject1Funding, currentTestCtx.expectedProject2Funding, "Projects 1 and 2 should have equal funding");
+        assertEq(currentTestCtx.expectedProject2Funding, project3Funding, "Projects 2 and 3 should have equal funding");
 
         // === FINALIZATION AND DISTRIBUTION ===
         console.log("=== FINALIZATION PHASE ===");
 
         // Add matching pool for realistic scenario
-        uint256 matchingPool = 3000 ether; // 1000 ether per project
-        token.mint(address(this), matchingPool);
-        token.transfer(address(mechanism), matchingPool);
+        currentTestCtx.matchingPoolNeeded = 3000 ether; // 1000 ether per project
+        token.mint(address(this), currentTestCtx.matchingPoolNeeded);
+        token.transfer(address(mechanism), currentTestCtx.matchingPoolNeeded);
 
         // Finalize voting
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
 
         // Queue all proposals
-        (bool success1, ) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", pid1));
+        (bool success1, ) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", currentTestCtx.pid1));
         require(success1, "Queue project 1 failed");
 
-        (bool success2, ) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", pid2));
+        (bool success2, ) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", currentTestCtx.pid2));
         require(success2, "Queue project 2 failed");
 
-        (bool success3, ) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", pid3));
+        (bool success3, ) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", currentTestCtx.pid3));
         require(success3, "Queue project 3 failed");
 
         // === VERIFICATION ===
         console.log("=== FINAL VERIFICATION ===");
 
         // Check share balances
-        uint256 recipient1Shares = _tokenized(address(mechanism)).balanceOf(recipient1);
-        uint256 recipient2Shares = _tokenized(address(mechanism)).balanceOf(recipient2);
-        uint256 recipient3Shares = _tokenized(address(mechanism)).balanceOf(recipient3);
+        currentTestCtx.recipient1Shares = _tokenized(address(mechanism)).balanceOf(recipient1);
+        currentTestCtx.recipient2Shares = _tokenized(address(mechanism)).balanceOf(recipient2);
+        currentTestCtx.recipient3Shares = _tokenized(address(mechanism)).balanceOf(recipient3);
 
-        console.log("Recipient 1 shares:", recipient1Shares);
-        console.log("Recipient 2 shares:", recipient2Shares);
-        console.log("Recipient 3 shares:", recipient3Shares);
+        console.log("Recipient 1 shares:", currentTestCtx.recipient1Shares);
+        console.log("Recipient 2 shares:", currentTestCtx.recipient2Shares);
+        console.log("Recipient 3 shares:", currentTestCtx.recipient3Shares);
 
         // Verify symmetric share distribution
-        assertEq(recipient1Shares, recipient2Shares, "Recipients 1 and 2 should have equal shares");
-        assertEq(recipient2Shares, recipient3Shares, "Recipients 2 and 3 should have equal shares");
+        assertEq(currentTestCtx.recipient1Shares, currentTestCtx.recipient2Shares, "Recipients 1 and 2 should have equal shares");
+        assertEq(currentTestCtx.recipient2Shares, currentTestCtx.recipient3Shares, "Recipients 2 and 3 should have equal shares");
 
         // Verify shares match funding calculations
-        assertEq(recipient1Shares, project1Funding, "Recipient 1 shares should match project 1 funding");
-        assertEq(recipient2Shares, project2Funding, "Recipient 2 shares should match project 2 funding");
-        assertEq(recipient3Shares, project3Funding, "Recipient 3 shares should match project 3 funding");
+        assertEq(currentTestCtx.recipient1Shares, currentTestCtx.expectedProject1Funding, "Recipient 1 shares should match project 1 funding");
+        assertEq(currentTestCtx.recipient2Shares, currentTestCtx.expectedProject2Funding, "Recipient 2 shares should match project 2 funding");
+        assertEq(currentTestCtx.recipient3Shares, currentTestCtx.expectedProject1Funding, "Recipient 3 shares should match project 3 funding");
 
-        uint256 totalShares = recipient1Shares + recipient2Shares + recipient3Shares;
-        uint256 expectedTotalShares = 3 * 1225; // 3 projects × 1225 funding each
-        assertEq(totalShares, expectedTotalShares, "Total shares should equal sum of project funding");
+        currentTestCtx.totalSharesRedeemed = currentTestCtx.recipient1Shares + currentTestCtx.recipient2Shares + currentTestCtx.recipient3Shares;
+        currentTestCtx.expectedTotalAssets = 3 * 1225; // 3 projects × 1225 funding each
+        assertEq(currentTestCtx.totalSharesRedeemed, currentTestCtx.expectedTotalAssets, "Total shares should equal sum of project funding");
 
         console.log("=== SYMMETRIC VOTING AUDIT COMPLETE ===");
         console.log("SUCCESS: Symmetric voting pattern verified!");
-        console.log("All three projects received equal funding:", project1Funding);
-        console.log("Total funding distributed:", totalShares);
+        console.log("All three projects received equal funding:", currentTestCtx.expectedProject1Funding);
+        console.log("Total funding distributed:", currentTestCtx.totalSharesRedeemed);
+    }
+
+    /// @notice Calculate optimal alpha parameters for capital-constrained scenarios
+    /// @param ctx Test context to store calculated values
+    function _calculateOptimalAlphaParams(TestContext storage ctx) internal {
+        ctx.totalQuadraticSum = mechanism.totalQuadraticSum();
+        uint256 totalLinearSum = mechanism.totalLinearSum();
+        uint256 quadraticMinusLinear = ctx.totalQuadraticSum - totalLinearSum;
+        
+        // Demonstrate capital constraint: use 50% of ideal budget
+        uint256 smallerBudget = (quadraticMinusLinear * 500) / 1000;
+        ctx.constrainedAlphaDenominator = quadraticMinusLinear;
+        ctx.constrainedAlphaNumerator = smallerBudget;
+        
+        ctx.requiredMatchingPool = (ctx.totalQuadraticSum * ctx.constrainedAlphaNumerator) / ctx.constrainedAlphaDenominator;
+        
+        console.log("Total quadratic sum:", ctx.totalQuadraticSum);
+        console.log("Total linear sum:", totalLinearSum);
+        console.log("Quadratic - Linear:", quadraticMinusLinear);
+        console.log("Example: If budget was", smallerBudget, "shares");
+        console.log("Then alpha would be:", ctx.constrainedAlphaNumerator, "/", ctx.constrainedAlphaDenominator);
+        console.log("Alpha percentage:", (ctx.constrainedAlphaNumerator * 10000) / ctx.constrainedAlphaDenominator, "/ 10000");
+    }
+
+    /// @notice Verify funding calculations with constrained alpha
+    /// @param ctx Test context containing alpha parameters and storing results
+    function _verifyConstrainedFunding(TestContext storage ctx) internal {
+        // Get actual funding from mechanism
+        (, , uint256 project1QuadraticFunding, uint256 project1LinearFunding) = mechanism.getTally(ctx.pid1);
+        (, , uint256 project2QuadraticFunding, uint256 project2LinearFunding) = mechanism.getTally(ctx.pid2);
+        
+        uint256 project1Funding = project1QuadraticFunding + project1LinearFunding;
+        uint256 project2Funding = project2QuadraticFunding + project2LinearFunding;
+        
+        console.log("Project 1 funding:", project1Funding);
+        console.log("Project 2 funding:", project2Funding);
+        
+        // Calculate expected funding in scoped block to limit stack usage
+        {
+            uint256 project1QuadraticComponent = (60 * 60 * ctx.constrainedAlphaNumerator) / ctx.constrainedAlphaDenominator;
+            uint256 project1LinearComponent = (1250 * (ctx.constrainedAlphaDenominator - ctx.constrainedAlphaNumerator)) / ctx.constrainedAlphaDenominator;
+            ctx.expectedProject1Funding = project1QuadraticComponent + project1LinearComponent;
+            
+            assertEq(project1Funding, ctx.expectedProject1Funding, "Project 1 funding should match quadratic calculation");
+        }
+        
+        {
+            uint256 project2QuadraticComponent = (27 * 27 * ctx.constrainedAlphaNumerator) / ctx.constrainedAlphaDenominator;
+            uint256 project2LinearComponent = (369 * (ctx.constrainedAlphaDenominator - ctx.constrainedAlphaNumerator)) / ctx.constrainedAlphaDenominator;
+            ctx.expectedProject2Funding = project2QuadraticComponent + project2LinearComponent;
+            
+            assertEq(project2Funding, ctx.expectedProject2Funding, "Project 2 funding should match quadratic calculation");
+        }
+    }
+
+    /// @notice Investigate precision loss and verify asset conservation
+    /// @param ctx Test context containing all necessary values
+    function _investigatePrecisionLoss(TestContext storage ctx) internal view {
+        uint256 remainingAssets = token.balanceOf(address(mechanism));
+        uint256 remainingShares = _tokenized(address(mechanism)).totalSupply();
+
+        console.log("=== PRECISION LOSS INVESTIGATION ===");
+        console.log("Final remaining assets:", remainingAssets);
+        console.log("Final remaining shares:", remainingShares);
+        console.log("Total original assets:", ctx.totalAssets);
+        console.log("Total original shares:", ctx.totalShares);
+        console.log("Recipient1 final shares:", _tokenized(address(mechanism)).balanceOf(recipient1));
+        console.log("Recipient2 final shares:", _tokenized(address(mechanism)).balanceOf(recipient2));
+        console.log("Assets redeemed by recipient1:", ctx.recipient1Assets);
+        console.log("Assets redeemed by recipient2:", ctx.recipient2Assets);
+        console.log("Total assets redeemed:", ctx.recipient1Assets + ctx.recipient2Assets);
+        console.log("Assets that should have been redeemed:", ctx.expectedTotalAssets);
+
+        if (remainingAssets > 0) {
+            console.log("PRECISION LOSS DETECTED:");
+            console.log("- Amount trapped:", remainingAssets);
+            console.log("- Percentage of total:", (remainingAssets * 10000) / ctx.totalAssets, "basis points");
+            console.log("- Exchange rate at time of issue: totalAssets/totalShares =", ctx.totalAssets, "/", ctx.totalShares);
+            if (remainingShares > 0) {
+                console.log(
+                    "- Current exchange rate: remainingAssets/remainingShares =",
+                    remainingAssets,
+                    "/",
+                    remainingShares
+                );
+            }
+        }
+
+        // ANALYSIS: Determine if this is acceptable dust or a real bug
+        if (remainingAssets > 0) {
+            uint256 basisPoints = (remainingAssets * 10000) / ctx.totalAssets;
+            console.log("Basis points trapped:", basisPoints);
+
+            // More than 10 basis points (0.1%) is unacceptable for a production system
+            assertTrue(basisPoints <= 10, "CRITICAL: More than 0.1% of assets trapped - this is a systemic issue");
+
+            // But let's also check if the issue is in our test setup vs the mechanism itself
+            console.log("DEBUG: Investigating whether this is test setup or mechanism issue");
+            console.log("Total shares minted should equal totalQuadraticSum:", ctx.totalShares);
+            console.log("Actual totalQuadraticSum from mechanism:", ctx.totalQuadraticSum);
+
+            // If shares don't equal quadratic sum, the issue is in share minting
+            if (ctx.totalShares != ctx.totalQuadraticSum) {
+                console.log("BUG FOUND: Share minting doesn't match quadratic funding calculation");
+            }
+        }
     }
 }
