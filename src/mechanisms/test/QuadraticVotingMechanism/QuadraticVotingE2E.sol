@@ -560,9 +560,17 @@ contract QuadraticVotingE2E is Test {
         assertEq(p3Linear, 0 ether, "Project 3 linear funding should be 0 with alpha=1");
 
         // Verify total funding allocation using direct assertions to reduce stack usage
-        assertEq(p1Quadratic + p2Quadratic + p3Quadratic, 2025 ether + 625 ether + 576 ether, "Total quadratic funding calculation");
+        assertEq(
+            p1Quadratic + p2Quadratic + p3Quadratic,
+            2025 ether + 625 ether + 576 ether,
+            "Total quadratic funding calculation"
+        );
         assertEq(p1Linear + p2Linear + p3Linear, 0 ether, "Total linear funding should be 0 with alpha=1");
-        assertEq(p1Contributions + p2Contributions + p3Contributions, 1025 ether + 325 ether + 296 ether, "Total contributions calculation");
+        assertEq(
+            p1Contributions + p2Contributions + p3Contributions,
+            1025 ether + 325 ether + 296 ether,
+            "Total contributions calculation"
+        );
 
         // Verify quadratic funding formula: each project gets α × (sum_sqrt)² + (1-α) × sum_contributions
         // With alpha = 1: funding = 1 × quadratic + 0 × linear = quadratic only
@@ -771,7 +779,6 @@ contract QuadraticVotingE2E is Test {
             // console.log("Expected total funding:", expectedTotalFunding);
             // console.log("Actual total assets:", totalAssets);
         }
-
 
         // Move past voting period and finalize using scoping for intermediate variables
         {

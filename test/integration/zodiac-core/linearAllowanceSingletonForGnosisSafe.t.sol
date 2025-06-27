@@ -1000,7 +1000,7 @@ contract TestLinearAllowanceIntegration is Test {
 
     function testRevokeAllowances() public {
         _clearTestContext();
-        
+
         currentTestCtx.dripRate = 100 ether;
         currentTestCtx.safeAddress = address(safeImpl);
 
@@ -1020,9 +1020,21 @@ contract TestLinearAllowanceIntegration is Test {
         vm.warp(block.timestamp + 1 days);
 
         // Verify all allowances exist
-        currentTestCtx.unspent1Before = allowanceModule.getTotalUnspent(currentTestCtx.safeAddress, address(currentTestCtx.executor1), NATIVE_TOKEN);
-        currentTestCtx.unspent2Before = allowanceModule.getTotalUnspent(currentTestCtx.safeAddress, address(currentTestCtx.executor2), NATIVE_TOKEN);
-        currentTestCtx.unspent3Before = allowanceModule.getTotalUnspent(currentTestCtx.safeAddress, address(currentTestCtx.executor3), NATIVE_TOKEN);
+        currentTestCtx.unspent1Before = allowanceModule.getTotalUnspent(
+            currentTestCtx.safeAddress,
+            address(currentTestCtx.executor1),
+            NATIVE_TOKEN
+        );
+        currentTestCtx.unspent2Before = allowanceModule.getTotalUnspent(
+            currentTestCtx.safeAddress,
+            address(currentTestCtx.executor2),
+            NATIVE_TOKEN
+        );
+        currentTestCtx.unspent3Before = allowanceModule.getTotalUnspent(
+            currentTestCtx.safeAddress,
+            address(currentTestCtx.executor3),
+            NATIVE_TOKEN
+        );
 
         assertEq(currentTestCtx.unspent1Before, currentTestCtx.dripRate, "Executor1 should have accrued allowance");
         assertEq(currentTestCtx.unspent2Before, currentTestCtx.dripRate, "Executor2 should have accrued allowance");
@@ -1058,29 +1070,68 @@ contract TestLinearAllowanceIntegration is Test {
 
         // Expect events for all revocations
         vm.expectEmit(true, true, true, true);
-        emit ILinearAllowanceSingleton.AllowanceRevoked(currentTestCtx.safeAddress, address(currentTestCtx.executor1), NATIVE_TOKEN, currentTestCtx.dripRate);
+        emit ILinearAllowanceSingleton.AllowanceRevoked(
+            currentTestCtx.safeAddress,
+            address(currentTestCtx.executor1),
+            NATIVE_TOKEN,
+            currentTestCtx.dripRate
+        );
         vm.expectEmit(true, true, true, true);
-        emit ILinearAllowanceSingleton.AllowanceRevoked(currentTestCtx.safeAddress, address(currentTestCtx.executor2), NATIVE_TOKEN, currentTestCtx.dripRate);
+        emit ILinearAllowanceSingleton.AllowanceRevoked(
+            currentTestCtx.safeAddress,
+            address(currentTestCtx.executor2),
+            NATIVE_TOKEN,
+            currentTestCtx.dripRate
+        );
         vm.expectEmit(true, true, true, true);
-        emit ILinearAllowanceSingleton.AllowanceRevoked(currentTestCtx.safeAddress, address(currentTestCtx.executor3), NATIVE_TOKEN, currentTestCtx.dripRate);
+        emit ILinearAllowanceSingleton.AllowanceRevoked(
+            currentTestCtx.safeAddress,
+            address(currentTestCtx.executor3),
+            NATIVE_TOKEN,
+            currentTestCtx.dripRate
+        );
 
         // Execute batch revocation
         vm.prank(currentTestCtx.safeAddress);
         allowanceModule.revokeAllowances(currentTestCtx.delegates, currentTestCtx.tokens);
 
         // Verify all allowances are cleared
-        currentTestCtx.unspent1After = allowanceModule.getTotalUnspent(currentTestCtx.safeAddress, address(currentTestCtx.executor1), NATIVE_TOKEN);
-        currentTestCtx.unspent2After = allowanceModule.getTotalUnspent(currentTestCtx.safeAddress, address(currentTestCtx.executor2), NATIVE_TOKEN);
-        currentTestCtx.unspent3After = allowanceModule.getTotalUnspent(currentTestCtx.safeAddress, address(currentTestCtx.executor3), NATIVE_TOKEN);
+        currentTestCtx.unspent1After = allowanceModule.getTotalUnspent(
+            currentTestCtx.safeAddress,
+            address(currentTestCtx.executor1),
+            NATIVE_TOKEN
+        );
+        currentTestCtx.unspent2After = allowanceModule.getTotalUnspent(
+            currentTestCtx.safeAddress,
+            address(currentTestCtx.executor2),
+            NATIVE_TOKEN
+        );
+        currentTestCtx.unspent3After = allowanceModule.getTotalUnspent(
+            currentTestCtx.safeAddress,
+            address(currentTestCtx.executor3),
+            NATIVE_TOKEN
+        );
 
         assertEq(currentTestCtx.unspent1After, 0, "Executor1 allowance should be cleared");
         assertEq(currentTestCtx.unspent2After, 0, "Executor2 allowance should be cleared");
         assertEq(currentTestCtx.unspent3After, 0, "Executor3 allowance should be cleared");
 
         // Verify drip rates are set to 0
-        (currentTestCtx.dripRate1, , , ) = allowanceModule.allowances(currentTestCtx.safeAddress, address(currentTestCtx.executor1), NATIVE_TOKEN);
-        (currentTestCtx.dripRate2, , , ) = allowanceModule.allowances(currentTestCtx.safeAddress, address(currentTestCtx.executor2), NATIVE_TOKEN);
-        (currentTestCtx.dripRate3, , , ) = allowanceModule.allowances(currentTestCtx.safeAddress, address(currentTestCtx.executor3), NATIVE_TOKEN);
+        (currentTestCtx.dripRate1, , , ) = allowanceModule.allowances(
+            currentTestCtx.safeAddress,
+            address(currentTestCtx.executor1),
+            NATIVE_TOKEN
+        );
+        (currentTestCtx.dripRate2, , , ) = allowanceModule.allowances(
+            currentTestCtx.safeAddress,
+            address(currentTestCtx.executor2),
+            NATIVE_TOKEN
+        );
+        (currentTestCtx.dripRate3, , , ) = allowanceModule.allowances(
+            currentTestCtx.safeAddress,
+            address(currentTestCtx.executor3),
+            NATIVE_TOKEN
+        );
 
         assertEq(currentTestCtx.dripRate1, 0, "Executor1 drip rate should be zero");
         assertEq(currentTestCtx.dripRate2, 0, "Executor2 drip rate should be zero");

@@ -366,7 +366,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         );
     }
 
-
     /// @notice Internal allocation mechanism initialization
     function _initializeAllocation(
         address _owner,

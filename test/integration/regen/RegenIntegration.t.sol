@@ -82,7 +82,6 @@ contract RegenIntegrationTest is Test {
         bytes32 r;
         bytes32 s;
         uint256 actualContribution;
-        
         // Additional fields for compound rewards tests
         uint256 user1StakeBase;
         uint256 user2StakeBase;
@@ -103,7 +102,6 @@ contract RegenIntegrationTest is Test {
         uint256 totalStake;
         RegenStaker compoundRegenStaker;
         MockERC20Staking sameToken;
-        
         // Additional fields for fee tests
         uint256 feeAmount;
         address feeCollector;
@@ -129,7 +127,7 @@ contract RegenIntegrationTest is Test {
         currentTestCtx.r = bytes32(0);
         currentTestCtx.s = bytes32(0);
         currentTestCtx.actualContribution = 0;
-        
+
         // Clear compound rewards test fields
         currentTestCtx.user1StakeBase = 0;
         currentTestCtx.user2StakeBase = 0;
@@ -151,7 +149,7 @@ contract RegenIntegrationTest is Test {
         // Note: compoundRegenStaker and sameToken are reference types, set to storage defaults
         delete currentTestCtx.compoundRegenStaker;
         delete currentTestCtx.sameToken;
-        
+
         // Clear fee test fields
         currentTestCtx.feeAmount = 0;
         currentTestCtx.feeCollector = address(0);
@@ -1992,10 +1990,14 @@ contract RegenIntegrationTest is Test {
         uint256 user2JoinTimePercent
     ) public {
         _clearTestContext();
-        
+
         currentTestCtx.user1StakeBase = bound(user1StakeBase, 1, 10_000);
         currentTestCtx.user2StakeBase = bound(user2StakeBase, 1, 10_000);
-        currentTestCtx.rewardAmountBase = bound(rewardAmountBase, MIN_REWARD_DURATION, MAX_REWARD_DURATION + 1_000_000_000);
+        currentTestCtx.rewardAmountBase = bound(
+            rewardAmountBase,
+            MIN_REWARD_DURATION,
+            MAX_REWARD_DURATION + 1_000_000_000
+        );
         currentTestCtx.user2JoinTimePercent = bound(user2JoinTimePercent, 10, 90);
 
         currentTestCtx.sameToken = new MockERC20Staking(18);
@@ -2032,17 +2034,27 @@ contract RegenIntegrationTest is Test {
 
         vm.startPrank(currentTestCtx.user1);
         currentTestCtx.sameToken.approve(address(currentTestCtx.compoundRegenStaker), currentTestCtx.user1Stake);
-        currentTestCtx.depositId1 = currentTestCtx.compoundRegenStaker.stake(currentTestCtx.user1Stake, currentTestCtx.user1);
+        currentTestCtx.depositId1 = currentTestCtx.compoundRegenStaker.stake(
+            currentTestCtx.user1Stake,
+            currentTestCtx.user1
+        );
         vm.stopPrank();
 
         vm.prank(ADMIN);
         currentTestCtx.compoundRegenStaker.notifyRewardAmount(currentTestCtx.rewardAmount);
 
-        vm.warp(block.timestamp + (currentTestCtx.compoundRegenStaker.rewardDuration() * currentTestCtx.user2JoinTimePercent) / 100);
+        vm.warp(
+            block.timestamp +
+                (currentTestCtx.compoundRegenStaker.rewardDuration() * currentTestCtx.user2JoinTimePercent) /
+                100
+        );
 
         vm.startPrank(currentTestCtx.user2);
         currentTestCtx.sameToken.approve(address(currentTestCtx.compoundRegenStaker), currentTestCtx.user2Stake);
-        currentTestCtx.depositId2 = currentTestCtx.compoundRegenStaker.stake(currentTestCtx.user2Stake, currentTestCtx.user2);
+        currentTestCtx.depositId2 = currentTestCtx.compoundRegenStaker.stake(
+            currentTestCtx.user2Stake,
+            currentTestCtx.user2
+        );
         vm.stopPrank();
 
         vm.warp(
@@ -2078,18 +2090,28 @@ contract RegenIntegrationTest is Test {
             // Only verify reward calculations if both users actually received rewards
             // Extreme edge cases with tiny amounts may result in 0 rewards due to precision loss
             if (currentTestCtx.unclaimed1 > 0 && currentTestCtx.unclaimed2 > 0) {
-                currentTestCtx.soloPhaseRewards = (currentTestCtx.rewardAmount * currentTestCtx.user2JoinTimePercent) / 100;
-                currentTestCtx.sharedPhaseRewards = (currentTestCtx.rewardAmount * (100 - currentTestCtx.user2JoinTimePercent)) / 100;
+                currentTestCtx.soloPhaseRewards =
+                    (currentTestCtx.rewardAmount * currentTestCtx.user2JoinTimePercent) /
+                    100;
+                currentTestCtx.sharedPhaseRewards =
+                    (currentTestCtx.rewardAmount * (100 - currentTestCtx.user2JoinTimePercent)) /
+                    100;
                 currentTestCtx.totalStake = currentTestCtx.user1Stake + currentTestCtx.user2Stake;
 
                 // NOTE: These assertions may fail with extreme fuzzing values due to precision differences
                 // when using 7-day reward duration vs original 30-day duration
                 assertApproxEqRel(
                     currentTestCtx.compounded1,
-                    currentTestCtx.soloPhaseRewards + (currentTestCtx.sharedPhaseRewards * currentTestCtx.user1Stake) / currentTestCtx.totalStake,
+                    currentTestCtx.soloPhaseRewards +
+                        (currentTestCtx.sharedPhaseRewards * currentTestCtx.user1Stake) /
+                        currentTestCtx.totalStake,
                     ONE_PERCENT
                 );
-                assertApproxEqRel(currentTestCtx.compounded2, (currentTestCtx.sharedPhaseRewards * currentTestCtx.user2Stake) / currentTestCtx.totalStake, ONE_PERCENT);
+                assertApproxEqRel(
+                    currentTestCtx.compounded2,
+                    (currentTestCtx.sharedPhaseRewards * currentTestCtx.user2Stake) / currentTestCtx.totalStake,
+                    ONE_PERCENT
+                );
             }
         }
 
@@ -2285,7 +2307,7 @@ contract RegenIntegrationTest is Test {
 
     function test_Contribute_WithSignature_Success() public {
         _clearTestContext();
-        
+
         // Setup
         currentTestCtx.stakeAmount = getStakeAmount(1000);
         currentTestCtx.rewardAmount = getRewardAmount(10000);
@@ -2314,14 +2336,24 @@ contract RegenIntegrationTest is Test {
 
         // Verify alice has unclaimed rewards
         currentTestCtx.unclaimedBefore = regenStaker.unclaimedReward(currentTestCtx.depositId);
-        assertGt(currentTestCtx.unclaimedBefore, currentTestCtx.contributeAmount, "Alice should have sufficient unclaimed rewards");
+        assertGt(
+            currentTestCtx.unclaimedBefore,
+            currentTestCtx.contributeAmount,
+            "Alice should have sufficient unclaimed rewards"
+        );
 
         // Create EIP-2612 signature for TokenizedAllocationMechanism
         currentTestCtx.nonce = TokenizedAllocationMechanism(currentTestCtx.allocationMechanism).nonces(alice);
         currentTestCtx.deadline = block.timestamp + 1 hours;
         currentTestCtx.netContribution = currentTestCtx.contributeAmount; // No fees in this test
 
-        currentTestCtx.digest = _getSignupDigest(currentTestCtx.allocationMechanism, alice, currentTestCtx.netContribution, currentTestCtx.nonce, currentTestCtx.deadline);
+        currentTestCtx.digest = _getSignupDigest(
+            currentTestCtx.allocationMechanism,
+            alice,
+            currentTestCtx.netContribution,
+            currentTestCtx.nonce,
+            currentTestCtx.deadline
+        );
         (currentTestCtx.v, currentTestCtx.r, currentTestCtx.s) = _signDigest(currentTestCtx.digest, ALICE_PRIVATE_KEY);
 
         // Give Alice tokens and approve for the expected flow
@@ -2343,10 +2375,18 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         // Verify results
-        assertEq(currentTestCtx.actualContribution, currentTestCtx.contributeAmount, "Contribution amount should match");
+        assertEq(
+            currentTestCtx.actualContribution,
+            currentTestCtx.contributeAmount,
+            "Contribution amount should match"
+        );
 
         uint256 unclaimedAfter = regenStaker.unclaimedReward(currentTestCtx.depositId);
-        assertEq(unclaimedAfter, currentTestCtx.unclaimedBefore - currentTestCtx.contributeAmount, "Unclaimed rewards should be reduced");
+        assertEq(
+            unclaimedAfter,
+            currentTestCtx.unclaimedBefore - currentTestCtx.contributeAmount,
+            "Unclaimed rewards should be reduced"
+        );
 
         // Verify the allocation mechanism received the contribution
         assertEq(
@@ -2367,7 +2407,7 @@ contract RegenIntegrationTest is Test {
 
     function test_Contribute_WithSignature_AndFees() public {
         _clearTestContext();
-        
+
         currentTestCtx.stakeAmount = getStakeAmount(1000);
         currentTestCtx.rewardAmount = getRewardAmount(100000); // Much larger reward amount to ensure sufficient rewards
         currentTestCtx.contributeAmount = currentTestCtx.rewardAmount / 100; // Use 1% of total rewards to ensure it's available
@@ -2379,7 +2419,10 @@ contract RegenIntegrationTest is Test {
 
         vm.prank(ADMIN);
         regenStaker.setClaimFeeParameters(
-            Staker.ClaimFeeParameters({ feeAmount: uint96(currentTestCtx.feeAmount), feeCollector: currentTestCtx.feeCollector })
+            Staker.ClaimFeeParameters({
+                feeAmount: uint96(currentTestCtx.feeAmount),
+                feeCollector: currentTestCtx.feeCollector
+            })
         );
 
         currentTestCtx.netContribution = currentTestCtx.contributeAmount - currentTestCtx.feeAmount;
@@ -2409,7 +2452,13 @@ contract RegenIntegrationTest is Test {
         currentTestCtx.nonce = TokenizedAllocationMechanism(currentTestCtx.allocationMechanism).nonces(alice);
         currentTestCtx.deadline = block.timestamp + 1 hours;
 
-        currentTestCtx.digest = _getSignupDigest(currentTestCtx.allocationMechanism, alice, currentTestCtx.netContribution, currentTestCtx.nonce, currentTestCtx.deadline);
+        currentTestCtx.digest = _getSignupDigest(
+            currentTestCtx.allocationMechanism,
+            alice,
+            currentTestCtx.netContribution,
+            currentTestCtx.nonce,
+            currentTestCtx.deadline
+        );
         (currentTestCtx.v, currentTestCtx.r, currentTestCtx.s) = _signDigest(currentTestCtx.digest, ALICE_PRIVATE_KEY);
 
         // Give Alice tokens and approve for the expected flow
@@ -2433,7 +2482,11 @@ contract RegenIntegrationTest is Test {
         vm.stopPrank();
 
         // Verify results
-        assertEq(currentTestCtx.actualContribution, currentTestCtx.netContribution, "Net contribution should exclude fees");
+        assertEq(
+            currentTestCtx.actualContribution,
+            currentTestCtx.netContribution,
+            "Net contribution should exclude fees"
+        );
         assertEq(
             rewardToken.balanceOf(currentTestCtx.feeCollector),
             currentTestCtx.feeCollectorBalanceBefore + currentTestCtx.feeAmount,

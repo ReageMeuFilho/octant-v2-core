@@ -39,18 +39,15 @@ contract QuadraticVotingRecipientJourneyTest is Test {
         uint256 pid1;
         uint256 pid2;
         uint256 queueTime;
-        
         // Additional proposal IDs for different test scenarios
         uint256 pidCharlie;
         uint256 pidDave;
         uint256 pidEve;
-        
         // Share and asset tracking
         uint256 charlieShares;
         uint256 daveShares;
         uint256 totalSupply;
         uint256 totalAssets;
-        
         // Charlie redemption tracking
         uint256 charlieMaxRedeem;
         uint256 charliePartialRedeem;
@@ -61,14 +58,12 @@ contract QuadraticVotingRecipientJourneyTest is Test {
         uint256 charlieRemainingAfterSecond;
         uint256 charlieAssets3;
         uint256 charlieMaxRedeem3;
-        
-        // Dave redemption tracking  
+        // Dave redemption tracking
         uint256 daveMaxRedeemShares;
         uint256 daveAssets;
         uint256 daveRemainingShares;
         uint256 daveAssets2;
         uint256 daveMaxRedeem2;
-        
         // Expected values and verification
         uint256 expectedCharlieAssets1;
         uint256 expectedDaveAssets;
@@ -76,7 +71,6 @@ contract QuadraticVotingRecipientJourneyTest is Test {
         uint256 totalRemainingShares;
         uint256 totalAssetsRedeemed;
         uint256 charlieSharesRedeemed;
-        
         // Funding tracking variables for outcome monitoring
         uint256 charlieQuadraticFunding;
         uint256 charlieLinearFunding;
@@ -276,17 +270,23 @@ contract QuadraticVotingRecipientJourneyTest is Test {
         _castVote(frank, currentTestCtx.pidEve, 8);
 
         // Recipients can monitor progress in real-time using getTally() from ProperQF
-        (, , currentTestCtx.charlieQuadraticFunding, currentTestCtx.charlieLinearFunding) = mechanism.getTally(currentTestCtx.pidCharlie);
+        (, , currentTestCtx.charlieQuadraticFunding, currentTestCtx.charlieLinearFunding) = mechanism.getTally(
+            currentTestCtx.pidCharlie
+        );
         currentTestCtx.charlieFor = currentTestCtx.charlieQuadraticFunding + currentTestCtx.charlieLinearFunding;
         // Charlie: Alice(25) + Bob(12) = (37)² × 0.5 = 684.5, rounded funding calculation
         assertTrue(currentTestCtx.charlieFor > 0, "Charlie should have funding from QuadraticFunding calculation");
 
-        (, , currentTestCtx.daveQuadraticFunding, currentTestCtx.daveLinearFunding) = mechanism.getTally(currentTestCtx.pidDave);
+        (, , currentTestCtx.daveQuadraticFunding, currentTestCtx.daveLinearFunding) = mechanism.getTally(
+            currentTestCtx.pidDave
+        );
         currentTestCtx.daveFor = currentTestCtx.daveQuadraticFunding + currentTestCtx.daveLinearFunding;
         // Dave: Bob(10) = (10)² × 0.5 = 50
         assertTrue(currentTestCtx.daveFor > 0, "Dave should have some funding");
 
-        (, , currentTestCtx.eveQuadraticFunding, currentTestCtx.eveLinearFunding) = mechanism.getTally(currentTestCtx.pidEve);
+        (, , currentTestCtx.eveQuadraticFunding, currentTestCtx.eveLinearFunding) = mechanism.getTally(
+            currentTestCtx.pidEve
+        );
         currentTestCtx.eveFor = currentTestCtx.eveQuadraticFunding + currentTestCtx.eveLinearFunding;
         // Eve: Alice(12) + Frank(8) = (20)² × 0.5 = 200
         assertTrue(currentTestCtx.eveFor > 0, "Eve should have funding from For votes");
@@ -415,12 +415,16 @@ contract QuadraticVotingRecipientJourneyTest is Test {
 
         // Warp to a specific time BEFORE queuing to ensure both get the same timestamp
         vm.warp(currentTestCtx.queueTime);
-        (bool success1, ) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", currentTestCtx.pid1));
+        (bool success1, ) = address(mechanism).call(
+            abi.encodeWithSignature("queueProposal(uint256)", currentTestCtx.pid1)
+        );
         require(success1, "Queue proposal 1 failed");
 
         // Reset to same timestamp for second proposal
         vm.warp(currentTestCtx.queueTime);
-        (bool success2, ) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", currentTestCtx.pid2));
+        (bool success2, ) = address(mechanism).call(
+            abi.encodeWithSignature("queueProposal(uint256)", currentTestCtx.pid2)
+        );
         require(success2, "Queue proposal 2 failed");
 
         // Verify both recipients received shares based on QuadraticFunding calculations
@@ -439,33 +443,60 @@ contract QuadraticVotingRecipientJourneyTest is Test {
         currentTestCtx.charlieMaxRedeem = _tokenized(address(mechanism)).maxRedeem(charlie);
         currentTestCtx.charliePartialRedeem = currentTestCtx.charlieMaxRedeem / 2; // Redeem half of what's allowed
         vm.prank(charlie);
-        currentTestCtx.charlieAssets1 = _tokenized(address(mechanism)).redeem(currentTestCtx.charliePartialRedeem, charlie, charlie);
+        currentTestCtx.charlieAssets1 = _tokenized(address(mechanism)).redeem(
+            currentTestCtx.charliePartialRedeem,
+            charlie,
+            charlie
+        );
 
         currentTestCtx.charlieRemainingShares = currentTestCtx.charlieShares - currentTestCtx.charliePartialRedeem;
         assertEq(_tokenized(address(mechanism)).balanceOf(charlie), currentTestCtx.charlieRemainingShares);
-        assertEq(_tokenized(address(mechanism)).totalSupply(), currentTestCtx.totalSupply - currentTestCtx.charliePartialRedeem);
+        assertEq(
+            _tokenized(address(mechanism)).totalSupply(),
+            currentTestCtx.totalSupply - currentTestCtx.charliePartialRedeem
+        );
 
         // With matching pool: calculate expected assets based on share-to-asset ratio
         currentTestCtx.totalAssets = LARGE_DEPOSIT + MEDIUM_DEPOSIT + 2000 ether; // 3500 ether
-        currentTestCtx.expectedCharlieAssets1 = (currentTestCtx.charliePartialRedeem * currentTestCtx.totalAssets) / currentTestCtx.totalSupply;
-        assertApproxEqAbs(currentTestCtx.charlieAssets1, currentTestCtx.expectedCharlieAssets1, 1, "Charlie assets1 within 1 wei");
+        currentTestCtx.expectedCharlieAssets1 =
+            (currentTestCtx.charliePartialRedeem * currentTestCtx.totalAssets) /
+            currentTestCtx.totalSupply;
+        assertApproxEqAbs(
+            currentTestCtx.charlieAssets1,
+            currentTestCtx.expectedCharlieAssets1,
+            1,
+            "Charlie assets1 within 1 wei"
+        );
 
         // Dave full redemption - use maxRedeem to handle any rounding issues
         currentTestCtx.daveMaxRedeemShares = _tokenized(address(mechanism)).maxRedeem(dave);
         vm.prank(dave);
-        currentTestCtx.daveAssets = _tokenized(address(mechanism)).redeem(currentTestCtx.daveMaxRedeemShares, dave, dave);
+        currentTestCtx.daveAssets = _tokenized(address(mechanism)).redeem(
+            currentTestCtx.daveMaxRedeemShares,
+            dave,
+            dave
+        );
 
         currentTestCtx.daveRemainingShares = currentTestCtx.daveShares - currentTestCtx.daveMaxRedeemShares;
         assertEq(_tokenized(address(mechanism)).balanceOf(dave), currentTestCtx.daveRemainingShares);
-        assertEq(_tokenized(address(mechanism)).totalSupply(), currentTestCtx.charlieRemainingShares + currentTestCtx.daveRemainingShares);
+        assertEq(
+            _tokenized(address(mechanism)).totalSupply(),
+            currentTestCtx.charlieRemainingShares + currentTestCtx.daveRemainingShares
+        );
 
-        currentTestCtx.expectedDaveAssets = (currentTestCtx.daveMaxRedeemShares * currentTestCtx.totalAssets) / currentTestCtx.totalSupply;
+        currentTestCtx.expectedDaveAssets =
+            (currentTestCtx.daveMaxRedeemShares * currentTestCtx.totalAssets) /
+            currentTestCtx.totalSupply;
         assertApproxEqAbs(currentTestCtx.daveAssets, currentTestCtx.expectedDaveAssets, 1, "Dave assets within 1 wei");
 
         // Charlie remaining redemption - redeem whatever is left and allowed
         currentTestCtx.charlieMaxRedeem2 = _tokenized(address(mechanism)).maxRedeem(charlie);
         vm.prank(charlie);
-        currentTestCtx.charlieAssets2 = _tokenized(address(mechanism)).redeem(currentTestCtx.charlieMaxRedeem2, charlie, charlie);
+        currentTestCtx.charlieAssets2 = _tokenized(address(mechanism)).redeem(
+            currentTestCtx.charlieMaxRedeem2,
+            charlie,
+            charlie
+        );
 
         // If Charlie has any remaining shares due to rounding, redeem them too
         currentTestCtx.charlieRemainingAfterSecond = _tokenized(address(mechanism)).balanceOf(charlie);
@@ -474,7 +505,11 @@ contract QuadraticVotingRecipientJourneyTest is Test {
             currentTestCtx.charlieMaxRedeem3 = _tokenized(address(mechanism)).maxRedeem(charlie);
             if (currentTestCtx.charlieMaxRedeem3 > 0) {
                 vm.prank(charlie);
-                currentTestCtx.charlieAssets3 = _tokenized(address(mechanism)).redeem(currentTestCtx.charlieMaxRedeem3, charlie, charlie);
+                currentTestCtx.charlieAssets3 = _tokenized(address(mechanism)).redeem(
+                    currentTestCtx.charlieMaxRedeem3,
+                    charlie,
+                    charlie
+                );
             }
         }
 
@@ -482,8 +517,15 @@ contract QuadraticVotingRecipientJourneyTest is Test {
         assertEq(_tokenized(address(mechanism)).balanceOf(charlie), 0, "Charlie should have redeemed all shares");
         assertEq(_tokenized(address(mechanism)).totalSupply(), currentTestCtx.daveRemainingShares);
 
-        currentTestCtx.expectedCharlieAssets2 = (currentTestCtx.charlieMaxRedeem2 * currentTestCtx.totalAssets) / currentTestCtx.totalSupply;
-        assertApproxEqAbs(currentTestCtx.charlieAssets2, currentTestCtx.expectedCharlieAssets2, 1, "Charlie assets2 within 1 wei");
+        currentTestCtx.expectedCharlieAssets2 =
+            (currentTestCtx.charlieMaxRedeem2 * currentTestCtx.totalAssets) /
+            currentTestCtx.totalSupply;
+        assertApproxEqAbs(
+            currentTestCtx.charlieAssets2,
+            currentTestCtx.expectedCharlieAssets2,
+            1,
+            "Charlie assets2 within 1 wei"
+        );
 
         // Let Dave redeem any remaining shares too
         currentTestCtx.daveAssets2 = 0;
@@ -491,13 +533,19 @@ contract QuadraticVotingRecipientJourneyTest is Test {
             currentTestCtx.daveMaxRedeem2 = _tokenized(address(mechanism)).maxRedeem(dave);
             if (currentTestCtx.daveMaxRedeem2 > 0) {
                 vm.prank(dave);
-                currentTestCtx.daveAssets2 = _tokenized(address(mechanism)).redeem(currentTestCtx.daveMaxRedeem2, dave, dave);
+                currentTestCtx.daveAssets2 = _tokenized(address(mechanism)).redeem(
+                    currentTestCtx.daveMaxRedeem2,
+                    dave,
+                    dave
+                );
             }
         }
 
         // Verify total assets redeemed correctly with matching pool conversion using inline computation
         {
-            currentTestCtx.charlieSharesRedeemed = currentTestCtx.charliePartialRedeem + currentTestCtx.charlieMaxRedeem2;
+            currentTestCtx.charlieSharesRedeemed =
+                currentTestCtx.charliePartialRedeem +
+                currentTestCtx.charlieMaxRedeem2;
             if (currentTestCtx.charlieAssets3 > 0) {
                 currentTestCtx.charlieSharesRedeemed += currentTestCtx.charlieRemainingAfterSecond;
             }
@@ -514,7 +562,12 @@ contract QuadraticVotingRecipientJourneyTest is Test {
         assertTrue(currentTestCtx.totalRemainingShares <= 1, "Should have at most 1 remaining share due to rounding");
 
         // Verify total assets conservation - almost all assets should be redeemed
-        currentTestCtx.totalAssetsRedeemed = currentTestCtx.charlieAssets1 + currentTestCtx.charlieAssets2 + currentTestCtx.charlieAssets3 + currentTestCtx.daveAssets + currentTestCtx.daveAssets2;
+        currentTestCtx.totalAssetsRedeemed =
+            currentTestCtx.charlieAssets1 +
+            currentTestCtx.charlieAssets2 +
+            currentTestCtx.charlieAssets3 +
+            currentTestCtx.daveAssets +
+            currentTestCtx.daveAssets2;
         assertApproxEqAbs(
             currentTestCtx.totalAssetsRedeemed,
             currentTestCtx.totalAssets,
