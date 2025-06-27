@@ -377,24 +377,27 @@ contract EIP712SignatureTest is Test {
         ];
 
         for (uint i = 0; i < 3; i++) {
-            uint256 nonce = _tokenized(address(mechanism)).nonces(users[i]);
-            uint256 deadline = block.timestamp + 1 hours;
-            uint8 choice = uint8(voteTypes[i]);
-            uint256 weight = 50;
+            // Scope variables to reduce stack pressure
+            {
+                uint256 nonce = _tokenized(address(mechanism)).nonces(users[i]);
+                uint256 deadline = block.timestamp + 1 hours;
+                uint8 choice = uint8(voteTypes[i]);
+                uint256 weight = 50;
 
-            bytes32 digest = _getCastVoteDigest(users[i], pids[i], choice, weight, nonce, deadline);
-            (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, privateKeys[i]);
+                bytes32 digest = _getCastVoteDigest(users[i], pids[i], choice, weight, nonce, deadline);
+                (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, privateKeys[i]);
 
-            _tokenized(address(mechanism)).castVoteWithSignature(
-                users[i],
-                pids[i],
-                voteTypes[i],
-                weight,
-                deadline,
-                v,
-                r,
-                s
-            );
+                _tokenized(address(mechanism)).castVoteWithSignature(
+                    users[i],
+                    pids[i],
+                    voteTypes[i],
+                    weight,
+                    deadline,
+                    v,
+                    r,
+                    s
+                );
+            }
 
             assertTrue(_tokenized(address(mechanism)).hasVoted(pids[i], users[i]), "Vote not recorded");
         }
