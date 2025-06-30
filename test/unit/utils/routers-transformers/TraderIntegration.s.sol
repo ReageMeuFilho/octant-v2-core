@@ -25,7 +25,6 @@ contract TestTraderIntegrationETH2GLM is Test, TestPlus, DeployTrader {
 
         mainnetFork = vm.createFork("mainnet");
         vm.selectFork(mainnetFork);
-        vm.rollFork(mainnetForkBlock);
 
         config = new HelperConfig(true);
 
