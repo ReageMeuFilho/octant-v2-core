@@ -25,7 +25,7 @@ abstract contract BaseYieldSkimmingStrategy is BaseYieldSkimmingHealthCheck {
         address _tokenizedStrategyAddress
     )
         BaseYieldSkimmingHealthCheck(
-            _asset, // shares address
+            _asset,
             _name,
             _management,
             _keeper,
@@ -42,6 +42,12 @@ abstract contract BaseYieldSkimmingStrategy is BaseYieldSkimmingHealthCheck {
     function balanceOfAsset() public view returns (uint256) {
         return IERC20(asset).balanceOf(address(this));
     }
+
+    function getCurrentExchangeRate() public view returns (uint256) {
+        return _getCurrentExchangeRate();
+    }
+
+    function decimalsOfExchangeRate() public view virtual returns (uint256);
 
     /**
      * @notice Deposits available funds into the yield vault
@@ -82,12 +88,6 @@ abstract contract BaseYieldSkimmingStrategy is BaseYieldSkimmingHealthCheck {
     function _tend(uint256 /*_idle*/) internal override {
         // No action needed
     }
-
-    function getCurrentExchangeRate() public view returns (uint256) {
-        return _getCurrentExchangeRate();
-    }
-
-    function decimalsOfExchangeRate() public view virtual returns (uint256);
 
     /**
      * @notice Gets the current exchange rate from the yield vault

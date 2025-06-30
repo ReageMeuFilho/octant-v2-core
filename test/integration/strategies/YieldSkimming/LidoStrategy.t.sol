@@ -260,11 +260,26 @@ contract LidoStrategyTest is Test {
         assertEq(vault.balanceOf(user), initialShareBalance - sharesToBurn, "Shares not burned correctly");
     }
 
+    // Additional struct for profit fuzz tests to avoid stack too deep
+    struct ProfitFuzzTestState {
+        uint256 totalAssetsBefore;
+        uint256 initialExchangeRate;
+        uint256 newExchangeRate;
+        uint256 donationAddressBalanceBefore;
+        uint256 donationAddressBalanceAfter;
+        uint256 totalAssetsAfter;
+        uint256 sharesToRedeem;
+        uint256 assetsReceived;
+        uint256 donationAssetsReceived;
+    }
+
     /// @notice Fuzz test the harvesting functionality with profit
     function testFuzzHarvestWithProfitLido(uint256 depositAmount, uint256 profitPercentage) public {
         // Bound inputs to reasonable values
         depositAmount = bound(depositAmount, 1e18, 10000e18); // 1 to 10,000 WSTETH
         profitPercentage = bound(profitPercentage, 1, 99); // 1% to 99% profit (under 100% health check limit)
+
+        ProfitFuzzTestState memory state;
 
         // Airdrop tokens to user for this test
         airdrop(ERC20(WSTETH), user, depositAmount);
@@ -276,16 +291,16 @@ contract LidoStrategyTest is Test {
         vm.stopPrank();
 
         // Check initial state
-        uint256 totalAssetsBefore = vault.totalAssets();
-        uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
+        state.totalAssetsBefore = vault.totalAssets();
+        state.initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
 
         // Simulate exchange rate increase based on fuzzed percentage
-        uint256 newExchangeRate = (initialExchangeRate * (100 + profitPercentage)) / 100;
+        state.newExchangeRate = (state.initialExchangeRate * (100 + profitPercentage)) / 100;
 
         // Mock the actual yield vault's stEthPerToken (convert back to WAD format)
-        vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(newExchangeRate));
+        vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(state.newExchangeRate));
 
-        uint256 donationAddressBalanceBefore = ERC20(address(strategy)).balanceOf(donationAddress);
+        state.donationAddressBalanceBefore = ERC20(address(strategy)).balanceOf(donationAddress);
 
         // Call report
         vm.startPrank(keeper);
@@ -299,37 +314,33 @@ contract LidoStrategyTest is Test {
         assertGt(profit, 0, "Profit should be positive");
         assertEq(loss, 0, "There should be no loss");
 
-        uint256 donationAddressBalanceAfter = ERC20(address(strategy)).balanceOf(donationAddress);
+        state.donationAddressBalanceAfter = ERC20(address(strategy)).balanceOf(donationAddress);
 
         // donation address should have received the profit
         assertGt(
-            donationAddressBalanceAfter,
-            donationAddressBalanceBefore,
+            state.donationAddressBalanceAfter,
+            state.donationAddressBalanceBefore,
             "Donation address should have received profit"
         );
 
         // Check total assets after harvest
-        uint256 totalAssetsAfter = vault.totalAssets();
-        assertEq(totalAssetsAfter, totalAssetsBefore, "Total assets should not change after harvest");
+        state.totalAssetsAfter = vault.totalAssets();
+        assertEq(state.totalAssetsAfter, state.totalAssetsBefore, "Total assets should not change after harvest");
 
         // Withdraw everything for user
         vm.startPrank(user);
-        uint256 sharesToRedeem = vault.balanceOf(user);
+        state.sharesToRedeem = vault.balanceOf(user);
 
-        uint256 assetsReceived = vault.redeem(sharesToRedeem, user, user);
+        state.assetsReceived = vault.redeem(state.sharesToRedeem, user, user);
         vm.stopPrank();
 
         // withdraw the donation address shares
         vm.startPrank(donationAddress);
-        uint256 donationAssetsReceived = vault.redeem(
-            vault.balanceOf(donationAddress),
-            donationAddress,
-            donationAddress
-        );
+        state.donationAssetsReceived = vault.redeem(vault.balanceOf(donationAddress), donationAddress, donationAddress);
         vm.stopPrank();
 
         assertApproxEqRel(
-            donationAssetsReceived,
+            state.donationAssetsReceived,
             (depositAmount * profitPercentage) / (100 + profitPercentage),
             0.1e16,
             "Donation address should have received profit"
@@ -337,8 +348,8 @@ contract LidoStrategyTest is Test {
 
         // Verify user received their original deposit
         assertApproxEqRel(
-            assetsReceived * newExchangeRate,
-            depositAmount * initialExchangeRate,
+            state.assetsReceived * state.newExchangeRate,
+            depositAmount * state.initialExchangeRate,
             0.1e16, // 0.1% tolerance for fuzzing
             "User should receive original deposit"
         );
