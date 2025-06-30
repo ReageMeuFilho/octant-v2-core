@@ -46,13 +46,11 @@ contract SkyCompounderTest is Test {
     // Mainnet addresses
     address public constant USDS = 0xdC035D45d973E3EC169d2276DDab16f1e407384F;
     address public constant STAKING = 0x0650CAF159C5A49f711e8169D4336ECB9b950275; // Sky Protocol Staking Contract
-    address public constant TOKENIZED_STRATEGY_ADDRESS = 0x8cf7246a74704bBE59c9dF614ccB5e3d9717d8Ac;
     address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
 
     // Test constants
     uint256 public constant INITIAL_DEPOSIT = 100000e18;
     uint256 public mainnetFork;
-    uint256 public mainnetForkBlock = 21880848; // A recent Ethereum mainnet block
 
     // Events from ITokenizedStrategy
     event Reported(uint256 profit, uint256 loss);
@@ -74,15 +72,8 @@ contract SkyCompounderTest is Test {
         // where mainnet = "${ETHEREUM_NODE_MAINNET}" environment variable
         mainnetFork = vm.createFork("mainnet");
         vm.selectFork(mainnetFork);
-        vm.rollFork(mainnetForkBlock);
 
-        // Etch YieldDonatingTokenizedStrategy
         implementation = new YieldDonatingTokenizedStrategy{ salt: keccak256("OCT_YIELD_DONATING_STRATEGY_V1") }();
-        bytes memory tokenizedStrategyBytecode = address(implementation).code;
-        vm.etch(TOKENIZED_STRATEGY_ADDRESS, tokenizedStrategyBytecode);
-
-        // Now use that address as our tokenizedStrategy
-        tokenizedStrategy = YieldDonatingTokenizedStrategy(TOKENIZED_STRATEGY_ADDRESS);
 
         // Set up addresses
         management = address(0x1);
@@ -116,7 +107,6 @@ contract SkyCompounderTest is Test {
         vm.label(address(factory), "SkyCompounderStrategyFactory");
         vm.label(USDS, "USDS Token");
         vm.label(STAKING, "Sky Staking");
-        vm.label(TOKENIZED_STRATEGY_ADDRESS, "TokenizedStrategy");
         vm.label(management, "Management");
         vm.label(keeper, "Keeper");
         vm.label(emergencyAdmin, "Emergency Admin");

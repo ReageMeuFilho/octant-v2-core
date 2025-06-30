@@ -61,8 +61,6 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     {
         StrategyData storage S = super._strategyStorage();
 
-        uint256 lastLossRate = _strategyYieldSkimmingStorage().lastRateRay;
-
         uint256 rateNow = _currentRateRay();
 
         uint256 currentTotalAssets = IBaseStrategy(address(this)).harvestAndReport();
@@ -83,19 +81,12 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
 
             _mint(S, S.dragonRouter, profit);
 
-            // set last lost rate back to 0
-            _strategyYieldSkimmingStorage().lastRateRay = 0;
-
             emit DonationMinted(S.dragonRouter, profit, rateNow.rayToWad());
             // do not burn shares if the rate is the same as the last rate
-        } else if (totalETH < supply && rateNow < lastLossRate) {
+        } else if (totalETH < supply) {
             // Rare: negative yield (slash). Use loss protection mechanism.
             loss = supply - totalETH;
             _handleDragonLossProtection(S, loss);
-        } else {
-            // No change
-            profit = 0;
-            loss = 0;
         }
 
         S.lastReport = uint96(block.timestamp);
@@ -110,6 +101,22 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         emit Reported(profitInAssets, lossInAssets);
 
         return (profitInAssets, lossInAssets);
+    }
+
+    /**
+     * @dev Get the last reported exchange rate
+     * @return The last exchange rate in RAY format
+     */
+    function getLastRateRay() external view returns (uint256) {
+        return _strategyYieldSkimmingStorage().lastRateRay;
+    }
+
+    /**
+     * @dev Get the current exchange rate
+     * @return The current exchange rate in RAY format
+     */
+    function getCurrentRateRay() external view returns (uint256) {
+        return _currentRateRay();
     }
 
     function _deposit(StrategyData storage S, address receiver, uint256 assets, uint256 shares) internal override {
@@ -151,22 +158,6 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         Math.Rounding rounding
     ) internal view virtual override returns (uint256) {
         return assets.mulDiv(_currentRateRay(), WadRayMath.RAY, rounding);
-    }
-
-    /**
-     * @dev Get the last reported exchange rate
-     * @return The last exchange rate in RAY format
-     */
-    function getLastRateRay() external view returns (uint256) {
-        return _strategyYieldSkimmingStorage().lastRateRay;
-    }
-
-    /**
-     * @dev Get the current exchange rate
-     * @return The current exchange rate in RAY format
-     */
-    function getCurrentRateRay() external view returns (uint256) {
-        return _currentRateRay();
     }
 
     function _strategyYieldSkimmingStorage() internal pure returns (YieldSkimmingStorage storage S) {
