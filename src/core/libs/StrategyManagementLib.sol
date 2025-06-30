@@ -210,12 +210,6 @@ library StrategyManagementLib {
             }
         }
 
-        // Protocol fee config information
-        if (assessment.totalFees > 0) {
-            (assessment.protocolFeeBps, assessment.protocolFeeRecipient) = IMultistrategyVaultFactory(factory)
-                .protocolFeeConfig(vaultAddress);
-        }
-
         // Store profit max unlock time for later use in the vault
         assessment.profitMaxUnlockTime = profitMaxUnlockTime;
 
@@ -233,6 +227,10 @@ library StrategyManagementLib {
                 assessment.totalFeesShares =
                     (assessment.sharesToBurn * assessment.totalFees) /
                     (assessment.loss + assessment.totalFees);
+
+                // Get protocol fee config
+                (assessment.protocolFeeBps, assessment.protocolFeeRecipient) = IMultistrategyVaultFactory(factory)
+                    .protocolFeeConfig(vaultAddress);
 
                 // If there is a protocol fee
                 if (assessment.protocolFeeBps > 0) {
