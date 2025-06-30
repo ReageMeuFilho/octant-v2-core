@@ -3,10 +3,10 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
-import { TokenizedAllocationMechanism } from "../../TokenizedAllocationMechanism.sol";
-import { QuadraticVotingMechanism } from "../../mechanism/QuadraticVotingMechanism.sol";
-import { AllocationMechanismFactory } from "../../AllocationMechanismFactory.sol";
-import { AllocationConfig } from "../../BaseAllocationMechanism.sol";
+import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocationMechanism.sol";
+import { QuadraticVotingMechanism } from "src/mechanisms/mechanism/QuadraticVotingMechanism.sol";
+import { AllocationMechanismFactory } from "src/mechanisms/AllocationMechanismFactory.sol";
+import { AllocationConfig } from "src/mechanisms/BaseAllocationMechanism.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { ERC20Mock } from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 
@@ -30,6 +30,105 @@ contract QuadraticVotingRecipientJourneyTest is Test {
     uint256 constant VOTING_DELAY = 100;
     uint256 constant VOTING_PERIOD = 1000;
     uint256 constant TIMELOCK_DELAY = 1 days;
+
+    /// @notice Test context struct for stack optimization
+    /// @dev Consolidates all test variables into storage to prevent stack too deep issues
+    struct TestContext {
+        // Proposal and timing
+        uint256 startBlock;
+        uint256 pid1;
+        uint256 pid2;
+        uint256 queueTime;
+        // Additional proposal IDs for different test scenarios
+        uint256 pidCharlie;
+        uint256 pidDave;
+        uint256 pidEve;
+        // Share and asset tracking
+        uint256 charlieShares;
+        uint256 daveShares;
+        uint256 totalSupply;
+        uint256 totalAssets;
+        // Charlie redemption tracking
+        uint256 charlieMaxRedeem;
+        uint256 charliePartialRedeem;
+        uint256 charlieAssets1;
+        uint256 charlieRemainingShares;
+        uint256 charlieMaxRedeem2;
+        uint256 charlieAssets2;
+        uint256 charlieRemainingAfterSecond;
+        uint256 charlieAssets3;
+        uint256 charlieMaxRedeem3;
+        // Dave redemption tracking
+        uint256 daveMaxRedeemShares;
+        uint256 daveAssets;
+        uint256 daveRemainingShares;
+        uint256 daveAssets2;
+        uint256 daveMaxRedeem2;
+        // Expected values and verification
+        uint256 expectedCharlieAssets1;
+        uint256 expectedDaveAssets;
+        uint256 expectedCharlieAssets2;
+        uint256 totalRemainingShares;
+        uint256 totalAssetsRedeemed;
+        uint256 charlieSharesRedeemed;
+        // Funding tracking variables for outcome monitoring
+        uint256 charlieQuadraticFunding;
+        uint256 charlieLinearFunding;
+        uint256 charlieFor;
+        uint256 daveQuadraticFunding;
+        uint256 daveLinearFunding;
+        uint256 daveFor;
+        uint256 eveQuadraticFunding;
+        uint256 eveLinearFunding;
+        uint256 eveFor;
+    }
+
+    /// @notice Storage-based test context for stack optimization
+    TestContext internal currentTestCtx;
+
+    /// @notice Clear test context for fresh initialization
+    function _clearTestContext() internal {
+        currentTestCtx.startBlock = 0;
+        currentTestCtx.pid1 = 0;
+        currentTestCtx.pid2 = 0;
+        currentTestCtx.queueTime = 0;
+        currentTestCtx.pidCharlie = 0;
+        currentTestCtx.pidDave = 0;
+        currentTestCtx.pidEve = 0;
+        currentTestCtx.charlieShares = 0;
+        currentTestCtx.daveShares = 0;
+        currentTestCtx.totalSupply = 0;
+        currentTestCtx.totalAssets = 0;
+        currentTestCtx.charlieMaxRedeem = 0;
+        currentTestCtx.charliePartialRedeem = 0;
+        currentTestCtx.charlieAssets1 = 0;
+        currentTestCtx.charlieRemainingShares = 0;
+        currentTestCtx.charlieMaxRedeem2 = 0;
+        currentTestCtx.charlieAssets2 = 0;
+        currentTestCtx.charlieRemainingAfterSecond = 0;
+        currentTestCtx.charlieAssets3 = 0;
+        currentTestCtx.charlieMaxRedeem3 = 0;
+        currentTestCtx.daveMaxRedeemShares = 0;
+        currentTestCtx.daveAssets = 0;
+        currentTestCtx.daveRemainingShares = 0;
+        currentTestCtx.daveAssets2 = 0;
+        currentTestCtx.daveMaxRedeem2 = 0;
+        currentTestCtx.expectedCharlieAssets1 = 0;
+        currentTestCtx.expectedDaveAssets = 0;
+        currentTestCtx.expectedCharlieAssets2 = 0;
+        currentTestCtx.totalRemainingShares = 0;
+        currentTestCtx.totalAssetsRedeemed = 0;
+        currentTestCtx.charlieSharesRedeemed = 0;
+        currentTestCtx.charlieQuadraticFunding = 0;
+        currentTestCtx.charlieLinearFunding = 0;
+        currentTestCtx.charlieFor = 0;
+        currentTestCtx.daveQuadraticFunding = 0;
+        currentTestCtx.daveLinearFunding = 0;
+        currentTestCtx.daveFor = 0;
+        currentTestCtx.eveQuadraticFunding = 0;
+        currentTestCtx.eveLinearFunding = 0;
+        currentTestCtx.eveFor = 0;
+    }
 
     function _tokenized(address _mechanism) internal pure returns (TokenizedAllocationMechanism) {
         return TokenizedAllocationMechanism(_mechanism);
@@ -119,11 +218,8 @@ contract QuadraticVotingRecipientJourneyTest is Test {
         assertEq(proposal1.earliestRedeemableTime, 0);
 
         // Multiple recipients can have proposals
-        uint256 pid2 = _createProposal(bob, dave, "Dave's Education Platform");
-        console.log("Created proposal", pid2);
-
-        uint256 pid3 = _createProposal(alice, eve, "Eve's Healthcare Program");
-        console.log("Created proposal", pid3);
+        _createProposal(bob, dave, "Dave's Education Platform");
+        _createProposal(alice, eve, "Eve's Healthcare Program");
 
         assertEq(_tokenized(address(mechanism)).getProposalCount(), 3);
 
@@ -145,8 +241,9 @@ contract QuadraticVotingRecipientJourneyTest is Test {
 
     /// @notice Test recipient monitoring and outcome tracking
     function testRecipientMonitoring_OutcomeTracking() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        _clearTestContext();
+        currentTestCtx.startBlock = _tokenized(address(mechanism)).startBlock();
+        vm.roll(currentTestCtx.startBlock - 1);
 
         // Setup voting scenario with multiple outcomes
         _signupUser(alice, LARGE_DEPOSIT);
@@ -154,56 +251,62 @@ contract QuadraticVotingRecipientJourneyTest is Test {
         _signupUser(frank, 100 ether);
 
         // Create proposals for different recipients
-        uint256 pidCharlie = _createProposal(alice, charlie, "Charlie's Project");
-        uint256 pidDave = _createProposal(bob, dave, "Dave's Project");
-        uint256 pidEve = _createProposal(frank, eve, "Eve's Project");
+        currentTestCtx.pidCharlie = _createProposal(alice, charlie, "Charlie's Project");
+        currentTestCtx.pidDave = _createProposal(bob, dave, "Dave's Project");
+        currentTestCtx.pidEve = _createProposal(frank, eve, "Eve's Project");
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.roll(currentTestCtx.startBlock + VOTING_DELAY + 1);
 
         // Create different voting outcomes
         // Charlie: Successful (meets quorum)
-        _castVote(alice, pidCharlie, 30);
-        _castVote(bob, pidCharlie, 15);
+        _castVote(alice, currentTestCtx.pidCharlie, 30);
+        _castVote(bob, currentTestCtx.pidCharlie, 15);
 
         // Dave: Failed (below quorum)
-        _castVote(bob, pidDave, 10);
+        _castVote(bob, currentTestCtx.pidDave, 10);
 
         // Eve: Negative outcome
-        _castVote(alice, pidEve, 12);
-        _castVote(frank, pidEve, 8);
+        _castVote(alice, currentTestCtx.pidEve, 12);
+        _castVote(frank, currentTestCtx.pidEve, 8);
 
         // Recipients can monitor progress in real-time using getTally() from ProperQF
-        (, , uint256 charlieQuadraticFunding, uint256 charlieLinearFunding) = mechanism.getTally(pidCharlie);
-        uint256 charlieFor = charlieQuadraticFunding + charlieLinearFunding;
+        (, , currentTestCtx.charlieQuadraticFunding, currentTestCtx.charlieLinearFunding) = mechanism.getTally(
+            currentTestCtx.pidCharlie
+        );
+        currentTestCtx.charlieFor = currentTestCtx.charlieQuadraticFunding + currentTestCtx.charlieLinearFunding;
         // Charlie: Alice(25) + Bob(12) = (37)² × 0.5 = 684.5, rounded funding calculation
-        assertTrue(charlieFor > 0, "Charlie should have funding from QuadraticFunding calculation");
+        assertTrue(currentTestCtx.charlieFor > 0, "Charlie should have funding from QuadraticFunding calculation");
 
-        (, , uint256 daveQuadraticFunding, uint256 daveLinearFunding) = mechanism.getTally(pidDave);
-        uint256 daveFor = daveQuadraticFunding + daveLinearFunding;
+        (, , currentTestCtx.daveQuadraticFunding, currentTestCtx.daveLinearFunding) = mechanism.getTally(
+            currentTestCtx.pidDave
+        );
+        currentTestCtx.daveFor = currentTestCtx.daveQuadraticFunding + currentTestCtx.daveLinearFunding;
         // Dave: Bob(10) = (10)² × 0.5 = 50
-        assertTrue(daveFor > 0, "Dave should have some funding");
+        assertTrue(currentTestCtx.daveFor > 0, "Dave should have some funding");
 
-        (, , uint256 eveQuadraticFunding, uint256 eveLinearFunding) = mechanism.getTally(pidEve);
-        uint256 eveFor = eveQuadraticFunding + eveLinearFunding;
+        (, , currentTestCtx.eveQuadraticFunding, currentTestCtx.eveLinearFunding) = mechanism.getTally(
+            currentTestCtx.pidEve
+        );
+        currentTestCtx.eveFor = currentTestCtx.eveQuadraticFunding + currentTestCtx.eveLinearFunding;
         // Eve: Alice(12) + Frank(8) = (20)² × 0.5 = 200
-        assertTrue(eveFor > 0, "Eve should have funding from For votes");
+        assertTrue(currentTestCtx.eveFor > 0, "Eve should have funding from For votes");
 
         // End voting and finalize
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.roll(currentTestCtx.startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
 
         // Test outcome tracking
         assertEq(
-            uint(_tokenized(address(mechanism)).state(pidCharlie)),
+            uint(_tokenized(address(mechanism)).state(currentTestCtx.pidCharlie)),
             uint(TokenizedAllocationMechanism.ProposalState.Succeeded)
         );
         assertEq(
-            uint(_tokenized(address(mechanism)).state(pidDave)),
+            uint(_tokenized(address(mechanism)).state(currentTestCtx.pidDave)),
             uint(TokenizedAllocationMechanism.ProposalState.Defeated)
         );
         assertEq(
-            uint(_tokenized(address(mechanism)).state(pidEve)),
+            uint(_tokenized(address(mechanism)).state(currentTestCtx.pidEve)),
             uint(TokenizedAllocationMechanism.ProposalState.Defeated)
         );
     }
@@ -279,8 +382,9 @@ contract QuadraticVotingRecipientJourneyTest is Test {
 
     /// @notice Test recipient partial redemption and share management
     function testRecipientShares_PartialRedemption() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        _clearTestContext();
+        currentTestCtx.startBlock = _tokenized(address(mechanism)).startBlock();
+        vm.roll(currentTestCtx.startBlock - 1);
 
         // Setup multiple successful recipients
         vm.startPrank(alice);
@@ -293,127 +397,180 @@ contract QuadraticVotingRecipientJourneyTest is Test {
         _tokenized(address(mechanism)).signup(MEDIUM_DEPOSIT);
         vm.stopPrank();
 
-        uint256 pid1 = _createProposal(alice, charlie, "Charlie's Project");
-        uint256 pid2 = _createProposal(bob, dave, "Dave's Project");
+        currentTestCtx.pid1 = _createProposal(alice, charlie, "Charlie's Project");
+        currentTestCtx.pid2 = _createProposal(bob, dave, "Dave's Project");
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.roll(currentTestCtx.startBlock + VOTING_DELAY + 1);
 
         // Vote for both proposals
-        _castVote(alice, pid1, 30);
-        _castVote(bob, pid2, 25);
+        _castVote(alice, currentTestCtx.pid1, 30);
+        _castVote(bob, currentTestCtx.pid2, 25);
 
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.roll(currentTestCtx.startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
 
         // Queue both proposals at the same time to ensure same timelock schedule
-        uint256 queueTime = block.timestamp;
+        currentTestCtx.queueTime = block.timestamp;
 
         // Warp to a specific time BEFORE queuing to ensure both get the same timestamp
-        vm.warp(queueTime);
-        (bool success1, ) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", pid1));
+        vm.warp(currentTestCtx.queueTime);
+        (bool success1, ) = address(mechanism).call(
+            abi.encodeWithSignature("queueProposal(uint256)", currentTestCtx.pid1)
+        );
         require(success1, "Queue proposal 1 failed");
 
         // Reset to same timestamp for second proposal
-        vm.warp(queueTime);
-        (bool success2, ) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", pid2));
+        vm.warp(currentTestCtx.queueTime);
+        (bool success2, ) = address(mechanism).call(
+            abi.encodeWithSignature("queueProposal(uint256)", currentTestCtx.pid2)
+        );
         require(success2, "Queue proposal 2 failed");
 
         // Verify both recipients received shares based on QuadraticFunding calculations
-        uint256 charlieShares = _tokenized(address(mechanism)).balanceOf(charlie);
-        uint256 daveShares = _tokenized(address(mechanism)).balanceOf(dave);
-        uint256 totalSupply = _tokenized(address(mechanism)).totalSupply();
+        currentTestCtx.charlieShares = _tokenized(address(mechanism)).balanceOf(charlie);
+        currentTestCtx.daveShares = _tokenized(address(mechanism)).balanceOf(dave);
+        currentTestCtx.totalSupply = _tokenized(address(mechanism)).totalSupply();
 
-        assertTrue(charlieShares > 0, "Charlie should receive shares");
-        assertTrue(daveShares > 0, "Dave should receive shares");
-        assertEq(totalSupply, charlieShares + daveShares);
+        assertTrue(currentTestCtx.charlieShares > 0, "Charlie should receive shares");
+        assertTrue(currentTestCtx.daveShares > 0, "Dave should receive shares");
+        assertEq(currentTestCtx.totalSupply, currentTestCtx.charlieShares + currentTestCtx.daveShares);
 
         // Fast forward past timelock with buffer for safety
         vm.warp(block.timestamp + TIMELOCK_DELAY + 100);
 
         // Charlie partial redemption (50%) - use maxRedeem to avoid boundary issues
-        uint256 charlieMaxRedeem = _tokenized(address(mechanism)).maxRedeem(charlie);
-        uint256 charliePartialRedeem = charlieMaxRedeem / 2; // Redeem half of what's allowed
+        currentTestCtx.charlieMaxRedeem = _tokenized(address(mechanism)).maxRedeem(charlie);
+        currentTestCtx.charliePartialRedeem = currentTestCtx.charlieMaxRedeem / 2; // Redeem half of what's allowed
         vm.prank(charlie);
-        uint256 charlieAssets1 = _tokenized(address(mechanism)).redeem(charliePartialRedeem, charlie, charlie);
+        currentTestCtx.charlieAssets1 = _tokenized(address(mechanism)).redeem(
+            currentTestCtx.charliePartialRedeem,
+            charlie,
+            charlie
+        );
 
-        uint256 charlieRemainingShares = charlieShares - charliePartialRedeem;
-        assertEq(_tokenized(address(mechanism)).balanceOf(charlie), charlieRemainingShares);
-        assertEq(_tokenized(address(mechanism)).totalSupply(), totalSupply - charliePartialRedeem);
+        currentTestCtx.charlieRemainingShares = currentTestCtx.charlieShares - currentTestCtx.charliePartialRedeem;
+        assertEq(_tokenized(address(mechanism)).balanceOf(charlie), currentTestCtx.charlieRemainingShares);
+        assertEq(
+            _tokenized(address(mechanism)).totalSupply(),
+            currentTestCtx.totalSupply - currentTestCtx.charliePartialRedeem
+        );
 
         // With matching pool: calculate expected assets based on share-to-asset ratio
-        uint256 totalAssets = LARGE_DEPOSIT + MEDIUM_DEPOSIT + 2000 ether; // 3500 ether
-        uint256 expectedCharlieAssets1 = (charliePartialRedeem * totalAssets) / totalSupply;
-        assertApproxEqAbs(charlieAssets1, expectedCharlieAssets1, 1, "Charlie assets1 within 1 wei");
+        currentTestCtx.totalAssets = LARGE_DEPOSIT + MEDIUM_DEPOSIT + 2000 ether; // 3500 ether
+        currentTestCtx.expectedCharlieAssets1 =
+            (currentTestCtx.charliePartialRedeem * currentTestCtx.totalAssets) /
+            currentTestCtx.totalSupply;
+        assertApproxEqAbs(
+            currentTestCtx.charlieAssets1,
+            currentTestCtx.expectedCharlieAssets1,
+            1,
+            "Charlie assets1 within 1 wei"
+        );
 
         // Dave full redemption - use maxRedeem to handle any rounding issues
-        uint256 daveMaxRedeemShares = _tokenized(address(mechanism)).maxRedeem(dave);
+        currentTestCtx.daveMaxRedeemShares = _tokenized(address(mechanism)).maxRedeem(dave);
         vm.prank(dave);
-        uint256 daveAssets = _tokenized(address(mechanism)).redeem(daveMaxRedeemShares, dave, dave);
+        currentTestCtx.daveAssets = _tokenized(address(mechanism)).redeem(
+            currentTestCtx.daveMaxRedeemShares,
+            dave,
+            dave
+        );
 
-        uint256 daveRemainingShares = daveShares - daveMaxRedeemShares;
-        assertEq(_tokenized(address(mechanism)).balanceOf(dave), daveRemainingShares);
-        assertEq(_tokenized(address(mechanism)).totalSupply(), charlieRemainingShares + daveRemainingShares);
+        currentTestCtx.daveRemainingShares = currentTestCtx.daveShares - currentTestCtx.daveMaxRedeemShares;
+        assertEq(_tokenized(address(mechanism)).balanceOf(dave), currentTestCtx.daveRemainingShares);
+        assertEq(
+            _tokenized(address(mechanism)).totalSupply(),
+            currentTestCtx.charlieRemainingShares + currentTestCtx.daveRemainingShares
+        );
 
-        uint256 expectedDaveAssets = (daveMaxRedeemShares * totalAssets) / totalSupply;
-        assertApproxEqAbs(daveAssets, expectedDaveAssets, 1, "Dave assets within 1 wei");
+        currentTestCtx.expectedDaveAssets =
+            (currentTestCtx.daveMaxRedeemShares * currentTestCtx.totalAssets) /
+            currentTestCtx.totalSupply;
+        assertApproxEqAbs(currentTestCtx.daveAssets, currentTestCtx.expectedDaveAssets, 1, "Dave assets within 1 wei");
 
         // Charlie remaining redemption - redeem whatever is left and allowed
-        uint256 charlieMaxRedeem2 = _tokenized(address(mechanism)).maxRedeem(charlie);
+        currentTestCtx.charlieMaxRedeem2 = _tokenized(address(mechanism)).maxRedeem(charlie);
         vm.prank(charlie);
-        uint256 charlieAssets2 = _tokenized(address(mechanism)).redeem(charlieMaxRedeem2, charlie, charlie);
+        currentTestCtx.charlieAssets2 = _tokenized(address(mechanism)).redeem(
+            currentTestCtx.charlieMaxRedeem2,
+            charlie,
+            charlie
+        );
 
         // If Charlie has any remaining shares due to rounding, redeem them too
-        uint256 charlieRemainingAfterSecond = _tokenized(address(mechanism)).balanceOf(charlie);
-        uint256 charlieAssets3 = 0;
-        if (charlieRemainingAfterSecond > 0) {
-            uint256 charlieMaxRedeem3 = _tokenized(address(mechanism)).maxRedeem(charlie);
-            if (charlieMaxRedeem3 > 0) {
+        currentTestCtx.charlieRemainingAfterSecond = _tokenized(address(mechanism)).balanceOf(charlie);
+        currentTestCtx.charlieAssets3 = 0;
+        if (currentTestCtx.charlieRemainingAfterSecond > 0) {
+            currentTestCtx.charlieMaxRedeem3 = _tokenized(address(mechanism)).maxRedeem(charlie);
+            if (currentTestCtx.charlieMaxRedeem3 > 0) {
                 vm.prank(charlie);
-                charlieAssets3 = _tokenized(address(mechanism)).redeem(charlieMaxRedeem3, charlie, charlie);
+                currentTestCtx.charlieAssets3 = _tokenized(address(mechanism)).redeem(
+                    currentTestCtx.charlieMaxRedeem3,
+                    charlie,
+                    charlie
+                );
             }
         }
 
         // Charlie should now have redeemed all shares
         assertEq(_tokenized(address(mechanism)).balanceOf(charlie), 0, "Charlie should have redeemed all shares");
-        assertEq(_tokenized(address(mechanism)).totalSupply(), daveRemainingShares);
+        assertEq(_tokenized(address(mechanism)).totalSupply(), currentTestCtx.daveRemainingShares);
 
-        uint256 expectedCharlieAssets2 = (charlieMaxRedeem2 * totalAssets) / totalSupply;
-        assertApproxEqAbs(charlieAssets2, expectedCharlieAssets2, 1, "Charlie assets2 within 1 wei");
+        currentTestCtx.expectedCharlieAssets2 =
+            (currentTestCtx.charlieMaxRedeem2 * currentTestCtx.totalAssets) /
+            currentTestCtx.totalSupply;
+        assertApproxEqAbs(
+            currentTestCtx.charlieAssets2,
+            currentTestCtx.expectedCharlieAssets2,
+            1,
+            "Charlie assets2 within 1 wei"
+        );
 
         // Let Dave redeem any remaining shares too
-        uint256 daveAssets2 = 0;
-        if (daveRemainingShares > 0) {
-            uint256 daveMaxRedeem2 = _tokenized(address(mechanism)).maxRedeem(dave);
-            if (daveMaxRedeem2 > 0) {
+        currentTestCtx.daveAssets2 = 0;
+        if (currentTestCtx.daveRemainingShares > 0) {
+            currentTestCtx.daveMaxRedeem2 = _tokenized(address(mechanism)).maxRedeem(dave);
+            if (currentTestCtx.daveMaxRedeem2 > 0) {
                 vm.prank(dave);
-                daveAssets2 = _tokenized(address(mechanism)).redeem(daveMaxRedeem2, dave, dave);
+                currentTestCtx.daveAssets2 = _tokenized(address(mechanism)).redeem(
+                    currentTestCtx.daveMaxRedeem2,
+                    dave,
+                    dave
+                );
             }
         }
 
-        // Verify total assets redeemed correctly with matching pool conversion
-        uint256 charlieActualSharesRedeemed = charliePartialRedeem + charlieMaxRedeem2;
-        if (charlieAssets3 > 0) {
-            // If there was a third redemption, include it
-            charlieActualSharesRedeemed += charlieRemainingAfterSecond;
+        // Verify total assets redeemed correctly with matching pool conversion using inline computation
+        {
+            currentTestCtx.charlieSharesRedeemed =
+                currentTestCtx.charliePartialRedeem +
+                currentTestCtx.charlieMaxRedeem2;
+            if (currentTestCtx.charlieAssets3 > 0) {
+                currentTestCtx.charlieSharesRedeemed += currentTestCtx.charlieRemainingAfterSecond;
+            }
+            assertApproxEqAbs(
+                currentTestCtx.charlieAssets1 + currentTestCtx.charlieAssets2 + currentTestCtx.charlieAssets3,
+                (currentTestCtx.charlieSharesRedeemed * currentTestCtx.totalAssets) / currentTestCtx.totalSupply,
+                3,
+                "Charlie total within 3 wei"
+            );
         }
-        uint256 expectedCharlieTotal = (charlieActualSharesRedeemed * totalAssets) / totalSupply;
-        assertApproxEqAbs(
-            charlieAssets1 + charlieAssets2 + charlieAssets3,
-            expectedCharlieTotal,
-            3,
-            "Charlie total within 3 wei"
-        );
 
         // Both recipients should have redeemed all or nearly all their shares
-        uint256 totalRemainingShares = _tokenized(address(mechanism)).totalSupply();
-        assertTrue(totalRemainingShares <= 1, "Should have at most 1 remaining share due to rounding");
+        currentTestCtx.totalRemainingShares = _tokenized(address(mechanism)).totalSupply();
+        assertTrue(currentTestCtx.totalRemainingShares <= 1, "Should have at most 1 remaining share due to rounding");
 
         // Verify total assets conservation - almost all assets should be redeemed
-        uint256 totalAssetsRedeemed = charlieAssets1 + charlieAssets2 + charlieAssets3 + daveAssets + daveAssets2;
+        currentTestCtx.totalAssetsRedeemed =
+            currentTestCtx.charlieAssets1 +
+            currentTestCtx.charlieAssets2 +
+            currentTestCtx.charlieAssets3 +
+            currentTestCtx.daveAssets +
+            currentTestCtx.daveAssets2;
         assertApproxEqAbs(
-            totalAssetsRedeemed,
-            totalAssets,
+            currentTestCtx.totalAssetsRedeemed,
+            currentTestCtx.totalAssets,
             10,
             "Total assets redeemed should be close to total assets"
         );

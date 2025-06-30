@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
-import { ProperQF } from "../../voting-strategy/ProperQF.sol";
+import { ProperQF } from "src/mechanisms/voting-strategy/ProperQF.sol";
 
 /// @notice Test harness that wraps ProperQF for direct testing
 contract ProperQFHarness is ProperQF {

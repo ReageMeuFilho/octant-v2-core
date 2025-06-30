@@ -7,7 +7,7 @@ evm_version = "prague"
 optimizer = true
 # Runs changed from 10M to 25k to fit code in EVM
 optimizer_runs = 200
-via_ir = true
+via_ir = false
 solc = "0.8.30"
 verbosity = 3
 ast = true

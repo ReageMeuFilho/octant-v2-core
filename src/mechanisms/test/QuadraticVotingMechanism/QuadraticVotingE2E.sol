@@ -3,10 +3,10 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
-import { TokenizedAllocationMechanism } from "../../TokenizedAllocationMechanism.sol";
-import { QuadraticVotingMechanism } from "../../mechanism/QuadraticVotingMechanism.sol";
-import { AllocationMechanismFactory } from "../../AllocationMechanismFactory.sol";
-import { AllocationConfig } from "../../BaseAllocationMechanism.sol";
+import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocationMechanism.sol";
+import { QuadraticVotingMechanism } from "src/mechanisms/mechanism/QuadraticVotingMechanism.sol";
+import { AllocationMechanismFactory } from "src/mechanisms/AllocationMechanismFactory.sol";
+import { AllocationConfig } from "src/mechanisms/BaseAllocationMechanism.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { ERC20Mock } from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 
@@ -497,7 +497,7 @@ contract QuadraticVotingE2E is Test {
         assertEq(_tokenized(address(mechanism)).votingPower(bob), 500 ether - 500 ether, "Bob remaining power");
 
         // Charlie votes on one proposal
-        console.log("Charlie voting...");
+        // console.log("Charlie voting...");
         _castVote(charlie, pid3, 14e9); // Cost: 196 ether
         // Charlie remaining power: 200 ether - 196 = 200 ether - 196
         assertEq(_tokenized(address(mechanism)).votingPower(charlie), 200 ether - 196 ether, "Charlie remaining power");
@@ -514,16 +514,16 @@ contract QuadraticVotingE2E is Test {
         assertTrue(_tokenized(address(mechanism)).hasVoted(pid3, charlie), "Charlie voted on pid3");
 
         // Verify vote tallies using getTally from ProperQF
-        console.log("=== Verifying Vote Tallies ===");
+        // console.log("=== Verifying Vote Tallies ===");
 
         // Project 1 (Education): Alice(25e9) + Bob(20e9) = weight sum 45e9
         // Linear contributions: Alice(625 ether) + Bob(400 ether) = 1025 ether
         // Quadratic calculation: (25e9 + 20e9)² = (45e9)² = 2025e18 = 2025 ether
         (uint256 p1Contributions, uint256 p1SqrtSum, uint256 p1Quadratic, uint256 p1Linear) = mechanism.getTally(pid1);
-        console.log("Project 1 - Contributions:", p1Contributions);
-        console.log("Project 1 - SqrtSum:", p1SqrtSum);
-        console.log("Project 1 - Quadratic:", p1Quadratic);
-        console.log("Project 1 - Linear:", p1Linear);
+        // console.log("Project 1 - Contributions:", p1Contributions);
+        // console.log("Project 1 - SqrtSum:", p1SqrtSum);
+        // console.log("Project 1 - Quadratic:", p1Quadratic);
+        // console.log("Project 1 - Linear:", p1Linear);
 
         assertEq(p1Contributions, 625 ether + 400 ether, "Project 1 contributions should be sum of quadratic costs");
         assertEq(p1SqrtSum, 25e9 + 20e9, "Project 1 sqrt sum should be sum of vote weights");
@@ -535,10 +535,10 @@ contract QuadraticVotingE2E is Test {
         // Linear contributions: Alice(225 ether) + Bob(100 ether) = 325 ether
         // Quadratic calculation: (15e9 + 10e9)² = (25e9)² = 625e18 = 625 ether
         (uint256 p2Contributions, uint256 p2SqrtSum, uint256 p2Quadratic, uint256 p2Linear) = mechanism.getTally(pid2);
-        console.log("Project 2 - Contributions:", p2Contributions);
-        console.log("Project 2 - SqrtSum:", p2SqrtSum);
-        console.log("Project 2 - Quadratic:", p2Quadratic);
-        console.log("Project 2 - Linear:", p2Linear);
+        // console.log("Project 2 - Contributions:", p2Contributions);
+        // console.log("Project 2 - SqrtSum:", p2SqrtSum);
+        // console.log("Project 2 - Quadratic:", p2Quadratic);
+        // console.log("Project 2 - Linear:", p2Linear);
 
         assertEq(p2Contributions, 225 ether + 100 ether, "Project 2 contributions should be sum of quadratic costs");
         assertEq(p2SqrtSum, 15e9 + 10e9, "Project 2 sqrt sum should be sum of vote weights");
@@ -549,28 +549,28 @@ contract QuadraticVotingE2E is Test {
         // Linear contributions: Alice(100 ether) + Charlie(196 ether) = 296 ether
         // Quadratic calculation: (10e9 + 14e9)² = (24e9)² = 576e18 = 576 ether
         (uint256 p3Contributions, uint256 p3SqrtSum, uint256 p3Quadratic, uint256 p3Linear) = mechanism.getTally(pid3);
-        console.log("Project 3 - Contributions:", p3Contributions);
-        console.log("Project 3 - SqrtSum:", p3SqrtSum);
-        console.log("Project 3 - Quadratic:", p3Quadratic);
-        console.log("Project 3 - Linear:", p3Linear);
+        // console.log("Project 3 - Contributions:", p3Contributions);
+        // console.log("Project 3 - SqrtSum:", p3SqrtSum);
+        // console.log("Project 3 - Quadratic:", p3Quadratic);
+        // console.log("Project 3 - Linear:", p3Linear);
 
         assertEq(p3Contributions, 100 ether + 196 ether, "Project 3 contributions should be sum of quadratic costs");
         assertEq(p3SqrtSum, 10e9 + 14e9, "Project 3 sqrt sum should be sum of vote weights");
         assertEq(p3Quadratic, 576 ether, "Project 3 quadratic funding should be (24e9)^2");
         assertEq(p3Linear, 0 ether, "Project 3 linear funding should be 0 with alpha=1");
 
-        // Verify total funding allocation
-        uint256 totalQuadraticFunding = p1Quadratic + p2Quadratic + p3Quadratic;
-        uint256 totalLinearFunding = p1Linear + p2Linear + p3Linear;
-        uint256 totalContributions = p1Contributions + p2Contributions + p3Contributions;
-
-        console.log("Total quadratic funding:", totalQuadraticFunding);
-        console.log("Total linear funding:", totalLinearFunding);
-        console.log("Total contributions:", totalContributions);
-
-        assertEq(totalQuadraticFunding, 2025 ether + 625 ether + 576 ether, "Total quadratic funding calculation");
-        assertEq(totalLinearFunding, 0 ether, "Total linear funding should be 0 with alpha=1");
-        assertEq(totalContributions, 1025 ether + 325 ether + 296 ether, "Total contributions calculation");
+        // Verify total funding allocation using direct assertions to reduce stack usage
+        assertEq(
+            p1Quadratic + p2Quadratic + p3Quadratic,
+            2025 ether + 625 ether + 576 ether,
+            "Total quadratic funding calculation"
+        );
+        assertEq(p1Linear + p2Linear + p3Linear, 0 ether, "Total linear funding should be 0 with alpha=1");
+        assertEq(
+            p1Contributions + p2Contributions + p3Contributions,
+            1025 ether + 325 ether + 296 ether,
+            "Total contributions calculation"
+        );
 
         // Verify quadratic funding formula: each project gets α × (sum_sqrt)² + (1-α) × sum_contributions
         // With alpha = 1: funding = 1 × quadratic + 0 × linear = quadratic only
@@ -578,10 +578,10 @@ contract QuadraticVotingE2E is Test {
         assertEq(p2Quadratic + p2Linear, 625 ether, "Project 2 total funding should be 625");
         assertEq(p3Quadratic + p3Linear, 576 ether, "Project 3 total funding should be 576");
 
-        console.log("Multi-user voting scenario complete");
-        console.log("Alice remaining power:", _tokenized(address(mechanism)).votingPower(alice));
-        console.log("Bob remaining power:", _tokenized(address(mechanism)).votingPower(bob));
-        console.log("Charlie remaining power:", _tokenized(address(mechanism)).votingPower(charlie));
+        // console.log("Multi-user voting scenario complete");
+        // console.log("Alice remaining power:", _tokenized(address(mechanism)).votingPower(alice));
+        // console.log("Bob remaining power:", _tokenized(address(mechanism)).votingPower(bob));
+        // console.log("Charlie remaining power:", _tokenized(address(mechanism)).votingPower(charlie));
     }
 
     /// @notice Test matching fund calculation and 1:1 shares-to-assets ratio verification
@@ -706,15 +706,15 @@ contract QuadraticVotingE2E is Test {
         _castVote(bob, pid1, 20e9); // Cost: 400 ether
         _castVote(charlie, pid2, 14e9); // Cost: 196 ether
 
-        console.log("=== OPTIMAL ALPHA CALCULATION TEST ===");
+        // console.log("=== OPTIMAL ALPHA CALCULATION TEST ===");
 
         // Get totals after voting
         uint256 totalQuadraticSum = mechanism.totalQuadraticSum();
         uint256 totalLinearSum = mechanism.totalLinearSum();
 
-        console.log("Total Quadratic Sum:", totalQuadraticSum);
-        console.log("Total Linear Sum:", totalLinearSum);
-        console.log("Total User Deposits:", totalUserDeposits);
+        // console.log("Total Quadratic Sum:", totalQuadraticSum);
+        // console.log("Total Linear Sum:", totalLinearSum);
+        // console.log("Total User Deposits:", totalUserDeposits);
 
         // Project 1: (30e9 + 20e9)² = (50e9)² = 2500e18 = 2500 ether
         // Project 2: (14e9)² = 196e18 = 196 ether
@@ -735,65 +735,76 @@ contract QuadraticVotingE2E is Test {
             totalUserDeposits
         );
 
-        console.log("Fixed matching pool:", fixedMatchingPool);
-        console.log("Calculated alpha:", alphaNumerator, "/", alphaDenominator);
+        // console.log("Fixed matching pool:", fixedMatchingPool);
+        // console.log("Calculated alpha:", alphaNumerator, "/", alphaDenominator);
 
-        // Verify alpha calculation
-        uint256 totalAssetsAvailable = totalUserDeposits + fixedMatchingPool; // 1700 + 300 = 2000
-        uint256 quadraticAdvantage = totalQuadraticSum - totalLinearSum; // 2696 - 1496 = 1200
-        uint256 expectedNumerator = totalAssetsAvailable - totalLinearSum; // 2000 - 1496 = 504
+        // Verify alpha calculation using scoping for intermediate variables
+        {
+            uint256 totalAssetsAvailable = totalUserDeposits + fixedMatchingPool; // 1700 + 300 = 2000
+            uint256 quadraticAdvantage = totalQuadraticSum - totalLinearSum; // 2696 - 1496 = 1200
+            uint256 expectedNumerator = totalAssetsAvailable - totalLinearSum; // 2000 - 1496 = 504
 
-        // expectedNumerator (504) < quadraticAdvantage (1200), so alpha should be fractional
-        assertEq(alphaNumerator, expectedNumerator, "Alpha numerator should be total assets minus linear sum");
-        assertEq(alphaDenominator, quadraticAdvantage, "Alpha denominator should be quadratic advantage");
+            // expectedNumerator (504) < quadraticAdvantage (1200), so alpha should be fractional
+            assertEq(alphaNumerator, expectedNumerator, "Alpha numerator should be total assets minus linear sum");
+            assertEq(alphaDenominator, quadraticAdvantage, "Alpha denominator should be quadratic advantage");
+        }
 
         // Add the fixed matching pool to the mechanism
         token.mint(address(this), fixedMatchingPool);
         token.transfer(address(mechanism), fixedMatchingPool);
 
-        // Update alpha to the calculated optimal value
-        mechanism.setAlpha(alphaNumerator, alphaDenominator);
+        // Update alpha to the calculated optimal value using scoping
+        {
+            mechanism.setAlpha(alphaNumerator, alphaDenominator);
 
-        // Verify alpha was set correctly
-        (uint256 newAlphaNumerator, uint256 newAlphaDenominator) = mechanism.getAlpha();
-        assertEq(newAlphaNumerator, alphaNumerator, "Alpha numerator should be updated");
-        assertEq(newAlphaDenominator, alphaDenominator, "Alpha denominator should be updated");
+            // Verify alpha was set correctly
+            (uint256 newAlphaNumerator, uint256 newAlphaDenominator) = mechanism.getAlpha();
+            assertEq(newAlphaNumerator, alphaNumerator, "Alpha numerator should be updated");
+            assertEq(newAlphaDenominator, alphaDenominator, "Alpha denominator should be updated");
+        }
 
-        // Verify total assets = user deposits + matching pool
+        // Verify total assets and calculate expected funding
         uint256 totalAssets = token.balanceOf(address(mechanism));
         assertEq(totalAssets, totalUserDeposits + fixedMatchingPool, "Total assets should be deposits + matching pool");
 
-        // Calculate expected total funding with this alpha
-        uint256 expectedQuadraticComponent = (totalQuadraticSum * alphaNumerator) / alphaDenominator;
-        uint256 expectedLinearComponent = (totalLinearSum * (alphaDenominator - alphaNumerator)) / alphaDenominator;
-        uint256 expectedTotalFunding = expectedQuadraticComponent + expectedLinearComponent;
+        // Calculate expected total funding with this alpha using scoping for intermediate variables
+        uint256 expectedTotalFunding;
+        {
+            uint256 expectedQuadraticComponent = (totalQuadraticSum * alphaNumerator) / alphaDenominator;
+            uint256 expectedLinearComponent = (totalLinearSum * (alphaDenominator - alphaNumerator)) / alphaDenominator;
+            expectedTotalFunding = expectedQuadraticComponent + expectedLinearComponent;
 
-        console.log("Expected quadratic component:", expectedQuadraticComponent);
-        console.log("Expected linear component:", expectedLinearComponent);
-        console.log("Expected total funding:", expectedTotalFunding);
-        console.log("Actual total assets:", totalAssets);
+            // console.log("Expected quadratic component:", expectedQuadraticComponent);
+            // console.log("Expected linear component:", expectedLinearComponent);
+            // console.log("Expected total funding:", expectedTotalFunding);
+            // console.log("Actual total assets:", totalAssets);
+        }
 
-        // Move past voting period and finalize
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
-        _tokenized(address(mechanism)).finalizeVoteTally();
+        // Move past voting period and finalize using scoping for intermediate variables
+        {
+            vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+            _tokenized(address(mechanism)).finalizeVoteTally();
 
-        // Queue proposals to mint shares
-        _tokenized(address(mechanism)).queueProposal(pid1);
-        _tokenized(address(mechanism)).queueProposal(pid2);
+            // Queue proposals to mint shares
+            _tokenized(address(mechanism)).queueProposal(pid1);
+            _tokenized(address(mechanism)).queueProposal(pid2);
+        }
 
-        // Verify 1:1 ratio is maintained
-        uint256 assetsFor1Share = _tokenized(address(mechanism)).convertToAssets(1e18);
-        assertEq(assetsFor1Share, 1e18, "1:1 ratio should be maintained with optimal alpha");
+        // Verify 1:1 ratio is maintained using scoping
+        {
+            uint256 assetsFor1Share = _tokenized(address(mechanism)).convertToAssets(1e18);
+            assertEq(assetsFor1Share, 1e18, "1:1 ratio should be maintained with optimal alpha");
 
-        // Verify total shares match total assets
-        uint256 totalShares = _tokenized(address(mechanism)).totalSupply();
-        assertEq(totalShares, totalAssets, "Total shares should equal total assets");
-        assertEq(totalShares, expectedTotalFunding, "Total shares should equal expected total funding");
+            // Verify total shares match total assets
+            uint256 totalShares = _tokenized(address(mechanism)).totalSupply();
+            assertEq(totalShares, totalAssets, "Total shares should equal total assets");
+            assertEq(totalShares, expectedTotalFunding, "Total shares should equal expected total funding");
+        }
 
-        console.log("=== OPTIMAL ALPHA TEST COMPLETE ===");
-        console.log("Perfect 1:1 ratio achieved with alpha =", alphaNumerator, "/", alphaDenominator);
-        console.log("Total assets:", totalAssets);
-        console.log("Total shares:", totalShares);
-        console.log("1e18 shares converts to:", assetsFor1Share, "assets");
+        // console.log("=== OPTIMAL ALPHA TEST COMPLETE ===");
+        // console.log("Perfect 1:1 ratio achieved with alpha =", alphaNumerator, "/", alphaDenominator);
+        // console.log("Total assets:", totalAssets);
+        // console.log("Total shares:", totalShares);
+        // console.log("1e18 shares converts to:", assetsFor1Share, "assets");
     }
 }

@@ -4,7 +4,7 @@ pragma solidity >=0.8.18;
 import { DragonBaseStrategy, ERC20 } from "src/zodiac-core/vaults/DragonBaseStrategy.sol";
 import { Math } from "lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 import { IBaseStrategy } from "src/zodiac-core/interfaces/IBaseStrategy.sol";
-import { IStrategy } from "../interfaces/IStrategy.sol";
+import { IStrategy } from "src/zodiac-core/interfaces/IStrategy.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC4626Payable } from "src/zodiac-core/interfaces/IERC4626Payable.sol";
 

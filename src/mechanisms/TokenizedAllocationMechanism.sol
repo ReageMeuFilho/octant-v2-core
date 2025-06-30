@@ -195,13 +195,11 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         mapping(address => mapping(address => uint256)) allowances; // Mapping to track the allowances for the strategies shares
         uint256 totalSupply; // The total amount of shares currently issued
         uint256 totalAssets; // We manually track `totalAssets` to prevent PPS manipulation through airdrops
-        // Strategy Management (from DistributionMechanism)
+        // Strategy Management
         address keeper; // Address given permission to call {report} and {tend}
-        uint96 lastReport; // The last time a {report} was called
         address management; // Main address that can set all configurable variables
         address pendingManagement; // Address that is pending to take over `management`
         address emergencyAdmin; // Address to act in emergencies as well as `management`
-        address dragonRouter; // Router that receives minted shares from yield in specialized strategies
         uint8 decimals; // The amount of decimals that `asset` and strategy use
         uint8 entered; // To prevent reentrancy. Use uint8 for gas savings
         bool shutdown; // Bool that can be used to stop deposits into the strategy
@@ -290,6 +288,12 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         }
     }
 
+    /// @notice Constructor to prevent initialization of the library implementation
+    constructor() {
+        AllocationStorage storage s = _getStorage();
+        s.initialized = true; // Prevent initialization on the library contract
+    }
+
     /// @notice Returns the domain separator, updating it if chain ID changed (fork protection)
     function DOMAIN_SEPARATOR() public view returns (bytes32) {
         AllocationStorage storage s = _getStorage();
@@ -362,57 +366,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         );
     }
 
-    /// @notice Initialize with vault functionality (includes keeper, management, etc.)
-    /// @dev Extended initialization for full vault functionality
-    function initializeVault(
-        address _owner,
-        IERC20 _asset,
-        string memory _name,
-        string memory _symbol,
-        uint256 _votingDelay,
-        uint256 _votingPeriod,
-        uint256 _quorumShares,
-        uint256 _timelockDelay,
-        uint256 _gracePeriod,
-        uint256 _startBlock,
-        address _management,
-        address _keeper,
-        address _emergencyAdmin,
-        address _dragonRouter
-    ) external {
-        AllocationStorage storage s = _getStorage();
-        if (s.initialized) revert AlreadyInitialized();
-
-        // Initialize allocation mechanism
-        _initializeAllocation(
-            _owner,
-            _asset,
-            _name,
-            _symbol,
-            _votingDelay,
-            _votingPeriod,
-            _quorumShares,
-            _timelockDelay,
-            _gracePeriod,
-            _startBlock
-        );
-
-        // Initialize vault-specific fields
-        require(_management != address(0), "ZERO ADDRESS");
-        require(_keeper != address(0), "ZERO ADDRESS");
-        require(_emergencyAdmin != address(0), "ZERO ADDRESS");
-        require(_dragonRouter != address(0), "ZERO ADDRESS");
-
-        s.management = _management;
-        s.keeper = _keeper;
-        s.emergencyAdmin = _emergencyAdmin;
-        s.dragonRouter = _dragonRouter;
-        s.decimals = ERC20(address(_asset)).decimals();
-        s.lastReport = uint96(block.timestamp);
-
-        emit NewTokenizedStrategy(address(this), address(_asset), API_VERSION);
-    }
-
     /// @notice Internal allocation mechanism initialization
     function _initializeAllocation(
         address _owner,
@@ -452,6 +405,12 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         s.gracePeriod = _gracePeriod;
         s.startBlock = _startBlock;
         s.initialized = true;
+
+        // Set management roles to owner
+        s.management = _owner;
+        s.keeper = _owner;
+        s.emergencyAdmin = _owner;
+        s.decimals = ERC20(address(_asset)).decimals();
 
         // Initialize EIP712 domain separator
         s.initialChainId = block.chainid;

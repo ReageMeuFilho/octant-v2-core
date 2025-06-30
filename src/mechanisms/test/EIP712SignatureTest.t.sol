@@ -3,10 +3,10 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
-import { TokenizedAllocationMechanism } from "../TokenizedAllocationMechanism.sol";
-import { SimpleVotingMechanism } from "../mechanism/SimpleVotingMechanism.sol";
-import { AllocationMechanismFactory } from "../AllocationMechanismFactory.sol";
-import { AllocationConfig } from "../BaseAllocationMechanism.sol";
+import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocationMechanism.sol";
+import { SimpleVotingMechanism } from "src/mechanisms/mechanism/SimpleVotingMechanism.sol";
+import { AllocationMechanismFactory } from "src/mechanisms/AllocationMechanismFactory.sol";
+import { AllocationConfig } from "src/mechanisms/BaseAllocationMechanism.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { ERC20Mock } from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 
@@ -377,24 +377,27 @@ contract EIP712SignatureTest is Test {
         ];
 
         for (uint i = 0; i < 3; i++) {
-            uint256 nonce = _tokenized(address(mechanism)).nonces(users[i]);
-            uint256 deadline = block.timestamp + 1 hours;
-            uint8 choice = uint8(voteTypes[i]);
-            uint256 weight = 50;
+            // Scope variables to reduce stack pressure
+            {
+                uint256 nonce = _tokenized(address(mechanism)).nonces(users[i]);
+                uint256 deadline = block.timestamp + 1 hours;
+                uint8 choice = uint8(voteTypes[i]);
+                uint256 weight = 50;
 
-            bytes32 digest = _getCastVoteDigest(users[i], pids[i], choice, weight, nonce, deadline);
-            (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, privateKeys[i]);
+                bytes32 digest = _getCastVoteDigest(users[i], pids[i], choice, weight, nonce, deadline);
+                (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, privateKeys[i]);
 
-            _tokenized(address(mechanism)).castVoteWithSignature(
-                users[i],
-                pids[i],
-                voteTypes[i],
-                weight,
-                deadline,
-                v,
-                r,
-                s
-            );
+                _tokenized(address(mechanism)).castVoteWithSignature(
+                    users[i],
+                    pids[i],
+                    voteTypes[i],
+                    weight,
+                    deadline,
+                    v,
+                    r,
+                    s
+                );
+            }
 
             assertTrue(_tokenized(address(mechanism)).hasVoted(pids[i], users[i]), "Vote not recorded");
         }

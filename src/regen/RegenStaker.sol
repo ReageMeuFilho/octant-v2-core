@@ -107,26 +107,27 @@ contract RegenStaker is
     /// @notice Constructor for the RegenStaker contract.
     /// @param _rewardsToken The token that will be used to reward contributors.
     /// @param _stakeToken The token that will be used to stake.
+    /// @param _earningPowerCalculator The earning power calculator.
+    /// @param _maxBumpTip The maximum bump tip.
     /// @param _admin The address of the admin. TRUSTED.
+    /// @param _rewardDuration The duration over which rewards are distributed.
+    /// @param _maxClaimFee The maximum claim fee. You can set fees between 0 and _maxClaimFee. _maxClaimFee cannot be changed after deployment.
+    /// @param _minimumStakeAmount The minimum stake amount.
     /// @param _stakerWhitelist The whitelist for stakers. Can be address(0) to disable whitelisting.
     /// @param _contributionWhitelist The whitelist for contributors. Can be address(0) to disable whitelisting.
     /// @param _allocationMechanismWhitelist The whitelist for allocation mechanisms.
-    /// @param _earningPowerCalculator The earning power calculator.
-    /// @param _maxBumpTip The maximum bump tip.
-    /// @param _maxClaimFee The maximum claim fee. You can set fees between 0 and _maxClaimFee. _maxClaimFee cannot be changed after deployment.
-    /// @param _rewardDuration The duration over which rewards are distributed.
     constructor(
         IERC20 _rewardsToken,
         IERC20Staking _stakeToken,
-        address _admin,
-        IWhitelist _stakerWhitelist,
-        IWhitelist _contributionWhitelist,
-        IWhitelist _allocationMechanismWhitelist,
         IEarningPowerCalculator _earningPowerCalculator,
         uint256 _maxBumpTip,
+        address _admin,
+        uint256 _rewardDuration,
         uint256 _maxClaimFee,
         uint256 _minimumStakeAmount,
-        uint256 _rewardDuration
+        IWhitelist _stakerWhitelist,
+        IWhitelist _contributionWhitelist,
+        IWhitelist _allocationMechanismWhitelist
     )
         Staker(_rewardsToken, _stakeToken, _earningPowerCalculator, _maxBumpTip, _admin)
         StakerPermitAndStake(_stakeToken)
@@ -365,6 +366,7 @@ contract RegenStaker is
         onlyWhitelistedIfWhitelistIsSet(contributionWhitelist, msg.sender)
         returns (uint256 amountContributedToAllocationMechanism)
     {
+        // Checks
         require(_amount > 0, ZeroOperation());
         _revertIfAddressZero(_allocationMechanismAddress);
         require(
@@ -377,6 +379,34 @@ contract RegenStaker is
             revert Staker__Unauthorized("not claimer or owner", msg.sender);
         }
 
+        // Effects - Update state before external calls
+        amountContributedToAllocationMechanism = _processContribution(_depositId, deposit, _amount);
+
+        // Interactions - External calls
+        _executeContribution(
+            _depositId,
+            _allocationMechanismAddress,
+            _votingDelegatee,
+            amountContributedToAllocationMechanism,
+            _deadline,
+            _v,
+            _r,
+            _s
+        );
+
+        return amountContributedToAllocationMechanism;
+    }
+
+    /// @notice Internal function to process contribution state changes (Effects phase)
+    /// @param _depositId The deposit identifier
+    /// @param deposit The deposit storage reference
+    /// @param _amount The amount to contribute
+    /// @return amountContributedToAllocationMechanism The amount after fees
+    function _processContribution(
+        DepositIdentifier _depositId,
+        Deposit storage deposit,
+        uint256 _amount
+    ) internal returns (uint256 amountContributedToAllocationMechanism) {
         _checkpointGlobalReward();
         _checkpointReward(deposit);
 
@@ -395,7 +425,27 @@ contract RegenStaker is
         deposit.scaledUnclaimedRewardCheckpoint = deposit.scaledUnclaimedRewardCheckpoint - scaledAmountConsumed;
 
         emit RewardClaimed(_depositId, msg.sender, amountContributedToAllocationMechanism, deposit.earningPower);
+    }
 
+    /// @notice Internal function to execute external interactions (Interactions phase)
+    /// @param _depositId The deposit identifier
+    /// @param _allocationMechanismAddress The allocation mechanism address
+    /// @param _votingDelegatee The voting delegatee address
+    /// @param amountContributedToAllocationMechanism The amount to contribute after fees
+    /// @param _deadline Signature deadline
+    /// @param _v Signature parameter
+    /// @param _r Signature parameter
+    /// @param _s Signature parameter
+    function _executeContribution(
+        DepositIdentifier _depositId,
+        address _allocationMechanismAddress,
+        address _votingDelegatee,
+        uint256 amountContributedToAllocationMechanism,
+        uint256 _deadline,
+        uint8 _v,
+        bytes32 _r,
+        bytes32 _s
+    ) internal {
         SafeERC20.forceApprove(REWARD_TOKEN, _allocationMechanismAddress, amountContributedToAllocationMechanism);
 
         emit RewardContributed(
@@ -416,11 +466,10 @@ contract RegenStaker is
 
         SafeERC20.forceApprove(REWARD_TOKEN, _allocationMechanismAddress, 0);
 
+        uint256 fee = claimFeeParameters.feeAmount;
         if (fee > 0) {
             SafeERC20.safeTransfer(REWARD_TOKEN, claimFeeParameters.feeCollector, fee);
         }
-
-        return amountContributedToAllocationMechanism;
     }
 
     /// @notice Internal helper to update earning power for a deposit

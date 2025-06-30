@@ -65,6 +65,97 @@ contract RegenIntegrationTest is Test {
     address alice;
     address bob;
 
+    /// @notice Test context struct for stack optimization
+    /// @dev Consolidates test variables into storage to prevent stack too deep issues
+    struct TestContext {
+        uint256 stakeAmount;
+        uint256 rewardAmount;
+        uint256 contributeAmount;
+        address allocationMechanism;
+        Staker.DepositIdentifier depositId;
+        uint256 unclaimedBefore;
+        uint256 nonce;
+        uint256 deadline;
+        uint256 netContribution;
+        bytes32 digest;
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+        uint256 actualContribution;
+        // Additional fields for compound rewards tests
+        uint256 user1StakeBase;
+        uint256 user2StakeBase;
+        uint256 rewardAmountBase;
+        uint256 user2JoinTimePercent;
+        address user1;
+        address user2;
+        uint256 user1Stake;
+        uint256 user2Stake;
+        Staker.DepositIdentifier depositId1;
+        Staker.DepositIdentifier depositId2;
+        uint256 unclaimed1;
+        uint256 unclaimed2;
+        uint256 compounded1;
+        uint256 compounded2;
+        uint256 soloPhaseRewards;
+        uint256 sharedPhaseRewards;
+        uint256 totalStake;
+        RegenStaker compoundRegenStaker;
+        MockERC20Staking sameToken;
+        // Additional fields for fee tests
+        uint256 feeAmount;
+        address feeCollector;
+        uint256 feeCollectorBalanceBefore;
+    }
+
+    /// @notice Storage-based test context for stack optimization
+    TestContext internal currentTestCtx;
+
+    /// @notice Clear test context for fresh initialization
+    function _clearTestContext() internal {
+        currentTestCtx.stakeAmount = 0;
+        currentTestCtx.rewardAmount = 0;
+        currentTestCtx.contributeAmount = 0;
+        currentTestCtx.allocationMechanism = address(0);
+        currentTestCtx.depositId = Staker.DepositIdentifier.wrap(0);
+        currentTestCtx.unclaimedBefore = 0;
+        currentTestCtx.nonce = 0;
+        currentTestCtx.deadline = 0;
+        currentTestCtx.netContribution = 0;
+        currentTestCtx.digest = bytes32(0);
+        currentTestCtx.v = 0;
+        currentTestCtx.r = bytes32(0);
+        currentTestCtx.s = bytes32(0);
+        currentTestCtx.actualContribution = 0;
+
+        // Clear compound rewards test fields
+        currentTestCtx.user1StakeBase = 0;
+        currentTestCtx.user2StakeBase = 0;
+        currentTestCtx.rewardAmountBase = 0;
+        currentTestCtx.user2JoinTimePercent = 0;
+        currentTestCtx.user1 = address(0);
+        currentTestCtx.user2 = address(0);
+        currentTestCtx.user1Stake = 0;
+        currentTestCtx.user2Stake = 0;
+        currentTestCtx.depositId1 = Staker.DepositIdentifier.wrap(0);
+        currentTestCtx.depositId2 = Staker.DepositIdentifier.wrap(0);
+        currentTestCtx.unclaimed1 = 0;
+        currentTestCtx.unclaimed2 = 0;
+        currentTestCtx.compounded1 = 0;
+        currentTestCtx.compounded2 = 0;
+        currentTestCtx.soloPhaseRewards = 0;
+        currentTestCtx.sharedPhaseRewards = 0;
+        currentTestCtx.totalStake = 0;
+        // Note: compoundRegenStaker and sameToken are reference types, set to storage defaults
+        delete currentTestCtx.compoundRegenStaker;
+        delete currentTestCtx.sameToken;
+
+        // Clear fee test fields
+        currentTestCtx.feeAmount = 0;
+        currentTestCtx.feeCollector = address(0);
+        currentTestCtx.feeCollectorBalanceBefore = 0;
+    }
+
     function getRewardAmount() internal view returns (uint256) {
         return REWARD_AMOUNT_BASE * (10 ** rewardTokenDecimals);
     }
@@ -116,15 +207,15 @@ contract RegenIntegrationTest is Test {
         regenStaker = new RegenStaker(
             IERC20(address(rewardToken)),
             IERC20Staking(address(stakeToken)),
-            ADMIN,
-            stakerWhitelist,
-            contributorWhitelist,
-            allocationMechanismWhitelist,
             calculator,
             MAX_BUMP_TIP,
+            ADMIN,
+            rewardDuration,
             MAX_CLAIM_FEE,
             0,
-            rewardDuration
+            stakerWhitelist,
+            contributorWhitelist,
+            allocationMechanismWhitelist
         );
 
         regenStaker.setRewardNotifier(ADMIN, true);
@@ -147,15 +238,15 @@ contract RegenIntegrationTest is Test {
         RegenStaker localRegenStaker = new RegenStaker(
             IERC20(address(rewardToken)),
             IERC20Staking(address(stakeToken)),
-            ADMIN,
-            IWhitelist(address(0)),
-            IWhitelist(address(0)),
-            allocationMechanismWhitelist,
             calculator,
             tipAmount,
+            ADMIN,
+            MIN_REWARD_DURATION,
             feeAmount,
             minimumStakeAmount,
-            MIN_REWARD_DURATION
+            IWhitelist(address(0)),
+            IWhitelist(address(0)),
+            allocationMechanismWhitelist
         );
 
         assertEq(address(localRegenStaker.REWARD_TOKEN()), address(rewardToken));
@@ -198,15 +289,15 @@ contract RegenIntegrationTest is Test {
         RegenStaker localRegenStaker = new RegenStaker(
             IERC20(address(rewardToken)),
             IERC20Staking(address(stakeToken)),
-            ADMIN,
-            providedStakerWhitelist,
-            providedContributorWhitelist,
-            allocationMechanismWhitelist,
             calculator,
             tipAmount,
+            ADMIN,
+            MIN_REWARD_DURATION,
             feeAmount,
             minimumStakeAmount,
-            MIN_REWARD_DURATION
+            providedStakerWhitelist,
+            providedContributorWhitelist,
+            allocationMechanismWhitelist
         );
 
         assertEq(address(localRegenStaker.REWARD_TOKEN()), address(rewardToken));
@@ -1353,15 +1444,15 @@ contract RegenIntegrationTest is Test {
         RegenStaker localRegenStaker = new RegenStaker(
             IERC20(address(rewardToken)),
             IERC20Staking(address(stakeToken)),
-            ADMIN,
-            IWhitelist(address(0)),
-            IWhitelist(address(0)),
-            stakerWhitelist,
             calculator,
             MAX_BUMP_TIP,
+            ADMIN,
+            customDuration,
             MAX_CLAIM_FEE,
             0,
-            customDuration
+            IWhitelist(address(0)),
+            IWhitelist(address(0)),
+            stakerWhitelist
         );
 
         assertEq(localRegenStaker.rewardDuration(), customDuration);
@@ -1374,15 +1465,15 @@ contract RegenIntegrationTest is Test {
         new RegenStaker(
             IERC20(address(rewardToken)),
             IERC20Staking(address(stakeToken)),
-            ADMIN,
-            IWhitelist(address(0)),
-            IWhitelist(address(0)),
-            stakerWhitelist,
             calculator,
             MAX_BUMP_TIP,
+            ADMIN,
+            0,
             MAX_CLAIM_FEE,
             0,
-            0
+            IWhitelist(address(0)),
+            IWhitelist(address(0)),
+            stakerWhitelist
         );
         vm.stopPrank();
     }
@@ -1625,15 +1716,15 @@ contract RegenIntegrationTest is Test {
         RegenStaker compoundRegenStaker = new RegenStaker(
             IERC20(address(sameToken)),
             IERC20Staking(address(sameToken)),
-            ADMIN,
-            stakerWhitelist,
-            contributorWhitelist,
-            allocationMechanismWhitelist,
             calculator,
             MAX_BUMP_TIP,
+            ADMIN,
+            MIN_REWARD_DURATION,
             MAX_CLAIM_FEE,
             0,
-            MIN_REWARD_DURATION
+            stakerWhitelist,
+            contributorWhitelist,
+            allocationMechanismWhitelist
         );
         compoundRegenStaker.setRewardNotifier(ADMIN, true);
         compoundRegenStaker.setMinimumStakeAmount(minimumAmount);
@@ -1694,15 +1785,15 @@ contract RegenIntegrationTest is Test {
         RegenStaker compoundRegenStaker = new RegenStaker(
             IERC20(address(sameToken)),
             IERC20Staking(address(sameToken)),
-            ADMIN,
-            stakerWhitelist,
-            contributorWhitelist,
-            allocationMechanismWhitelist,
             calculator,
             MAX_BUMP_TIP,
+            ADMIN,
+            MIN_REWARD_DURATION,
             MAX_CLAIM_FEE,
             0,
-            MIN_REWARD_DURATION
+            stakerWhitelist,
+            contributorWhitelist,
+            allocationMechanismWhitelist
         );
         compoundRegenStaker.setRewardNotifier(ADMIN, true);
         vm.stopPrank();
@@ -1759,15 +1850,15 @@ contract RegenIntegrationTest is Test {
         RegenStaker compoundRegenStaker = new RegenStaker(
             IERC20(address(sameToken)),
             IERC20Staking(address(sameToken)),
-            ADMIN,
-            stakerWhitelist,
-            contributorWhitelist,
-            allocationMechanismWhitelist,
             calculator,
             MAX_BUMP_TIP,
+            ADMIN,
+            MIN_REWARD_DURATION,
             MAX_CLAIM_FEE,
             0,
-            MIN_REWARD_DURATION
+            stakerWhitelist,
+            contributorWhitelist,
+            allocationMechanismWhitelist
         );
         compoundRegenStaker.setRewardNotifier(ADMIN, true);
         vm.stopPrank();
@@ -1841,15 +1932,15 @@ contract RegenIntegrationTest is Test {
         RegenStaker compoundRegenStaker = new RegenStaker(
             IERC20(address(sameToken)),
             IERC20Staking(address(sameToken)),
-            ADMIN,
-            stakerWhitelist,
-            contributorWhitelist,
-            allocationMechanismWhitelist,
             calculator,
             MAX_BUMP_TIP,
+            ADMIN,
+            MIN_REWARD_DURATION,
             MAX_CLAIM_FEE,
             0,
-            MIN_REWARD_DURATION
+            stakerWhitelist,
+            contributorWhitelist,
+            allocationMechanismWhitelist
         );
         compoundRegenStaker.setRewardNotifier(ADMIN, true);
         vm.stopPrank();
@@ -1898,112 +1989,138 @@ contract RegenIntegrationTest is Test {
         uint256 rewardAmountBase,
         uint256 user2JoinTimePercent
     ) public {
-        user1StakeBase = bound(user1StakeBase, 1, 10_000);
-        user2StakeBase = bound(user2StakeBase, 1, 10_000);
-        rewardAmountBase = bound(rewardAmountBase, MIN_REWARD_DURATION, MAX_REWARD_DURATION + 1_000_000_000);
-        user2JoinTimePercent = bound(user2JoinTimePercent, 10, 90);
+        _clearTestContext();
 
-        MockERC20Staking sameToken = new MockERC20Staking(18);
+        currentTestCtx.user1StakeBase = bound(user1StakeBase, 1, 10_000);
+        currentTestCtx.user2StakeBase = bound(user2StakeBase, 1, 10_000);
+        currentTestCtx.rewardAmountBase = bound(
+            rewardAmountBase,
+            MIN_REWARD_DURATION,
+            MAX_REWARD_DURATION + 1_000_000_000
+        );
+        currentTestCtx.user2JoinTimePercent = bound(user2JoinTimePercent, 10, 90);
+
+        currentTestCtx.sameToken = new MockERC20Staking(18);
 
         vm.startPrank(ADMIN);
-        RegenStaker compoundRegenStaker = new RegenStaker(
-            IERC20(address(sameToken)),
-            IERC20Staking(address(sameToken)),
-            ADMIN,
-            stakerWhitelist,
-            contributorWhitelist,
-            allocationMechanismWhitelist,
+        currentTestCtx.compoundRegenStaker = new RegenStaker(
+            IERC20(address(currentTestCtx.sameToken)),
+            IERC20Staking(address(currentTestCtx.sameToken)),
             calculator,
             MAX_BUMP_TIP,
+            ADMIN,
+            MIN_REWARD_DURATION,
             MAX_CLAIM_FEE,
             0,
-            MIN_REWARD_DURATION
+            stakerWhitelist,
+            contributorWhitelist,
+            allocationMechanismWhitelist
         );
-        compoundRegenStaker.setRewardNotifier(ADMIN, true);
+        currentTestCtx.compoundRegenStaker.setRewardNotifier(ADMIN, true);
         vm.stopPrank();
 
-        address user1 = makeAddr("user1");
-        address user2 = makeAddr("user2");
-        whitelistUser(user1, true, false, true);
-        whitelistUser(user2, true, false, true);
+        currentTestCtx.user1 = makeAddr("user1");
+        currentTestCtx.user2 = makeAddr("user2");
+        whitelistUser(currentTestCtx.user1, true, false, true);
+        whitelistUser(currentTestCtx.user2, true, false, true);
 
-        uint256 user1Stake = getStakeAmount(user1StakeBase);
-        uint256 user2Stake = getStakeAmount(user2StakeBase);
-        uint256 rewardAmount = getRewardAmount(rewardAmountBase);
+        currentTestCtx.user1Stake = getStakeAmount(currentTestCtx.user1StakeBase);
+        currentTestCtx.user2Stake = getStakeAmount(currentTestCtx.user2StakeBase);
+        currentTestCtx.rewardAmount = getRewardAmount(currentTestCtx.rewardAmountBase);
 
-        sameToken.mint(user1, user1Stake);
-        sameToken.mint(user2, user2Stake);
-        sameToken.mint(address(compoundRegenStaker), rewardAmount);
+        currentTestCtx.sameToken.mint(currentTestCtx.user1, currentTestCtx.user1Stake);
+        currentTestCtx.sameToken.mint(currentTestCtx.user2, currentTestCtx.user2Stake);
+        currentTestCtx.sameToken.mint(address(currentTestCtx.compoundRegenStaker), currentTestCtx.rewardAmount);
 
-        vm.startPrank(user1);
-        sameToken.approve(address(compoundRegenStaker), user1Stake);
-        Staker.DepositIdentifier depositId1 = compoundRegenStaker.stake(user1Stake, user1);
+        vm.startPrank(currentTestCtx.user1);
+        currentTestCtx.sameToken.approve(address(currentTestCtx.compoundRegenStaker), currentTestCtx.user1Stake);
+        currentTestCtx.depositId1 = currentTestCtx.compoundRegenStaker.stake(
+            currentTestCtx.user1Stake,
+            currentTestCtx.user1
+        );
         vm.stopPrank();
 
         vm.prank(ADMIN);
-        compoundRegenStaker.notifyRewardAmount(rewardAmount);
+        currentTestCtx.compoundRegenStaker.notifyRewardAmount(currentTestCtx.rewardAmount);
 
-        vm.warp(block.timestamp + (compoundRegenStaker.rewardDuration() * user2JoinTimePercent) / 100);
+        vm.warp(
+            block.timestamp +
+                (currentTestCtx.compoundRegenStaker.rewardDuration() * currentTestCtx.user2JoinTimePercent) /
+                100
+        );
 
-        vm.startPrank(user2);
-        sameToken.approve(address(compoundRegenStaker), user2Stake);
-        Staker.DepositIdentifier depositId2 = compoundRegenStaker.stake(user2Stake, user2);
+        vm.startPrank(currentTestCtx.user2);
+        currentTestCtx.sameToken.approve(address(currentTestCtx.compoundRegenStaker), currentTestCtx.user2Stake);
+        currentTestCtx.depositId2 = currentTestCtx.compoundRegenStaker.stake(
+            currentTestCtx.user2Stake,
+            currentTestCtx.user2
+        );
         vm.stopPrank();
 
         vm.warp(
             block.timestamp +
-                compoundRegenStaker.rewardDuration() -
-                (compoundRegenStaker.rewardDuration() * user2JoinTimePercent) /
+                currentTestCtx.compoundRegenStaker.rewardDuration() -
+                (currentTestCtx.compoundRegenStaker.rewardDuration() * currentTestCtx.user2JoinTimePercent) /
                 100
         );
 
         // Check if users actually have unclaimed rewards before attempting to compound
-        uint256 unclaimed1 = compoundRegenStaker.unclaimedReward(depositId1);
-        uint256 unclaimed2 = compoundRegenStaker.unclaimedReward(depositId2);
+        currentTestCtx.unclaimed1 = currentTestCtx.compoundRegenStaker.unclaimedReward(currentTestCtx.depositId1);
+        currentTestCtx.unclaimed2 = currentTestCtx.compoundRegenStaker.unclaimedReward(currentTestCtx.depositId2);
 
-        uint256 compounded1;
-        uint256 compounded2;
+        currentTestCtx.compounded1 = 0;
+        currentTestCtx.compounded2 = 0;
 
-        if (unclaimed1 > 0) {
-            vm.prank(user1);
-            compounded1 = compoundRegenStaker.compoundRewards(depositId1);
+        if (currentTestCtx.unclaimed1 > 0) {
+            vm.prank(currentTestCtx.user1);
+            currentTestCtx.compounded1 = currentTestCtx.compoundRegenStaker.compoundRewards(currentTestCtx.depositId1);
         }
 
-        if (unclaimed2 > 0) {
-            vm.prank(user2);
-            compounded2 = compoundRegenStaker.compoundRewards(depositId2);
+        if (currentTestCtx.unclaimed2 > 0) {
+            vm.prank(currentTestCtx.user2);
+            currentTestCtx.compounded2 = currentTestCtx.compoundRegenStaker.compoundRewards(currentTestCtx.depositId2);
         }
 
         // For extreme edge cases with tiny reward amounts, precision loss may result in 0 rewards
         // This is acceptable behavior as such small amounts wouldn't be used in practice
-        if (unclaimed1 > 0) assertGt(compounded1, 0);
-        if (unclaimed2 > 0) assertGt(compounded2, 0);
+        if (currentTestCtx.unclaimed1 > 0) assertGt(currentTestCtx.compounded1, 0);
+        if (currentTestCtx.unclaimed2 > 0) assertGt(currentTestCtx.compounded2, 0);
 
         {
             // Only verify reward calculations if both users actually received rewards
             // Extreme edge cases with tiny amounts may result in 0 rewards due to precision loss
-            if (unclaimed1 > 0 && unclaimed2 > 0) {
-                uint256 soloPhaseRewards = (rewardAmount * user2JoinTimePercent) / 100;
-                uint256 sharedPhaseRewards = (rewardAmount * (100 - user2JoinTimePercent)) / 100;
-                uint256 totalStake = user1Stake + user2Stake;
+            if (currentTestCtx.unclaimed1 > 0 && currentTestCtx.unclaimed2 > 0) {
+                currentTestCtx.soloPhaseRewards =
+                    (currentTestCtx.rewardAmount * currentTestCtx.user2JoinTimePercent) /
+                    100;
+                currentTestCtx.sharedPhaseRewards =
+                    (currentTestCtx.rewardAmount * (100 - currentTestCtx.user2JoinTimePercent)) /
+                    100;
+                currentTestCtx.totalStake = currentTestCtx.user1Stake + currentTestCtx.user2Stake;
 
                 // NOTE: These assertions may fail with extreme fuzzing values due to precision differences
                 // when using 7-day reward duration vs original 30-day duration
                 assertApproxEqRel(
-                    compounded1,
-                    soloPhaseRewards + (sharedPhaseRewards * user1Stake) / totalStake,
+                    currentTestCtx.compounded1,
+                    currentTestCtx.soloPhaseRewards +
+                        (currentTestCtx.sharedPhaseRewards * currentTestCtx.user1Stake) /
+                        currentTestCtx.totalStake,
                     ONE_PERCENT
                 );
-                assertApproxEqRel(compounded2, (sharedPhaseRewards * user2Stake) / totalStake, ONE_PERCENT);
+                assertApproxEqRel(
+                    currentTestCtx.compounded2,
+                    (currentTestCtx.sharedPhaseRewards * currentTestCtx.user2Stake) / currentTestCtx.totalStake,
+                    ONE_PERCENT
+                );
             }
         }
 
         {
-            (uint96 balance1, , , , , , ) = compoundRegenStaker.deposits(depositId1);
-            (uint96 balance2, , , , , , ) = compoundRegenStaker.deposits(depositId2);
+            (uint96 balance1, , , , , , ) = currentTestCtx.compoundRegenStaker.deposits(currentTestCtx.depositId1);
+            (uint96 balance2, , , , , , ) = currentTestCtx.compoundRegenStaker.deposits(currentTestCtx.depositId2);
 
-            assertEq(balance1, user1Stake + compounded1);
-            assertEq(balance2, user2Stake + compounded2);
+            assertEq(balance1, currentTestCtx.user1Stake + currentTestCtx.compounded1);
+            assertEq(balance2, currentTestCtx.user2Stake + currentTestCtx.compounded2);
         }
     }
 
@@ -2022,15 +2139,15 @@ contract RegenIntegrationTest is Test {
         RegenStaker compoundRegenStaker = new RegenStaker(
             IERC20(address(sameToken)),
             IERC20Staking(address(sameToken)),
-            ADMIN,
-            stakerWhitelist,
-            contributorWhitelist,
-            allocationMechanismWhitelist,
             calculator,
             MAX_BUMP_TIP,
+            ADMIN,
+            MIN_REWARD_DURATION,
             MAX_CLAIM_FEE,
             0,
-            MIN_REWARD_DURATION
+            stakerWhitelist,
+            contributorWhitelist,
+            allocationMechanismWhitelist
         );
         compoundRegenStaker.setRewardNotifier(ADMIN, true);
         vm.stopPrank();
@@ -2091,15 +2208,15 @@ contract RegenIntegrationTest is Test {
         RegenStaker compoundRegenStaker = new RegenStaker(
             IERC20(address(sameToken)),
             IERC20Staking(address(sameToken)),
-            ADMIN,
-            stakerWhitelist,
-            contributorWhitelist,
-            allocationMechanismWhitelist,
             calculator,
             MAX_BUMP_TIP,
+            ADMIN,
+            MIN_REWARD_DURATION,
             MAX_CLAIM_FEE,
             0,
-            MIN_REWARD_DURATION
+            stakerWhitelist,
+            contributorWhitelist,
+            allocationMechanismWhitelist
         );
         compoundRegenStaker.setRewardNotifier(ADMIN, true);
         vm.stopPrank();
@@ -2189,12 +2306,14 @@ contract RegenIntegrationTest is Test {
     // ============ Contribute Function Tests ============
 
     function test_Contribute_WithSignature_Success() public {
-        // Setup
-        uint256 stakeAmount = getStakeAmount(1000);
-        uint256 rewardAmount = getRewardAmount(10000);
-        uint256 contributeAmount = getRewardAmount(100); // Use a smaller, more realistic amount
+        _clearTestContext();
 
-        address allocationMechanism = _deployAllocationMechanism();
+        // Setup
+        currentTestCtx.stakeAmount = getStakeAmount(1000);
+        currentTestCtx.rewardAmount = getRewardAmount(10000);
+        currentTestCtx.contributeAmount = getRewardAmount(100); // Use a smaller, more realistic amount
+
+        currentTestCtx.allocationMechanism = _deployAllocationMechanism();
 
         // Advance to allow signup (startBlock + votingDelay period)
         vm.roll(block.number + 5);
@@ -2202,90 +2321,113 @@ contract RegenIntegrationTest is Test {
         whitelistUser(alice, true, true, true);
 
         // Fund and stake
-        stakeToken.mint(alice, stakeAmount);
-        rewardToken.mint(address(regenStaker), rewardAmount);
+        stakeToken.mint(alice, currentTestCtx.stakeAmount);
+        rewardToken.mint(address(regenStaker), currentTestCtx.rewardAmount);
 
         vm.startPrank(alice);
-        stakeToken.approve(address(regenStaker), stakeAmount);
-        Staker.DepositIdentifier depositId = regenStaker.stake(stakeAmount, alice);
+        stakeToken.approve(address(regenStaker), currentTestCtx.stakeAmount);
+        currentTestCtx.depositId = regenStaker.stake(currentTestCtx.stakeAmount, alice);
         vm.stopPrank();
 
         // Notify rewards
         vm.prank(ADMIN);
-        regenStaker.notifyRewardAmount(rewardAmount);
+        regenStaker.notifyRewardAmount(currentTestCtx.rewardAmount);
         vm.warp(block.timestamp + regenStaker.rewardDuration());
 
         // Verify alice has unclaimed rewards
-        uint256 unclaimedBefore = regenStaker.unclaimedReward(depositId);
-        assertGt(unclaimedBefore, contributeAmount, "Alice should have sufficient unclaimed rewards");
+        currentTestCtx.unclaimedBefore = regenStaker.unclaimedReward(currentTestCtx.depositId);
+        assertGt(
+            currentTestCtx.unclaimedBefore,
+            currentTestCtx.contributeAmount,
+            "Alice should have sufficient unclaimed rewards"
+        );
 
         // Create EIP-2612 signature for TokenizedAllocationMechanism
-        uint256 nonce = TokenizedAllocationMechanism(allocationMechanism).nonces(alice);
-        uint256 deadline = block.timestamp + 1 hours;
-        uint256 netContribution = contributeAmount; // No fees in this test
+        currentTestCtx.nonce = TokenizedAllocationMechanism(currentTestCtx.allocationMechanism).nonces(alice);
+        currentTestCtx.deadline = block.timestamp + 1 hours;
+        currentTestCtx.netContribution = currentTestCtx.contributeAmount; // No fees in this test
 
-        bytes32 digest = _getSignupDigest(allocationMechanism, alice, netContribution, nonce, deadline);
-        (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, ALICE_PRIVATE_KEY);
+        currentTestCtx.digest = _getSignupDigest(
+            currentTestCtx.allocationMechanism,
+            alice,
+            currentTestCtx.netContribution,
+            currentTestCtx.nonce,
+            currentTestCtx.deadline
+        );
+        (currentTestCtx.v, currentTestCtx.r, currentTestCtx.s) = _signDigest(currentTestCtx.digest, ALICE_PRIVATE_KEY);
 
         // Give Alice tokens and approve for the expected flow
-        rewardToken.mint(alice, netContribution);
+        rewardToken.mint(alice, currentTestCtx.netContribution);
         vm.startPrank(alice);
-        rewardToken.approve(allocationMechanism, netContribution);
+        rewardToken.approve(currentTestCtx.allocationMechanism, currentTestCtx.netContribution);
 
         // Call contribute function
-        uint256 actualContribution = regenStaker.contribute(
-            depositId,
-            allocationMechanism,
+        currentTestCtx.actualContribution = regenStaker.contribute(
+            currentTestCtx.depositId,
+            currentTestCtx.allocationMechanism,
             alice, // voting delegatee
-            contributeAmount,
-            deadline,
-            v,
-            r,
-            s
+            currentTestCtx.contributeAmount,
+            currentTestCtx.deadline,
+            currentTestCtx.v,
+            currentTestCtx.r,
+            currentTestCtx.s
         );
         vm.stopPrank();
 
         // Verify results
-        assertEq(actualContribution, contributeAmount, "Contribution amount should match");
+        assertEq(
+            currentTestCtx.actualContribution,
+            currentTestCtx.contributeAmount,
+            "Contribution amount should match"
+        );
 
-        uint256 unclaimedAfter = regenStaker.unclaimedReward(depositId);
-        assertEq(unclaimedAfter, unclaimedBefore - contributeAmount, "Unclaimed rewards should be reduced");
+        uint256 unclaimedAfter = regenStaker.unclaimedReward(currentTestCtx.depositId);
+        assertEq(
+            unclaimedAfter,
+            currentTestCtx.unclaimedBefore - currentTestCtx.contributeAmount,
+            "Unclaimed rewards should be reduced"
+        );
 
         // Verify the allocation mechanism received the contribution
         assertEq(
-            rewardToken.balanceOf(allocationMechanism),
-            contributeAmount,
+            rewardToken.balanceOf(currentTestCtx.allocationMechanism),
+            currentTestCtx.contributeAmount,
             "Allocation mechanism should receive tokens"
         );
 
         // Verify alice has voting power in the allocation mechanism
         // SimpleVotingMechanism scales voting power to 18 decimals
-        uint256 expectedVotingPower = netContribution * (10 ** (18 - rewardTokenDecimals));
+        uint256 expectedVotingPower = currentTestCtx.netContribution * (10 ** (18 - rewardTokenDecimals));
         assertEq(
-            TokenizedAllocationMechanism(allocationMechanism).votingPower(alice),
+            TokenizedAllocationMechanism(currentTestCtx.allocationMechanism).votingPower(alice),
             expectedVotingPower,
             "Alice should have voting power"
         );
     }
 
     function test_Contribute_WithSignature_AndFees() public {
-        uint256 stakeAmount = getStakeAmount(1000);
-        uint256 rewardAmount = getRewardAmount(100000); // Much larger reward amount to ensure sufficient rewards
-        uint256 contributeAmount = rewardAmount / 100; // Use 1% of total rewards to ensure it's available
+        _clearTestContext();
+
+        currentTestCtx.stakeAmount = getStakeAmount(1000);
+        currentTestCtx.rewardAmount = getRewardAmount(100000); // Much larger reward amount to ensure sufficient rewards
+        currentTestCtx.contributeAmount = currentTestCtx.rewardAmount / 100; // Use 1% of total rewards to ensure it's available
 
         // Setup with fees - make fee amount relative to contribution amount to avoid underflow
-        uint256 feeAmount = contributeAmount / 10; // 10% of contribution as fee
-        feeAmount = bound(feeAmount, 0, MAX_CLAIM_FEE); // Ensure it doesn't exceed max
-        address feeCollector = makeAddr("feeCollector");
+        currentTestCtx.feeAmount = currentTestCtx.contributeAmount / 10; // 10% of contribution as fee
+        currentTestCtx.feeAmount = bound(currentTestCtx.feeAmount, 0, MAX_CLAIM_FEE); // Ensure it doesn't exceed max
+        currentTestCtx.feeCollector = makeAddr("feeCollector");
 
         vm.prank(ADMIN);
         regenStaker.setClaimFeeParameters(
-            Staker.ClaimFeeParameters({ feeAmount: uint96(feeAmount), feeCollector: feeCollector })
+            Staker.ClaimFeeParameters({
+                feeAmount: uint96(currentTestCtx.feeAmount),
+                feeCollector: currentTestCtx.feeCollector
+            })
         );
 
-        uint256 netContribution = contributeAmount - feeAmount;
+        currentTestCtx.netContribution = currentTestCtx.contributeAmount - currentTestCtx.feeAmount;
 
-        address allocationMechanism = _deployAllocationMechanism();
+        currentTestCtx.allocationMechanism = _deployAllocationMechanism();
 
         // Advance to allow signup (startBlock + votingDelay period)
         vm.roll(block.number + 5);
@@ -2293,62 +2435,72 @@ contract RegenIntegrationTest is Test {
         whitelistUser(alice, true, true, true);
 
         // Fund and stake
-        stakeToken.mint(alice, stakeAmount);
-        rewardToken.mint(address(regenStaker), rewardAmount);
+        stakeToken.mint(alice, currentTestCtx.stakeAmount);
+        rewardToken.mint(address(regenStaker), currentTestCtx.rewardAmount);
 
         vm.startPrank(alice);
-        stakeToken.approve(address(regenStaker), stakeAmount);
-        Staker.DepositIdentifier depositId = regenStaker.stake(stakeAmount, alice);
+        stakeToken.approve(address(regenStaker), currentTestCtx.stakeAmount);
+        currentTestCtx.depositId = regenStaker.stake(currentTestCtx.stakeAmount, alice);
         vm.stopPrank();
 
         // Notify rewards
         vm.prank(ADMIN);
-        regenStaker.notifyRewardAmount(rewardAmount);
+        regenStaker.notifyRewardAmount(currentTestCtx.rewardAmount);
         vm.warp(block.timestamp + regenStaker.rewardDuration());
 
         // Create signature for the net contribution (after fees)
-        uint256 nonce = TokenizedAllocationMechanism(allocationMechanism).nonces(alice);
-        uint256 deadline = block.timestamp + 1 hours;
+        currentTestCtx.nonce = TokenizedAllocationMechanism(currentTestCtx.allocationMechanism).nonces(alice);
+        currentTestCtx.deadline = block.timestamp + 1 hours;
 
-        bytes32 digest = _getSignupDigest(allocationMechanism, alice, netContribution, nonce, deadline);
-        (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, ALICE_PRIVATE_KEY);
+        currentTestCtx.digest = _getSignupDigest(
+            currentTestCtx.allocationMechanism,
+            alice,
+            currentTestCtx.netContribution,
+            currentTestCtx.nonce,
+            currentTestCtx.deadline
+        );
+        (currentTestCtx.v, currentTestCtx.r, currentTestCtx.s) = _signDigest(currentTestCtx.digest, ALICE_PRIVATE_KEY);
 
         // Give Alice tokens and approve for the expected flow
-        rewardToken.mint(alice, netContribution);
+        rewardToken.mint(alice, currentTestCtx.netContribution);
         vm.startPrank(alice);
-        rewardToken.approve(allocationMechanism, netContribution);
+        rewardToken.approve(currentTestCtx.allocationMechanism, currentTestCtx.netContribution);
 
-        uint256 feeCollectorBalanceBefore = rewardToken.balanceOf(feeCollector);
+        currentTestCtx.feeCollectorBalanceBefore = rewardToken.balanceOf(currentTestCtx.feeCollector);
 
         // Call contribute function
-        uint256 actualContribution = regenStaker.contribute(
-            depositId,
-            allocationMechanism,
+        currentTestCtx.actualContribution = regenStaker.contribute(
+            currentTestCtx.depositId,
+            currentTestCtx.allocationMechanism,
             alice,
-            contributeAmount,
-            deadline,
-            v,
-            r,
-            s
+            currentTestCtx.contributeAmount,
+            currentTestCtx.deadline,
+            currentTestCtx.v,
+            currentTestCtx.r,
+            currentTestCtx.s
         );
         vm.stopPrank();
 
         // Verify results
-        assertEq(actualContribution, netContribution, "Net contribution should exclude fees");
         assertEq(
-            rewardToken.balanceOf(feeCollector),
-            feeCollectorBalanceBefore + feeAmount,
+            currentTestCtx.actualContribution,
+            currentTestCtx.netContribution,
+            "Net contribution should exclude fees"
+        );
+        assertEq(
+            rewardToken.balanceOf(currentTestCtx.feeCollector),
+            currentTestCtx.feeCollectorBalanceBefore + currentTestCtx.feeAmount,
             "Fee collector should receive fees"
         );
         assertEq(
-            rewardToken.balanceOf(allocationMechanism),
-            netContribution,
+            rewardToken.balanceOf(currentTestCtx.allocationMechanism),
+            currentTestCtx.netContribution,
             "Allocation mechanism should receive net amount"
         );
         // SimpleVotingMechanism scales voting power to 18 decimals
-        uint256 expectedVotingPower = netContribution * (10 ** (18 - rewardTokenDecimals));
+        uint256 expectedVotingPower = currentTestCtx.netContribution * (10 ** (18 - rewardTokenDecimals));
         assertEq(
-            TokenizedAllocationMechanism(allocationMechanism).votingPower(alice),
+            TokenizedAllocationMechanism(currentTestCtx.allocationMechanism).votingPower(alice),
             expectedVotingPower,
             "Voting power should be net amount"
         );
