@@ -32,6 +32,7 @@ node_modules/
 # cursor files
 .cursor/
 .specstory/
+.cursor/
 
 # Yarn files
 .pnp.*
