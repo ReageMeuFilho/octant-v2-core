@@ -68,7 +68,16 @@ contract RocketPoolStrategyFactory {
     ) external returns (address strategyAddress) {
         bytes memory bytecode = abi.encodePacked(
             type(RocketPoolStrategy).creationCode,
-            abi.encode(R_ETH, _name, _management, _keeper, _emergencyAdmin, _donationAddress, _enableBurning, _tokenizedStrategyAddress)
+            abi.encode(
+                R_ETH,
+                _name,
+                _management,
+                _keeper,
+                _emergencyAdmin,
+                _donationAddress,
+                _enableBurning,
+                _tokenizedStrategyAddress
+            )
         );
 
         strategyAddress = Create2.deploy(0, _salt, bytecode);
