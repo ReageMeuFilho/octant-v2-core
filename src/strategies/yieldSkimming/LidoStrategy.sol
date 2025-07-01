@@ -20,6 +20,7 @@ contract LidoStrategy is BaseYieldSkimmingStrategy {
         address _keeper,
         address _emergencyAdmin,
         address _donationAddress,
+        bool _enableBurning,
         address _tokenizedStrategyAddress
     )
         BaseYieldSkimmingStrategy(
@@ -29,6 +30,7 @@ contract LidoStrategy is BaseYieldSkimmingStrategy {
             _keeper,
             _emergencyAdmin,
             _donationAddress,
+            _enableBurning,
             _tokenizedStrategyAddress
         )
     {}
