@@ -15,10 +15,6 @@ RUN PATH="$PATH:/root/.foundry/bin" yarn install --immutable
 
 COPY ./ ./
 
-# TODO TEMP - to be removed after fixing safe compilation issue
-RUN rm -Rf test/ script/
-# </TODO TEMP>
-
 RUN PATH="$PATH:/root/.foundry/bin" yarn build
 
 # Removed files we don't want to copy to destination container
@@ -45,8 +41,3 @@ RUN forge build --offline
 
 ENTRYPOINT [ "/usr/local/bin/yarn" ]
 CMD [ "deploy:tenderly" ]
-
-# TODO TEMP - to be removed after fixing safe compilation issue
-COPY /test /app/test/
-COPY /script /app/script/
-# </TODO TEMP>
