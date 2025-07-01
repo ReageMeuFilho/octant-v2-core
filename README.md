@@ -1,31 +1,29 @@
+## Prerequisites
+
+- Node.js 22.16.0
+- Foundry Stable
+
 ## Installation
 
 1. Clone the repository:
 
 ```bash
-# Clone with submodules in one command
-git clone --recurse-submodules https://github.com/golemfoundation/octant-v2-core.git
-cd octant-v2-core
-
-# Or clone and init submodules separately
+# Clone repository
 git clone https://github.com/golemfoundation/octant-v2-core.git
 cd octant-v2-core
-git submodule update --init --recursive
 ```
 
 2. Install dependencies:
 
 ```bash
-# Initialize and update all submodules
-git submodule update --init --recursive
-
-# Install Foundry dependencies
-forge install
-
-# Install Node.js dependencies
+# Install Node.js and Foundry dependencies
 corepack enable
 yarn install
+forge soldeer install
 ```
+
+We're using `soldeer` as dependency manager for Solidity contracts, which allows us to manage Solidity versions and dependencies in a consistent manner.
+We have added Soldeer execution as a postinstall script in `package.json`, so it will run automatically after installing Node.js dependencies. Unfortunately it will not run if node dependencies are already installed.
 
 3. Configure environment:
 
