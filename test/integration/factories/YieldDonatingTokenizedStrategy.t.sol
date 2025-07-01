@@ -68,7 +68,8 @@ contract YieldDonatingTokenizedStrategyTest is Test {
             mockManagement,
             mockKeeper,
             mockEmergencyAdmin,
-            mockDragonRouter
+            mockDragonRouter,
+            true // enableBurning
         );
     }
 

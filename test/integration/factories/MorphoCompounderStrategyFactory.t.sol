@@ -92,6 +92,7 @@ contract MorphoCompounderStrategyFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            false, // enableBurning
             strategySalt,
             address(implementation)
         );
@@ -124,6 +125,7 @@ contract MorphoCompounderStrategyFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            false, // enableBurning
             firstSalt,
             address(implementation)
         );
@@ -138,6 +140,7 @@ contract MorphoCompounderStrategyFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            false, // enableBurning
             secondSalt,
             address(implementation)
         );
@@ -172,6 +175,7 @@ contract MorphoCompounderStrategyFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            false, // enableBurning
             firstSalt,
             address(implementation)
         );
@@ -188,6 +192,7 @@ contract MorphoCompounderStrategyFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            false, // enableBurning
             secondSalt,
             address(implementation)
         );
@@ -219,6 +224,7 @@ contract MorphoCompounderStrategyFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            false, // enableBurning
             strategySalt,
             address(implementation)
         );
@@ -235,6 +241,7 @@ contract MorphoCompounderStrategyFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            false, // enableBurning
             strategySalt,
             address(implementation)
         );
@@ -254,6 +261,7 @@ contract MorphoCompounderStrategyFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            false, // enableBurning
             differentSalt,
             address(implementation)
         );

@@ -87,6 +87,7 @@ contract RocketPoolStrategyFactoryTest is Test {
                 keeper,
                 emergencyAdmin,
                 donationAddress,
+                false, // enableBurning
                 address(implementation)
             )
         );
@@ -108,6 +109,7 @@ contract RocketPoolStrategyFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            false, // enableBurning
             strategySalt,
             address(implementation)
         );
@@ -149,6 +151,7 @@ contract RocketPoolStrategyFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            false, // enableBurning
             firstSalt,
             address(implementation)
         );
@@ -160,6 +163,7 @@ contract RocketPoolStrategyFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            false, // enableBurning
             secondSalt,
             address(implementation)
         );
@@ -205,6 +209,7 @@ contract RocketPoolStrategyFactoryTest is Test {
                 keeper,
                 emergencyAdmin,
                 donationAddress,
+                false, // enableBurning
                 salt,
                 address(implementation)
             );
@@ -249,6 +254,7 @@ contract RocketPoolStrategyFactoryTest is Test {
                 keeper,
                 emergencyAdmin,
                 donationAddress,
+                false, // enableBurning
                 strategySalt,
                 address(implementation)
             );
@@ -273,6 +279,7 @@ contract RocketPoolStrategyFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            false, // enableBurning
             differentSalt,
             address(implementation)
         );
@@ -311,6 +318,7 @@ contract RocketPoolStrategyFactoryTest is Test {
             fuzzKeeper,
             fuzzEmergencyAdmin,
             fuzzDonationAddress,
+            false, // enableBurning
             salt,
             address(implementation)
         );
@@ -345,6 +353,7 @@ contract RocketPoolStrategyFactoryTest is Test {
                 keeper,
                 emergencyAdmin,
                 donationAddress,
+                false, // enableBurning
                 salt,
                 address(implementation)
             );
