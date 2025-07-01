@@ -2,16 +2,16 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import { TestPlus } from "lib/solady/test/utils/TestPlus.sol";
+import { TestPlus } from "solady-test/utils/TestPlus.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MockYieldSource } from "test/mocks/core/MockYieldSource.sol";
 import { MockStrategy } from "test/mocks/zodiac-core/MockStrategy.sol";
 import { IMockStrategy } from "test/mocks/zodiac-core/IMockStrategy.sol";
-import { Safe } from "lib/safe-smart-account/contracts/Safe.sol";
-import { SafeProxy } from "lib/safe-smart-account/contracts/proxies/SafeProxy.sol";
-import { SafeProxyFactory } from "lib/safe-smart-account/contracts/proxies/SafeProxyFactory.sol";
-import { Enum } from "lib/safe-smart-account/contracts/libraries/Enum.sol";
-import { Hats } from "lib/hats-protocol/src/Hats.sol";
+import { Safe } from "@gnosis.pm/safe-contracts/contracts/Safe.sol";
+import { SafeProxy } from "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxy.sol";
+import { SafeProxyFactory } from "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
+import { Enum } from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
+import { Hats } from "hats-protocol/Hats.sol";
 import { DragonHatter } from "src/utils/hats/DragonHatter.sol";
 import { SimpleEligibilityAndToggle } from "src/utils/hats/SimpleEligibilityAndToggle.sol";
 import { DragonRouter } from "src/zodiac-core/DragonRouter.sol";

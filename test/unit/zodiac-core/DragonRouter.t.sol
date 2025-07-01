@@ -19,7 +19,7 @@ import { IDragonRouter } from "src/zodiac-core/interfaces/IDragonRouter.sol";
 
 import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { IERC4626 } from "lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
+import { IERC4626 } from "@openzeppelin/contracts//interfaces/IERC4626.sol";
 import { ITokenizedStrategy } from "src/zodiac-core/interfaces/ITokenizedStrategy.sol";
 import { DragonRouter } from "src/zodiac-core/DragonRouter.sol";
 
@@ -28,7 +28,7 @@ import { MockDragonRouterTesting } from "test/mocks/zodiac-core/MockDragonRouter
 import { MockNativeTransformer } from "test/mocks/zodiac-core/MockNativeTransformer.sol";
 import { MockStrategy } from "test/mocks/zodiac-core/MockStrategy.sol";
 import { ISplitChecker } from "src/zodiac-core/interfaces/ISplitChecker.sol";
-import { AccessControl } from "lib/openzeppelin-contracts/contracts/access/AccessControl.sol";
+import { AccessControl } from "@openzeppelin/contracts//access/AccessControl.sol";
 import { DragonTokenizedStrategy } from "src/zodiac-core/vaults/DragonTokenizedStrategy.sol";
 
 import { MockStrategy } from "test/mocks/zodiac-core/MockStrategy.sol";

@@ -1,10 +1,6 @@
 {
-  "solc_remaps": [
-    "@solady=lib/solady/src",
-    "solady=lib/solady"
-  ],
-  "detectors_to_exclude": "external-function,naming-convention,solc-version,dead-code,block-timestamp,missing-zero-check,delegatecall-loop,msg-value-loop,unused-return,incorrect-equality,reentrancy-no-eth",
-  "filter_paths": "node_modules|openzeppelin-presets",
+  "detectors_to_exclude": "unused-return,incorrect-equality,reentrancy-no-eth",
+  "filter_paths": "dependencies",
   "exclude_informational": true,
   "exclude_low": true,
   "exclude_medium": false,

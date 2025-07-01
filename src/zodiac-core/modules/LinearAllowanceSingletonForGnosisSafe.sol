@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { Enum } from "lib/safe-smart-account/contracts/libraries/Enum.sol";
+import { Enum } from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { NATIVE_TOKEN } from "src/constants.sol";
 import { ILinearAllowanceSingleton } from "src/zodiac-core/interfaces/ILinearAllowanceSingleton.sol";

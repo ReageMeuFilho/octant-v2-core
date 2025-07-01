@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "lib/safe-smart-account/contracts/proxies/SafeProxy.sol";
+import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxy.sol";
 import "forge-std/Script.sol";
 import { BatchScript } from "../helpers/BatchScript.sol";
 

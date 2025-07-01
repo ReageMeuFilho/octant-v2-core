@@ -3,11 +3,11 @@ pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
 import { FixedPointMathLib } from "solady/utils/FixedPointMathLib.sol";
-import { TestPlus } from "lib/solady/test/utils/TestPlus.sol";
-import { WETH } from "lib/solady/src/tokens/WETH.sol";
+import { TestPlus } from "solady-test/utils/TestPlus.sol";
+import { WETH } from "solady/tokens/WETH.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
-import "../../../../script/deploy/DeployTrader.sol";
-import { HelperConfig } from "../../../../script/helpers/HelperConfig.s.sol";
+import "script/deploy/DeployTrader.sol";
+import { HelperConfig } from "script/helpers/HelperConfig.s.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IUniswapV3Pool } from "src/utils/vendor/uniswap/IUniswapV3Pool.sol";
 
@@ -25,7 +25,6 @@ contract TestTraderIntegrationETH2GLM is Test, TestPlus, DeployTrader {
 
         mainnetFork = vm.createFork("mainnet");
         vm.selectFork(mainnetFork);
-        vm.rollFork(mainnetForkBlock);
 
         config = new HelperConfig(true);
 

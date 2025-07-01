@@ -10,7 +10,7 @@ import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { YieldDonatingTokenizedStrategy } from "src/strategies/yieldDonating/YieldDonatingTokenizedStrategy.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
-import { CREATE3 } from "lib/solady/src/utils/CREATE3.sol";
+import { CREATE3 } from "solady/utils/CREATE3.sol";
 
 /// @title MorphoCompounderVaultFactory Test (Yield Donating)
 /// @author Octant

@@ -74,7 +74,6 @@ contract SkyCompounderTest is Test {
         // where mainnet = "${ETHEREUM_NODE_MAINNET}" environment variable
         mainnetFork = vm.createFork("mainnet");
         vm.selectFork(mainnetFork);
-        vm.rollFork(mainnetForkBlock);
 
         // Etch YieldDonatingTokenizedStrategy
         implementation = new YieldDonatingTokenizedStrategy{ salt: keccak256("OCT_YIELD_DONATING_STRATEGY_V1") }();
