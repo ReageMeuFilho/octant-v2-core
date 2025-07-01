@@ -3,9 +3,9 @@ pragma solidity ^0.8.0;
 
 import { CREATE3 } from "solady/utils/CREATE3.sol";
 import { IERC20, IERC20Staking, IWhitelist, IEarningPowerCalculator } from "src/regen/RegenStaker.sol";
-import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import { IERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import { IERC20Delegates } from "staker/interfaces/IERC20Delegates.sol";
+import { ERC165Checker } from "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
 
 /// @title RegenStaker Factory with Automatic Variant Detection
 /// @notice Deploys RegenStaker contracts with automatic token capability detection
@@ -172,12 +172,12 @@ contract RegenStakerFactory {
     }
 
     function _supportsInterface(IERC20 contractAddr, bytes4 interfaceId) internal view returns (bool) {
-        bool isERC165Compliant = _isERC165Compliant(contractAddr);
-
-        if (isERC165Compliant) {
-            return _queryERC165Interface(contractAddr, interfaceId);
+        // First try ERC165 detection using OpenZeppelin's robust implementation
+        if (ERC165Checker.supportsInterface(address(contractAddr), interfaceId)) {
+            return true;
         }
 
+        // Fallback to manual detection for interfaces that might not be properly declared via ERC165
         if (interfaceId == type(IERC20Delegates).interfaceId) {
             return _checkDelegatesSupport(contractAddr);
         } else if (interfaceId == type(IERC20Permit).interfaceId) {
@@ -185,42 +185,6 @@ contract RegenStakerFactory {
         }
 
         return false;
-    }
-
-    function _isERC165Compliant(IERC20 contractAddr) internal view returns (bool) {
-        (bool success, bytes memory data) = address(contractAddr).staticcall{ gas: INTERFACE_CHECK_GAS_LIMIT }(
-            abi.encodeWithSignature("supportsInterface(bytes4)", type(IERC165).interfaceId)
-        );
-
-        if (!success || data.length != EVM_WORD_SIZE) {
-            return false;
-        }
-
-        bool supportsERC165 = abi.decode(data, (bool));
-        if (!supportsERC165) return false;
-
-        (success, data) = address(contractAddr).staticcall{ gas: INTERFACE_CHECK_GAS_LIMIT }(
-            abi.encodeWithSignature("supportsInterface(bytes4)", bytes4(0xffffffff))
-        );
-
-        if (!success || data.length != EVM_WORD_SIZE) {
-            return false;
-        }
-
-        bool rejectsInvalidInterface = !abi.decode(data, (bool));
-        return rejectsInvalidInterface;
-    }
-
-    function _queryERC165Interface(IERC20 contractAddr, bytes4 interfaceId) internal view returns (bool) {
-        (bool success, bytes memory data) = address(contractAddr).staticcall{ gas: INTERFACE_CHECK_GAS_LIMIT }(
-            abi.encodeWithSignature("supportsInterface(bytes4)", interfaceId)
-        );
-
-        if (!success || data.length != EVM_WORD_SIZE) {
-            return false;
-        }
-
-        return abi.decode(data, (bool));
     }
 
     function _checkDelegatesSupport(IERC20 contractAddr) internal view returns (bool) {
