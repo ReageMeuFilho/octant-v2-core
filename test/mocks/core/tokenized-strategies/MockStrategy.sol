@@ -27,6 +27,7 @@ contract MockStrategy is BaseStrategy {
             _keeper,
             _emergencyAdmin,
             _donationAddress,
+            false,
             _tokenizedStrategyAddress
         )
     {
