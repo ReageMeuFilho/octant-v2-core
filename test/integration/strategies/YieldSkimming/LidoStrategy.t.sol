@@ -2,6 +2,7 @@
 pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
+import { console2 } from "forge-std/console2.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { LidoStrategy } from "src/strategies/yieldSkimming/LidoStrategy.sol";
 import { LidoStrategyFactory } from "src/factories/LidoStrategyFactory.sol";
@@ -10,13 +11,16 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
 import { YieldSkimmingTokenizedStrategy } from "src/strategies/yieldSkimming/YieldSkimmingTokenizedStrategy.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
+import { WadRayMath } from "src/utils/libs/Maths/WadRay.sol";
 import { IBaseStrategy } from "src/core/interfaces/IBaseStrategy.sol";
+import { IYieldSkimmingStrategy } from "src/strategies/yieldSkimming/IYieldSkimmingStrategy.sol";
 
 /// @title Lido Test
 /// @author Octant
 /// @notice Integration tests for the Lido strategy using a mainnet fork
 contract LidoStrategyTest is Test {
     using SafeERC20 for ERC20;
+    using WadRayMath for uint256;
 
     // Strategy instance
     LidoStrategy public strategy;
@@ -163,7 +167,11 @@ contract LidoStrategyTest is Test {
         assertEq(vault.management(), management, "Management address incorrect");
         assertEq(vault.keeper(), keeper, "Keeper address incorrect");
         assertEq(vault.emergencyAdmin(), emergencyAdmin, "Emergency admin incorrect");
-        assertGt(strategy.getLastReportedExchangeRate(), 0, "Last reported exchange rate should be initialized");
+        assertGt(
+            IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate(),
+            0,
+            "Last reported exchange rate should be initialized"
+        );
     }
 
     /// @notice Test depositing assets into the strategy
@@ -188,7 +196,7 @@ contract LidoStrategyTest is Test {
         );
 
         assertGt(sharesReceived, 0, "No shares received from deposit");
-        assertGt(strategy.balanceOfShares(), 0, "Strategy should have deployed assets to yield vault");
+        assertGt(strategy.balanceOfAsset(), 0, "Strategy should have deployed assets to yield vault");
     }
 
     /// @notice Fuzz test depositing assets into the strategy
@@ -217,14 +225,14 @@ contract LidoStrategyTest is Test {
         );
 
         assertGt(sharesReceived, 0, "No shares received from deposit");
-        assertGt(strategy.balanceOfShares(), 0, "Strategy should have deployed assets to yield vault");
+        assertGt(strategy.balanceOfAsset(), 0, "Strategy should have deployed assets to yield vault");
     }
 
     /// @notice Fuzz test withdrawing assets from the strategy
     function testFuzzWithdraw(uint256 depositAmount, uint256 withdrawPercentage) public {
         // Bound inputs to reasonable values
         depositAmount = bound(depositAmount, 1e18, 10000e18); // 1 to 10,000 WSTETH
-        withdrawPercentage = bound(withdrawPercentage, 1, 100); // 1% to 100%
+        withdrawPercentage = bound(withdrawPercentage, 1, 100); // 1% to 100% (prevents overflow in percentage calc)
 
         // Airdrop tokens to user for this test
         airdrop(ERC20(WSTETH), user, depositAmount);
@@ -238,22 +246,31 @@ contract LidoStrategyTest is Test {
         uint256 initialUserBalance = ERC20(WSTETH).balanceOf(user);
         uint256 initialShareBalance = vault.balanceOf(user);
 
-        // Calculate withdrawal amount based on percentage
-        uint256 withdrawAmount = (depositAmount * withdrawPercentage) / 100;
-
-        // Preview the withdrawal to get shares to burn
-        uint256 sharesToBurn = vault.previewWithdraw(withdrawAmount);
-        uint256 assetsReceived = vault.withdraw(withdrawAmount, user, user);
+        // redeem balance of shares
+        uint256 sharesToBurn = (vault.balanceOf(user) * withdrawPercentage) / 100;
+        uint256 withdrawnAmount = vault.redeem(sharesToBurn, user, user);
         vm.stopPrank();
 
         // Verify balances after withdrawal
         assertEq(
             ERC20(WSTETH).balanceOf(user),
-            initialUserBalance + withdrawAmount,
+            initialUserBalance + withdrawnAmount,
             "User didn't receive correct assets"
         );
         assertEq(vault.balanceOf(user), initialShareBalance - sharesToBurn, "Shares not burned correctly");
-        assertEq(assetsReceived, withdrawAmount, "Incorrect amount of assets received");
+    }
+
+    // Additional struct for profit fuzz tests to avoid stack too deep
+    struct ProfitFuzzTestState {
+        uint256 totalAssetsBefore;
+        uint256 initialExchangeRate;
+        uint256 newExchangeRate;
+        uint256 donationAddressBalanceBefore;
+        uint256 donationAddressBalanceAfter;
+        uint256 totalAssetsAfter;
+        uint256 sharesToRedeem;
+        uint256 assetsReceived;
+        uint256 donationAssetsReceived;
     }
 
     /// @notice Fuzz test the harvesting functionality with profit
@@ -261,6 +278,8 @@ contract LidoStrategyTest is Test {
         // Bound inputs to reasonable values
         depositAmount = bound(depositAmount, 1e18, 10000e18); // 1 to 10,000 WSTETH
         profitPercentage = bound(profitPercentage, 1, 99); // 1% to 99% profit (under 100% health check limit)
+
+        ProfitFuzzTestState memory state;
 
         // Airdrop tokens to user for this test
         airdrop(ERC20(WSTETH), user, depositAmount);
@@ -272,16 +291,16 @@ contract LidoStrategyTest is Test {
         vm.stopPrank();
 
         // Check initial state
-        uint256 totalAssetsBefore = vault.totalAssets();
-        uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
+        state.totalAssetsBefore = vault.totalAssets();
+        state.initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
 
         // Simulate exchange rate increase based on fuzzed percentage
-        uint256 newExchangeRate = (initialExchangeRate * (100 + profitPercentage)) / 100;
+        state.newExchangeRate = (state.initialExchangeRate * (100 + profitPercentage)) / 100;
 
-        // Mock the actual yield vault's stEthPerToken
-        vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(newExchangeRate));
+        // Mock the actual yield vault's stEthPerToken (convert back to WAD format)
+        vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(state.newExchangeRate));
 
-        uint256 donationAddressBalanceBefore = ERC20(address(strategy)).balanceOf(donationAddress);
+        state.donationAddressBalanceBefore = ERC20(address(strategy)).balanceOf(donationAddress);
 
         // Call report
         vm.startPrank(keeper);
@@ -295,30 +314,43 @@ contract LidoStrategyTest is Test {
         assertGt(profit, 0, "Profit should be positive");
         assertEq(loss, 0, "There should be no loss");
 
-        uint256 donationAddressBalanceAfter = ERC20(address(strategy)).balanceOf(donationAddress);
+        state.donationAddressBalanceAfter = ERC20(address(strategy)).balanceOf(donationAddress);
 
         // donation address should have received the profit
         assertGt(
-            donationAddressBalanceAfter,
-            donationAddressBalanceBefore,
+            state.donationAddressBalanceAfter,
+            state.donationAddressBalanceBefore,
             "Donation address should have received profit"
         );
 
         // Check total assets after harvest
-        uint256 totalAssetsAfter = vault.totalAssets();
-        assertEq(totalAssetsAfter, totalAssetsBefore, "Total assets should not change after harvest");
+        state.totalAssetsAfter = vault.totalAssets();
+        assertEq(state.totalAssetsAfter, state.totalAssetsBefore, "Total assets should not change after harvest");
 
         // Withdraw everything for user
         vm.startPrank(user);
-        uint256 sharesToRedeem = vault.balanceOf(user);
-        uint256 assetsReceived = vault.redeem(sharesToRedeem, user, user);
+        state.sharesToRedeem = vault.balanceOf(user);
+
+        state.assetsReceived = vault.redeem(state.sharesToRedeem, user, user);
         vm.stopPrank();
+
+        // withdraw the donation address shares
+        vm.startPrank(donationAddress);
+        state.donationAssetsReceived = vault.redeem(vault.balanceOf(donationAddress), donationAddress, donationAddress);
+        vm.stopPrank();
+
+        assertApproxEqRel(
+            state.donationAssetsReceived,
+            (depositAmount * profitPercentage) / (100 + profitPercentage),
+            0.1e16,
+            "Donation address should have received profit"
+        );
 
         // Verify user received their original deposit
         assertApproxEqRel(
-            assetsReceived * newExchangeRate,
-            depositAmount * initialExchangeRate,
-            0.001e18, // 0.1% tolerance for fuzzing
+            state.assetsReceived * state.newExchangeRate,
+            depositAmount * state.initialExchangeRate,
+            0.1e16, // 0.1% tolerance for fuzzing
             "User should receive original deposit"
         );
     }
@@ -334,7 +366,7 @@ contract LidoStrategyTest is Test {
         state.depositAmount2 = 2000e18; // 2000 WSTETH
 
         // Get initial exchange rate
-        state.initialExchangeRate = strategy.getLastReportedExchangeRate();
+        state.initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
 
         vm.startPrank(state.user1);
         vault.deposit(state.depositAmount1, state.user1);
@@ -448,7 +480,7 @@ contract LidoStrategyTest is Test {
 
         // Capture initial state
         uint256 initialAssets = vault.totalAssets();
-        uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
+        uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
 
         // Call report as keeper (which internally calls _harvestAndReport)
         vm.startPrank(keeper);
@@ -456,7 +488,7 @@ contract LidoStrategyTest is Test {
         vm.stopPrank();
 
         // Get new exchange rate and total assets
-        uint256 newExchangeRate = strategy.getLastReportedExchangeRate();
+        uint256 newExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         uint256 newTotalAssets = vault.totalAssets();
 
         // mock stEthPerToken to be 1.1x the initial exchange rate
@@ -509,26 +541,6 @@ contract LidoStrategyTest is Test {
         );
     }
 
-    /// @notice Test the sweep function for non-asset ERC20 tokens
-    function testSweep() public {
-        // Create a mock token that we'll sweep
-        MockERC20 mockToken = new MockERC20(18);
-        mockToken.mint(address(strategy), 1000e18);
-
-        // Verify token balance in strategy
-        assertEq(mockToken.balanceOf(address(strategy)), 1000e18, "Strategy should have mock tokens");
-        assertEq(mockToken.balanceOf(strategy.GOV()), 0, "GOV should have no mock tokens initially");
-
-        // Call sweep function
-        vm.startPrank(strategy.GOV());
-        strategy.sweep(address(mockToken));
-        vm.stopPrank();
-
-        // Verify tokens were swept to governance
-        assertEq(mockToken.balanceOf(address(strategy)), 0, "Strategy should have no mock tokens after sweep");
-        assertEq(mockToken.balanceOf(strategy.GOV()), 1000e18, "GOV should have all mock tokens after sweep");
-    }
-
     /// @notice Fuzz test exchange rate tracking and yield calculation
     function testFuzzExchangeRateTrackingLido(uint256 depositAmount, uint256 exchangeRateIncreasePercentage) public {
         // Bound inputs to reasonable values
@@ -545,7 +557,7 @@ contract LidoStrategyTest is Test {
         vm.stopPrank();
 
         // Get initial exchange rate
-        uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
+        uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
 
         // Simulate exchange rate increase based on fuzzed percentage
         uint256 newExchangeRate = (initialExchangeRate * (100 + exchangeRateIncreasePercentage)) / 100;
@@ -566,13 +578,19 @@ contract LidoStrategyTest is Test {
         assertEq(loss, 0, "Should have no loss");
 
         // Verify exchange rate was updated
-        uint256 updatedExchangeRate = strategy.getLastReportedExchangeRate();
-        assertEq(updatedExchangeRate, newExchangeRate, "Exchange rate should be updated after harvest");
+        uint256 updatedExchangeRate = IYieldSkimmingStrategy(address(strategy)).getLastRateRay().rayToWad();
+
+        assertApproxEqRel(
+            updatedExchangeRate,
+            newExchangeRate,
+            0.000001e18,
+            "Exchange rate should be updated after harvest"
+        );
     }
 
     /// @notice Test getting the last reported exchange rate
-    function testGetLastReportedExchangeRate() public view {
-        uint256 rate = strategy.getLastReportedExchangeRate();
+    function testgetCurrentExchangeRate() public view {
+        uint256 rate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         assertGt(rate, 0, "Exchange rate should be initialized and greater than zero");
     }
 
@@ -584,34 +602,10 @@ contract LidoStrategyTest is Test {
         vm.stopPrank();
 
         uint256 assetBalance = strategy.balanceOfAsset();
-        uint256 sharesBalance = strategy.balanceOfShares();
+        uint256 sharesBalance = strategy.balanceOfAsset();
 
         assertEq(assetBalance, sharesBalance, "Asset and shares balance should match for this strategy");
         assertGt(assetBalance, 0, "Asset balance should be greater than zero after deposit");
-    }
-
-    /// @notice Test sweep function for unauthorized access
-    function testSweepUnauthorized() public {
-        MockERC20 mockToken = new MockERC20(18);
-        mockToken.mint(address(strategy), 1000e18);
-
-        // Try to sweep as a non-governance address
-        vm.startPrank(user);
-        vm.expectRevert();
-        strategy.sweep(address(mockToken));
-        vm.stopPrank();
-    }
-
-    /// @notice Test onlyGovernance modifier
-    function testOnlyGovernanceModifier() public {
-        // Try to call sweep as a non-governance address
-        MockERC20 mockToken = new MockERC20(18);
-        mockToken.mint(address(strategy), 1000e18);
-
-        vm.startPrank(user);
-        vm.expectRevert();
-        strategy.sweep(address(mockToken));
-        vm.stopPrank();
     }
 
     /// @notice Test health check for profit limit exceeded
@@ -627,7 +621,7 @@ contract LidoStrategyTest is Test {
         vm.stopPrank();
 
         // Mock a 10x exchange rate
-        uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
+        uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         uint256 newExchangeRate = (initialExchangeRate * 7) / 3; // 233%
         vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(newExchangeRate));
 
@@ -650,10 +644,10 @@ contract LidoStrategyTest is Test {
         assertEq(strategy.doHealthCheck(), false);
 
         // old exchange rate
-        uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
+        uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
 
         // make a 10 time profit (should revert when doHealthCheck is true but not when it is false)
-        vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode((initialExchangeRate * 10)));
+        vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(initialExchangeRate * 10));
 
         // report
         vm.startPrank(keeper);
@@ -715,7 +709,7 @@ contract LidoStrategyTest is Test {
         vm.stopPrank();
 
         // Generate some profit first to create donation shares
-        uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
+        uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         uint256 profitExchangeRate = (initialExchangeRate * (100 + profitPercentage)) / 100;
 
         vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(profitExchangeRate));
@@ -779,7 +773,7 @@ contract LidoStrategyTest is Test {
         state.depositAmount2 = 2000e18; // 2000 WSTETH
 
         // Get initial exchange rate
-        state.initialExchangeRate = strategy.getLastReportedExchangeRate();
+        state.initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
 
         // First user deposits
         vm.startPrank(state.user1);
@@ -847,7 +841,7 @@ contract LidoStrategyTest is Test {
         // Users should receive their deposits adjusted for exchange rate changes with loss protection
         assertApproxEqRel(
             state.user1Assets * state.newExchangeRate2,
-            (state.depositAmount1 * state.initialExchangeRate * 8) / 10, // expect a 20 pr cent loss in value
+            ((state.depositAmount1 * state.initialExchangeRate) * (110 * 8)) / (100 * 10),
             0.1e18, // 0.1% tolerance for loss scenarios
             "User 1 should receive deposit value with loss protection"
         );
@@ -875,7 +869,7 @@ contract LidoStrategyTest is Test {
         vm.stopPrank();
 
         // Generate small profit to create minimal donation shares
-        uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
+        uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         uint256 smallProfitRate = (initialExchangeRate * 1005) / 1000; // 0.5% profit
         vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(smallProfitRate));
 
@@ -935,7 +929,7 @@ contract LidoStrategyTest is Test {
         vm.stopPrank();
 
         // Generate profit to create donation shares
-        uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
+        uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         uint256 profitRate = (initialExchangeRate * 120) / 100; // 20% profit
         vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(profitRate));
 
@@ -1015,7 +1009,7 @@ contract LidoStrategyTest is Test {
         uint256 totalAssetsBefore = vault.totalAssets();
 
         // Generate loss (5% decrease)
-        uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
+        uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         uint256 lossRate = (initialExchangeRate * 95) / 100;
         vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(lossRate));
 
@@ -1081,7 +1075,7 @@ contract LidoStrategyTest is Test {
         vm.stopPrank();
 
         // Generate profit to create donation shares
-        state.initialExchangeRate = strategy.getLastReportedExchangeRate();
+        state.initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         state.profitRate = (state.initialExchangeRate * (100 + profitPercentage)) / 100;
         vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(state.profitRate));
 

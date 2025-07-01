@@ -7,7 +7,7 @@ import { Setup } from "./utils/Setup.sol";
 import { MockYieldSourceSkimming } from "test/mocks/core/tokenized-strategies/MockYieldSourceSkimming.sol";
 
 // SEE https://github.com/a16z/erc4626-tests
-contract ERC4626StdTestHere is ERC4626Test, Setup {
+contract ERC4626StdTest is ERC4626Test, Setup {
     function setUp() public override(ERC4626Test, Setup) {
         super.setUp();
         _underlying_ = address(yieldSource);

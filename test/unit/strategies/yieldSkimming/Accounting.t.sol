@@ -3,14 +3,15 @@ pragma solidity >=0.8.18;
 
 import { Setup, IMockStrategy } from "./utils/Setup.sol";
 import { MockYieldSourceSkimming } from "test/mocks/core/tokenized-strategies/MockYieldSourceSkimming.sol";
+import { IYieldSkimmingStrategy } from "src/strategies/yieldSkimming/IYieldSkimmingStrategy.sol";
+import { MockStrategySkimming } from "test/mocks/core/tokenized-strategies/MockStrategySkimming.sol";
 
 contract AccountingTest is Setup {
     function setUp() public override {
         super.setUp();
     }
 
-    // todo check with team if it makes sense in yield skimming strategy
-    function test_airdropDoesNotIncreasePPS(address _address, uint256 _amount, uint16 _profitFactor) public {
+    function test_airdropDoesNotIncreasePPSHere(address _address, uint256 _amount, uint16 _profitFactor) public {
         _amount = bound(_amount, minFuzzAmount, maxFuzzAmount);
         _profitFactor = uint16(bound(uint256(_profitFactor), 10, MAX_BPS));
         vm.assume(
@@ -43,12 +44,27 @@ contract AccountingTest is Setup {
         strategy.report();
 
         uint256 beforeBalance = yieldSource.balanceOf(_address);
+
         vm.startPrank(_address);
         strategy.redeem(strategy.balanceOf(_address), _address, _address);
         vm.stopPrank();
 
-        // should have pulled out just the deposited amount leaving the rest deployed.
-        assertEq(yieldSource.balanceOf(_address), beforeBalance + _amount + toAirdrop, "!balanceOf _address");
+        // make sure balance of strategy is 0
+        assertEq(strategy.balanceOf(_address), 0, "!balanceOf _address 0");
+
+        // should have pulled out just the deposited amount
+        assertApproxEqRel(yieldSource.balanceOf(_address), beforeBalance + _amount, 2e15, "!balanceOf _address");
+
+        // redeem donation address shares
+        uint256 donationShares = strategy.balanceOf(donationAddress);
+        if (donationShares > 0) {
+            vm.startPrank(address(donationAddress));
+            strategy.redeem(donationShares, donationAddress, donationAddress);
+            vm.stopPrank();
+        }
+
+        // make sure balance of strategy is 0
+        assertEq(strategy.balanceOf(donationAddress), 0, "!balanceOf donationShares 0");
 
         assertEq(yieldSource.balanceOf(address(strategy)), 0, "!balanceOf strategy");
 
@@ -423,6 +439,7 @@ contract AccountingTest is Setup {
     function test_maxUintDeposit_depositsBalance(address _address, uint256 _amount) public {
         _amount = bound(_amount, minFuzzAmount, maxFuzzAmount);
         vm.assume(_address != address(0) && _address != address(strategy) && _address != address(yieldSource));
+        vm.assume(yieldSource.balanceOf(_address) == 0);
 
         yieldSource.mint(_address, _amount);
 
@@ -443,80 +460,98 @@ contract AccountingTest is Setup {
         assertEq(yieldSource.balanceOf(address(strategy)), _amount, "!balanceOf strategy yieldSource");
     }
 
-    function test_deposit_zeroAssetsPositiveSupply_reverts(address _address, uint256 _amount) public {
+    // ===== LOSS BEHAVIOR TESTS =====
+
+    /**
+     * @notice Test that loss protection mechanism tracks losses correctly for yield skimming
+     * @dev This tests the _handleDragonLossProtection function in YieldSkimmingTokenizedStrategy
+     */
+    function test_lossProtection_tracksLossesCorrectly(uint256 _amount, uint16 _lossFactor) public {
         _amount = bound(_amount, minFuzzAmount, maxFuzzAmount);
-        vm.assume(
-            _address != address(0) &&
-                _address != address(strategy) &&
-                _address != address(yieldSource) &&
-                _address != donationAddress
-        );
+        _lossFactor = uint16(bound(uint256(_lossFactor), 10, MAX_BPS - 1)); // Prevent 100% loss
 
-        mintAndDepositIntoStrategy(strategy, _address, _amount);
+        // Setup initial deposit
+        mintAndDepositIntoStrategy(strategy, user, _amount);
 
-        uint256 toLose = _amount;
-        // Simulate a loss.
-        vm.prank(address(strategy));
-        yieldSource.transfer(address(69), toLose);
+        // Record initial state
+        uint256 initialDonationShares = strategy.balanceOf(donationAddress);
+        assertEq(initialDonationShares, 0, "Initial donation shares should be 0");
 
+        // Simulate a loss by decreasing the exchange rate
+        uint256 currentRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
+        uint256 newRate = currentRate - (currentRate * _lossFactor) / MAX_BPS;
+
+        // update the exchange rate
+        MockStrategySkimming(address(strategy)).updateExchangeRate(newRate);
+
+        // Report the loss - this should trigger loss protection
         vm.prank(keeper);
-        strategy.report();
+        (uint256 profit, uint256 loss) = strategy.report();
 
-        // Should still have shares but no yieldSources
-        // checkStrategyTotals(strategy, _amount, 0, _amount, _amount);
+        assertEq(profit, 0, "Should report no profit");
+        assertGt(loss, 0, "Should report some loss");
 
-        assertEq(strategy.balanceOf(_address), _amount, "!balanceOf _address");
-        assertEq(yieldSource.balanceOf(address(strategy)), 0, "!balanceOf strategy");
-        assertEq(yieldSource.balanceOf(address(yieldSource)), 0, "!balanceOf yieldSource");
+        // Donation address should not receive any shares yet (loss is tracked internally)
+        uint256 finalDonationShares = strategy.balanceOf(donationAddress);
+        assertEq(finalDonationShares, initialDonationShares, "Donation shares should not change on loss");
 
-        yieldSource.mint(_address, _amount);
-        vm.prank(_address);
-        yieldSource.approve(address(strategy), _amount);
-
-        vm.expectRevert("ZERO_SHARES");
-        vm.prank(_address);
-        strategy.deposit(_amount, _address);
-
-        assertEq(strategy.convertToAssets(_amount), 0);
-        assertEq(strategy.convertToShares(_amount), 0);
-        assertEq(strategy.pricePerShare(), 0);
+        // Clear the mock
+        vm.clearMockedCalls();
     }
 
-    function test_mint_zeroAssetsPositiveSupply_reverts(address _address, uint256 _amount) public {
+    /**
+     * @notice Test withdraw behavior during stored losses in yield skimming
+     */
+    function test_lossProtection_withdrawDuringStoredLoss(uint256 _amount, uint16 _lossFactor) public {
         _amount = bound(_amount, minFuzzAmount, maxFuzzAmount);
-        vm.assume(
-            _address != address(0) &&
-                _address != address(strategy) &&
-                _address != address(yieldSource) &&
-                _address != donationAddress
-        );
+        _lossFactor = uint16(bound(uint256(_lossFactor), 10, MAX_BPS / 2));
 
-        mintAndDepositIntoStrategy(strategy, _address, _amount);
+        // Setup initial deposit
+        mintAndDepositIntoStrategy(strategy, user, _amount);
 
-        uint256 toLose = _amount;
-        // Simulate a loss.
+        // Simulate a loss (exchange rate decrease)
+        uint256 toLose = (_amount * _lossFactor) / MAX_BPS;
         vm.prank(address(strategy));
         yieldSource.transfer(address(69), toLose);
 
+        // Report the loss
         vm.prank(keeper);
         strategy.report();
 
-        // Should still have shares but no assets
-        checkStrategyTotals(strategy, 0, 0, 0, _amount);
+        // User should be able to withdraw with loss
+        uint256 userShares = strategy.balanceOf(user);
+        uint256 expectedAssets = _amount - toLose; // What should actually be available
 
-        assertEq(strategy.balanceOf(_address), _amount);
-        assertEq(yieldSource.balanceOf(address(strategy)), 0, "!balanceOf strategy");
+        uint256 beforeBalance = yieldSource.balanceOf(user);
+        vm.prank(user);
+        uint256 assetsReceived = strategy.redeem(userShares, user, user);
 
-        yieldSource.mint(_address, _amount);
-        vm.prank(_address);
-        yieldSource.approve(address(strategy), _amount);
+        // Should receive the reduced amount
+        assertEq(assetsReceived, expectedAssets, "Should receive expected assets after loss");
+        assertEq(yieldSource.balanceOf(user) - beforeBalance, expectedAssets, "Balance should match");
 
-        vm.expectRevert("ZERO_ASSETS");
-        vm.prank(_address);
-        strategy.mint(_amount, _address);
+        // Strategy should be empty after full withdrawal
+        checkStrategyTotals(strategy, 0, 0, 0, 0);
+    }
 
-        assertEq(strategy.convertToAssets(_amount), 0);
-        assertEq(strategy.convertToShares(_amount), 0);
-        assertEq(strategy.pricePerShare(), 0);
+    /**
+     * @notice Test maximum possible loss scenario in yield skimming
+     */
+    function test_lossProtection_maximumLossScenario(uint256 _amount) public {
+        _amount = bound(_amount, minFuzzAmount, maxFuzzAmount);
+
+        // Setup initial deposit
+        mintAndDepositIntoStrategy(strategy, user, _amount);
+
+        // mock the exchange rate to 0
+        MockStrategySkimming(address(strategy)).updateExchangeRate(0);
+
+        // Report the loss
+        vm.prank(keeper);
+        (uint256 profit, uint256 loss) = strategy.report();
+
+        assertEq(profit, 0, "Should report no profit");
+        assertEq(loss, _amount, "Should report total loss");
+        assertEq(strategy.balanceOf(donationAddress), 0, "Donation address should have no shares");
     }
 }

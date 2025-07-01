@@ -214,6 +214,9 @@ abstract contract TokenizedStrategy {
         uint8 decimals; // The amount of decimals that `asset` and strategy use.
         uint8 entered; // To prevent reentrancy. Use uint8 for gas savings.
         bool shutdown; // Bool that can be used to stop deposits into the strategy.
+        
+        // Loss tracking for yield strategies
+        uint256 lossAmount; // Accumulated losses to offset against future profits
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -403,7 +406,7 @@ abstract contract TokenizedStrategy {
         address _keeper,
         address _emergencyAdmin,
         address _dragonRouter
-    ) external {
+    ) public virtual {
         // Cache storage pointer.
         StrategyData storage S = _strategyStorage();
 
@@ -761,7 +764,7 @@ abstract contract TokenizedStrategy {
         StrategyData storage S,
         uint256 assets,
         Math.Rounding _rounding
-    ) internal view returns (uint256) {
+    ) internal view virtual returns (uint256) {
         // Saves an extra SLOAD if values are non-zero.
         uint256 totalSupply_ = _totalSupply(S);
         // If supply is 0, PPS = 1.
@@ -779,7 +782,7 @@ abstract contract TokenizedStrategy {
         StrategyData storage S,
         uint256 shares,
         Math.Rounding _rounding
-    ) internal view returns (uint256) {
+    ) internal view virtual returns (uint256) {
         // Saves an extra SLOAD if totalSupply() is non-zero.
         uint256 supply = _totalSupply(S);
 

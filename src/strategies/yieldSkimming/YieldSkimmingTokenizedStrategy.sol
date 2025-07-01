@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.8.25;
+pragma solidity ^0.8.18;
 
-import { IBaseYieldSkimmingStrategy } from "src/core/interfaces/IBaseYieldSkimmingStrategy.sol";
-import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
+import { IBaseStrategy } from "src/core/interfaces/IBaseStrategy.sol";
 import { TokenizedStrategy, Math } from "src/core/TokenizedStrategy.sol";
+import { WadRayMath } from "src/utils/libs/Maths/WadRay.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import { IYieldSkimmingStrategy } from "src/strategies/yieldSkimming/IYieldSkimmingStrategy.sol";
+import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title YieldSkimmingTokenizedStrategy
@@ -18,102 +22,154 @@ import { TokenizedStrategy, Math } from "src/core/TokenizedStrategy.sol";
  */
 contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     using Math for uint256;
+    using WadRayMath for uint256;
+    using SafeERC20 for ERC20;
+
+    /// @dev The exchange rate at the last harvest, scaled by RAY (1e27)
+    struct YieldSkimmingStorage {
+        uint256 lastRateRay;
+    }
+
+    // exchange rate storage slot
+    bytes32 private constant YIELD_SKIMMING_STORAGE_SLOT = keccak256("octant.yieldSkimming.exchangeRate");
+
+    /// @dev Event emitted when harvest is performed
+    event Harvest(address indexed caller, uint256 currentRate);
+
+    /// @dev Events for donation tracking
+    event DonationMinted(address indexed dragonRouter, uint256 amount, uint256 exchangeRate);
+    event DonationBurned(address indexed dragonRouter, uint256 amount, uint256 exchangeRate);
 
     /**
      * @inheritdoc TokenizedStrategy
      * @dev Overrides report to handle asset appreciation in yield-bearing tokens.
      * This implementation specifically:
-     * 1. Calls harvestAndReport to get profit in the asset's terms
-     * 2. Converts that profit to shares using a specialized formula that accounts for dilution
-     * 3. Mints these shares to dragonRouter, effectively diluting existing shares
-     * 4. Updates lastReport timestamp for accounting
+     * 1. Gets current exchange rate and calculates total ETH value
+     * 2. Compares total ETH to current supply to determine profit/loss
+     * 3. For profit: mints shares to dragonRouter (feeRecipient)
+     * 4. For loss: burns shares from dragonRouter (donationAddress) for protection
+     * 5. Updates exchange rate and emits harvest event
      *
-     * This approach works well for assets like LSTs (Liquid Staking Tokens) that
-     * continuously appreciate in value.
+     * This approach maintains PPS ≈ 1 by diluting/concentrating shares based on yield.
      */
-    function report() public override(TokenizedStrategy) returns (uint256 profit, uint256 loss) {
+    function report()
+        public
+        override(TokenizedStrategy)
+        nonReentrant
+        onlyKeepers
+        returns (uint256 profit, uint256 loss)
+    {
         StrategyData storage S = super._strategyStorage();
 
-        // Get the delta
-        int256 delta = IBaseYieldSkimmingStrategy(address(this)).harvestAndReport();
+        uint256 rateNow = _currentRateRay();
 
-        address _dragonRouter = S.dragonRouter;
+        uint256 currentTotalAssets = IBaseStrategy(address(this)).harvestAndReport();
 
-        S.totalAssets = S.asset.balanceOf(address(this));
+        uint256 totalAssetsBalance = S.asset.balanceOf(address(this));
 
-        if (delta > 0) {
-            // Mint shares based on the adjusted profit amount
-            uint256 shares = _convertToSharesFromReport(S, uint256(delta), Math.Rounding.Floor);
-            profit = uint256(delta);
-            // mint the value
-            _mint(S, _dragonRouter, shares);
-        } else if (delta < 0) {
-            profit = 0;
-            loss = uint256(-delta);
+        // airdropping tokens to the strategy results in profit to the dragon router
+        if (totalAssetsBalance != currentTotalAssets) {
+            // update total assets
+            S.totalAssets = totalAssetsBalance;
+        }
+
+        uint256 totalETH = totalAssetsBalance.mulDiv(rateNow, WadRayMath.RAY); // asset → ETH
+        uint256 supply = _totalSupply(S); // shares denom. in ETH
+
+        if (totalETH > supply) {
+            profit = totalETH - supply; // positive yield
+
+            _mint(S, S.dragonRouter, profit);
+
+            emit DonationMinted(S.dragonRouter, profit, rateNow.rayToWad());
+            // do not burn shares if the rate is the same as the last rate
+        } else if (totalETH < supply) {
+            // Rare: negative yield (slash). Use loss protection mechanism.
+            loss = supply - totalETH;
             _handleDragonLossProtection(S, loss);
         }
 
-        // Update the new total assets value
         S.lastReport = uint96(block.timestamp);
+        _strategyYieldSkimmingStorage().lastRateRay = rateNow;
 
-        emit Reported(profit, loss);
+        emit Harvest(msg.sender, rateNow.rayToWad());
 
-        return (profit, loss);
+        uint256 profitInAssets = rateNow == 0 ? 0 : profit.mulDiv(WadRayMath.RAY, rateNow);
+
+        // if the rate is 0, we need to use the total assets balance as the loss
+        uint256 lossInAssets = rateNow == 0 ? totalAssetsBalance : loss.mulDiv(WadRayMath.RAY, rateNow);
+        emit Reported(profitInAssets, lossInAssets);
+
+        return (profitInAssets, lossInAssets);
     }
 
     /**
-     * @dev Override _deposit to ensure the exchange rate is updated before depositing
-     * @param assets The amount of assets being deposited
-     * @param receiver The address that will receive the shares
-     *
-     * This function calls report() first to ensure the latest exchange rate is used
-     * when converting assets to shares, preventing stale exchange rates which could
-     * lead to incorrect share issuance.
+     * @dev Get the last reported exchange rate
+     * @return The last exchange rate in RAY format
      */
-
-    function _deposit(
-        StrategyData storage S,
-        address receiver,
-        uint256 assets,
-        uint256 shares
-    ) internal override(TokenizedStrategy) {
-        super._deposit(S, receiver, assets, shares);
+    function getLastRateRay() external view returns (uint256) {
+        return _strategyYieldSkimmingStorage().lastRateRay;
     }
 
     /**
-     * @dev Helper function to convert assets to shares during a report
-     * @param S Storage struct pointer to access strategy's storage variables
-     * @param assets The amount of assets to convert to shares
-     * @param _rounding The rounding direction to use in calculations
-     * @return The number of shares that correspond to the given assets
-     *
-     * Modified from standard ERC4626 conversion to handle the totalAssets_ - assets
-     * calculation so that shares issued account for the fact that profit
-     * is being recognized and dilution is occurring simultaneously.
-     * This prevents undervaluation of newly minted shares.
+     * @dev Get the current exchange rate
+     * @return The current exchange rate in RAY format
      */
-    function _convertToSharesFromReport(
-        StrategyData storage S,
-        uint256 assets,
-        Math.Rounding _rounding
-    ) internal view virtual returns (uint256) {
-        // Saves an extra SLOAD if values are non-zero.
-        uint256 totalSupply_ = _totalSupply(S);
-        // If supply is 0, PPS = 1.
-        if (totalSupply_ == 0) return assets;
+    function getCurrentRateRay() external view returns (uint256) {
+        return _currentRateRay();
+    }
 
-        uint256 totalAssets_ = _totalAssets(S);
-        // If assets are 0 but supply is not PPS = 0.
-        if (totalAssets_ == 0) return 0;
+    function _deposit(StrategyData storage S, address receiver, uint256 assets, uint256 shares) internal override {
+        // tracking the last rate ray for the first deposit
+        if (_strategyYieldSkimmingStorage().lastRateRay == 0) {
+            _strategyYieldSkimmingStorage().lastRateRay = _currentRateRay();
+        }
+        // Cache storage variables used more than once.
+        ERC20 _asset = S.asset;
 
-        return assets.mulDiv(totalSupply_, totalAssets_ - assets, _rounding);
+        // Need to transfer before minting or ERC777s could reenter.
+        _asset.safeTransferFrom(msg.sender, address(this), assets);
+
+        // We can deploy the full loose balance currently held.
+        IBaseStrategy(address(this)).deployFunds(_asset.balanceOf(address(this)));
+
+        // Adjust total Assets.
+        S.totalAssets += assets;
+
+        // mint shares
+        _mint(S, receiver, shares);
+
+        emit Deposit(msg.sender, receiver, assets, shares);
     }
 
     /**
-     * @dev Internal function to handle loss protection for dragon principal
-     * @param S Storage struct pointer to access strategy's storage variables
-     * @param loss The amount of loss in terms of asset to protect against
-     *
+     * @dev Get the current exchange rate scaled to RAY precision
+     * @return The current exchange rate in RAY format (1e27)
+     */
+    function _currentRateRay() internal view virtual returns (uint256) {
+        uint256 exchangeRate = IYieldSkimmingStrategy(address(this)).getCurrentExchangeRate();
+
+        return exchangeRate.wadToRay(); // Convert from WAD (1e18) to RAY (1e27)
+    }
+
+    function _convertToShares(
+        StrategyData storage,
+        uint256 assets,
+        Math.Rounding rounding
+    ) internal view virtual override returns (uint256) {
+        return assets.mulDiv(_currentRateRay(), WadRayMath.RAY, rounding);
+    }
+
+    function _strategyYieldSkimmingStorage() internal pure returns (YieldSkimmingStorage storage S) {
+        // Since STORAGE_SLOT is a constant, we have to put a variable
+        // on the stack to access it from an inline assembly block.
+        bytes32 slot = YIELD_SKIMMING_STORAGE_SLOT;
+        assembly {
+            S.slot := slot
+        }
+    }
+
+    /**
      * This function calculates how many shares would be equivalent to the loss amount,
      * then burns up to that amount of shares from dragonRouter, limited by the router's
      * actual balance. This effectively socializes the loss among all shareholders by
@@ -121,10 +177,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
      */
     function _handleDragonLossProtection(StrategyData storage S, uint256 loss) internal {
         // Can only burn up to available shares
-        uint256 sharesBurned = Math.min(
-            _convertToSharesFromReport(S, loss, Math.Rounding.Floor),
-            S.balances[S.dragonRouter]
-        );
+        uint256 sharesBurned = Math.min(loss, S.balances[S.dragonRouter]);
 
         if (sharesBurned > 0) {
             // Burn shares from dragon router

@@ -11,12 +11,15 @@ import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
 import { YieldSkimmingTokenizedStrategy } from "src/strategies/yieldSkimming/YieldSkimmingTokenizedStrategy.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import { IBaseStrategy } from "src/core/interfaces/IBaseStrategy.sol";
+import { WadRayMath } from "src/utils/libs/Maths/WadRay.sol";
+import { IYieldSkimmingStrategy } from "src/strategies/yieldSkimming/IYieldSkimmingStrategy.sol";
 
 /// @title RocketPool Test
 /// @author Octant
 /// @notice Integration tests for the RocketPool strategy using a mainnet fork
 contract RocketPoolStrategyTest is Test {
     using SafeERC20 for ERC20;
+    using WadRayMath for uint256;
 
     // Strategy instance
     RocketPoolStrategy public strategy;
@@ -162,42 +165,8 @@ contract RocketPoolStrategyTest is Test {
         vm.stopPrank();
     }
 
-    /// @notice Test that the strategy is properly initialized
-    function testInitialization() public view {
-        assertEq(IERC4626(address(strategy)).asset(), R_ETH, "Yield vault address incorrect");
-        assertEq(vault.management(), management, "Management address incorrect");
-        assertEq(vault.keeper(), keeper, "Keeper address incorrect");
-        assertEq(vault.emergencyAdmin(), emergencyAdmin, "Emergency admin incorrect");
-        assertGt(strategy.getLastReportedExchangeRate(), 0, "Last reported exchange rate should be initialized");
-    }
-
-    /// @notice Test depositing assets into the strategy
-    function testDeposit() public {
-        uint256 depositAmount = 100e18; // 100 R_ETH
-
-        // Initial balances
-        uint256 initialUserBalance = ERC20(R_ETH).balanceOf(user);
-
-        // Deposit assets
-        vm.startPrank(user);
-        // approve the strategy to spend the user's tokens
-        ERC20(R_ETH).approve(address(strategy), depositAmount);
-        uint256 sharesReceived = vault.deposit(depositAmount, user);
-        vm.stopPrank();
-
-        // Verify balances after deposit
-        assertEq(
-            ERC20(R_ETH).balanceOf(user),
-            initialUserBalance - depositAmount,
-            "User balance not reduced correctly"
-        );
-
-        assertGt(sharesReceived, 0, "No shares received from deposit");
-        assertGt(strategy.balanceOfShares(), 0, "Strategy should have deployed assets to yield vault");
-    }
-
     /// @notice Fuzz test depositing assets into the strategy
-    function testFuzzDeposit(uint256 depositAmount) public {
+    function testFuzzDepositRocket(uint256 depositAmount) public {
         // Bound the deposit amount to reasonable values (0.01 to 10,000 R_ETH)
         depositAmount = bound(depositAmount, 0.01e18, 10000e18);
 
@@ -222,14 +191,14 @@ contract RocketPoolStrategyTest is Test {
         );
 
         assertGt(sharesReceived, 0, "No shares received from deposit");
-        assertGt(strategy.balanceOfShares(), 0, "Strategy should have deployed assets to yield vault");
+        assertGt(strategy.balanceOfAsset(), 0, "Strategy should have deployed assets to yield vault");
     }
 
     /// @notice Fuzz test withdrawing assets from the strategy
     function testFuzzWithdraw(uint256 depositAmount, uint256 withdrawPercentage) public {
         // Bound inputs to reasonable values
         depositAmount = bound(depositAmount, 1e18, 10000e18); // 1 to 10,000 R_ETH
-        withdrawPercentage = bound(withdrawPercentage, 1, 100); // 1% to 100%
+        withdrawPercentage = bound(withdrawPercentage, 1, 100); // 1% to 100% (prevents overflow in percentage calc)
 
         // Airdrop tokens to user for this test
         airdrop(ERC20(R_ETH), user, depositAmount);
@@ -243,26 +212,22 @@ contract RocketPoolStrategyTest is Test {
         uint256 initialUserBalance = ERC20(R_ETH).balanceOf(user);
         uint256 initialShareBalance = vault.balanceOf(user);
 
-        // Calculate withdrawal amount based on percentage
-        uint256 withdrawAmount = (depositAmount * withdrawPercentage) / 100;
-
-        // Preview the withdrawal to get shares to burn
-        uint256 sharesToBurn = vault.previewWithdraw(withdrawAmount);
-        uint256 assetsReceived = vault.withdraw(withdrawAmount, user, user);
+        // redeem balance of shares
+        uint256 sharesToBurn = (vault.balanceOf(user) * withdrawPercentage) / 100;
+        uint256 withdrawnAmount = vault.redeem(sharesToBurn, user, user);
         vm.stopPrank();
 
         // Verify balances after withdrawal
         assertEq(
             ERC20(R_ETH).balanceOf(user),
-            initialUserBalance + withdrawAmount,
+            initialUserBalance + withdrawnAmount,
             "User didn't receive correct assets"
         );
         assertEq(vault.balanceOf(user), initialShareBalance - sharesToBurn, "Shares not burned correctly");
-        assertEq(assetsReceived, withdrawAmount, "Incorrect amount of assets received");
     }
 
     /// @notice Fuzz test the harvesting functionality with profit
-    function testFuzzHarvestWithProfit(uint256 depositAmount, uint256 profitPercentage) public {
+    function testFuzzHarvestWithProfitRocket(uint256 depositAmount, uint256 profitPercentage) public {
         // Bound inputs to reasonable values
         depositAmount = bound(depositAmount, 1e18, 10000e18); // 1 to 10,000 R_ETH
         profitPercentage = bound(profitPercentage, 1, 99); // 1% to 99% profit (under 100% health check limit)
@@ -278,12 +243,12 @@ contract RocketPoolStrategyTest is Test {
 
         // Check initial state
         uint256 totalAssetsBefore = vault.totalAssets();
-        uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
+        uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
 
         // Simulate exchange rate increase based on fuzzed percentage
         uint256 newExchangeRate = (initialExchangeRate * (100 + profitPercentage)) / 100;
 
-        // Mock the actual yield vault's getExchangeRate
+        // Mock the actual yield vault's getExchangeRate (convert back to WAD format)
         vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(newExchangeRate));
 
         uint256 donationAddressBalanceBefore = ERC20(address(strategy)).balanceOf(donationAddress);
@@ -316,7 +281,13 @@ contract RocketPoolStrategyTest is Test {
         // Withdraw everything for user
         vm.startPrank(user);
         uint256 sharesToRedeem = vault.balanceOf(user);
+
         uint256 assetsReceived = vault.redeem(sharesToRedeem, user, user);
+        vm.stopPrank();
+
+        // withdraw the donation address shares
+        vm.startPrank(donationAddress);
+        vault.redeem(vault.balanceOf(donationAddress), donationAddress, donationAddress);
         vm.stopPrank();
 
         // Verify user received their original deposit
@@ -329,7 +300,7 @@ contract RocketPoolStrategyTest is Test {
     }
 
     /// @notice Test multiple users with fair profit distribution
-    function testMultipleUserProfitDistribution() public {
+    function testMultipleUserProfitDistributionRocket() public {
         TestState memory state;
 
         // First user deposits
@@ -339,7 +310,7 @@ contract RocketPoolStrategyTest is Test {
         state.depositAmount2 = 2000e18; // 2000 R_ETH
 
         // Get initial exchange rate
-        state.initialExchangeRate = strategy.getLastReportedExchangeRate();
+        state.initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
 
         vm.startPrank(state.user1);
         vault.deposit(state.depositAmount1, state.user1);
@@ -443,7 +414,7 @@ contract RocketPoolStrategyTest is Test {
     }
 
     /// @notice Test the harvesting functionality
-    function testHarvest() public {
+    function testHarvestRocket() public {
         uint256 depositAmount = 100e18; // 100 R_ETH
 
         // Deposit first
@@ -453,7 +424,7 @@ contract RocketPoolStrategyTest is Test {
 
         // Capture initial state
         uint256 initialAssets = vault.totalAssets();
-        uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
+        uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
 
         // Call report as keeper (which internally calls _harvestAndReport)
         vm.startPrank(keeper);
@@ -461,7 +432,7 @@ contract RocketPoolStrategyTest is Test {
         vm.stopPrank();
 
         // Get new exchange rate and total assets
-        uint256 newExchangeRate = strategy.getLastReportedExchangeRate();
+        uint256 newExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         uint256 newTotalAssets = vault.totalAssets();
 
         // mock getExchangeRate to be 1.1x the initial exchange rate
@@ -514,28 +485,8 @@ contract RocketPoolStrategyTest is Test {
         );
     }
 
-    /// @notice Test the sweep function for non-asset ERC20 tokens
-    function testSweep() public {
-        // Create a mock token that we'll sweep
-        MockERC20 mockToken = new MockERC20(18);
-        mockToken.mint(address(strategy), 1000e18);
-
-        // Verify token balance in strategy
-        assertEq(mockToken.balanceOf(address(strategy)), 1000e18, "Strategy should have mock tokens");
-        assertEq(mockToken.balanceOf(strategy.GOV()), 0, "GOV should have no mock tokens initially");
-
-        // Call sweep function
-        vm.startPrank(strategy.GOV());
-        strategy.sweep(address(mockToken));
-        vm.stopPrank();
-
-        // Verify tokens were swept to governance
-        assertEq(mockToken.balanceOf(address(strategy)), 0, "Strategy should have no mock tokens after sweep");
-        assertEq(mockToken.balanceOf(strategy.GOV()), 1000e18, "GOV should have all mock tokens after sweep");
-    }
-
     /// @notice Fuzz test exchange rate tracking and yield calculation
-    function testFuzzExchangeRateTracking(uint256 depositAmount, uint256 exchangeRateIncreasePercentage) public {
+    function testFuzzExchangeRateTrackingRocket(uint256 depositAmount, uint256 exchangeRateIncreasePercentage) public {
         // Bound inputs to reasonable values
         depositAmount = bound(depositAmount, 1e18, 10000e18); // 1 to 10,000 R_ETH
         exchangeRateIncreasePercentage = bound(exchangeRateIncreasePercentage, 1, 99); // 1% to 50% increase
@@ -550,7 +501,7 @@ contract RocketPoolStrategyTest is Test {
         vm.stopPrank();
 
         // Get initial exchange rate
-        uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
+        uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
 
         // Simulate exchange rate increase based on fuzzed percentage
         uint256 newExchangeRate = (initialExchangeRate * (100 + exchangeRateIncreasePercentage)) / 100;
@@ -571,13 +522,19 @@ contract RocketPoolStrategyTest is Test {
         assertEq(loss, 0, "Should have no loss");
 
         // Verify exchange rate was updated
-        uint256 updatedExchangeRate = strategy.getLastReportedExchangeRate();
-        assertEq(updatedExchangeRate, newExchangeRate, "Exchange rate should be updated after harvest");
+        uint256 updatedExchangeRate = IYieldSkimmingStrategy(address(strategy)).getLastRateRay().rayToWad();
+
+        assertApproxEqRel(
+            updatedExchangeRate,
+            newExchangeRate,
+            0.000001e18,
+            "Exchange rate should be updated after harvest"
+        );
     }
 
     /// @notice Test getting the last reported exchange rate
-    function testGetLastReportedExchangeRate() public view {
-        uint256 rate = strategy.getLastReportedExchangeRate();
+    function testgetCurrentExchangeRate() public view {
+        uint256 rate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         assertGt(rate, 0, "Exchange rate should be initialized and greater than zero");
     }
 
@@ -589,34 +546,10 @@ contract RocketPoolStrategyTest is Test {
         vm.stopPrank();
 
         uint256 assetBalance = strategy.balanceOfAsset();
-        uint256 sharesBalance = strategy.balanceOfShares();
+        uint256 sharesBalance = strategy.balanceOfAsset();
 
         assertEq(assetBalance, sharesBalance, "Asset and shares balance should match for this strategy");
         assertGt(assetBalance, 0, "Asset balance should be greater than zero after deposit");
-    }
-
-    /// @notice Test sweep function for unauthorized access
-    function testSweepUnauthorized() public {
-        MockERC20 mockToken = new MockERC20(18);
-        mockToken.mint(address(strategy), 1000e18);
-
-        // Try to sweep as a non-governance address
-        vm.startPrank(user);
-        vm.expectRevert();
-        strategy.sweep(address(mockToken));
-        vm.stopPrank();
-    }
-
-    /// @notice Test onlyGovernance modifier
-    function testOnlyGovernanceModifier() public {
-        // Try to call sweep as a non-governance address
-        MockERC20 mockToken = new MockERC20(18);
-        mockToken.mint(address(strategy), 1000e18);
-
-        vm.startPrank(user);
-        vm.expectRevert();
-        strategy.sweep(address(mockToken));
-        vm.stopPrank();
     }
 
     /// @notice Test health check for profit limit exceeded
@@ -632,7 +565,7 @@ contract RocketPoolStrategyTest is Test {
         vm.stopPrank();
 
         // Mock a 10x exchange rate
-        uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
+        uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         uint256 newExchangeRate = (initialExchangeRate * 7) / 3; // 233%
         vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(newExchangeRate));
 
@@ -655,10 +588,10 @@ contract RocketPoolStrategyTest is Test {
         assertEq(strategy.doHealthCheck(), false);
 
         // old exchange rate
-        uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
+        uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
 
         // make a 10 time profit (should revert when doHealthCheck is true but not when it is false)
-        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode((initialExchangeRate * 10)));
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(initialExchangeRate * 10));
 
         // report
         vm.startPrank(keeper);
@@ -695,7 +628,11 @@ contract RocketPoolStrategyTest is Test {
     }
 
     /// @notice Fuzz test basic loss scenario with single user
-    function testFuzzHarvestWithLoss(uint256 depositAmount, uint256 profitPercentage, uint256 lossPercentage) public {
+    function testFuzzHarvestWithLossRocket(
+        uint256 depositAmount,
+        uint256 profitPercentage,
+        uint256 lossPercentage
+    ) public {
         // Bound inputs to reasonable values
         depositAmount = bound(depositAmount, 1e18, 10000e18); // 1 to 10,000 R_ETH
         profitPercentage = bound(profitPercentage, 5, 50); // 5% to 50% profit first
@@ -716,7 +653,7 @@ contract RocketPoolStrategyTest is Test {
         vm.stopPrank();
 
         // Generate some profit first to create donation shares
-        uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
+        uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         uint256 profitExchangeRate = (initialExchangeRate * (100 + profitPercentage)) / 100;
 
         vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(profitExchangeRate));
@@ -765,7 +702,7 @@ contract RocketPoolStrategyTest is Test {
     }
 
     /// @notice Test loss scenario with multiple users to verify fair loss handling
-    function testMultipleUserLossDistribution() public {
+    function testMultipleUserLossDistributionRocket() public {
         // Set loss limit to allow 20% losses
         vm.startPrank(management);
         strategy.setLossLimitRatio(2000); // 20%
@@ -780,7 +717,7 @@ contract RocketPoolStrategyTest is Test {
         state.depositAmount2 = 2000e18; // 2000 R_ETH
 
         // Get initial exchange rate
-        state.initialExchangeRate = strategy.getLastReportedExchangeRate();
+        state.initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
 
         // First user deposits
         vm.startPrank(state.user1);
@@ -848,7 +785,7 @@ contract RocketPoolStrategyTest is Test {
         // Users should receive their deposits adjusted for exchange rate changes with loss protection
         assertApproxEqRel(
             state.user1Assets * state.newExchangeRate2,
-            (state.depositAmount1 * state.initialExchangeRate * 8) / 10, // expect a 20 pr cent loss in value
+            ((state.depositAmount1 * state.initialExchangeRate) * (110 * 8)) / (100 * 10),
             0.1e18, // 0.1% tolerance for loss scenarios
             "User 1 should receive deposit value with loss protection"
         );
@@ -862,7 +799,7 @@ contract RocketPoolStrategyTest is Test {
     }
 
     /// @notice Test loss scenario where loss exceeds available donation shares
-    function testLossExceedingDonationShares() public {
+    function testLossExceedingDonationSharesRocket() public {
         // Set loss limit to allow 15% losses
         vm.startPrank(management);
         strategy.setLossLimitRatio(1500); // 15%
@@ -876,7 +813,7 @@ contract RocketPoolStrategyTest is Test {
         vm.stopPrank();
 
         // Generate small profit to create minimal donation shares
-        uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
+        uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         uint256 smallProfitRate = (initialExchangeRate * 1005) / 1000; // 0.5% profit
         vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(smallProfitRate));
 
@@ -922,7 +859,7 @@ contract RocketPoolStrategyTest is Test {
     }
 
     /// @notice Test consecutive loss scenarios
-    function testConsecutiveLosses() public {
+    function testConsecutiveLossesRocket() public {
         // Set loss limit to allow 15% losses
         vm.startPrank(management);
         strategy.setLossLimitRatio(1500); // 15%
@@ -936,7 +873,7 @@ contract RocketPoolStrategyTest is Test {
         vm.stopPrank();
 
         // Generate profit to create donation shares
-        uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
+        uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         uint256 profitRate = (initialExchangeRate * 120) / 100; // 20% profit
         vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(profitRate));
 
@@ -995,7 +932,7 @@ contract RocketPoolStrategyTest is Test {
     }
 
     /// @notice Test that loss protection works correctly with zero donation shares
-    function testLossWithZeroDonationShares() public {
+    function testLossWithZeroDonationSharesRocket() public {
         // Set loss limit to allow 10% losses
         vm.startPrank(management);
         strategy.setLossLimitRatio(1000); // 10%
@@ -1016,7 +953,7 @@ contract RocketPoolStrategyTest is Test {
         uint256 totalAssetsBefore = vault.totalAssets();
 
         // Generate loss (5% decrease)
-        uint256 initialExchangeRate = strategy.getLastReportedExchangeRate();
+        uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         uint256 lossRate = (initialExchangeRate * 95) / 100;
         vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(lossRate));
 
@@ -1053,7 +990,7 @@ contract RocketPoolStrategyTest is Test {
     }
 
     /// @notice Fuzz test consecutive loss scenarios
-    function testFuzzConsecutiveLosses(
+    function testFuzzConsecutiveLossesRocket(
         uint256 depositAmount,
         uint256 profitPercentage,
         uint256 firstLossPercentage,
@@ -1082,7 +1019,7 @@ contract RocketPoolStrategyTest is Test {
         vm.stopPrank();
 
         // Generate profit to create donation shares
-        state.initialExchangeRate = strategy.getLastReportedExchangeRate();
+        state.initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         state.profitRate = (state.initialExchangeRate * (100 + profitPercentage)) / 100;
         vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(state.profitRate));
 

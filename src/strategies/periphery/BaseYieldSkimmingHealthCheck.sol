@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { BaseYieldSkimmingStrategy } from "src/core/BaseYieldSkimmingStrategy.sol";
+import { BaseStrategy } from "src/core/BaseStrategy.sol";
 import { IBaseHealthCheck } from "src/strategies/interfaces/IBaseHealthCheck.sol";
 import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
+import { IYieldSkimmingStrategy } from "src/strategies/yieldSkimming/IYieldSkimmingStrategy.sol";
+import { WadRayMath } from "src/utils/libs/Maths/WadRay.sol";
 
 /**
  *   @title Base Yield Skimming Health Check
  *   @author Octant
- *   @notice This contract can be inherited by any Yield Skimming
- *   strategy wishing to implement a health check during
- *   the `report` function in order to prevent any unexpected
- *   behavior from being permanently recorded as well as the
- *   `checkHealth` modifier.
+ *   @notice This contract can be inherited by any Yield Skimming strategy wishing to implement a health check during
+ *   the `harvestAndReport` function in order to prevent any unexpected behavior from being permanently recorded as well
+ *   as the `checkHealth` modifier.
  *
  *   A strategist simply needs to inherit this contract. Set
  *   the limit ratios to the desired amounts and then
@@ -24,7 +24,8 @@ import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
  *   losses, but rather can make sure manual intervention is
  *   needed before reporting an unexpected loss or profit.
  */
-abstract contract BaseYieldSkimmingHealthCheck is BaseYieldSkimmingStrategy, IBaseHealthCheck {
+abstract contract BaseYieldSkimmingHealthCheck is BaseStrategy, IBaseHealthCheck {
+    using WadRayMath for uint256;
     // Can be used to determine if a healthcheck should be called.
     // Defaults to true;
     bool public doHealthCheck = true;
@@ -45,17 +46,7 @@ abstract contract BaseYieldSkimmingHealthCheck is BaseYieldSkimmingStrategy, IBa
         address _emergencyAdmin,
         address _donationAddress,
         address _tokenizedStrategyAddress
-    )
-        BaseYieldSkimmingStrategy(
-            _asset,
-            _name,
-            _management,
-            _keeper,
-            _emergencyAdmin,
-            _donationAddress,
-            _tokenizedStrategyAddress
-        )
-    {}
+    ) BaseStrategy(_asset, _name, _management, _keeper, _emergencyAdmin, _donationAddress, _tokenizedStrategyAddress) {}
 
     /**
      * @notice Returns the current profit limit ratio.
@@ -125,38 +116,40 @@ abstract contract BaseYieldSkimmingHealthCheck is BaseYieldSkimmingStrategy, IBa
 
     /**
      * @notice OVerrides the default {harvestAndReport} to include a healthcheck.
-     * @return deltaAtNewRate New delta post report.
+     * @return _totalAssets New totalAssets post report.
      */
-    function harvestAndReport() external override onlySelf returns (int256 deltaAtNewRate) {
-        int256 deltaAtOldRate;
+    function harvestAndReport() external override onlySelf returns (uint256 _totalAssets) {
         // Let the strategy report.
-        (deltaAtNewRate, deltaAtOldRate) = _harvestAndReport();
+        _totalAssets = _harvestAndReport();
 
         // Run the healthcheck on the amount returned.
-        _executeHealthCheck(deltaAtNewRate, deltaAtOldRate);
+        _executeHealthCheck(_totalAssets);
     }
 
     /**
      * @dev To be called during a report to make sure the profit
      * or loss being recorded is within the acceptable bound.
-     * @dev The profit is an int256 to handle both gains and losses.
-     * @param deltaAtOldRate The delta at the old exchange rate.
      */
-    function _executeHealthCheck(int256, int256 deltaAtOldRate) internal virtual {
+    function _executeHealthCheck(uint256 /*_newTotalAssets*/) internal virtual {
         if (!doHealthCheck) {
             doHealthCheck = true;
             return;
         }
 
-        uint256 currentTotalAssets = ITokenizedStrategy(address(this)).totalAssets();
+        uint256 currentExchangeRate = IYieldSkimmingStrategy(address(this)).getLastRateRay().rayToWad();
+        uint256 newExchangeRate = IYieldSkimmingStrategy(address(this)).getCurrentExchangeRate();
 
-        if (deltaAtOldRate > 0) {
+        if (currentExchangeRate < newExchangeRate) {
             require(
-                (uint256(deltaAtOldRate) <= (currentTotalAssets * uint256(_profitLimitRatio)) / MAX_BPS),
+                ((newExchangeRate - currentExchangeRate) <=
+                    (currentExchangeRate * uint256(_profitLimitRatio)) / MAX_BPS),
                 "!profit"
             );
-        } else if (deltaAtOldRate < 0) {
-            require((uint256(-deltaAtOldRate) <= (currentTotalAssets * uint256(_lossLimitRatio)) / MAX_BPS), "!loss");
+        } else if (currentExchangeRate > newExchangeRate) {
+            require(
+                ((currentExchangeRate - newExchangeRate) <= (currentExchangeRate * uint256(_lossLimitRatio)) / MAX_BPS),
+                "!loss"
+            );
         }
     }
 }
