@@ -10,9 +10,12 @@ import { ERC165Checker } from "@openzeppelin/contracts/utils/introspection/ERC16
 /// @title RegenStaker Factory with Automatic Variant Detection
 /// @notice Deploys RegenStaker contracts with automatic token capability detection
 /// @author [Golem Foundation](https://golem.foundation)
+/// @dev SECURITY: Tracks canonical bytecode per variant from first deployment by factory deployer
 contract RegenStakerFactory {
     uint256 private constant EVM_WORD_SIZE = 32;
     uint256 private constant INTERFACE_CHECK_GAS_LIMIT = 30000;
+
+    mapping(RegenStakerVariant => bytes32) public canonicalBytecodeHash;
 
     // Reason codes for VariantDetected event
     bytes32 public constant REASON_SUPPORTS_DELEGATION = keccak256("SUPPORTS_DELEGATION");
@@ -47,7 +50,33 @@ contract RegenStakerFactory {
     );
     event VariantDetected(IERC20 indexed token, RegenStakerVariant variant, bytes32 reasonCode);
 
+    event CanonicalBytecodeSet(RegenStakerVariant indexed variant, bytes32 indexed bytecodeHash);
+
     error InvalidBytecode();
+    error UnauthorizedBytecode(RegenStakerVariant variant, bytes32 providedHash, bytes32 expectedHash);
+
+    constructor(bytes memory regenStakerBytecode, bytes memory noDelegationBytecode) {
+        _canonicalizeBytecode(regenStakerBytecode, RegenStakerVariant.ERC20_STAKING);
+        _canonicalizeBytecode(noDelegationBytecode, RegenStakerVariant.NO_DELEGATION);
+    }
+
+    /// @notice SECURITY: Internal function to canonicalize bytecode without full deployment
+    /// @param bytecode The bytecode to canonicalize
+    /// @param variant The variant this bytecode represents
+    function _canonicalizeBytecode(bytes memory bytecode, RegenStakerVariant variant) private {
+        if (bytecode.length == 0) revert InvalidBytecode();
+
+        bytes32 bytecodeHash = keccak256(bytecode);
+        canonicalBytecodeHash[variant] = bytecodeHash;
+
+        emit CanonicalBytecodeSet(variant, bytecodeHash);
+    }
+
+    /// @notice SECURITY: Modifier to validate bytecode against canonical version
+    modifier validatedBytecode(bytes calldata code, RegenStakerVariant variant) {
+        _validateBytecode(code, variant);
+        _;
+    }
 
     /// @notice Deploy RegenStaker with automatic variant detection
     /// @param params Staker configuration parameters
@@ -64,6 +93,10 @@ contract RegenStakerFactory {
     ) external returns (address stakerAddress, RegenStakerVariant variant) {
         if (codePermit.length == 0 || codeStaking.length == 0) revert InvalidBytecode();
 
+        // SECURITY: Validate both bytecode options against canonical versions
+        _validateBytecode(codePermit, RegenStakerVariant.NO_DELEGATION);
+        _validateBytecode(codeStaking, RegenStakerVariant.ERC20_STAKING);
+
         variant = detectStakerVariant(params.stakeToken);
         bytes memory bytecode = variant == RegenStakerVariant.ERC20_STAKING ? codeStaking : codePermit;
         stakerAddress = _deployStaker(params, salt, bytecode, variant);
@@ -78,7 +111,7 @@ contract RegenStakerFactory {
         CreateStakerParams calldata params,
         bytes32 salt,
         bytes calldata code
-    ) external returns (address stakerAddress) {
+    ) external validatedBytecode(code, RegenStakerVariant.NO_DELEGATION) returns (address stakerAddress) {
         if (code.length == 0) revert InvalidBytecode();
         stakerAddress = _deployStaker(params, salt, code, RegenStakerVariant.NO_DELEGATION);
     }
@@ -92,7 +125,7 @@ contract RegenStakerFactory {
         CreateStakerParams calldata params,
         bytes32 salt,
         bytes calldata code
-    ) external returns (address stakerAddress) {
+    ) external validatedBytecode(code, RegenStakerVariant.ERC20_STAKING) returns (address stakerAddress) {
         if (code.length == 0) revert InvalidBytecode();
         stakerAddress = _deployStaker(params, salt, code, RegenStakerVariant.ERC20_STAKING);
     }
@@ -136,6 +169,20 @@ contract RegenStakerFactory {
     /// @return Predicted contract address
     function predictStakerAddress(bytes32 salt, address deployer) external view returns (address) {
         return CREATE3.predictDeterministicAddress(keccak256(abi.encodePacked(salt, deployer)));
+    }
+
+    /// @notice SECURITY: Validate bytecode against canonical version
+    /// @param code Bytecode to validate
+    /// @param variant The RegenStaker variant this bytecode represents
+    function _validateBytecode(bytes calldata code, RegenStakerVariant variant) internal view {
+        if (code.length == 0) revert InvalidBytecode();
+
+        bytes32 providedHash = keccak256(code);
+        bytes32 expectedHash = canonicalBytecodeHash[variant];
+
+        if (providedHash != expectedHash) {
+            revert UnauthorizedBytecode(variant, providedHash, expectedHash);
+        }
     }
 
     function _deployStaker(

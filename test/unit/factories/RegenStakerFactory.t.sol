@@ -5,6 +5,7 @@ import { Test } from "forge-std/Test.sol";
 import { console } from "forge-std/console.sol";
 import { RegenStakerFactory } from "src/factories/RegenStakerFactory.sol";
 import { RegenStaker } from "src/regen/RegenStaker.sol";
+import { RegenStakerWithoutDelegateSurrogateVotes } from "src/regen/RegenStakerWithoutDelegateSurrogateVotes.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC20Staking } from "staker/interfaces/IERC20Staking.sol";
 import { IWhitelist } from "src/utils/IWhitelist.sol";
@@ -55,7 +56,10 @@ contract RegenStakerFactoryTest is Test {
         contributionWhitelist = new Whitelist();
         allocationMechanismWhitelist = new Whitelist();
 
-        factory = new RegenStakerFactory();
+        // Deploy the factory with both variants' bytecode (this test contract is the deployer)
+        bytes memory regenStakerBytecode = type(RegenStaker).creationCode;
+        bytes memory noDelegationBytecode = type(RegenStakerWithoutDelegateSurrogateVotes).creationCode;
+        factory = new RegenStakerFactory(regenStakerBytecode, noDelegationBytecode);
 
         vm.label(address(factory), "RegenStakerFactory");
         vm.label(address(rewardsToken), "RewardsToken");

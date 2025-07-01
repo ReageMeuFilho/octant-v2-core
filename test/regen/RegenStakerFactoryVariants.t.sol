@@ -35,8 +35,10 @@ contract RegenStakerFactoryVariantsTest is Test {
     function setUp() public {
         vm.startPrank(ADMIN);
 
-        // Deploy factory
-        factory = new RegenStakerFactory();
+        // Deploy factory with canonical bytecode
+        bytes memory permitCode = type(RegenStakerWithoutDelegateSurrogateVotes).creationCode;
+        bytes memory stakingCode = type(RegenStaker).creationCode;
+        factory = new RegenStakerFactory(stakingCode, permitCode);
 
         // Deploy test tokens
         basicToken = new MockERC20(18);
