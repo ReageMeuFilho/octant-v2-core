@@ -69,7 +69,8 @@ contract Setup is Test {
             management,
             keeper,
             emergencyAdmin,
-            donationAddress
+            donationAddress,
+            false // enableBurning
         );
 
         vm.etch(TOKENIZED_STRATEGY_ADDRESS, address(implementation).code);
