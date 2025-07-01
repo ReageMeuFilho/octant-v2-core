@@ -142,6 +142,7 @@ abstract contract BaseStrategy {
      * @param _keeper Address with keeper permissions
      * @param _emergencyAdmin Address with emergency admin permissions
      * @param _donationAddress Address that will receive donations for this specific strategy
+     * @param _enableBurning Whether to enable burning shares from dragon router during loss protection
      * @param _tokenizedStrategyAddress Address of the TokenizedStrategy implementation
      */
     constructor(
@@ -151,6 +152,7 @@ abstract contract BaseStrategy {
         address _keeper,
         address _emergencyAdmin,
         address _donationAddress,
+        bool _enableBurning,
         address _tokenizedStrategyAddress
     ) {
         asset = ERC20(_asset);
@@ -163,7 +165,7 @@ abstract contract BaseStrategy {
         _delegateCall(
             abi.encodeCall(
                 ITokenizedStrategy.initialize,
-                (_asset, _name, _management, _keeper, _emergencyAdmin, _donationAddress)
+                (_asset, _name, _management, _keeper, _emergencyAdmin, _donationAddress, _enableBurning)
             )
         );
 
