@@ -77,11 +77,36 @@ contract YieldDonatingTokenizedStrategy is TokenizedStrategy {
      * @param S Storage struct pointer to access strategy's storage variables
      * @param loss The amount of loss in terms of asset to protect against
      *
-     * This function calculates how many shares would be equivalent to the loss amount,
-     * then adds it to the loss amount in the strategy storage.
-     * This way on the next profit we can mint the difference between the profit and the loss amount.
+     * If burning is enabled, this function will try to burn shares from the dragon router
+     * equivalent to the loss amount, and add any remaining unburnted amount to the loss tracker.
+     * If burning is disabled, it adds the full loss amount to the loss tracker.
      */
     function _handleDragonLossProtection(StrategyData storage S, uint256 loss) internal {
-        S.lossAmount += loss;
+        if (S.enableBurning) {
+            // Convert loss to shares that should be burned
+            uint256 sharesToBurn = _convertToSharesWithLoss(S, loss, Math.Rounding.Ceil);
+            
+            // Can only burn up to available shares from dragon router
+            uint256 sharesBurned = Math.min(sharesToBurn, S.balances[S.dragonRouter]);
+            
+            if (sharesBurned > 0) {
+                // Burn shares from dragon router
+                _burn(S, S.dragonRouter, sharesBurned);
+                
+                // Convert burned shares back to assets to calculate remaining loss
+                uint256 assetValueBurned = _convertToAssets(S, sharesBurned, Math.Rounding.Floor);
+                
+                // Add any remaining loss that couldn't be covered by burning
+                if (loss > assetValueBurned) {
+                    S.lossAmount += (loss - assetValueBurned);
+                }
+            } else {
+                // No shares available to burn, add full loss
+                S.lossAmount += loss;
+            }
+        } else {
+            // Burning disabled, add full loss to tracker
+            S.lossAmount += loss;
+        }
     }
 }
