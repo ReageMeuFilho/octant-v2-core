@@ -93,6 +93,7 @@ contract SkyCompounderTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            true, // enableBurning
             strategySalt,
             address(implementation)
         );

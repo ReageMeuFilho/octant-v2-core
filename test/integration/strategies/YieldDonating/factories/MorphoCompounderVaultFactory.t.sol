@@ -95,6 +95,7 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            false, // enableBurning
             strategySalt,
             address(implementation)
         );
@@ -128,6 +129,7 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            false, // enableBurning
             firstSalt,
             address(implementation)
         );
@@ -143,6 +145,7 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            false, // enableBurning
             secondSalt,
             address(implementation)
         );
@@ -178,6 +181,7 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            false, // enableBurning
             firstSalt,
             address(implementation)
         );
@@ -195,6 +199,7 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            false, // enableBurning
             secondSalt,
             address(implementation)
         );
@@ -227,6 +232,7 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            false, // enableBurning
             strategySalt,
             address(implementation)
         );
@@ -244,6 +250,7 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            false, // enableBurning
             strategySalt,
             address(implementation)
         );
@@ -264,6 +271,7 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            false, // enableBurning
             differentSalt,
             address(implementation)
         );
@@ -290,6 +298,7 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            false, // enableBurning
             firstSalt,
             address(implementation)
         );
@@ -301,6 +310,7 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            false, // enableBurning
             secondSalt,
             address(implementation)
         );

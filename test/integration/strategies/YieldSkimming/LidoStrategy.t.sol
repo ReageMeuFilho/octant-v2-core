@@ -132,6 +132,7 @@ contract LidoStrategyTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            true, // enableBurning
             strategySalt,
             address(implementation)
         );

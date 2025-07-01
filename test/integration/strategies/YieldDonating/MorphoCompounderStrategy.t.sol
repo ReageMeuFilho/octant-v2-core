@@ -84,6 +84,7 @@ contract MorphoCompounderDonatingStrategyTest is Test {
                 keeper,
                 emergencyAdmin,
                 donationAddress,
+                false, // enableBurning
                 keccak256("OCT_MORPHO_COMPOUNDER_STRATEGY_V1"),
                 address(implementation)
             )
@@ -334,6 +335,7 @@ contract MorphoCompounderDonatingStrategyTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            true, // enableBurning
             address(implementation)
         );
     }

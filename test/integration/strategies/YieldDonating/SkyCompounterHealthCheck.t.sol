@@ -95,6 +95,7 @@ contract SkyCompounterHealthCheckTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            true, // enableBurning
             strategySalt,
             address(tokenizedStrategy)
         );

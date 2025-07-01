@@ -137,6 +137,7 @@ contract MorphoCompounderStrategyTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            false, // enableBurning
             address(tokenizedStrategy)
         );
 
@@ -148,6 +149,7 @@ contract MorphoCompounderStrategyTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            true, // enableBurning
             strategySalt,
             address(implementation)
         );
