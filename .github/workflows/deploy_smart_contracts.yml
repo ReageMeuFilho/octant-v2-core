@@ -60,7 +60,7 @@ jobs:
       - name: Upload contract addresses artifact
         uses: actions/upload-artifact@v4
         with:
-          name: contract_addresses.txt
+          name: contract_addresses
           path: /app/ci/contract_addresses.txt
 
   publish:

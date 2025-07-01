@@ -14,96 +14,17 @@ env:
   FOUNDRY_PROFILE: ci
 
 jobs:
-  format:
-    name: Check formatting
-    runs-on: general
-    container:
-      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:4fafbd60
-      credentials:
-        username: _json_key_base64
-        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Init env
-        run: yarn install
-
-      - name: Check formatting
-        run: yarn format:check
-
-  lint:
-    name: Run linter
-    runs-on: general
-    container:
-      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:4fafbd60
-      credentials:
-        username: _json_key_base64
-        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Init env
-        run: yarn install
-
-      - name: Linter
-        run: yarn lint
-
-  lint-commits:
-    name: Lint commits
-    runs-on: general
-    container:
-      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:4fafbd60
-      credentials:
-        username: _json_key_base64
-        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Init env
-        run: yarn install
-
-      - name: Lint commits
-        run: yarn lint:commits
-
-  analyze:
-    name: Analyze with Slither
-    runs-on: general
-    continue-on-error: true
-    container:
-      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:4fafbd60
-      credentials:
-        username: _json_key_base64
-        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Init env
-        run: yarn install
-
-      - name: Run Slither
-        shell: "bash {0}"
-        run: |
-          yarn slither:ci
-          exit_code=$?
-          echo '```' > $GITHUB_STEP_SUMMARY
-          cat reports/slither.txt >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          exit $exit_code
+  lint-and-format:
+    name: Lint and test
+    uses: ./.github/workflows/tpl-lint.yml
+    with:
+      GCP_DOCKER_IMAGE_REGISTRY: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}
+    secrets: inherit
 
   build-image:
     name: Build Docker Image
     needs:
-      - format
-      - lint
-      - lint-commits
+      - lint-and-format
     runs-on:
       - general
     steps:
