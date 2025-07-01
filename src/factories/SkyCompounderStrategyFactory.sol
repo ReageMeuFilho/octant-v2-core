@@ -48,6 +48,7 @@ contract SkyCompounderStrategyFactory {
      * @param _keeper The address of the keeper responsible for maintaining the strategy.
      * @param _emergencyAdmin The address of the emergency admin for the strategy.
      * @param _donationAddress The address where donations from the strategy will be sent.
+     * @param _enableBurning Whether to enable burning shares from dragon router during loss protection.
      * @param _salt A unique salt used for deterministic deployment of the strategy.
      * @return strategyAddress The address of the newly deployed strategy contract.
      */
@@ -57,6 +58,7 @@ contract SkyCompounderStrategyFactory {
         address _keeper,
         address _emergencyAdmin,
         address _donationAddress,
+        bool _enableBurning,
         bytes32 _salt,
         address _tokenizedStrategyAddress
     ) external returns (address strategyAddress) {
@@ -69,6 +71,7 @@ contract SkyCompounderStrategyFactory {
                 _keeper,
                 _emergencyAdmin,
                 _donationAddress,
+                _enableBurning,
                 _tokenizedStrategyAddress
             )
         );

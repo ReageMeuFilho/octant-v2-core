@@ -43,7 +43,7 @@ contract RocketPoolStrategyFactory {
     );
 
     /**
-     * @notice Deploys a new Lido strategy for the Yield Skimming Vault.
+     * @notice Deploys a new RocketPool strategy for the Yield Skimming Vault.
      * @dev This function uses Create2 to deploy a new strategy contract deterministically.
      *      The strategy is initialized with the provided parameters, and its address is
      *      returned upon successful deployment. The function emits a `RocketPoolStrategyDeploy` event.
@@ -52,6 +52,7 @@ contract RocketPoolStrategyFactory {
      * @param _keeper The address of the keeper responsible for maintaining the strategy.
      * @param _emergencyAdmin The address of the emergency admin for the strategy.
      * @param _donationAddress The address where donations from the strategy will be sent.
+     * @param _enableBurning Whether to enable burning shares from dragon router during loss protection.
      * @param _salt A unique salt used for deterministic deployment of the strategy.
      * @return strategyAddress The address of the newly deployed strategy contract.
      */
@@ -61,12 +62,13 @@ contract RocketPoolStrategyFactory {
         address _keeper,
         address _emergencyAdmin,
         address _donationAddress,
+        bool _enableBurning,
         bytes32 _salt,
         address _tokenizedStrategyAddress
     ) external returns (address strategyAddress) {
         bytes memory bytecode = abi.encodePacked(
             type(RocketPoolStrategy).creationCode,
-            abi.encode(R_ETH, _name, _management, _keeper, _emergencyAdmin, _donationAddress, _tokenizedStrategyAddress)
+            abi.encode(R_ETH, _name, _management, _keeper, _emergencyAdmin, _donationAddress, _enableBurning, _tokenizedStrategyAddress)
         );
 
         strategyAddress = Create2.deploy(0, _salt, bytecode);
