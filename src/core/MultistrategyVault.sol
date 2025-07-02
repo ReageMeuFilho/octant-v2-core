@@ -12,7 +12,6 @@ import { IWithdrawLimitModule } from "src/core/interfaces/IWithdrawLimitModule.s
 import { IERC4626Payable } from "src/zodiac-core/interfaces/IERC4626Payable.sol";
 import { IAccountant } from "src/interfaces/IAccountant.sol";
 import { IMultistrategyVaultFactory } from "src/factories/interfaces/IMultistrategyVaultFactory.sol";
-import { StrategyManagementLib } from "src/core/libs/StrategyManagementLib.sol";
 import { DebtManagementLib } from "src/core/libs/DebtManagementLib.sol";
 import { ERC20SafeLib } from "src/core/libs/ERC20SafeLib.sol";
 
@@ -1249,7 +1248,28 @@ contract MultistrategyVault is IMultistrategyVault {
         uint256 currentDebt,
         uint256 assetsNeeded
     ) external view returns (uint256) {
-        return _assessShareOfUnrealisedLosses(strategy, currentDebt, assetsNeeded);
+        require(currentDebt >= assetsNeeded, NotEnoughDebt());
+
+        // The actual amount that the debt is currently worth.
+        uint256 vaultShares = IERC4626Payable(strategy).balanceOf(address(this));
+        uint256 strategyAssets = IERC4626Payable(strategy).convertToAssets(vaultShares);
+
+        // If no losses, return 0
+        if (strategyAssets >= currentDebt || currentDebt == 0) {
+            return 0;
+        }
+
+        // Users will withdraw assetsNeeded divided by loss ratio (strategyAssets / currentDebt - 1).
+        // NOTE: If there are unrealised losses, the user will take his share.
+        uint256 numerator = assetsNeeded * strategyAssets;
+        uint256 usersShareOfLoss = assetsNeeded - numerator / currentDebt;
+
+        // Always round up.
+        if (numerator % currentDebt != 0) {
+            usersShareOfLoss += 1;
+        }
+
+        return usersShareOfLoss;
     }
 
     /**
@@ -1642,8 +1662,27 @@ contract MultistrategyVault is IMultistrategyVault {
      * @dev Adds a new strategy
      */
     function _addStrategy(address newStrategy_, bool addToQueue_) internal {
-        // Call the library function to handle the strategy addition logic
-        StrategyManagementLib.addStrategy(_strategies, _defaultQueue, newStrategy_, addToQueue_, asset, MAX_QUEUE);
+        // Validate the strategy
+        require(newStrategy_ != address(0), StrategyCannotBeZeroAddress());
+
+        // Verify the strategy asset matches the vault's asset
+        require(IERC4626Payable(newStrategy_).asset() == asset, InvalidAsset());
+
+        // Check the strategy is not already active
+        require(_strategies[newStrategy_].activation == 0, StrategyAlreadyActive());
+
+        // Add the new strategy to the mapping with initialization parameters
+        _strategies[newStrategy_] = StrategyParams({
+            activation: block.timestamp,
+            lastReport: block.timestamp,
+            currentDebt: 0,
+            maxDebt: 0
+        });
+
+        // If requested and there's room, add to the default queue
+        if (addToQueue_ && _defaultQueue.length < MAX_QUEUE) {
+            _defaultQueue.push(newStrategy_);
+        }
 
         // Emit the strategy changed event
         emit StrategyChanged(newStrategy_, StrategyChangeType.ADDED);
@@ -1856,13 +1895,53 @@ contract MultistrategyVault is IMultistrategyVault {
      * @dev Revokes a strategy
      */
     function _revokeStrategy(address strategy, bool force) internal {
-        // Call the library function to handle the revocation logic
-        uint256 loss = StrategyManagementLib.revokeStrategy(_strategies, _defaultQueue, strategy, force);
+        require(_strategies[strategy].activation != 0, StrategyNotActive());
+
+        uint256 currentDebt = _strategies[strategy].currentDebt;
+        uint256 lossAmount = 0;
+        
+        if (currentDebt != 0) {
+            require(force, StrategyHasDebt());
+            // If force is true, we realize the full loss of outstanding debt
+            lossAmount = currentDebt;
+        }
+
+        // Set strategy params all back to 0 (WARNING: it can be re-added)
+        _strategies[strategy] = StrategyParams({
+            activation: 0,
+            lastReport: 0,
+            currentDebt: 0,
+            maxDebt: 0
+        });
+
+        // Remove strategy from the default queue if it exists
+        // Create a new dynamic array and add all strategies except the one being revoked
+        address[] memory newQueue = new address[](_defaultQueue.length);
+        uint256 newQueueLength = 0;
+
+        for (uint256 i = 0; i < _defaultQueue.length; i++) {
+            // Add all strategies to the new queue besides the one revoked
+            if (_defaultQueue[i] != strategy) {
+                newQueue[newQueueLength] = _defaultQueue[i];
+                newQueueLength++;
+            }
+        }
+
+        // Replace the default queue with our updated queue
+        // First clear the existing queue
+        while (_defaultQueue.length > 0) {
+            _defaultQueue.pop();
+        }
+
+        // Then add all items from the new queue
+        for (uint256 i = 0; i < newQueueLength; i++) {
+            _defaultQueue.push(newQueue[i]);
+        }
 
         // If there was a loss (force revoke with debt), update total vault debt
-        if (loss > 0) {
-            _totalDebt -= loss;
-            emit StrategyReported(strategy, 0, loss, 0, 0, 0, 0);
+        if (lossAmount > 0) {
+            _totalDebt -= lossAmount;
+            emit StrategyReported(strategy, 0, lossAmount, 0, 0, 0, 0);
         }
 
         emit StrategyChanged(strategy, StrategyChangeType.REVOKED);
