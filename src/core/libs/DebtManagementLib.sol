@@ -4,163 +4,253 @@ pragma solidity ^0.8.25;
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC4626Payable } from "src/zodiac-core/interfaces/IERC4626Payable.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
-import { IAccountant } from "src/interfaces/IAccountant.sol";
-import { IMultistrategyVaultFactory } from "src/factories/interfaces/IMultistrategyVaultFactory.sol";
 import { IMultistrategyVault } from "src/core/interfaces/IMultistrategyVault.sol";
-import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
+import { ERC20SafeLib } from "src/core/libs/ERC20SafeLib.sol";
 
 /// @notice Library with all actions that can be performed on strategies
 library DebtManagementLib {
+    // Constants
+    uint256 public constant MAX_BPS = 10_000;
+
+    // Result struct to return updated storage values
     struct UpdateDebtResult {
         uint256 newDebt; // The new debt amount for the strategy
         uint256 newTotalIdle; // The new total idle amount for the vault
         uint256 newTotalDebt; // The new total debt amount for the vault
-        uint256 assetApprovalAmount; // Amount to approve if depositing
     }
 
-    // New struct to organize calculation variables
+    // Struct to organize calculation variables - following Vyper implementation
     struct UpdateDebtVars {
-        uint256 currentDebt; // The strategy's current debt
-        uint256 newDebt; // The target debt
-        uint256 maxDebt; // The strategy's max debt
-        uint256 assetsToWithdraw; // Amount to withdraw (if decreasing debt)
-        uint256 assetsToDeposit; // Amount to deposit (if increasing debt)
-        uint256 availableIdle; // Available idle assets after minimum
-        uint256 maxRedeemAmount; // Strategy's max redeem
-        uint256 withdrawable; // Strategy's withdrawable amount
-        uint256 maxDepositAmount; // Strategy's max deposit amount
-        bool isDebtDecrease; // Whether we're decreasing debt
+        uint256 newDebt; // How much we want the strategy to have
+        uint256 currentDebt; // How much the strategy currently has
+        uint256 assetsToWithdraw; // Amount to withdraw if reducing debt
+        uint256 assetsToDeposit; // Amount to deposit if increasing debt
+        uint256 minimumTotalIdle; // Minimum amount to keep in vault
+        uint256 totalIdle; // Current idle in vault
+        uint256 availableIdle; // Available idle after minimum
+        uint256 withdrawable; // Max withdrawable from strategy
+        uint256 maxDeposit; // Max deposit to strategy
+        uint256 maxDebt; // Strategy's max debt
+        address asset; // Vault's asset
+        uint256 preBalance; // Balance before operation
+        uint256 postBalance; // Balance after operation
+        uint256 withdrawn; // Actual amount withdrawn
+        uint256 actualDeposit; // Actual amount deposited
     }
+
+    /**
+     * @notice Update debt for a strategy - follows Vyper _update_debt implementation line by line
+     * @dev The vault will re-balance the debt vs target debt. Target debt must be
+     *      smaller or equal to strategy's max_debt. This function will compare the
+     *      current debt with the target debt and will take funds or deposit new
+     *      funds to the strategy.
+     * @param strategies Storage mapping of strategies
+     * @param totalIdle Current total idle in vault
+     * @param totalDebt Current total debt in vault
+     * @param strategy The strategy address
+     * @param targetDebt The target debt amount
+     * @param maxLoss Maximum acceptable loss in basis points
+     * @param minimumTotalIdle Minimum idle to maintain in vault
+     * @param asset The vault's asset address
+     * @param vaultAddress Address of the vault
+     * @param isShutdown Whether vault is shutdown
+     * @return result UpdateDebtResult with new debt, total idle, and total debt
+     */
     /* solhint-disable code-complexity */
     function updateDebt(
         mapping(address => IMultistrategyVault.StrategyParams) storage strategies,
-        address strategy,
-        uint256 targetDebt,
         uint256 totalIdle,
         uint256 totalDebt,
+        address strategy,
+        uint256 targetDebt,
+        uint256 maxLoss,
         uint256 minimumTotalIdle,
+        address asset,
         address vaultAddress,
         bool isShutdown
-    ) external view returns (UpdateDebtResult memory result) {
-        // Initialize the result with current values
+    ) external returns (UpdateDebtResult memory result) {
+        // slither-disable-next-line uninitialized-local
+        UpdateDebtVars memory vars;
+
+        // Initialize result with current values
         result.newTotalIdle = totalIdle;
         result.newTotalDebt = totalDebt;
 
-        // Initialize calculation variables
-        // slither-disable-next-line uninitialized-local
-        UpdateDebtVars memory vars;
-        vars.currentDebt = strategies[strategy].currentDebt;
+        // How much we want the strategy to have.
         vars.newDebt = targetDebt;
+        // How much the strategy currently has.
+        vars.currentDebt = strategies[strategy].currentDebt;
+        vars.asset = asset;
+        vars.minimumTotalIdle = minimumTotalIdle;
+        vars.totalIdle = totalIdle;
 
-        // If vault is shutdown, we can only withdraw
+        // If the vault is shutdown we can only pull funds.
         if (isShutdown) {
             vars.newDebt = 0;
         }
 
-        // Can't update to the same debt level
-        if (vars.newDebt == vars.currentDebt) revert IMultistrategyVault.NewDebtEqualsCurrentDebt();
+        // assert new_debt != current_debt, "new debt equals current debt"
+        if (vars.newDebt == vars.currentDebt) {
+            revert IMultistrategyVault.NewDebtEqualsCurrentDebt();
+        }
 
-        // Determine if we're decreasing or increasing debt
-        vars.isDebtDecrease = vars.currentDebt > vars.newDebt;
-
-        if (vars.isDebtDecrease) {
-            // DEBT DECREASE - Withdrawing from strategy
-            // Calculate how much to withdraw
+        if (vars.currentDebt > vars.newDebt) {
+            // Reduce debt.
             vars.assetsToWithdraw = vars.currentDebt - vars.newDebt;
 
+            // Ensure we always have minimum_total_idle when updating debt.
             // Respect minimum total idle in vault
-            if (totalIdle + vars.assetsToWithdraw < minimumTotalIdle) {
-                vars.assetsToWithdraw = minimumTotalIdle - totalIdle;
-                // Can't withdraw more than the strategy has
+            if (vars.totalIdle + vars.assetsToWithdraw < vars.minimumTotalIdle) {
+                vars.assetsToWithdraw = vars.minimumTotalIdle - vars.totalIdle;
+                // Cant withdraw more than the strategy has.
                 if (vars.assetsToWithdraw > vars.currentDebt) {
                     vars.assetsToWithdraw = vars.currentDebt;
                 }
             }
 
-            // Check how much we are able to withdraw based on strategy limits
-            vars.maxRedeemAmount = IERC4626Payable(strategy).maxRedeem(vaultAddress);
-            vars.withdrawable = IERC4626Payable(strategy).convertToAssets(vars.maxRedeemAmount);
+            // Check how much we are able to withdraw.
+            // Use maxRedeem and convert since we use redeem.
+            vars.withdrawable = IERC4626Payable(strategy).convertToAssets(
+                IERC4626Payable(strategy).maxRedeem(vaultAddress)
+            );
 
-            // If insufficient withdrawable, withdraw what we can
+            // If insufficient withdrawable, withdraw what we can.
             if (vars.withdrawable < vars.assetsToWithdraw) {
                 vars.assetsToWithdraw = vars.withdrawable;
             }
 
-            // If nothing to withdraw, return current debt
             if (vars.assetsToWithdraw == 0) {
                 result.newDebt = vars.currentDebt;
                 return result;
             }
 
-            // Check for unrealized losses
+            // If there are unrealised losses we don't let the vault reduce its debt until there is a new report
             uint256 unrealisedLossesShare = IMultistrategyVault(vaultAddress).assessShareOfUnrealisedLosses(
                 strategy,
                 vars.currentDebt,
                 vars.assetsToWithdraw
             );
+            if (unrealisedLossesShare != 0) {
+                revert IMultistrategyVault.StrategyHasUnrealisedLosses();
+            }
 
-            // Strategy shouldn't have unrealized losses to proceed
-            if (unrealisedLossesShare > 0) revert IMultistrategyVault.StrategyHasUnrealisedLosses();
+            // Always check the actual amount withdrawn.
+            vars.preBalance = IERC20(vars.asset).balanceOf(vaultAddress);
+            _withdrawFromStrategy(strategy, vars.assetsToWithdraw, vaultAddress);
+            vars.postBalance = IERC20(vars.asset).balanceOf(vaultAddress);
 
-            // Update tracking variables
-            result.newTotalIdle += vars.assetsToWithdraw;
-            result.newTotalDebt -= vars.assetsToWithdraw;
-            result.newDebt = vars.currentDebt - vars.assetsToWithdraw;
+            // making sure we are changing idle according to the real result no matter what.
+            // We pull funds with {redeem} so there can be losses or rounding differences.
+            vars.withdrawn = Math.min(vars.postBalance - vars.preBalance, vars.currentDebt);
+
+            // If we didn't get the amount we asked for and there is a max loss.
+            if (vars.withdrawn < vars.assetsToWithdraw && maxLoss < MAX_BPS) {
+                // Make sure the loss is within the allowed range.
+                if (vars.assetsToWithdraw - vars.withdrawn > (vars.assetsToWithdraw * maxLoss) / MAX_BPS) {
+                    revert IMultistrategyVault.TooMuchLoss();
+                }
+            }
+            // If we got too much make sure not to increase PPS.
+            else if (vars.withdrawn > vars.assetsToWithdraw) {
+                vars.assetsToWithdraw = vars.withdrawn;
+            }
+
+            // Update storage.
+            vars.totalIdle += vars.withdrawn; // actual amount we got.
+            // Amount we tried to withdraw in case of losses
+            result.newTotalDebt = totalDebt - vars.assetsToWithdraw;
+
+            vars.newDebt = vars.currentDebt - vars.assetsToWithdraw;
         } else {
-            // DEBT INCREASE - Depositing to strategy
+            // We are increasing the strategies debt
 
-            // Apply max debt limit
+            // Respect the maximum amount allowed.
             vars.maxDebt = strategies[strategy].maxDebt;
             if (vars.newDebt > vars.maxDebt) {
                 vars.newDebt = vars.maxDebt;
-                // Possible for current to be greater than max from reports
+                // Possible for current to be greater than max from reports.
                 if (vars.newDebt < vars.currentDebt) {
                     result.newDebt = vars.currentDebt;
                     return result;
                 }
             }
 
-            // Check if strategy accepts deposits
-            vars.maxDepositAmount = IERC4626Payable(strategy).maxDeposit(vaultAddress);
-            if (vars.maxDepositAmount == 0) {
+            // Vault is increasing debt with the strategy by sending more funds.
+            vars.maxDeposit = IERC4626Payable(strategy).maxDeposit(vaultAddress);
+            if (vars.maxDeposit == 0) {
                 result.newDebt = vars.currentDebt;
                 return result;
             }
 
-            // Calculate how much to deposit
+            // Deposit the difference between desired and current.
             vars.assetsToDeposit = vars.newDebt - vars.currentDebt;
-            if (vars.assetsToDeposit > vars.maxDepositAmount) {
-                vars.assetsToDeposit = vars.maxDepositAmount;
+            if (vars.assetsToDeposit > vars.maxDeposit) {
+                // Deposit as much as possible.
+                vars.assetsToDeposit = vars.maxDeposit;
             }
 
-            // Check vault minimum idle requirement
-            if (totalIdle <= minimumTotalIdle) {
+            // Ensure we always have minimum_total_idle when updating debt.
+            if (vars.totalIdle <= vars.minimumTotalIdle) {
                 result.newDebt = vars.currentDebt;
                 return result;
             }
 
-            vars.availableIdle = totalIdle - minimumTotalIdle;
+            vars.availableIdle = vars.totalIdle - vars.minimumTotalIdle;
 
-            // If insufficient funds to deposit, transfer only what is free
+            // If insufficient funds to deposit, transfer only what is free.
             if (vars.assetsToDeposit > vars.availableIdle) {
                 vars.assetsToDeposit = vars.availableIdle;
             }
 
-            // Skip if nothing to deposit
-            if (vars.assetsToDeposit == 0) {
-                result.newDebt = vars.currentDebt;
-                return result;
+            // Can't Deposit 0.
+            if (vars.assetsToDeposit > 0) {
+                // Approve the strategy to pull only what we are giving it.
+                ERC20SafeLib.safeApprove(vars.asset, strategy, vars.assetsToDeposit);
+
+                // Always update based on actual amounts deposited.
+                vars.preBalance = IERC20(vars.asset).balanceOf(vaultAddress);
+                IERC4626Payable(strategy).deposit(vars.assetsToDeposit, vaultAddress);
+                vars.postBalance = IERC20(vars.asset).balanceOf(vaultAddress);
+
+                // Make sure our approval is always back to 0.
+                ERC20SafeLib.safeApprove(vars.asset, strategy, 0);
+
+                // Making sure we are changing according to the real result no
+                // matter what. This will spend more gas but makes it more robust.
+                vars.actualDeposit = vars.preBalance - vars.postBalance;
+
+                // Update storage.
+                vars.totalIdle -= vars.actualDeposit;
+                result.newTotalDebt = totalDebt + vars.actualDeposit;
             }
 
-            // Set amount for approval
-            result.assetApprovalAmount = vars.assetsToDeposit;
-
-            // Update tracking variables
-            result.newTotalIdle -= vars.assetsToDeposit;
-            result.newTotalDebt += vars.assetsToDeposit;
-            result.newDebt = vars.currentDebt + vars.assetsToDeposit;
+            vars.newDebt = vars.currentDebt + vars.assetsToDeposit;
         }
 
+        // Commit memory to storage.
+        strategies[strategy].currentDebt = vars.newDebt;
+        result.newTotalIdle = vars.totalIdle;
+        result.newDebt = vars.newDebt;
+
         return result;
+    }
+
+    /**
+     * @notice Internal function to withdraw from strategy
+     * @param strategy The strategy to withdraw from
+     * @param assetsToWithdraw Amount to withdraw
+     * @param vaultAddress Address of the vault
+     */
+    function _withdrawFromStrategy(address strategy, uint256 assetsToWithdraw, address vaultAddress) internal {
+        // Need to get shares since we use redeem to be able to take on losses.
+        uint256 sharesToRedeem = Math.min(
+            // Use previewWithdraw since it should round up.
+            IERC4626Payable(strategy).previewWithdraw(assetsToWithdraw),
+            // And check against our actual balance.
+            IERC4626Payable(strategy).balanceOf(vaultAddress)
+        );
+
+        // Redeem the shares.
+        IERC4626Payable(strategy).redeem(sharesToRedeem, vaultAddress, vaultAddress);
     }
 }
