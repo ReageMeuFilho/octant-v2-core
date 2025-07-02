@@ -5,7 +5,7 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC4626Payable } from "src/zodiac-core/interfaces/IERC4626Payable.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { IMultistrategyVault } from "src/core/interfaces/IMultistrategyVault.sol";
-import { ERC20SafeLib } from "src/core/libs/ERC20SafeLib.sol";
+import { ERC20SafeApproveLib } from "src/core/libs/ERC20SafeApproveLib.sol";
 
 /// @notice Library with all actions that can be performed on strategies
 library DebtManagementLib {
@@ -52,7 +52,6 @@ library DebtManagementLib {
      * @param maxLoss Maximum acceptable loss in basis points
      * @param minimumTotalIdle Minimum idle to maintain in vault
      * @param asset The vault's asset address
-     * @param vaultAddress Address of the vault
      * @param isShutdown Whether vault is shutdown
      * @return result UpdateDebtResult with new debt, total idle, and total debt
      */
@@ -66,7 +65,6 @@ library DebtManagementLib {
         uint256 maxLoss,
         uint256 minimumTotalIdle,
         address asset,
-        address vaultAddress,
         bool isShutdown
     ) external returns (UpdateDebtResult memory result) {
         // slither-disable-next-line uninitialized-local
@@ -111,7 +109,7 @@ library DebtManagementLib {
             // Check how much we are able to withdraw.
             // Use maxRedeem and convert since we use redeem.
             vars.withdrawable = IERC4626Payable(strategy).convertToAssets(
-                IERC4626Payable(strategy).maxRedeem(vaultAddress)
+                IERC4626Payable(strategy).maxRedeem(address(this))
             );
 
             // If insufficient withdrawable, withdraw what we can.
@@ -125,7 +123,7 @@ library DebtManagementLib {
             }
 
             // If there are unrealised losses we don't let the vault reduce its debt until there is a new report
-            uint256 unrealisedLossesShare = IMultistrategyVault(vaultAddress).assessShareOfUnrealisedLosses(
+            uint256 unrealisedLossesShare = IMultistrategyVault(address(this)).assessShareOfUnrealisedLosses(
                 strategy,
                 vars.currentDebt,
                 vars.assetsToWithdraw
@@ -135,9 +133,9 @@ library DebtManagementLib {
             }
 
             // Always check the actual amount withdrawn.
-            vars.preBalance = IERC20(vars.asset).balanceOf(vaultAddress);
-            _withdrawFromStrategy(strategy, vars.assetsToWithdraw, vaultAddress);
-            vars.postBalance = IERC20(vars.asset).balanceOf(vaultAddress);
+            vars.preBalance = IERC20(vars.asset).balanceOf(address(this));
+            _withdrawFromStrategy(strategy, vars.assetsToWithdraw);
+            vars.postBalance = IERC20(vars.asset).balanceOf(address(this));
 
             // making sure we are changing idle according to the real result no matter what.
             // We pull funds with {redeem} so there can be losses or rounding differences.
@@ -176,7 +174,7 @@ library DebtManagementLib {
             }
 
             // Vault is increasing debt with the strategy by sending more funds.
-            vars.maxDeposit = IERC4626Payable(strategy).maxDeposit(vaultAddress);
+            vars.maxDeposit = IERC4626Payable(strategy).maxDeposit(address(this));
             if (vars.maxDeposit == 0) {
                 result.newDebt = vars.currentDebt;
                 return result;
@@ -205,15 +203,15 @@ library DebtManagementLib {
             // Can't Deposit 0.
             if (vars.assetsToDeposit > 0) {
                 // Approve the strategy to pull only what we are giving it.
-                ERC20SafeLib.safeApprove(vars.asset, strategy, vars.assetsToDeposit);
+                ERC20SafeApproveLib.safeApprove(vars.asset, strategy, vars.assetsToDeposit);
 
                 // Always update based on actual amounts deposited.
-                vars.preBalance = IERC20(vars.asset).balanceOf(vaultAddress);
-                IERC4626Payable(strategy).deposit(vars.assetsToDeposit, vaultAddress);
-                vars.postBalance = IERC20(vars.asset).balanceOf(vaultAddress);
+                vars.preBalance = IERC20(vars.asset).balanceOf(address(this));
+                IERC4626Payable(strategy).deposit(vars.assetsToDeposit, address(this));
+                vars.postBalance = IERC20(vars.asset).balanceOf(address(this));
 
                 // Make sure our approval is always back to 0.
-                ERC20SafeLib.safeApprove(vars.asset, strategy, 0);
+                ERC20SafeApproveLib.safeApprove(vars.asset, strategy, 0);
 
                 // Making sure we are changing according to the real result no
                 // matter what. This will spend more gas but makes it more robust.
@@ -239,18 +237,17 @@ library DebtManagementLib {
      * @notice Internal function to withdraw from strategy
      * @param strategy The strategy to withdraw from
      * @param assetsToWithdraw Amount to withdraw
-     * @param vaultAddress Address of the vault
      */
-    function _withdrawFromStrategy(address strategy, uint256 assetsToWithdraw, address vaultAddress) internal {
+    function _withdrawFromStrategy(address strategy, uint256 assetsToWithdraw) internal {
         // Need to get shares since we use redeem to be able to take on losses.
         uint256 sharesToRedeem = Math.min(
             // Use previewWithdraw since it should round up.
             IERC4626Payable(strategy).previewWithdraw(assetsToWithdraw),
             // And check against our actual balance.
-            IERC4626Payable(strategy).balanceOf(vaultAddress)
+            IERC4626Payable(strategy).balanceOf(address(this))
         );
 
         // Redeem the shares.
-        IERC4626Payable(strategy).redeem(sharesToRedeem, vaultAddress, vaultAddress);
+        IERC4626Payable(strategy).redeem(sharesToRedeem, address(this), address(this));
     }
 }

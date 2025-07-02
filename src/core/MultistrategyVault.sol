@@ -1619,7 +1619,10 @@ contract MultistrategyVault is IMultistrategyVault {
 
         emit Deposit(msg.sender, recipient_, assets_, shares_);
 
-        if (autoAllocate && _defaultQueue.length > 0) {
+        // cache the default queue length
+        uint256 defaultQueueLength = _defaultQueue.length;
+
+        if (autoAllocate && defaultQueueLength > 0) {
             _updateDebt(_defaultQueue[0], type(uint256).max, 0);
         }
     }
@@ -1911,8 +1914,9 @@ contract MultistrategyVault is IMultistrategyVault {
         // Create a new dynamic array and add all strategies except the one being revoked
         address[] memory newQueue = new address[](_defaultQueue.length);
         uint256 newQueueLength = 0;
+        uint256 defaultQueueLength = _defaultQueue.length;
 
-        for (uint256 i = 0; i < _defaultQueue.length; i++) {
+        for (uint256 i = 0; i < defaultQueueLength; i++) {
             // Add all strategies to the new queue besides the one revoked
             if (_defaultQueue[i] != strategy) {
                 newQueue[newQueueLength] = _defaultQueue[i];
@@ -1941,19 +1945,6 @@ contract MultistrategyVault is IMultistrategyVault {
     }
 
     /// ERC20 SAFE OPERATIONS ///
-
-    /**
-     * @dev Safely approve ERC20 tokens, handling non-standard implementations
-     * @param token The token to approve
-     * @param spender The address to approve spending for
-     * @param amount The amount to approve
-     */
-    function _safeApprove(address token, address spender, uint256 amount) internal {
-        (bool success, bytes memory data) = token.call(
-            abi.encodeWithSelector(IERC20.approve.selector, spender, amount)
-        );
-        require(success && (data.length == 0 || abi.decode(data, (bool))), ApprovalFailed());
-    }
 
     /**
      * @dev Safely transfer ERC20 tokens from one address to another, handling non-standard implementations
