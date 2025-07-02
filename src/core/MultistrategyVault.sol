@@ -10,6 +10,9 @@ import { IMultistrategyVault } from "src/core/interfaces/IMultistrategyVault.sol
 import { IDepositLimitModule } from "src/core/interfaces/IDepositLimitModule.sol";
 import { IWithdrawLimitModule } from "src/core/interfaces/IWithdrawLimitModule.sol";
 import { IERC4626Payable } from "src/zodiac-core/interfaces/IERC4626Payable.sol";
+import { IFactory } from "src/interfaces/IFactory.sol";
+import { IAccountant } from "src/interfaces/IAccountant.sol";
+import { IMultistrategyVaultFactory } from "src/factories/interfaces/IMultistrategyVaultFactory.sol";
 import { StrategyManagementLib } from "src/core/libs/StrategyManagementLib.sol";
 import { DebtManagementLib } from "src/core/libs/DebtManagementLib.sol";
 import { ERC20SafeLib } from "src/core/libs/ERC20SafeLib.sol";
@@ -496,62 +499,111 @@ contract MultistrategyVault is IMultistrategyVault {
 
     /// REPORTING MANAGEMENT ///
 
-    // Main external function
     function processReport(address strategy_) external returns (uint256, uint256) {
         _enforceRole(msg.sender, Roles.REPORTING_MANAGER);
 
-        // Call the library with total supply and total assets
-        StrategyManagementLib.StrategyAssessment memory assessment = StrategyManagementLib.assessStrategy(
-            _strategies,
-            strategy_,
-            accountant,
-            asset,
-            _totalIdle,
-            address(this),
-            factory,
-            _profitMaxUnlockTime
-        );
-
-        // Initialize process report variables with assessment results
         // slither-disable-next-line uninitialized-local
-        ProcessReportVars memory vars;
-        vars.asset = assessment.asset;
-        vars.totalAssets = assessment.totalAssets;
-        vars.currentDebt = assessment.currentDebt;
-        vars.gain = assessment.gain;
-        vars.loss = assessment.loss;
-        vars.totalFees = assessment.totalFees;
-        vars.totalRefunds = assessment.totalRefunds;
-        vars.protocolFeeBps = assessment.protocolFeeBps;
-        vars.protocolFeeRecipient = assessment.protocolFeeRecipient;
-        vars.profitMaxUnlockTime = assessment.profitMaxUnlockTime;
-        vars.sharesToBurn = assessment.sharesToBurn;
-        vars.totalFeesShares = assessment.totalFeesShares;
-        vars.protocolFeesShares = assessment.protocolFeesShares;
-        vars.sharesToLock = assessment.sharesToLock;
+        ProcessReportLocalVars memory vars;
 
-        // The total current supply including locked shares
-        vars.totalSupply = _totalSupplyValue;
-        // The total shares the vault currently owns. Both locked and unlocked
-        vars.totalLockedShares = _balanceOf[address(this)];
-        // Get the desired end amount of shares after all accounting
-        vars.endingSupply = vars.totalSupply + vars.sharesToLock - vars.sharesToBurn - _unlockedShares();
+        if (strategy_ != address(this)) {
+            // Make sure we have a valid strategy.
+            require(_strategies[strategy_].activation != 0, InactiveStrategy());
 
-        // If we will end with more shares than we have now
-        if (vars.endingSupply > vars.totalSupply) {
-            // Issue the difference
-            _issueShares(vars.endingSupply - vars.totalSupply, address(this));
+            // Vault assesses profits using 4626 compliant interface.
+            // NOTE: It is important that a strategies `convertToAssets` implementation
+            // cannot be manipulated or else the vault could report incorrect gains/losses.
+            uint256 strategyShares = IERC4626Payable(strategy_).balanceOf(address(this));
+            // How much the vaults position is worth.
+            vars.strategyTotalAssets = IERC4626Payable(strategy_).convertToAssets(strategyShares);
+            // How much the vault had deposited to the strategy.
+            vars.currentDebt = _strategies[strategy_].currentDebt;
+        } else {
+            // Accrue any airdropped `asset` into `total_idle`
+            vars.strategyTotalAssets = IERC20(asset).balanceOf(address(this));
+            vars.currentDebt = _totalIdle;
         }
-        // Else we need to burn shares
-        else if (vars.totalSupply > vars.endingSupply) {
-            // Can't burn more than the vault owns
-            vars.toBurn = Math.min(vars.totalSupply - vars.endingSupply, vars.totalLockedShares);
+
+        /// Assess Gain or Loss ///
+
+        // Compare reported assets vs. the current debt.
+        if (vars.strategyTotalAssets > vars.currentDebt) {
+            // We have a gain.
+            vars.gain = vars.strategyTotalAssets - vars.currentDebt;
+        } else {
+            // We have a loss.
+            vars.loss = vars.currentDebt - vars.strategyTotalAssets;
+        }
+
+        /// Assess Fees and Refunds ///
+
+        // If accountant is not set, fees and refunds remain unchanged.
+        vars.accountant = accountant;
+        if (vars.accountant != address(0)) {
+            (vars.totalFees, vars.totalRefunds) = IAccountant(vars.accountant).report(strategy_, vars.gain, vars.loss);
+
+            if (vars.totalRefunds > 0) {
+                // Make sure we have enough approval and enough asset to pull.
+                vars.totalRefunds = Math.min(
+                    vars.totalRefunds,
+                    Math.min(
+                        IERC20(asset).balanceOf(vars.accountant),
+                        IERC20(asset).allowance(vars.accountant, address(this))
+                    )
+                );
+            }
+        }
+
+        // Only need to burn shares if there is a loss or fees.
+        if (vars.loss + vars.totalFees > 0) {
+            // The amount of shares we will want to burn to offset losses and fees.
+            vars.sharesToBurn = _convertToShares(vars.loss + vars.totalFees, Rounding.ROUND_UP);
+
+            // If we have fees then get the proportional amount of shares to issue.
+            if (vars.totalFees > 0) {
+                // Get the total amount shares to issue for the fees.
+                vars.totalFeesShares = (vars.sharesToBurn * vars.totalFees) / (vars.loss + vars.totalFees);
+
+                // Get the protocol fee config for this vault.
+                (vars.protocolFeeBps, vars.protocolFeeRecipient) = IMultistrategyVaultFactory(factory)
+                    .protocolFeeConfig(address(this));
+
+                // If there is a protocol fee.
+                if (vars.protocolFeeBps > 0) {
+                    // Get the percent of fees to go to protocol fees.
+                    vars.protocolFeesShares = (vars.totalFeesShares * uint256(vars.protocolFeeBps)) / MAX_BPS;
+                }
+            }
+        }
+
+        // Shares to lock is any amount that would otherwise increase the vaults PPS.
+        vars.profitMaxUnlockTimeVar = _profitMaxUnlockTime;
+        // Get the amount we will lock to avoid a PPS increase.
+        if (vars.gain + vars.totalRefunds > 0 && vars.profitMaxUnlockTimeVar != 0) {
+            vars.sharesToLock = _convertToShares(vars.gain + vars.totalRefunds, Rounding.ROUND_DOWN);
+        }
+
+        // The total current supply including locked shares.
+        vars.currentTotalSupply = _totalSupplyValue;
+        // The total shares the vault currently owns. Both locked and unlocked.
+        vars.totalLockedShares = _balanceOf[address(this)];
+        // Get the desired end amount of shares after all accounting.
+        vars.endingSupply = vars.currentTotalSupply + vars.sharesToLock - vars.sharesToBurn - _unlockedShares();
+
+        // If we will end with more shares than we have now.
+        if (vars.endingSupply > vars.currentTotalSupply) {
+            // Issue the difference.
+            _issueShares(vars.endingSupply - vars.currentTotalSupply, address(this));
+        }
+        // Else we need to burn shares.
+        else if (vars.currentTotalSupply > vars.endingSupply) {
+            // Can't burn more than the vault owns.
+            vars.toBurn = Math.min(vars.currentTotalSupply - vars.endingSupply, vars.totalLockedShares);
             _burnShares(vars.toBurn, address(this));
         }
 
-        // Adjust the amount to lock for this period
+        // Adjust the amount to lock for this period.
         if (vars.sharesToLock > vars.sharesToBurn) {
-            // Don't lock fees or losses
+            // Don't lock fees or losses.
             vars.sharesToLock = vars.sharesToLock - vars.sharesToBurn;
         } else {
             vars.sharesToLock = 0;
@@ -559,14 +611,13 @@ contract MultistrategyVault is IMultistrategyVault {
 
         // Pull refunds
         if (vars.totalRefunds > 0) {
-            // Transfer the refunded amount of asset to the vault
-            // slither-disable-next-line arbitrary-send-erc20
-            ERC20SafeLib.safeTransferFrom(asset, accountant, address(this), vars.totalRefunds);
-            // Update storage to increase total assets
+            // Transfer the refunded amount of asset to the vault.
+            ERC20SafeLib.safeTransferFrom(asset, vars.accountant, address(this), vars.totalRefunds);
+            // Update storage to increase total assets.
             _totalIdle += vars.totalRefunds;
         }
 
-        // Record any reported gains
+        // Record any reported gains.
         if (vars.gain > 0) {
             // NOTE: this will increase total_assets
             vars.currentDebt = vars.currentDebt + vars.gain;
@@ -574,7 +625,7 @@ contract MultistrategyVault is IMultistrategyVault {
                 _strategies[strategy_].currentDebt = vars.currentDebt;
                 _totalDebt += vars.gain;
             } else {
-                // Add in any refunds since it is now idle
+                // Add in any refunds since it is now idle.
                 vars.currentDebt = vars.currentDebt + vars.totalRefunds;
                 _totalIdle = vars.currentDebt;
             }
@@ -586,59 +637,57 @@ contract MultistrategyVault is IMultistrategyVault {
                 _strategies[strategy_].currentDebt = vars.currentDebt;
                 _totalDebt -= vars.loss;
             } else {
-                // Add in any refunds since it is now idle
+                // Add in any refunds since it is now idle.
                 vars.currentDebt = vars.currentDebt + vars.totalRefunds;
                 _totalIdle = vars.currentDebt;
             }
         }
 
-        // Issue shares for fees that were calculated above if applicable
+        // Issue shares for fees that were calculated above if applicable.
         if (vars.totalFeesShares > 0) {
-            // Accountant fees are (total_fees - protocol_fees)
-            _issueShares(vars.totalFeesShares - vars.protocolFeesShares, accountant);
+            // Accountant fees are (total_fees - protocol_fees).
+            _issueShares(vars.totalFeesShares - vars.protocolFeesShares, vars.accountant);
 
-            // If we also have protocol fees
+            // If we also have protocol fees.
             if (vars.protocolFeesShares > 0) {
                 _issueShares(vars.protocolFeesShares, vars.protocolFeeRecipient);
             }
         }
 
-        // PART 3: Profit unlocking mechanism in the Vault directly
-
-        // Update unlocking rate and time to fully unlocked
+        // Update unlocking rate and time to fully unlocked.
         vars.totalLockedShares = _balanceOf[address(this)];
         if (vars.totalLockedShares > 0) {
-            vars.fullProfitUnlockDate = _fullProfitUnlockDate;
-            // Check if we need to account for shares still unlocking
-            if (vars.fullProfitUnlockDate > block.timestamp) {
-                // There will only be previously locked shares if time remains
-                // We calculate this here since it will not occur every time we lock shares
+            vars.fullProfitUnlockDateVar = _fullProfitUnlockDate;
+            // Check if we need to account for shares still unlocking.
+            if (vars.fullProfitUnlockDateVar > block.timestamp) {
+                // There will only be previously locked shares if time remains.
+                // We calculate this here since it will not occur every time we lock shares.
                 vars.previouslyLockedTime =
                     (vars.totalLockedShares - vars.sharesToLock) *
-                    (vars.fullProfitUnlockDate - block.timestamp);
+                    (vars.fullProfitUnlockDateVar - block.timestamp);
             }
 
             // new_profit_locking_period is a weighted average between the remaining time of the previously locked shares and the profit_max_unlock_time
             vars.newProfitLockingPeriod =
-                (vars.previouslyLockedTime + vars.sharesToLock * vars.profitMaxUnlockTime) /
+                (vars.previouslyLockedTime + vars.sharesToLock * vars.profitMaxUnlockTimeVar) /
                 vars.totalLockedShares;
-            // Calculate how many shares unlock per second
+            // Calculate how many shares unlock per second.
             _profitUnlockingRate = (vars.totalLockedShares * MAX_BPS_EXTENDED) / vars.newProfitLockingPeriod;
-            // Calculate how long until the full amount of shares is unlocked
+            // Calculate how long until the full amount of shares is unlocked.
             _fullProfitUnlockDate = block.timestamp + vars.newProfitLockingPeriod;
-            // Update the last profitable report timestamp
+            // Update the last profitable report timestamp.
             _lastProfitUpdate = block.timestamp;
         } else {
-            // NOTE: only setting this to 0 will turn in the desired effect,
+            // NOTE: only setting this to the 0 will turn in the desired effect,
             // no need to update profit_unlocking_rate
             _fullProfitUnlockDate = 0;
         }
 
-        // Record the report of profit timestamp
+        // Record the report of profit timestamp.
         _strategies[strategy_].lastReport = block.timestamp;
 
         // We have to recalculate the fees paid for cases with an overall loss or no profit locking
-        if (vars.loss + vars.totalFees > vars.gain + vars.totalRefunds || vars.profitMaxUnlockTime == 0) {
+        if (vars.loss + vars.totalFees > vars.gain + vars.totalRefunds || vars.profitMaxUnlockTimeVar == 0) {
             vars.totalFees = _convertToAssets(vars.totalFeesShares, Rounding.ROUND_DOWN);
         }
 
@@ -773,81 +822,26 @@ contract MultistrategyVault is IMultistrategyVault {
     }
 
     function _updateDebt(address strategy_, uint256 targetDebt_, uint256 maxLoss_) internal returns (uint256) {
-        // Call the library to calculate debt changes
+        // Store the old debt before calling library
+        uint256 oldDebt = _strategies[strategy_].currentDebt;
+
+        // Call the library to handle all debt management logic
         DebtManagementLib.UpdateDebtResult memory result = DebtManagementLib.updateDebt(
             _strategies,
-            strategy_,
-            targetDebt_,
             _totalIdle,
             _totalDebt,
+            strategy_,
+            targetDebt_,
+            maxLoss_,
             minimumTotalIdle,
+            asset,
             address(this),
             _shutdown
         );
 
-        // If we need to increase debt (deposit)
-        if (result.assetApprovalAmount > 0) {
-            // Approve the strategy to pull funds
-            ERC20SafeLib.safeApprove(asset, strategy_, result.assetApprovalAmount);
-
-            // Track pre-deposit balance
-            uint256 preBalance = IERC20(asset).balanceOf(address(this));
-
-            // Execute the deposit
-            IERC4626Payable(strategy_).deposit(result.assetApprovalAmount, address(this));
-
-            // Track post-deposit balance
-            uint256 postBalance = IERC20(asset).balanceOf(address(this));
-
-            // Calculate actual amount deposited
-            uint256 actualDeposit = preBalance - postBalance;
-
-            // Zero the approval
-            ERC20SafeLib.safeApprove(asset, strategy_, 0);
-
-            // Adjust result values based on actual deposit amount
-            result.newTotalIdle = _totalIdle - actualDeposit;
-            result.newTotalDebt = _totalDebt + actualDeposit;
-            result.newDebt = _strategies[strategy_].currentDebt + actualDeposit;
-        }
-        // If we need to decrease debt (withdraw)
-        else if (result.newDebt < _strategies[strategy_].currentDebt) {
-            uint256 assetsToWithdraw = _strategies[strategy_].currentDebt - result.newDebt;
-
-            // Track pre-withdraw balance
-            uint256 preBalance = IERC20(asset).balanceOf(address(this));
-
-            // Execute the withdrawal
-            _withdrawFromStrategy(strategy_, assetsToWithdraw);
-
-            // Track post-withdraw balance
-            uint256 postBalance = IERC20(asset).balanceOf(address(this));
-
-            // Calculate actual amount withdrawn
-            uint256 actualWithdraw = Math.min(postBalance - preBalance, _strategies[strategy_].currentDebt);
-
-            // Check for losses if max loss is set
-            if (actualWithdraw < assetsToWithdraw && maxLoss_ < MAX_BPS) {
-                require(assetsToWithdraw - actualWithdraw <= (assetsToWithdraw * maxLoss_) / MAX_BPS, TooMuchLoss());
-            }
-            // Handle case where we got more than expected
-            else if (actualWithdraw > assetsToWithdraw) {
-                assetsToWithdraw = actualWithdraw;
-            }
-
-            // Adjust result values based on actual withdraw amount
-            result.newTotalIdle = _totalIdle + actualWithdraw;
-            result.newTotalDebt = _totalDebt - assetsToWithdraw;
-            result.newDebt = _strategies[strategy_].currentDebt - assetsToWithdraw;
-        }
-
-        // Update storage
+        // Update vault storage with results from library
         _totalIdle = result.newTotalIdle;
         _totalDebt = result.newTotalDebt;
-
-        // Store the new debt for the strategy
-        uint256 oldDebt = _strategies[strategy_].currentDebt;
-        _strategies[strategy_].currentDebt = result.newDebt;
 
         // Emit debt updated event
         emit DebtUpdated(strategy_, oldDebt, result.newDebt);
@@ -1642,22 +1636,6 @@ contract MultistrategyVault is IMultistrategyVault {
         }
 
         return usersShareOfLoss;
-    }
-
-    /**
-     * @dev Withdraws assets from strategy
-     */
-    function _withdrawFromStrategy(address strategy_, uint256 assetsToWithdraw_) internal {
-        // Need to get shares since we use redeem to be able to take on losses.
-        uint256 sharesToRedeem = Math.min(
-            // Use previewWithdraw since it should round up.
-            IERC4626Payable(strategy_).previewWithdraw(assetsToWithdraw_),
-            // And check against our actual balance.
-            IERC4626Payable(strategy_).balanceOf(address(this))
-        );
-
-        // Redeem the shares.
-        IERC4626Payable(strategy_).redeem(sharesToRedeem, address(this), address(this));
     }
 
     /// STRATEGY MANAGEMENT ///
