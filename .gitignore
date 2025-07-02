@@ -10,7 +10,7 @@ gasreport.txt
 cache/
 out/
 coverage/
-contract_addresses.txt
+ci/contract_addresses.txt
 
 # Ignore broadcast logs
 broadcast/
