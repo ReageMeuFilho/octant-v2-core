@@ -60,7 +60,7 @@ jobs:
       - name: Upload contract addresses artifact
         uses: actions/upload-artifact@v4
         with:
-          name: contract_addresses.txt
+          name: contract_addresses
           path: /app/ci/contract_addresses.txt
 
   publish:
@@ -77,8 +77,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
-          token: '${{ secrets.GH_BOT_TOKEN }}'
           fetch-depth: 0
 
       - name: Init env
