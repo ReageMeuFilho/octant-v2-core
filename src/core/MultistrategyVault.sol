@@ -1941,7 +1941,7 @@ contract MultistrategyVault is IMultistrategyVault {
     }
 
     /// ERC20 SAFE OPERATIONS ///
-    
+
     /**
      * @dev Safely approve ERC20 tokens, handling non-standard implementations
      * @param token The token to approve
