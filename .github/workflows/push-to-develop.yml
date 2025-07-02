@@ -10,9 +10,6 @@ concurrency:
   group: "${{ github.ref }}-images"
   cancel-in-progress: true
 
-env:
-  FOUNDRY_PROFILE: ci
-
 jobs:
   lint-and-format:
     name: Lint and test

@@ -12,9 +12,6 @@ concurrency:
   group: "pr-${{ github.sha }}"
   cancel-in-progress: true
 
-env:
-  FOUNDRY_PROFILE: ci
-
 jobs:
   lint-and-format:
     name: Lint and test

@@ -6,9 +6,6 @@ concurrency:
   group: "${{ github.ref }}-deploy-sc"
   cancel-in-progress: true
 
-env:
-  FOUNDRY_PROFILE: ci
-
 jobs:
   access-check:
     name: Check access-rights
