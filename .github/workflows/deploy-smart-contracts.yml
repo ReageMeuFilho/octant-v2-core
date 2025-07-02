@@ -61,10 +61,11 @@ jobs:
           name: contract_addresses
           path: /app/ci/contract_addresses.txt
 
-  publish:
-    name: Publish
+  publish-prerelease:
+    name: Publish Prerelease
     needs:
       - deploy-contract
+    if: github.ref_name == 'develop'
     runs-on: general
     container:
       image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:4fafbd60
@@ -75,6 +76,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          token: ${{ secrets.GH_BOT_TOKEN }}
           fetch-depth: 0
 
       - name: Init env
@@ -94,15 +96,47 @@ jobs:
           git config --local user.signingkey "${{ secrets.HOUSEKEEPER_GITHUB_SIGNING_KEY_ID }}"
 
       - name: Publish preRelease
-        if: github.ref_name == 'develop'
         env:
           GITHUB_TOKEN:  ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}
         run: |
           yarn release --preRelease=develop --ci
 
+  publish-release:
+    name: Publish Release
+    needs:
+      - deploy-contract
+    if: github.ref_name == 'main'
+    runs-on: general
+    container:
+      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:4fafbd60
+      credentials:
+        username: _json_key_base64
+        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_BOT_TOKEN }}
+          fetch-depth: 0
+
+      - name: Init env
+        run: yarn install
+
+      - name: Build
+        run: yarn build:contracts
+
+      - name: Set npm auth token
+        shell: bash
+        run: |
+          yarn config set -H npmScopes.golemfoundation.npmAuthToken "${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}"
+          gpg --import <(echo "${{ secrets.HOUSEKEEPER_GITHUB_SIGNING_KEY }}" | base64 -d)
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --local user.email "birnam@wildland.io"
+          git config --local user.name "Housekeeper Bot"
+          git config --local user.signingkey "${{ secrets.HOUSEKEEPER_GITHUB_SIGNING_KEY_ID }}"
+
       - name: Publish release
-        if: github.ref_name == 'main'
         env:
           GITHUB_TOKEN:  ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}
