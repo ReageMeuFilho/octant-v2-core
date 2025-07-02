@@ -10,7 +10,6 @@ import { IMultistrategyVault } from "src/core/interfaces/IMultistrategyVault.sol
 import { IDepositLimitModule } from "src/core/interfaces/IDepositLimitModule.sol";
 import { IWithdrawLimitModule } from "src/core/interfaces/IWithdrawLimitModule.sol";
 import { IERC4626Payable } from "src/zodiac-core/interfaces/IERC4626Payable.sol";
-import { IFactory } from "src/interfaces/IFactory.sol";
 import { IAccountant } from "src/interfaces/IAccountant.sol";
 import { IMultistrategyVaultFactory } from "src/factories/interfaces/IMultistrategyVaultFactory.sol";
 import { StrategyManagementLib } from "src/core/libs/StrategyManagementLib.sol";
@@ -69,7 +68,7 @@ contract MultistrategyVault is IMultistrategyVault {
     // Based off the `asset` decimals.
     uint8 public override decimals;
     // Deployer contract used to retrieve the protocol fee config.
-    address private factory;
+    address private _factory;
 
     // HashMap that records all the strategies that are allowed to receive assets from the vault.
     mapping(address => StrategyParams) internal _strategies;
@@ -135,13 +134,13 @@ contract MultistrategyVault is IMultistrategyVault {
     /// MODIFIERS ///
 
     // Re-entrancy guard
-    bool private locked;
+    bool private _locked;
 
     modifier nonReentrant() {
-        require(!locked, Reentrancy());
-        locked = true;
+        require(!_locked, Reentrancy());
+        _locked = true;
         _;
-        locked = false;
+        _locked = false;
     }
 
     /// CONSTRUCTOR ///
@@ -174,7 +173,7 @@ contract MultistrategyVault is IMultistrategyVault {
         decimals = IERC20Metadata(asset_).decimals();
 
         // Set the factory as the deployer address.
-        factory = msg.sender;
+        _factory = msg.sender;
 
         // Must be less than one year for report cycles
         require(profitMaxUnlockTime_ <= 31_556_952, ProfitUnlockTimeTooLong());
@@ -564,7 +563,7 @@ contract MultistrategyVault is IMultistrategyVault {
                 vars.totalFeesShares = (vars.sharesToBurn * vars.totalFees) / (vars.loss + vars.totalFees);
 
                 // Get the protocol fee config for this vault.
-                (vars.protocolFeeBps, vars.protocolFeeRecipient) = IMultistrategyVaultFactory(factory)
+                (vars.protocolFeeBps, vars.protocolFeeRecipient) = IMultistrategyVaultFactory(_factory)
                     .protocolFeeConfig(address(this));
 
                 // If there is a protocol fee.
@@ -1188,7 +1187,7 @@ contract MultistrategyVault is IMultistrategyVault {
      * @return Address of the vault factory.
      */
     function FACTORY() external view override returns (address) {
-        return factory;
+        return _factory;
     }
 
     /**
