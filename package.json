@@ -45,7 +45,7 @@
     "storage:check": "./script/storage.sh check",
     "patch:hats": "sed -i.bak '197,205s/^/\\/\\/ /' dependencies/hats-protocol-1.0/src/Hats.sol",
     "init": "husky && shx chmod +x .husky/*",
-    "deploy:tenderly": "bash -c 'source .env; patch -fp1 -d dependencies/hats-protocol-1.0 -i ../../ci/lib_hats_protocol_erc1155_import.diff; forge script script/deployment/staging/DeployProtocol.s.sol --slow -f $RPC_URL && forge script script/deployment/staging/DeployProtocol.s.sol --slow --verify --verifier custom --broadcast -f $RPC_URL'",
+    "deploy:tenderly": "bash -c 'source .env; forge script script/deployment/staging/DeployProtocol.s.sol --slow -f $RPC_URL && forge script script/deployment/staging/DeployProtocol.s.sol --slow --verify --verifier custom --broadcast -f $RPC_URL'",
     "release": "release-it",
     "lint:commits": "commitlint --last --verbose"
   },

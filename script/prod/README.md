@@ -81,4 +81,4 @@ GOVERNANCE=$SENDER # to confirm
 3. Run script in terminal (repo root)
     1. `source .env`
     2. ```forge script script/prod/DeployProtocol.s.sol --slow --verify --verifier-url $TENDERLY_VERIFIER_URL --sender $SENDER --rpc-url $TENDERLY_VIRTUAL_TESTNET_RPC_URL --private-key $PRIVATE_KEY --etherscan-api-key $TENDERLY_ACCESS_TOKEN -vvvv --broadcast``` // Deploy V2 Contracts
-    3. ```forge script lib/hats-protocol/script/Hats.s.sol:DeployHats --slow --verify --verifier-url $TENDERLY_VERIFIER_URL --rpc-url $TENDERLY_VIRTUAL_TESTNET_RPC_URL --private-key $PRIVATE_KEY --etherscan-api-key $TENDERLY_ACCESS_TOKEN -vvvv --broadcast``` // Deploy Hats Protocol - if lib error occurs change ERC1155 import to relative lib/hats-protocol/src/Hats.sol:19 -> import { ERC1155 } from "../lib/ERC1155/ERC1155.sol";
+    3. ```forge script dependencies/hats-protocol-1.0/script/Hats.s.sol:DeployHats --slow --verify --verifier-url $TENDERLY_VERIFIER_URL --rpc-url $TENDERLY_VIRTUAL_TESTNET_RPC_URL --private-key $PRIVATE_KEY --etherscan-api-key $TENDERLY_ACCESS_TOKEN -vvvv --broadcast``` // Deploy Hats Protocol
