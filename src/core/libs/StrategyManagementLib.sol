@@ -11,26 +11,7 @@ import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
 /// @notice Library with all actions that can be performed on strategies
 library StrategyManagementLib {
-    struct StrategyAssessment {
-        address asset;
-        address strategy;
-        uint256 totalAssets;
-        uint256 currentDebt;
-        uint256 gain;
-        uint256 loss;
-        uint256 totalFees;
-        uint256 totalRefunds;
-        uint16 protocolFeeBps;
-        address protocolFeeRecipient;
-        uint256 profitMaxUnlockTime;
-        uint256 sharesToBurn;
-        uint256 totalFeesShares;
-        uint256 protocolFeesShares;
-        uint256 sharesToLock;
-    }
-
     /// CONSTANTS ///
-
     // 100% in Basis Points.
     uint256 internal constant MAX_BPS = 10_000;
     // Extended for profit locking calculations.
@@ -112,41 +93,28 @@ library StrategyManagementLib {
             maxDebt: 0
         });
 
-        // First count how many strategies we'll keep to properly size the new array
-        uint256 strategiesInQueue = 0;
-        bool strategyFound = false;
+        // Remove strategy from the default queue if it exists
+        // Create a new dynamic array and add all strategies except the one being revoked
+        address[] memory newQueue = new address[](defaultQueue.length);
+        uint256 newQueueLength = 0;
 
         for (uint256 i = 0; i < defaultQueue.length; i++) {
-            if (defaultQueue[i] == strategy) {
-                strategyFound = true;
-            } else {
-                strategiesInQueue++;
+            // Add all strategies to the new queue besides the one revoked
+            if (defaultQueue[i] != strategy) {
+                newQueue[newQueueLength] = defaultQueue[i];
+                newQueueLength++;
             }
         }
 
-        // Only create a new queue if the strategy was actually in the queue
-        if (strategyFound) {
-            address[] memory newQueue = new address[](strategiesInQueue);
-            uint256 j = 0;
+        // Replace the default queue with our updated queue
+        // First clear the existing queue
+        while (defaultQueue.length > 0) {
+            defaultQueue.pop();
+        }
 
-            for (uint256 i = 0; i < defaultQueue.length; i++) {
-                // Add all strategies to the new queue besides the one revoked
-                if (defaultQueue[i] != strategy) {
-                    newQueue[j] = defaultQueue[i];
-                    j++;
-                }
-            }
-
-            // Replace the default queue with our new queue
-            // First clear the existing queue
-            while (defaultQueue.length > 0) {
-                defaultQueue.pop();
-            }
-
-            // Then add all items from the new queue
-            for (uint256 i = 0; i < newQueue.length; i++) {
-                defaultQueue.push(newQueue[i]);
-            }
+        // Then add all items from the new queue
+        for (uint256 i = 0; i < newQueueLength; i++) {
+            defaultQueue.push(newQueue[i]);
         }
 
         return lossAmount;
@@ -186,30 +154,5 @@ library StrategyManagementLib {
         }
 
         return usersShareOfLoss;
-    }
-
-    /**
-     * @notice Withdraw assets from a strategy
-     * @param strategy The strategy to withdraw from
-     * @param assetsToWithdraw The amount of assets to withdraw
-     * @return The amount of assets actually withdrawn
-     */
-    function withdrawFromStrategy(address strategy, uint256 assetsToWithdraw) internal returns (uint256) {
-        // Need to get shares since we use redeem to be able to take on losses.
-        uint256 sharesToRedeem = Math.min(
-            // Use previewWithdraw since it should round up.
-            IERC4626Payable(strategy).previewWithdraw(assetsToWithdraw),
-            // And check against our actual balance.
-            IERC4626Payable(strategy).balanceOf(address(this))
-        );
-
-        uint256 preBalance = IERC20(IERC4626Payable(strategy).asset()).balanceOf(address(this));
-
-        // Redeem the shares.
-        IERC4626Payable(strategy).redeem(sharesToRedeem, address(this), address(this));
-
-        uint256 postBalance = IERC20(IERC4626Payable(strategy).asset()).balanceOf(address(this));
-
-        return postBalance - preBalance;
     }
 }
