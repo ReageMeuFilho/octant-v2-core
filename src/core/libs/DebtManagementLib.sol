@@ -224,7 +224,7 @@ library DebtManagementLib {
                 result.newTotalDebt = totalDebt + vars.actualDeposit;
             }
 
-            vars.newDebt = vars.currentDebt + vars.assetsToDeposit;
+            vars.newDebt = vars.currentDebt + vars.actualDeposit;
         }
 
         // Commit memory to storage.
