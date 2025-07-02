@@ -13,7 +13,6 @@ import { IERC4626Payable } from "src/zodiac-core/interfaces/IERC4626Payable.sol"
 import { IAccountant } from "src/interfaces/IAccountant.sol";
 import { IMultistrategyVaultFactory } from "src/factories/interfaces/IMultistrategyVaultFactory.sol";
 import { DebtManagementLib } from "src/core/libs/DebtManagementLib.sol";
-import { ERC20SafeLib } from "src/core/libs/ERC20SafeLib.sol";
 
 /**
  * @notice
@@ -610,7 +609,7 @@ contract MultistrategyVault is IMultistrategyVault {
         // Pull refunds
         if (vars.totalRefunds > 0) {
             // Transfer the refunded amount of asset to the vault.
-            ERC20SafeLib.safeTransferFrom(asset, vars.accountant, address(this), vars.totalRefunds);
+            _safeTransferFrom(asset, vars.accountant, address(this), vars.totalRefunds);
             // Update storage to increase total assets.
             _totalIdle += vars.totalRefunds;
         }
@@ -734,7 +733,7 @@ contract MultistrategyVault is IMultistrategyVault {
 
         require(shares > 0, CannotBuyZero());
 
-        ERC20SafeLib.safeTransferFrom(asset, msg.sender, address(this), _amount);
+        _safeTransferFrom(asset, msg.sender, address(this), _amount);
 
         // Lower strategy debt
         uint256 newDebt = currentDebt - _amount;
@@ -747,7 +746,7 @@ contract MultistrategyVault is IMultistrategyVault {
         emit DebtUpdated(strategy_, currentDebt, newDebt);
 
         // Transfer the strategies shares out.
-        ERC20SafeLib.safeTransfer(strategy_, msg.sender, shares);
+        _safeTransfer(strategy_, msg.sender, shares);
 
         emit DebtPurchased(strategy_, _amount);
     }
@@ -833,7 +832,6 @@ contract MultistrategyVault is IMultistrategyVault {
             maxLoss_,
             minimumTotalIdle,
             asset,
-            address(this),
             _shutdown
         );
 
@@ -1611,7 +1609,7 @@ contract MultistrategyVault is IMultistrategyVault {
         require(shares_ > 0, CannotMintZero());
 
         // Transfer the tokens to the vault first.
-        ERC20SafeLib.safeTransferFrom(asset, msg.sender, address(this), assets_);
+        _safeTransferFrom(asset, msg.sender, address(this), assets_);
 
         // Record the change in total assets.
         _totalIdle += assets_;
@@ -1885,7 +1883,7 @@ contract MultistrategyVault is IMultistrategyVault {
         _totalDebt = state.currentTotalDebt;
 
         // Transfer the requested amount to the receiver
-        ERC20SafeLib.safeTransfer(state.asset, receiver_, state.requestedAssets);
+        _safeTransfer(state.asset, receiver_, state.requestedAssets);
 
         emit Withdraw(sender_, receiver_, owner_, state.requestedAssets, shares_);
         return state.requestedAssets;
@@ -1899,7 +1897,7 @@ contract MultistrategyVault is IMultistrategyVault {
 
         uint256 currentDebt = _strategies[strategy].currentDebt;
         uint256 lossAmount = 0;
-        
+
         if (currentDebt != 0) {
             require(force, StrategyHasDebt());
             // If force is true, we realize the full loss of outstanding debt
@@ -1907,12 +1905,7 @@ contract MultistrategyVault is IMultistrategyVault {
         }
 
         // Set strategy params all back to 0 (WARNING: it can be re-added)
-        _strategies[strategy] = StrategyParams({
-            activation: 0,
-            lastReport: 0,
-            currentDebt: 0,
-            maxDebt: 0
-        });
+        _strategies[strategy] = StrategyParams({ activation: 0, lastReport: 0, currentDebt: 0, maxDebt: 0 });
 
         // Remove strategy from the default queue if it exists
         // Create a new dynamic array and add all strategies except the one being revoked
@@ -1945,5 +1938,47 @@ contract MultistrategyVault is IMultistrategyVault {
         }
 
         emit StrategyChanged(strategy, StrategyChangeType.REVOKED);
+    }
+
+    /// ERC20 SAFE OPERATIONS ///
+    
+    /**
+     * @dev Safely approve ERC20 tokens, handling non-standard implementations
+     * @param token The token to approve
+     * @param spender The address to approve spending for
+     * @param amount The amount to approve
+     */
+    function _safeApprove(address token, address spender, uint256 amount) internal {
+        (bool success, bytes memory data) = token.call(
+            abi.encodeWithSelector(IERC20.approve.selector, spender, amount)
+        );
+        require(success && (data.length == 0 || abi.decode(data, (bool))), ApprovalFailed());
+    }
+
+    /**
+     * @dev Safely transfer ERC20 tokens from one address to another, handling non-standard implementations
+     * @param token The token to transfer
+     * @param sender The address to transfer from
+     * @param receiver The address to transfer to
+     * @param amount The amount to transfer
+     */
+    function _safeTransferFrom(address token, address sender, address receiver, uint256 amount) internal {
+        (bool success, bytes memory data) = token.call(
+            abi.encodeWithSelector(IERC20.transferFrom.selector, sender, receiver, amount)
+        );
+        require(success && (data.length == 0 || abi.decode(data, (bool))), TransferFailed());
+    }
+
+    /**
+     * @dev Safely transfer ERC20 tokens, handling non-standard implementations
+     * @param token The token to transfer
+     * @param receiver The address to transfer to
+     * @param amount The amount to transfer
+     */
+    function _safeTransfer(address token, address receiver, uint256 amount) internal {
+        (bool success, bytes memory data) = token.call(
+            abi.encodeWithSelector(IERC20.transfer.selector, receiver, amount)
+        );
+        require(success && (data.length == 0 || abi.decode(data, (bool))), TransferFailed());
     }
 }
