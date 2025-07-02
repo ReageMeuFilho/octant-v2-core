@@ -39,7 +39,7 @@ library DebtManagementLib {
     }
 
     /**
-     * @notice Update debt for a strategy - follows Vyper _update_debt implementation line by line
+     * @notice Update debt for a strategy
      * @dev The vault will re-balance the debt vs target debt. Target debt must be
      *      smaller or equal to strategy's max_debt. This function will compare the
      *      current debt with the target debt and will take funds or deposit new
