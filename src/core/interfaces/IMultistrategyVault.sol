@@ -157,6 +157,33 @@ interface IMultistrategyVault {
     }
 
     /**
+     * @notice Variables for the processReport function.
+     */
+    struct ProcessReportLocalVars {
+        uint256 strategyTotalAssets;
+        uint256 currentDebt;
+        uint256 gain;
+        uint256 loss;
+        uint256 totalFees;
+        uint256 totalRefunds;
+        address accountant;
+        uint256 totalFeesShares;
+        uint16 protocolFeeBps;
+        uint256 protocolFeesShares;
+        address protocolFeeRecipient;
+        uint256 sharesToBurn;
+        uint256 sharesToLock;
+        uint256 profitMaxUnlockTimeVar;
+        uint256 currentTotalSupply;
+        uint256 totalLockedShares;
+        uint256 endingSupply;
+        uint256 toBurn;
+        uint256 previouslyLockedTime;
+        uint256 fullProfitUnlockDateVar;
+        uint256 newProfitLockingPeriod;
+    }
+
+    /**
      * @notice State for a redeem operation.
      * @param requestedAssets The requested assets to redeem.
      * @param currentTotalIdle The current total idle of the vault.

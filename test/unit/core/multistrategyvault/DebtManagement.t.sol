@@ -428,10 +428,10 @@ contract DebtManagementTest is Test {
         uint256 initialDebt = vault.totalDebt();
 
         // Check the strategy only took half and vault recorded it correctly
-        assertEq(initialIdle, expectedDebt);
-        assertEq(initialDebt, expectedDebt);
-        assertEq(vault.strategies(address(faultyStrategy)).currentDebt, expectedDebt);
-        assertEq(asset.balanceOf(address(faultyStrategy)), expectedDebt);
+        assertEq(initialIdle, expectedDebt, "initialIdle");
+        assertEq(initialDebt, expectedDebt, "initialDebt");
+        assertEq(vault.strategies(address(faultyStrategy)).currentDebt, expectedDebt, "currentDebt");
+        assertEq(asset.balanceOf(address(faultyStrategy)), expectedDebt, "assetBalance");
     }
 
     function testUpdateDebtWithLossyStrategyThatWithdrawsLessThanRequestedWithAirdrop() public {
