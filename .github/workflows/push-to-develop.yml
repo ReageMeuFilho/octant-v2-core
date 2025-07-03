@@ -77,7 +77,10 @@ jobs:
 
     steps:
       - name: Build
-        run: "cd /app; yarn build"
+        run: |
+          cd /app
+          yarn build
+          forge script script/deployment/staging/DeployProtocol.s.sol -f ${{ vars.TENDERLY_MAINNET_RPC_URL }}
 
   test:
     name: Test suite
