@@ -1,5 +1,41 @@
 
 
+## [0.5.0-develop.0](https://github.com/golemfoundation/octant-v2-core/compare/v0.4.0-develop.0...v0.5.0-develop.0) (2025-07-03)
+
+
+### Features
+
+* add enableBurning flag to TokenizedStrategy ([952397e](https://github.com/golemfoundation/octant-v2-core/commit/952397e11d54980919ab422664ad71d5d30881c9))
+* add loss tracker to TokenizedStrategy ([dd6dfd4](https://github.com/golemfoundation/octant-v2-core/commit/dd6dfd440764085ac59d0b69dbebf6f26d15dc6a))
+* create BaseYieldSkimmingStrategy ([bcc94d2](https://github.com/golemfoundation/octant-v2-core/commit/bcc94d2352311856c8ad14f0323864a029d023b5))
+* create IYieldSkimmingStrategy interface ([7875aa6](https://github.com/golemfoundation/octant-v2-core/commit/7875aa665f55cfc6b611cd6be469cbed22b19ced))
+* ERC20SafeApproveLib ([ad52b9a](https://github.com/golemfoundation/octant-v2-core/commit/ad52b9a8eff38d7518396a5aa567c4b9ed577b4d))
+* **events:** add donation tracking events for transparent yield flow monitoring ([829109c](https://github.com/golemfoundation/octant-v2-core/commit/829109c075f1ecc0a14a85b840dd7182ea47aecc))
+* implement burning logic in yield strategies ([00f9ba1](https://github.com/golemfoundation/octant-v2-core/commit/00f9ba11bf40e4a53e81fa3bc4c2cdf541abf866))
+* remove ERC20SafeLib after consolidating safe operations ([1256147](https://github.com/golemfoundation/octant-v2-core/commit/125614793ab4322b1597938bc8f374f66fc8e201))
+* **security:** implement constructor-based bytecode canonicalization for RegenStakerFactory ([f476b26](https://github.com/golemfoundation/octant-v2-core/commit/f476b266c1c1fe3c7083b9e6d065ba2b4d8ad963))
+* **strategies:** implement loss tracking mechanism for yield skimming strategies ([ef5f87b](https://github.com/golemfoundation/octant-v2-core/commit/ef5f87b693b10c468f7645a9be9da9631b6532f9))
+* update BaseStrategy to pass enableBurning parameter ([eca769a](https://github.com/golemfoundation/octant-v2-core/commit/eca769a5b869ccb029b0ea86d882e5526ac702ea))
+* update concrete strategies for enableBurning parameter ([bb9c019](https://github.com/golemfoundation/octant-v2-core/commit/bb9c0192787cbe5c829889081d52657e4a79f97a))
+* update health check classes for enableBurning parameter ([8b475b8](https://github.com/golemfoundation/octant-v2-core/commit/8b475b8651cafb17fdab83d844eba0436f06beb3))
+* update LidoStrategy with BaseYieldSkimming ([72ee74c](https://github.com/golemfoundation/octant-v2-core/commit/72ee74cd2f3122fda00d5366ff3534ed0a223d19))
+* update MorphoCompounderStrategy with BaseYieldSkimming ([6810af7](https://github.com/golemfoundation/octant-v2-core/commit/6810af77b833316620115de49f5b9e814370ed46))
+* update RocketPoolStrategy with BaseYieldSkimming ([125c2bb](https://github.com/golemfoundation/octant-v2-core/commit/125c2bbc93c1d411da30612ddf4d59e916ab4606))
+* update strategy factories to include enableBurning parameter ([5d73d2e](https://github.com/golemfoundation/octant-v2-core/commit/5d73d2ea4b8ca0d5a07106931a23104916c29a05))
+
+
+### Bug Fixes
+
+* **rounding:** resolve share calculation inconsistency in withdrawal operations ([4e5b727](https://github.com/golemfoundation/octant-v2-core/commit/4e5b727d97e626aeaf69a450d57c2ae8ade8a538))
+* **security:** remove inappropriate Yearn governance control from yield skimming strategies ([c81abcd](https://github.com/golemfoundation/octant-v2-core/commit/c81abcd323da5f25e4a93d8d82169ec861ba8063))
+* use actual deposit amount in debt calculation ([b84d3a6](https://github.com/golemfoundation/octant-v2-core/commit/b84d3a6284fd746499876a98e94415f0d5a8e5e7))
+* **yield-skimming:** implement proper _harvestAndReport return value in BaseYieldSkimmingStrategy ([7a3e024](https://github.com/golemfoundation/octant-v2-core/commit/7a3e024eb273579bb4ccca202af5402280dbf170))
+
+
+### Reverts
+
+* Revert "chore: add dry-run deployment of staging env to PR and push pipelines" ([a6a2c5b](https://github.com/golemfoundation/octant-v2-core/commit/a6a2c5b192c59a2f0fe85238632564f7f4acf6c6))
+
 ## [0.4.0-develop.0](https://github.com/golemfoundation/octant-v2-core/compare/v0.3.0-develop.1...v0.4.0-develop.0) (2025-06-27)
 
 
