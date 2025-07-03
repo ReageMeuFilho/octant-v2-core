@@ -61,6 +61,23 @@ jobs:
           name: contract_addresses
           path: /app/ci/contract_addresses.txt
 
+  restart-services:
+    name: Deploy contracts
+    runs-on: general
+    needs:
+      - deploy-contract
+
+    steps:
+      - name: Update frontend contracts
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          repo: golemfoundation/octant-v2-frontend
+          workflow: update-secret-version.yml
+          ref: develop
+          inputs: '{"run_id":"${{ github.run_id }}","env_type":"develop"}'
+          token: "${{ secrets.GH_BOT_TOKEN }}"
+
+
   publish-prerelease:
     name: Publish Prerelease
     needs:
@@ -97,7 +114,7 @@ jobs:
 
       - name: Publish preRelease
         env:
-          GITHUB_TOKEN:  ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}
         run: |
           yarn release --preRelease=develop --ci
@@ -138,7 +155,7 @@ jobs:
 
       - name: Publish release
         env:
-          GITHUB_TOKEN:  ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}
         run: |
           yarn release --ci
