@@ -38,11 +38,22 @@ contract YieldDonatingTokenizedStrategy is TokenizedStrategy {
         uint256 oldTotalAssets = _totalAssets(S);
         address _dragonRouter = S.dragonRouter;
 
+        uint256 lossAmount = S.lossAmount;
+
         if (newTotalAssets > oldTotalAssets) {
             unchecked {
                 profit = newTotalAssets - oldTotalAssets;
             }
-            _mint(S, _dragonRouter, _convertToShares(S, profit, Math.Rounding.Floor));
+            if (profit > lossAmount) {
+                uint256 sharesToMint = _convertToSharesWithLoss(S, profit - lossAmount, Math.Rounding.Floor);
+
+                // update the loss amount
+                S.lossAmount = 0;
+                // mint the shares to the dragon router
+                _mint(S, _dragonRouter, sharesToMint);
+            } else {
+                S.lossAmount -= profit;
+            }
         } else {
             unchecked {
                 loss = oldTotalAssets - newTotalAssets;
@@ -66,18 +77,36 @@ contract YieldDonatingTokenizedStrategy is TokenizedStrategy {
      * @param S Storage struct pointer to access strategy's storage variables
      * @param loss The amount of loss in terms of asset to protect against
      *
-     * This function calculates how many shares would be equivalent to the loss amount,
-     * then burns up to that amount of shares from dragonRouter, limited by the router's
-     * actual balance. This effectively socializes the loss among all shareholders by
-     * burning shares from the donation recipient rather than reducing the value of all shares.
+     * If burning is enabled, this function will try to burn shares from the dragon router
+     * equivalent to the loss amount, and add any remaining unburnted amount to the loss tracker.
+     * If burning is disabled, it adds the full loss amount to the loss tracker.
      */
     function _handleDragonLossProtection(StrategyData storage S, uint256 loss) internal {
-        // Can only burn up to available shares
-        uint256 sharesBurned = Math.min(_convertToShares(S, loss, Math.Rounding.Ceil), S.balances[S.dragonRouter]);
+        if (S.enableBurning) {
+            // Convert loss to shares that should be burned
+            uint256 sharesToBurn = _convertToSharesWithLoss(S, loss, Math.Rounding.Ceil);
 
-        if (sharesBurned > 0) {
-            // Burn shares from dragon router
-            _burn(S, S.dragonRouter, sharesBurned);
+            // Can only burn up to available shares from dragon router
+            uint256 sharesBurned = Math.min(sharesToBurn, S.balances[S.dragonRouter]);
+
+            if (sharesBurned > 0) {
+                // Burn shares from dragon router
+                _burn(S, S.dragonRouter, sharesBurned);
+
+                // Convert burned shares back to assets to calculate remaining loss
+                uint256 assetValueBurned = _convertToAssets(S, sharesBurned, Math.Rounding.Floor);
+
+                // Add any remaining loss that couldn't be covered by burning
+                if (loss > assetValueBurned) {
+                    S.lossAmount += (loss - assetValueBurned);
+                }
+            } else {
+                // No shares available to burn, add full loss
+                S.lossAmount += loss;
+            }
+        } else {
+            // Burning disabled, add full loss to tracker
+            S.lossAmount += loss;
         }
     }
 }

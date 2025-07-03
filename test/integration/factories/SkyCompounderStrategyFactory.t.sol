@@ -89,6 +89,7 @@ contract SkyCompounderStrategyFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            true, // enableBurning
             strategySalt,
             address(tokenizedStrategy)
         );
@@ -122,6 +123,7 @@ contract SkyCompounderStrategyFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            true, // enableBurning
             firstSalt,
             address(tokenizedStrategy)
         );
@@ -136,6 +138,7 @@ contract SkyCompounderStrategyFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            true, // enableBurning
             secondSalt,
             address(tokenizedStrategy)
         );
@@ -170,6 +173,7 @@ contract SkyCompounderStrategyFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            true, // enableBurning
             firstSalt,
             address(tokenizedStrategy)
         );
@@ -186,6 +190,7 @@ contract SkyCompounderStrategyFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            true, // enableBurning
             secondSalt,
             address(tokenizedStrategy)
         );
@@ -217,6 +222,7 @@ contract SkyCompounderStrategyFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            true, // enableBurning
             strategySalt,
             address(tokenizedStrategy)
         );
@@ -233,6 +239,7 @@ contract SkyCompounderStrategyFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            true, // enableBurning
             strategySalt,
             address(tokenizedStrategy)
         );
@@ -252,6 +259,7 @@ contract SkyCompounderStrategyFactoryTest is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
+            true, // enableBurning
             differentSalt,
             address(tokenizedStrategy)
         );

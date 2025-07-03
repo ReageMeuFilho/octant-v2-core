@@ -72,6 +72,7 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
      * @param _keeper Address to set as strategies `keeper`.
      * @param _emergencyAdmin Address to set as strategy's `emergencyAdmin`.
      * @param _dragonRouter Address that receives minted shares from yield in specialized strategies.
+     * @param _enableBurning Whether to enable burning shares from dragon router during loss protection.
      */
     function initialize(
         address _asset,
@@ -79,7 +80,8 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
         address _management,
         address _keeper,
         address _emergencyAdmin,
-        address _dragonRouter
+        address _dragonRouter,
+        bool _enableBurning
     ) external;
 
     /*//////////////////////////////////////////////////////////////

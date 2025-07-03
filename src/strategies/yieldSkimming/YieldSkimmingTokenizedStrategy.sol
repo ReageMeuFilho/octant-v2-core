@@ -170,18 +170,21 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     }
 
     /**
-     * This function calculates how many shares would be equivalent to the loss amount,
-     * then burns up to that amount of shares from dragonRouter, limited by the router's
+     * This function handles loss protection by burning shares from the dragon router if burning is enabled.
+     * Since yield skimming strategies don't track losses, they either burn shares or do nothing.
+     * When burning is enabled, it burns up to the loss amount from dragonRouter, limited by the router's
      * actual balance. This effectively socializes the loss among all shareholders by
      * burning shares from the donation recipient rather than reducing the value of all shares.
      */
     function _handleDragonLossProtection(StrategyData storage S, uint256 loss) internal {
-        // Can only burn up to available shares
-        uint256 sharesBurned = Math.min(loss, S.balances[S.dragonRouter]);
+        if (S.enableBurning) {
+            // Can only burn up to available shares
+            uint256 sharesBurned = Math.min(loss, S.balances[S.dragonRouter]);
 
-        if (sharesBurned > 0) {
-            // Burn shares from dragon router
-            _burn(S, S.dragonRouter, sharesBurned);
+            if (sharesBurned > 0) {
+                // Burn shares from dragon router
+                _burn(S, S.dragonRouter, sharesBurned);
+            }
         }
     }
 }

@@ -52,8 +52,20 @@ contract SkyCompounderStrategy is BaseHealthCheck, UniswapV3Swapper, ISkyCompoun
         address _keeper,
         address _emergencyAdmin,
         address _donationAddress,
+        bool _enableBurning,
         address _tokenizedStrategyAddress
-    ) BaseHealthCheck(USDS, _name, _management, _keeper, _emergencyAdmin, _donationAddress, _tokenizedStrategyAddress) {
+    )
+        BaseHealthCheck(
+            USDS,
+            _name,
+            _management,
+            _keeper,
+            _emergencyAdmin,
+            _donationAddress,
+            _enableBurning,
+            _tokenizedStrategyAddress
+        )
+    {
         require(IStaking(_staking).paused() == false, "paused");
         require(USDS == IStaking(_staking).stakingToken(), "!stakingToken");
         rewardsToken = IStaking(_staking).rewardsToken();

@@ -164,6 +164,11 @@ abstract contract TokenizedStrategy {
      */
     event PendingDragonRouterChange(address indexed newDragonRouter, uint256 effectiveTimestamp);
 
+    /**
+     * @notice Emitted when the burning mechanism is enabled or disabled.
+     */
+    event UpdateBurningMechanism(bool enableBurning);
+
     /*//////////////////////////////////////////////////////////////
                         STORAGE STRUCT
     //////////////////////////////////////////////////////////////*/
@@ -217,6 +222,9 @@ abstract contract TokenizedStrategy {
         
         // Loss tracking for yield strategies
         uint256 lossAmount; // Accumulated losses to offset against future profits
+        
+        // Burning mechanism control
+        bool enableBurning; // Whether to burn shares from dragon router during loss protection
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -398,6 +406,7 @@ abstract contract TokenizedStrategy {
      * @param _keeper Address to set as strategies `keeper`.
      * @param _emergencyAdmin Address to set as strategy's `emergencyAdmin`.
      * @param _dragonRouter Address that receives minted shares from yield in specialized strategies.
+     * @param _enableBurning Whether to enable burning shares from dragon router during loss protection.
      */
     function initialize(
         address _asset,
@@ -405,7 +414,8 @@ abstract contract TokenizedStrategy {
         address _management,
         address _keeper,
         address _emergencyAdmin,
-        address _dragonRouter
+        address _dragonRouter,
+        bool _enableBurning
     ) public virtual {
         // Cache storage pointer.
         StrategyData storage S = _strategyStorage();
@@ -438,6 +448,9 @@ abstract contract TokenizedStrategy {
         // Set the dragon router address, can't be 0
         require(_dragonRouter != address(0), "ZERO ADDRESS");
         S.dragonRouter = _dragonRouter;
+
+        // Set the burning mechanism flag
+        S.enableBurning = _enableBurning;
 
         // Emit event to signal a new strategy has been initialized.
         emit NewTokenizedStrategy(address(this), _asset, API_VERSION);
@@ -775,6 +788,23 @@ abstract contract TokenizedStrategy {
         if (totalAssets_ == 0) return 0;
 
         return assets.mulDiv(totalSupply_, totalAssets_, _rounding);
+    }
+
+    function _convertToSharesWithLoss(
+        StrategyData storage S,
+        uint256 assets,
+        Math.Rounding _rounding
+    ) internal view returns (uint256) {
+        // Saves an extra SLOAD if values are non-zero.
+        uint256 totalSupply_ = _totalSupply(S);
+        // If supply is 0, PPS = 1.
+        if (totalSupply_ == 0) return assets;
+
+        uint256 totalAssets_ = _totalAssets(S);
+        // If assets are 0 but supply is not PPS = 0.
+        if (totalAssets_ == 0) return 0;
+
+        return assets.mulDiv(totalSupply_, totalAssets_ + S.lossAmount, _rounding);
     }
 
     /// @dev Internal implementation of {convertToAssets}.
@@ -1140,6 +1170,14 @@ abstract contract TokenizedStrategy {
         return _strategyStorage().shutdown;
     }
 
+    /**
+     * @notice Get whether burning shares from dragon router during loss protection is enabled.
+     * @return Whether the burning mechanism is enabled.
+     */
+    function enableBurning() external view returns (bool) {
+        return _strategyStorage().enableBurning;
+    }
+
     /*//////////////////////////////////////////////////////////////
                         SETTER FUNCTIONS
     //////////////////////////////////////////////////////////////*/
@@ -1253,6 +1291,16 @@ abstract contract TokenizedStrategy {
      */
     function setName(string calldata _name) external onlyManagement {
         _strategyStorage().name = _name;
+    }
+
+    /**
+     * @notice Sets whether to enable burning shares from dragon router during loss protection.
+     * @dev Can only be called by the current `management`.
+     * @param _enableBurning Whether to enable the burning mechanism.
+     */
+    function setEnableBurning(bool _enableBurning) external onlyManagement {
+        _strategyStorage().enableBurning = _enableBurning;
+        emit UpdateBurningMechanism(_enableBurning);
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -43,7 +43,7 @@ contract MorphoCompounderStrategyFactory {
     );
 
     /**
-     * @notice Deploys a new MorphoCompounder strategy for the Yield Skimming Vault.
+     * @notice Deploys a new MorphoCompounder strategy for the Yield Donating Vault.
      * @dev This function uses CREATE3 to deploy a new strategy contract deterministically.
      *      The strategy is initialized with the provided parameters, and its address is
      *      returned upon successful deployment. The function emits a `MorphoStrategyDeploy` event.
@@ -52,6 +52,7 @@ contract MorphoCompounderStrategyFactory {
      * @param _keeper The address of the keeper responsible for maintaining the strategy.
      * @param _emergencyAdmin The address of the emergency admin for the strategy.
      * @param _donationAddress The address where donations from the strategy will be sent.
+     * @param _enableBurning Whether to enable burning shares from dragon router during loss protection.
      * @param _salt A unique salt used for deterministic deployment of the strategy.
      * @return strategyAddress The address of the newly deployed strategy contract.
      */
@@ -62,6 +63,7 @@ contract MorphoCompounderStrategyFactory {
         address _keeper,
         address _emergencyAdmin,
         address _donationAddress,
+        bool _enableBurning,
         bytes32 _salt,
         address _tokenizedStrategyAddress
     ) external returns (address strategyAddress) {
@@ -75,6 +77,7 @@ contract MorphoCompounderStrategyFactory {
                 _keeper,
                 _emergencyAdmin,
                 _donationAddress,
+                _enableBurning,
                 _tokenizedStrategyAddress
             )
         );
