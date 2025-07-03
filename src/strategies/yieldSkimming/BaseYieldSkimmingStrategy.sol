@@ -60,14 +60,6 @@ abstract contract BaseYieldSkimmingStrategy is BaseYieldSkimmingHealthCheck {
     }
 
     /**
-     * @notice Emergency withdrawal function to transfer tokens to emergency admin
-     * @param _amount Amount to withdraw in emergency
-     */
-    function _emergencyWithdraw(uint256 _amount) internal override {
-        // nothing to do here as assets are always held in the strategy
-    }
-
-    /**
      * @notice Withdraws funds from the yield vault
      * @param _amount Amount to free
      */
@@ -85,23 +77,8 @@ abstract contract BaseYieldSkimmingStrategy is BaseYieldSkimmingHealthCheck {
     }
 
     /**
-     * @notice No tending needed
-     */
-    function _tend(uint256 /*_idle*/) internal override {
-        // No action needed
-    }
-
-    /**
      * @notice Gets the current exchange rate from the yield vault
      * @return The current price per share
      */
     function _getCurrentExchangeRate() internal view virtual returns (uint256);
-
-    /**
-     * @notice Always returns false as no tending is needed
-     * @return Always false as tending is not required
-     */
-    function _tendTrigger() internal pure override returns (bool) {
-        return false;
-    }
 }

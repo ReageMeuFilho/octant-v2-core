@@ -148,8 +148,14 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
      */
     function _currentRateRay() internal view virtual returns (uint256) {
         uint256 exchangeRate = IYieldSkimmingStrategy(address(this)).getCurrentExchangeRate();
+        uint256 exchangeRateDecimals = IYieldSkimmingStrategy(address(this)).decimalsOfExchangeRate();
 
-        return exchangeRate.wadToRay(); // Convert from WAD (1e18) to RAY (1e27)
+        uint256 scaledRate = exchangeRateDecimals == 18
+            ? exchangeRate
+            : exchangeRateDecimals < 18
+                ? exchangeRate * 10 ** (18 - exchangeRateDecimals)
+                : exchangeRate / 10 ** (exchangeRateDecimals - 18);
+        return scaledRate.wadToRay();
     }
 
     function _convertToShares(

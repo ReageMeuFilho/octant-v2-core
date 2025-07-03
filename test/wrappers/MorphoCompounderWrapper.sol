@@ -47,7 +47,7 @@ contract MorphoCompounderWrapper is MorphoCompounderStrategy {
     }
 
     // expose _tendTrigger
-    function exposeTendTrigger() public pure returns (bool) {
+    function exposeTendTrigger() public view returns (bool) {
         return _tendTrigger();
     }
 }

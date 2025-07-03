@@ -3,7 +3,6 @@ pragma solidity ^0.8.0;
 
 import { BaseStrategy } from "src/core/BaseStrategy.sol";
 import { IBaseHealthCheck } from "src/strategies/interfaces/IBaseHealthCheck.sol";
-import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
 import { IYieldSkimmingStrategy } from "src/strategies/yieldSkimming/IYieldSkimmingStrategy.sol";
 import { WadRayMath } from "src/utils/libs/Maths/WadRay.sol";
 
@@ -26,6 +25,7 @@ import { WadRayMath } from "src/utils/libs/Maths/WadRay.sol";
  */
 abstract contract BaseYieldSkimmingHealthCheck is BaseStrategy, IBaseHealthCheck {
     using WadRayMath for uint256;
+
     // Can be used to determine if a healthcheck should be called.
     // Defaults to true;
     bool public doHealthCheck = true;
