@@ -74,7 +74,28 @@ jobs:
           repo: golemfoundation/octant-v2-frontend
           workflow: update-secret-version.yml
           ref: develop
-          inputs: '{"run_id":"${{ github.run_id }}","env_type":"develop"}'
+          inputs: '{"run-id":"${{ github.run_id }}","env-type":"develop"}'
+          token: "${{ secrets.GH_BOT_TOKEN }}"
+
+      - name: Get last subgraph tag
+        id: last-subgraph-tag
+        run: |
+          echo "Fetching last subgraph tag..."
+          TAG=$(curl -s -H "Authorization: Bearer ${{ secrets.GH_BOT_TOKEN }}" 'https://api.github.com/repos/golemfoundation/octant-v2-subgraph/releases?per_page=1' | jq -r '.[0].tag_name')
+          if [ -z "$TAG" ] || [ $TAG == 'null' ]; then
+            echo "No tags found, exiting."
+            exit 1
+          fi
+          echo "Last subgraph tag: $TAG"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Redeploy subgraph
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          repo: golemfoundation/octant-v2-subgraph
+          workflow: tpl-deploy-app.yml
+          ref: develop
+          inputs: '{"core-run-id":"${{ github.run_id }}","env-type":"develop","image-tag":"${{ steps.last-subgraph-tag.outputs.tag }}"}'
           token: "${{ secrets.GH_BOT_TOKEN }}"
 
 
