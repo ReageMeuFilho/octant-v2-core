@@ -14,7 +14,7 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title RegenStakerFactoryVariantsTest
- * @notice Tests for the RegenStakerFactory contract variant detection and deployment
+ * @notice Tests for the RegenStakerFactory contract explicit variant deployment
  */
 contract RegenStakerFactoryVariantsTest is Test {
     RegenStakerFactory factory;
@@ -35,58 +35,24 @@ contract RegenStakerFactoryVariantsTest is Test {
     function setUp() public {
         vm.startPrank(ADMIN);
 
-        // Deploy factory with canonical bytecode
         bytes memory permitCode = type(RegenStakerWithoutDelegateSurrogateVotes).creationCode;
         bytes memory stakingCode = type(RegenStaker).creationCode;
         factory = new RegenStakerFactory(stakingCode, permitCode);
 
-        // Deploy test tokens
         basicToken = new MockERC20(18);
         permitToken = new MockERC20Permit(18);
         stakingToken = new MockERC20Staking(18);
 
-        // Deploy whitelists
         stakerWhitelist = new Whitelist();
         contributionWhitelist = new Whitelist();
         allocationMechanismWhitelist = new Whitelist();
 
-        // Deploy calculator
         calculator = new RegenEarningPowerCalculator(ADMIN, stakerWhitelist);
 
         vm.stopPrank();
     }
 
-    function test_DetectStakerVariant_BasicERC20_ReturnsNO_DELEGATION() public {
-        RegenStakerFactory.RegenStakerVariant variant = factory.detectStakerVariant(IERC20(address(basicToken)));
-        assertEq(uint256(variant), uint256(RegenStakerFactory.RegenStakerVariant.NO_DELEGATION));
-    }
-
-    function test_DetectStakerVariant_PermitToken_ReturnsNO_DELEGATION() public {
-        RegenStakerFactory.RegenStakerVariant variant = factory.detectStakerVariant(IERC20(address(permitToken)));
-        assertEq(uint256(variant), uint256(RegenStakerFactory.RegenStakerVariant.NO_DELEGATION));
-    }
-
-    function test_DetectStakerVariant_StakingToken_ReturnsERC20_STAKING() public {
-        RegenStakerFactory.RegenStakerVariant variant = factory.detectStakerVariant(IERC20(address(stakingToken)));
-        assertEq(uint256(variant), uint256(RegenStakerFactory.RegenStakerVariant.ERC20_STAKING));
-    }
-
-    function test_GetRecommendedVariant_BasicERC20_ReturnsNO_DELEGATION() public view {
-        RegenStakerFactory.RegenStakerVariant variant = factory.getRecommendedVariant(IERC20(address(basicToken)));
-        assertEq(uint256(variant), uint256(RegenStakerFactory.RegenStakerVariant.NO_DELEGATION));
-    }
-
-    function test_GetRecommendedVariant_PermitToken_ReturnsNO_DELEGATION() public view {
-        RegenStakerFactory.RegenStakerVariant variant = factory.getRecommendedVariant(IERC20(address(permitToken)));
-        assertEq(uint256(variant), uint256(RegenStakerFactory.RegenStakerVariant.NO_DELEGATION));
-    }
-
-    function test_GetRecommendedVariant_StakingToken_ReturnsERC20_STAKING() public view {
-        RegenStakerFactory.RegenStakerVariant variant = factory.getRecommendedVariant(IERC20(address(stakingToken)));
-        assertEq(uint256(variant), uint256(RegenStakerFactory.RegenStakerVariant.ERC20_STAKING));
-    }
-
-    function test_CreateStaker_BasicERC20_DeploysNO_DELEGATION() public {
+    function test_CreateStakerNoDelegation_WithBasicERC20_Success() public {
         RegenStakerFactory.CreateStakerParams memory params = RegenStakerFactory.CreateStakerParams({
             rewardsToken: IERC20(address(basicToken)),
             stakeToken: IERC20(address(basicToken)),
@@ -102,24 +68,14 @@ contract RegenStakerFactoryVariantsTest is Test {
         });
 
         bytes memory permitCode = type(RegenStakerWithoutDelegateSurrogateVotes).creationCode;
-        bytes memory stakingCode = type(RegenStaker).creationCode;
 
-        (address stakerAddress, RegenStakerFactory.RegenStakerVariant variant) = factory.createStaker(
-            params,
-            bytes32(uint256(1)),
-            permitCode,
-            stakingCode
-        );
+        address stakerAddress = factory.createStakerNoDelegation(params, bytes32(uint256(1)), permitCode);
 
-        assertEq(uint256(variant), uint256(RegenStakerFactory.RegenStakerVariant.NO_DELEGATION));
         assertTrue(stakerAddress != address(0));
-
-        // Verify it's actually a RegenStakerWithoutDelegateSurrogateVotes by checking the contract code
-        // (This is a basic check - in practice you might verify specific functionality)
         assertTrue(stakerAddress.code.length > 0);
     }
 
-    function test_CreateStaker_PermitToken_DeploysNO_DELEGATION() public {
+    function test_CreateStakerNoDelegation_WithPermitToken_Success() public {
         RegenStakerFactory.CreateStakerParams memory params = RegenStakerFactory.CreateStakerParams({
             rewardsToken: IERC20(address(permitToken)),
             stakeToken: IERC20(address(permitToken)),
@@ -135,21 +91,14 @@ contract RegenStakerFactoryVariantsTest is Test {
         });
 
         bytes memory permitCode = type(RegenStakerWithoutDelegateSurrogateVotes).creationCode;
-        bytes memory stakingCode = type(RegenStaker).creationCode;
 
-        (address stakerAddress, RegenStakerFactory.RegenStakerVariant variant) = factory.createStaker(
-            params,
-            bytes32(uint256(2)),
-            permitCode,
-            stakingCode
-        );
+        address stakerAddress = factory.createStakerNoDelegation(params, bytes32(uint256(2)), permitCode);
 
-        assertEq(uint256(variant), uint256(RegenStakerFactory.RegenStakerVariant.NO_DELEGATION));
         assertTrue(stakerAddress != address(0));
         assertTrue(stakerAddress.code.length > 0);
     }
 
-    function test_CreateStaker_StakingToken_DeploysERC20_STAKING() public {
+    function test_CreateStakerERC20Staking_WithStakingToken_Success() public {
         RegenStakerFactory.CreateStakerParams memory params = RegenStakerFactory.CreateStakerParams({
             rewardsToken: IERC20(address(stakingToken)),
             stakeToken: IERC20(address(stakingToken)),
@@ -164,18 +113,131 @@ contract RegenStakerFactoryVariantsTest is Test {
             rewardDuration: MIN_REWARD_DURATION
         });
 
-        bytes memory permitCode = type(RegenStakerWithoutDelegateSurrogateVotes).creationCode;
         bytes memory stakingCode = type(RegenStaker).creationCode;
 
-        (address stakerAddress, RegenStakerFactory.RegenStakerVariant variant) = factory.createStaker(
-            params,
-            bytes32(uint256(3)),
-            permitCode,
-            stakingCode
-        );
+        address stakerAddress = factory.createStakerERC20Staking(params, bytes32(uint256(3)), stakingCode);
 
-        assertEq(uint256(variant), uint256(RegenStakerFactory.RegenStakerVariant.ERC20_STAKING));
         assertTrue(stakerAddress != address(0));
         assertTrue(stakerAddress.code.length > 0);
+    }
+
+    function test_CreateStakerERC20Staking_WithBasicToken_Success() public {
+        RegenStakerFactory.CreateStakerParams memory params = RegenStakerFactory.CreateStakerParams({
+            rewardsToken: IERC20(address(basicToken)),
+            stakeToken: IERC20(address(basicToken)),
+            admin: ADMIN,
+            stakerWhitelist: stakerWhitelist,
+            contributionWhitelist: contributionWhitelist,
+            allocationMechanismWhitelist: allocationMechanismWhitelist,
+            earningPowerCalculator: calculator,
+            maxBumpTip: MAX_BUMP_TIP,
+            maxClaimFee: MAX_CLAIM_FEE,
+            minimumStakeAmount: 0,
+            rewardDuration: MIN_REWARD_DURATION
+        });
+
+        bytes memory stakingCode = type(RegenStaker).creationCode;
+
+        address stakerAddress = factory.createStakerERC20Staking(params, bytes32(uint256(4)), stakingCode);
+
+        assertTrue(stakerAddress != address(0));
+        assertTrue(stakerAddress.code.length > 0);
+    }
+
+    function test_RevertIf_CreateStakerNoDelegation_WithInvalidBytecode() public {
+        RegenStakerFactory.CreateStakerParams memory params = RegenStakerFactory.CreateStakerParams({
+            rewardsToken: IERC20(address(basicToken)),
+            stakeToken: IERC20(address(basicToken)),
+            admin: ADMIN,
+            stakerWhitelist: stakerWhitelist,
+            contributionWhitelist: contributionWhitelist,
+            allocationMechanismWhitelist: allocationMechanismWhitelist,
+            earningPowerCalculator: calculator,
+            maxBumpTip: MAX_BUMP_TIP,
+            maxClaimFee: MAX_CLAIM_FEE,
+            minimumStakeAmount: 0,
+            rewardDuration: MIN_REWARD_DURATION
+        });
+
+        bytes memory wrongCode = type(RegenStaker).creationCode; // Using staking code for no-delegation variant
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RegenStakerFactory.UnauthorizedBytecode.selector,
+                RegenStakerFactory.RegenStakerVariant.NO_DELEGATION,
+                keccak256(wrongCode),
+                factory.canonicalBytecodeHash(RegenStakerFactory.RegenStakerVariant.NO_DELEGATION)
+            )
+        );
+
+        factory.createStakerNoDelegation(params, bytes32(uint256(5)), wrongCode);
+    }
+
+    function test_RevertIf_CreateStakerERC20Staking_WithInvalidBytecode() public {
+        RegenStakerFactory.CreateStakerParams memory params = RegenStakerFactory.CreateStakerParams({
+            rewardsToken: IERC20(address(stakingToken)),
+            stakeToken: IERC20(address(stakingToken)),
+            admin: ADMIN,
+            stakerWhitelist: stakerWhitelist,
+            contributionWhitelist: contributionWhitelist,
+            allocationMechanismWhitelist: allocationMechanismWhitelist,
+            earningPowerCalculator: calculator,
+            maxBumpTip: MAX_BUMP_TIP,
+            maxClaimFee: MAX_CLAIM_FEE,
+            minimumStakeAmount: 0,
+            rewardDuration: MIN_REWARD_DURATION
+        });
+
+        bytes memory wrongCode = type(RegenStakerWithoutDelegateSurrogateVotes).creationCode; // Using no-delegation code for staking variant
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RegenStakerFactory.UnauthorizedBytecode.selector,
+                RegenStakerFactory.RegenStakerVariant.ERC20_STAKING,
+                keccak256(wrongCode),
+                factory.canonicalBytecodeHash(RegenStakerFactory.RegenStakerVariant.ERC20_STAKING)
+            )
+        );
+
+        factory.createStakerERC20Staking(params, bytes32(uint256(6)), wrongCode);
+    }
+
+    function test_RevertIf_CreateStaker_WithEmptyBytecode() public {
+        RegenStakerFactory.CreateStakerParams memory params = RegenStakerFactory.CreateStakerParams({
+            rewardsToken: IERC20(address(basicToken)),
+            stakeToken: IERC20(address(basicToken)),
+            admin: ADMIN,
+            stakerWhitelist: stakerWhitelist,
+            contributionWhitelist: contributionWhitelist,
+            allocationMechanismWhitelist: allocationMechanismWhitelist,
+            earningPowerCalculator: calculator,
+            maxBumpTip: MAX_BUMP_TIP,
+            maxClaimFee: MAX_CLAIM_FEE,
+            minimumStakeAmount: 0,
+            rewardDuration: MIN_REWARD_DURATION
+        });
+
+        vm.expectRevert(RegenStakerFactory.InvalidBytecode.selector);
+        factory.createStakerNoDelegation(params, bytes32(uint256(7)), "");
+
+        vm.expectRevert(RegenStakerFactory.InvalidBytecode.selector);
+        factory.createStakerERC20Staking(params, bytes32(uint256(8)), "");
+    }
+
+    function test_CanonicalBytecodeHashes_SetCorrectly() public view {
+        bytes32 noDelegationHash = factory.canonicalBytecodeHash(RegenStakerFactory.RegenStakerVariant.NO_DELEGATION);
+        bytes32 erc20StakingHash = factory.canonicalBytecodeHash(RegenStakerFactory.RegenStakerVariant.ERC20_STAKING);
+
+        assertTrue(noDelegationHash != bytes32(0));
+        assertTrue(erc20StakingHash != bytes32(0));
+        assertTrue(noDelegationHash != erc20StakingHash);
+    }
+
+    function test_PredictStakerAddress_WorksCorrectly() public view {
+        bytes32 salt = bytes32(uint256(100));
+        address deployer = address(0x123);
+
+        address predicted = factory.predictStakerAddress(salt, deployer);
+        assertTrue(predicted != address(0));
     }
 }
