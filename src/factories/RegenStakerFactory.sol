@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import { CREATE3 } from "solady/utils/CREATE3.sol";
-import { IERC20, IERC20Staking, IWhitelist, IEarningPowerCalculator } from "src/regen/RegenStaker.sol";
+import { IERC20, IWhitelist, IEarningPowerCalculator } from "src/regen/RegenStaker.sol";
 
 /// @title RegenStaker Factory
 /// @notice Deploys RegenStaker contracts with explicit variant selection

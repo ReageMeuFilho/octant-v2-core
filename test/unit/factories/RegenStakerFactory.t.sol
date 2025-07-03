@@ -2,7 +2,6 @@
 pragma solidity ^0.8.0;
 
 import { Test } from "forge-std/Test.sol";
-import { console } from "forge-std/console.sol";
 import { RegenStakerFactory } from "src/factories/RegenStakerFactory.sol";
 import { RegenStaker } from "src/regen/RegenStaker.sol";
 import { RegenStakerWithoutDelegateSurrogateVotes } from "src/regen/RegenStakerWithoutDelegateSurrogateVotes.sol";
