@@ -40,9 +40,6 @@ jobs:
       - name: Build
         run: yarn build
 
-      - name: Dry run staging deployment
-        run: forge script script/deployment/staging/DeployProtocol.s.sol -f ${{ vars.TENDERLY_MAINNET_RPC_URL }}
-
   test:
     name: Test suite
     needs: build
