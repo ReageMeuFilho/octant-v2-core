@@ -57,6 +57,10 @@ contract MockStrategySkimming is BaseStrategy {
         lastReportedPPS = _newRate;
     }
 
+    function decimalsOfExchangeRate() public pure returns (uint256) {
+        return 18;
+    }
+
     function _deployFunds(uint256 _amount) internal override {}
 
     function _freeFunds(uint256 /*_amount*/) internal override {}
