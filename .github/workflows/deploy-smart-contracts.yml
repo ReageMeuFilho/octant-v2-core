@@ -62,7 +62,7 @@ jobs:
           path: /app/ci/contract_addresses.txt
 
   restart-services:
-    name: Deploy contracts
+    name: Restart develop services
     runs-on: general
     needs:
       - deploy-contract
@@ -120,9 +120,6 @@ jobs:
       - name: Init env
         run: yarn install
 
-      - name: Build
-        run: yarn build:contracts
-
       - name: Set npm auth token
         shell: bash
         run: |
@@ -132,6 +129,9 @@ jobs:
           git config --local user.email "birnam@wildland.io"
           git config --local user.name "Housekeeper Bot"
           git config --local user.signingkey "${{ secrets.HOUSEKEEPER_GITHUB_SIGNING_KEY_ID }}"
+
+      - name: Build
+        run: yarn build:contracts
 
       - name: Publish preRelease
         env:
