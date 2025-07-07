@@ -39,6 +39,16 @@ contract SkyCompounderStrategyFactory {
     address constant USDS_REWARD_ADDRESS = 0x0650CAF159C5A49f711e8169D4336ECB9b950275;
 
     /**
+     * @notice Predict deterministic deployment address
+     * @param _salt Deployment salt
+     * @param deployer Address that will deploy
+     * @return Predicted contract address
+     */
+    function predictStrategyAddress(bytes32 _salt, address deployer) external view returns (address) {
+        return CREATE3.predictDeterministicAddress(keccak256(abi.encodePacked(_salt, deployer)));
+    }
+
+    /**
      * @notice Deploys a new SkyCompounder strategy for the Yield Donating Vault.
      * @dev This function uses CREATE3 to deploy a new strategy contract deterministically.
      *      The strategy is initialized with the provided parameters, and its address is
@@ -76,7 +86,7 @@ contract SkyCompounderStrategyFactory {
             )
         );
 
-        strategyAddress = CREATE3.deployDeterministic(bytecode, _salt);
+        strategyAddress = CREATE3.deployDeterministic(bytecode, keccak256(abi.encodePacked(_salt, msg.sender)));
         emit StrategyDeploy(msg.sender, _donationAddress, strategyAddress);
         StrategyInfo memory strategyInfo = StrategyInfo({
             deployerAddress: msg.sender,

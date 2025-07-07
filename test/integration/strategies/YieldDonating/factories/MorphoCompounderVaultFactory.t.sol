@@ -76,7 +76,7 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
         string memory vaultSharesName = "MorphoCompounder Donating Vault Shares";
         bytes32 strategySalt = keccak256("TEST_STRATEGY_SALT");
 
-        address expectedStrategyAddress = CREATE3.predictDeterministicAddress(strategySalt, address(factory));
+        address expectedStrategyAddress = factory.predictStrategyAddress(strategySalt, management);
 
         // Create a strategy and check events
         vm.startPrank(management);
