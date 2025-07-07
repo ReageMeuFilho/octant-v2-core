@@ -12,9 +12,22 @@ import { ERC165 } from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
+/// @title RegenEarningPowerCalculator
+/// @author [Golem Foundation](https://golem.foundation)
+/// @notice Contract that calculates earning power based on staked amounts with optional whitelist restrictions
+/// @dev This calculator returns the minimum of the staked amount and uint96 max value as earning power.
+/// When a whitelist is configured, only whitelisted addresses receive earning power.
+/// Setting the whitelist to address(0) allows all addresses to earn.
 contract RegenEarningPowerCalculator is IWhitelistedEarningPowerCalculator, Ownable, ERC165 {
+    /// @notice The whitelist contract that determines which addresses are eligible to earn power
+    /// @dev When set to address(0), all addresses are eligible. Otherwise, only whitelisted addresses
+    /// can earn power from their staked tokens.
     IWhitelist public override whitelist;
 
+    /// @notice Initializes the RegenEarningPowerCalculator with an owner and optional whitelist
+    /// @param _owner The address that will own this contract
+    /// @param _whitelist The whitelist contract address (can be address(0) for no whitelist)
+    /// @dev Emits a WhitelistSet event upon construction
     constructor(address _owner, IWhitelist _whitelist) Ownable(_owner) {
         whitelist = _whitelist;
         emit WhitelistSet(_whitelist);
@@ -24,6 +37,9 @@ contract RegenEarningPowerCalculator is IWhitelistedEarningPowerCalculator, Owna
     /// @param stakedAmount The amount of staked tokens
     /// @param staker The address of the staker
     /// @return The earning power of the staker
+    /// @dev Returns 0 if the staker is not whitelisted (when whitelist is active).
+    /// Otherwise, returns the minimum of stakedAmount and uint96 max to prevent overflow
+    /// in earning power calculations.
     function getEarningPower(
         uint256 stakedAmount,
         address staker,
@@ -41,6 +57,11 @@ contract RegenEarningPowerCalculator is IWhitelistedEarningPowerCalculator, Owna
     /// @param oldEarningPower The old earning power of the staker
     /// @return newCalculatedEarningPower The new earning power of the staker
     /// @return qualifiesForBump Boolean indicating if the staker qualifies for a bump
+    /// @dev Calculates new earning power based on whitelist status and staked amount.
+    /// A staker qualifies for a bump whenever their earning power changes, which can happen when:
+    /// - They are added/removed from the whitelist
+    /// - Their staked amount changes
+    /// This ensures deposits are updated promptly when whitelist status changes.
     function getNewEarningPower(
         uint256 stakedAmount,
         address staker,
@@ -58,14 +79,16 @@ contract RegenEarningPowerCalculator is IWhitelistedEarningPowerCalculator, Owna
 
     /// @notice Sets the whitelist for the earning power calculator. Setting the whitelist to address(0) will allow all addresses to be eligible for earning power.
     /// @param _whitelist The whitelist to set
+    /// @dev When _whitelist is address(0), whitelist checks are bypassed and all stakers can earn power.
+    /// This allows the calculator to switch between permissioned and permissionless modes.
+    /// Emits a WhitelistSet event.
     function setWhitelist(IWhitelist _whitelist) public override onlyOwner {
         whitelist = _whitelist;
         emit WhitelistSet(_whitelist);
     }
 
-    /// @notice Returns true if the contract implements the interface
-    /// @param interfaceId The interface ID to check
-    /// @return True if the contract implements the interface, false otherwise
+    /// @inheritdoc ERC165
+    /// @dev Additionally supports the IWhitelistedEarningPowerCalculator interface
     function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165, IERC165) returns (bool) {
         return
             interfaceId == type(IWhitelistedEarningPowerCalculator).interfaceId || super.supportsInterface(interfaceId);

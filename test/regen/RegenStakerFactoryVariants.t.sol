@@ -52,7 +52,7 @@ contract RegenStakerFactoryVariantsTest is Test {
         vm.stopPrank();
     }
 
-    function test_CreateStakerNoDelegation_WithBasicERC20_Success() public {
+    function test_CreateStakerWithoutDelegation_WithBasicERC20_Success() public {
         RegenStakerFactory.CreateStakerParams memory params = RegenStakerFactory.CreateStakerParams({
             rewardsToken: IERC20(address(basicToken)),
             stakeToken: IERC20(address(basicToken)),
@@ -69,13 +69,13 @@ contract RegenStakerFactoryVariantsTest is Test {
 
         bytes memory permitCode = type(RegenStakerWithoutDelegateSurrogateVotes).creationCode;
 
-        address stakerAddress = factory.createStakerNoDelegation(params, bytes32(uint256(1)), permitCode);
+        address stakerAddress = factory.createStakerWithoutDelegation(params, bytes32(uint256(1)), permitCode);
 
         assertTrue(stakerAddress != address(0));
         assertTrue(stakerAddress.code.length > 0);
     }
 
-    function test_CreateStakerNoDelegation_WithPermitToken_Success() public {
+    function test_CreateStakerWithoutDelegation_WithPermitToken_Success() public {
         RegenStakerFactory.CreateStakerParams memory params = RegenStakerFactory.CreateStakerParams({
             rewardsToken: IERC20(address(permitToken)),
             stakeToken: IERC20(address(permitToken)),
@@ -92,13 +92,13 @@ contract RegenStakerFactoryVariantsTest is Test {
 
         bytes memory permitCode = type(RegenStakerWithoutDelegateSurrogateVotes).creationCode;
 
-        address stakerAddress = factory.createStakerNoDelegation(params, bytes32(uint256(2)), permitCode);
+        address stakerAddress = factory.createStakerWithoutDelegation(params, bytes32(uint256(2)), permitCode);
 
         assertTrue(stakerAddress != address(0));
         assertTrue(stakerAddress.code.length > 0);
     }
 
-    function test_CreateStakerERC20Staking_WithStakingToken_Success() public {
+    function test_CreateStakerWithDelegation_WithStakingToken_Success() public {
         RegenStakerFactory.CreateStakerParams memory params = RegenStakerFactory.CreateStakerParams({
             rewardsToken: IERC20(address(stakingToken)),
             stakeToken: IERC20(address(stakingToken)),
@@ -115,13 +115,13 @@ contract RegenStakerFactoryVariantsTest is Test {
 
         bytes memory stakingCode = type(RegenStaker).creationCode;
 
-        address stakerAddress = factory.createStakerERC20Staking(params, bytes32(uint256(3)), stakingCode);
+        address stakerAddress = factory.createStakerWithDelegation(params, bytes32(uint256(3)), stakingCode);
 
         assertTrue(stakerAddress != address(0));
         assertTrue(stakerAddress.code.length > 0);
     }
 
-    function test_CreateStakerERC20Staking_WithBasicToken_Success() public {
+    function test_CreateStakerWithDelegation_WithBasicToken_Success() public {
         RegenStakerFactory.CreateStakerParams memory params = RegenStakerFactory.CreateStakerParams({
             rewardsToken: IERC20(address(basicToken)),
             stakeToken: IERC20(address(basicToken)),
@@ -138,7 +138,7 @@ contract RegenStakerFactoryVariantsTest is Test {
 
         bytes memory stakingCode = type(RegenStaker).creationCode;
 
-        address stakerAddress = factory.createStakerERC20Staking(params, bytes32(uint256(4)), stakingCode);
+        address stakerAddress = factory.createStakerWithDelegation(params, bytes32(uint256(4)), stakingCode);
 
         assertTrue(stakerAddress != address(0));
         assertTrue(stakerAddress.code.length > 0);
@@ -159,18 +159,18 @@ contract RegenStakerFactoryVariantsTest is Test {
             rewardDuration: MIN_REWARD_DURATION
         });
 
-        bytes memory wrongCode = type(RegenStaker).creationCode; // Using staking code for no-delegation variant
+        bytes memory wrongCode = type(RegenStaker).creationCode; // Using with-delegation code for without-delegation variant
 
         vm.expectRevert(
             abi.encodeWithSelector(
                 RegenStakerFactory.UnauthorizedBytecode.selector,
-                RegenStakerFactory.RegenStakerVariant.NO_DELEGATION,
+                RegenStakerFactory.RegenStakerVariant.WITHOUT_DELEGATION,
                 keccak256(wrongCode),
-                factory.canonicalBytecodeHash(RegenStakerFactory.RegenStakerVariant.NO_DELEGATION)
+                factory.canonicalBytecodeHash(RegenStakerFactory.RegenStakerVariant.WITHOUT_DELEGATION)
             )
         );
 
-        factory.createStakerNoDelegation(params, bytes32(uint256(5)), wrongCode);
+        factory.createStakerWithoutDelegation(params, bytes32(uint256(5)), wrongCode);
     }
 
     function test_RevertIf_CreateStakerERC20Staking_WithInvalidBytecode() public {
@@ -188,18 +188,18 @@ contract RegenStakerFactoryVariantsTest is Test {
             rewardDuration: MIN_REWARD_DURATION
         });
 
-        bytes memory wrongCode = type(RegenStakerWithoutDelegateSurrogateVotes).creationCode; // Using no-delegation code for staking variant
+        bytes memory wrongCode = type(RegenStakerWithoutDelegateSurrogateVotes).creationCode; // Using without-delegation code for with-delegation variant
 
         vm.expectRevert(
             abi.encodeWithSelector(
                 RegenStakerFactory.UnauthorizedBytecode.selector,
-                RegenStakerFactory.RegenStakerVariant.ERC20_STAKING,
+                RegenStakerFactory.RegenStakerVariant.WITH_DELEGATION,
                 keccak256(wrongCode),
-                factory.canonicalBytecodeHash(RegenStakerFactory.RegenStakerVariant.ERC20_STAKING)
+                factory.canonicalBytecodeHash(RegenStakerFactory.RegenStakerVariant.WITH_DELEGATION)
             )
         );
 
-        factory.createStakerERC20Staking(params, bytes32(uint256(6)), wrongCode);
+        factory.createStakerWithDelegation(params, bytes32(uint256(6)), wrongCode);
     }
 
     function test_RevertIf_CreateStaker_WithEmptyBytecode() public {
@@ -218,15 +218,17 @@ contract RegenStakerFactoryVariantsTest is Test {
         });
 
         vm.expectRevert(RegenStakerFactory.InvalidBytecode.selector);
-        factory.createStakerNoDelegation(params, bytes32(uint256(7)), "");
+        factory.createStakerWithoutDelegation(params, bytes32(uint256(7)), "");
 
         vm.expectRevert(RegenStakerFactory.InvalidBytecode.selector);
-        factory.createStakerERC20Staking(params, bytes32(uint256(8)), "");
+        factory.createStakerWithDelegation(params, bytes32(uint256(8)), "");
     }
 
     function test_CanonicalBytecodeHashes_SetCorrectly() public view {
-        bytes32 noDelegationHash = factory.canonicalBytecodeHash(RegenStakerFactory.RegenStakerVariant.NO_DELEGATION);
-        bytes32 erc20StakingHash = factory.canonicalBytecodeHash(RegenStakerFactory.RegenStakerVariant.ERC20_STAKING);
+        bytes32 noDelegationHash = factory.canonicalBytecodeHash(
+            RegenStakerFactory.RegenStakerVariant.WITHOUT_DELEGATION
+        );
+        bytes32 erc20StakingHash = factory.canonicalBytecodeHash(RegenStakerFactory.RegenStakerVariant.WITH_DELEGATION);
 
         assertTrue(noDelegationHash != bytes32(0));
         assertTrue(erc20StakingHash != bytes32(0));

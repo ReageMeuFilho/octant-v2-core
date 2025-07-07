@@ -34,8 +34,6 @@ import { IEarningPowerCalculator } from "staker/interfaces/IEarningPowerCalculat
 /// @notice Earning power is updated via bumpEarningPower externally. This action is incentivized with a tip. Use maxBumpTip to set the maximum tip.
 /// @notice The admin can adjust the minimum stake amount. Existing deposits below a newly set threshold remain valid
 ///         but will be restricted from certain operations (partial withdraw, stake increase below threshold) until brought above the threshold.
-/// @dev SCALE_FACTOR (1e36) is inherited from base Staker and used to minimize precision loss in reward calculations by scaling up values before division.
-/// @dev Earning power is capped at uint96.max (~7.9e28) to prevent overflow in reward calculations while still supporting extremely large values.
 /// @dev NO SURROGATES: This contract eliminates the surrogate pattern entirely - all tokens are held directly by this contract.
 /// @dev PRECISION IMPLICATIONS: Variable reward durations affect calculation precision. The original Staker contract assumed a fixed
 ///      30-day duration for optimal precision. This contract allows 7-3000 days, providing flexibility at the cost of potential precision loss.
@@ -44,12 +42,6 @@ import { IEarningPowerCalculator } from "staker/interfaces/IEarningPowerCalculat
 ///      operational flexibility over mathematical precision. For maximum precision, prefer longer reward durations (≥30 days).
 /// @dev DELEGATION LIMITATION: This variant does not support delegation functionality since it works with regular ERC20 tokens.
 ///      The delegatee parameter is still tracked for compatibility but has no effect on token delegation.
-/// @dev PERMIT SUPPORT: This variant supports EIP-2612 permit functionality through the StakerPermitAndStake extension.
-///      Functions like permitAndStake() and permitAndStakeMore() allow users to approve and stake in a single transaction.
-///      The stake token must implement IERC20Permit for these functions to work properly.
-/// @dev ON-BEHALF SUPPORT: This variant supports signature-based operations through the StakerOnBehalf extension.
-///      Functions like stakeOnBehalf(), withdrawOnBehalf(), and claimRewardOnBehalf() allow third parties to execute
-///      operations on behalf of users using valid signatures, enabling gasless transactions and delegation patterns.
 contract RegenStakerWithoutDelegateSurrogateVotes is StakerPermitAndStake, StakerOnBehalf, Pausable, ReentrancyGuard {
     using SafeCast for uint256;
     using RegenStakerShared for RegenStakerShared.SharedState;
@@ -126,7 +118,9 @@ contract RegenStakerWithoutDelegateSurrogateVotes is StakerPermitAndStake, Stake
     /// @param _minimumStakeAmount The minimum stake amount.
     /// @param _stakerWhitelist The whitelist for stakers. Can be address(0) to disable whitelisting.
     /// @param _contributionWhitelist The whitelist for contributors. Can be address(0) to disable whitelisting.
-    /// @param _allocationMechanismWhitelist The whitelist for allocation mechanisms.
+    /// @param _allocationMechanismWhitelist The whitelist for allocation mechanisms. SECURITY CRITICAL.
+    ///      Only audited and trusted allocation mechanisms should be whitelisted.
+    ///      Users contribute funds to these mechanisms and may lose funds if mechanisms are malicious.
     constructor(
         IERC20 _rewardsToken,
         IERC20 _stakeToken,
@@ -160,20 +154,18 @@ contract RegenStakerWithoutDelegateSurrogateVotes is StakerPermitAndStake, Stake
 
     /// @inheritdoc Staker
     /// @notice Returns address(0) since this contract doesn't use surrogates
+    /// @dev WITHOUT_DELEGATION: This variant eliminates delegation entirely for gas efficiency
+    /// @dev COMPATIBILITY: Maintains interface compatibility with base Staker contract
     function surrogates(address /* _delegatee */) public pure override returns (DelegationSurrogate) {
         return DelegationSurrogate(address(0));
     }
 
     /// @inheritdoc Staker
-    /// @notice Returns address(0) since this contract doesn't use surrogates
+    /// @notice Returns address(0) since this contract doesn't deploy surrogates
+    /// @dev WITHOUT_DELEGATION: Surrogate deployment disabled for this variant
+    /// @dev GAS_SAVINGS: Eliminates surrogate deployment costs
     function _fetchOrDeploySurrogate(address /* _delegatee */) internal pure override returns (DelegationSurrogate) {
         return DelegationSurrogate(address(0));
-    }
-
-    /// @notice No surrogate transfer needed - tokens are already in this contract for compounding
-    function _transferForCompound(address /* _delegatee */, uint256 /* _amount */) internal {
-        // No token transfer needed since tokens are held directly by this contract
-        // The compounding just updates the deposit balance
     }
 
     /// @notice Internal helper to check minimum stake amount
