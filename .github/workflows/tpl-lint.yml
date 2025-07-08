@@ -15,7 +15,7 @@ jobs:
     name: Check Code Formatting
     runs-on: general
     container:
-      image: ${{ inputs.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:4fafbd60
+      image: ${{ inputs.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:f4f41461
       credentials:
         username: _json_key_base64
         password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
@@ -33,7 +33,7 @@ jobs:
     name: Lint Code
     runs-on: general
     container:
-      image: ${{ inputs.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:4fafbd60
+      image: ${{ inputs.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:f4f41461
       credentials:
         username: _json_key_base64
         password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
@@ -51,7 +51,7 @@ jobs:
     name: Lint Commits
     runs-on: general
     container:
-      image: ${{ inputs.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:4fafbd60
+      image: ${{ inputs.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:f4f41461
       credentials:
         username: _json_key_base64
         password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
@@ -69,7 +69,7 @@ jobs:
     name: Analyze with Slither
     runs-on: general
     container:
-      image: ${{ inputs.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:4fafbd60
+      image: ${{ inputs.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:f4f41461
       credentials:
         username: _json_key_base64
         password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
