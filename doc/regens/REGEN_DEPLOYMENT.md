@@ -27,14 +27,6 @@ RegenStakerFactory factory = new RegenStakerFactory(bytecode1, bytecode2);
 address staker = factory.createStaker(variant, params, salt, bytecode);
 ```
 
-## Security Checklist
-
-- [ ] Admin is multisig
-- [ ] Earning power calculator audited
-- [ ] Allocation mechanisms audited for proper use of public good contributions
-- [ ] Token contracts verified
-- [ ] Understand precision implications for <30 day reward durations
-
 ## Post-Deployment
 
 ```solidity
@@ -49,6 +41,8 @@ staker.setClaimFeeParameters(ClaimFeeParameters(feeAmount, feeCollector));
 staker.pause();    // Pause operations
 staker.unpause();  // Resume after resolution
 ```
+
+**Important:** The pause functionality **does not** affect rewards calculation. Rewards continue to accumulate based on `block.timestamp` even while the contract is paused. The pause only prevents user interactions (stake, withdraw, claim, contribute, compound) but the reward distribution timeline remains unchanged.
 
 ## Common Issues
 
