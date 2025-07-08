@@ -36,20 +36,12 @@ import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocation
 /// @notice Earning power is updated via bumpEarningPower externally. This action is incentivized with a tip. Use maxBumpTip to set the maximum tip.
 /// @notice The admin can adjust the minimum stake amount. Existing deposits below a newly set threshold remain valid
 ///         but will be restricted from certain operations (partial withdraw, stake increase below threshold) until brought above the threshold.
-/// @dev SCALE_FACTOR (1e36) is inherited from base Staker and used to minimize precision loss in reward calculations by scaling up values before division.
-/// @dev Earning power is capped at uint96.max (~7.9e28) to prevent overflow in reward calculations while still supporting extremely large values.
-/// @dev This contract uses the surrogate pattern from base Staker: tokens are transferred to surrogate contracts that delegate voting power to the designated delegatee.
+/// @dev This contract uses DelegationSurrogateVotes (not basic DelegationSurrogate) to support voting functionality for IERC20Staking tokens.
 /// @dev PRECISION IMPLICATIONS: Variable reward durations affect calculation precision. The original Staker contract assumed a fixed
 ///      30-day duration for optimal precision. This contract allows 7-3000 days, providing flexibility at the cost of potential precision loss.
 ///      Shorter durations (especially < 30 days) can increase the margin of error in reward calculations by up to ~1% due to increased
 ///      reward rates amplifying rounding errors in scaled arithmetic operations. This is an intentional design trade-off favoring
 ///      operational flexibility over mathematical precision. For maximum precision, prefer longer reward durations (≥30 days).
-/// @dev PERMIT SUPPORT: This variant supports EIP-2612 permit functionality through the StakerPermitAndStake extension.
-///      Functions like permitAndStake() and permitAndStakeMore() allow users to approve and stake in a single transaction.
-///      The stake token must implement both IERC20Staking and IERC20Permit for full functionality.
-/// @dev ON-BEHALF SUPPORT: This variant supports signature-based operations through the StakerOnBehalf extension.
-///      Functions like stakeOnBehalf(), withdrawOnBehalf(), and claimRewardOnBehalf() allow third parties to execute
-///      operations on behalf of users using valid signatures, enabling gasless transactions and delegation patterns.
 contract RegenStaker is StakerPermitAndStake, StakerOnBehalf, Pausable, ReentrancyGuard {
     using SafeCast for uint256;
     using RegenStakerShared for RegenStakerShared.SharedState;
@@ -130,7 +122,9 @@ contract RegenStaker is StakerPermitAndStake, StakerOnBehalf, Pausable, Reentran
     /// @param _minimumStakeAmount The minimum stake amount.
     /// @param _stakerWhitelist The whitelist for stakers. Can be address(0) to disable whitelisting.
     /// @param _contributionWhitelist The whitelist for contributors. Can be address(0) to disable whitelisting.
-    /// @param _allocationMechanismWhitelist The whitelist for allocation mechanisms.
+    /// @param _allocationMechanismWhitelist The whitelist for allocation mechanisms. SECURITY CRITICAL.
+    ///      Only audited and trusted allocation mechanisms should be whitelisted.
+    ///      Users contribute funds to these mechanisms and may lose funds if mechanisms are malicious.
     constructor(
         IERC20 _rewardsToken,
         IERC20Staking _stakeToken,
@@ -183,6 +177,11 @@ contract RegenStaker is StakerPermitAndStake, StakerOnBehalf, Pausable, Reentran
     }
 
     /// @notice Sets the reward duration for future reward notifications
+    /// @dev PRECISION WARNING: Shorter durations (< 30 days) may introduce calculation errors up to ~1%.
+    /// @dev GAS IMPLICATIONS: Shorter reward durations may result in higher gas costs for certain
+    ///      operations due to more frequent reward rate calculations. Consider gas costs when
+    ///      selecting reward durations.
+    /// @param _rewardDuration New reward duration in seconds (7 days minimum, 3000 days maximum)
     function setRewardDuration(uint256 _rewardDuration) external {
         _revertIfNotAdmin();
         require(block.timestamp > rewardEndTime, CannotChangeRewardDurationDuringActiveReward());
@@ -225,7 +224,11 @@ contract RegenStaker is StakerPermitAndStake, StakerOnBehalf, Pausable, Reentran
         emit RewardNotified(_amount, msg.sender);
     }
 
-    /// @notice Sets the whitelist for the staker
+    /// @notice Sets the whitelist for stakers (who can stake tokens)
+    /// @dev ACCESS CONTROL: Use address(0) to disable whitelisting and allow all addresses.
+    /// @dev OPERATIONAL IMPACT: Affects all stake and stakeMore operations immediately.
+    /// @dev GRANDFATHERING: Existing stakers can continue operations regardless of new whitelist.
+    /// @param _stakerWhitelist New staker whitelist contract (address(0) = no restrictions)
     function setStakerWhitelist(IWhitelist _stakerWhitelist) external {
         require(sharedState.stakerWhitelist != _stakerWhitelist, NoOperation());
         _revertIfNotAdmin();
@@ -233,7 +236,11 @@ contract RegenStaker is StakerPermitAndStake, StakerOnBehalf, Pausable, Reentran
         sharedState.stakerWhitelist = _stakerWhitelist;
     }
 
-    /// @notice Sets the whitelist for the contribution
+    /// @notice Sets the whitelist for contributors (who can contribute rewards)
+    /// @dev ACCESS CONTROL: Use address(0) to disable whitelisting and allow all addresses.
+    /// @dev OPERATIONAL IMPACT: Affects all contribute operations immediately.
+    /// @dev GRANDFATHERING: Existing contributors can continue operations regardless of new whitelist.
+    /// @param _contributionWhitelist New contribution whitelist contract (address(0) = no restrictions)
     function setContributionWhitelist(IWhitelist _contributionWhitelist) external {
         require(sharedState.contributionWhitelist != _contributionWhitelist, NoOperation());
         _revertIfNotAdmin();
@@ -241,7 +248,15 @@ contract RegenStaker is StakerPermitAndStake, StakerOnBehalf, Pausable, Reentran
         sharedState.contributionWhitelist = _contributionWhitelist;
     }
 
-    /// @notice Sets the whitelist for the allocation mechanism
+    /// @notice Sets the whitelist for allocation mechanisms
+    /// @dev SECURITY: Only add thoroughly audited allocation mechanisms to this whitelist.
+    ///      Users will contribute rewards to whitelisted mechanisms and funds cannot be recovered
+    ///      if sent to malicious or buggy implementations.
+    /// @dev EVALUATION PROCESS: New mechanisms should undergo comprehensive security audit,
+    ///      integration testing, and governance review before whitelisting.
+    /// @dev OPERATIONAL IMPACT: Changes affect all future contributions. Existing contributions
+    ///      to previously whitelisted mechanisms are not affected.
+    /// @param _allocationMechanismWhitelist New whitelist contract (cannot be address(0))
     function setAllocationMechanismWhitelist(IWhitelist _allocationMechanismWhitelist) external {
         require(sharedState.allocationMechanismWhitelist != _allocationMechanismWhitelist, NoOperation());
         require(
@@ -254,6 +269,11 @@ contract RegenStaker is StakerPermitAndStake, StakerOnBehalf, Pausable, Reentran
     }
 
     /// @notice Sets the minimum stake amount
+    /// @dev GRANDFATHERING: Existing deposits below new minimum remain valid but will be
+    ///      restricted from partial withdrawals and stakeMore operations until brought above threshold.
+    /// @dev TIMING RESTRICTION: Cannot raise minimum during active reward period for user protection.
+    /// @dev OPERATIONAL IMPACT: Affects all new stakes immediately. Consider user communication before changes.
+    /// @param _minimumStakeAmount New minimum stake amount in wei (0 = no minimum)
     function setMinimumStakeAmount(uint256 _minimumStakeAmount) external {
         _revertIfNotAdmin();
         require(
@@ -264,19 +284,30 @@ contract RegenStaker is StakerPermitAndStake, StakerOnBehalf, Pausable, Reentran
         sharedState.minimumStakeAmount = _minimumStakeAmount;
     }
 
-    /// @notice Pauses the contract
+    /// @notice Pauses the contract, disabling all user operations except view functions
+    /// @dev EMERGENCY USE: Intended for security incidents or critical maintenance.
+    /// @dev SCOPE: Affects stake, withdraw, claim, contribute, and compound operations.
+    /// @dev ADMIN ONLY: Only admin can pause. Use emergency procedures for urgent situations.
     function pause() external whenNotPaused {
         _revertIfNotAdmin();
         _pause();
     }
 
-    /// @notice Unpauses the contract
+    /// @notice Unpauses the contract, re-enabling all user operations
+    /// @dev RECOVERY: Use after resolving issues that required pause.
+    /// @dev ADMIN ONLY: Only admin can unpause. Ensure all issues resolved before unpause.
     function unpause() external whenPaused {
         _revertIfNotAdmin();
         _unpause();
     }
 
     /// @notice Compounds rewards by claiming them and immediately restaking them into the same deposit
+    /// @dev REQUIREMENT: Only works when REWARD_TOKEN == STAKE_TOKEN, otherwise reverts.
+    /// @dev FEE HANDLING: Claim fees are deducted before compounding. Zero fee results in zero compound.
+    /// @dev EARNING POWER: Compounding updates earning power based on new total balance.
+    /// @dev GAS OPTIMIZATION: More efficient than separate claim + stake operations.
+    /// @param _depositId The deposit to compound rewards for
+    /// @return compoundedAmount Amount of rewards compounded (after fees)
     function compoundRewards(
         DepositIdentifier _depositId
     ) external whenNotPaused nonReentrant returns (uint256 compoundedAmount) {
@@ -337,6 +368,23 @@ contract RegenStaker is StakerPermitAndStake, StakerOnBehalf, Pausable, Reentran
     }
 
     /// @notice Contributes unclaimed rewards to a user-specified allocation mechanism
+    /// @dev CONTRIBUTION RISK: Contributed funds are transferred to external allocation mechanisms
+    ///      for public good causes. Malicious mechanisms may misappropriate funds for unintended
+    ///      purposes rather than the stated public good cause.
+    /// @dev TRUST MODEL: Allocation mechanisms must be whitelisted by protocol governance.
+    ///      Only contribute to mechanisms you trust, as the protocol cannot recover funds
+    ///      sent to malicious or buggy allocation mechanisms.
+    /// @dev SECURITY: This function approves the exact contribution amount to the allocation
+    ///      mechanism and immediately revokes approval after the call to limit exposure.
+    /// @param _depositId The deposit identifier to contribute from
+    /// @param _allocationMechanismAddress Whitelisted allocation mechanism to receive contribution
+    /// @param _votingDelegatee Address to delegate voting power to in the allocation mechanism
+    /// @param _amount Amount of unclaimed rewards to contribute (must be <= available rewards)
+    /// @param _deadline Signature expiration timestamp
+    /// @param _v Signature component v
+    /// @param _r Signature component r
+    /// @param _s Signature component s
+    /// @return amountContributedToAllocationMechanism Actual amount contributed (after fees)
     function contribute(
         DepositIdentifier _depositId,
         address _allocationMechanismAddress,

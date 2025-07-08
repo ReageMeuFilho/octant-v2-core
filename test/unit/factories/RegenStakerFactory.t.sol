@@ -84,10 +84,10 @@ contract RegenStakerFactoryTest is Test {
             admin,
             predictedAddress,
             salt,
-            RegenStakerFactory.RegenStakerVariant.ERC20_STAKING
+            RegenStakerFactory.RegenStakerVariant.WITH_DELEGATION
         );
 
-        address stakerAddress = factory.createStakerERC20Staking(
+        address stakerAddress = factory.createStakerWithDelegation(
             RegenStakerFactory.CreateStakerParams({
                 rewardsToken: rewardsToken,
                 stakeToken: stakeToken,
@@ -119,7 +119,7 @@ contract RegenStakerFactoryTest is Test {
         bytes32 salt2 = keccak256("SECOND_STAKER_SALT");
 
         vm.startPrank(deployer1);
-        address firstStaker = factory.createStakerERC20Staking(
+        address firstStaker = factory.createStakerWithDelegation(
             RegenStakerFactory.CreateStakerParams({
                 rewardsToken: rewardsToken,
                 stakeToken: stakeToken,
@@ -137,7 +137,7 @@ contract RegenStakerFactoryTest is Test {
             getRegenStakerBytecode()
         );
 
-        address secondStaker = factory.createStakerERC20Staking(
+        address secondStaker = factory.createStakerWithDelegation(
             RegenStakerFactory.CreateStakerParams({
                 rewardsToken: rewardsToken,
                 stakeToken: stakeToken,
@@ -164,7 +164,7 @@ contract RegenStakerFactoryTest is Test {
         bytes32 salt2 = keccak256("DEPLOYER2_SALT");
 
         vm.prank(deployer1);
-        address staker1 = factory.createStakerERC20Staking(
+        address staker1 = factory.createStakerWithDelegation(
             RegenStakerFactory.CreateStakerParams({
                 rewardsToken: rewardsToken,
                 stakeToken: stakeToken,
@@ -183,7 +183,7 @@ contract RegenStakerFactoryTest is Test {
         );
 
         vm.prank(deployer2);
-        address staker2 = factory.createStakerERC20Staking(
+        address staker2 = factory.createStakerWithDelegation(
             RegenStakerFactory.CreateStakerParams({
                 rewardsToken: rewardsToken,
                 stakeToken: stakeToken,
@@ -211,7 +211,7 @@ contract RegenStakerFactoryTest is Test {
         address predictedAddress = factory.predictStakerAddress(salt, deployer1);
 
         vm.prank(deployer1);
-        address actualAddress = factory.createStakerERC20Staking(
+        address actualAddress = factory.createStakerWithDelegation(
             RegenStakerFactory.CreateStakerParams({
                 rewardsToken: rewardsToken,
                 stakeToken: stakeToken,
@@ -236,7 +236,7 @@ contract RegenStakerFactoryTest is Test {
         bytes32 salt = keccak256("NULL_WHITELIST_SALT");
 
         vm.prank(deployer1);
-        address stakerAddress = factory.createStakerERC20Staking(
+        address stakerAddress = factory.createStakerWithDelegation(
             RegenStakerFactory.CreateStakerParams({
                 rewardsToken: rewardsToken,
                 stakeToken: stakeToken,

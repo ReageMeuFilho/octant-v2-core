@@ -26,10 +26,11 @@ contract RegenStakerFactory {
     }
 
     enum RegenStakerVariant {
-        NO_DELEGATION,
-        ERC20_STAKING
+        WITHOUT_DELEGATION,
+        WITH_DELEGATION
     }
 
+    // Events
     event StakerDeploy(
         address indexed deployer,
         address indexed admin,
@@ -40,12 +41,13 @@ contract RegenStakerFactory {
 
     event CanonicalBytecodeSet(RegenStakerVariant indexed variant, bytes32 indexed bytecodeHash);
 
+    // Errors
     error InvalidBytecode();
     error UnauthorizedBytecode(RegenStakerVariant variant, bytes32 providedHash, bytes32 expectedHash);
 
     constructor(bytes memory regenStakerBytecode, bytes memory noDelegationBytecode) {
-        _canonicalizeBytecode(regenStakerBytecode, RegenStakerVariant.ERC20_STAKING);
-        _canonicalizeBytecode(noDelegationBytecode, RegenStakerVariant.NO_DELEGATION);
+        _canonicalizeBytecode(regenStakerBytecode, RegenStakerVariant.WITH_DELEGATION);
+        _canonicalizeBytecode(noDelegationBytecode, RegenStakerVariant.WITHOUT_DELEGATION);
     }
 
     /// @notice SECURITY: Internal function to canonicalize bytecode without full deployment
@@ -69,29 +71,29 @@ contract RegenStakerFactory {
     /// @notice Deploy RegenStaker without delegation support
     /// @param params Staker configuration parameters
     /// @param salt Deployment salt for deterministic addressing
-    /// @param code Bytecode for NO_DELEGATION variant
+    /// @param code Bytecode for WITHOUT_DELEGATION variant
     /// @return stakerAddress Address of deployed contract
-    function createStakerNoDelegation(
+    function createStakerWithoutDelegation(
         CreateStakerParams calldata params,
         bytes32 salt,
         bytes calldata code
-    ) external validatedBytecode(code, RegenStakerVariant.NO_DELEGATION) returns (address stakerAddress) {
+    ) external validatedBytecode(code, RegenStakerVariant.WITHOUT_DELEGATION) returns (address stakerAddress) {
         if (code.length == 0) revert InvalidBytecode();
-        stakerAddress = _deployStaker(params, salt, code, RegenStakerVariant.NO_DELEGATION);
+        stakerAddress = _deployStaker(params, salt, code, RegenStakerVariant.WITHOUT_DELEGATION);
     }
 
     /// @notice Deploy RegenStaker with delegation support
     /// @param params Staker configuration parameters
     /// @param salt Deployment salt for deterministic addressing
-    /// @param code Bytecode for ERC20_STAKING variant
+    /// @param code Bytecode for WITH_DELEGATION variant
     /// @return stakerAddress Address of deployed contract
-    function createStakerERC20Staking(
+    function createStakerWithDelegation(
         CreateStakerParams calldata params,
         bytes32 salt,
         bytes calldata code
-    ) external validatedBytecode(code, RegenStakerVariant.ERC20_STAKING) returns (address stakerAddress) {
+    ) external validatedBytecode(code, RegenStakerVariant.WITH_DELEGATION) returns (address stakerAddress) {
         if (code.length == 0) revert InvalidBytecode();
-        stakerAddress = _deployStaker(params, salt, code, RegenStakerVariant.ERC20_STAKING);
+        stakerAddress = _deployStaker(params, salt, code, RegenStakerVariant.WITH_DELEGATION);
     }
 
     /// @notice Predict deterministic deployment address
