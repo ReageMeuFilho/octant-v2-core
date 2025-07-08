@@ -1,5 +1,13 @@
 
 
+## [0.5.1-develop.0](https://github.com/golemfoundation/octant-v2-core/compare/v0.5.0-develop.0...v0.5.1-develop.0) (2025-07-08)
+
+
+### Bug Fixes
+
+* prevent CREATE3 front-running attacks in strategy factories ([c3653ee](https://github.com/golemfoundation/octant-v2-core/commit/c3653ee94d9aa150adf28e07b61ff0b3024e6831))
+* use decimalsOfExchangeRate for proper exchange rate scaling ([60638e9](https://github.com/golemfoundation/octant-v2-core/commit/60638e9f33672fe83a7cd619ab15ca2602c02a9a))
+
 ## [0.5.0-develop.0](https://github.com/golemfoundation/octant-v2-core/compare/v0.4.0-develop.0...v0.5.0-develop.0) (2025-07-03)
 
 
