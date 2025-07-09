@@ -57,7 +57,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}
         run: |
-          yarn release --preRelease=develop --ci
+          yarn release --preRelease=develop --ci && yarn npm publish
 
   publish-release:
     name: Publish Release
@@ -94,4 +94,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}
         run: |
-          yarn release --ci
+          yarn release --ci && yarn npm publish
