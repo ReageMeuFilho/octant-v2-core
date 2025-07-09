@@ -44,6 +44,7 @@ jobs:
         shell: bash
         run: |
           yarn config set -H npmScopes.golemfoundation.npmAuthToken "${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}"
+          npm config set //npm.pkg.github.com/:_authToken "${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}"
           gpg --import <(echo "${{ secrets.HOUSEKEEPER_GITHUB_SIGNING_KEY }}" | base64 -d)
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config --local user.email "birnam@wildland.io"
