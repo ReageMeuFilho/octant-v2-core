@@ -64,21 +64,6 @@ jobs:
           cache-from: type=registry,ref=${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/cache:core
           cache-to: type=registry,ref=${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/cache:core,mode=max
 
-  # Technically we don't need to build step is done during the docker build
-  build:
-    name: Build
-    needs: build-image
-    runs-on: general
-    container:
-      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/core:${{ github.sha }}
-      credentials:
-        username: _json_key_base64
-        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
-
-    steps:
-      - name: Build
-        run: "cd /app; yarn build"
-
   test:
     name: Test suite
     needs: build-image

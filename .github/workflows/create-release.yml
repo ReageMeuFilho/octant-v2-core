@@ -1,9 +1,9 @@
-name: ▶️ Deploy Smart Contracts
+name: ▶️ Create New Release
 on:
   workflow_dispatch:
 
 concurrency:
-  group: "${{ github.ref }}-deploy-sc"
+  group: "${{ github.ref }}-create-release"
   cancel-in-progress: true
 
 jobs:
@@ -22,87 +22,10 @@ jobs:
           fi
           echo "✅ Authorized user: ${{ github.actor }}"
 
-  deploy-contract:
-    name: Deploy contracts
-    runs-on: general
-    needs:
-      - access-check
-    container:
-      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/core:${{ github.sha }}
-      credentials:
-        username: _json_key_base64
-        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
-
-    steps:
-      - name: Deploy contracts
-        env:
-          PRIVATE_KEY: "${{ secrets.TESTNET_DEPLOYER_PRIVATE_KEY }}"
-          ETHERSCAN_API_KEY: "${{ secrets.TENDERLY_API_KEY }}"
-          RPC_URL: "${{ vars.TENDERLY_MAINNET_RPC_URL }}"
-          VERIFIER_URL: "${{ vars.TENDERLY_MAINNET_RPC_URL }}/verify/etherscan"
-          MAX_OPEX_SPLIT: "5"
-          MIN_METAPOOL_SPLIT: "0"
-          CONTRACT_ADDRESSES: "/app/ci/contract_addresses.txt"
-        run: |
-          cd /app
-          mkdir -p ci
-          touch .env
-          yarn deploy:tenderly && (
-            cp $CONTRACT_ADDRESSES $GITHUB_OUTPUT
-            echo "# Smart contract addresses\n\n| Contract name | Address |\n|---|---|" > $GITHUB_STEP_SUMMARY
-            grep ADDRESS $CONTRACT_ADDRESSES | awk -F '=' '{gsub("_ADDRESS", "", $1); print "| `" $1 "` | `" $2 "` |"}' >> $GITHUB_STEP_SUMMARY
-            echo "\n# Other variables\n\n| Variable | Value |\n|---|---|" >> $GITHUB_STEP_SUMMARY
-            grep -v ADDRESS $CONTRACT_ADDRESSES | awk -F '=' '{print "| `" $1 "` | `" $2 "` |"}' >> $GITHUB_STEP_SUMMARY
-          )
-
-      - name: Upload contract addresses artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: contract_addresses
-          path: /app/ci/contract_addresses.txt
-
-  restart-services:
-    name: Restart develop services
-    runs-on: general
-    needs:
-      - deploy-contract
-
-    steps:
-      - name: Update frontend contracts
-        uses: benc-uk/workflow-dispatch@v1
-        with:
-          repo: golemfoundation/octant-v2-frontend
-          workflow: update-secret-version.yml
-          ref: develop
-          inputs: '{"run-id":"${{ github.run_id }}","env-type":"develop"}'
-          token: "${{ secrets.GH_BOT_TOKEN }}"
-
-      - name: Get last subgraph tag
-        id: last-subgraph-tag
-        run: |
-          echo "Fetching last subgraph tag..."
-          TAG=$(curl -s -H "Authorization: Bearer ${{ secrets.GH_BOT_TOKEN }}" 'https://api.github.com/repos/golemfoundation/octant-v2-subgraph/releases?per_page=1' | jq -r '.[0].tag_name')
-          if [ -z "$TAG" ] || [ $TAG == 'null' ]; then
-            echo "No tags found, exiting."
-            exit 1
-          fi
-          echo "Last subgraph tag: $TAG"
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-
-      - name: Redeploy subgraph
-        uses: benc-uk/workflow-dispatch@v1
-        with:
-          repo: golemfoundation/octant-v2-subgraph
-          workflow: tpl-deploy-app.yml
-          ref: develop
-          inputs: '{"core-run-id":"${{ github.run_id }}","env-type":"develop","image-tag":"${{ steps.last-subgraph-tag.outputs.tag }}"}'
-          token: "${{ secrets.GH_BOT_TOKEN }}"
-
-
   publish-prerelease:
     name: Publish Prerelease
     needs:
-      - deploy-contract
+      - access-check
     if: github.ref_name == 'develop'
     runs-on: general
     container:
@@ -130,9 +53,6 @@ jobs:
           git config --local user.name "Housekeeper Bot"
           git config --local user.signingkey "${{ secrets.HOUSEKEEPER_GITHUB_SIGNING_KEY_ID }}"
 
-      - name: Build
-        run: yarn build:contracts
-
       - name: Publish preRelease
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -143,7 +63,7 @@ jobs:
   publish-release:
     name: Publish Release
     needs:
-      - deploy-contract
+      - access-check
     if: github.ref_name == 'main'
     runs-on: general
     container:
@@ -160,9 +80,6 @@ jobs:
 
       - name: Init env
         run: yarn install
-
-      - name: Build
-        run: yarn build:contracts
 
       - name: Set npm auth token
         shell: bash
