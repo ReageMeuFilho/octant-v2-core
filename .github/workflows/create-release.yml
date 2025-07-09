@@ -4,7 +4,7 @@ on:
 
 concurrency:
   group: "${{ github.ref }}-create-release"
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   access-check:

@@ -9,10 +9,11 @@
     "release": true
   },
   "npm": {
-    "publish": true
+    "publish": false
   },
   "hooks": {
-    "after:bump": "yarn build:contracts"
+    "after:bump": "yarn build:contracts",
+    "after:github:release": "yarn npm publish"
   },
   "plugins": {
     "@release-it/conventional-changelog": {
