@@ -7,8 +7,8 @@ on:
       - develop
 
 concurrency:
-  group: "${{ github.ref }}-images"
-  cancel-in-progress: true
+  group: "build-image"
+  cancel-in-progress: false
 
 jobs:
   lint-and-format:

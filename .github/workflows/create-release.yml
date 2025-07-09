@@ -40,18 +40,17 @@ jobs:
           token: ${{ secrets.GH_BOT_TOKEN }}
           fetch-depth: 0
 
-      - name: Init env
-        run: yarn install
-
       - name: Set npm auth token
         shell: bash
         run: |
-          yarn config set -H npmScopes.golemfoundation.npmAuthToken "${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}"
           gpg --import <(echo "${{ secrets.HOUSEKEEPER_GITHUB_SIGNING_KEY }}" | base64 -d)
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config --local user.email "birnam@wildland.io"
           git config --local user.name "Housekeeper Bot"
           git config --local user.signingkey "${{ secrets.HOUSEKEEPER_GITHUB_SIGNING_KEY_ID }}"
+
+      - name: Init env
+        run: yarn install
 
       - name: Publish preRelease
         env:
@@ -78,18 +77,17 @@ jobs:
           token: ${{ secrets.GH_BOT_TOKEN }}
           fetch-depth: 0
 
-      - name: Init env
-        run: yarn install
-
       - name: Set npm auth token
         shell: bash
         run: |
-          yarn config set -H npmScopes.golemfoundation.npmAuthToken "${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}"
           gpg --import <(echo "${{ secrets.HOUSEKEEPER_GITHUB_SIGNING_KEY }}" | base64 -d)
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config --local user.email "birnam@wildland.io"
           git config --local user.name "Housekeeper Bot"
           git config --local user.signingkey "${{ secrets.HOUSEKEEPER_GITHUB_SIGNING_KEY_ID }}"
+
+      - name: Init env
+        run: yarn install
 
       - name: Publish release
         env:

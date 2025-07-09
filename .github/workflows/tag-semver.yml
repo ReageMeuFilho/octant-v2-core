@@ -6,8 +6,8 @@ on:
       - 'v*.*.*'
 
 concurrency:
-  group: "${{ github.ref_name }}-tag-semver"
-  cancel-in-progress: true
+  group: "build-image"
+  cancel-in-progress: false
 
 jobs:
   build-image:
