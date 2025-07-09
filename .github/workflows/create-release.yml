@@ -6,9 +6,6 @@ concurrency:
   group: "${{ github.ref }}-create-release"
   cancel-in-progress: false
 
-permissions:
-  id-token: write
-
 jobs:
   access-check:
     name: Check access-rights
@@ -31,6 +28,9 @@ jobs:
       - access-check
     if: github.ref_name == 'develop'
     runs-on: general
+    permissions:
+      contents: write
+      id-token: write
     container:
       image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:f4f41461
       credentials:
@@ -68,6 +68,9 @@ jobs:
       - access-check
     if: github.ref_name == 'main'
     runs-on: general
+    permissions:
+      contents: write
+      id-token: write
     container:
       image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:f4f41461
       credentials:
