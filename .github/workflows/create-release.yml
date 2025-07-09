@@ -28,9 +28,6 @@ jobs:
       - access-check
     if: github.ref_name == 'develop'
     runs-on: general
-    permissions:
-      contents: write
-      id-token: write
     container:
       image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:f4f41461
       credentials:
@@ -43,9 +40,10 @@ jobs:
           token: ${{ secrets.GH_BOT_TOKEN }}
           fetch-depth: 0
 
-      - name: Set npm auth token
+      - name: Set git signing
         shell: bash
         run: |
+          yarn config set -H npmScopes.golemfoundation.npmAuthToken "${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}"
           gpg --import <(echo "${{ secrets.HOUSEKEEPER_GITHUB_SIGNING_KEY }}" | base64 -d)
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config --local user.email "birnam@wildland.io"
@@ -58,9 +56,8 @@ jobs:
       - name: Publish preRelease
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}
         run: |
-          yarn release --preRelease=develop --ci && yarn npm publish
+          yarn release --ci --preRelease=develop
 
   publish-release:
     name: Publish Release
@@ -71,6 +68,7 @@ jobs:
     permissions:
       contents: write
       id-token: write
+      packages: write
     container:
       image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:f4f41461
       credentials:
@@ -86,6 +84,7 @@ jobs:
       - name: Set npm auth token
         shell: bash
         run: |
+          yarn config set -H npmScopes.golemfoundation.npmAuthToken "${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}"
           gpg --import <(echo "${{ secrets.HOUSEKEEPER_GITHUB_SIGNING_KEY }}" | base64 -d)
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config --local user.email "birnam@wildland.io"
@@ -98,6 +97,5 @@ jobs:
       - name: Publish release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}
         run: |
-          yarn release --ci && yarn npm publish
+          yarn release --ci
