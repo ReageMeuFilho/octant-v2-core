@@ -1,40 +1,3 @@
-# IDE
-.idea/
-
-.DS_Store
-reports/
-lcov.info
-gasreport.txt
-
-# Compiler files
-cache/
-out/
-coverage/
-ci/contract_addresses.txt
-
-# Ignore broadcast logs
-broadcast/
-
-# Dotenv/direnv files
-.env
-.envrc
-
-# Github CI secrets for local CI runner (https://github.com/nektos/act)
-/.secrets
-
-# npm/pnpm related files
-node_modules/
-.venv/
-
-# direnv files
-.direnv/
-
-# cursor files
-.cursor/
-.specstory/
-.cursor/
-
-# Yarn files
 .pnp.*
 .yarn/*
 !.yarn/patches
@@ -42,9 +5,26 @@ node_modules/
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
-
-output.json
-
-# Soldeer
+.direnv/
+.cursor/
+.idea/
+.specstory/
+.venv/
 /dependencies/
+broadcast/
+cache/
+coverage/
+node_modules/
+reports/
+out/
+
+.secrets
+.env
+.envrc
+.DS_Store
+ci/contract_addresses.txt
+lcov.info
+gasreport.txt
+output.json
+package.tgz
 
