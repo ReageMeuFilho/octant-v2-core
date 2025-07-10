@@ -57,9 +57,7 @@ jobs:
 
       - name: Publish preRelease
         env:
-          NPM_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          yarn config set npmAuthToken "$NPM_TOKEN"
+          yarn config set -H npmScopes.golemfoundation.npmAuthToken "$NPM_TOKEN"
           yarn release --ci --preRelease=test
