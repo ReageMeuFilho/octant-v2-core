@@ -61,4 +61,5 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          yarn config set npmAuthToken "$NPM_TOKEN"
           yarn release --ci --preRelease=test
