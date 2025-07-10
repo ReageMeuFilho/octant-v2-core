@@ -57,6 +57,5 @@ jobs:
       - name: Publish preRelease
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}
         run: |
           yarn release --ci --preRelease=test
