@@ -29,7 +29,6 @@ jobs:
     permissions:
       contents: write
       id-token: write
-      packages: write
     container:
       image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:f4f41461
       credentials:
@@ -45,7 +44,7 @@ jobs:
       - name: Set git signing
         shell: bash
         run: |
-          
+          yarn config set -H npmScopes.golemfoundation.npmAuthToken "${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}"
           gpg --import <(echo "${{ secrets.HOUSEKEEPER_GITHUB_SIGNING_KEY }}" | base64 -d)
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config --local user.email "birnam@wildland.io"
@@ -58,6 +57,6 @@ jobs:
       - name: Publish preRelease
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}
         run: |
-          npm config set //npm.pkg.github.com/:_authToken="$NPM_TOKEN"
           yarn release --ci --preRelease=test
