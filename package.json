@@ -16,14 +16,12 @@
     "node": ">=22.16.0"
   },
   "files": [
-    "dependencies",
     "out",
     "script",
     "src",
     "test",
-    "foundry.toml",
-    "kontrol.toml",
-    "remappings.txt"
+    "./foundry.toml",
+    "./remappings.txt"
   ],
   "scripts": {
     "postinstall": "forge soldeer install",
