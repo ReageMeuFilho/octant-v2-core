@@ -10,7 +10,6 @@ jobs:
   access-check:
     name: Check access-rights
     runs-on: general
-    if: github.ref_name == 'develop' || github.ref_name == 'main'
     steps:
       - name: Check pre-requisites
         run: |
@@ -26,7 +25,6 @@ jobs:
     name: Publish Prerelease
     needs:
       - access-check
-    if: github.ref_name == 'develop'
     runs-on: general
     container:
       image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:f4f41461
@@ -59,7 +57,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}
         run: |
-          yarn release --ci --preRelease=develop
+          yarn release --ci --preRelease=test
 
   publish-release:
     name: Publish Release
