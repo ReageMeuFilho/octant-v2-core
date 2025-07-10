@@ -26,45 +26,6 @@ jobs:
     needs:
       - access-check
     runs-on: general
-    container:
-      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:f4f41461
-      credentials:
-        username: _json_key_base64
-        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GH_BOT_TOKEN }}
-          fetch-depth: 0
-
-      - name: Set git signing
-        shell: bash
-        run: |
-          yarn config set -H npmScopes.golemfoundation.npmAuthToken "${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}"
-          npm config set //npm.pkg.github.com/:_authToken "${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}"
-          gpg --import <(echo "${{ secrets.HOUSEKEEPER_GITHUB_SIGNING_KEY }}" | base64 -d)
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          git config --local user.email "birnam@wildland.io"
-          git config --local user.name "Housekeeper Bot"
-          git config --local user.signingkey "${{ secrets.HOUSEKEEPER_GITHUB_SIGNING_KEY_ID }}"
-
-      - name: Init env
-        run: yarn install
-
-      - name: Publish preRelease
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}
-        run: |
-          yarn release --ci --preRelease=test
-
-  publish-release:
-    name: Publish Release
-    needs:
-      - access-check
-    if: github.ref_name == 'main'
-    runs-on: general
     permissions:
       contents: write
       id-token: write
@@ -81,10 +42,9 @@ jobs:
           token: ${{ secrets.GH_BOT_TOKEN }}
           fetch-depth: 0
 
-      - name: Set npm auth token
+      - name: Set git signing
         shell: bash
         run: |
-          yarn config set -H npmScopes.golemfoundation.npmAuthToken "${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}"
           gpg --import <(echo "${{ secrets.HOUSEKEEPER_GITHUB_SIGNING_KEY }}" | base64 -d)
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config --local user.email "birnam@wildland.io"
@@ -94,9 +54,9 @@ jobs:
       - name: Init env
         run: yarn install
 
-      - name: Publish release
+      - name: Publish preRelease
         env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.HOUSEKEEPER_PAT_OCTANT_V2_PACKAGES }}
         run: |
-          yarn release --ci
+          yarn release --ci --preRelease=test
