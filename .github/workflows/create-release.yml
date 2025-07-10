@@ -28,6 +28,9 @@ jobs:
       - access-check
     if: github.ref_name == 'develop'
     runs-on: general
+    permissions:
+      contents: write
+      id-token: write
     container:
       image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:f4f41461
       credentials:
@@ -68,7 +71,6 @@ jobs:
     permissions:
       contents: write
       id-token: write
-      packages: write
     container:
       image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:f4f41461
       credentials:
