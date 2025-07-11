@@ -42,6 +42,9 @@ contract QuadraticVotingTimelockDebugTest is Test {
 
         address mechanismAddr = factory.deployQuadraticVotingMechanism(config, 50, 100); // 50% alpha
         mechanism = QuadraticVotingMechanism(payable(mechanismAddr));
+        
+        // Set alice as keeper so she can create proposals
+        _tokenized(address(mechanism)).setKeeper(alice);
     }
 
     function testTimelockDebug() public {

@@ -60,6 +60,8 @@ contract QuadraticVotingProposalStateTest is Test {
 
         address mechanismAddr = factory.deployQuadraticVotingMechanism(config, 50, 100); // 50% alpha
         mechanism = QuadraticVotingMechanism(payable(mechanismAddr));
+        _tokenized(address(mechanism)).setKeeper(alice);
+        _tokenized(address(mechanism)).setManagement(bob);
 
         // Pre-fund matching pool - this will be included in total assets during finalize
         uint256 matchingPoolAmount = 2000 ether;

@@ -190,6 +190,8 @@ contract QuadraticVotingRecipientJourneyTest is Test {
 
         address mechanismAddr = factory.deployQuadraticVotingMechanism(config, 50, 100); // 50% alpha
         mechanism = QuadraticVotingMechanism(payable(mechanismAddr));
+        _tokenized(address(mechanism)).setKeeper(alice);
+        _tokenized(address(mechanism)).setManagement(bob);
 
         // Pre-fund matching pool - this will be included in total assets during finalize
         uint256 matchingPoolAmount = 2000 ether;
@@ -253,7 +255,7 @@ contract QuadraticVotingRecipientJourneyTest is Test {
         // Create proposals for different recipients
         currentTestCtx.pidCharlie = _createProposal(alice, charlie, "Charlie's Project");
         currentTestCtx.pidDave = _createProposal(bob, dave, "Dave's Project");
-        currentTestCtx.pidEve = _createProposal(frank, eve, "Eve's Project");
+        currentTestCtx.pidEve = _createProposal(alice, eve, "Eve's Project");
 
         vm.roll(currentTestCtx.startBlock + VOTING_DELAY + 1);
 

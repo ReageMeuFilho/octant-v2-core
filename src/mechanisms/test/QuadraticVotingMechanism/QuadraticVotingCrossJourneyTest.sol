@@ -61,6 +61,8 @@ contract QuadraticVotingCrossJourneyTest is Test {
 
         address mechanismAddr = factory.deployQuadraticVotingMechanism(config, 50, 100); // 50% alpha
         mechanism = QuadraticVotingMechanism(payable(mechanismAddr));
+        _tokenized(address(mechanism)).setKeeper(alice);
+        _tokenized(address(mechanism)).setManagement(bob);
 
         // Pre-fund matching pool - this will be included in total assets during finalize
         uint256 matchingPoolAmount = 2000 ether;
@@ -100,7 +102,7 @@ contract QuadraticVotingCrossJourneyTest is Test {
         vm.prank(bob);
         uint256 pidDave = _tokenized(address(mechanism)).propose(dave, "Dave's Digital Literacy Program");
 
-        vm.prank(frank);
+        vm.prank(alice);
         uint256 pidEve = _tokenized(address(mechanism)).propose(eve, "Eve's Community Health Clinic");
 
         // PHASE 3: DEMOCRATIC VOTING PROCESS
@@ -426,7 +428,7 @@ contract QuadraticVotingCrossJourneyTest is Test {
         vm.prank(bob);
         uint256 pid2 = _tokenized(address(mechanism)).propose(dave, "Community Education");
 
-        vm.prank(frank);
+        vm.prank(alice);
         uint256 pid3 = _tokenized(address(mechanism)).propose(eve, "Healthcare Access");
 
         vm.roll(startBlock + VOTING_DELAY + 1);

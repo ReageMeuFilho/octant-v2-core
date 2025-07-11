@@ -89,6 +89,10 @@ contract QuadraticVotingAdminJourneyTest is Test {
 
         address mechanismAddr = factory.deployQuadraticVotingMechanism(config, 50, 100); // 50% alpha
         mechanism = QuadraticVotingMechanism(payable(mechanismAddr));
+        
+        // Set alice as keeper and bob as management so they can create proposals
+        _tokenized(address(mechanism)).setKeeper(alice);
+        _tokenized(address(mechanism)).setManagement(bob);
     }
 
     /// @notice Test admin deployment and configuration verification

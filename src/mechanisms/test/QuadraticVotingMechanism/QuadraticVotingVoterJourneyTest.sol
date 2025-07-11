@@ -104,6 +104,7 @@ contract QuadraticVotingVoterJourneyTest is Test {
         address mechanismAddr = factory.deployQuadraticVotingMechanism(config, 50, 100); // 50% alpha
         mechanism = QuadraticVotingMechanism(payable(mechanismAddr));
         _tokenized(address(mechanism)).setKeeper(alice);
+        _tokenized(address(mechanism)).setManagement(bob);
     }
 
     /// @notice Test voter registration with various deposit amounts

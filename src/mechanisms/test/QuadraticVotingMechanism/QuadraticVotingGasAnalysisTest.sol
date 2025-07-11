@@ -56,6 +56,8 @@ contract QuadraticVotingGasAnalysisTest is Test {
         );
 
         mechanism = QuadraticVotingMechanism(payable(mechanismAddr));
+        TokenizedAllocationMechanism(address(mechanism)).setKeeper(alice);
+        TokenizedAllocationMechanism(address(mechanism)).setManagement(david);
 
         console.log("=== GAS ANALYSIS TEST SETUP COMPLETE ===");
         console.log("Mechanism deployed at:", address(mechanism));
@@ -73,10 +75,10 @@ contract QuadraticVotingGasAnalysisTest is Test {
         vm.prank(alice);
         uint256 pid1 = _tokenized().propose(recipient1, "First Project");
 
-        vm.prank(bob);
+        vm.prank(david);
         uint256 pid2 = _tokenized().propose(recipient2, "Second Project");
 
-        vm.prank(charlie);
+        vm.prank(alice);
         uint256 pid3 = _tokenized().propose(recipient3, "Third Project");
 
         console.log("Created 3 proposals for cold storage testing");
@@ -129,6 +131,7 @@ contract QuadraticVotingGasAnalysisTest is Test {
         address bob2 = makeAddr("bob2");
         address charlie2 = makeAddr("charlie2");
         address david2 = makeAddr("david2");
+        
 
         address[] memory users = new address[](4);
         users[0] = alice2;
@@ -146,13 +149,13 @@ contract QuadraticVotingGasAnalysisTest is Test {
         console.log("Setup complete: 4 fresh users with 1000 ether voting power each");
 
         // Create proposals and set up initial votes (cold storage operations)
-        vm.prank(alice2);
+        vm.prank(alice);
         uint256 pid1 = _tokenized().propose(recipient1, "First Project");
 
-        vm.prank(bob2);
+        vm.prank(david);
         uint256 pid2 = _tokenized().propose(recipient2, "Second Project");
 
-        vm.prank(charlie2);
+        vm.prank(alice);
         uint256 pid3 = _tokenized().propose(recipient3, "Third Project");
 
         console.log("Created 3 proposals for warm storage testing");
@@ -366,9 +369,9 @@ contract QuadraticVotingGasAnalysisTest is Test {
         uint256 pid2 = _tokenized().propose(recipient2, "Project 2");
         vm.prank(alice);
         uint256 pid3 = _tokenized().propose(recipient3, "Project 3");
-        vm.prank(bob);
+        vm.prank(david);
         uint256 pid4 = _tokenized().propose(makeAddr("recipient4"), "Project 4");
-        vm.prank(bob);
+        vm.prank(david);
         uint256 pid5 = _tokenized().propose(makeAddr("recipient5"), "Project 5");
 
         // Advance to voting period (start block + voting delay + 1)
