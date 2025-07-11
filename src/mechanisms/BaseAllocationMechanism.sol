@@ -150,9 +150,9 @@ abstract contract BaseAllocationMechanism is IBaseAllocationStrategy {
     // and use onlySelf modifier to ensure security
 
     modifier onlySelf() {
-        // In delegatecall context, address(this) is the proxy and msg.sender is the external caller
-        // We need to allow calls from the TokenizedAllocationMechanism
-        require(msg.sender == address(this) || msg.sender == tokenizedAllocationAddress, "!self");
+        // In delegatecall context, msg.sender must be address(this) to ensure
+        // hooks can only be called via delegatecall from TokenizedAllocationMechanism
+        require(msg.sender == address(this), "!self");
         _;
     }
 
