@@ -147,9 +147,6 @@ abstract contract ProperQF {
         s.totalQuadraticSum = newTotalQuadraticSum.toUint128();
         s.totalLinearSum = newTotalLinearSum.toUint128();
 
-        // Calculate total funding with alpha weighting
-        s.totalFunding = _calculateWeightedTotalFunding();
-
         // Update project state - batch storage writes
         project.sumSquareRoots = newSumSquareRoots;
         project.sumContributions = newSumContributions;
@@ -166,7 +163,8 @@ abstract contract ProperQF {
         // Convert to uint256 for calculation to prevent overflow
         uint256 weightedQuadratic = (uint256(s.totalQuadraticSum) * uint256(s.alphaNumerator)) /
             uint256(s.alphaDenominator);
-        uint256 weightedLinear = uint256(s.totalLinearSum); // Linear funding is always the raw contribution sum
+        uint256 weightedLinear = (uint256(s.totalLinearSum) * (uint256(s.alphaDenominator) - uint256(s.alphaNumerator))) /
+            uint256(s.alphaDenominator);
         return weightedQuadratic + weightedLinear;
     }
 
@@ -236,6 +234,9 @@ abstract contract ProperQF {
         s.alphaNumerator = newNumerator.toUint128();
         s.alphaDenominator = newDenominator.toUint128();
 
+        // Recalculate total funding with new alpha
+        s.totalFunding = _calculateWeightedTotalFunding();
+
         // Emit event
         emit AlphaUpdated(oldNumerator, oldDenominator, newNumerator, newDenominator);
     }
@@ -247,5 +248,59 @@ abstract contract ProperQF {
     function getAlpha() public view returns (uint256, uint256) {
         ProperQFStorage storage s = _getProperQFStorage();
         return (uint256(s.alphaNumerator), uint256(s.alphaDenominator));
+    }
+
+    /**
+     * @notice Calculate optimal alpha for 1:1 shares-to-assets ratio given fixed matching pool amount
+     * @dev Formula: We want total funding = total assets available
+     * @dev Total funding = α × totalQuadraticSum + (1-α) × totalLinearSum
+     * @dev Total assets = totalUserDeposits + matchingPoolAmount
+     * @dev Solving: α × totalQuadraticSum + (1-α) × totalLinearSum = totalUserDeposits + matchingPoolAmount
+     * @dev Rearranging: α × (totalQuadraticSum - totalLinearSum) = totalUserDeposits + matchingPoolAmount - totalLinearSum
+     * @param matchingPoolAmount Fixed amount of matching funds available
+     * @param quadraticSum Total quadratic sum across all proposals
+     * @param linearSum Total linear sum across all proposals (voting costs)
+     * @param totalUserDeposits Total user deposits in the mechanism
+     * @return optimalAlphaNumerator Calculated alpha numerator
+     * @return optimalAlphaDenominator Calculated alpha denominator
+     */
+    function _calculateOptimalAlpha(
+        uint256 matchingPoolAmount,
+        uint256 quadraticSum,
+        uint256 linearSum,
+        uint256 totalUserDeposits
+    ) internal pure returns (uint256 optimalAlphaNumerator, uint256 optimalAlphaDenominator) {
+        // Handle edge cases
+        if (quadraticSum <= linearSum) {
+            // No quadratic funding benefit, set alpha to 0
+            optimalAlphaNumerator = 0;
+            optimalAlphaDenominator = 1;
+            return (optimalAlphaNumerator, optimalAlphaDenominator);
+        }
+
+        uint256 totalAssetsAvailable = totalUserDeposits + matchingPoolAmount;
+        uint256 quadraticAdvantage = quadraticSum - linearSum;
+
+        // We want: α × quadraticSum + (1-α) × linearSum = totalAssetsAvailable
+        // Solving for α: α × (quadraticSum - linearSum) = totalAssetsAvailable - linearSum
+        // Therefore: α = (totalAssetsAvailable - linearSum) / (quadraticSum - linearSum)
+
+        if (totalAssetsAvailable <= linearSum) {
+            // Not enough assets even for linear funding, set alpha to 0
+            optimalAlphaNumerator = 0;
+            optimalAlphaDenominator = 1;
+        } else {
+            uint256 numerator = totalAssetsAvailable - linearSum;
+
+            if (numerator >= quadraticAdvantage) {
+                // Enough assets for full quadratic funding
+                optimalAlphaNumerator = 1;
+                optimalAlphaDenominator = 1;
+            } else {
+                // Calculate fractional alpha
+                optimalAlphaNumerator = numerator;
+                optimalAlphaDenominator = quadraticAdvantage;
+            }
+        }
     }
 }

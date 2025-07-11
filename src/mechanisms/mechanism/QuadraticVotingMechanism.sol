@@ -228,4 +228,22 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
         // Update alpha using ProperQF's internal function
         _setAlpha(newNumerator, newDenominator);
     }
+
+    /// @notice Calculate optimal alpha for 1:1 shares-to-assets ratio given fixed matching pool amount
+    /// @param matchingPoolAmount Fixed amount of matching funds available
+    /// @param totalUserDeposits Total user deposits in the mechanism
+    /// @return optimalAlphaNumerator Calculated alpha numerator
+    /// @return optimalAlphaDenominator Calculated alpha denominator
+    /// @dev Uses current mechanism state for quadratic and linear sums
+    function calculateOptimalAlpha(
+        uint256 matchingPoolAmount,
+        uint256 totalUserDeposits
+    ) external view returns (uint256 optimalAlphaNumerator, uint256 optimalAlphaDenominator) {
+        return _calculateOptimalAlpha(
+            matchingPoolAmount,
+            totalQuadraticSum(),
+            totalLinearSum(),
+            totalUserDeposits
+        );
+    }
 }
