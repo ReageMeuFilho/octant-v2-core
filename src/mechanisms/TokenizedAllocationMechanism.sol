@@ -482,8 +482,8 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         uint256 newPower = IBaseAllocationStrategy(address(this)).getVotingPowerHook(user, deposit);
         if (newPower > MAX_SAFE_VALUE) revert VotingPowerTooLarge(newPower, MAX_SAFE_VALUE);
 
-        // Prevent registration with zero voting power
-        if (newPower == 0) revert InsufficientDeposit(deposit);
+        // Prevent registration with zero voting power when deposit is non-zero
+        if (newPower == 0 && deposit > 0) revert InsufficientDeposit(deposit);
 
         s.votingPower[user] = newPower;
         emit UserRegistered(user, newPower);
