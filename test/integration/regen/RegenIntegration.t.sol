@@ -648,7 +648,7 @@ contract RegenIntegrationTest is Test {
 
         vm.startPrank(contributor);
         vm.expectRevert(abi.encodeWithSelector(Pausable.EnforcedPause.selector));
-        regenStaker.contribute(depositId, allocationMechanism, contributor, contributeAmount, deadline, v, r, s);
+        regenStaker.contribute(depositId, allocationMechanism, contributeAmount, deadline, v, r, s);
         vm.stopPrank();
 
         vm.prank(ADMIN);
@@ -1360,7 +1360,7 @@ contract RegenIntegrationTest is Test {
 
         vm.startPrank(contributor);
         vm.expectRevert(abi.encodeWithSelector(Staker.Staker__InvalidAddress.selector));
-        regenStaker.contribute(depositId, address(0), contributor, contributionAmount, deadline, v, r, s);
+        regenStaker.contribute(depositId, address(0), contributionAmount, deadline, v, r, s);
         vm.stopPrank();
     }
 
@@ -2365,7 +2365,6 @@ contract RegenIntegrationTest is Test {
         currentTestCtx.actualContribution = regenStaker.contribute(
             currentTestCtx.depositId,
             currentTestCtx.allocationMechanism,
-            alice, // voting delegatee
             currentTestCtx.contributeAmount,
             currentTestCtx.deadline,
             currentTestCtx.v,
@@ -2472,7 +2471,6 @@ contract RegenIntegrationTest is Test {
         currentTestCtx.actualContribution = regenStaker.contribute(
             currentTestCtx.depositId,
             currentTestCtx.allocationMechanism,
-            alice,
             currentTestCtx.contributeAmount,
             currentTestCtx.deadline,
             currentTestCtx.v,
@@ -2548,7 +2546,7 @@ contract RegenIntegrationTest is Test {
 
         // Should revert with CantAfford
         vm.expectRevert(abi.encodeWithSelector(RegenStaker.CantAfford.selector, contributeAmount, unclaimedAmount));
-        regenStaker.contribute(depositId, allocationMechanism, alice, contributeAmount, deadline, v, r, s);
+        regenStaker.contribute(depositId, allocationMechanism, contributeAmount, deadline, v, r, s);
         vm.stopPrank();
     }
 
@@ -2595,7 +2593,7 @@ contract RegenIntegrationTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(RegenStaker.NotWhitelisted.selector, regenStaker.contributionWhitelist(), alice)
         );
-        regenStaker.contribute(depositId, allocationMechanism, alice, contributeAmount, deadline, v, r, s);
+        regenStaker.contribute(depositId, allocationMechanism, contributeAmount, deadline, v, r, s);
         vm.stopPrank();
     }
 
@@ -2643,7 +2641,7 @@ contract RegenIntegrationTest is Test {
 
         // Should revert with EnforcedPause
         vm.expectRevert(abi.encodeWithSelector(Pausable.EnforcedPause.selector));
-        regenStaker.contribute(depositId, allocationMechanism, alice, contributeAmount, deadline, v, r, s);
+        regenStaker.contribute(depositId, allocationMechanism, contributeAmount, deadline, v, r, s);
         vm.stopPrank();
     }
 
@@ -2687,7 +2685,7 @@ contract RegenIntegrationTest is Test {
 
         // Should revert with ExpiredSignature from TokenizedAllocationMechanism
         vm.expectRevert(); // The exact error will be from TokenizedAllocationMechanism
-        regenStaker.contribute(depositId, allocationMechanism, alice, contributeAmount, deadline, v, r, s);
+        regenStaker.contribute(depositId, allocationMechanism, contributeAmount, deadline, v, r, s);
         vm.stopPrank();
     }
 
@@ -2750,7 +2748,7 @@ contract RegenIntegrationTest is Test {
                 allocationMechanism
             )
         );
-        regenStaker.contribute(depositId, allocationMechanism, alice, contributeAmount, deadline, v, r, s);
+        regenStaker.contribute(depositId, allocationMechanism, contributeAmount, deadline, v, r, s);
         vm.stopPrank();
     }
 

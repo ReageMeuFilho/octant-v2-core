@@ -84,6 +84,7 @@ contract RegenStaker is StakerPermitAndStake, StakerOnBehalf, Pausable, Reentran
     error ZeroOperation();
     error NoOperation();
     error DisablingAllocationMechanismWhitelistNotAllowed();
+    error InsufficientAllowanceForContribution(uint256 allowance, uint256 required);
 
     // Shared state getters
     function rewardDuration() external view returns (uint256) {
@@ -378,7 +379,6 @@ contract RegenStaker is StakerPermitAndStake, StakerOnBehalf, Pausable, Reentran
     ///      must have pre-approved the allocation mechanism to pull the tokens.
     /// @param _depositId The deposit identifier to contribute from
     /// @param _allocationMechanismAddress Whitelisted allocation mechanism to receive contribution
-    /// @param _votingDelegatee Address to delegate voting power to in the allocation mechanism
     /// @param _amount Amount of unclaimed rewards to contribute (must be <= available rewards)
     /// @param _deadline Signature expiration timestamp
     /// @param _v Signature component v
@@ -388,7 +388,6 @@ contract RegenStaker is StakerPermitAndStake, StakerOnBehalf, Pausable, Reentran
     function contribute(
         DepositIdentifier _depositId,
         address _allocationMechanismAddress,
-        address _votingDelegatee,
         uint256 _amount,
         uint256 _deadline,
         uint8 _v,
@@ -422,6 +421,11 @@ contract RegenStaker is StakerPermitAndStake, StakerOnBehalf, Pausable, Reentran
             amountContributedToAllocationMechanism = _amount - fee;
         }
 
+        uint256 currentAllowance = REWARD_TOKEN.allowance(msg.sender, _allocationMechanismAddress);
+        if (currentAllowance < amountContributedToAllocationMechanism) {
+            revert InsufficientAllowanceForContribution(currentAllowance, amountContributedToAllocationMechanism);
+        }
+
         uint256 scaledAmountConsumed = _amount * SCALE_FACTOR;
         deposit.scaledUnclaimedRewardCheckpoint = deposit.scaledUnclaimedRewardCheckpoint - scaledAmountConsumed;
 
@@ -437,10 +441,8 @@ contract RegenStaker is StakerPermitAndStake, StakerOnBehalf, Pausable, Reentran
             amountContributedToAllocationMechanism
         );
 
-        // The allocation mechanism will pull tokens from the contributor (msg.sender)
-        // The contributor must have pre-approved the allocation mechanism
         TokenizedAllocationMechanism(_allocationMechanismAddress).signupWithSignature(
-            _votingDelegatee,
+            msg.sender,
             amountContributedToAllocationMechanism,
             _deadline,
             _v,
