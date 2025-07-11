@@ -6,7 +6,6 @@ import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocation
 import { ProperQF } from "src/mechanisms/voting-strategy/ProperQF.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title Quadratic Voting Mechanism
 /// @notice Implements quadratic funding for proposal allocation using the ProperQF strategy
@@ -20,7 +19,6 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
     error VoteWeightTooLarge();
     error InsufficientVotingPowerForQuadraticCost();
     error TotalVotingPowerOverflow();
-    using Math for uint256;
 
     /// @notice Total voting power distributed across all proposals
     uint256 public totalVotingPower;
