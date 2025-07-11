@@ -289,6 +289,11 @@ contract SimpleVotingAdminJourneyTest is Test {
         // Transfer ownership
         (bool success3, ) = address(mechanism).call(abi.encodeWithSignature("transferOwnership(address)", newOwner));
         require(success3, "Transfer ownership failed");
+        
+        // New owner accepts ownership
+        vm.prank(newOwner);
+        (bool success3b, ) = address(mechanism).call(abi.encodeWithSignature("acceptOwnership()"));
+        require(success3b, "Accept ownership failed");
         assertEq(_tokenized(address(mechanism)).owner(), newOwner);
 
         // Old owner cannot perform owner functions
@@ -350,6 +355,11 @@ contract SimpleVotingAdminJourneyTest is Test {
             abi.encodeWithSignature("transferOwnership(address)", emergencyAdmin)
         );
         require(success3, "Transfer ownership failed");
+        
+        // New owner accepts ownership
+        vm.prank(emergencyAdmin);
+        (bool success3b, ) = address(mechanism).call(abi.encodeWithSignature("acceptOwnership()"));
+        require(success3b, "Accept ownership failed");
 
         // New owner manages crisis
         vm.startPrank(emergencyAdmin);

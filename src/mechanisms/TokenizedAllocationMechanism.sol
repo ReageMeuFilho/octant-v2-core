@@ -177,6 +177,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         uint256 quorumShares;
         // Access control
         address owner;
+        address pendingOwner;
         bool paused;
         bool initialized;
         // Voting state
@@ -221,6 +222,8 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     event ProposalQueued(uint256 indexed pid, uint256 eta, uint256 shareAmount);
     /// @notice Emitted when a proposal is canceled
     event ProposalCanceled(uint256 indexed pid, address indexed proposer);
+    /// @notice Emitted when ownership transfer is initiated
+    event OwnershipTransferInitiated(address indexed currentOwner, address indexed pendingOwner);
     /// @notice Emitted when ownership is transferred
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
     /// @notice Emitted when keeper is updated
@@ -745,6 +748,10 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         return _getStorage().owner;
     }
 
+    function pendingOwner() external view onlyInitialized returns (address) {
+        return _getStorage().pendingOwner;
+    }
+
     function tallyFinalized() external view onlyInitialized returns (bool) {
         return _getStorage().tallyFinalized;
     }
@@ -804,13 +811,35 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
 
     // ---------- Emergency Functions ----------
 
-    /// @notice Transfer ownership to a new address
+    /// @notice Initiate ownership transfer to a new address (step 1 of 2)
+    /// @param newOwner The address to transfer ownership to
     function transferOwnership(address newOwner) external onlyOwner onlyInitialized {
         if (newOwner == address(0)) revert Unauthorized();
         AllocationStorage storage s = _getStorage();
+        s.pendingOwner = newOwner;
+        emit OwnershipTransferInitiated(s.owner, newOwner);
+    }
+
+    /// @notice Accept ownership transfer (step 2 of 2)
+    /// @dev Must be called by the pending owner to complete the transfer
+    function acceptOwnership() external onlyInitialized {
+        AllocationStorage storage s = _getStorage();
+        if (msg.sender != s.pendingOwner) revert Unauthorized();
+        
         address oldOwner = s.owner;
-        s.owner = newOwner;
-        emit OwnershipTransferred(oldOwner, newOwner);
+        s.owner = s.pendingOwner;
+        s.pendingOwner = address(0);
+        emit OwnershipTransferred(oldOwner, s.owner);
+    }
+
+    /// @notice Cancel pending ownership transfer
+    /// @dev Can only be called by current owner
+    function cancelOwnershipTransfer() external onlyOwner onlyInitialized {
+        AllocationStorage storage s = _getStorage();
+        if (s.pendingOwner == address(0)) revert Unauthorized();
+        
+        s.pendingOwner = address(0);
+        emit OwnershipTransferInitiated(s.owner, address(0));
     }
 
     /// @notice Update keeper address
