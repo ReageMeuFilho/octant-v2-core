@@ -15,7 +15,6 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
     error AlphaDenominatorMustBePositive();
     error ZeroAddressCannotPropose();
     error OnlyForVotesSupported();
-    error VoteWeightTooLarge();
     error InsufficientVotingPowerForQuadraticCost();
 
     /// @notice Total voting power distributed across all proposals
@@ -84,9 +83,6 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
         uint256 oldPower
     ) internal override returns (uint256) {
         if (choice != TokenizedAllocationMechanism.VoteType.For) revert OnlyForVotesSupported();
-
-        // Validate weight to prevent overflow in quadratic cost calculation
-        if (weight > type(uint128).max) revert VoteWeightTooLarge();
 
         // Quadratic cost: to vote with weight W, you pay W^2 voting power
         uint256 quadraticCost = weight * weight;
