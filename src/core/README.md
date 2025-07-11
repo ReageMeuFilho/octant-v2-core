@@ -23,6 +23,28 @@ The system provides two specialized implementations optimized for different yiel
 - **Loss Protection:** Burns dragon router shares to absorb losses before affecting user principal if flag is enabled
 - **Optimal For:** Strategies where totalAssets can be precisely calculated and profits are harvested periodically
 
+##### Loss Tracking Mechanism
+
+The YieldDonatingTokenizedStrategy implements a sophisticated loss tracking system:
+
+**Storage Variables:**
+- `lossAmount` (uint256): Accumulated losses to offset against future profits
+- `enableBurning` (bool): Whether to burn shares from dragon router during loss protection
+
+**Loss Handling Process:**
+1. When losses occur, the system first attempts to burn dragon router shares to cover the loss
+2. Any remaining loss that cannot be covered by burning is tracked in `S.lossAmount`
+3. Future profits first offset tracked losses before minting new shares to dragon router
+
+**Share Burning Logic:**
+- Converts loss to shares using `_convertToSharesWithLoss()` with rounding up
+- Burns up to available dragon router shares
+- Tracks any uncovered loss in `S.lossAmount`
+
+**Profit Recovery:**
+- If profit > lossAmount: Clears tracked losses and mints shares for net profit
+- If profit ≤ lossAmount: Reduces tracked losses by profit amount, no shares minted
+
 #### YieldSkimmingTokenizedStrategy  
 - **Use Case:** Appreciating assets like liquid staking tokens (mETH, stETH) where value grows continuously
 - **Mechanism:** Skims appreciation through share dilution while using vault shares to snapshot underlying principal on user deposit.
@@ -45,12 +67,26 @@ The system provides two specialized implementations optimized for different yiel
 - YieldSkimming: RAY precision (1e27) exchange rate storage with WadRayMath library integration
 
 **State Management:**
-- YieldDonating: Standard ERC4626 state tracking
+- YieldDonating: Standard ERC4626 state tracking + loss tracking via `S.lossAmount`
 - YieldSkimming: Custom storage slot for exchange rate data, ETH value calculations vs share supply
+
+**Loss Protection:**
+- YieldDonating: Burns dragon router shares when `enableBurning = true`, tracks uncovered losses in `S.lossAmount`
+- YieldSkimming: Burns shares from dragon router if enabled, absorbs losses before affecting user principal
 
 **Update Timing:**
 - YieldDonating: Manual keeper-triggered reports at optimal intervals generate and harvest profit.
 - YieldSkimming: Manual keeper-triggered reports at optimal intervals skim value appreciation above principal.
+
+#### Critical Conversion Functions
+
+**Edge Cases & Considerations:**
+
+1. **No Dragon Router Shares:** Full loss tracked in S.lossAmount
+2. **Insufficient Shares:** Burns all available, tracks remainder
+3. **Partial Recovery:** Reduces tracked loss, no share minting
+4. **Full Recovery:** Clears tracked loss, mints net profit shares
+5. **Multiple Cycles:** Accumulates losses, offsets with profits over time
 
 ## Trust Minimization
 
@@ -76,6 +112,12 @@ The system provides two specialized implementations optimized for different yiel
 - Time to withdraw if disagreeing with new destination
 - Cannot be changed instantly or without notice
 - Preserves user agency in donation decisions
+
+#### Loss Protection & Risk Distribution
+- User principal protected through dragon router share burning when `enableBurning = true`
+- Dragon router bears first loss through automated share burning mechanism
+- Uncovered losses tracked transparently in `S.lossAmount` for future offset
+- Strategist responsible for ensuring dragon router compatibility with share burning
 
 
 ## Security Model and Trust Assumptions
@@ -109,6 +151,21 @@ The security model makes the following key assumptions:
 3. **Oracle Reliability**: Exchange rate data from RocketPool is assumed to be generally reliable, though validation bounds are implemented as defense-in-depth.
 
 4. **Dragon Router Beneficiary**: The dragon router address is assumed to be a legitimate beneficiary for donated yield.
+
+5. **Loss Protection Mechanism**: The loss tracking and share burning mechanism assumes:
+   - Dragon router shares represent risk capital that absorbs losses first
+   - Price-per-share calculations remain consistent through `_convertToSharesWithLoss`
+   - Economic invariants are preserved: users can recover original deposits after full recovery
+   - If share burning is enabled (`enableBurning = true`), it is the strategist's responsibility to ensure the dragon router can support having its shares burned
+
+### Economic Invariants
+
+The loss tracking mechanism maintains critical economic invariants:
+
+1. **Total Value Conservation**: `totalAssets + trackedLosses = original deposits + net profits`
+2. **User Principal Protection**: Users can recover original deposits after full loss recovery
+3. **Dragon Router Risk**: Dragon router bears loss risk through share burning
+4. **Fair Share Pricing**: Share conversions account for tracked losses to prevent dilution
 
 ### Threat Model Boundaries
 
@@ -210,6 +267,17 @@ WLOG, I refer to yield donating and yield skimming strategies as 'donation strat
   - MaxLoss parameters enable users to specify acceptable loss tolerance for withdrawals protecting their contributed capital
   - Preview functions accurately simulate transaction outcomes without affecting donation accounting or state changes
   - Max functions respect strategy-specific deposit/withdrawal limits and shutdown states while preserving donation mechanism integrity
+
+#### FR-7: Loss Tracking & Principal Protection
+- **Requirement:** The system must protect user principal during loss events by burning dragon router shares first, tracking uncovered losses for future offset, and ensuring fair recovery distribution when profits return.
+- **Implementation:** `_handleDragonLossProtection()`, `S.lossAmount` storage, `_convertToSharesWithLoss()`, share burning mechanism
+- **Acceptance Criteria:**
+  - When losses occur with `enableBurning = true`, dragon router shares are burned up to available balance to cover losses
+  - Uncovered losses are tracked in `S.lossAmount` and offset against future profits before new share minting
+  - Share conversions during loss periods use `_convertToSharesWithLoss()` to maintain fair pricing
+  - Recovery follows priority: offset tracked losses first, then mint shares for net profit to dragon router
+  - If `enableBurning = false`, all losses are tracked without share burning
+  - Strategist must ensure dragon router implementation supports share burning when enabling this feature
 
 ## User Lifecycle Documentation
 
