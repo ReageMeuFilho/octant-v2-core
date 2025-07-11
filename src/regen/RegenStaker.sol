@@ -413,12 +413,7 @@ contract RegenStaker is StakerPermitAndStake, StakerOnBehalf, Pausable, Reentran
         require(_amount <= unclaimedAmount, CantAfford(_amount, unclaimedAmount));
 
         uint256 fee = claimFeeParameters.feeAmount;
-        if (fee == 0) {
-            amountContributedToAllocationMechanism = _amount;
-        } else {
-            require(_amount >= fee, CantAfford(fee, _amount));
-            amountContributedToAllocationMechanism = _amount - fee;
-        }
+        amountContributedToAllocationMechanism = RegenStakerShared.calculateNetContribution(_amount, fee);
 
         uint256 currentAllowance = REWARD_TOKEN.allowance(msg.sender, _allocationMechanismAddress);
         require(

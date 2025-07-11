@@ -146,4 +146,17 @@ library RegenStakerShared {
             revert MinimumStakeAmountNotMet(minimumStakeAmount, deposit.balance);
         }
     }
+
+    /// @notice Calculate net contribution amount after deducting fees
+    /// @param amount The gross amount to contribute
+    /// @param feeAmount The fee amount to deduct
+    /// @return netAmount The amount after fee deduction
+    function calculateNetContribution(uint256 amount, uint256 feeAmount) external pure returns (uint256 netAmount) {
+        if (feeAmount == 0) {
+            netAmount = amount;
+        } else {
+            require(amount >= feeAmount, CantAfford(feeAmount, amount));
+            netAmount = amount - feeAmount;
+        }
+    }
 }
