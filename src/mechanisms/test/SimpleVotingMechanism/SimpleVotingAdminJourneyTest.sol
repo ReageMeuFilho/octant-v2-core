@@ -142,11 +142,11 @@ contract SimpleVotingAdminJourneyTest is Test {
         _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 400 ether);
 
         // Admin checks real-time vote tallies
-        (uint256 p1For, uint256 p1Against, ) = _tokenized(address(mechanism)).getVoteTally(pid1);
+        (uint256 p1For, uint256 p1Against,) = mechanism.voteTallies(pid1);
         assertEq(p1For, 600 ether);
         assertEq(p1Against, 100 ether);
 
-        (uint256 p2For, , ) = _tokenized(address(mechanism)).getVoteTally(pid2);
+        (uint256 p2For,,) = mechanism.voteTallies(pid2);
         assertEq(p2For, 800 ether);
 
         // Admin monitors proposal states during voting

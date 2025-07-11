@@ -269,9 +269,7 @@ contract TokenizedPatternDemoTest is Test {
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.Against, 50 ether);
 
         // Check vote tally
-        (uint256 forVotes, uint256 againstVotes, uint256 abstainVotes) = _tokenized(address(mechanism)).getVoteTally(
-            pid
-        );
+        (uint256 forVotes, uint256 againstVotes, uint256 abstainVotes) = mechanism.voteTallies(pid);
         assertEq(forVotes, 100 ether);
         assertEq(againstVotes, 50 ether);
         assertEq(abstainVotes, 0);
@@ -306,7 +304,7 @@ contract TokenizedPatternDemoTest is Test {
         // Check partial power usage
         assertEq(_tokenized(address(mechanism)).votingPower(alice), 40 ether);
 
-        (uint256 forVotes, , ) = _tokenized(address(mechanism)).getVoteTally(pid);
+        (uint256 forVotes,,) = mechanism.voteTallies(pid);
         assertEq(forVotes, 60 ether);
     }
 
@@ -469,7 +467,7 @@ contract TokenizedPatternDemoTest is Test {
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether);
 
-        (uint256 forVotes, , ) = _tokenized(address(mechanism)).getVoteTally(pid);
+        (uint256 forVotes,,) = mechanism.voteTallies(pid);
         assertEq(forVotes, 100 ether);
 
         vm.roll(block.number + 1000);
@@ -540,11 +538,11 @@ contract TokenizedPatternDemoTest is Test {
         _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.Against, 75 ether);
 
         // Check tallies
-        (uint256 p1For, uint256 p1Against, ) = _tokenized(address(mechanism)).getVoteTally(pid1);
+        (uint256 p1For, uint256 p1Against,) = mechanism.voteTallies(pid1);
         assertEq(p1For, 175 ether); // 100 + 75
         assertEq(p1Against, 50 ether);
 
-        (uint256 p2For, uint256 p2Against, ) = _tokenized(address(mechanism)).getVoteTally(pid2);
+        (uint256 p2For, uint256 p2Against,) = mechanism.voteTallies(pid2);
         assertEq(p2For, 150 ether);
         assertEq(p2Against, 75 ether);
 

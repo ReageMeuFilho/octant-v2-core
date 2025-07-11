@@ -161,11 +161,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         bool canceled;
     }
 
-    struct ProposalVote {
-        uint256 sharesFor;
-        uint256 sharesAgainst;
-        uint256 sharesAbstain;
-    }
 
     /// @notice Main storage struct containing all allocation mechanism state
     struct AllocationStorage {
@@ -200,7 +195,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         uint8 decimals; // The amount of decimals that `asset` and strategy use
         // Mappings
         mapping(uint256 => Proposal) proposals;
-        mapping(uint256 => ProposalVote) proposalVotes;
         mapping(address => bool) recipientUsed;
         mapping(uint256 => mapping(address => bool)) hasVoted;
         mapping(address => uint256) votingPower;
@@ -213,21 +207,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
 
     // ---------- Storage Access for Hooks ----------
 
-    /// @notice Get storage reference for use in hooks
-    /// @dev This allows hook implementations to access and modify storage
-    function getProposalVoteStorage(uint256 pid) external view returns (ProposalVote memory) {
-        return _getStorage().proposalVotes[pid];
-    }
 
-    /// @notice Update vote tallies from hooks
-    /// @dev Only callable via delegatecall from the strategy contract
-    function updateVoteTally(uint256 pid, uint256 sharesFor, uint256 sharesAgainst, uint256 sharesAbstain) external {
-        require(address(this) == msg.sender, "Only self");
-        AllocationStorage storage s = _getStorage();
-        s.proposalVotes[pid].sharesFor = sharesFor;
-        s.proposalVotes[pid].sharesAgainst = sharesAgainst;
-        s.proposalVotes[pid].sharesAbstain = sharesAbstain;
-    }
 
     /// @notice Emitted when a user completes registration
     event UserRegistered(address indexed user, uint256 votingPower);
@@ -662,7 +642,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         if (p.canceled) revert ProposalCanceledError(pid);
 
         if (!IBaseAllocationStrategy(address(this)).hasQuorumHook(pid))
-            revert NoQuorum(pid, s.proposalVotes[pid].sharesFor, s.proposalVotes[pid].sharesAgainst, s.quorumShares);
+            revert NoQuorum(pid, 0, 0, s.quorumShares);
 
         if (p.earliestRedeemableTime != 0) revert AlreadyQueued(pid);
 
@@ -737,15 +717,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
 
     // ---------- View Functions ----------
 
-    /// @notice Get current vote tallies for a proposal
-    function getVoteTally(
-        uint256 pid
-    ) external view onlyInitialized returns (uint256 sharesFor, uint256 sharesAgainst, uint256 sharesAbstain) {
-        AllocationStorage storage s = _getStorage();
-        if (!IBaseAllocationStrategy(address(this)).validateProposalHook(pid)) revert InvalidProposal(pid);
-        ProposalVote storage votes = s.proposalVotes[pid];
-        return (votes.sharesFor, votes.sharesAgainst, votes.sharesAbstain);
-    }
 
     /// @notice Get remaining voting power for an address
     function getRemainingVotingPower(address voter) external view onlyInitialized returns (uint256) {
@@ -782,9 +753,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         return _getStorage().proposals[pid];
     }
 
-    function proposalVotes(uint256 pid) external view onlyInitialized returns (ProposalVote memory) {
-        return _getStorage().proposalVotes[pid];
-    }
 
     function hasVoted(uint256 pid, address voter) external view onlyInitialized returns (bool) {
         return _getStorage().hasVoted[pid][voter];

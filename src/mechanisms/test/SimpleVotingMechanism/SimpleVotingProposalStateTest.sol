@@ -125,7 +125,7 @@ contract SimpleVotingProposalStateTest is Test {
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 300 ether);
 
-        (uint256 forVotes, , ) = _tokenized(address(mechanism)).getVoteTally(pid);
+        (uint256 forVotes,,) = mechanism.voteTallies(pid);
         assertEq(forVotes, 300 ether);
 
         // Still ACTIVE until finalized
@@ -280,7 +280,7 @@ contract SimpleVotingProposalStateTest is Test {
         assertFalse(proposal.canceled);
 
         // Verify vote tallies are correct
-        (uint256 forVotes, uint256 againstVotes, ) = _tokenized(address(mechanism)).getVoteTally(pid);
+        (uint256 forVotes, uint256 againstVotes,) = mechanism.voteTallies(pid);
         assertEq(forVotes, 300 ether);
         assertEq(againstVotes, 0);
         assertTrue(forVotes - againstVotes >= QUORUM_REQUIREMENT);
