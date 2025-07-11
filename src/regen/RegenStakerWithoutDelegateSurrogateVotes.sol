@@ -221,34 +221,26 @@ contract RegenStakerWithoutDelegateSurrogateVotes is StakerPermitAndStake, Stake
     }
 
     /// @inheritdoc Staker
+    /// @notice Override to handle token transfers without surrogates
+    /// @dev Since surrogates are always address(0), we skip transfers between address(0) addresses
+    function _stakeTokenSafeTransferFrom(address _from, address _to, uint256 _value) internal override {
+        // Skip transfers between address(0) since we don't use surrogates
+        if (_from == address(0) && _to == address(0)) {
+            return;
+        }
+        // Handle normal transfers (e.g., from user to contract, contract to user)
+        super._stakeTokenSafeTransferFrom(_from, _to, _value);
+    }
+
+    /// @inheritdoc Staker
     /// @notice Override to handle delegatee changes without surrogates (delegatee is tracked but has no effect)
     function _alterDelegatee(
         Deposit storage deposit,
         DepositIdentifier _depositId,
         address _newDelegatee
     ) internal override nonReentrant {
-        _revertIfAddressZero(_newDelegatee);
-        _checkpointGlobalReward();
-        _checkpointReward(deposit);
-
-        uint256 _newEarningPower = earningPowerCalculator.getEarningPower(
-            deposit.balance,
-            deposit.owner,
-            _newDelegatee
-        );
-
-        totalEarningPower = _calculateTotalEarningPower(deposit.earningPower, _newEarningPower, totalEarningPower);
-        depositorTotalEarningPower[deposit.owner] = _calculateTotalEarningPower(
-            deposit.earningPower,
-            _newEarningPower,
-            depositorTotalEarningPower[deposit.owner]
-        );
-
-        emit DelegateeAltered(_depositId, deposit.delegatee, _newDelegatee, _newEarningPower);
-        deposit.delegatee = _newDelegatee;
-        deposit.earningPower = _newEarningPower.toUint96();
-
-        // No token transfer needed since we don't use surrogates
+        // Now we can call super since _stakeTokenSafeTransferFrom handles the surrogate transfers
+        super._alterDelegatee(deposit, _depositId, _newDelegatee);
     }
 
     /// @inheritdoc Staker
@@ -700,27 +692,7 @@ contract RegenStakerWithoutDelegateSurrogateVotes is StakerPermitAndStake, Stake
         DepositIdentifier _depositId,
         address _newClaimer
     ) internal override nonReentrant {
-        _revertIfAddressZero(_newClaimer);
-        _checkpointGlobalReward();
-        _checkpointReward(deposit);
-
-        // Updating the earning power here is not strictly necessary, but if the user is touching their
-        // deposit anyway, it seems reasonable to make sure their earning power is up to date.
-        uint256 _newEarningPower = earningPowerCalculator.getEarningPower(
-            deposit.balance,
-            deposit.owner,
-            deposit.delegatee
-        );
-        totalEarningPower = _calculateTotalEarningPower(deposit.earningPower, _newEarningPower, totalEarningPower);
-        depositorTotalEarningPower[deposit.owner] = _calculateTotalEarningPower(
-            deposit.earningPower,
-            _newEarningPower,
-            depositorTotalEarningPower[deposit.owner]
-        );
-
-        deposit.earningPower = _newEarningPower.toUint96();
-
-        emit ClaimerAltered(_depositId, deposit.claimer, _newClaimer, _newEarningPower);
-        deposit.claimer = _newClaimer;
+        // Base implementation doesn't do any token transfers, so we can just call super
+        super._alterClaimer(deposit, _depositId, _newClaimer);
     }
 }
