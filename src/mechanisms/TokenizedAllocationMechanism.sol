@@ -195,11 +195,8 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         // Strategy Management
         address keeper; // Address given permission to call {report} and {tend}
         address management; // Main address that can set all configurable variables
-        address pendingManagement; // Address that is pending to take over `management`
         address emergencyAdmin; // Address to act in emergencies as well as `management`
         uint8 decimals; // The amount of decimals that `asset` and strategy use
-        uint8 entered; // To prevent reentrancy. Use uint8 for gas savings
-        bool shutdown; // Bool that can be used to stop deposits into the strategy
         // Mappings
         mapping(uint256 => Proposal) proposals;
         mapping(uint256 => ProposalVote) proposalVotes;
@@ -253,8 +250,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     event PausedStatusChanged(bool paused);
 
     // Additional events from DistributionMechanism
-    /// @notice Emitted when a strategy is shutdown.
-    event StrategyShutdown();
     /// @notice Emitted on the initialization of any new `strategy` that uses `asset` with this specific `apiVersion`.
     event NewTokenizedStrategy(address indexed strategy, address indexed asset, string apiVersion);
     /// @notice Emitted when the 'keeper' address is updated to 'newKeeper'.
@@ -263,8 +258,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     event UpdateManagement(address indexed newManagement);
     /// @notice Emitted when the 'emergencyAdmin' address is updated to 'newEmergencyAdmin'.
     event UpdateEmergencyAdmin(address indexed newEmergencyAdmin);
-    /// @notice Emitted when the `pendingManagement` address is updated to `newPendingManagement`.
-    event UpdatePendingManagement(address indexed newPendingManagement);
     /// @notice Emitted when the allowance of a `spender` for an `owner` is set by a call to {approve}. `value` is the new allowance.
     event Approval(address indexed owner, address indexed spender, uint256 value);
     /// @notice Emitted when `value` tokens are moved from one account (`from`) to another (`to`).
