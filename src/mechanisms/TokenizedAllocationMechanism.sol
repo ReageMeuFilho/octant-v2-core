@@ -634,7 +634,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
 
     /// @notice Queue proposal and trigger share distribution
     /// @param pid Proposal ID to queue
-    function queueProposal(uint256 pid) external onlyOwner nonReentrant onlyInitialized {
+    function queueProposal(uint256 pid) external nonReentrant onlyInitialized {
         AllocationStorage storage s = _getStorage();
 
         if (!s.tallyFinalized) revert TallyNotFinalized();

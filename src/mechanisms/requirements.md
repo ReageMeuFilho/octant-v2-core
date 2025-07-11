@@ -53,6 +53,12 @@ The Yearn V3 pattern implements a sophisticated delegation mechanism:
 
 The contract defines 11 strategic hooks that implementers must override to create specific voting mechanisms:
 
+**Key Architectural Decision - Permissionless Queuing:**
+The system implements **permissionless proposal queuing** (`queueProposal()` has no `onlyOwner` modifier), enabling flexible governance models:
+- **Community-Driven**: Anyone can queue successful proposals, removing admin bottlenecks
+- **Custom Access Control**: Mechanisms can enforce restrictions via `_requestCustomDistributionHook()` if needed
+- **Governance Flexibility**: Supports both permissionless and permissioned models through hook customization
+
 #### Core Validation Hooks
 - **`_beforeSignupHook(address user)`** - Controls user registration eligibility
   - **Security Assumptions**: 
@@ -127,6 +133,10 @@ The contract defines 11 strategic hooks that implementers must override to creat
     - MUST NOT mint shares if returning false (default minting will occur)
     - MAY implement vesting, splitting, or other distribution logic
     - MUST handle reentrancy safely if making external calls
+  - **Access Control Pattern**: Since `queueProposal()` is permissionless, this hook can enforce custom access control:
+    - **Example**: `require(msg.sender == owner || hasRole(QUEUER_ROLE, msg.sender), "Unauthorized queuing")`
+    - **Governance Models**: Can implement community-driven queuing, role-based access, or other patterns
+    - **Flexibility**: Enables different governance models without requiring core contract changes
 - **`_availableWithdrawLimit(address shareOwner)`** - Controls withdrawal limits with timelock enforcement
   - **Security Assumptions**:
     - MUST enforce timelock by returning 0 before redeemableAfter timestamp
@@ -230,12 +240,15 @@ This pattern enables complete code reuse while maintaining storage isolation and
 #### FR-5: Proposal Queuing & Share Allocation
 - **Requirement:** Successful proposals must be queued and vault shares minted to recipients
 - **Implementation:** `queueProposal(uint256 pid)` with `_requestDistributionHook()` and direct `_mint()` calls
+- **Access Control Design:** `queueProposal` is **permissionless** to enable flexible governance models, but access control can be enforced via `_requestCustomDistributionHook()` if needed
 - **Acceptance Criteria:**
   - Can only queue proposals after tally finalization
   - Proposals must meet quorum requirements via `_hasQuorumHook()`
   - Share amount determined by `_convertVotesToShares()` hook
   - Shares actually minted to recipient via internal `_mint()` function
   - Timelock delay applied before redemption eligibility
+  - **Permissionless queuing** enables community-driven execution without admin bottlenecks
+  - **Custom distribution hook** can implement access control or other types of distributions altogether
 
 #### FR-6: Proposal State Management
 - **Requirement:** System must track and expose proposal states throughout lifecycle
@@ -421,7 +434,7 @@ Admins are trusted operators who manage the voting lifecycle and ensure proper g
 1. **Calculate Optimal Alpha** (Optional): `mechanism.calculateOptimalAlpha(matchingPoolAmount, totalUserDeposits)` to determine optimal funding parameters
 2. **Set Alpha** (Optional): `mechanism.setAlpha(alphaNumerator, alphaDenominator)` to adjust quadratic vs linear weighting
 3. **Finalize Voting**: `mechanism.finalizeVoteTally()` (after voting period ends)
-4. **Queue Successful Proposals**: `mechanism.queueProposal(pid)` for each successful proposal
+4. **Queue Successful Proposals** (Optional): `mechanism.queueProposal(pid)` for each successful proposal - **Note: This is permissionless and can be done by anyone**
 5. **Monitor Redemption**: Track recipient share redemption after timelock
 
 **System Response:**
@@ -435,7 +448,7 @@ Admins are trusted operators who manage the voting lifecycle and ensure proper g
 **Key Responsibilities:**
 - ✅ **Consider optimal alpha** to maximize quadratic funding within budget constraints
 - ✅ **Must finalize promptly** after voting period to enable queuing
-- ✅ Queue all successful proposals that meet quorum
+- ✅ **Permissionless queuing** means anyone can queue successful proposals - admins can facilitate but are not required
 - ✅ Communicate redemption timeline to recipients
 - ✅ Ensure proper execution of funding round outcomes
 
