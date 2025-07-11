@@ -124,6 +124,16 @@ The contract defines 9 strategic hooks that implementers must override to create
   - Redemption amount follows ERC4626 share-to-asset conversion
   - Recipients can redeem partial amounts or full allocation
 
+#### FR-9: Optimal Alpha Calculation for Quadratic Funding
+- **Requirement:** System must support dynamic calculation of optimal alpha parameter to ensure 1:1 shares-to-assets ratio given a fixed matching pool
+- **Implementation:** `calculateOptimalAlpha(matchingPoolAmount, totalUserDeposits)` in QuadraticVotingMechanism and `_calculateOptimalAlpha()` in ProperQF
+- **Acceptance Criteria:**
+  - Calculates alpha that ensures total funding equals total available assets
+  - Handles edge cases: no quadratic advantage (α=0), insufficient assets (α=0), excess assets (α=1)
+  - Returns fractional alpha as numerator/denominator for precision
+  - Can be called before finalization to determine optimal funding parameters
+  - Supports dynamic adjustment of alpha via `setAlpha()` by mechanism owner
+
 ## System Invariants & Constraints
 
 ### Timing Invariants
@@ -263,17 +273,22 @@ Admins are trusted operators who manage the voting lifecycle and ensure proper g
 **User Story:** "As an admin, I want to finalize voting results and execute successful proposals"
 
 **Actions:**
-1. **Finalize Voting**: `mechanism.finalizeVoteTally()` (after voting period ends)
-2. **Queue Successful Proposals**: `mechanism.queueProposal(pid)` for each successful proposal
-3. **Monitor Redemption**: Track recipient share redemption after timelock
+1. **Calculate Optimal Alpha** (Optional): `mechanism.calculateOptimalAlpha(matchingPoolAmount, totalUserDeposits)` to determine optimal funding parameters
+2. **Set Alpha** (Optional): `mechanism.setAlpha(alphaNumerator, alphaDenominator)` to adjust quadratic vs linear weighting
+3. **Finalize Voting**: `mechanism.finalizeVoteTally()` (after voting period ends)
+4. **Queue Successful Proposals**: `mechanism.queueProposal(pid)` for each successful proposal
+5. **Monitor Redemption**: Track recipient share redemption after timelock
 
 **System Response:**
+- Optimal alpha calculated to ensure 1:1 shares-to-assets ratio
+- Alpha parameter updated if admin chooses to adjust
 - Vote tallies permanently finalized (tallyFinalized = true)
 - Successful proposals transition to Queued state
 - Shares minted to recipients with timelock enforcement
 - ProposalQueued events emitted with redemption timeline
 
 **Key Responsibilities:**
+- ✅ **Consider optimal alpha** to maximize quadratic funding within budget constraints
 - ✅ **Must finalize promptly** after voting period to enable queuing
 - ✅ Queue all successful proposals that meet quorum
 - ✅ Communicate redemption timeline to recipients
