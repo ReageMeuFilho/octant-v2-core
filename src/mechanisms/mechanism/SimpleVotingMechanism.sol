@@ -175,4 +175,10 @@ contract SimpleVotingMechanism is BaseAllocationMechanism {
         // This reflects all user deposits without any matching pools
         return asset.balanceOf(address(this));
     }
+
+    /// @notice Reject ETH deposits to prevent permanent fund loss
+    /// @dev Override BaseAllocationMechanism's receive() to prevent accidental ETH deposits
+    receive() external payable override {
+        revert("ETH not supported - use ERC20 tokens only");
+    }
 }

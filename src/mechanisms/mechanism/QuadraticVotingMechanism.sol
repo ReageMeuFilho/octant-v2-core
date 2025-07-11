@@ -237,4 +237,10 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
     ) external view returns (uint256 optimalAlphaNumerator, uint256 optimalAlphaDenominator) {
         return _calculateOptimalAlpha(matchingPoolAmount, totalQuadraticSum(), totalLinearSum(), totalUserDeposits);
     }
+
+    /// @notice Reject ETH deposits to prevent permanent fund loss
+    /// @dev Override BaseAllocationMechanism's receive() to prevent accidental ETH deposits
+    receive() external payable override {
+        revert("ETH not supported - use ERC20 tokens only");
+    }
 }
