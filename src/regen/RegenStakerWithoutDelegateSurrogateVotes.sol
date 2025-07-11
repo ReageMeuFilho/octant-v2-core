@@ -80,6 +80,7 @@ contract RegenStakerWithoutDelegateSurrogateVotes is StakerPermitAndStake, Stake
     error ZeroOperation();
     error NoOperation();
     error DisablingAllocationMechanismWhitelistNotAllowed();
+    error InsufficientAllowanceForContribution(uint256 allowance, uint256 required);
 
     // Shared state getters
     function rewardDuration() external view returns (uint256) {
@@ -268,6 +269,95 @@ contract RegenStakerWithoutDelegateSurrogateVotes is StakerPermitAndStake, Stake
         SafeERC20.safeTransfer(STAKE_TOKEN, deposit.owner, _amount);
 
         _revertIfMinimumStakeAmountNotMet(_depositId);
+    }
+
+    /// @notice Contributes unclaimed rewards to a user-specified allocation mechanism
+    /// @dev CONTRIBUTION RISK: Contributed funds are transferred to external allocation mechanisms
+    ///      for public good causes. Malicious mechanisms may misappropriate funds for unintended
+    ///      purposes rather than the stated public good cause.
+    /// @dev TRUST MODEL: Allocation mechanisms must be whitelisted by protocol governance.
+    ///      Only contribute to mechanisms you trust, as the protocol cannot recover funds
+    ///      sent to malicious or buggy allocation mechanisms.
+    /// @dev SECURITY: This function first withdraws rewards to the contributor, then the contributor
+    ///      must have pre-approved the allocation mechanism to pull the tokens.
+    /// @param _depositId The deposit identifier to contribute from
+    /// @param _allocationMechanismAddress Whitelisted allocation mechanism to receive contribution
+    /// @param _amount Amount of unclaimed rewards to contribute (must be <= available rewards)
+    /// @param _deadline Signature expiration timestamp
+    /// @param _v Signature component v
+    /// @param _r Signature component r
+    /// @param _s Signature component s
+    /// @return amountContributedToAllocationMechanism Actual amount contributed (after fees)
+    function contribute(
+        DepositIdentifier _depositId,
+        address _allocationMechanismAddress,
+        uint256 _amount,
+        uint256 _deadline,
+        uint8 _v,
+        bytes32 _r,
+        bytes32 _s
+    ) public whenNotPaused nonReentrant returns (uint256 amountContributedToAllocationMechanism) {
+        RegenStakerShared.checkWhitelisted(sharedState.contributionWhitelist, msg.sender);
+        require(_amount > 0, ZeroOperation());
+        _revertIfAddressZero(_allocationMechanismAddress);
+        require(
+            sharedState.allocationMechanismWhitelist.isWhitelisted(_allocationMechanismAddress),
+            NotWhitelisted(sharedState.allocationMechanismWhitelist, _allocationMechanismAddress)
+        );
+
+        Deposit storage deposit = deposits[_depositId];
+        if (deposit.claimer != msg.sender && deposit.owner != msg.sender) {
+            revert Staker__Unauthorized("not claimer or owner", msg.sender);
+        }
+
+        _checkpointGlobalReward();
+        _checkpointReward(deposit);
+
+        uint256 unclaimedAmount = deposit.scaledUnclaimedRewardCheckpoint / SCALE_FACTOR;
+        require(_amount <= unclaimedAmount, CantAfford(_amount, unclaimedAmount));
+
+        uint256 fee = claimFeeParameters.feeAmount;
+        if (fee == 0) {
+            amountContributedToAllocationMechanism = _amount;
+        } else {
+            require(_amount >= fee, CantAfford(fee, _amount));
+            amountContributedToAllocationMechanism = _amount - fee;
+        }
+
+        uint256 currentAllowance = REWARD_TOKEN.allowance(msg.sender, _allocationMechanismAddress);
+        if (currentAllowance < amountContributedToAllocationMechanism) {
+            revert InsufficientAllowanceForContribution(currentAllowance, amountContributedToAllocationMechanism);
+        }
+
+        uint256 scaledAmountConsumed = _amount * SCALE_FACTOR;
+        deposit.scaledUnclaimedRewardCheckpoint = deposit.scaledUnclaimedRewardCheckpoint - scaledAmountConsumed;
+
+        emit RewardClaimed(_depositId, msg.sender, amountContributedToAllocationMechanism, deposit.earningPower);
+
+        // First withdraw rewards to the contributor
+        SafeERC20.safeTransfer(REWARD_TOKEN, msg.sender, amountContributedToAllocationMechanism);
+
+        emit RewardContributed(
+            _depositId,
+            msg.sender,
+            _allocationMechanismAddress,
+            amountContributedToAllocationMechanism
+        );
+
+        TokenizedAllocationMechanism(_allocationMechanismAddress).signupWithSignature(
+            msg.sender,
+            amountContributedToAllocationMechanism,
+            _deadline,
+            _v,
+            _r,
+            _s
+        );
+
+        if (fee > 0) {
+            SafeERC20.safeTransfer(REWARD_TOKEN, claimFeeParameters.feeCollector, fee);
+        }
+
+        return amountContributedToAllocationMechanism;
     }
 
     /// @notice Internal helper to create a deposit without delegation surrogates
