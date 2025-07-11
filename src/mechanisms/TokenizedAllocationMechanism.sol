@@ -866,22 +866,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         return _getStorage().paused;
     }
 
-    // ---------- Share Minting for Distribution ----------
-
-    /// @notice Mint shares to a recipient (only callable by strategy via delegatecall)
-    /// @param recipient Address to receive the minted shares
-    /// @param amount Number of shares to mint
-    function mintShares(address recipient, uint256 amount) external onlyInitialized {
-        // This function is designed to be called by strategies via delegatecall
-        // In delegatecall context, msg.sender == address(this) (the strategy contract)
-        require(msg.sender == address(this), "Only self");
-
-        AllocationStorage storage s = _getStorage();
-        _mint(s, recipient, amount);
-
-        // Note: totalAssets is updated in finalizeVoteTally() to reflect actual contract balance
-        // This prevents share price manipulation and ensures accurate accounting
-    }
 
     /*//////////////////////////////////////////////////////////////
                         ERC4626 VAULT FUNCTIONALITY
