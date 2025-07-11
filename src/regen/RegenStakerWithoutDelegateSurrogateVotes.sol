@@ -650,39 +650,8 @@ contract RegenStakerWithoutDelegateSurrogateVotes is StakerPermitAndStake, Stake
         Deposit storage deposit,
         address _claimer
     ) internal override whenNotPaused nonReentrant returns (uint256) {
-        _checkpointGlobalReward();
-        _checkpointReward(deposit);
-
-        uint256 _scaledReward = deposit.scaledUnclaimedRewardCheckpoint;
-        uint256 _reward = _scaledReward / SCALE_FACTOR;
-        // Intentionally reverts due to overflow if unclaimed rewards are less than fee.
-        uint256 _payout = _reward - claimFeeParameters.feeAmount;
-        if (_payout == 0) return 0;
-
-        // Use the original scaled amount to avoid precision loss from divide-before-multiply
-        deposit.scaledUnclaimedRewardCheckpoint = deposit.scaledUnclaimedRewardCheckpoint - _scaledReward;
-
-        uint256 _newEarningPower = earningPowerCalculator.getEarningPower(
-            deposit.balance,
-            deposit.owner,
-            deposit.delegatee
-        );
-
-        emit RewardClaimed(_depositId, _claimer, _payout, _newEarningPower);
-
-        totalEarningPower = _calculateTotalEarningPower(deposit.earningPower, _newEarningPower, totalEarningPower);
-        depositorTotalEarningPower[deposit.owner] = _calculateTotalEarningPower(
-            deposit.earningPower,
-            _newEarningPower,
-            depositorTotalEarningPower[deposit.owner]
-        );
-        deposit.earningPower = _newEarningPower.toUint96();
-
-        SafeERC20.safeTransfer(REWARD_TOKEN, _claimer, _payout);
-        if (claimFeeParameters.feeAmount > 0) {
-            SafeERC20.safeTransfer(REWARD_TOKEN, claimFeeParameters.feeCollector, claimFeeParameters.feeAmount);
-        }
-        return _payout;
+        // Base implementation is correct and doesn't involve surrogates
+        return super._claimReward(_depositId, deposit, _claimer);
     }
 
     /// @inheritdoc Staker
