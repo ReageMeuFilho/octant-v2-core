@@ -324,7 +324,10 @@ contract RegenStakerWithoutDelegateSurrogateVotes is StakerPermitAndStake, Stake
         }
 
         uint256 currentAllowance = REWARD_TOKEN.allowance(msg.sender, _allocationMechanismAddress);
-        require(currentAllowance >= amountContributedToAllocationMechanism, CantAfford(amountContributedToAllocationMechanism, currentAllowance));
+        require(
+            currentAllowance >= amountContributedToAllocationMechanism,
+            CantAfford(amountContributedToAllocationMechanism, currentAllowance)
+        );
 
         uint256 scaledAmountConsumed = _amount * SCALE_FACTOR;
         deposit.scaledUnclaimedRewardCheckpoint = deposit.scaledUnclaimedRewardCheckpoint - scaledAmountConsumed;
