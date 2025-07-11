@@ -1113,17 +1113,12 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         // Cache `asset` since it is used multiple times..
         ERC20 _asset = ERC20(address(S.asset));
 
+        // Ensure sufficient balance for withdrawal
         uint256 idle = _asset.balanceOf(address(this));
-        // slither-disable-next-line uninitialized-local
-        uint256 loss;
-        // Check if we need to withdraw funds.
-        if (idle < assets) {
-            // Return the actual amount withdrawn. Adjust for potential under withdraws.
-            assets = _asset.balanceOf(address(this));
-        }
+        require(idle >= assets, "Insufficient balance for withdrawal");
 
         // Update assets based on how much we took.
-        S.totalAssets -= (assets + loss);
+        S.totalAssets -= assets;
 
         _burn(S, shareOwner, shares);
 
