@@ -231,6 +231,8 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     event PausedStatusChanged(bool paused);
     /// @notice Emitted when global redemption period is set
     event GlobalRedemptionPeriodSet(uint256 redemptionStart, uint256 redemptionEnd);
+    /// @notice Emitted when tokens are swept after grace period
+    event Swept(address indexed token, address indexed receiver, uint256 amount);
 
     // Additional events from DistributionMechanism
     /// @notice Emitted on the initialization of any new `strategy` that uses `asset` with this specific `apiVersion`.
@@ -882,6 +884,35 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     /// @notice Check if contract is paused
     function paused() external view onlyInitialized returns (bool) {
         return _getStorage().paused;
+    }
+
+    /// @notice Sweep remaining tokens after grace period expires
+    /// @dev Can only be called by owner after global grace period ends
+    /// @param token The token to sweep (use address(0) for ETH)
+    /// @param receiver The address to receive the swept tokens
+    function sweep(address token, address receiver) external onlyOwner onlyInitialized nonReentrant {
+        AllocationStorage storage s = _getStorage();
+        
+        // Ensure grace period has expired for everyone
+        require(s.globalRedemptionStart != 0, "Redemption period not started");
+        require(block.timestamp > s.globalRedemptionStart + s.gracePeriod, "Grace period not expired");
+        require(receiver != address(0), "Invalid receiver");
+        
+        if (token == address(0)) {
+            // Sweep ETH
+            uint256 balance = address(this).balance;
+            require(balance > 0, "No ETH to sweep");
+            (bool success, ) = receiver.call{value: balance}("");
+            require(success, "ETH transfer failed");
+            emit Swept(token, receiver, balance);
+        } else {
+            // Sweep any ERC20 token
+            IERC20 tokenContract = IERC20(token);
+            uint256 balance = tokenContract.balanceOf(address(this));
+            require(balance > 0, "No tokens to sweep");
+            tokenContract.safeTransfer(receiver, balance);
+            emit Swept(token, receiver, balance);
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
