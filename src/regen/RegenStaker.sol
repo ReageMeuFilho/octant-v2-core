@@ -84,7 +84,6 @@ contract RegenStaker is StakerPermitAndStake, StakerOnBehalf, Pausable, Reentran
     error ZeroOperation();
     error NoOperation();
     error DisablingAllocationMechanismWhitelistNotAllowed();
-    error InsufficientAllowanceForContribution(uint256 allowance, uint256 required);
 
     // Shared state getters
     function rewardDuration() external view returns (uint256) {
@@ -422,9 +421,7 @@ contract RegenStaker is StakerPermitAndStake, StakerOnBehalf, Pausable, Reentran
         }
 
         uint256 currentAllowance = REWARD_TOKEN.allowance(msg.sender, _allocationMechanismAddress);
-        if (currentAllowance < amountContributedToAllocationMechanism) {
-            revert InsufficientAllowanceForContribution(currentAllowance, amountContributedToAllocationMechanism);
-        }
+        require(currentAllowance >= amountContributedToAllocationMechanism, CantAfford(amountContributedToAllocationMechanism, currentAllowance));
 
         uint256 scaledAmountConsumed = _amount * SCALE_FACTOR;
         deposit.scaledUnclaimedRewardCheckpoint = deposit.scaledUnclaimedRewardCheckpoint - scaledAmountConsumed;
