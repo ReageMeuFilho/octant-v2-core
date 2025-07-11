@@ -360,6 +360,198 @@ contract RegenStakerWithoutDelegateSurrogateVotes is StakerPermitAndStake, Stake
         return amountContributedToAllocationMechanism;
     }
 
+    /// @notice Sets the reward duration for future reward notifications
+    /// @dev PRECISION WARNING: Shorter durations (< 30 days) may introduce calculation errors up to ~1%.
+    /// @dev GAS IMPLICATIONS: Shorter reward durations may result in higher gas costs for certain
+    ///      operations due to more frequent reward rate calculations. Consider gas costs when
+    ///      selecting reward durations.
+    /// @param _rewardDuration New reward duration in seconds (7 days minimum, 3000 days maximum)
+    function setRewardDuration(uint256 _rewardDuration) external {
+        _revertIfNotAdmin();
+        require(block.timestamp > rewardEndTime, CannotChangeRewardDurationDuringActiveReward());
+        require(
+            _rewardDuration >= RegenStakerShared.MIN_REWARD_DURATION &&
+                _rewardDuration <= RegenStakerShared.MAX_REWARD_DURATION,
+            InvalidRewardDuration(_rewardDuration)
+        );
+        require(sharedState.rewardDuration != _rewardDuration, NoOperation());
+
+        emit RewardDurationSet(_rewardDuration);
+        sharedState.rewardDuration = _rewardDuration;
+    }
+
+    /// @notice Overrides to use the custom reward duration instead of the fixed 30-day constant
+    function notifyRewardAmount(uint256 _amount) external override {
+        if (!isRewardNotifier[msg.sender]) revert Staker__Unauthorized("not notifier", msg.sender);
+
+        rewardPerTokenAccumulatedCheckpoint = rewardPerTokenAccumulated();
+
+        uint256 totalRewards;
+        if (block.timestamp >= rewardEndTime) {
+            scaledRewardRate = (_amount * SCALE_FACTOR) / sharedState.rewardDuration;
+            totalRewards = _amount * SCALE_FACTOR;
+        } else {
+            uint256 _remainingReward = scaledRewardRate * (rewardEndTime - block.timestamp);
+            scaledRewardRate = (_remainingReward + _amount * SCALE_FACTOR) / sharedState.rewardDuration;
+            totalRewards = _remainingReward + _amount * SCALE_FACTOR;
+        }
+
+        rewardEndTime = block.timestamp + sharedState.rewardDuration;
+        lastCheckpointTime = block.timestamp;
+
+        if (scaledRewardRate < SCALE_FACTOR) revert Staker__InvalidRewardRate();
+
+        // Avoid "divide before multiply" by restructuring the balance check
+        if (totalRewards > (REWARD_TOKEN.balanceOf(address(this)) * SCALE_FACTOR))
+            revert Staker__InsufficientRewardBalance();
+
+        emit RewardNotified(_amount, msg.sender);
+    }
+
+    /// @notice Sets the whitelist for stakers (who can stake tokens)
+    /// @dev ACCESS CONTROL: Use address(0) to disable whitelisting and allow all addresses.
+    /// @dev OPERATIONAL IMPACT: Affects all stake and stakeMore operations immediately.
+    /// @dev GRANDFATHERING: Existing stakers can continue operations regardless of new whitelist.
+    /// @param _stakerWhitelist New staker whitelist contract (address(0) = no restrictions)
+    function setStakerWhitelist(IWhitelist _stakerWhitelist) external {
+        require(sharedState.stakerWhitelist != _stakerWhitelist, NoOperation());
+        _revertIfNotAdmin();
+        emit StakerWhitelistSet(_stakerWhitelist);
+        sharedState.stakerWhitelist = _stakerWhitelist;
+    }
+
+    /// @notice Sets the whitelist for contributors (who can contribute rewards)
+    /// @dev ACCESS CONTROL: Use address(0) to disable whitelisting and allow all addresses.
+    /// @dev OPERATIONAL IMPACT: Affects all contribute operations immediately.
+    /// @dev GRANDFATHERING: Existing contributors can continue operations regardless of new whitelist.
+    /// @param _contributionWhitelist New contribution whitelist contract (address(0) = no restrictions)
+    function setContributionWhitelist(IWhitelist _contributionWhitelist) external {
+        require(sharedState.contributionWhitelist != _contributionWhitelist, NoOperation());
+        _revertIfNotAdmin();
+        emit ContributionWhitelistSet(_contributionWhitelist);
+        sharedState.contributionWhitelist = _contributionWhitelist;
+    }
+
+    /// @notice Sets the whitelist for allocation mechanisms
+    /// @dev SECURITY: Only add thoroughly audited allocation mechanisms to this whitelist.
+    ///      Users will contribute rewards to whitelisted mechanisms and funds cannot be recovered
+    ///      if sent to malicious or buggy implementations.
+    /// @dev EVALUATION PROCESS: New mechanisms should undergo comprehensive security audit,
+    ///      integration testing, and governance review before whitelisting.
+    /// @dev OPERATIONAL IMPACT: Changes affect all future contributions. Existing contributions
+    ///      to previously whitelisted mechanisms are not affected.
+    /// @param _allocationMechanismWhitelist New whitelist contract (cannot be address(0))
+    function setAllocationMechanismWhitelist(IWhitelist _allocationMechanismWhitelist) external {
+        require(sharedState.allocationMechanismWhitelist != _allocationMechanismWhitelist, NoOperation());
+        require(
+            address(_allocationMechanismWhitelist) != address(0),
+            DisablingAllocationMechanismWhitelistNotAllowed()
+        );
+        _revertIfNotAdmin();
+        emit AllocationMechanismWhitelistSet(_allocationMechanismWhitelist);
+        sharedState.allocationMechanismWhitelist = _allocationMechanismWhitelist;
+    }
+
+    /// @notice Sets the minimum stake amount
+    /// @dev GRANDFATHERING: Existing deposits below new minimum remain valid but will be
+    ///      restricted from partial withdrawals and stakeMore operations until brought above threshold.
+    /// @dev TIMING RESTRICTION: Cannot raise minimum during active reward period for user protection.
+    /// @dev OPERATIONAL IMPACT: Affects all new stakes immediately. Consider user communication before changes.
+    /// @param _minimumStakeAmount New minimum stake amount in wei (0 = no minimum)
+    function setMinimumStakeAmount(uint256 _minimumStakeAmount) external {
+        _revertIfNotAdmin();
+        require(
+            _minimumStakeAmount <= sharedState.minimumStakeAmount || block.timestamp >= rewardEndTime,
+            CannotRaiseMinimumStakeAmountDuringActiveReward()
+        );
+        emit MinimumStakeAmountSet(_minimumStakeAmount);
+        sharedState.minimumStakeAmount = _minimumStakeAmount;
+    }
+
+    /// @notice Pauses the contract, disabling all user operations except view functions
+    /// @dev EMERGENCY USE: Intended for security incidents or critical maintenance.
+    /// @dev SCOPE: Affects stake, withdraw, claim, contribute, and compound operations.
+    /// @dev ADMIN ONLY: Only admin can pause. Use emergency procedures for urgent situations.
+    function pause() external whenNotPaused {
+        _revertIfNotAdmin();
+        _pause();
+    }
+
+    /// @notice Unpauses the contract, re-enabling all user operations
+    /// @dev RECOVERY: Use after resolving issues that required pause.
+    /// @dev ADMIN ONLY: Only admin can unpause. Ensure all issues resolved before unpause.
+    function unpause() external whenPaused {
+        _revertIfNotAdmin();
+        _unpause();
+    }
+
+    /// @notice Compounds rewards by claiming them and immediately restaking them into the same deposit
+    /// @dev REQUIREMENT: Only works when REWARD_TOKEN == STAKE_TOKEN, otherwise reverts.
+    /// @dev FEE HANDLING: Claim fees are deducted before compounding. Zero fee results in zero compound.
+    /// @dev EARNING POWER: Compounding updates earning power based on new total balance.
+    /// @dev GAS OPTIMIZATION: More efficient than separate claim + stake operations.
+    /// @dev WITHOUT_DELEGATION: Rewards are transferred directly to this contract instead of surrogates.
+    /// @param _depositId The deposit to compound rewards for
+    /// @return compoundedAmount Amount of rewards compounded (after fees)
+    function compoundRewards(
+        DepositIdentifier _depositId
+    ) external whenNotPaused nonReentrant returns (uint256 compoundedAmount) {
+        RegenStakerShared.checkWhitelisted(sharedState.stakerWhitelist, msg.sender);
+        if (address(REWARD_TOKEN) != address(STAKE_TOKEN)) {
+            revert CompoundingNotSupported();
+        }
+
+        Deposit storage deposit = deposits[_depositId];
+        address depositOwner = deposit.owner;
+
+        if (deposit.claimer != msg.sender && depositOwner != msg.sender) {
+            revert Staker__Unauthorized("not claimer or owner", msg.sender);
+        }
+
+        _checkpointGlobalReward();
+        _checkpointReward(deposit);
+
+        uint256 unclaimedAmount = deposit.scaledUnclaimedRewardCheckpoint / SCALE_FACTOR;
+        require(unclaimedAmount > 0, ZeroOperation());
+
+        ClaimFeeParameters memory feeParams = claimFeeParameters;
+        uint256 fee = feeParams.feeAmount;
+
+        if (unclaimedAmount < fee) {
+            return 0;
+        }
+
+        compoundedAmount = unclaimedAmount - fee;
+        uint256 newBalance = deposit.balance + compoundedAmount;
+        uint256 newEarningPower = earningPowerCalculator.getEarningPower(newBalance, deposit.owner, deposit.delegatee);
+
+        totalEarningPower = _calculateTotalEarningPower(deposit.earningPower, newEarningPower, totalEarningPower);
+        depositorTotalEarningPower[deposit.owner] = _calculateTotalEarningPower(
+            deposit.earningPower,
+            newEarningPower,
+            depositorTotalEarningPower[deposit.owner]
+        );
+
+        totalStaked += compoundedAmount;
+        depositorTotalStaked[depositOwner] += compoundedAmount;
+
+        deposit.balance = newBalance.toUint96();
+        deposit.earningPower = newEarningPower.toUint96();
+        deposit.scaledUnclaimedRewardCheckpoint = 0;
+
+        if (fee > 0) {
+            SafeERC20.safeTransfer(REWARD_TOKEN, feeParams.feeCollector, fee);
+        }
+
+        // No surrogate transfer needed - tokens stay in this contract
+
+        emit RewardCompounded(_depositId, msg.sender, compoundedAmount, newBalance, newEarningPower);
+
+        _revertIfMinimumStakeAmountNotMet(_depositId);
+
+        return compoundedAmount;
+    }
+
     /// @notice Internal helper to create a deposit without delegation surrogates
     /// @param _depositor The address making the deposit
     /// @param _amount The amount to stake
