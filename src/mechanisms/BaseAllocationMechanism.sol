@@ -218,7 +218,6 @@ abstract contract BaseAllocationMechanism is IBaseAllocationStrategy {
         return TokenizedAllocationMechanism(address(this));
     }
 
-
     /// @notice Get grace period from configuration
     /// @return Grace period in seconds
     function _getGracePeriod() internal view returns (uint256) {

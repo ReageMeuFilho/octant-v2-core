@@ -24,7 +24,6 @@ contract SkyCompounderStrategy is BaseHealthCheck, UniswapV3Swapper, ISkyCompoun
     ///@notice yearn's referral code
     uint16 public referral = 13425;
 
-
     address public immutable staking;
     address public immutable rewardsToken;
 
@@ -37,7 +36,6 @@ contract SkyCompounderStrategy is BaseHealthCheck, UniswapV3Swapper, ISkyCompoun
     address private constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
 
     uint256 private constant ASSET_DUST = 100;
-
 
     constructor(
         address _staking,

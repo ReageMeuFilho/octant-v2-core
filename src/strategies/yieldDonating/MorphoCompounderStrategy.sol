@@ -13,10 +13,8 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 contract MorphoCompounderStrategy is BaseHealthCheck {
     using SafeERC20 for IERC20;
 
-
     // morpho vault
     address public immutable compounderVault;
-
 
     constructor(
         address _compounderVault,

@@ -235,14 +235,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     event Swept(address indexed token, address indexed receiver, uint256 amount);
 
     // Additional events from DistributionMechanism
-    /// @notice Emitted on the initialization of any new `strategy` that uses `asset` with this specific `apiVersion`.
-    event NewTokenizedStrategy(address indexed strategy, address indexed asset, string apiVersion);
-    /// @notice Emitted when the 'keeper' address is updated to 'newKeeper'.
-    event UpdateKeeper(address indexed newKeeper);
-    /// @notice Emitted when the 'management' address is updated to 'newManagement'.
-    event UpdateManagement(address indexed newManagement);
-    /// @notice Emitted when the 'emergencyAdmin' address is updated to 'newEmergencyAdmin'.
-    event UpdateEmergencyAdmin(address indexed newEmergencyAdmin);
     /// @notice Emitted when the allowance of a `spender` for an `owner` is set by a call to {approve}. `value` is the new allowance.
     event Approval(address indexed owner, address indexed spender, uint256 value);
     /// @notice Emitted when `value` tokens are moved from one account (`from`) to another (`to`).
@@ -775,7 +767,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         return _getStorage().votingPower[user];
     }
 
-
     function proposalShares(uint256 pid) external view onlyInitialized returns (uint256) {
         return _getStorage().proposalShares[pid];
     }
@@ -892,17 +883,17 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     /// @param receiver The address to receive the swept tokens
     function sweep(address token, address receiver) external onlyOwner onlyInitialized nonReentrant {
         AllocationStorage storage s = _getStorage();
-        
+
         // Ensure grace period has expired for everyone
         require(s.globalRedemptionStart != 0, "Redemption period not started");
         require(block.timestamp > s.globalRedemptionStart + s.gracePeriod, "Grace period not expired");
         require(receiver != address(0), "Invalid receiver");
-        
+
         if (token == address(0)) {
             // Sweep ETH
             uint256 balance = address(this).balance;
             require(balance > 0, "No ETH to sweep");
-            (bool success, ) = receiver.call{value: balance}("");
+            (bool success, ) = receiver.call{ value: balance }("");
             require(success, "ETH transfer failed");
             emit Swept(token, receiver, balance);
         } else {
@@ -1301,7 +1292,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         require(from != address(0), "ERC20: transfer from the zero address");
         require(to != address(0), "ERC20: transfer to the zero address");
         require(to != address(this), "ERC20 transfer to strategy");
-        
+
         // Block transfers until redemption period starts
         if (S.globalRedemptionStart == 0 || block.timestamp < S.globalRedemptionStart) {
             revert("Transfers not allowed until redemption period");

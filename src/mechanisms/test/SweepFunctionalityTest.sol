@@ -33,7 +33,7 @@ contract SweepFunctionalityTest is Test {
         factory = new AllocationMechanismFactory();
         token = new ERC20Mock();
         randomToken = new ERC20Mock();
-        
+
         // Mint tokens
         token.mint(alice, 1000 ether);
         token.mint(bob, 1000 ether);
@@ -54,7 +54,7 @@ contract SweepFunctionalityTest is Test {
 
         address mechanismAddr = factory.deploySimpleVotingMechanism(config);
         mechanism = SimpleVotingMechanism(payable(mechanismAddr));
-        
+
         // Send some ETH to the mechanism
         vm.deal(address(mechanism), 10 ether);
     }
@@ -76,11 +76,11 @@ contract SweepFunctionalityTest is Test {
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 500 ether);
 
         vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
-        
+
         _tokenized(address(mechanism)).finalizeVoteTally();
 
         // Queue proposal
-        
+
         _tokenized(address(mechanism)).queueProposal(pid);
 
         // Charlie partially redeems during grace period
@@ -93,7 +93,7 @@ contract SweepFunctionalityTest is Test {
 
         // Try to sweep before grace period ends - should fail
         vm.warp(block.timestamp + GRACE_PERIOD - 100);
-        
+
         vm.expectRevert("Grace period not expired");
         _tokenized(address(mechanism)).sweep(address(token), sweepReceiver);
 
@@ -108,27 +108,25 @@ contract SweepFunctionalityTest is Test {
         // Owner can sweep allocation tokens
         uint256 remainingTokens = token.balanceOf(address(mechanism));
         assertTrue(remainingTokens > 0, "Should have remaining tokens");
-        
-        
+
         _tokenized(address(mechanism)).sweep(address(token), sweepReceiver);
-        
+
         assertEq(token.balanceOf(sweepReceiver), remainingTokens);
         assertEq(token.balanceOf(address(mechanism)), 0);
 
         // Owner can sweep random tokens
-        
+
         _tokenized(address(mechanism)).sweep(address(randomToken), sweepReceiver);
-        
+
         assertEq(randomToken.balanceOf(sweepReceiver), 100 ether);
         assertEq(randomToken.balanceOf(address(mechanism)), 0);
 
         // Owner can sweep ETH
         uint256 ethBalance = address(mechanism).balance;
         assertTrue(ethBalance > 0, "Should have ETH balance");
-        
-        
+
         _tokenized(address(mechanism)).sweep(address(0), sweepReceiver);
-        
+
         assertEq(sweepReceiver.balance, ethBalance);
         assertEq(address(mechanism).balance, 0);
     }
@@ -138,13 +136,13 @@ contract SweepFunctionalityTest is Test {
         vm.expectRevert("Redemption period not started");
         _tokenized(address(mechanism)).sweep(address(token), sweepReceiver);
     }
-    
+
     function testSweepRequiresGracePeriodExpired() public {
         // Setup and finalize to set globalRedemptionStart
         uint256 startBlock = _tokenized(address(mechanism)).startBlock();
         vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
         _tokenized(address(mechanism)).finalizeVoteTally();
-        
+
         // Try to sweep before grace period expires
         vm.warp(block.timestamp + TIMELOCK_DELAY + GRACE_PERIOD - 1);
         vm.expectRevert("Grace period not expired");
@@ -162,14 +160,14 @@ contract SweepFunctionalityTest is Test {
         vm.stopPrank();
 
         vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
-        
+
         _tokenized(address(mechanism)).finalizeVoteTally();
 
         // Fast forward past grace period
         vm.warp(block.timestamp + TIMELOCK_DELAY + GRACE_PERIOD + 1);
 
         // Try to sweep to zero address
-        
+
         vm.expectRevert("Invalid receiver");
         _tokenized(address(mechanism)).sweep(address(token), address(0));
     }
@@ -190,13 +188,13 @@ contract SweepFunctionalityTest is Test {
         });
 
         address emptyMechanism = factory.deploySimpleVotingMechanism(config);
-        
+
         uint256 startBlock = _tokenized(emptyMechanism).startBlock();
         vm.roll(startBlock - 1);
 
         // Setup and finalize without any deposits
         vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
-        
+
         _tokenized(emptyMechanism).finalizeVoteTally();
 
         // Fast forward past grace period

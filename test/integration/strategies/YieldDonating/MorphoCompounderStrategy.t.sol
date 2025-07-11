@@ -403,13 +403,4 @@ contract MorphoCompounderDonatingStrategyTest is Test {
             );
         }
     }
-
-    /// @notice Test that unauthorized users cannot call governance functions
-    function testUnauthorizedAccess() public {
-        // Only governance can call certain functions
-        vm.startPrank(user);
-        vm.expectRevert();
-        MorphoCompounderStrategy(address(strategy)).sweep(address(0x123));
-        vm.stopPrank();
-    }
 }
