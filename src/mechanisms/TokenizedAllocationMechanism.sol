@@ -77,6 +77,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     error AlreadyRegistered(address user);
     error DepositTooLarge(uint256 deposit, uint256 maxAllowed);
     error VotingPowerTooLarge(uint256 votingPower, uint256 maxAllowed);
+    error InsufficientDeposit(uint256 deposit);
     error ProposeNotAllowed(address proposer);
     error InvalidRecipient(address recipient);
     error RecipientUsed(address recipient);
@@ -480,6 +481,9 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
 
         uint256 newPower = IBaseAllocationStrategy(address(this)).getVotingPowerHook(user, deposit);
         if (newPower > MAX_SAFE_VALUE) revert VotingPowerTooLarge(newPower, MAX_SAFE_VALUE);
+
+        // Prevent registration with zero voting power
+        if (newPower == 0) revert InsufficientDeposit(deposit);
 
         s.votingPower[user] = newPower;
         emit UserRegistered(user, newPower);
