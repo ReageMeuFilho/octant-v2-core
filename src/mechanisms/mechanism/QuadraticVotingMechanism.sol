@@ -4,7 +4,6 @@ pragma solidity ^0.8.20;
 import { BaseAllocationMechanism, AllocationConfig } from "src/mechanisms/BaseAllocationMechanism.sol";
 import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocationMechanism.sol";
 import { ProperQF } from "src/mechanisms/voting-strategy/ProperQF.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 /// @title Quadratic Voting Mechanism
@@ -18,7 +17,6 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
     error OnlyForVotesSupported();
     error VoteWeightTooLarge();
     error InsufficientVotingPowerForQuadraticCost();
-    error TotalVotingPowerOverflow();
 
     /// @notice Total voting power distributed across all proposals
     uint256 public totalVotingPower;
@@ -100,10 +98,8 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
         // We know: quadraticCost = weight^2, so sqrt(quadraticCost) = weight (perfect square root relationship)
         _processVoteUnchecked(pid, quadraticCost, weight);
 
-        // Track total voting power used with overflow protection
-        uint256 newTotalVotingPower = totalVotingPower + weight;
-        if (newTotalVotingPower < totalVotingPower) revert TotalVotingPowerOverflow();
-        totalVotingPower = newTotalVotingPower;
+        // Track total voting power used
+        totalVotingPower = totalVotingPower + weight;
 
         // Return remaining voting power after quadratic cost
         return oldPower - quadraticCost;
