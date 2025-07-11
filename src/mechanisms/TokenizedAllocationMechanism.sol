@@ -248,6 +248,10 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     event ProposalCanceled(uint256 indexed pid, address indexed proposer);
     /// @notice Emitted when ownership is transferred
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+    /// @notice Emitted when keeper is updated
+    event KeeperUpdated(address indexed previousKeeper, address indexed newKeeper);
+    /// @notice Emitted when management is updated
+    event ManagementUpdated(address indexed previousManagement, address indexed newManagement);
     /// @notice Emitted when contract is paused/unpaused
     event PausedStatusChanged(bool paused);
 
@@ -845,6 +849,24 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         address oldOwner = s.owner;
         s.owner = newOwner;
         emit OwnershipTransferred(oldOwner, newOwner);
+    }
+
+    /// @notice Update keeper address
+    function setKeeper(address newKeeper) external onlyOwner onlyInitialized {
+        if (newKeeper == address(0)) revert Unauthorized();
+        AllocationStorage storage s = _getStorage();
+        address oldKeeper = s.keeper;
+        s.keeper = newKeeper;
+        emit KeeperUpdated(oldKeeper, newKeeper);
+    }
+
+    /// @notice Update management address
+    function setManagement(address newManagement) external onlyOwner onlyInitialized {
+        if (newManagement == address(0)) revert Unauthorized();
+        AllocationStorage storage s = _getStorage();
+        address oldManagement = s.management;
+        s.management = newManagement;
+        emit ManagementUpdated(oldManagement, newManagement);
     }
 
     /// @notice Emergency pause all operations

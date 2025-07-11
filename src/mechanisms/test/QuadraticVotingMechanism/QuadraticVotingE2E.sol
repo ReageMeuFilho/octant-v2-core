@@ -69,9 +69,9 @@ contract QuadraticVotingE2E is Test {
     QuadraticVotingMechanism mechanism;
 
     // Test actors
-    address alice = address(0x101); // Voter 1
-    address bob = address(0x102); // Voter 2
-    address charlie = address(0x103); // Voter 3
+    address alice = address(0x101); // Voter 1 and Keeper (can create proposals)
+    address bob = address(0x102); // Voter 2 and Management (can create proposals)
+    address charlie = address(0x103); // Voter 3 (cannot create proposals)
     address recipient1 = address(0x201); // Project recipient 1
     address recipient2 = address(0x202); // Project recipient 2
     address recipient3 = address(0x203); // Project recipient 3
@@ -102,7 +102,8 @@ contract QuadraticVotingE2E is Test {
     }
 
     /// @notice Helper function to create a proposal
-    /// @param proposer Address creating the proposal
+    /// @dev In QuadraticVotingMechanism, only keeper/management can create proposals
+    /// @param proposer Address creating the proposal (must be keeper/management)
     /// @param recipient Address that will receive funds if proposal passes
     /// @param description Description of the proposal
     /// @return pid The proposal ID
@@ -234,6 +235,10 @@ contract QuadraticVotingE2E is Test {
         address mechanismAddr = factory.deployQuadraticVotingMechanism(config, ALPHA_NUMERATOR, ALPHA_DENOMINATOR);
         mechanism = QuadraticVotingMechanism(payable(mechanismAddr));
 
+        // Set alice as keeper and bob as management (both can create proposals)
+        _tokenized(address(mechanism)).setKeeper(alice);
+        _tokenized(address(mechanism)).setManagement(bob);
+
         console.log("=== E2E TEST SETUP COMPLETE ===");
         console.log("Mechanism deployed at:", address(mechanism));
         console.log("Test token deployed at:", address(token));
@@ -241,6 +246,8 @@ contract QuadraticVotingE2E is Test {
         console.log("Alice balance:", token.balanceOf(alice));
         console.log("Bob balance:", token.balanceOf(bob));
         console.log("Charlie balance:", token.balanceOf(charlie));
+        console.log("Keeper:", _tokenized(address(mechanism)).keeper());
+        console.log("Management:", _tokenized(address(mechanism)).management());
     }
 
     /// @notice Verify the setup configuration and initial state
@@ -351,7 +358,7 @@ contract QuadraticVotingE2E is Test {
         _signupUser(alice, DEPOSIT_AMOUNT);
         _signupUser(bob, DEPOSIT_AMOUNT);
 
-        // Create first proposal
+        // Create first proposal (alice is the keeper)
         uint256 pid1 = _createProposal(alice, recipient1, "Education Initiative");
 
         // Verify proposal creation
@@ -359,7 +366,7 @@ contract QuadraticVotingE2E is Test {
 
         // Get proposal details
         TokenizedAllocationMechanism.Proposal memory proposal1 = _tokenized(address(mechanism)).proposals(pid1);
-        assertEq(proposal1.proposer, alice, "Proposer should be Alice");
+        assertEq(proposal1.proposer, alice, "Proposer should be alice (keeper)");
         assertEq(proposal1.recipient, recipient1, "Recipient should be recipient1");
         assertEq(proposal1.description, "Education Initiative", "Description should match");
         assertEq(
@@ -369,34 +376,28 @@ contract QuadraticVotingE2E is Test {
         );
         assertEq(proposal1.earliestRedeemableTime, 0, "Earliest redeemable time should be 0");
 
-        // Create second proposal from different user
-        uint256 pid2 = _createProposal(bob, recipient2, "Healthcare Project");
+        // Create second proposal
+        uint256 pid2 = _createProposal(alice, recipient2, "Healthcare Project");
 
         // Verify second proposal
         assertTrue(pid2 > pid1, "Second proposal ID should be greater than first");
 
         TokenizedAllocationMechanism.Proposal memory proposal2 = _tokenized(address(mechanism)).proposals(pid2);
-        assertEq(proposal2.proposer, bob, "Proposer should be Bob");
+        assertEq(proposal2.proposer, alice, "Proposer should be alice (keeper)");
         assertEq(proposal2.recipient, recipient2, "Recipient should be recipient2");
         assertEq(proposal2.description, "Healthcare Project", "Description should match");
 
         // Test edge cases
+        // Charlie (who is not keeper/management) cannot propose
+        vm.expectRevert(abi.encodeWithSelector(TokenizedAllocationMechanism.ProposeNotAllowed.selector, charlie));
+        _createProposal(charlie, recipient3, "Should fail - not keeper/management");
 
-        // Unregistered user cannot propose
-        vm.expectRevert();
-        _createProposal(charlie, recipient3, "Should fail - unregistered");
-
-        // User with zero voting power cannot propose (Charlie is registered but has no voting power)
-        _signupUser(charlie, 0);
-        vm.expectRevert();
-        _createProposal(charlie, recipient3, "Should fail - no voting power");
-
-        // Same user can create multiple proposals
+        // Alice (keeper) can create multiple proposals
         uint256 pid3 = _createProposal(alice, recipient3, "Alice's Second Project");
         assertTrue(pid3 > pid2, "Third proposal ID should be greater than second");
 
         TokenizedAllocationMechanism.Proposal memory proposal3 = _tokenized(address(mechanism)).proposals(pid3);
-        assertEq(proposal3.proposer, alice, "Proposer should still be Alice");
+        assertEq(proposal3.proposer, alice, "Proposer should be alice (keeper)");
         assertEq(proposal3.recipient, recipient3, "Recipient should be recipient3");
     }
 
@@ -418,7 +419,7 @@ contract QuadraticVotingE2E is Test {
         console.log("=== Phase 2: Proposal Creation ===");
         uint256 pid1 = _createProposal(alice, recipient1, "Green Energy Initiative");
         uint256 pid2 = _createProposal(bob, recipient2, "Community Development");
-        uint256 pid3 = _createProposal(charlie, recipient3, "Education Technology");
+        uint256 pid3 = _createProposal(alice, recipient3, "Education Technology");  // alice creates for charlie's project
 
         // Verify all proposals are created correctly
         assertTrue(pid1 < pid2 && pid2 < pid3, "Proposal IDs should be sequential");
@@ -525,7 +526,7 @@ contract QuadraticVotingE2E is Test {
 
         uint256 pid1 = _createProposal(alice, recipient1, "Education");
         uint256 pid2 = _createProposal(bob, recipient2, "Healthcare");
-        uint256 pid3 = _createProposal(charlie, recipient3, "Environment");
+        uint256 pid3 = _createProposal(alice, recipient3, "Environment");  // alice creates for charlie's project
 
         vm.roll(startBlock + VOTING_DELAY + 1);
 
@@ -1026,7 +1027,7 @@ contract QuadraticVotingE2E is Test {
         // Create 3 proposals
         uint256 pid1 = _createProposal(alice, recipient1, "Social Impact Project");
         uint256 pid2 = _createProposal(bob, recipient2, "Tech Innovation Project");
-        uint256 pid3 = _createProposal(charlie, recipient3, "Community Project");
+        uint256 pid3 = _createProposal(alice, recipient3, "Community Project");  // alice creates for charlie's project
 
         // Move to voting period
         vm.roll(startBlock + VOTING_DELAY + 1);
@@ -1707,7 +1708,7 @@ contract QuadraticVotingE2E is Test {
         // Create 3 proposals to test diverse voting patterns
         data.pid1 = _createProposal(alice, recipient1, "Education Project");
         data.pid2 = _createProposal(bob, recipient2, "Healthcare Project");
-        data.pid3 = _createProposal(charlie, recipient3, "Environmental Project");
+        data.pid3 = _createProposal(alice, recipient3, "Environmental Project");  // alice creates for charlie's project
 
         // Move to voting period
         vm.roll(data.startBlock + VOTING_DELAY + 1);
@@ -1810,9 +1811,9 @@ contract QuadraticVotingE2E is Test {
         // Create 4 proposals
         data.pid1 = _createProposal(alice, recipient1, "AI Research");
         data.pid2 = _createProposal(bob, recipient2, "Climate Tech");
-        data.pid3 = _createProposal(charlie, recipient3, "Public Health");
+        data.pid3 = _createProposal(alice, recipient3, "Public Health");  // alice creates for charlie's project
         data.recipient4 = address(0x204);
-        data.pid4 = _createProposal(data.dave, data.recipient4, "Education Access");
+        data.pid4 = _createProposal(bob, data.recipient4, "Education Access");  // bob creates for dave's project
 
         // Move to voting period
         vm.roll(data.startBlock + VOTING_DELAY + 1);

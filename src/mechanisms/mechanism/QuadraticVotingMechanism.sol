@@ -37,10 +37,16 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
         _setAlpha(_alphaNumerator, _alphaDenominator);
     }
 
-    /// @notice Only registered users with voting power can propose
+    /// @notice Only keeper or management can propose
     function _beforeProposeHook(address proposer) internal view override returns (bool) {
         if (proposer == address(0)) revert ZeroAddressCannotPropose();
-        return _getVotingPower(proposer) > 0;
+        
+        // Get keeper and management addresses from TokenizedAllocationMechanism
+        address keeper = _tokenizedAllocation().keeper();
+        address management = _tokenizedAllocation().management();
+        
+        // Allow if proposer is either keeper or management
+        return proposer == keeper || proposer == management;
     }
 
     /// @notice Validate proposal ID exists

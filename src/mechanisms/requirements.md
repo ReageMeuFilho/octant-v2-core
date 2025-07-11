@@ -62,10 +62,11 @@ The contract defines 11 strategic hooks that implementers must override to creat
     - MUST NOT allow re-registration if user already has voting power
 - **`_beforeProposeHook(address proposer)`** - Validates proposal creation rights
   - **Security Assumptions**:
-    - MUST verify proposer has legitimate right to create proposals (e.g., voting power > 0)
+    - MUST verify proposer has legitimate right to create proposals (e.g., voting power > 0, role-based access)
     - MUST be view function to prevent state changes during validation
     - SHOULD prevent spam by implementing appropriate restrictions
     - MUST return false for address(0) proposers
+    - MAY restrict to specific roles (e.g., QuadraticVotingMechanism restricts to keeper/management only)
 - **`_validateProposalHook(uint256 pid)`** - Ensures proposal ID validity
   - **Security Assumptions**:
     - MUST validate pid is within valid range (1 <= pid <= proposalCount)
@@ -206,6 +207,7 @@ This pattern enables complete code reuse while maintaining storage isolation and
   - Proposal creation requires hook-based authorization via interface
   - Proposals receive unique incremental IDs
   - Recipients cannot be zero address
+  - In QuadraticVotingMechanism: Only keeper or management roles can create proposals
 
 #### FR-3: Democratic Voting Process
 - **Requirement:** Registered users must be able to cast weighted votes (For/Against/Abstain) on proposals
@@ -461,7 +463,7 @@ Recipients are the beneficiaries of successful funding proposals who receive all
 - ✅ Each address can only be recipient of one proposal
 - ✅ Cannot modify recipient address after proposal creation
 - ⚠️ **Dependent on proposer** - recipients cannot self-propose
-- ⚠️ **QuadraticVotingMechanism**: Proposer must have voting power > 0
+- ⚠️ **QuadraticVotingMechanism**: Only keeper or management can propose (not regular voters)
 
 #### Phase 2: Voting Period & Outcome
 **User Story:** "As a recipient, I want to track voting progress and understand if my proposal will succeed"
