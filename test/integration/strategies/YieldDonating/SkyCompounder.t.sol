@@ -1115,34 +1115,34 @@ contract SkyCompounderTest is Test {
     /// @notice Test loss tracking when no dragon router shares exist to burn
     function testLossTracking_WithNoDragonShares() public {
         console.log("=== Loss Tracking: No Dragon Router Shares ===");
-        
+
         uint256 userDeposit = 1000e18;
         uint256 lossAmount = 200e18;
-        
+
         // User deposits - no dragon router shares
         vm.startPrank(user);
         vault.deposit(userDeposit, user);
         vm.stopPrank();
-        
+
         uint256 initialTotalAssets = vault.totalAssets();
         uint256 initialDragonShares = vault.balanceOf(donationAddress);
-        
+
         console.log("Initial state:");
         console.log("  User deposit:", userDeposit);
         console.log("  Dragon shares:", initialDragonShares);
         console.log("  Total assets:", initialTotalAssets);
         console.log("  Burning enabled:", YieldDonatingTokenizedStrategy(address(strategy)).enableBurning());
-        
+
         // Disable health check to allow loss simulation
         vm.startPrank(management);
         strategy.setDoHealthCheck(false);
         vm.stopPrank();
-        
+
         // Create loss by mocking the balanceOf call for the staking contract
         // This simulates the underlying protocol losing value
         uint256 stakingBalance = strategy.balanceOfStake();
         console.log("  Staking balance before loss:", stakingBalance);
-        
+
         // Mock the balanceOf call to return a reduced balance
         uint256 newStakingBalance = stakingBalance > lossAmount ? stakingBalance - lossAmount : 0;
         vm.mockCall(
@@ -1150,31 +1150,31 @@ contract SkyCompounderTest is Test {
             abi.encodeWithSelector(ERC20.balanceOf.selector, address(strategy)),
             abi.encode(newStakingBalance)
         );
-        
+
         // Report the loss
         vm.startPrank(keeper);
         (uint256 reportedProfit, uint256 reportedLoss) = vault.report();
         vm.stopPrank();
-        
+
         console.log("After loss report:");
         console.log("  Reported profit:", reportedProfit);
         console.log("  Reported loss:", reportedLoss);
         console.log("  Dragon shares after loss:", vault.balanceOf(donationAddress));
         console.log("  Total assets after loss:", vault.totalAssets());
-        
+
         // Expected behavior: Loss should be reported and tracked
         assertGt(reportedLoss, 0, "Loss should be reported when no dragon shares exist");
         assertEq(vault.balanceOf(donationAddress), 0, "Dragon router should still have no shares");
-        
+
         // Verify loss is tracked in storage (would be added to S.lossAmount)
         // Note: We can't directly access S.lossAmount but can verify behavior through recovery
         uint256 totalAssetsAfterLoss = vault.totalAssets();
         assertLt(totalAssetsAfterLoss, initialTotalAssets, "Total assets should decrease after loss");
-        
+
         // === RECOVERY VERIFICATION ===
         // Verify S.lossAmount = 200e18 through recovery testing
         console.log("\n=== Recovery Verification ===");
-        
+
         // Clear the mock and simulate partial recovery (less than loss)
         uint256 partialRecovery = 50e18; // Less than the 200e18 loss
         airdrop(ERC20(USDS), STAKING, partialRecovery);
@@ -1183,19 +1183,19 @@ contract SkyCompounderTest is Test {
             abi.encodeWithSelector(ERC20.balanceOf.selector, address(strategy)),
             abi.encode(newStakingBalance + partialRecovery)
         );
-        
+
         vm.startPrank(keeper);
         (uint256 recoveryProfit1, ) = vault.report();
         vm.stopPrank();
-        
+
         console.log("After partial recovery of 50e18:");
         console.log("  Reported profit:", recoveryProfit1);
         console.log("  Dragon shares:", vault.balanceOf(donationAddress));
-        
+
         // No shares should be minted since profit (50) < tracked loss (200)
         assertEq(vault.balanceOf(donationAddress), 0, "No shares should be minted during partial recovery");
         assertEq(recoveryProfit1, partialRecovery, "Profit should equal recovery amount");
-        
+
         // Now recover exactly the remaining loss (150e18)
         uint256 exactRemaining = 150e18;
         airdrop(ERC20(USDS), STAKING, exactRemaining);
@@ -1204,19 +1204,19 @@ contract SkyCompounderTest is Test {
             abi.encodeWithSelector(ERC20.balanceOf.selector, address(strategy)),
             abi.encode(newStakingBalance + partialRecovery + exactRemaining)
         );
-        
+
         vm.startPrank(keeper);
         (uint256 recoveryProfit2, ) = vault.report();
         vm.stopPrank();
-        
+
         console.log("\nAfter exact remaining recovery of 150e18:");
         console.log("  Reported profit:", recoveryProfit2);
         console.log("  Dragon shares:", vault.balanceOf(donationAddress));
-        
+
         // Still no shares should be minted (total recovery = original loss)
         assertEq(vault.balanceOf(donationAddress), 0, "No shares should be minted when recovery equals loss");
         assertEq(recoveryProfit2, exactRemaining, "Profit should equal remaining recovery");
-        
+
         // Now add excess profit to verify S.lossAmount was cleared
         uint256 excessProfit = 100e18;
         airdrop(ERC20(USDS), STAKING, excessProfit);
@@ -1225,56 +1225,56 @@ contract SkyCompounderTest is Test {
             abi.encodeWithSelector(ERC20.balanceOf.selector, address(strategy)),
             abi.encode(newStakingBalance + partialRecovery + exactRemaining + excessProfit)
         );
-        
+
         vm.startPrank(keeper);
         (uint256 recoveryProfit3, ) = vault.report();
         vm.stopPrank();
-        
+
         console.log("\nAfter excess profit of 100e18:");
         console.log("  Reported profit:", recoveryProfit3);
         console.log("  Dragon shares:", vault.balanceOf(donationAddress));
-        
+
         // Now shares should be minted for the excess profit
         assertEq(vault.balanceOf(donationAddress), excessProfit, "Dragon should receive shares for excess profit");
         assertEq(recoveryProfit3, excessProfit, "Profit should equal excess amount");
-        
+
         console.log("\nVerified S.lossAmount tracking: 200e18 loss fully offset before minting shares");
     }
 
     /// @notice Test loss tracking with insufficient dragon router shares
     function testLossTracking_WithInsufficientDragonShares() public {
         console.log("=== Loss Tracking: Insufficient Dragon Router Shares ===");
-        
+
         uint256 userDeposit = 1000e18;
         uint256 dragonDeposit = 100e18;
         uint256 lossAmount = 300e18; // More than dragon's contribution
-        
+
         // User deposits
         vm.startPrank(user);
         vault.deposit(userDeposit, user);
         vm.stopPrank();
-        
+
         // Dragon router deposits (small amount)
         airdrop(ERC20(USDS), donationAddress, dragonDeposit);
         vm.startPrank(donationAddress);
         ERC20(USDS).approve(address(strategy), type(uint256).max);
         vault.deposit(dragonDeposit, donationAddress);
         vm.stopPrank();
-        
+
         uint256 initialTotalAssets = vault.totalAssets();
         uint256 initialDragonShares = vault.balanceOf(donationAddress);
-        
+
         console.log("Initial state:");
         console.log("  User deposit:", userDeposit);
         console.log("  Dragon deposit:", dragonDeposit);
         console.log("  Dragon shares:", initialDragonShares);
         console.log("  Total assets:", initialTotalAssets);
-        
+
         // Disable health check to allow loss simulation
         vm.startPrank(management);
         strategy.setDoHealthCheck(false);
         vm.stopPrank();
-        
+
         // Create loss by mocking the balanceOf call
         uint256 stakingBalance = strategy.balanceOfStake();
         uint256 newStakingBalance = stakingBalance > lossAmount ? stakingBalance - lossAmount : 0;
@@ -1283,57 +1283,57 @@ contract SkyCompounderTest is Test {
             abi.encodeWithSelector(ERC20.balanceOf.selector, address(strategy)),
             abi.encode(newStakingBalance)
         );
-        
+
         // Report the loss
         vm.startPrank(keeper);
         (uint256 reportedProfit, uint256 reportedLoss) = vault.report();
         vm.stopPrank();
-        
+
         uint256 dragonSharesAfterLoss = vault.balanceOf(donationAddress);
         uint256 sharesBurned = initialDragonShares - dragonSharesAfterLoss;
-        
+
         console.log("After loss report:");
         console.log("  Reported profit:", reportedProfit);
         console.log("  Reported loss:", reportedLoss);
         console.log("  Dragon shares after loss:", dragonSharesAfterLoss);
         console.log("  Shares burned:", sharesBurned);
         console.log("  Total assets after loss:", vault.totalAssets());
-        
+
         // Expected behavior: All dragon shares should be burned since loss exceeds dragon's contribution
         assertEq(reportedLoss, lossAmount, "Full loss should be reported");
         assertEq(dragonSharesAfterLoss, 0, "All dragon shares should be burned");
         assertEq(sharesBurned, initialDragonShares, "All initial dragon shares should be burned");
-        
+
         // The remaining loss (300 - 100 = 200) should be tracked in S.lossAmount
         // We can verify this indirectly through recovery testing
-        
+
         // === RECOVERY VERIFICATION ===
         // Verify S.lossAmount = 200e18 (300 loss - 100 burned) through recovery testing
         console.log("\n=== Recovery Verification ===");
-        
+
         // First, let's recover less than the tracked loss (150e18 < 200e18)
         uint256 partialRecovery = 150e18;
         uint256 currentBalance = stakingBalance - lossAmount; // 800e18
-        
+
         airdrop(ERC20(USDS), STAKING, partialRecovery);
         vm.mockCall(
             STAKING,
             abi.encodeWithSelector(ERC20.balanceOf.selector, address(strategy)),
             abi.encode(currentBalance + partialRecovery) // 800 + 150 = 950
         );
-        
+
         vm.startPrank(keeper);
         (uint256 recoveryProfit1, ) = vault.report();
         vm.stopPrank();
-        
+
         console.log("After partial recovery of 150e18:");
         console.log("  Reported profit:", recoveryProfit1);
         console.log("  Dragon shares:", vault.balanceOf(donationAddress));
-        
+
         // No shares should be minted since profit (150) < remaining tracked loss (200)
         assertEq(vault.balanceOf(donationAddress), 0, "No shares should be minted during partial recovery");
         assertEq(recoveryProfit1, partialRecovery, "Profit should equal recovery amount");
-        
+
         // Now recover exactly the remaining tracked loss (50e18)
         uint256 exactRemaining = 50e18;
         airdrop(ERC20(USDS), STAKING, exactRemaining);
@@ -1342,24 +1342,24 @@ contract SkyCompounderTest is Test {
             abi.encodeWithSelector(ERC20.balanceOf.selector, address(strategy)),
             abi.encode(currentBalance + partialRecovery + exactRemaining) // 950 + 50 = 1000
         );
-        
+
         vm.startPrank(keeper);
         (uint256 recoveryProfit2, ) = vault.report();
         vm.stopPrank();
-        
+
         console.log("\nAfter exact remaining recovery of 50e18:");
         console.log("  Reported profit:", recoveryProfit2);
         console.log("  Dragon shares:", vault.balanceOf(donationAddress));
         console.log("  Total assets:", vault.totalAssets());
-        
+
         // Due to rounding in conversions, a tiny amount of shares might be minted
         // The tracked loss was slightly less than 200e18 due to conversion rounding
         uint256 dragonSharesAfterExactRecovery = vault.balanceOf(donationAddress);
         assertLe(dragonSharesAfterExactRecovery, 11e18, "Only minimal shares from rounding should be minted");
         assertEq(vault.totalAssets(), 1000e18, "Total assets should return to original user deposit");
-        
+
         console.log("  Note: Small minting due to rounding:", dragonSharesAfterExactRecovery);
-        
+
         // Now add excess profit to verify S.lossAmount was cleared
         uint256 excessProfit = 75e18;
         airdrop(ERC20(USDS), STAKING, excessProfit);
@@ -1368,59 +1368,69 @@ contract SkyCompounderTest is Test {
             abi.encodeWithSelector(ERC20.balanceOf.selector, address(strategy)),
             abi.encode(currentBalance + partialRecovery + exactRemaining + excessProfit) // 1000 + 75 = 1075
         );
-        
+
         vm.startPrank(keeper);
         (uint256 recoveryProfit3, ) = vault.report();
         vm.stopPrank();
-        
+
         console.log("\nAfter excess profit of 75e18:");
         console.log("  Reported profit:", recoveryProfit3);
         console.log("  Dragon shares:", vault.balanceOf(donationAddress));
-        
+
         // Now shares should be minted for the excess profit
         // Note: The share calculation will be slightly different due to the new totalAssets
         uint256 finalDragonShares = vault.balanceOf(donationAddress);
-        assertGt(finalDragonShares, dragonSharesAfterExactRecovery + 74e18, "Dragon should receive shares for excess profit");
-        assertLt(finalDragonShares, dragonSharesAfterExactRecovery + 76e18, "Share minting should be close to profit amount");
-        
-        console.log("\nVerified S.lossAmount tracking: ~200e18 remaining loss (300 total - 100 burned) fully offset before minting");
+        assertGt(
+            finalDragonShares,
+            dragonSharesAfterExactRecovery + 74e18,
+            "Dragon should receive shares for excess profit"
+        );
+        assertLt(
+            finalDragonShares,
+            dragonSharesAfterExactRecovery + 76e18,
+            "Share minting should be close to profit amount"
+        );
+
+        console.log(
+            "\nVerified S.lossAmount tracking: ~200e18 remaining loss (300 total - 100 burned) fully offset before minting"
+        );
         console.log("Small rounding difference in tracked loss due to share/asset conversions");
     }
 
     /// @notice Test loss tracking with sufficient dragon router shares for full burning
     function testLossTracking_WithSufficientDragonShares() public {
         console.log("=== Loss Tracking: Sufficient Dragon Router Shares ===");
-        
+
         uint256 userDeposit = 1000e18;
         uint256 dragonDeposit = 500e18;
         uint256 lossAmount = 200e18; // Less than dragon's contribution
-        
+
         // User deposits
         vm.startPrank(user);
         vault.deposit(userDeposit, user);
         vm.stopPrank();
-        
+
         // Dragon router deposits (large amount)
         airdrop(ERC20(USDS), donationAddress, dragonDeposit);
         vm.startPrank(donationAddress);
         ERC20(USDS).approve(address(strategy), type(uint256).max);
         vault.deposit(dragonDeposit, donationAddress);
         vm.stopPrank();
-        
+
         uint256 initialTotalAssets = vault.totalAssets();
         uint256 initialDragonShares = vault.balanceOf(donationAddress);
-        
+
         console.log("Initial state:");
         console.log("  User deposit:", userDeposit);
         console.log("  Dragon deposit:", dragonDeposit);
         console.log("  Dragon shares:", initialDragonShares);
         console.log("  Total assets:", initialTotalAssets);
-        
+
         // Disable health check to allow loss simulation
         vm.startPrank(management);
         strategy.setDoHealthCheck(false);
         vm.stopPrank();
-        
+
         // Create loss by mocking the balanceOf call
         uint256 stakingBalance = strategy.balanceOfStake();
         uint256 newStakingBalance = stakingBalance > lossAmount ? stakingBalance - lossAmount : 0;
@@ -1429,61 +1439,65 @@ contract SkyCompounderTest is Test {
             abi.encodeWithSelector(ERC20.balanceOf.selector, address(strategy)),
             abi.encode(newStakingBalance)
         );
-        
+
         // Report the loss
         vm.startPrank(keeper);
         (uint256 reportedProfit, uint256 reportedLoss) = vault.report();
         vm.stopPrank();
-        
+
         uint256 dragonSharesAfterLoss = vault.balanceOf(donationAddress);
         uint256 sharesBurned = initialDragonShares - dragonSharesAfterLoss;
-        
+
         console.log("After loss report:");
         console.log("  Reported profit:", reportedProfit);
         console.log("  Reported loss:", reportedLoss);
         console.log("  Dragon shares after loss:", dragonSharesAfterLoss);
         console.log("  Shares burned:", sharesBurned);
         console.log("  Total assets after loss:", vault.totalAssets());
-        
+
         // Expected behavior: Only the shares needed to cover the loss should be burned
         assertEq(reportedLoss, lossAmount, "Full loss should be reported");
         assertLt(dragonSharesAfterLoss, initialDragonShares, "Some dragon shares should be burned");
         assertGt(dragonSharesAfterLoss, 0, "Not all dragon shares should be burned");
-        
+
         // Verify that the shares burned correspond to the loss amount
         // With _convertToSharesWithLoss, the shares burned should equal the loss amount
         // when the share price is 1:1 (which it is initially)
         assertEq(sharesBurned, lossAmount, "Shares burned should equal loss amount with 1:1 share price");
-        
+
         // === RECOVERY VERIFICATION ===
         // Verify S.lossAmount = 0 (all loss covered by burning) through recovery testing
         console.log("\n=== Recovery Verification ===");
-        
+
         // Since all loss was covered by burning shares, S.lossAmount should be 0
         // Any profit should immediately result in share minting to dragon router
         uint256 smallProfit = 50e18;
         uint256 currentBalance = stakingBalance - lossAmount; // 1300e18
-        
+
         airdrop(ERC20(USDS), STAKING, smallProfit);
         vm.mockCall(
             STAKING,
             abi.encodeWithSelector(ERC20.balanceOf.selector, address(strategy)),
             abi.encode(currentBalance + smallProfit) // 1300 + 50 = 1350
         );
-        
+
         vm.startPrank(keeper);
         (uint256 recoveryProfit1, ) = vault.report();
         vm.stopPrank();
-        
+
         console.log("After small profit of 50e18:");
         console.log("  Reported profit:", recoveryProfit1);
         console.log("  Dragon shares before:", dragonSharesAfterLoss);
         console.log("  Dragon shares after:", vault.balanceOf(donationAddress));
         console.log("  New shares minted:", vault.balanceOf(donationAddress) - dragonSharesAfterLoss);
-        
+
         // Shares should be minted immediately since S.lossAmount = 0
-        assertEq(vault.balanceOf(donationAddress), dragonSharesAfterLoss + smallProfit, "All profit should mint shares");
-        
+        assertEq(
+            vault.balanceOf(donationAddress),
+            dragonSharesAfterLoss + smallProfit,
+            "All profit should mint shares"
+        );
+
         // Add more profit to further verify
         uint256 additionalProfit = 100e18;
         airdrop(ERC20(USDS), STAKING, additionalProfit);
@@ -1492,19 +1506,22 @@ contract SkyCompounderTest is Test {
             abi.encodeWithSelector(ERC20.balanceOf.selector, address(strategy)),
             abi.encode(currentBalance + smallProfit + additionalProfit) // 1350 + 100 = 1450
         );
-        
+
         vm.startPrank(keeper);
         (uint256 recoveryProfit2, ) = vault.report();
         vm.stopPrank();
-        
+
         console.log("\nAfter additional profit of 100e18:");
         console.log("  Reported profit:", recoveryProfit2);
         console.log("  Total dragon shares:", vault.balanceOf(donationAddress));
-        
+
         // All profit should continue to mint shares
-        assertEq(vault.balanceOf(donationAddress), dragonSharesAfterLoss + smallProfit + additionalProfit, 
-                 "All additional profit should mint shares");
-        
+        assertEq(
+            vault.balanceOf(donationAddress),
+            dragonSharesAfterLoss + smallProfit + additionalProfit,
+            "All additional profit should mint shares"
+        );
+
         console.log("\nVerified S.lossAmount = 0: All loss was covered by burning dragon shares");
         console.log("Subsequent profits immediately mint new shares to dragon router");
     }
@@ -1514,21 +1531,21 @@ contract SkyCompounderTest is Test {
     /// @notice Test partial profit recovery (profit < tracked loss)
     function testProfitRecovery_PartialRecovery() public {
         console.log("=== Profit Recovery: Partial Recovery ===");
-        
+
         uint256 userDeposit = 1000e18;
         uint256 lossAmount = 300e18;
         uint256 partialProfit = 100e18; // Less than loss
-        
+
         // User deposits - no dragon router shares initially
         vm.startPrank(user);
         vault.deposit(userDeposit, user);
         vm.stopPrank();
-        
+
         // Disable health check
         vm.startPrank(management);
         strategy.setDoHealthCheck(false);
         vm.stopPrank();
-        
+
         // Create loss
         uint256 stakingBalance = strategy.balanceOfStake();
         vm.mockCall(
@@ -1536,70 +1553,70 @@ contract SkyCompounderTest is Test {
             abi.encodeWithSelector(ERC20.balanceOf.selector, address(strategy)),
             abi.encode(stakingBalance - lossAmount)
         );
-        
+
         vm.startPrank(keeper);
         (, uint256 reportedLoss1) = vault.report();
         vm.stopPrank();
-        
+
         console.log("After loss:");
         console.log("  Reported loss:", reportedLoss1);
         console.log("  Total assets:", vault.totalAssets());
-        
+
         // Don't clear the mock - we need to maintain the loss state
         // Instead, update the mock to reflect the new balance after airdrop
         uint256 currentMockedBalance = stakingBalance - lossAmount; // 700e18
-        
+
         // Now add partial profit by airdropping to the staking contract directly
         // This simulates the strategy earning profit on its staked assets
         airdrop(ERC20(USDS), STAKING, partialProfit);
-        
+
         // Update the mock to reflect the new balance (loss + partial recovery)
         vm.mockCall(
             STAKING,
             abi.encodeWithSelector(ERC20.balanceOf.selector, address(strategy)),
             abi.encode(currentMockedBalance + partialProfit) // 700 + 100 = 800
         );
-        
+
         // Check what happens to the funds
         console.log("After profit simulation:");
         console.log("  Staking balance (mocked):", strategy.balanceOfStake());
-        
+
         uint256 totalAssetsBeforeReport = vault.totalAssets();
         uint256 dragonSharesBefore = vault.balanceOf(donationAddress);
-        
+
         console.log("Before profit report:");
         console.log("  Total assets before report:", totalAssetsBeforeReport);
         console.log("  Airdropped amount:", partialProfit);
-        
+
         vm.startPrank(keeper);
         (uint256 reportedProfit2, uint256 reportedLoss2) = vault.report();
         vm.stopPrank();
-        
+
         uint256 dragonSharesAfter = vault.balanceOf(donationAddress);
-        
+
         console.log("After partial recovery:");
         console.log("  Reported profit:", reportedProfit2);
         console.log("  Dragon shares before:", dragonSharesBefore);
         console.log("  Dragon shares after:", dragonSharesAfter);
         console.log("  New shares minted:", dragonSharesAfter - dragonSharesBefore);
-        
+
         // Expected behavior for partial recovery:
         // - After the 300e18 loss, totalAssets was 700e18 and S.lossAmount = 300e18
         // - We simulate earning 100e18 profit, so new totalAssets = 800e18
         // - Reported profit = 800e18 - 700e18 = 100e18
         // - Since profit (100) < tracked loss (300), no shares are minted
         // - S.lossAmount is reduced by profit: 300 - 100 = 200
-        
+
         assertEq(reportedProfit2, partialProfit, "Profit should equal the partial recovery amount");
         assertEq(reportedLoss2, 0, "No loss should be reported");
         assertEq(dragonSharesAfter, dragonSharesBefore, "No new shares should be minted during partial recovery");
-        
+
         // Remaining tracked loss should be 300 - 100 = 200 in S.lossAmount
-        
+
         // === RECOVERY VERIFICATION ===
         // Verify S.lossAmount = 200e18 (300 initial - 100 recovered) through recovery testing
         console.log("\n=== Recovery Verification ===");
-        
+
         // Recover exactly the remaining loss (200e18)
         airdrop(ERC20(USDS), STAKING, 200e18);
         vm.mockCall(
@@ -1607,20 +1624,20 @@ contract SkyCompounderTest is Test {
             abi.encodeWithSelector(ERC20.balanceOf.selector, address(strategy)),
             abi.encode(1000e18) // 800 + 200 = 1000
         );
-        
+
         vm.startPrank(keeper);
         (uint256 recoveryProfit3, ) = vault.report();
         vm.stopPrank();
-        
+
         console.log("After exact remaining recovery of 200e18:");
         console.log("  Reported profit:", recoveryProfit3);
         console.log("  Dragon shares:", vault.balanceOf(donationAddress));
         console.log("  Total assets:", vault.totalAssets());
-        
+
         // No shares should be minted (total recovery = tracked loss)
         assertEq(vault.balanceOf(donationAddress), 0, "No shares when recovery equals remaining loss");
         assertEq(vault.totalAssets(), 1000e18, "Total assets should return to original");
-        
+
         // Now add excess profit to verify S.lossAmount was cleared
         airdrop(ERC20(USDS), STAKING, 50e18);
         vm.mockCall(
@@ -1628,18 +1645,18 @@ contract SkyCompounderTest is Test {
             abi.encodeWithSelector(ERC20.balanceOf.selector, address(strategy)),
             abi.encode(1050e18) // 1000 + 50 = 1050
         );
-        
+
         vm.startPrank(keeper);
         (uint256 recoveryProfit4, ) = vault.report();
         vm.stopPrank();
-        
+
         console.log("\nAfter excess profit of 50e18:");
         console.log("  Reported profit:", recoveryProfit4);
         console.log("  Dragon shares:", vault.balanceOf(donationAddress));
-        
+
         // Now shares should be minted for the excess profit
         assertEq(vault.balanceOf(donationAddress), 50e18, "Dragon should receive shares for excess profit");
-        
+
         console.log("\nVerified S.lossAmount tracking: 200e18 remaining loss (300 initial - 100 partial recovery)");
         console.log("Full recovery offset tracked loss before minting new shares");
     }
@@ -1647,21 +1664,21 @@ contract SkyCompounderTest is Test {
     /// @notice Test exact profit recovery (profit = tracked loss)
     function testProfitRecovery_ExactRecovery() public {
         console.log("=== Profit Recovery: Exact Recovery ===");
-        
+
         uint256 userDeposit = 1000e18;
         uint256 lossAmount = 300e18;
         uint256 exactProfit = 300e18; // Exactly equals loss
-        
+
         // User deposits - no dragon router shares initially
         vm.startPrank(user);
         vault.deposit(userDeposit, user);
         vm.stopPrank();
-        
+
         // Disable health check
         vm.startPrank(management);
         strategy.setDoHealthCheck(false);
         vm.stopPrank();
-        
+
         // Create loss
         uint256 stakingBalance = strategy.balanceOfStake();
         vm.mockCall(
@@ -1669,67 +1686,67 @@ contract SkyCompounderTest is Test {
             abi.encodeWithSelector(ERC20.balanceOf.selector, address(strategy)),
             abi.encode(stakingBalance - lossAmount)
         );
-        
+
         vm.startPrank(keeper);
         (, uint256 reportedLoss1) = vault.report();
         vm.stopPrank();
-        
+
         console.log("After loss:");
         console.log("  Reported loss:", reportedLoss1);
         console.log("  Total assets:", vault.totalAssets());
-        
+
         // Update the mock to reflect recovery
         uint256 currentMockedBalance = stakingBalance - lossAmount; // 700e18
-        
+
         // Simulate exact profit recovery
         airdrop(ERC20(USDS), STAKING, exactProfit);
-        
+
         // Update the mock to reflect the new balance (loss + exact recovery)
         vm.mockCall(
             STAKING,
             abi.encodeWithSelector(ERC20.balanceOf.selector, address(strategy)),
             abi.encode(currentMockedBalance + exactProfit) // 700 + 300 = 1000
         );
-        
+
         console.log("After profit simulation:");
         console.log("  Staking balance (mocked):", strategy.balanceOfStake());
-        
+
         uint256 totalAssetsBeforeReport = vault.totalAssets();
         uint256 dragonSharesBefore = vault.balanceOf(donationAddress);
-        
+
         console.log("Before profit report:");
         console.log("  Total assets before report:", totalAssetsBeforeReport);
         console.log("  Expected profit:", exactProfit);
-        
+
         vm.startPrank(keeper);
         (uint256 reportedProfit2, uint256 reportedLoss2) = vault.report();
         vm.stopPrank();
-        
+
         uint256 dragonSharesAfter = vault.balanceOf(donationAddress);
-        
+
         console.log("After exact recovery:");
         console.log("  Reported profit:", reportedProfit2);
         console.log("  Dragon shares before:", dragonSharesBefore);
         console.log("  Dragon shares after:", dragonSharesAfter);
         console.log("  New shares minted:", dragonSharesAfter - dragonSharesBefore);
-        
+
         // Expected behavior for exact recovery:
         // - After the 300e18 loss, totalAssets was 700e18 and S.lossAmount = 300e18
         // - We simulate earning 300e18 profit, so new totalAssets = 1000e18
         // - Reported profit = 1000e18 - 700e18 = 300e18
         // - Since profit (300) = tracked loss (300), S.lossAmount becomes 0
         // - No shares are minted to dragon router (net profit is 0)
-        
+
         assertEq(reportedProfit2, exactProfit, "Profit should equal the exact recovery amount");
         assertEq(reportedLoss2, 0, "No loss should be reported");
         assertEq(dragonSharesAfter, dragonSharesBefore, "No new shares should be minted during exact recovery");
-        
+
         // S.lossAmount should be cleared to 0
-        
+
         // === RECOVERY VERIFICATION ===
         // Verify S.lossAmount = 0 after exact recovery through additional profit testing
         console.log("\n=== Recovery Verification ===");
-        
+
         // Add any profit - it should all mint shares since S.lossAmount = 0
         airdrop(ERC20(USDS), STAKING, 75e18);
         vm.mockCall(
@@ -1737,18 +1754,18 @@ contract SkyCompounderTest is Test {
             abi.encodeWithSelector(ERC20.balanceOf.selector, address(strategy)),
             abi.encode(1075e18) // 1000 + 75 = 1075
         );
-        
+
         vm.startPrank(keeper);
         (uint256 recoveryProfit3, ) = vault.report();
         vm.stopPrank();
-        
+
         console.log("After additional profit of 75e18:");
         console.log("  Reported profit:", recoveryProfit3);
         console.log("  Dragon shares:", vault.balanceOf(donationAddress));
-        
+
         // All profit should mint shares since S.lossAmount was cleared
         assertEq(vault.balanceOf(donationAddress), 75e18, "All profit should mint shares after exact recovery");
-        
+
         console.log("\nVerified S.lossAmount = 0: Exact recovery (300e18) cleared all tracked loss");
         console.log("Subsequent profits immediately mint shares to dragon router");
     }
@@ -1756,21 +1773,21 @@ contract SkyCompounderTest is Test {
     /// @notice Test over recovery (profit > tracked loss)
     function testProfitRecovery_OverRecovery() public {
         console.log("=== Profit Recovery: Over Recovery ===");
-        
+
         uint256 userDeposit = 1000e18;
         uint256 lossAmount = 300e18;
         uint256 overProfit = 400e18; // More than loss
-        
+
         // User deposits - no dragon router shares initially
         vm.startPrank(user);
         vault.deposit(userDeposit, user);
         vm.stopPrank();
-        
+
         // Disable health check
         vm.startPrank(management);
         strategy.setDoHealthCheck(false);
         vm.stopPrank();
-        
+
         // Create loss
         uint256 stakingBalance = strategy.balanceOfStake();
         vm.mockCall(
@@ -1778,51 +1795,51 @@ contract SkyCompounderTest is Test {
             abi.encodeWithSelector(ERC20.balanceOf.selector, address(strategy)),
             abi.encode(stakingBalance - lossAmount)
         );
-        
+
         vm.startPrank(keeper);
         (, uint256 reportedLoss1) = vault.report();
         vm.stopPrank();
-        
+
         console.log("After loss:");
         console.log("  Reported loss:", reportedLoss1);
         console.log("  Total assets:", vault.totalAssets());
-        
+
         // Update the mock to reflect recovery
         uint256 currentMockedBalance = stakingBalance - lossAmount; // 700e18
-        
+
         // Simulate over recovery
         airdrop(ERC20(USDS), STAKING, overProfit);
-        
+
         // Update the mock to reflect the new balance (loss + over recovery)
         vm.mockCall(
             STAKING,
             abi.encodeWithSelector(ERC20.balanceOf.selector, address(strategy)),
             abi.encode(currentMockedBalance + overProfit) // 700 + 400 = 1100
         );
-        
+
         console.log("After profit simulation:");
         console.log("  Staking balance (mocked):", strategy.balanceOfStake());
-        
+
         uint256 totalAssetsBeforeReport = vault.totalAssets();
         uint256 dragonSharesBefore = vault.balanceOf(donationAddress);
-        
+
         console.log("Before profit report:");
         console.log("  Total assets before report:", totalAssetsBeforeReport);
         console.log("  Expected profit:", overProfit);
-        
+
         vm.startPrank(keeper);
         (uint256 reportedProfit2, uint256 reportedLoss2) = vault.report();
         vm.stopPrank();
-        
+
         uint256 dragonSharesAfter = vault.balanceOf(donationAddress);
         uint256 sharesMinted = dragonSharesAfter - dragonSharesBefore;
-        
+
         console.log("After over recovery:");
         console.log("  Reported profit:", reportedProfit2);
         console.log("  Dragon shares before:", dragonSharesBefore);
         console.log("  Dragon shares after:", dragonSharesAfter);
         console.log("  New shares minted:", sharesMinted);
-        
+
         // Expected behavior for over recovery:
         // - After the 300e18 loss, totalAssets was 700e18 and S.lossAmount = 300e18
         // - We simulate earning 400e18 profit, so new totalAssets = 1100e18
@@ -1830,16 +1847,16 @@ contract SkyCompounderTest is Test {
         // - Since profit (400) > tracked loss (300), S.lossAmount becomes 0
         // - Net profit = 400 - 300 = 100e18
         // - Dragon router gets shares for the net profit (100e18)
-        
+
         uint256 expectedNetProfit = overProfit - lossAmount; // 400 - 300 = 100
-        
+
         assertEq(reportedProfit2, overProfit, "Profit should equal the over recovery amount");
         assertEq(reportedLoss2, 0, "No loss should be reported");
         assertEq(sharesMinted, expectedNetProfit, "Shares minted should equal net profit");
-        
+
         // S.lossAmount should be cleared to 0
         // Dragon router should have received shares for the excess profit
-        
+
         // === RECOVERY VERIFICATION ===
         // Verify S.lossAmount = 0 and only net profit minted shares
         console.log("\n=== Recovery Verification ===");
@@ -1854,27 +1871,27 @@ contract SkyCompounderTest is Test {
     /// @notice Test that users can recover their original principal after loss/profit cycles
     function testEconomicInvariant_UserPrincipalProtection() public {
         console.log("=== Economic Invariant: User Principal Protection ===");
-        
+
         uint256 userDeposit = 1000e18;
         uint256 lossAmount = 300e18;
         uint256 recoveryProfit = 400e18; // Net profit of 100e18
-        
+
         // User deposits
         vm.startPrank(user);
         vault.deposit(userDeposit, user);
         vm.stopPrank();
-        
+
         uint256 userSharesInitial = vault.balanceOf(user);
         console.log("Initial state:");
         console.log("  User deposited:", userDeposit);
         console.log("  User shares:", userSharesInitial);
         console.log("  Price per share:", vault.pricePerShare());
-        
+
         // Disable health check
         vm.startPrank(management);
         strategy.setDoHealthCheck(false);
         vm.stopPrank();
-        
+
         // Create loss
         uint256 stakingBalance = strategy.balanceOfStake();
         vm.mockCall(
@@ -1882,47 +1899,47 @@ contract SkyCompounderTest is Test {
             abi.encodeWithSelector(ERC20.balanceOf.selector, address(strategy)),
             abi.encode(stakingBalance - lossAmount)
         );
-        
+
         vm.startPrank(keeper);
         vault.report();
         vm.stopPrank();
-        
+
         console.log("After loss:");
         console.log("  Total assets:", vault.totalAssets());
         console.log("  Price per share:", vault.pricePerShare());
-        
+
         // Simulate recovery with profit
         uint256 currentMockedBalance = stakingBalance - lossAmount;
         airdrop(ERC20(USDS), STAKING, recoveryProfit);
-        
+
         vm.mockCall(
             STAKING,
             abi.encodeWithSelector(ERC20.balanceOf.selector, address(strategy)),
             abi.encode(currentMockedBalance + recoveryProfit) // 700 + 400 = 1100
         );
-        
+
         vm.startPrank(keeper);
         vault.report();
         vm.stopPrank();
-        
+
         console.log("After recovery:");
         console.log("  Total assets:", vault.totalAssets());
         console.log("  Price per share:", vault.pricePerShare());
         console.log("  Dragon shares:", vault.balanceOf(donationAddress));
-        
+
         // User withdraws all shares
         vm.startPrank(user);
         uint256 withdrawnAmount = vault.redeem(userSharesInitial, user, user);
         vm.stopPrank();
-        
+
         console.log("User withdrawal:");
         console.log("  Amount withdrawn:", withdrawnAmount);
         console.log("  User shares remaining:", vault.balanceOf(user));
-        
+
         // Economic invariant: User should recover exactly their original deposit
         assertEq(withdrawnAmount, userDeposit, "User should recover original principal");
         assertEq(vault.balanceOf(user), 0, "User should have no shares left");
-        
+
         // Dragon router should have shares representing the net profit
         uint256 dragonShares = vault.balanceOf(donationAddress);
         uint256 netProfit = recoveryProfit - lossAmount; // 100e18
@@ -1932,45 +1949,45 @@ contract SkyCompounderTest is Test {
     /// @notice Test fairness across multiple users during loss/profit cycles
     function testEconomicInvariant_MultipleUsers() public {
         console.log("=== Economic Invariant: Multiple Users Fairness ===");
-        
+
         // Split into helper function to avoid stack too deep
         _testMultipleUsersSetup();
     }
-    
+
     function _testMultipleUsersSetup() internal {
         address user2 = address(0x5678);
         address user3 = address(0x9ABC);
-        
+
         // Setup deposits
         airdrop(ERC20(USDS), user, 1000e18);
         airdrop(ERC20(USDS), user2, 2000e18);
         airdrop(ERC20(USDS), user3, 3000e18);
-        
+
         // User 1 deposit
         vm.startPrank(user);
         ERC20(USDS).approve(address(strategy), type(uint256).max);
         vault.deposit(1000e18, user);
         vm.stopPrank();
-        
+
         // User 2 deposit
         vm.startPrank(user2);
         ERC20(USDS).approve(address(strategy), type(uint256).max);
         vault.deposit(2000e18, user2);
         vm.stopPrank();
-        
+
         // User 3 deposit
         vm.startPrank(user3);
         ERC20(USDS).approve(address(strategy), type(uint256).max);
         vault.deposit(3000e18, user3);
         vm.stopPrank();
-        
+
         console.log("Initial deposits complete. Total assets:", vault.totalAssets());
-        
+
         // Disable health check
         vm.startPrank(management);
         strategy.setDoHealthCheck(false);
         vm.stopPrank();
-        
+
         // Create 25% loss
         uint256 stakingBalance = strategy.balanceOfStake();
         vm.mockCall(
@@ -1978,13 +1995,13 @@ contract SkyCompounderTest is Test {
             abi.encodeWithSelector(ERC20.balanceOf.selector, address(strategy)),
             abi.encode(stakingBalance - 1500e18) // 25% of 6000
         );
-        
+
         vm.startPrank(keeper);
         vault.report();
         vm.stopPrank();
-        
+
         console.log("After 25% loss. Total assets:", vault.totalAssets());
-        
+
         // Recover with profit
         airdrop(ERC20(USDS), STAKING, 2100e18); // 1500 loss recovery + 600 profit
         vm.mockCall(
@@ -1992,43 +2009,43 @@ contract SkyCompounderTest is Test {
             abi.encodeWithSelector(ERC20.balanceOf.selector, address(strategy)),
             abi.encode(stakingBalance - 1500e18 + 2100e18)
         );
-        
+
         vm.startPrank(keeper);
         vault.report();
         vm.stopPrank();
-        
+
         console.log("After recovery. Total assets:", vault.totalAssets());
         console.log("Dragon shares:", vault.balanceOf(donationAddress));
-        
+
         // Test withdrawals
         _testUserWithdrawals(user, user2, user3);
     }
-    
+
     function _testUserWithdrawals(address user1, address user2, address user3) internal {
         uint256 shares;
         uint256 withdrawn;
-        
+
         // User 1 withdrawal
         shares = vault.balanceOf(user1);
         vm.prank(user1);
         withdrawn = vault.redeem(shares, user1, user1);
         console.log("User1 withdrew:", withdrawn);
         assertEq(withdrawn, 1000e18, "User1 should recover original deposit");
-        
+
         // User 2 withdrawal
         shares = vault.balanceOf(user2);
         vm.prank(user2);
         withdrawn = vault.redeem(shares, user2, user2);
         console.log("User2 withdrew:", withdrawn);
         assertEq(withdrawn, 2000e18, "User2 should recover original deposit");
-        
+
         // User 3 withdrawal
         shares = vault.balanceOf(user3);
         vm.prank(user3);
         withdrawn = vault.redeem(shares, user3, user3);
         console.log("User3 withdrew:", withdrawn);
         assertEq(withdrawn, 3000e18, "User3 should recover original deposit");
-        
+
         // Verify dragon router has the net profit
         assertEq(vault.balanceOf(donationAddress), 600e18, "Dragon router should have net profit shares");
     }
