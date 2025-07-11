@@ -152,6 +152,9 @@ abstract contract ProperQF {
         project.sumContributions = newSumContributions;
         project.quadraticFunding = newQuadraticFunding;
         project.linearFunding = newSumContributions;
+
+        // Update total funding after vote processing
+        s.totalFunding = _calculateWeightedTotalFunding();
     }
 
     /**

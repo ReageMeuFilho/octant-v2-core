@@ -242,7 +242,8 @@ contract ProperQFSimulationTest is Test {
             uint256 sqrtSum = results[i][1];
             expectedQuadraticSum += sqrtSum * sqrtSum;
             expectedLinearSum += results[i][0];
-            expectedTotalFunding += results[i][0] + (sqrtSum * sqrtSum);
+            // With alpha = 1.0, totalFunding = quadraticSum only
+            expectedTotalFunding += sqrtSum * sqrtSum;
         }
 
         // Get actual totals from contract
@@ -290,9 +291,8 @@ contract ProperQFSimulationTest is Test {
                     for (uint256 k = 0; k < numProjects; k++) {
                         expectedQuadraticSum += projectQuadraticSums[k] * projectQuadraticSums[k];
                         expectedLinearSum += projectLinearSums[k];
-                        expectedTotalFunding +=
-                            projectLinearSums[k] +
-                            (projectQuadraticSums[k] * projectQuadraticSums[k]);
+                        // With alpha = 1.0, totalFunding = quadraticSum only
+                        expectedTotalFunding += projectQuadraticSums[k] * projectQuadraticSums[k];
                     }
 
                     // Verify running totals match contract state

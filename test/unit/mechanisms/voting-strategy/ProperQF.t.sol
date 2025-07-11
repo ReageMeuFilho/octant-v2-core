@@ -68,7 +68,8 @@ contract ProperQFTest is Test {
         assertEq(linearF, expectedLinear, "linearFunding incorrect");
         assertEq(qf.totalQuadraticSum(), expectedQuad, "totalQuadraticSum incorrect");
         assertEq(qf.totalLinearSum(), contribution, "totalLinearSum incorrect");
-        assertEq(qf.totalFunding(), expectedQuad + contribution, "totalFunding incorrect");
+        // With alpha = 1.0, totalFunding = alpha * quadratic + (1-alpha) * linear = 1.0 * quadratic + 0 * linear
+        assertEq(qf.totalFunding(), expectedQuad, "totalFunding incorrect");
     }
 
     function test_multiple_votes_same_project() public {
@@ -224,7 +225,8 @@ contract ProperQFTest is Test {
 
         assertEq(qf.totalQuadraticSum(), expectedTotalQuadratic, "Total quadratic sum incorrect");
         assertEq(qf.totalLinearSum(), expectedTotalLinear, "Total linear sum incorrect");
-        assertEq(qf.totalFunding(), expectedTotalQuadratic + expectedTotalLinear, "Total funding incorrect");
+        // With alpha = 1.0, totalFunding = alpha * quadratic + (1-alpha) * linear = 1.0 * quadratic + 0 * linear
+        assertEq(qf.totalFunding(), expectedTotalQuadratic, "Total funding incorrect");
     }
 
     function test_multiple_votes_multiple_projects() public {
@@ -306,7 +308,8 @@ contract ProperQFTest is Test {
 
         assertEq(qf.totalQuadraticSum(), expectedTotalQuadratic, "Total quadratic sum incorrect");
         assertEq(qf.totalLinearSum(), expectedTotalLinear, "Total linear sum incorrect");
-        assertEq(qf.totalFunding(), expectedTotalQuadratic + expectedTotalLinear, "Total funding incorrect");
+        // With alpha = 1.0, totalFunding = alpha * quadratic + (1-alpha) * linear = 1.0 * quadratic + 0 * linear
+        assertEq(qf.totalFunding(), expectedTotalQuadratic, "Total funding incorrect");
 
         // Verify quadratic effect
         // The quadratic funding amount should be greater than the sum of individual quadratic amounts
