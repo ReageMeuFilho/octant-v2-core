@@ -15,10 +15,11 @@ This implementation serves as a comprehensive reference for applying the Yearn V
 
 ## Technical Architecture Overview
 
-The allocation mechanism system follows the **Yearn V3 Tokenized Strategy Pattern** with two main components:
+The allocation mechanism system follows the **Yearn V3 Tokenized Strategy Pattern** with three main components:
 
 1. **TokenizedAllocationMechanism.sol** - Shared implementation containing all standard logic (voting, proposals, ERC4626 vault functionality, storage management)
 2. **BaseAllocationMechanism.sol** - Lightweight proxy contract with fallback delegation and hook definitions
+3. **ProperQF.sol** - Abstract contract providing incremental quadratic funding algorithm with alpha-weighted distribution (used by quadratic voting strategies)
 
 The system uses a hook-based architecture that allows implementers to customize voting behaviors while maintaining core security and flow invariants. This pattern provides significant gas savings and code reuse compared to traditional inheritance patterns.
 
@@ -28,25 +29,163 @@ The system uses a hook-based architecture that allows implementers to customize 
 - **Code Reuse**: All standard functionality (signup, propose, castVote) shared across strategies
 - **Storage Isolation**: Each strategy maintains independent storage despite shared implementation
 
+### Delegation Pattern Architecture
+
+The Yearn V3 pattern implements a sophisticated delegation mechanism:
+
+1. **Storage Location**: All storage lives in the proxy contract (e.g., QuadraticVotingMechanism) following TokenizedAllocationMechanism's layout
+2. **Logic Execution**: Shared logic executes in TokenizedAllocationMechanism's context via delegatecall
+3. **Access Pattern**: Proxy contracts access storage through helper functions that return interfaces at `address(this)`
+
+#### How It Works:
+- When a proxy calls `_tokenizedAllocation().management()`, it returns `TokenizedAllocationMechanism(address(this))`
+- This call to a non-existent function triggers the fallback, delegating to TokenizedAllocationMechanism
+- The implementation reads from the proxy's storage slots, returning the stored management address
+- This enables role-based access control (`owner`, `management`, `keeper`, `emergencyAdmin`) across all mechanisms
+
+#### Role Hierarchy:
+- **Owner**: Primary admin with full control (can transfer ownership, pause/unpause)
+- **Management**: Can configure operational parameters and settings
+- **Keeper**: Can execute routine maintenance operations
+- **Emergency Admin**: Can act in emergencies alongside management
+
 ### Hook-Based Modular Approach
 
-The contract defines 9 strategic hooks that implementers must override to create specific voting mechanisms:
+The contract defines 11 strategic hooks that implementers must override to create specific voting mechanisms:
 
 #### Core Validation Hooks
 - **`_beforeSignupHook(address user)`** - Controls user registration eligibility
+  - **Security Assumptions**: 
+    - MUST return false for address(0) to prevent zero address registration
+    - MUST be view function to prevent state manipulation during validation
+    - SHOULD implement consistent eligibility criteria that cannot be gamed
+    - MUST NOT allow re-registration if user already has voting power
 - **`_beforeProposeHook(address proposer)`** - Validates proposal creation rights
+  - **Security Assumptions**:
+    - MUST verify proposer has legitimate right to create proposals (e.g., voting power > 0)
+    - MUST be view function to prevent state changes during validation
+    - SHOULD prevent spam by implementing appropriate restrictions
+    - MUST return false for address(0) proposers
 - **`_validateProposalHook(uint256 pid)`** - Ensures proposal ID validity
+  - **Security Assumptions**:
+    - MUST validate pid is within valid range (1 <= pid <= proposalCount)
+    - MUST be view function for gas efficiency and security
+    - MUST NOT validate canceled proposals as valid
+    - SHOULD be used consistently before any proposal state access
 - **`_beforeFinalizeVoteTallyHook()`** - Guards vote tally finalization
+  - **Security Assumptions**:
+    - CAN implement additional timing or state checks before finalization
+    - MUST NOT revert unless finalization should be blocked
+    - MAY update state if needed (e.g., snapshot values)
+    - SHOULD return true in most implementations unless specific conditions aren't met
 
 #### Voting Power & Processing Hooks
 - **`_getVotingPowerHook(address user, uint256 deposit)`** - Calculates initial voting power
+  - **Security Assumptions**:
+    - MUST return deterministic voting power based on deposit amount
+    - MUST be view function to ensure consistency
+    - MUST NOT exceed MAX_SAFE_VALUE (type(uint128).max) to prevent overflow
+    - SHOULD implement fair and transparent power calculation
+    - MAY normalize decimals for consistent voting power across different assets
 - **`_processVoteHook(pid, voter, choice, weight, oldPower)`** - Processes vote and updates tallies
+  - **Security Assumptions**:
+    - MUST return newPower <= oldPower (power conservation invariant)
+    - MUST accurately update vote tallies based on weight and choice
+    - MUST prevent double voting by checking hasVoted mapping
+    - MUST validate weight does not exceed voter's available power
+    - SHOULD implement vote cost calculation (e.g., quadratic cost in QF)
+    - MUST handle all VoteType choices appropriately (Against/For/Abstain)
 - **`_hasQuorumHook(uint256 pid)`** - Determines if proposal meets quorum requirements
+  - **Security Assumptions**:
+    - MUST implement consistent quorum calculation logic
+    - MUST be view function for deterministic results
+    - SHOULD base quorum on objective metrics (vote count, funding amount, etc.)
+    - MUST NOT change quorum logic after voting has started
+    - SHOULD return false for proposals with zero votes
 
 #### Distribution Hooks
 - **`_convertVotesToShares(uint256 pid)`** - Converts vote tallies to vault shares
+  - **Security Assumptions**:
+    - MUST implement fair and consistent vote-to-share conversion
+    - MUST be view function for predictable outcomes
+    - MUST return 0 shares for proposals that don't meet quorum
+    - SHOULD consider total available assets to prevent over-allocation
+    - MUST handle mathematical operations safely (no overflow/underflow)
+    - MAY implement complex formulas (e.g., quadratic funding with alpha)
 - **`_getRecipientAddressHook(uint256 pid)`** - Retrieves proposal recipient
-- **`_requestDistributionHook(address recipient, uint256 shares)`** - Handles share distribution
+  - **Security Assumptions**:
+    - MUST return the correct recipient address for the proposal
+    - MUST be view function to prevent manipulation
+    - MUST NOT return address(0) for valid proposals
+    - SHOULD revert with descriptive error for invalid proposals
+    - MUST return consistent recipient throughout proposal lifecycle
+- **`_requestCustomDistributionHook(address recipient, uint256 shares)`** - Handles custom share distribution
+  - **Security Assumptions**:
+    - MUST return true ONLY if custom distribution is fully handled
+    - MUST mint/transfer exact share amount if returning true
+    - MUST NOT mint shares if returning false (default minting will occur)
+    - MAY implement vesting, splitting, or other distribution logic
+    - MUST handle reentrancy safely if making external calls
+- **`_availableWithdrawLimit(address shareOwner)`** - Controls withdrawal limits with timelock enforcement
+  - **Security Assumptions**:
+    - MUST enforce timelock by returning 0 before redeemableAfter timestamp
+    - MUST enforce grace period by returning 0 after expiration
+    - SHOULD return type(uint256).max for no limit (within valid window)
+    - MUST be view function for consistent results
+    - MUST coordinate with redeemableAfter mapping in storage
+- **`_calculateTotalAssetsHook()`** - Calculates total assets including matching pools
+  - **Security Assumptions**:
+    - MUST accurately reflect total assets available for distribution
+    - MUST include any external funding sources (matching pools, grants)
+    - MUST be view function when called during finalization
+    - SHOULD snapshot values if they might change after finalization
+    - MUST NOT double-count assets or include unauthorized funds
+
+### BaseAllocationMechanism Deep Dive
+
+BaseAllocationMechanism.sol serves as the lightweight proxy contract in the Yearn V3 pattern. It contains minimal code while enabling full functionality through delegation:
+
+**Core Architecture:**
+- **Immutable Storage**: Only stores `tokenizedAllocationAddress` and `asset` as immutable values
+- **Constructor Initialization**: Initializes TokenizedAllocationMechanism storage via delegatecall during deployment
+- **Hook Definitions**: Defines 12 abstract internal hooks that concrete implementations must override
+- **External Hook Wrappers**: Provides external versions of hooks with `onlySelf` modifier for security
+- **Fallback Delegation**: Implements assembly-based fallback to delegate all undefined calls to TokenizedAllocationMechanism
+
+**Security Pattern - onlySelf Modifier:**
+```solidity
+modifier onlySelf() {
+    require(msg.sender == address(this), "!self");
+    _;
+}
+```
+This ensures hooks can only be called via delegatecall from TokenizedAllocationMechanism where `msg.sender == address(this)`. This prevents external actors from directly calling the TokenizedAllocationMechanism contract to invoke hooks, maintaining strict security boundaries.
+
+**Hook Implementation Pattern:**
+Each hook follows a three-layer pattern:
+1. **Abstract Internal**: `function _hookName(...) internal virtual returns (...)`
+2. **External Wrapper**: `function hookName(...) external onlySelf returns (...) { return _hookName(...); }`
+3. **Interface Call**: TokenizedAllocationMechanism calls via `IBaseAllocationStrategy(address(this)).hookName(...)`
+
+**Helper Functions for Implementers:**
+- `_tokenizedAllocation()`: Returns TokenizedAllocationMechanism interface at current address
+- `_getProposalCount()`: Get total number of proposals
+- `_proposalExists(pid)`: Check if proposal ID is valid
+- `_getProposal(pid)`: Retrieve proposal details
+- `_getVoteTally(pid)`: Get current vote tallies
+- `_getVotingPower(user)`: Check user's voting power
+- `_getQuorumShares()`: Get quorum requirement
+- `_getRedeemableAfter(shareOwner)`: Check timelock status
+- `_getGracePeriod()`: Get grace period configuration
+
+**Fallback Function:**
+The fallback uses inline assembly for gas-efficient delegation:
+1. Copies calldata to memory
+2. Performs delegatecall to TokenizedAllocationMechanism
+3. Copies return data
+4. Returns data or reverts based on delegatecall result
+
+This pattern enables complete code reuse while maintaining storage isolation and upgrade safety through immutability.
 
 ## Functional Requirements
 
@@ -88,12 +227,12 @@ The contract defines 9 strategic hooks that implementers must override to create
 
 #### FR-5: Proposal Queuing & Share Allocation
 - **Requirement:** Successful proposals must be queued and vault shares minted to recipients
-- **Implementation:** `queueProposal(uint256 pid)` with `_requestDistributionHook()` calling `mintShares()` via delegatecall
+- **Implementation:** `queueProposal(uint256 pid)` with `_requestDistributionHook()` and direct `_mint()` calls
 - **Acceptance Criteria:**
   - Can only queue proposals after tally finalization
   - Proposals must meet quorum requirements via `_hasQuorumHook()`
   - Share amount determined by `_convertVotesToShares()` hook
-  - Shares actually minted to recipient via ERC4626 vault integration
+  - Shares actually minted to recipient via internal `_mint()` function
   - Timelock delay applied before redemption eligibility
 
 #### FR-6: Proposal State Management
@@ -156,9 +295,10 @@ The contract defines 9 strategic hooks that implementers must override to create
 
 ### Security Invariants
 1. **Hook Validation**: All critical operations protected by appropriate hooks
-2. **Asset Safety**: ERC20 transfers use standard transferFrom pattern
+2. **Asset Safety**: ERC20 transfers use SafeERC20 for secure token handling
 3. **Access Control**: Sensitive operations require proper validation
-4. **Reentrancy Protection**: External calls handled safely (implementation dependent)
+4. **Reentrancy Protection**: TokenizedAllocationMechanism uses ReentrancyGuard modifier
+5. **Storage Isolation**: ProperQF uses EIP-1967 storage pattern to prevent collisions
 
 ## Complete User Journey Documentation
 
@@ -178,7 +318,7 @@ Voters are community members who deposit assets to gain voting power and partici
 
 **System Response:**
 - Assets transferred from voter to mechanism vault
-- Voting power assigned (1:1 in SimpleVotingMechanism) 
+- Voting power assigned (1:1 in SimpleVotingMechanism, scaled to 18 decimals in QuadraticVotingMechanism) 
 - UserRegistered event emitted
 - Voter can now participate in voting
 
@@ -187,6 +327,7 @@ Voters are community members who deposit assets to gain voting power and partici
 - ✅ Must register before voting period ends
 - ⚠️ **No asset recovery** - deposited tokens locked until mechanism concludes
 - ✅ Voting power calculation customizable per mechanism
+- ✅ QuadraticVotingMechanism: Voting power normalized to 18 decimals regardless of asset decimals
 
 #### Phase 2: Proposal Discovery & Voting
 **User Story:** "As a registered voter, I want to review proposals and cast weighted votes to influence fund distribution"
@@ -207,6 +348,8 @@ Voters are community members who deposit assets to gain voting power and partici
 - ✅ One vote per proposal per voter (immutable)
 - ✅ Vote weight cannot exceed remaining voting power
 - ✅ Must manage power across multiple proposals strategically
+- ✅ QuadraticVotingMechanism: To cast W votes costs W² voting power (quadratic cost)
+- ✅ QuadraticVotingMechanism: Only "For" votes supported (no Against/Abstain)
 
 #### Phase 3: Post-Voting Monitoring  
 **User Story:** "As a voter, I want to see voting results and understand how my votes influenced the outcome"
@@ -235,8 +378,8 @@ Admins are trusted operators who manage the voting lifecycle and ensure proper g
 **User Story:** "As a funding round operator, I want to deploy and configure a voting mechanism for my community"
 
 **Actions:**
-1. **Deploy Mechanism**: Use `AllocationMechanismFactory.deploySimpleVotingMechanism(config)`
-2. **Configure Parameters**: Set voting delays, periods, quorum requirements, timelock
+1. **Deploy Mechanism**: Use `AllocationMechanismFactory.deploySimpleVotingMechanism(config)` or `deployQuadraticVotingMechanism(config, alphaNumerator, alphaDenominator)`
+2. **Configure Parameters**: Set voting delays, periods, quorum requirements, timelock, and alpha (for quadratic)
 3. **Announce Round**: Communicate mechanism address and voting schedule to community
 
 **System Response:**
@@ -318,6 +461,7 @@ Recipients are the beneficiaries of successful funding proposals who receive all
 - ✅ Each address can only be recipient of one proposal
 - ✅ Cannot modify recipient address after proposal creation
 - ⚠️ **Dependent on proposer** - recipients cannot self-propose
+- ⚠️ **QuadraticVotingMechanism**: Proposer must have voting power > 0
 
 #### Phase 2: Voting Period & Outcome
 **User Story:** "As a recipient, I want to track voting progress and understand if my proposal will succeed"
@@ -415,9 +559,9 @@ All hooks follow a dual-layer pattern:
 
 ### Mathematical Hooks
 - **`_getVotingPowerHook()`**: Should implement consistent power allocation based on deposits/eligibility
-- **`_processVoteHook()`**: MUST maintain vote tally accuracy and ensure power conservation
-- **`_convertVotesToShares()`**: Should implement fair conversion from votes to economic value
-- **`_hasQuorumHook()`**: Must implement consistent quorum calculation
+- **`_processVoteHook()`**: MUST maintain vote tally accuracy and ensure power conservation. For quadratic funding implementations, integrates with ProperQF's incremental update algorithm
+- **`_convertVotesToShares()`**: Should implement fair conversion from votes to economic value. In quadratic funding, uses alpha-weighted formula: `α × quadraticFunding + (1-α) × linearFunding`
+- **`_hasQuorumHook()`**: Must implement consistent quorum calculation based on total funding for the proposal
 
 ### Integration Hooks
 - **`_getRecipientAddressHook()`**: Should return consistent recipient for share distribution
@@ -428,9 +572,10 @@ All hooks follow a dual-layer pattern:
 
 ### Integration Requirements
 - ERC20 asset must be specified at deployment time via AllocationConfig
-- Vault share minting system integrated into TokenizedAllocationMechanism (ERC4626 compliant*)
+- Vault share minting system integrated into TokenizedAllocationMechanism (ERC4626 compliant)
 - Event emission provides off-chain integration points for monitoring and indexing
 - Factory pattern ensures proper owner context (deployer becomes owner, not factory)
+- Factory supports multiple voting mechanisms: `deploySimpleVotingMechanism()` and `deployQuadraticVotingMechanism()`
 
 
 ### Performance Metrics
