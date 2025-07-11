@@ -109,9 +109,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     /// @notice Maximum safe value for mathematical operations
     uint256 public constant MAX_SAFE_VALUE = type(uint128).max;
 
-    /// @notice API version this TokenizedStrategy implements.
-    string internal constant API_VERSION = "3.0.4";
-
     /// @notice Used for calculations.
     uint256 internal constant MAX_BPS = 10_000;
 
