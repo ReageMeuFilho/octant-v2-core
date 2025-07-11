@@ -199,7 +199,6 @@ contract TokenizedPatternDemoTest is Test {
         assertEq(proposal.description, "Fund Charlie's project");
         assertFalse(proposal.claimed);
         assertFalse(proposal.canceled);
-        assertEq(proposal.earliestRedeemableTime, 0); // Not queued yet
     }
 
     function testProposalCreationFailures() public {
@@ -368,15 +367,13 @@ contract TokenizedPatternDemoTest is Test {
         (bool success2, ) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", pid));
         require(success2, "queueProposal failed");
 
-        // Check proposal was queued
-        TokenizedAllocationMechanism.Proposal memory proposal = _tokenized(address(mechanism)).proposals(pid);
-        assertEq(proposal.earliestRedeemableTime, timestampBefore + 1 days);
-
         // Check shares were calculated
         assertEq(_tokenized(address(mechanism)).proposalShares(pid), 150 ether); // Net votes as shares
 
-        // Check recipient timelock
-        assertEq(_tokenized(address(mechanism)).redeemableAfter(charlie), timestampBefore + 1 days);
+        // Check global timelock
+        uint256 globalRedemptionStart = _tokenized(address(mechanism)).globalRedemptionStart();
+        assertEq(globalRedemptionStart, timestampBefore + 1 days);
+        assertEq(_tokenized(address(mechanism)).globalRedemptionStart(), globalRedemptionStart);
     }
 
     // ========== PROPOSAL STATE TESTS ==========
@@ -640,7 +637,7 @@ contract TokenizedPatternDemoTest is Test {
         assertEq(_tokenized(address(mechanism)).proposalShares(pid), expectedShares);
 
         // Charlie should be able to redeem shares after timelock
-        assertGt(_tokenized(address(mechanism)).redeemableAfter(charlie), block.timestamp);
+        assertGt(_tokenized(address(mechanism)).globalRedemptionStart(), block.timestamp);
     }
 
     function testMultipleProposalShareMinting() public {
@@ -694,8 +691,8 @@ contract TokenizedPatternDemoTest is Test {
         assertEq(_tokenized(address(mechanism)).totalAssets(), 300 ether);
 
         // Verify both have redeemable times set
-        assertGt(_tokenized(address(mechanism)).redeemableAfter(charlie), block.timestamp);
-        assertGt(_tokenized(address(mechanism)).redeemableAfter(dave), block.timestamp);
+        assertGt(_tokenized(address(mechanism)).globalRedemptionStart(), block.timestamp);
+        assertGt(_tokenized(address(mechanism)).globalRedemptionStart(), block.timestamp);
     }
 
     function testShareRedemption() public {
@@ -729,7 +726,7 @@ contract TokenizedPatternDemoTest is Test {
         assertEq(_tokenized(address(mechanism)).balanceOf(charlie), charlieShares);
 
         // Before timelock - charlie cannot redeem yet (if timelock is enforced)
-        uint256 redeemableTime = _tokenized(address(mechanism)).redeemableAfter(charlie);
+        uint256 redeemableTime = _tokenized(address(mechanism)).globalRedemptionStart();
         assertGt(redeemableTime, block.timestamp);
 
         // Fast forward past timelock (1 day)

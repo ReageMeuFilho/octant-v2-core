@@ -86,7 +86,6 @@ contract SimpleVotingRecipientJourneyTest is Test {
         assertEq(proposal1.description, "Charlie's Clean Energy Initiative");
         assertFalse(proposal1.claimed);
         assertFalse(proposal1.canceled);
-        assertEq(proposal1.earliestRedeemableTime, 0);
 
         // Multiple recipients can have proposals
         vm.prank(bob);
@@ -246,7 +245,7 @@ contract SimpleVotingRecipientJourneyTest is Test {
         assertEq(_tokenized(address(mechanism)).proposalShares(pid), expectedShares);
 
         // Timelock enforcement
-        uint256 redeemableTime = _tokenized(address(mechanism)).redeemableAfter(charlie);
+        uint256 redeemableTime = _tokenized(address(mechanism)).globalRedemptionStart();
         assertEq(redeemableTime, timestampBefore + TIMELOCK_DELAY);
         assertGt(redeemableTime, block.timestamp);
 
@@ -401,7 +400,15 @@ contract SimpleVotingRecipientJourneyTest is Test {
         uint256 charlieShares = 500 ether;
         assertEq(_tokenized(address(mechanism)).balanceOf(charlie), charlieShares);
 
-        // Test share transferability
+        // Test that transfers are blocked before redemption period
+        vm.prank(charlie);
+        vm.expectRevert("Transfers not allowed until redemption period");
+        _tokenized(address(mechanism)).transfer(dave, 100 ether);
+
+        // Fast forward to redemption period start
+        vm.warp(block.timestamp + TIMELOCK_DELAY);
+
+        // Now test share transferability
         uint256 transferAmount = 200 ether;
         vm.prank(charlie);
         _tokenized(address(mechanism)).transfer(dave, transferAmount);
@@ -425,9 +432,6 @@ contract SimpleVotingRecipientJourneyTest is Test {
         assertEq(_tokenized(address(mechanism)).balanceOf(charlie), charlieShares - transferAmount - allowanceAmount);
         assertEq(_tokenized(address(mechanism)).balanceOf(eve), allowanceAmount);
         assertEq(_tokenized(address(mechanism)).allowance(charlie, dave), 0);
-
-        // Fast forward and test redemption by transferees
-        vm.warp(block.timestamp + TIMELOCK_DELAY + 1);
 
         // Calculate expected assets based on proper accounting
         // Total deposits: 1000 ether (alice's deposit)

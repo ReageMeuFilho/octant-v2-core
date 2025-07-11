@@ -90,8 +90,8 @@ contract SimpleVotingTimelockEnforcementTest is Test {
 
         // Test 1: Immediately after queuing - should be blocked by timelock
         console.log("Current timestamp:", block.timestamp);
-        console.log("Charlie redeemableAfter:", _tokenized(address(mechanism)).redeemableAfter(charlie));
-        console.log("Time difference:", _tokenized(address(mechanism)).redeemableAfter(charlie) - block.timestamp);
+        console.log("Charlie redeemableAfter:", _tokenized(address(mechanism)).globalRedemptionStart());
+        console.log("Time difference:", _tokenized(address(mechanism)).globalRedemptionStart() - block.timestamp);
         assertEq(_tokenized(address(mechanism)).maxRedeem(charlie), 0);
 
         vm.expectRevert("Allocation: redeem more than max");
@@ -108,7 +108,7 @@ contract SimpleVotingTimelockEnforcementTest is Test {
 
         // Test 3: One second before timelock expires - still blocked
         // Need to check what the actual redeemableAfter time is
-        uint256 redeemableTime = _tokenized(address(mechanism)).redeemableAfter(charlie);
+        uint256 redeemableTime = _tokenized(address(mechanism)).globalRedemptionStart();
         vm.warp(redeemableTime - 1);
         assertEq(_tokenized(address(mechanism)).maxRedeem(charlie), 0);
 
@@ -175,7 +175,7 @@ contract SimpleVotingTimelockEnforcementTest is Test {
         assertEq(_tokenized(address(mechanism)).balanceOf(charlie), 100 ether);
 
         // Test 3: One second before grace period expires - should work
-        uint256 redeemableTime = _tokenized(address(mechanism)).redeemableAfter(charlie);
+        uint256 redeemableTime = _tokenized(address(mechanism)).globalRedemptionStart();
         vm.warp(redeemableTime + GRACE_PERIOD - 1);
         assertEq(_tokenized(address(mechanism)).maxRedeem(charlie), 100 ether);
 
@@ -295,8 +295,8 @@ contract SimpleVotingTimelockEnforcementTest is Test {
         // Test different timelock schedules
 
         // At charlie's timelock expiry - charlie can redeem, bob cannot
-        uint256 charlieRedeemableTime = _tokenized(address(mechanism)).redeemableAfter(charlie);
-        uint256 bobRedeemableTime = _tokenized(address(mechanism)).redeemableAfter(bob);
+        uint256 charlieRedeemableTime = _tokenized(address(mechanism)).globalRedemptionStart();
+        uint256 bobRedeemableTime = _tokenized(address(mechanism)).globalRedemptionStart();
         vm.warp(charlieRedeemableTime);
         assertEq(_tokenized(address(mechanism)).maxRedeem(charlie), 600 ether);
         // Bob's timelock should still be active since he was queued later

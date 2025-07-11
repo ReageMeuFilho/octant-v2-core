@@ -548,12 +548,12 @@ contract QuadraticVotingAccountingAuditTest is Test {
         // Verify timelock setup
         currentTestCtx.expectedRedeemableTime = currentTestCtx.queueTimestamp + TIMELOCK_DELAY;
         assertEq(
-            _tokenized(address(mechanism)).redeemableAfter(recipient1),
+            _tokenized(address(mechanism)).globalRedemptionStart(),
             currentTestCtx.expectedRedeemableTime,
             "Recipient1 timelock incorrect"
         );
         assertEq(
-            _tokenized(address(mechanism)).redeemableAfter(recipient2),
+            _tokenized(address(mechanism)).globalRedemptionStart(),
             currentTestCtx.expectedRedeemableTime,
             "Recipient2 timelock incorrect"
         );

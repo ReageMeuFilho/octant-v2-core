@@ -218,17 +218,16 @@ abstract contract BaseAllocationMechanism is IBaseAllocationStrategy {
         return TokenizedAllocationMechanism(address(this));
     }
 
-    /// @notice Get redeemable time for a share owner
-    /// @param shareOwner Address to check redeemable time for
-    /// @return Timestamp when shares become redeemable
-    function _getRedeemableAfter(address shareOwner) internal view returns (uint256) {
-        return _tokenizedAllocation().redeemableAfter(shareOwner);
-    }
 
     /// @notice Get grace period from configuration
     /// @return Grace period in seconds
     function _getGracePeriod() internal view returns (uint256) {
         return _tokenizedAllocation().gracePeriod();
+    }
+
+    /// @dev Get global redemption start timestamp
+    function _getGlobalRedemptionStart() internal view returns (uint256) {
+        return _tokenizedAllocation().globalRedemptionStart();
     }
 
     // ---------- Fallback Function ----------

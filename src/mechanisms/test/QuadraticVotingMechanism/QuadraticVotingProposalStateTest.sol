@@ -170,7 +170,6 @@ contract QuadraticVotingProposalStateTest is Test {
         // Recipient cannot receive anything from canceled proposal
         TokenizedAllocationMechanism.Proposal memory proposal = _tokenized(address(mechanism)).proposals(pid);
         assertTrue(proposal.canceled);
-        assertEq(proposal.earliestRedeemableTime, 0);
 
         // Cannot vote on canceled proposal
         vm.expectRevert();
@@ -280,7 +279,6 @@ contract QuadraticVotingProposalStateTest is Test {
 
         // Proposal can be queued by admin
         TokenizedAllocationMechanism.Proposal memory proposal = _tokenized(address(mechanism)).proposals(pid);
-        assertEq(proposal.earliestRedeemableTime, 0); // Not queued yet
         assertFalse(proposal.canceled);
 
         // Verify vote tallies are correct using getTally() from ProperQF
@@ -330,10 +328,9 @@ contract QuadraticVotingProposalStateTest is Test {
         assertEq(_tokenized(address(mechanism)).proposalShares(pid), expectedShares);
 
         // Timelock is active
-        TokenizedAllocationMechanism.Proposal memory proposal = _tokenized(address(mechanism)).proposals(pid);
-        assertEq(proposal.earliestRedeemableTime, timestampBefore + TIMELOCK_DELAY);
-        assertEq(_tokenized(address(mechanism)).redeemableAfter(charlie), timestampBefore + TIMELOCK_DELAY);
-        assertGt(proposal.earliestRedeemableTime, block.timestamp);
+        uint256 globalRedemptionStart = _tokenized(address(mechanism)).globalRedemptionStart();
+        assertEq(globalRedemptionStart, timestampBefore + TIMELOCK_DELAY);
+        assertEq(_tokenized(address(mechanism)).globalRedemptionStart(), globalRedemptionStart);
 
         // Cannot redeem during timelock
         vm.expectRevert("Allocation: redeem more than max");

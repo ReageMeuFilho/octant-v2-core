@@ -68,7 +68,7 @@ contract QuadraticVotingTimelockDebugTest is Test {
 
         console.log("Before queuing:");
         console.log("  Charlie balance:", _tokenized(address(mechanism)).balanceOf(charlie));
-        console.log("  Charlie redeemableAfter:", _tokenized(address(mechanism)).redeemableAfter(charlie));
+        console.log("  Charlie redeemableAfter:", _tokenized(address(mechanism)).globalRedemptionStart());
         console.log("  Block timestamp:", block.timestamp);
 
         uint256 queueTime = block.timestamp;
@@ -77,7 +77,7 @@ contract QuadraticVotingTimelockDebugTest is Test {
 
         console.log("After queuing:");
         console.log("  Charlie balance:", _tokenized(address(mechanism)).balanceOf(charlie));
-        console.log("  Charlie redeemableAfter:", _tokenized(address(mechanism)).redeemableAfter(charlie));
+        console.log("  Charlie redeemableAfter:", _tokenized(address(mechanism)).globalRedemptionStart());
         console.log("  Expected redeemableAfter:", queueTime + 1 days);
         console.log("  Timelock delay:", _tokenized(address(mechanism)).timelockDelay());
         console.log("  Grace period:", _tokenized(address(mechanism)).gracePeriod());

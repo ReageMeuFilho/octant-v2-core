@@ -139,12 +139,12 @@ contract SimpleVotingMechanism is BaseAllocationMechanism {
     /// @param shareOwner Address attempting to withdraw shares
     /// @return availableLimit Amount of assets that can be withdrawn (0 if timelock active or expired)
     function _availableWithdrawLimit(address shareOwner) internal view override returns (uint256) {
-        // Get the redeemable time for this share owner
-        uint256 redeemableTime = _getRedeemableAfter(shareOwner);
+        // Get the global redemption start time
+        uint256 redeemableTime = _getGlobalRedemptionStart();
 
-        // If no redeemable time set, allow unlimited withdrawal (shouldn't happen in normal flow)
+        // If no redeemable time set, no withdrawals allowed
         if (redeemableTime == 0) {
-            return type(uint256).max;
+            return 0;
         }
 
         // Check if still in timelock period

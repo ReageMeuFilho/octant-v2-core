@@ -73,7 +73,7 @@ contract SimpleVotingDebugTimelockTest is Test {
 
         console.log("=== BEFORE QUEUING ===");
         console.log("Current timestamp:", block.timestamp);
-        console.log("Charlie redeemableAfter BEFORE:", _tokenized(address(mechanism)).redeemableAfter(charlie));
+        console.log("Charlie redeemableAfter BEFORE:", _tokenized(address(mechanism)).globalRedemptionStart());
         console.log("Charlie balance BEFORE:", _tokenized(address(mechanism)).balanceOf(charlie));
         console.log("Charlie maxRedeem BEFORE:", _tokenized(address(mechanism)).maxRedeem(charlie));
 
@@ -87,7 +87,7 @@ contract SimpleVotingDebugTimelockTest is Test {
 
         console.log("=== AFTER QUEUING ===");
         console.log("Current timestamp:", block.timestamp);
-        console.log("Charlie redeemableAfter AFTER:", _tokenized(address(mechanism)).redeemableAfter(charlie));
+        console.log("Charlie redeemableAfter AFTER:", _tokenized(address(mechanism)).globalRedemptionStart());
         console.log("Charlie balance AFTER:", _tokenized(address(mechanism)).balanceOf(charlie));
         console.log("Charlie maxRedeem AFTER:", _tokenized(address(mechanism)).maxRedeem(charlie));
 
@@ -103,7 +103,7 @@ contract SimpleVotingDebugTimelockTest is Test {
         }
 
         // Debug the _availableWithdrawLimit logic step by step
-        uint256 redeemableTime = _tokenized(address(mechanism)).redeemableAfter(charlie);
+        uint256 redeemableTime = _tokenized(address(mechanism)).globalRedemptionStart();
         console.log("Debug - redeemableTime:", redeemableTime);
         console.log("Debug - block.timestamp:", block.timestamp);
         console.log("Debug - block.timestamp < redeemableTime:", block.timestamp < redeemableTime);

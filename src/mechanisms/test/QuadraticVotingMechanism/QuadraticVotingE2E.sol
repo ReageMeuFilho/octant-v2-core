@@ -372,7 +372,6 @@ contract QuadraticVotingE2E is Test {
             uint8(TokenizedAllocationMechanism.ProposalState.Pending),
             "Proposal should be Pending"
         );
-        assertEq(proposal1.earliestRedeemableTime, 0, "Earliest redeemable time should be 0");
 
         // Create second proposal
         uint256 pid2 = _createProposal(alice, recipient2, "Healthcare Project");

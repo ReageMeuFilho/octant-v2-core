@@ -251,7 +251,7 @@ contract SimpleVotingAdminJourneyTest is Test {
         );
         assertEq(_tokenized(address(mechanism)).proposalShares(pidSuccessful), 1100 ether);
         assertEq(_tokenized(address(mechanism)).balanceOf(charlie), 1100 ether);
-        assertEq(_tokenized(address(mechanism)).redeemableAfter(charlie), timestampBefore + TIMELOCK_DELAY);
+        assertEq(_tokenized(address(mechanism)).globalRedemptionStart(), timestampBefore + TIMELOCK_DELAY);
 
         // Cannot queue failed proposal
         assertEq(

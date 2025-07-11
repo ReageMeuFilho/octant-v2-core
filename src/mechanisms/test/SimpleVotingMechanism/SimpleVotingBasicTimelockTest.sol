@@ -59,50 +59,51 @@ contract SimpleVotingBasicTimelockTest is Test {
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 500 ether);
 
-        // Finalize
+        // Finalize - this sets the global redemption start time
         vm.roll(startBlock + 111);
+        uint256 finalizeTime = block.timestamp; // Should be 1
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
 
-        // Check initial state before queuing
+        // Check that global redemption start was set during finalization
         assertEq(
-            _tokenized(address(mechanism)).redeemableAfter(charlie),
-            0,
-            "Should have no redeemableAfter before queue"
+            _tokenized(address(mechanism)).globalRedemptionStart(),
+            finalizeTime + 1000,
+            "Should have globalRedemptionStart set after finalize"
         );
         assertEq(_tokenized(address(mechanism)).balanceOf(charlie), 0, "Should have no shares before queue");
 
-        // Queue at timestamp 1 (default)
+        // Queue proposal
         assertEq(block.timestamp, 1, "Should be at timestamp 1");
-        uint256 queueTime = block.timestamp;
         (bool success2, ) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", pid));
         require(success2, "Queue failed");
 
-        // Verify shares were minted and timelock set
+        // Verify shares were minted
         assertGt(_tokenized(address(mechanism)).balanceOf(charlie), 0, "Should have shares after queue");
+        // Global redemption start remains the same (set during finalize)
         assertEq(
-            _tokenized(address(mechanism)).redeemableAfter(charlie),
-            queueTime + 1000,
-            "Should have correct redeemableAfter"
+            _tokenized(address(mechanism)).globalRedemptionStart(),
+            finalizeTime + 1000,
+            "globalRedemptionStart should not change after queue"
         );
 
         // Should be blocked immediately at queue time
         assertEq(_tokenized(address(mechanism)).maxRedeem(charlie), 0, "Should be blocked at queue time");
 
         // Should be blocked during timelock period (1 second before expiry)
-        vm.warp(queueTime + 999);
+        vm.warp(finalizeTime + 999);
         assertEq(_tokenized(address(mechanism)).maxRedeem(charlie), 0, "Should be blocked 1 second before expiry");
 
         // Should be allowed at timelock expiry
-        vm.warp(queueTime + 1000);
+        vm.warp(finalizeTime + 1000);
         assertGt(_tokenized(address(mechanism)).maxRedeem(charlie), 0, "Should be allowed at timelock expiry");
 
         // Should still be allowed after timelock expiry
-        vm.warp(queueTime + 1001);
+        vm.warp(finalizeTime + 1001);
         assertGt(_tokenized(address(mechanism)).maxRedeem(charlie), 0, "Should be allowed after timelock expiry");
 
         // Should be blocked after grace period expires
-        vm.warp(queueTime + 1000 + 5000 + 1);
+        vm.warp(finalizeTime + 1000 + 5000 + 1);
         assertEq(_tokenized(address(mechanism)).maxRedeem(charlie), 0, "Should be blocked after grace period");
     }
 }

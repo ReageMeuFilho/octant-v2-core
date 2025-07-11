@@ -154,7 +154,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
 
     struct Proposal {
         uint256 sharesRequested;
-        uint256 earliestRedeemableTime;
         address proposer;
         address recipient;
         string description;
@@ -182,8 +181,8 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         bool initialized;
         // Voting state
         bool tallyFinalized;
-        bool redemptionStarted;
         uint256 proposalIdCounter;
+        uint256 globalRedemptionStart; // Global timestamp when all redemptions and transfers can begin
         // Allocation Mechanism Vault Storage (merged from DistributionMechanism)
         mapping(address => uint256) nonces; // Mapping of nonces used for permit functions
         mapping(address => uint256) balances; // Mapping to track current balances for each account that holds shares
@@ -200,7 +199,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         mapping(address => bool) recipientUsed;
         mapping(uint256 => mapping(address => bool)) hasVoted;
         mapping(address => uint256) votingPower;
-        mapping(address => uint256) redeemableAfter;
         mapping(uint256 => uint256) proposalShares;
         // EIP712 storage
         bytes32 domainSeparator; // Cached domain separator
@@ -231,6 +229,8 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     event ManagementUpdated(address indexed previousManagement, address indexed newManagement);
     /// @notice Emitted when contract is paused/unpaused
     event PausedStatusChanged(bool paused);
+    /// @notice Emitted when global redemption period is set
+    event GlobalRedemptionPeriodSet(uint256 redemptionStart, uint256 redemptionEnd);
 
     // Additional events from DistributionMechanism
     /// @notice Emitted on the initialization of any new `strategy` that uses `asset` with this specific `apiVersion`.
@@ -502,7 +502,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         s.proposalIdCounter++;
         pid = s.proposalIdCounter;
 
-        s.proposals[pid] = Proposal(0, 0, proposer, recipient, description, false, false);
+        s.proposals[pid] = Proposal(0, proposer, recipient, description, false, false);
         s.recipientUsed[recipient] = true;
 
         emit ProposalCreated(pid, proposer, recipient, description);
@@ -626,8 +626,12 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         // This allows for custom logic like matching pools in quadratic funding
         s.totalAssets = IBaseAllocationStrategy(address(this)).calculateTotalAssetsHook();
 
+        // Set global redemption start time for all proposals
+        s.globalRedemptionStart = block.timestamp + s.timelockDelay;
+
         s.tallyFinalized = true;
         emit VoteTallyFinalized();
+        emit GlobalRedemptionPeriodSet(s.globalRedemptionStart, s.globalRedemptionStart + s.gracePeriod);
     }
 
     // ---------- Queue Proposal ----------
@@ -638,7 +642,10 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         AllocationStorage storage s = _getStorage();
 
         if (!s.tallyFinalized) revert TallyNotFinalized();
-        if (s.redemptionStarted) revert QueueingClosedAfterRedemption();
+        // Check if redemption period has started - no new queuing after redemption begins
+        if (s.globalRedemptionStart != 0 && block.timestamp >= s.globalRedemptionStart) {
+            revert QueueingClosedAfterRedemption();
+        }
         if (!IBaseAllocationStrategy(address(this)).validateProposalHook(pid)) revert InvalidProposal(pid);
 
         Proposal storage p = s.proposals[pid];
@@ -646,7 +653,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
 
         if (!IBaseAllocationStrategy(address(this)).hasQuorumHook(pid)) revert NoQuorum(pid, 0, 0, s.quorumShares);
 
-        if (p.earliestRedeemableTime != 0) revert AlreadyQueued(pid);
+        if (s.proposalShares[pid] != 0) revert AlreadyQueued(pid);
 
         uint256 sharesToMint = IBaseAllocationStrategy(address(this)).convertVotesToShares(pid);
         if (sharesToMint == 0) revert NoAllocation(pid, sharesToMint);
@@ -666,11 +673,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
             _mint(s, recipient, sharesToMint);
         }
 
-        uint256 earliestRedeemableTime = block.timestamp + s.timelockDelay;
-        p.earliestRedeemableTime = earliestRedeemableTime;
-        s.redeemableAfter[recipient] = earliestRedeemableTime;
-
-        emit ProposalQueued(pid, earliestRedeemableTime, sharesToMint);
+        emit ProposalQueued(pid, s.globalRedemptionStart, sharesToMint);
     }
 
     // ---------- State Machine ----------
@@ -693,9 +696,13 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         if (block.number <= s.startBlock + s.votingDelay + s.votingPeriod || !s.tallyFinalized)
             return ProposalState.Active;
         if (!IBaseAllocationStrategy(address(this)).hasQuorumHook(pid)) return ProposalState.Defeated;
-        if (p.earliestRedeemableTime == 0) return ProposalState.Succeeded;
+        // Check if proposal has been queued (has shares allocated)
+        if (s.proposalShares[pid] == 0) return ProposalState.Succeeded;
         if (p.claimed) return ProposalState.Executed;
-        if (block.timestamp > p.earliestRedeemableTime + s.gracePeriod) return ProposalState.Expired;
+        // Check global grace period expiration
+        if (s.globalRedemptionStart != 0 && block.timestamp > s.globalRedemptionStart + s.gracePeriod) {
+            return ProposalState.Expired;
+        }
         return ProposalState.Queued;
     }
 
@@ -711,7 +718,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         Proposal storage p = s.proposals[pid];
         if (msg.sender != p.proposer) revert NotProposer(msg.sender, p.proposer);
         if (p.canceled) revert AlreadyCanceled(pid);
-        if (p.earliestRedeemableTime != 0) revert AlreadyQueued(pid);
+        if (s.proposalShares[pid] != 0) revert AlreadyQueued(pid);
 
         p.canceled = true;
         emit ProposalCanceled(pid, p.proposer);
@@ -766,9 +773,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         return _getStorage().votingPower[user];
     }
 
-    function redeemableAfter(address recipient) external view onlyInitialized returns (uint256) {
-        return _getStorage().redeemableAfter[recipient];
-    }
 
     function proposalShares(uint256 pid) external view onlyInitialized returns (uint256) {
         return _getStorage().proposalShares[pid];
@@ -797,6 +801,10 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
 
     function gracePeriod() external view onlyInitialized returns (uint256) {
         return _getStorage().gracePeriod;
+    }
+
+    function globalRedemptionStart() external view onlyInitialized returns (uint256) {
+        return _getStorage().globalRedemptionStart;
     }
 
     /// @notice Returns the current nonce for an address
@@ -1131,11 +1139,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         require(receiver != address(0), "ZERO ADDRESS");
         require(maxLoss <= MAX_BPS, "exceeds MAX_BPS");
 
-        // Mark redemption as started to prevent future proposal queuing
-        if (!S.redemptionStarted) {
-            S.redemptionStarted = true;
-        }
-
         // Spend allowance if applicable.
         if (msg.sender != shareOwner) {
             _spendAllowance(S, shareOwner, msg.sender, shares);
@@ -1267,6 +1270,11 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         require(from != address(0), "ERC20: transfer from the zero address");
         require(to != address(0), "ERC20: transfer to the zero address");
         require(to != address(this), "ERC20 transfer to strategy");
+        
+        // Block transfers until redemption period starts
+        if (S.globalRedemptionStart == 0 || block.timestamp < S.globalRedemptionStart) {
+            revert("Transfers not allowed until redemption period");
+        }
 
         S.balances[from] -= amount;
         unchecked {

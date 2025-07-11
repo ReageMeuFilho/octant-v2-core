@@ -256,7 +256,7 @@ contract QuadraticVotingAdminJourneyTest is Test {
         uint256 actualShares = _tokenized(address(mechanism)).proposalShares(pidSuccessful);
         assertTrue(actualShares > 0, "Successful proposal should receive shares");
         assertEq(_tokenized(address(mechanism)).balanceOf(charlie), actualShares);
-        assertEq(_tokenized(address(mechanism)).redeemableAfter(charlie), timestampBefore + TIMELOCK_DELAY);
+        assertEq(_tokenized(address(mechanism)).globalRedemptionStart(), timestampBefore + TIMELOCK_DELAY);
 
         // Cannot queue failed proposal
         assertEq(
