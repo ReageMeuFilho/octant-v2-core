@@ -374,8 +374,8 @@ contract RegenStaker is StakerPermitAndStake, StakerOnBehalf, Pausable, Reentran
     /// @dev TRUST MODEL: Allocation mechanisms must be whitelisted by protocol governance.
     ///      Only contribute to mechanisms you trust, as the protocol cannot recover funds
     ///      sent to malicious or buggy allocation mechanisms.
-    /// @dev SECURITY: This function approves the exact contribution amount to the allocation
-    ///      mechanism and immediately revokes approval after the call to limit exposure.
+    /// @dev SECURITY: This function first withdraws rewards to the contributor, then the contributor
+    ///      must have pre-approved the allocation mechanism to pull the tokens.
     /// @param _depositId The deposit identifier to contribute from
     /// @param _allocationMechanismAddress Whitelisted allocation mechanism to receive contribution
     /// @param _votingDelegatee Address to delegate voting power to in the allocation mechanism
@@ -427,7 +427,8 @@ contract RegenStaker is StakerPermitAndStake, StakerOnBehalf, Pausable, Reentran
 
         emit RewardClaimed(_depositId, msg.sender, amountContributedToAllocationMechanism, deposit.earningPower);
 
-        SafeERC20.forceApprove(REWARD_TOKEN, _allocationMechanismAddress, amountContributedToAllocationMechanism);
+        // First withdraw rewards to the contributor
+        SafeERC20.safeTransfer(REWARD_TOKEN, msg.sender, amountContributedToAllocationMechanism);
 
         emit RewardContributed(
             _depositId,
@@ -436,6 +437,8 @@ contract RegenStaker is StakerPermitAndStake, StakerOnBehalf, Pausable, Reentran
             amountContributedToAllocationMechanism
         );
 
+        // The allocation mechanism will pull tokens from the contributor (msg.sender)
+        // The contributor must have pre-approved the allocation mechanism
         TokenizedAllocationMechanism(_allocationMechanismAddress).signupWithSignature(
             _votingDelegatee,
             amountContributedToAllocationMechanism,
@@ -444,8 +447,6 @@ contract RegenStaker is StakerPermitAndStake, StakerOnBehalf, Pausable, Reentran
             _r,
             _s
         );
-
-        SafeERC20.forceApprove(REWARD_TOKEN, _allocationMechanismAddress, 0);
 
         if (fee > 0) {
             SafeERC20.safeTransfer(REWARD_TOKEN, claimFeeParameters.feeCollector, fee);
