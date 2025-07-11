@@ -189,7 +189,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         // Voting state
         bool tallyFinalized;
         uint256 proposalIdCounter;
-        // ERC4626 Vault Storage (merged from DistributionMechanism)
+        // Allocation Mechanism Vault Storage (merged from DistributionMechanism)
         mapping(address => uint256) nonces; // Mapping of nonces used for permit functions
         mapping(address => uint256) balances; // Mapping to track current balances for each account that holds shares
         mapping(address => mapping(address => uint256)) allowances; // Mapping to track the allowances for the strategies shares
@@ -889,7 +889,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     }
 
     /*//////////////////////////////////////////////////////////////
-                        ERC4626 VAULT FUNCTIONALITY
+                        ALLOCATION VAULT FUNCTIONALITY
     //////////////////////////////////////////////////////////////*/
 
     /**
@@ -924,7 +924,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     ) public nonReentrant returns (uint256) {
         // Get the storage slot for all following calls.
         AllocationStorage storage S = _getStorage();
-        require(shares <= _maxRedeem(S, shareOwner), "ERC4626: redeem more than max");
+        require(shares <= _maxRedeem(S, shareOwner), "Allocation: redeem more than max");
         // slither-disable-next-line uninitialized-local
         uint256 assets;
         // Check for rounding error or 0 value.
@@ -1045,7 +1045,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     }
 
     /*//////////////////////////////////////////////////////////////
-                    INTERNAL 4626 VIEW METHODS
+                    INTERNAL VAULT VIEW METHODS
     //////////////////////////////////////////////////////////////*/
 
     /// @dev Internal implementation of {totalAssets}.
@@ -1120,7 +1120,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     }
 
     /*//////////////////////////////////////////////////////////////
-                    INTERNAL 4626 WRITE METHODS
+                    INTERNAL VAULT WRITE METHODS
     //////////////////////////////////////////////////////////////*/
 
     /**

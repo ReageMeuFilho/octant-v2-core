@@ -101,7 +101,7 @@ contract QuadraticVotingTimelockEnforcementTest is Test {
         console.log("Time difference:", _tokenized(address(mechanism)).redeemableAfter(charlie) - block.timestamp);
         assertEq(_tokenized(address(mechanism)).maxRedeem(charlie), 0);
 
-        vm.expectRevert("ERC4626: redeem more than max");
+        vm.expectRevert("Allocation: redeem more than max");
         vm.prank(charlie);
         _tokenized(address(mechanism)).redeem(charlieShares, charlie, charlie);
 
@@ -109,7 +109,7 @@ contract QuadraticVotingTimelockEnforcementTest is Test {
         vm.warp(queueTime + TIMELOCK_DELAY / 2);
         assertEq(_tokenized(address(mechanism)).maxRedeem(charlie), 0);
 
-        vm.expectRevert("ERC4626: redeem more than max");
+        vm.expectRevert("Allocation: redeem more than max");
         vm.prank(charlie);
         _tokenized(address(mechanism)).redeem(charlieShares, charlie, charlie);
 
@@ -119,7 +119,7 @@ contract QuadraticVotingTimelockEnforcementTest is Test {
         vm.warp(redeemableTime - 1);
         assertEq(_tokenized(address(mechanism)).maxRedeem(charlie), 0);
 
-        vm.expectRevert("ERC4626: redeem more than max");
+        vm.expectRevert("Allocation: redeem more than max");
         vm.prank(charlie);
         _tokenized(address(mechanism)).redeem(charlieShares, charlie, charlie);
     }
@@ -227,12 +227,12 @@ contract QuadraticVotingTimelockEnforcementTest is Test {
         assertEq(_tokenized(address(mechanism)).maxRedeem(charlie), 0);
 
         // Test 2: Redemption should fail
-        vm.expectRevert("ERC4626: redeem more than max");
+        vm.expectRevert("Allocation: redeem more than max");
         vm.prank(charlie);
         _tokenized(address(mechanism)).redeem(charlieShares, charlie, charlie);
 
         // Test 3: Even partial redemption should fail
-        vm.expectRevert("ERC4626: redeem more than max");
+        vm.expectRevert("Allocation: redeem more than max");
         vm.prank(charlie);
         _tokenized(address(mechanism)).redeem(1 ether, charlie, charlie);
 
@@ -243,7 +243,7 @@ contract QuadraticVotingTimelockEnforcementTest is Test {
         vm.warp(queueTime + TIMELOCK_DELAY + GRACE_PERIOD + 365 days);
         assertEq(_tokenized(address(mechanism)).maxRedeem(charlie), 0);
 
-        vm.expectRevert("ERC4626: redeem more than max");
+        vm.expectRevert("Allocation: redeem more than max");
         vm.prank(charlie);
         _tokenized(address(mechanism)).redeem(charlieShares, charlie, charlie);
     }
@@ -321,7 +321,7 @@ contract QuadraticVotingTimelockEnforcementTest is Test {
 
         // Only try to revert if Bob's timelock is still active
         if (charlieRedeemableTime < bobRedeemableTime) {
-            vm.expectRevert("ERC4626: redeem more than max");
+            vm.expectRevert("Allocation: redeem more than max");
             vm.prank(bob);
             _tokenized(address(mechanism)).redeem(900, bob, bob);
         }

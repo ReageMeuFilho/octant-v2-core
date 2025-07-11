@@ -330,7 +330,7 @@ contract SimpleVotingProposalStateTest is Test {
         assertGt(proposal.earliestRedeemableTime, block.timestamp);
 
         // Cannot redeem during timelock
-        vm.expectRevert("ERC4626: redeem more than max");
+        vm.expectRevert("Allocation: redeem more than max");
         vm.prank(charlie);
         _tokenized(address(mechanism)).redeem(expectedShares, charlie, charlie);
 
@@ -434,7 +434,7 @@ contract SimpleVotingProposalStateTest is Test {
         assertEq(_tokenized(address(mechanism)).balanceOf(eve), 300 ether);
 
         // Redemption should fail due to expiration
-        vm.expectRevert("ERC4626: redeem more than max");
+        vm.expectRevert("Allocation: redeem more than max");
         vm.prank(eve);
         _tokenized(address(mechanism)).redeem(300 ether, eve, eve);
     }

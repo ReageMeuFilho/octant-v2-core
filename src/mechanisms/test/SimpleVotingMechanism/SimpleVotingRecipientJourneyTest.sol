@@ -251,7 +251,7 @@ contract SimpleVotingRecipientJourneyTest is Test {
         assertGt(redeemableTime, block.timestamp);
 
         // Cannot redeem before timelock
-        vm.expectRevert("ERC4626: redeem more than max");
+        vm.expectRevert("Allocation: redeem more than max");
         vm.prank(charlie);
         _tokenized(address(mechanism)).redeem(expectedShares, charlie, charlie);
 

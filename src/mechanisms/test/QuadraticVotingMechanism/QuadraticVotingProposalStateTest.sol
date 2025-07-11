@@ -336,7 +336,7 @@ contract QuadraticVotingProposalStateTest is Test {
         assertGt(proposal.earliestRedeemableTime, block.timestamp);
 
         // Cannot redeem during timelock
-        vm.expectRevert("ERC4626: redeem more than max");
+        vm.expectRevert("Allocation: redeem more than max");
         vm.prank(charlie);
         _tokenized(address(mechanism)).redeem(expectedShares, charlie, charlie);
 
@@ -438,7 +438,7 @@ contract QuadraticVotingProposalStateTest is Test {
         assertEq(_tokenized(address(mechanism)).balanceOf(eve), 900);
 
         // Redemption should fail due to expiration
-        vm.expectRevert("ERC4626: redeem more than max");
+        vm.expectRevert("Allocation: redeem more than max");
         vm.prank(eve);
         _tokenized(address(mechanism)).redeem(900, eve, eve);
     }
