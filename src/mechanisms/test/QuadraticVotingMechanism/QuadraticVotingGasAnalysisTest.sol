@@ -131,7 +131,6 @@ contract QuadraticVotingGasAnalysisTest is Test {
         address bob2 = makeAddr("bob2");
         address charlie2 = makeAddr("charlie2");
         address david2 = makeAddr("david2");
-        
 
         address[] memory users = new address[](4);
         users[0] = alice2;

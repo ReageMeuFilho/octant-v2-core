@@ -24,7 +24,6 @@ contract QuadraticVotingE2E is Test {
         uint256 pid4;
         address dave;
         address recipient4;
-        
         // Tally data for multiple snapshots
         uint256 p1Contributions1;
         uint256 p1SqrtSum1;
@@ -46,7 +45,6 @@ contract QuadraticVotingE2E is Test {
         uint256 p1SqrtSum3;
         uint256 p1Quadratic3;
         uint256 p1Linear3;
-        
         // Alpha and funding data
         uint256 newAlphaNumerator;
         uint256 newAlphaDenominator;
@@ -419,7 +417,7 @@ contract QuadraticVotingE2E is Test {
         console.log("=== Phase 2: Proposal Creation ===");
         uint256 pid1 = _createProposal(alice, recipient1, "Green Energy Initiative");
         uint256 pid2 = _createProposal(bob, recipient2, "Community Development");
-        uint256 pid3 = _createProposal(alice, recipient3, "Education Technology");  // alice creates for charlie's project
+        uint256 pid3 = _createProposal(alice, recipient3, "Education Technology"); // alice creates for charlie's project
 
         // Verify all proposals are created correctly
         assertTrue(pid1 < pid2 && pid2 < pid3, "Proposal IDs should be sequential");
@@ -526,7 +524,7 @@ contract QuadraticVotingE2E is Test {
 
         uint256 pid1 = _createProposal(alice, recipient1, "Education");
         uint256 pid2 = _createProposal(bob, recipient2, "Healthcare");
-        uint256 pid3 = _createProposal(alice, recipient3, "Environment");  // alice creates for charlie's project
+        uint256 pid3 = _createProposal(alice, recipient3, "Environment"); // alice creates for charlie's project
 
         vm.roll(startBlock + VOTING_DELAY + 1);
 
@@ -1027,7 +1025,7 @@ contract QuadraticVotingE2E is Test {
         // Create 3 proposals
         uint256 pid1 = _createProposal(alice, recipient1, "Social Impact Project");
         uint256 pid2 = _createProposal(bob, recipient2, "Tech Innovation Project");
-        uint256 pid3 = _createProposal(alice, recipient3, "Community Project");  // alice creates for charlie's project
+        uint256 pid3 = _createProposal(alice, recipient3, "Community Project"); // alice creates for charlie's project
 
         // Move to voting period
         vm.roll(startBlock + VOTING_DELAY + 1);
@@ -1099,7 +1097,11 @@ contract QuadraticVotingE2E is Test {
         assertTrue(recipient1Shares > 0, "Recipient 1 should receive shares");
         assertTrue(recipient2Shares > 0, "Recipient 2 should receive shares");
         assertTrue(recipient3Shares > 0, "Recipient 3 should receive shares");
-        assertEq(recipient1Shares + recipient2Shares + recipient3Shares, totalShares, "Individual shares should sum to total");
+        assertEq(
+            recipient1Shares + recipient2Shares + recipient3Shares,
+            totalShares,
+            "Individual shares should sum to total"
+        );
 
         console.log("Alpha:", optimalAlphaNumerator, "/", optimalAlphaDenominator);
         console.log("Total assets:", totalAssets);
@@ -1116,7 +1118,7 @@ contract QuadraticVotingE2E is Test {
 
         // Use very large deposits to test precision boundaries
         uint256 largeDeposit1 = 100_000_000 ether; // 100M tokens
-        uint256 largeDeposit2 = 80_000_000 ether;  // 80M tokens
+        uint256 largeDeposit2 = 80_000_000 ether; // 80M tokens
         uint256 totalUserDeposits = largeDeposit1 + largeDeposit2;
 
         // Mint large amounts for testing
@@ -1135,9 +1137,9 @@ contract QuadraticVotingE2E is Test {
 
         // Cast large votes that fit within available voting power
         _castVote(alice, pid1, 8000e9); // Cost: 64M ether
-        _castVote(bob, pid1, 6000e9);   // Cost: 36M ether
+        _castVote(bob, pid1, 6000e9); // Cost: 36M ether
         _castVote(alice, pid2, 6000e9); // Cost: 36M ether (Alice total: 100M ether)
-        _castVote(bob, pid2, 6500e9);   // Cost: 42.25M ether (Bob total: 78.25M ether)
+        _castVote(bob, pid2, 6500e9); // Cost: 42.25M ether (Bob total: 78.25M ether)
 
         console.log("=== LARGE SCALE PRECISION TEST ===");
 
@@ -1181,7 +1183,12 @@ contract QuadraticVotingE2E is Test {
 
         uint256 totalShares = _tokenized(address(mechanism)).totalSupply();
         uint256 totalAssets = token.balanceOf(address(mechanism));
-        assertApproxEqAbs(totalShares, totalAssets, 1000, "Total shares should approximately equal total assets at large scale");
+        assertApproxEqAbs(
+            totalShares,
+            totalAssets,
+            1000,
+            "Total shares should approximately equal total assets at large scale"
+        );
 
         console.log("Large scale alpha:", optimalAlphaNumerator, "/", optimalAlphaDenominator);
         console.log("Large scale total assets:", totalAssets);
@@ -1207,9 +1214,9 @@ contract QuadraticVotingE2E is Test {
 
         // Cast votes that create large quadratic advantage
         _castVote(alice, pid1, 25e9); // Cost: 625 ether
-        _castVote(bob, pid1, 20e9);   // Cost: 400 ether
+        _castVote(bob, pid1, 20e9); // Cost: 400 ether
         _castVote(alice, pid2, 15e9); // Cost: 225 ether
-        _castVote(bob, pid2, 18e9);   // Cost: 324 ether
+        _castVote(bob, pid2, 18e9); // Cost: 324 ether
 
         console.log("=== TINY MATCHING POOL PRECISION TEST ===");
 
@@ -1253,7 +1260,12 @@ contract QuadraticVotingE2E is Test {
 
         uint256 totalShares = _tokenized(address(mechanism)).totalSupply();
         uint256 totalAssets = token.balanceOf(address(mechanism));
-        assertApproxEqAbs(totalShares, totalAssets, 100, "Total shares should approximately equal total assets with tiny pool");
+        assertApproxEqAbs(
+            totalShares,
+            totalAssets,
+            100,
+            "Total shares should approximately equal total assets with tiny pool"
+        );
 
         console.log("Tiny pool alpha:", optimalAlphaNumerator, "/", optimalAlphaDenominator);
         console.log("Tiny pool total assets:", totalAssets);
@@ -1279,7 +1291,7 @@ contract QuadraticVotingE2E is Test {
 
         // Cast votes to create measurable quadratic advantage
         _castVote(alice, pid1, 15e9); // Cost: 225 ether (Alice remaining: 275 ether)
-        _castVote(bob, pid1, 10e9);   // Cost: 100 ether (Bob remaining: 400 ether)
+        _castVote(bob, pid1, 10e9); // Cost: 100 ether (Bob remaining: 400 ether)
         _castVote(alice, pid2, 16e9); // Cost: 256 ether (Alice remaining: 19 ether)
         // Project 1: (15e9 + 10e9)² = (25e9)² = 625 ether, linear = 325 ether
         // Project 2: (16e9)² = 256 ether, linear = 256 ether
@@ -1328,11 +1340,19 @@ contract QuadraticVotingE2E is Test {
 
         // Verify 1:1 ratio is not violated (it's OK to be over 1:1, but not under)
         uint256 assetsFor1Share = _tokenized(address(mechanism)).convertToAssets(1e18);
-        assertGe(assetsFor1Share, 1e18, "1:1 ratio should not be violated - users should get at least 1:1 assets per share");
+        assertGe(
+            assetsFor1Share,
+            1e18,
+            "1:1 ratio should not be violated - users should get at least 1:1 assets per share"
+        );
 
         uint256 totalShares = _tokenized(address(mechanism)).totalSupply();
         uint256 totalAssets = token.balanceOf(address(mechanism));
-        assertGe(totalAssets, totalShares, "Total assets should be at least equal to total shares (never under-collateralized)");
+        assertGe(
+            totalAssets,
+            totalShares,
+            "Total assets should be at least equal to total shares (never under-collateralized)"
+        );
 
         console.log("Near-full alpha:", optimalAlphaNumerator, "/", optimalAlphaDenominator);
         console.log("Near-full total assets:", totalAssets);
@@ -1348,11 +1368,11 @@ contract QuadraticVotingE2E is Test {
         uint256 largeDeposit1 = 10000 ether;
         uint256 largeDeposit2 = 8000 ether;
         uint256 totalUserDeposits = largeDeposit1 + largeDeposit2;
-        
+
         // Mint additional tokens for large deposits
         token.mint(alice, largeDeposit1);
         token.mint(bob, largeDeposit2);
-        
+
         _signupUser(alice, largeDeposit1);
         _signupUser(bob, largeDeposit2);
 
@@ -1365,9 +1385,9 @@ contract QuadraticVotingE2E is Test {
 
         // Cast very large votes to create huge quadratic advantage
         _castVote(alice, pid1, 80e9); // Cost: 6400 ether
-        _castVote(bob, pid1, 60e9);   // Cost: 3600 ether (total: 10000 ether for pid1)
+        _castVote(bob, pid1, 60e9); // Cost: 3600 ether (total: 10000 ether for pid1)
         _castVote(alice, pid2, 60e9); // Cost: 3600 ether (Alice total: 10000 ether)
-        _castVote(bob, pid2, 65e9);   // Cost: 4225 ether (Bob remaining: 175 ether)
+        _castVote(bob, pid2, 65e9); // Cost: 4225 ether (Bob remaining: 175 ether)
 
         console.log("=== HUGE QUADRATIC ADVANTAGE PRECISION TEST ===");
 
@@ -1416,7 +1436,12 @@ contract QuadraticVotingE2E is Test {
 
         uint256 totalShares = _tokenized(address(mechanism)).totalSupply();
         uint256 totalAssets = token.balanceOf(address(mechanism));
-        assertApproxEqAbs(totalShares, totalAssets, 100, "Total shares should approximately equal total assets with huge advantage");
+        assertApproxEqAbs(
+            totalShares,
+            totalAssets,
+            100,
+            "Total shares should approximately equal total assets with huge advantage"
+        );
 
         console.log("Huge advantage alpha:", optimalAlphaNumerator, "/", optimalAlphaDenominator);
         console.log("Huge advantage total assets:", totalAssets);
@@ -1442,9 +1467,9 @@ contract QuadraticVotingE2E is Test {
 
         // Cast votes to create known quadratic advantage
         _castVote(alice, pid1, 20e9); // Cost: 400 ether
-        _castVote(bob, pid1, 15e9);   // Cost: 225 ether
+        _castVote(bob, pid1, 15e9); // Cost: 225 ether
         _castVote(alice, pid2, 15e9); // Cost: 225 ether
-        _castVote(bob, pid2, 18e9);   // Cost: 324 ether
+        _castVote(bob, pid2, 18e9); // Cost: 324 ether
 
         console.log("=== EXCESS FUNDS AND ALPHA=1 VALIDATION TEST ===");
 
@@ -1498,14 +1523,22 @@ contract QuadraticVotingE2E is Test {
 
         // With alpha=1 and excess matching funds, the ratio should be >1:1
         assertGt(assetsFor1Share, 1e18, "Ratio should be >1:1 when alpha=1 and there are excess matching funds");
-        assertGt(totalAssets, totalShares, "Total assets should exceed total shares when there are excess matching funds");
+        assertGt(
+            totalAssets,
+            totalShares,
+            "Total assets should exceed total shares when there are excess matching funds"
+        );
 
         // Verify that total shares equals total quadratic funding (since alpha=1)
         assertEq(totalShares, totalQuadraticSum, "With alpha=1, total shares should equal total quadratic sum");
 
         // Verify that excess funds remain in the contract (not allocated to shares)
         uint256 expectedExcessAssets = totalUserDeposits + excessMatchingFunds;
-        assertEq(totalAssets, expectedExcessAssets, "Total assets should include user deposits + excess matching funds");
+        assertEq(
+            totalAssets,
+            expectedExcessAssets,
+            "Total assets should include user deposits + excess matching funds"
+        );
 
         console.log("=== VALIDATION COMPLETE ===");
         console.log("Confirmed: >1:1 ratio only occurs with alpha=1 and excess matching funds");
@@ -1531,9 +1564,9 @@ contract QuadraticVotingE2E is Test {
 
         // Cast votes to create quadratic advantage (adjusted for available voting power)
         _castVote(alice, pid1, 25e9); // Cost: 625 ether (Alice remaining: 375 ether)
-        _castVote(bob, pid1, 20e9);   // Cost: 400 ether (Bob remaining: 200 ether)
+        _castVote(bob, pid1, 20e9); // Cost: 400 ether (Bob remaining: 200 ether)
         _castVote(alice, pid2, 15e9); // Cost: 225 ether (Alice remaining: 150 ether)
-        _castVote(bob, pid2, 14e9);   // Cost: 196 ether (Bob remaining: 4 ether)
+        _castVote(bob, pid2, 14e9); // Cost: 196 ether (Bob remaining: 4 ether)
 
         console.log("=== FRACTIONAL ALPHA RATIO VALIDATION TEST ===");
 
@@ -1550,7 +1583,10 @@ contract QuadraticVotingE2E is Test {
         console.log("Calculated optimal alpha:", optimalAlphaNumerator, "/", optimalAlphaDenominator);
 
         // Verify alpha < 1
-        assertTrue(optimalAlphaNumerator < optimalAlphaDenominator, "Alpha should be less than 1 with limited matching funds");
+        assertTrue(
+            optimalAlphaNumerator < optimalAlphaDenominator,
+            "Alpha should be less than 1 with limited matching funds"
+        );
 
         // Apply limited matching funds and fractional alpha
         token.mint(address(this), limitedMatchingPool);
@@ -1574,7 +1610,12 @@ contract QuadraticVotingE2E is Test {
 
         // With fractional alpha, ratio should be 1:1 (or very close due to rounding)
         assertApproxEqAbs(assetsFor1Share, 1e18, 10, "Ratio should be approximately 1:1 when alpha < 1");
-        assertApproxEqAbs(totalAssets, totalShares, 10, "Total assets should approximately equal total shares when alpha < 1");
+        assertApproxEqAbs(
+            totalAssets,
+            totalShares,
+            10,
+            "Total assets should approximately equal total shares when alpha < 1"
+        );
 
         // Verify that we're not over-collateralized when alpha < 1
         assertLe(assetsFor1Share, 1e18 + 10, "Ratio should not significantly exceed 1:1 when alpha < 1");
@@ -1613,7 +1654,7 @@ contract QuadraticVotingE2E is Test {
         // Check Project 1 funding with alpha=1.0
         (data.p1Contributions1, data.p1SqrtSum1, data.p1Quadratic1, data.p1Linear1) = mechanism.getTally(data.pid1);
 
-        // Bob votes 25 on Project 2 (costs 625 ether)  
+        // Bob votes 25 on Project 2 (costs 625 ether)
         _castVote(bob, data.pid2, 25e9); // Cost: 625 ether
 
         // Check Project 2 funding with alpha=1.0
@@ -1644,7 +1685,7 @@ contract QuadraticVotingE2E is Test {
         assertEq(data.p1Quadratic2, expectedP1Quadratic, "Project 1 quadratic funding should be 450 with alpha=0.5");
         assertEq(data.p1Linear2, expectedP1Linear, "Project 1 linear funding should be 450 with alpha=0.5");
 
-        // For Project 2: Bob voted 25e9, so quadratic = (25e9)^2 = 625 ether, linear = 625 ether  
+        // For Project 2: Bob voted 25e9, so quadratic = (25e9)^2 = 625 ether, linear = 625 ether
         // With alpha=0.5: quadratic_weighted = 0.5 * 625 = 312.5, linear_weighted = 0.5 * 625 = 312.5
         uint256 expectedP2Quadratic = 312.5 ether;
         uint256 expectedP2Linear = 312.5 ether;
@@ -1652,7 +1693,7 @@ contract QuadraticVotingE2E is Test {
         assertEq(data.p2Linear2, expectedP2Linear, "Project 2 linear funding should be 312.5 with alpha=0.5");
 
         // NOW ADD THIRD VOTE AFTER ALPHA CHANGE to verify new votes use new alpha correctly
-        
+
         // Charlie votes 20e9 on Project 1 (costs 400 ether)
         _signupUser(charlie, 500 ether); // Give Charlie some voting power
         _castVote(charlie, data.pid1, 20e9); // Cost: 400 ether
@@ -1688,7 +1729,7 @@ contract QuadraticVotingE2E is Test {
         // Expected shares should match final funding calculations with alpha=0.5
         uint256 expectedP1Shares = data.p1Quadratic3 + data.p1Linear3; // 1250 + 650 = 1900
         uint256 expectedP2Shares = data.p2Quadratic2 + data.p2Linear2; // 312.5 + 312.5 = 625
-        
+
         assertEq(recipient1Shares, expectedP1Shares, "Recipient 1 should receive shares equal to final funding");
         assertEq(recipient2Shares, expectedP2Shares, "Recipient 2 should receive shares equal to final funding");
     }
@@ -1708,22 +1749,22 @@ contract QuadraticVotingE2E is Test {
         // Create 3 proposals to test diverse voting patterns
         data.pid1 = _createProposal(alice, recipient1, "Education Project");
         data.pid2 = _createProposal(bob, recipient2, "Healthcare Project");
-        data.pid3 = _createProposal(alice, recipient3, "Environmental Project");  // alice creates for charlie's project
+        data.pid3 = _createProposal(alice, recipient3, "Environmental Project"); // alice creates for charlie's project
 
         // Move to voting period
         vm.roll(data.startBlock + VOTING_DELAY + 1);
 
         // Complex voting pattern across multiple projects
-        _castVote(alice, data.pid1, 25e9);    // Cost: 625 ether
-        _castVote(alice, data.pid2, 15e9);    // Cost: 225 ether
-        _castVote(bob, data.pid1, 20e9);      // Cost: 400 ether
-        _castVote(bob, data.pid3, 18e9);      // Cost: 324 ether
-        _castVote(charlie, data.pid2, 22e9);  // Cost: 484 ether
-        _castVote(charlie, data.pid3, 12e9);  // Cost: 144 ether
+        _castVote(alice, data.pid1, 25e9); // Cost: 625 ether
+        _castVote(alice, data.pid2, 15e9); // Cost: 225 ether
+        _castVote(bob, data.pid1, 20e9); // Cost: 400 ether
+        _castVote(bob, data.pid3, 18e9); // Cost: 324 ether
+        _castVote(charlie, data.pid2, 22e9); // Cost: 484 ether
+        _castVote(charlie, data.pid3, 12e9); // Cost: 144 ether
 
         // Fixed matching pool amount
         data.fixedMatchingPool = 500 ether;
-        
+
         // Get current totals
         data.totalQuadraticSum = mechanism.totalQuadraticSum();
         data.totalLinearSum = mechanism.totalLinearSum();
@@ -1737,41 +1778,52 @@ contract QuadraticVotingE2E is Test {
         // Apply optimal alpha and add matching pool
         token.mint(address(this), data.fixedMatchingPool);
         token.transfer(address(mechanism), data.fixedMatchingPool);
-        
+
         // Check totalFunding before setAlpha
         uint256 totalFundingBeforeAlpha = mechanism.totalFunding();
-        
+
         mechanism.setAlpha(data.optimalAlphaNumerator, data.optimalAlphaDenominator);
-        
+
         // Check totalFunding after setAlpha
         uint256 totalFundingAfterAlpha = mechanism.totalFunding();
-        
+
         // Verify that setAlpha immediately updates totalFunding
         assertTrue(totalFundingAfterAlpha != totalFundingBeforeAlpha, "setAlpha should update totalFunding");
 
         // Calculate expected total funding with optimal alpha
-        uint256 expectedTotalFunding = (data.totalQuadraticSum * data.optimalAlphaNumerator) / data.optimalAlphaDenominator + 
-                                       (data.totalLinearSum * (data.optimalAlphaDenominator - data.optimalAlphaNumerator)) / data.optimalAlphaDenominator;
-        
+        uint256 expectedTotalFunding = (data.totalQuadraticSum * data.optimalAlphaNumerator) /
+            data.optimalAlphaDenominator +
+            (data.totalLinearSum * (data.optimalAlphaDenominator - data.optimalAlphaNumerator)) /
+            data.optimalAlphaDenominator;
+
         // Check if setAlpha updated totalFunding correctly
         assertEq(totalFundingAfterAlpha, expectedTotalFunding, "setAlpha should update totalFunding correctly");
-        
+
         // Finalize to update totalFunding storage
         vm.roll(data.startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
         _tokenized(address(mechanism)).finalizeVoteTally();
 
         // Verify totalFunding matches expected calculation
         uint256 actualTotalFunding = mechanism.totalFunding();
-        
+
         assertEq(actualTotalFunding, expectedTotalFunding, "Total funding should match alpha-weighted calculation");
 
         // Verify total assets available
         data.totalAssets = token.balanceOf(address(mechanism));
-        
-        assertEq(data.totalAssets, data.totalUserDeposits + data.fixedMatchingPool, "Total assets should equal deposits plus matching pool");
+
+        assertEq(
+            data.totalAssets,
+            data.totalUserDeposits + data.fixedMatchingPool,
+            "Total assets should equal deposits plus matching pool"
+        );
 
         // With optimal alpha, total funding should approximately equal total assets
-        assertApproxEqAbs(actualTotalFunding, data.totalAssets, 10, "Total funding should approximately match total assets");
+        assertApproxEqAbs(
+            actualTotalFunding,
+            data.totalAssets,
+            10,
+            "Total funding should approximately match total assets"
+        );
 
         // Queue all proposals and verify shares
         _tokenized(address(mechanism)).queueProposal(data.pid1);
@@ -1779,17 +1831,22 @@ contract QuadraticVotingE2E is Test {
         _tokenized(address(mechanism)).queueProposal(data.pid3);
 
         // Verify individual project funding adds up to total
-        (,, uint256 q1, uint256 l1) = mechanism.getTally(data.pid1);
-        (,, uint256 q2, uint256 l2) = mechanism.getTally(data.pid2);
-        (,, uint256 q3, uint256 l3) = mechanism.getTally(data.pid3);
-        
+        (, , uint256 q1, uint256 l1) = mechanism.getTally(data.pid1);
+        (, , uint256 q2, uint256 l2) = mechanism.getTally(data.pid2);
+        (, , uint256 q3, uint256 l3) = mechanism.getTally(data.pid3);
+
         uint256 sumOfProjectFunding = (q1 + l1) + (q2 + l2) + (q3 + l3);
-        
-        assertApproxEqAbs(sumOfProjectFunding, actualTotalFunding, 10, "Sum of project funding should equal total funding within precision");
+
+        assertApproxEqAbs(
+            sumOfProjectFunding,
+            actualTotalFunding,
+            10,
+            "Sum of project funding should equal total funding within precision"
+        );
 
         // Verify 1:1 asset-to-share ratio is maintained
         uint256 assetsFor1Share = _tokenized(address(mechanism)).convertToAssets(1e18);
-        
+
         assertGe(assetsFor1Share, 1e18, "Should maintain at least 1:1 asset-to-share ratio");
     }
 
@@ -1811,31 +1868,31 @@ contract QuadraticVotingE2E is Test {
         // Create 4 proposals
         data.pid1 = _createProposal(alice, recipient1, "AI Research");
         data.pid2 = _createProposal(bob, recipient2, "Climate Tech");
-        data.pid3 = _createProposal(alice, recipient3, "Public Health");  // alice creates for charlie's project
+        data.pid3 = _createProposal(alice, recipient3, "Public Health"); // alice creates for charlie's project
         data.recipient4 = address(0x204);
-        data.pid4 = _createProposal(bob, data.recipient4, "Education Access");  // bob creates for dave's project
+        data.pid4 = _createProposal(bob, data.recipient4, "Education Access"); // bob creates for dave's project
 
         // Move to voting period
         vm.roll(data.startBlock + VOTING_DELAY + 1);
 
         // Pattern 1: Heavy concentration on one project
-        _castVote(alice, data.pid1, 35e9);    // Cost: 1225 ether
-        _castVote(bob, data.pid1, 25e9);      // Cost: 625 ether
-        
+        _castVote(alice, data.pid1, 35e9); // Cost: 1225 ether
+        _castVote(bob, data.pid1, 25e9); // Cost: 625 ether
+
         // Pattern 2: Moderate support across multiple projects
-        _castVote(charlie, data.pid1, 10e9);  // Cost: 100 ether
-        _castVote(charlie, data.pid2, 15e9);  // Cost: 225 ether
-        _castVote(charlie, data.pid3, 20e9);  // Cost: 400 ether
-        
+        _castVote(charlie, data.pid1, 10e9); // Cost: 100 ether
+        _castVote(charlie, data.pid2, 15e9); // Cost: 225 ether
+        _castVote(charlie, data.pid3, 20e9); // Cost: 400 ether
+
         // Pattern 3: Small votes spread widely
-        _castVote(data.dave, data.pid1, 5e9);      // Cost: 25 ether
-        _castVote(data.dave, data.pid2, 8e9);      // Cost: 64 ether
-        _castVote(data.dave, data.pid3, 12e9);     // Cost: 144 ether
-        _castVote(data.dave, data.pid4, 18e9);     // Cost: 324 ether
+        _castVote(data.dave, data.pid1, 5e9); // Cost: 25 ether
+        _castVote(data.dave, data.pid2, 8e9); // Cost: 64 ether
+        _castVote(data.dave, data.pid3, 12e9); // Cost: 144 ether
+        _castVote(data.dave, data.pid4, 18e9); // Cost: 324 ether
 
         // Additional votes to create interesting dynamics
-        _castVote(alice, data.pid2, 12e9);    // Cost: 144 ether (remaining from 1500-1225=275)
-        _castVote(bob, data.pid3, 15e9);      // Cost: 225 ether (remaining from 1000-625=375)
+        _castVote(alice, data.pid2, 12e9); // Cost: 144 ether (remaining from 1500-1225=275)
+        _castVote(bob, data.pid3, 15e9); // Cost: 225 ether (remaining from 1000-625=375)
 
         // Get voting results
         data.totalQuadraticSum = mechanism.totalQuadraticSum();
@@ -1843,25 +1900,32 @@ contract QuadraticVotingE2E is Test {
 
         // Test with multiple fixed matching pool sizes
         uint256[3] memory matchingPoolSizes = [uint256(600 ether), uint256(1200 ether), uint256(2000 ether)];
-        
+
         for (uint256 i = 0; i < matchingPoolSizes.length; i++) {
             uint256 matchingPool = matchingPoolSizes[i];
-            
+
             // Calculate optimal alpha for this matching pool size
             (uint256 alphaNumerator, uint256 alphaDenominator) = mechanism.calculateOptimalAlpha(
                 matchingPool,
                 data.totalUserDeposits
             );
-            
+
             // Calculate expected total funding
-            uint256 expectedTotalFunding = (data.totalQuadraticSum * alphaNumerator) / alphaDenominator + 
-                                           (data.totalLinearSum * (alphaDenominator - alphaNumerator)) / alphaDenominator;
-            
+            uint256 expectedTotalFunding = (data.totalQuadraticSum * alphaNumerator) /
+                alphaDenominator +
+                (data.totalLinearSum * (alphaDenominator - alphaNumerator)) /
+                alphaDenominator;
+
             uint256 expectedTotalAssets = data.totalUserDeposits + matchingPool;
-            
+
             // With optimal alpha, these should be approximately equal
-            assertApproxEqAbs(expectedTotalFunding, expectedTotalAssets, 10, "Total funding should match total assets with optimal alpha");
-            
+            assertApproxEqAbs(
+                expectedTotalFunding,
+                expectedTotalAssets,
+                10,
+                "Total funding should match total assets with optimal alpha"
+            );
+
             // Verify alpha is within valid bounds
             assertTrue(alphaNumerator <= alphaDenominator, "Alpha should be <= 1");
             if (expectedTotalAssets > data.totalLinearSum && data.totalQuadraticSum > data.totalLinearSum) {
@@ -1873,37 +1937,47 @@ contract QuadraticVotingE2E is Test {
         data.finalMatchingPool = 2000 ether;
         token.mint(address(this), data.finalMatchingPool);
         token.transfer(address(mechanism), data.finalMatchingPool);
-        
+
         (data.finalAlphaNumerator, data.finalAlphaDenominator) = mechanism.calculateOptimalAlpha(
             data.finalMatchingPool,
             data.totalUserDeposits
         );
-        
+
         mechanism.setAlpha(data.finalAlphaNumerator, data.finalAlphaDenominator);
-        
+
         // Finalize and verify total funding is updated correctly
         vm.roll(data.startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
         _tokenized(address(mechanism)).finalizeVoteTally();
-        
+
         data.finalTotalFunding = mechanism.totalFunding();
         data.finalTotalAssets = token.balanceOf(address(mechanism));
-        
-        assertApproxEqAbs(data.finalTotalFunding, data.finalTotalAssets, 10, "Final total funding should match total assets");
-        
+
+        assertApproxEqAbs(
+            data.finalTotalFunding,
+            data.finalTotalAssets,
+            10,
+            "Final total funding should match total assets"
+        );
+
         // Queue all proposals and verify individual funding
         _tokenized(address(mechanism)).queueProposal(data.pid1);
         _tokenized(address(mechanism)).queueProposal(data.pid2);
         _tokenized(address(mechanism)).queueProposal(data.pid3);
         _tokenized(address(mechanism)).queueProposal(data.pid4);
-        
+
         // Calculate sum of individual project funding
         uint256 totalProjectFunding = 0;
         for (uint256 pid = data.pid1; pid <= data.pid4; pid++) {
-            (,, uint256 q, uint256 l) = mechanism.getTally(pid);
+            (, , uint256 q, uint256 l) = mechanism.getTally(pid);
             uint256 projectFunding = q + l;
             totalProjectFunding += projectFunding;
         }
-        
-        assertApproxEqAbs(totalProjectFunding, data.finalTotalFunding, 10, "Sum of project funding should equal total funding within precision");
+
+        assertApproxEqAbs(
+            totalProjectFunding,
+            data.finalTotalFunding,
+            10,
+            "Sum of project funding should equal total funding within precision"
+        );
     }
 }

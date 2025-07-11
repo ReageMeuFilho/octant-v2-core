@@ -166,8 +166,8 @@ abstract contract ProperQF {
         // Convert to uint256 for calculation to prevent overflow
         uint256 weightedQuadratic = (uint256(s.totalQuadraticSum) * uint256(s.alphaNumerator)) /
             uint256(s.alphaDenominator);
-        uint256 weightedLinear = (uint256(s.totalLinearSum) * (uint256(s.alphaDenominator) - uint256(s.alphaNumerator))) /
-            uint256(s.alphaDenominator);
+        uint256 weightedLinear = (uint256(s.totalLinearSum) *
+            (uint256(s.alphaDenominator) - uint256(s.alphaNumerator))) / uint256(s.alphaDenominator);
         return weightedQuadratic + weightedLinear;
     }
 

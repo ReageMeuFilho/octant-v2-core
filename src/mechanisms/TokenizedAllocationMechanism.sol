@@ -888,7 +888,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         return _getStorage().paused;
     }
 
-
     /*//////////////////////////////////////////////////////////////
                         ERC4626 VAULT FUNCTIONALITY
     //////////////////////////////////////////////////////////////*/

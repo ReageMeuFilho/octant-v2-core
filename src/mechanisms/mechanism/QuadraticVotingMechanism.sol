@@ -40,11 +40,11 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
     /// @notice Only keeper or management can propose
     function _beforeProposeHook(address proposer) internal view override returns (bool) {
         if (proposer == address(0)) revert ZeroAddressCannotPropose();
-        
+
         // Get keeper and management addresses from TokenizedAllocationMechanism
         address keeper = _tokenizedAllocation().keeper();
         address management = _tokenizedAllocation().management();
-        
+
         // Allow if proposer is either keeper or management
         return proposer == keeper || proposer == management;
     }
@@ -245,11 +245,6 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
         uint256 matchingPoolAmount,
         uint256 totalUserDeposits
     ) external view returns (uint256 optimalAlphaNumerator, uint256 optimalAlphaDenominator) {
-        return _calculateOptimalAlpha(
-            matchingPoolAmount,
-            totalQuadraticSum(),
-            totalLinearSum(),
-            totalUserDeposits
-        );
+        return _calculateOptimalAlpha(matchingPoolAmount, totalQuadraticSum(), totalLinearSum(), totalUserDeposits);
     }
 }

@@ -203,7 +203,7 @@ contract QuadraticVotingAccountingAuditTest is Test {
 
         address mechanismAddr = factory.deployQuadraticVotingMechanism(config, ALPHA_NUMERATOR, ALPHA_DENOMINATOR);
         mechanism = QuadraticVotingMechanism(payable(mechanismAddr));
-        
+
         // Set alice as keeper and management for proposers
         _tokenized(address(mechanism)).setKeeper(alice);
         _tokenized(address(mechanism)).setManagement(alice);
