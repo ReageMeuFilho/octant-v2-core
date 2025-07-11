@@ -283,7 +283,6 @@ abstract contract BaseAllocationMechanism is IBaseAllocationStrategy {
         return _tokenizedAllocation().proposals(pid);
     }
 
-
     /// @notice Get voting power for an address
     /// @dev Helper for concrete implementations
     function _getVotingPower(address user) internal view returns (uint256) {

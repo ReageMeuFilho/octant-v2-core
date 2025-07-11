@@ -191,11 +191,11 @@ contract SimpleVotingVoterJourneyTest is Test {
         assertEq(_tokenized(address(mechanism)).votingPower(frank), 50 ether);
 
         // Verify vote tallies
-        (uint256 p1For, uint256 p1Against,) = mechanism.voteTallies(pid1);
+        (uint256 p1For, uint256 p1Against, ) = mechanism.voteTallies(pid1);
         assertEq(p1For, LARGE_DEPOSIT);
         assertEq(p1Against, 200 ether);
 
-        (uint256 p2For,,) = mechanism.voteTallies(pid2);
+        (uint256 p2For, , ) = mechanism.voteTallies(pid2);
         assertEq(p2For, 250 ether);
     }
 

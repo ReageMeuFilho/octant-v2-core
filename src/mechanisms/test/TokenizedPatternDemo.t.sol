@@ -304,7 +304,7 @@ contract TokenizedPatternDemoTest is Test {
         // Check partial power usage
         assertEq(_tokenized(address(mechanism)).votingPower(alice), 40 ether);
 
-        (uint256 forVotes,,) = mechanism.voteTallies(pid);
+        (uint256 forVotes, , ) = mechanism.voteTallies(pid);
         assertEq(forVotes, 60 ether);
     }
 
@@ -467,7 +467,7 @@ contract TokenizedPatternDemoTest is Test {
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether);
 
-        (uint256 forVotes,,) = mechanism.voteTallies(pid);
+        (uint256 forVotes, , ) = mechanism.voteTallies(pid);
         assertEq(forVotes, 100 ether);
 
         vm.roll(block.number + 1000);
@@ -538,11 +538,11 @@ contract TokenizedPatternDemoTest is Test {
         _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.Against, 75 ether);
 
         // Check tallies
-        (uint256 p1For, uint256 p1Against,) = mechanism.voteTallies(pid1);
+        (uint256 p1For, uint256 p1Against, ) = mechanism.voteTallies(pid1);
         assertEq(p1For, 175 ether); // 100 + 75
         assertEq(p1Against, 50 ether);
 
-        (uint256 p2For, uint256 p2Against,) = mechanism.voteTallies(pid2);
+        (uint256 p2For, uint256 p2Against, ) = mechanism.voteTallies(pid2);
         assertEq(p2For, 150 ether);
         assertEq(p2Against, 75 ether);
 

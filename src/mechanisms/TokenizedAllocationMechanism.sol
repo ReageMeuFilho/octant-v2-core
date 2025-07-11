@@ -91,6 +91,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     error ProposalCanceledError(uint256 pid);
     error NoQuorum(uint256 pid, uint256 forVotes, uint256 againstVotes, uint256 required);
     error AlreadyQueued(uint256 pid);
+    error QueueingClosedAfterRedemption();
     error NoAllocation(uint256 pid, uint256 sharesToMint);
     error VotingClosed(uint256 currentBlock, uint256 startBlock, uint256 endBlock);
     error AlreadyVoted(address voter, uint256 pid);
@@ -161,7 +162,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         bool canceled;
     }
 
-
     /// @notice Main storage struct containing all allocation mechanism state
     struct AllocationStorage {
         // Basic information
@@ -182,6 +182,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         bool initialized;
         // Voting state
         bool tallyFinalized;
+        bool redemptionStarted;
         uint256 proposalIdCounter;
         // Allocation Mechanism Vault Storage (merged from DistributionMechanism)
         mapping(address => uint256) nonces; // Mapping of nonces used for permit functions
@@ -207,8 +208,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     }
 
     // ---------- Storage Access for Hooks ----------
-
-
 
     /// @notice Emitted when a user completes registration
     event UserRegistered(address indexed user, uint256 votingPower);
@@ -639,13 +638,13 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         AllocationStorage storage s = _getStorage();
 
         if (!s.tallyFinalized) revert TallyNotFinalized();
+        if (s.redemptionStarted) revert QueueingClosedAfterRedemption();
         if (!IBaseAllocationStrategy(address(this)).validateProposalHook(pid)) revert InvalidProposal(pid);
 
         Proposal storage p = s.proposals[pid];
         if (p.canceled) revert ProposalCanceledError(pid);
 
-        if (!IBaseAllocationStrategy(address(this)).hasQuorumHook(pid))
-            revert NoQuorum(pid, 0, 0, s.quorumShares);
+        if (!IBaseAllocationStrategy(address(this)).hasQuorumHook(pid)) revert NoQuorum(pid, 0, 0, s.quorumShares);
 
         if (p.earliestRedeemableTime != 0) revert AlreadyQueued(pid);
 
@@ -720,7 +719,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
 
     // ---------- View Functions ----------
 
-
     /// @notice Get remaining voting power for an address
     function getRemainingVotingPower(address voter) external view onlyInitialized returns (uint256) {
         return _getStorage().votingPower[voter];
@@ -759,7 +757,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     function proposals(uint256 pid) external view onlyInitialized returns (Proposal memory) {
         return _getStorage().proposals[pid];
     }
-
 
     function hasVoted(uint256 pid, address voter) external view onlyInitialized returns (bool) {
         return _getStorage().hasVoted[pid][voter];
@@ -825,7 +822,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     function acceptOwnership() external onlyInitialized {
         AllocationStorage storage s = _getStorage();
         if (msg.sender != s.pendingOwner) revert Unauthorized();
-        
+
         address oldOwner = s.owner;
         s.owner = s.pendingOwner;
         s.pendingOwner = address(0);
@@ -837,7 +834,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     function cancelOwnershipTransfer() external onlyOwner onlyInitialized {
         AllocationStorage storage s = _getStorage();
         if (s.pendingOwner == address(0)) revert Unauthorized();
-        
+
         s.pendingOwner = address(0);
         emit OwnershipTransferInitiated(s.owner, address(0));
     }
@@ -1133,6 +1130,11 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     ) internal returns (uint256) {
         require(receiver != address(0), "ZERO ADDRESS");
         require(maxLoss <= MAX_BPS, "exceeds MAX_BPS");
+
+        // Mark redemption as started to prevent future proposal queuing
+        if (!S.redemptionStarted) {
+            S.redemptionStarted = true;
+        }
 
         // Spend allowance if applicable.
         if (msg.sender != shareOwner) {

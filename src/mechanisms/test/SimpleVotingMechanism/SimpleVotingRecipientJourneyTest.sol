@@ -166,14 +166,14 @@ contract SimpleVotingRecipientJourneyTest is Test {
         _tokenized(address(mechanism)).castVote(pidEve, TokenizedAllocationMechanism.VoteType.For, 100 ether);
 
         // Recipients can monitor progress in real-time
-        (uint256 charlieFor, uint256 charlieAgainst,) = mechanism.voteTallies(pidCharlie);
+        (uint256 charlieFor, uint256 charlieAgainst, ) = mechanism.voteTallies(pidCharlie);
         assertEq(charlieFor, 1000 ether);
         assertEq(charlieAgainst, 0);
 
-        (uint256 daveFor,,) = mechanism.voteTallies(pidDave);
+        (uint256 daveFor, , ) = mechanism.voteTallies(pidDave);
         assertEq(daveFor, 150 ether);
 
-        (uint256 eveFor, uint256 eveAgainst,) = mechanism.voteTallies(pidEve);
+        (uint256 eveFor, uint256 eveAgainst, ) = mechanism.voteTallies(pidEve);
         assertEq(eveFor, 100 ether);
         assertEq(eveAgainst, 200 ether);
 

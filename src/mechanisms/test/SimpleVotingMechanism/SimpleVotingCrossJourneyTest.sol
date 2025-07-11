@@ -261,7 +261,7 @@ contract SimpleVotingCrossJourneyTest is Test {
             abi.encodeWithSignature("transferOwnership(address)", emergencyAdmin)
         );
         require(success3, "Transfer ownership failed");
-        
+
         // New owner accepts ownership
         vm.prank(emergencyAdmin);
         (bool success3b, ) = address(mechanism).call(abi.encodeWithSignature("acceptOwnership()"));
