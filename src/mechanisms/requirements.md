@@ -62,8 +62,6 @@ QuadraticVotingMechanism.sol is a concrete implementation that demonstrates the 
 
 ### Delegation Pattern Architecture
 
-The Yearn V3 pattern implements a sophisticated delegation mechanism:
-
 1. **Storage Location**: All storage lives in the proxy contract (e.g., QuadraticVotingMechanism) following TokenizedAllocationMechanism's layout and whatever is added by the mechanism designer
 2. **Logic Execution**: Shared logic executes in TokenizedAllocationMechanism's context via delegatecall
 3. **Access Pattern**: Proxy contracts access storage through helper functions that return interfaces at `address(this)`
@@ -435,9 +433,9 @@ Admins are trusted operators who manage the voting lifecycle and ensure proper g
 - Mechanism ready for user registration
 
 **Key Responsibilities:**
-- ✅ Choose appropriate voting parameters for community size
-- ✅ Ensure sufficient timelock for security
-- ✅ Communicate timing and rules clearly to participants
+- Choose appropriate voting parameters for community size
+- Ensure sufficient timelock for security
+- Communicate timing and rules clearly to participants
 
 #### Phase 2: Round Monitoring & Validation
 **User Story:** "As an admin, I want to monitor voting progress and ensure fair process execution"
@@ -454,9 +452,9 @@ Admins are trusted operators who manage the voting lifecycle and ensure proper g
 - Proposal state tracking enables intervention if needed
 
 **Key Responsibilities:**
-- ✅ Ensure fair access to registration and voting
-- ✅ Monitor for gaming or manipulation attempts
-- ✅ Prepare community for finalization timeline
+- Ensure fair access to registration and voting
+- Monitor for gaming or manipulation attempts
+- Prepare community for finalization timeline
 
 #### Phase 3: Finalization & Execution
 **User Story:** "As an admin, I want to finalize voting results and execute successful proposals"
@@ -523,7 +521,7 @@ Recipients are the beneficiaries of successful funding proposals who receive all
 
 **Possible Outcomes:**
 - **Succeeded**: Net votes meet quorum requirement
-- **Defeated**: Failed to meet quorum or negative net votes
+- **Defeated**: Failed to meet quorum
 - **Canceled**: Proposer canceled before completion
 
 #### Phase 3: Share Allocation & Redemption
@@ -542,10 +540,10 @@ Recipients are the beneficiaries of successful funding proposals who receive all
 - Assets transferred from mechanism vault to recipient
 
 **Key Benefits:**
-- ✅ **ERC20 Shares**: Can be transferred, traded, or delegated after redemption
-- ✅ **Flexible Redemption**: Can redeem partial amounts over time
-- ✅ **Timelock Protection**: Prevents immediate extraction, enables intervention if needed
-- ✅ **Fair Conversion**: Share value based on actual vote allocation
+- **ERC20 Shares**: Can be transferred, traded, or delegated after redemption
+- **Flexible Redemption**: Can redeem partial amounts over time
+- **Timelock Protection**: Prevents immediate extraction, enables intervention if needed
+- **Fair Conversion**: Share value based on actual vote allocation
 
 #### Phase 4: Asset Utilization
 **User Story:** "As a funded recipient, I want to use allocated resources for the intended purpose"
@@ -619,4 +617,60 @@ All hooks follow a dual-layer pattern:
 - Vault share minting system integrated into TokenizedAllocationMechanism (ERC4626 compliant)
 - Event emission provides off-chain integration points for monitoring and indexing
 - Factory pattern ensures proper owner context (deployer becomes owner, not factory)
-- Factory supports multiple voting mechanisms: `deploySimpleVotingMechanism()` and `deployQuadraticVotingMechanism()`
+
+## MEV Protection Requirements
+
+### Keeper Requirements and Security assumptions
+
+**Required Keeper Configuration**:
+- **Private Mempool Protection**: Keepers MUST use private transaction relays such as:
+  - Flashbots Protect RPC
+  - MEV Blocker RPC
+  - Other trusted private mempool services
+- **Transaction Submission**: When calling `report()` on SkyCompounderStrategy, transactions MUST be submitted through private channels to prevent front-running
+- **Risk Without Protection**: Without MEV protection, malicious actors can:
+  - Front-run the reward swap with a buy transaction
+  - Back-run with a sell transaction
+  - Extract significant value from the strategy's rewards
+
+**Implementation Note**: This requirement exists because the strategy prioritizes simplicity over on-chain slippage protection. Future versions may implement proper slippage calculations, but until then, MEV protection at the transaction layer is mandatory.
+
+## Harvest Reporting and Loss Protection
+
+### Strategy Reporting Mechanisms
+Both yield donating and yield skimming strategies use the same reporting mechanism with built-in health checks for loss protection.
+
+### Health Check Flag: `doHealthCheck`
+**Key Configuration**: All strategies use the `doHealthCheck` boolean flag (default: `true`) to control loss protection validation during harvest reporting.
+
+**Flag Behavior**:
+- **When `doHealthCheck = true`**: The strategy validates that profit/loss is within acceptable bounds defined by `_profitLimitRatio` and `_lossLimitRatio`
+- **When `doHealthCheck = false`**: The check is bypassed for one report cycle, then automatically re-enabled
+- **Purpose**: Prevents reporting of excessive losses or suspicious profits that could indicate an exploit or price manipulation
+
+### Loss Protection Mechanisms
+
+#### Burning Flag: `enableBurning`
+**Key Configuration**: All strategies use the `enableBurning` boolean flag to control whether shares can be burned from the donation address during loss events.
+
+**Flag Behavior**:
+- **When `enableBurning = true`**: The strategy can burn shares from the donation address (dragon router) to cover losses
+- **When `enableBurning = false`**: No share burning occurs; losses are absorbed by all shareholders proportionally
+- **Purpose**: Protects principal depositors by socializing losses to the donation recipient when enabled *and supported*
+
+**Loss Protection Implementation**:
+
+**Yield Donating Strategies**:
+- Uses `_handleDragonLossProtection()` in YieldDonatingTokenizedStrategy
+- Burns shares from donation address to cover losses when `enableBurning = true`
+- Protects principal depositors from losses by reducing donation recipient's shares
+
+**Yield Skimming Strategies**:
+- Uses the same `_handleDragonLossProtection()` mechanism as yield donating strategies
+- Operates identically: burns dragon router shares during losses if burning is enabled
+- Ensures consistent loss protection across both strategy types
+
+**Management Controls**:
+- `setDoHealthCheck(bool)`: Enable/disable health checks (management only)
+- `setProfitLimitRatio(uint16)`: Set maximum allowed profit percentage (management only)
+- `setLossLimitRatio(uint16)`: Set maximum allowed loss percentage (management only)
