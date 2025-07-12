@@ -106,7 +106,8 @@ abstract contract ProperQF {
         // Validate square root approximation within 10% tolerance
         uint256 actualSqrt = _sqrt(contribution);
         uint256 tolerance = actualSqrt / 10; // 10% tolerance
-        if (voteWeight < actualSqrt - tolerance || voteWeight > actualSqrt + tolerance) {
+        // Only allow vote weight to be lower than actual sqrt, not higher
+        if (voteWeight < actualSqrt - tolerance || voteWeight > actualSqrt) {
             revert VoteWeightOutsideTolerance();
         }
 
