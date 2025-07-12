@@ -147,8 +147,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         Defeated,
         Succeeded,
         Queued,
-        Expired,
-        Executed
+        Expired
     }
 
     struct Proposal {
@@ -156,7 +155,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         address proposer;
         address recipient;
         string description;
-        bool claimed;
         bool canceled;
     }
 
@@ -494,7 +492,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         s.proposalIdCounter++;
         pid = s.proposalIdCounter;
 
-        s.proposals[pid] = Proposal(0, proposer, recipient, description, false, false);
+        s.proposals[pid] = Proposal(0, proposer, recipient, description, false);
         s.recipientUsed[recipient] = true;
 
         emit ProposalCreated(pid, proposer, recipient, description);
@@ -687,7 +685,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         if (!IBaseAllocationStrategy(address(this)).hasQuorumHook(pid)) return ProposalState.Defeated;
         // Check if proposal has been queued (has shares allocated)
         if (s.proposalShares[pid] == 0) return ProposalState.Succeeded;
-        if (p.claimed) return ProposalState.Executed;
         // Check global grace period expiration
         if (s.globalRedemptionStart != 0 && block.timestamp > s.globalRedemptionStart + s.gracePeriod) {
             return ProposalState.Expired;

@@ -84,7 +84,6 @@ contract SimpleVotingRecipientJourneyTest is Test {
         assertEq(proposal1.proposer, alice);
         assertEq(proposal1.recipient, charlie);
         assertEq(proposal1.description, "Charlie's Clean Energy Initiative");
-        assertFalse(proposal1.claimed);
         assertFalse(proposal1.canceled);
 
         // Multiple recipients can have proposals

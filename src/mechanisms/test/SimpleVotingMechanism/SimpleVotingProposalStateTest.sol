@@ -337,8 +337,8 @@ contract SimpleVotingProposalStateTest is Test {
         assertFalse(success3);
     }
 
-    /// @notice Test EXECUTED state - shares redeemed after timelock
-    function testProposalState_Executed() public {
+    /// @notice Test share redemption after timelock - proposal remains in Queued state
+    function testProposalState_ShareRedemption() public {
         uint256 startBlock = _tokenized(address(mechanism)).startBlock();
         vm.roll(startBlock - 1);
 

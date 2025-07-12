@@ -197,7 +197,6 @@ contract TokenizedPatternDemoTest is Test {
         assertEq(proposal.proposer, alice);
         assertEq(proposal.recipient, charlie);
         assertEq(proposal.description, "Fund Charlie's project");
-        assertFalse(proposal.claimed);
         assertFalse(proposal.canceled);
     }
 

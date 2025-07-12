@@ -1,6 +1,6 @@
 # Product Requirements Document: Allocation Mechanism System
 
-This implementation serves as a comprehensive reference for applying the Yearn V3 tokenized strategy pattern to complex governance systems with real economic distribution.
+This implementation serves as a comprehensive reference for applying the Yearn V3 tokenized strategy pattern to other allocation mechanisms.
 
 ## Product Vision & Motivation
 
@@ -15,13 +15,44 @@ This implementation serves as a comprehensive reference for applying the Yearn V
 
 ## Technical Architecture Overview
 
-The allocation mechanism system follows the **Yearn V3 Tokenized Strategy Pattern** with three main components:
+The allocation mechanism system follows the **Yearn V3 Tokenized Strategy Pattern** with four main components:
 
 1. **TokenizedAllocationMechanism.sol** - Shared implementation containing all standard logic (voting, proposals, ERC4626 vault functionality, storage management)
 2. **BaseAllocationMechanism.sol** - Lightweight proxy contract with fallback delegation and hook definitions
 3. **ProperQF.sol** - Abstract contract providing incremental quadratic funding algorithm with alpha-weighted distribution (used by quadratic voting strategies)
+4. **QuadraticVotingMechanism.sol** - Concrete implementation of quadratic funding using the ProperQF strategy
 
 The system uses a hook-based architecture that allows implementers to customize voting behaviors while maintaining core security and flow invariants. This pattern provides significant gas savings and code reuse compared to traditional inheritance patterns.
+
+### QuadraticVotingMechanism Implementation
+
+QuadraticVotingMechanism.sol is a concrete implementation that demonstrates the power of the Yearn V3 pattern:
+
+**Key Features:**
+- **Quadratic Cost Voting**: To cast W votes, users pay W² voting power (prevents plutocracy)
+- **Alpha-Weighted Funding**: Configurable blend of quadratic (α) and linear (1-α) funding components
+- **Role-Based Proposing**: Only keeper or management can create proposals (prevents spam)
+- **Single Vote Per Proposal**: Users can only vote once per proposal (prevents vote splitting attacks)
+- **Decimal Normalization**: Converts all voting power to 18 decimals for consistent calculations
+
+**Hook Implementations:**
+1. **`_beforeProposeHook`**: Restricts proposal creation to keeper/management roles
+2. **`_getVotingPowerHook`**: Normalizes deposit amounts to 18 decimals regardless of asset decimals
+3. **`_processVoteHook`**: Implements quadratic cost (W² power for W votes) and enforces single-vote rule
+4. **`_hasQuorumHook`**: Checks if total funding (quadratic + linear) meets threshold
+5. **`_convertVotesToShares`**: Returns alpha-weighted funding as share amount
+6. **`_availableWithdrawLimit`**: Enforces global timelock and grace period for redemptions
+
+**Alpha Parameter:**
+- Controls the balance between quadratic and linear funding: `F_j = α × (sum_sqrt)² + (1-α) × sum_contributions`
+- Can be dynamically calculated via `calculateOptimalAlpha()` to ensure 1:1 shares-to-assets ratio (ignoring decimals)
+- Adjustable by owner via `setAlpha()` for fine-tuning funding distribution
+
+**Security Features:**
+- Rejects ETH deposits via custom `receive()` function (prevents permanent fund loss)
+- Validates all mathematical operations to prevent overflow/underflow
+- Enforces strict role-based access control for sensitive operations
+- Integrates ProperQF's incremental update algorithm for gas-efficient tallying
 
 ### Yearn V3 Pattern Benefits
 - **Gas Efficiency**: Deploy shared implementation once, reuse for all strategies
@@ -33,15 +64,16 @@ The system uses a hook-based architecture that allows implementers to customize 
 
 The Yearn V3 pattern implements a sophisticated delegation mechanism:
 
-1. **Storage Location**: All storage lives in the proxy contract (e.g., QuadraticVotingMechanism) following TokenizedAllocationMechanism's layout
+1. **Storage Location**: All storage lives in the proxy contract (e.g., QuadraticVotingMechanism) following TokenizedAllocationMechanism's layout and whatever is added by the mechanism designer
 2. **Logic Execution**: Shared logic executes in TokenizedAllocationMechanism's context via delegatecall
 3. **Access Pattern**: Proxy contracts access storage through helper functions that return interfaces at `address(this)`
 
 #### How It Works:
-- When a proxy calls `_tokenizedAllocation().management()`, it returns `TokenizedAllocationMechanism(address(this))`
-- This call to a non-existent function triggers the fallback, delegating to TokenizedAllocationMechanism
-- The implementation reads from the proxy's storage slots, returning the stored management address
-- This enables role-based access control (`owner`, `management`, `keeper`, `emergencyAdmin`) across all mechanisms
+- When a proxy calls `_tokenizedAllocation().management()`, it casts `address(this)` to the TokenizedAllocationMechanism interface
+- The call to `management()` on the proxy triggers the fallback function, which delegates to TokenizedAllocationMechanism
+- TokenizedAllocationMechanism's code executes in the proxy's context, reading from the proxy's storage slots
+- This returns the management address stored in the proxy's storage, enabling role-based access control
+- This pattern works for all roles (`owner`, `management`, `keeper`, `emergencyAdmin`) across all mechanisms
 
 #### Role Hierarchy:
 - **Owner**: Primary admin with full control (can transfer ownership, pause/unpause)
@@ -51,10 +83,10 @@ The Yearn V3 pattern implements a sophisticated delegation mechanism:
 
 ### Hook-Based Modular Approach
 
-The contract defines 11 strategic hooks that implementers must override to create specific voting mechanisms:
+The contract defines 11 strategic hooks that implementers must override to create specific voting mechanisms, but in practice they will take most of them from the type of voting they want to support and only implement a handful to shape the details like participation, timeline, and rules on fund distribution:
 
 **Key Architectural Decision - Permissionless Queuing:**
-The system implements **permissionless proposal queuing** (`queueProposal()` has no `onlyOwner` modifier), enabling flexible governance models:
+The system implements **permissionless proposal queuing**, enabling flexible governance models:
 - **Community-Driven**: Anyone can queue successful proposals, removing admin bottlenecks
 - **Custom Access Control**: Mechanisms can enforce restrictions via `_requestCustomDistributionHook()` if needed
 - **Governance Flexibility**: Supports both permissionless and permissioned models through hook customization
@@ -254,7 +286,7 @@ This pattern enables complete code reuse while maintaining storage isolation and
 - **Requirement:** System must track and expose proposal states throughout lifecycle
 - **Implementation:** `state(uint256 pid)` and `_state()` functions with comprehensive state machine
 - **Acceptance Criteria:**
-  - States: Pending, Active, Canceled, Defeated, Succeeded, Queued, Expired, Executed
+  - States: Pending, Active, Canceled, Defeated, Succeeded, Queued, Expired
   - State transitions follow predefined rules based on timing and votes
   - Canceled proposals remain permanently canceled
   - Grace period handling for expired proposals
@@ -279,10 +311,10 @@ This pattern enables complete code reuse while maintaining storage isolation and
   - Recipients can redeem partial amounts or full allocation
 
 #### FR-9: Optimal Alpha Calculation for Quadratic Funding
-- **Requirement:** System must support dynamic calculation of optimal alpha parameter to ensure 1:1 shares-to-assets ratio given a fixed matching pool
+- **Requirement:** System must support dynamic calculation of optimal alpha parameter to ensure 1:1 shares-to-assets ratio (ignoring decimals) given a fixed matching pool
 - **Implementation:** `calculateOptimalAlpha(matchingPoolAmount, totalUserDeposits)` in QuadraticVotingMechanism and `_calculateOptimalAlpha()` in ProperQF
 - **Acceptance Criteria:**
-  - Calculates alpha that ensures total funding equals total available assets
+  - Calculates alpha that ensures total funding equals total available assets (ignoring decimal precision differences)
   - Handles edge cases: no quadratic advantage (α=0), insufficient assets (α=0), excess assets (α=1)
   - Returns fractional alpha as numerator/denominator for precision
   - Can be called before finalization to determine optimal funding parameters
@@ -300,7 +332,6 @@ This pattern enables complete code reuse while maintaining storage isolation and
 ### Power Conservation Invariants
 1. **Non-Increasing Power**: `_processVoteHook()` must return `newPower ≤ oldPower`
 2. **Single Registration**: Each address can only call `signup()` once
-3. **Vote Uniqueness**: Each user can vote at most once per proposal
 
 ### State Consistency Invariants
 1. **Unique Recipients**: Each recipient address used in at most one proposal
@@ -333,16 +364,16 @@ Voters are community members who deposit assets to gain voting power and partici
 
 **System Response:**
 - Assets transferred from voter to mechanism vault
-- Voting power assigned (1:1 in SimpleVotingMechanism, scaled to 18 decimals in QuadraticVotingMechanism) 
+- Voting power assigned
 - UserRegistered event emitted
 - Voter can now participate in voting
 
 **Key Constraints:**
-- ✅ One-time registration only (cannot re-register)
-- ✅ Must register before voting period ends
-- ⚠️ **No asset recovery** - deposited tokens locked until mechanism concludes
-- ✅ Voting power calculation customizable per mechanism
-- ✅ QuadraticVotingMechanism: Voting power normalized to 18 decimals regardless of asset decimals
+- One-time registration only (cannot re-register)
+- Must register before voting period ends
+- **No asset recovery** - deposited tokens locked until mechanism concludes
+- Voting power calculation customizable per mechanism
+- QuadraticVotingMechanism: Voting power normalized to 18 decimals regardless of asset decimals
 
 #### Phase 2: Proposal Discovery & Voting
 **User Story:** "As a registered voter, I want to review proposals and cast weighted votes to influence fund distribution"
@@ -359,12 +390,12 @@ Voters are community members who deposit assets to gain voting power and partici
 - Vote recorded (cannot be changed)
 
 **Key Constraints:**
-- ✅ Can only vote during active voting window
-- ✅ One vote per proposal per voter (immutable)
-- ✅ Vote weight cannot exceed remaining voting power
-- ✅ Must manage power across multiple proposals strategically
-- ✅ QuadraticVotingMechanism: To cast W votes costs W² voting power (quadratic cost)
-- ✅ QuadraticVotingMechanism: Only "For" votes supported (no Against/Abstain)
+- Can only vote during active voting window
+- One vote per proposal per voter (immutable)
+- Vote weight cannot exceed remaining voting power
+- Must manage power across multiple proposals strategically
+- QuadraticVotingMechanism: To cast W votes costs W² voting power (quadratic cost)
+- QuadraticVotingMechanism: Only "For" votes supported (no Against/Abstain)
 
 #### Phase 3: Post-Voting Monitoring  
 **User Story:** "As a voter, I want to see voting results and understand how my votes influenced the outcome"
@@ -380,8 +411,8 @@ Voters are community members who deposit assets to gain voting power and partici
 - Final allocation determined by successful proposals
 
 **Current Limitations:**
-- ⚠️ **No asset recovery mechanism** for voters after voting concludes
-- ⚠️ Deposited assets remain in vault even if all voting power is not consumed
+- **No asset recovery mechanism** for voters after voting concludes
+- Deposited assets remain in vault even if all voting power is not consumed
 
 ---
 
@@ -434,7 +465,7 @@ Admins are trusted operators who manage the voting lifecycle and ensure proper g
 1. **Calculate Optimal Alpha** (Optional): `mechanism.calculateOptimalAlpha(matchingPoolAmount, totalUserDeposits)` to determine optimal funding parameters
 2. **Set Alpha** (Optional): `mechanism.setAlpha(alphaNumerator, alphaDenominator)` to adjust quadratic vs linear weighting
 3. **Finalize Voting**: `mechanism.finalizeVoteTally()` (after voting period ends)
-4. **Queue Successful Proposals** (Optional): `mechanism.queueProposal(pid)` for each successful proposal - **Note: This is permissionless and can be done by anyone**
+4. **Queue Successful Proposals** (Optional): `mechanism.queueProposal(pid)` for each successful proposal - **Note: This is permissionless by default and can be done by anyone**
 5. **Monitor Redemption**: Track recipient share redemption after timelock
 
 **System Response:**
@@ -446,11 +477,11 @@ Admins are trusted operators who manage the voting lifecycle and ensure proper g
 - ProposalQueued events emitted with redemption timeline
 
 **Key Responsibilities:**
-- ✅ **Consider optimal alpha** to maximize quadratic funding within budget constraints
-- ✅ **Must finalize promptly** after voting period to enable queuing
-- ✅ **Permissionless queuing** means anyone can queue successful proposals - admins can facilitate but are not required
-- ✅ Communicate redemption timeline to recipients
-- ✅ Ensure proper execution of funding round outcomes
+- **Consider optimal alpha** to maximize quadratic funding within budget constraints
+- **Must finalize promptly** after voting period to enable queuing
+- **Permissionless queuing** means anyone can queue successful proposals - admins can facilitate but are not required
+- Communicate redemption timeline to recipients
+- Ensure proper execution of funding round outcomes
 
 ---
 
@@ -462,7 +493,7 @@ Recipients are the beneficiaries of successful funding proposals who receive all
 **User Story:** "As a project seeking funding, I want to get my proposal created and advocate for community support"
 
 **Actions:**
-- **Find Proposer**: Work with registered voter who can create proposal
+- **Find Proposer**: Work with user who can create proposal accourding to mechanism design
 - **Proposal Creation**: Proposer calls `mechanism.propose(recipientAddress, description)`
 - **Campaign**: Advocate to voters during voting period
 
@@ -473,10 +504,9 @@ Recipients are the beneficiaries of successful funding proposals who receive all
 - Proposal enters Active state when voting begins
 
 **Key Constraints:**
-- ✅ Each address can only be recipient of one proposal
-- ✅ Cannot modify recipient address after proposal creation
-- ⚠️ **Dependent on proposer** - recipients cannot self-propose
-- ⚠️ **QuadraticVotingMechanism**: Only keeper or management can propose (not regular voters)
+- Each address can only be recipient of one proposal
+- Cannot modify recipient address after proposal creation
+- **QuadraticVotingMechanism**: Only keeper or management can propose (not regular voters)
 
 #### Phase 2: Voting Period & Outcome
 **User Story:** "As a recipient, I want to track voting progress and understand if my proposal will succeed"
@@ -492,17 +522,17 @@ Recipients are the beneficiaries of successful funding proposals who receive all
 - Final outcome determined by quorum and net vote calculation
 
 **Possible Outcomes:**
-- ✅ **Succeeded**: Net votes meet quorum requirement
-- ❌ **Defeated**: Failed to meet quorum or negative net votes
-- ❌ **Canceled**: Proposer canceled before completion
+- **Succeeded**: Net votes meet quorum requirement
+- **Defeated**: Failed to meet quorum or negative net votes
+- **Canceled**: Proposer canceled before completion
 
 #### Phase 3: Share Allocation & Redemption
 **User Story:** "As a successful recipient, I want to claim my allocated shares and redeem them for underlying assets"
 
 **Actions (for Successful Proposals):**
-1. **Wait for Queuing**: Admin must call `queueProposal(pid)` after finalization
+1. **Wait for Queuing**: Call `queueProposal(pid)` after finalization
 2. **Receive Shares**: Shares automatically minted to recipient address
-3. **Wait for Timelock**: Cannot redeem until `redeemableAfter` timestamp
+3. **Wait for Timelock**: Cannot redeem until after end of redemption window
 4. **Redeem Assets**: `mechanism.redeem(shares, recipient, recipient)` to claim underlying tokens
 
 **System Response:**
@@ -512,7 +542,7 @@ Recipients are the beneficiaries of successful funding proposals who receive all
 - Assets transferred from mechanism vault to recipient
 
 **Key Benefits:**
-- ✅ **ERC20 Shares**: Can be transferred, traded, or delegated before redemption
+- ✅ **ERC20 Shares**: Can be transferred, traded, or delegated after redemption
 - ✅ **Flexible Redemption**: Can redeem partial amounts over time
 - ✅ **Timelock Protection**: Prevents immediate extraction, enables intervention if needed
 - ✅ **Fair Conversion**: Share value based on actual vote allocation
@@ -531,9 +561,9 @@ Recipients are the beneficiaries of successful funding proposals who receive all
 - Allocation mechanism completes its role
 
 **Long-term Considerations:**
-- ✅ Recipients have full control over redeemed assets
-- ✅ Can potentially redeem incrementally based on project milestones*
-- ⚠️ **No enforcement** of fund usage (social/legal layer responsibility)
+- Recipients have full control over redeemed assets
+- Can potentially redeem incrementally based on project milestones*
+- **Soft enforcement** of fund usage (social/legal layer responsibility)
 
 ---
 
@@ -547,7 +577,6 @@ Recipients are the beneficiaries of successful funding proposals who receive all
 
 ### 📊 System-Wide Invariants
 
-- **Conservation of Value**: Total allocated shares ≤ total deposited assets
 - **Fairness Guarantee**: All participants operate under same rules and timing
 - **Transparency**: All votes, proposals, and allocations are publicly visible
 - **Immutability**: Key decisions (votes, proposals) cannot be reversed once committed
@@ -591,17 +620,3 @@ All hooks follow a dual-layer pattern:
 - Event emission provides off-chain integration points for monitoring and indexing
 - Factory pattern ensures proper owner context (deployer becomes owner, not factory)
 - Factory supports multiple voting mechanisms: `deploySimpleVotingMechanism()` and `deployQuadraticVotingMechanism()`
-
-
-### Performance Metrics
-- **Gas Savings**: ~3.5M gas saved per additional strategy deployment vs traditional inheritance
-- **Code Reuse**: 100% of core logic shared across all voting strategies
-- **Audit Surface**: Reduced to only custom hook implementations per strategy
-- **Deployment Success**: Factory successfully deploys lightweight strategies using shared implementation
-
-### Architecture Validation
-- **Voter Journey**: Complete registration → voting → monitoring flow working
-- **Admin Journey**: Deployment → monitoring → finalization → execution flow working  
-- **Recipient Journey**: Advocacy → outcome → share receipt → redemption flow working
-- **Security Features**: Timelock protection, hook validation, owner controls all functional
-- **Economic Model**: Fair vote-to-share conversion, proper vault accounting, asset conservation
