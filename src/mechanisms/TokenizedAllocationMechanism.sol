@@ -94,7 +94,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     error QueueingClosedAfterRedemption();
     error NoAllocation(uint256 pid, uint256 sharesToMint);
     error VotingClosed(uint256 currentBlock, uint256 startBlock, uint256 endBlock);
-    error AlreadyVoted(address voter, uint256 pid);
     error InvalidWeight(uint256 weight, uint256 votingPower);
     error WeightTooLarge(uint256 weight, uint256 maxAllowed);
     error PowerIncreased(uint256 oldPower, uint256 newPower);
@@ -197,7 +196,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         // Mappings
         mapping(uint256 => Proposal) proposals;
         mapping(address => bool) recipientUsed;
-        mapping(uint256 => mapping(address => bool)) hasVoted;
         mapping(address => uint256) votingPower;
         mapping(uint256 => uint256) proposalShares;
         // EIP712 storage
@@ -581,8 +579,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
                 s.startBlock + s.votingDelay + s.votingPeriod
             );
 
-        if (s.hasVoted[pid][voter]) revert AlreadyVoted(voter, pid);
-
         uint256 oldPower = s.votingPower[voter];
         if (weight == 0) revert InvalidWeight(weight, oldPower);
         if (weight > MAX_SAFE_VALUE) revert WeightTooLarge(weight, MAX_SAFE_VALUE);
@@ -599,7 +595,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         if (newPower > oldPower) revert PowerIncreased(oldPower, newPower);
 
         s.votingPower[voter] = newPower;
-        s.hasVoted[pid][voter] = true;
         emit VotesCast(voter, pid, weight);
     }
 
@@ -759,9 +754,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         return _getStorage().proposals[pid];
     }
 
-    function hasVoted(uint256 pid, address voter) external view onlyInitialized returns (bool) {
-        return _getStorage().hasVoted[pid][voter];
-    }
 
     function votingPower(address user) external view onlyInitialized returns (uint256) {
         return _getStorage().votingPower[user];

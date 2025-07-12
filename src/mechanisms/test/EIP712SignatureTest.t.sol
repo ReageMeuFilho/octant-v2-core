@@ -334,7 +334,7 @@ contract EIP712SignatureTest is Test {
         );
 
         // Verify vote was recorded
-        assertTrue(_tokenized(address(mechanism)).hasVoted(pid, alice), "Vote not recorded");
+        // SimpleVoting now allows multiple votes, so we don't check hasVoted
         assertEq(
             _tokenized(address(mechanism)).votingPower(alice),
             DEPOSIT_AMOUNT - weight,
@@ -399,7 +399,7 @@ contract EIP712SignatureTest is Test {
                 );
             }
 
-            assertTrue(_tokenized(address(mechanism)).hasVoted(pids[i], users[i]), "Vote not recorded");
+            // SimpleVoting now allows multiple votes, so we don't check hasVoted
         }
     }
 
@@ -564,7 +564,7 @@ contract EIP712SignatureTest is Test {
         );
 
         // Verify final state
-        assertTrue(_tokenized(address(mechanism)).hasVoted(pid, alice), "Vote not recorded");
+        // SimpleVoting now allows multiple votes, so we don't check hasVoted
         assertEq(_tokenized(address(mechanism)).votingPower(alice), DEPOSIT_AMOUNT - 200, "Voting power incorrect");
         assertEq(_tokenized(address(mechanism)).nonces(alice), signupNonce + 2, "Nonce should increment twice");
     }
@@ -619,8 +619,7 @@ contract EIP712SignatureTest is Test {
         );
 
         // Verify both votes recorded
-        assertTrue(_tokenized(address(mechanism)).hasVoted(pid, alice), "Alice vote not recorded");
-        assertTrue(_tokenized(address(mechanism)).hasVoted(pid, bob), "Bob vote not recorded");
+        // SimpleVoting now allows multiple votes, so we don't check hasVoted
     }
 
     function test_NonceSharing() public {

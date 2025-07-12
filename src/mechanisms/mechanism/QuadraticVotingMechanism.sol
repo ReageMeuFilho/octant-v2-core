@@ -16,9 +16,12 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
     error ZeroAddressCannotPropose();
     error OnlyForVotesSupported();
     error InsufficientVotingPowerForQuadraticCost();
+    error AlreadyVoted(address voter, uint256 pid);
 
     /// @notice Total voting power distributed across all proposals
-    uint256 public totalVotingPower;
+
+    /// @notice Mapping to track if a voter has voted on a proposal
+    mapping(uint256 => mapping(address => bool)) public hasVoted;
 
     constructor(
         address _implementation,
@@ -77,12 +80,15 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
     /// @dev The cost of voting is quadratic: to cast `weight` votes, you pay `weight^2` voting power
     function _processVoteHook(
         uint256 pid,
-        address,
+        address voter,
         TokenizedAllocationMechanism.VoteType choice,
         uint256 weight,
         uint256 oldPower
     ) internal override returns (uint256) {
         if (choice != TokenizedAllocationMechanism.VoteType.For) revert OnlyForVotesSupported();
+
+        // Check if voter has already voted on this proposal
+        if (hasVoted[pid][voter]) revert AlreadyVoted(voter, pid);
 
         // Quadratic cost: to vote with weight W, you pay W^2 voting power
         uint256 quadraticCost = weight * weight;
@@ -94,8 +100,8 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
         // We know: quadraticCost = weight^2, so sqrt(quadraticCost) = weight (perfect square root relationship)
         _processVoteUnchecked(pid, quadraticCost, weight);
 
-        // Track total voting power used
-        totalVotingPower = totalVotingPower + weight;
+        // Mark that voter has voted on this proposal
+        hasVoted[pid][voter] = true;
 
         // Return remaining voting power after quadratic cost
         return oldPower - quadraticCost;
