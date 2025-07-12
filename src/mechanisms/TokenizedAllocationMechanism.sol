@@ -751,7 +751,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         return _getStorage().proposals[pid];
     }
 
-
     function votingPower(address user) external view onlyInitialized returns (uint256) {
         return _getStorage().votingPower[user];
     }

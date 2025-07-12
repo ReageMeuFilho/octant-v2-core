@@ -229,11 +229,11 @@ contract SimpleVotingVoterJourneyTest is Test {
         // Alice can vote multiple times with remaining power
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether);
-        
+
         // Alice can vote again with her remaining power
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.Against, 100 ether);
-        
+
         // Verify Alice has used 200 ether total voting power
         assertEq(_tokenized(address(mechanism)).votingPower(alice), LARGE_DEPOSIT - 200 ether);
 
