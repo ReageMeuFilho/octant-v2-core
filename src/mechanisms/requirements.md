@@ -169,11 +169,12 @@ The system implements **permissionless proposal queuing**, enabling flexible gov
     - **Flexibility**: Enables different governance models without requiring core contract changes
 - **`_availableWithdrawLimit(address shareOwner)`** - Controls withdrawal limits with timelock enforcement
   - **Security Assumptions**:
-    - MUST enforce timelock by returning 0 before redeemableAfter timestamp
-    - MUST enforce grace period by returning 0 after expiration
-    - SHOULD return type(uint256).max for no limit (within valid window)
+    - MUST enforce timelock by returning 0 before globalRedemptionStart
+    - MUST enforce grace period by returning 0 after `globalRedemptionStart + gracePeriod`
+    - SHOULD return type(uint256).max for no limit (within valid redemption window)
     - MUST be view function for consistent results
-    - MUST coordinate with redeemableAfter mapping in storage
+    - Creates mutually exclusive windows: users can withdraw OR owner can sweep, never both
+  - **Implementation Note**: This hook is what prevents withdrawals after grace period, enabling safe sweep
 - **`_calculateTotalAssetsHook()`** - Calculates total assets including matching pools
   - **Security Assumptions**:
     - MUST accurately reflect total assets available for distribution
@@ -238,6 +239,7 @@ This pattern enables complete code reuse while maintaining storage isolation and
   - Registration requires hook validation to pass via `IBaseAllocationStrategy` interface
   - Voting power is calculated through customizable hook in strategy contract
   - Asset deposits are transferred securely using ERC20 transferFrom
+  - Operation blocked when contract is paused (`whenNotPaused` modifier)
 
 #### FR-2: Proposal Creation & Management
 - **Requirement:** Authorized users must be able to create proposals targeting specific recipients
@@ -307,8 +309,58 @@ This pattern enables complete code reuse while maintaining storage isolation and
   - Underlying assets transferred to recipient from mechanism vault
   - Redemption amount follows ERC4626 share-to-asset conversion
   - Recipients can redeem partial amounts or full allocation
+  - **Grace Period Enforcement**: Shares become unredeemable after `globalRedemptionStart + gracePeriod`
 
-#### FR-9: Optimal Alpha Calculation for Quadratic Funding
+#### FR-9: Asset Recovery via Sweep Function
+- **Requirement:** Owner must be able to recover unclaimed tokens and ETH after grace period expires to prevent permanent fund lock
+- **Implementation:** `sweep(address token, address receiver)` function in TokenizedAllocationMechanism (shared implementation level)
+- **Acceptance Criteria:**
+  - Can only be called by owner role
+  - Requires grace period to be fully expired: `block.timestamp > globalRedemptionStart + gracePeriod`
+  - Can sweep any ERC20 token or ETH (address(0))
+  - Prevents sweeping before grace period ends to protect late redeemers
+  - Emits `Swept` event for transparency
+  - **Enforcement Level**: TokenizedAllocationMechanism (core shared implementation)
+  - **Grace Period Check**: Enforced at mechanism level via `_availableWithdrawLimit()` hook
+
+#### FR-10: Emergency Controls & Admin Functions
+- **Requirement:** System must provide emergency controls for critical situations and admin functions for operational management
+- **Implementation:** Multiple admin functions in TokenizedAllocationMechanism (shared implementation level)
+- **Functions:**
+  - `pause()` / `unpause()`: Emergency stop mechanism for all operations
+  - `transferOwnership(newOwner)` / `acceptOwnership()`: Two-step ownership transfer
+  - `cancelOwnershipTransfer()`: Cancel pending ownership transfer
+  - `setKeeper(address)`: Update keeper role
+  - `setManagement(address)`: Update management role
+- **Acceptance Criteria:**
+  - All functions restricted to owner role (except acceptOwnership for pending owner)
+  - Pause blocks all state-changing operations via `whenNotPaused` modifier
+  - Two-step ownership transfer prevents accidental loss of ownership
+  - All role updates emit corresponding events
+  
+#### FR-11: EIP-712 Signature Support
+- **Requirement:** System must support gasless transactions via EIP-712 signatures for key user operations
+- **Implementation:** Signature functions in TokenizedAllocationMechanism with domain separator and nonce management
+- **Functions:**
+  - `signupWithSignature()`: Register with voting power using signature
+  - `castVoteWithSignature()`: Cast votes using signature
+  - `DOMAIN_SEPARATOR()`: Returns EIP-712 domain separator with fork protection
+  - `nonces(address)`: Track signature nonces for replay protection
+- **Acceptance Criteria:**
+  - Signatures include deadline parameter to prevent old signature reuse
+  - Nonces increment atomically to prevent replay attacks
+  - Domain separator includes chain ID
+  - Invalid signatures revert with appropriate errors
+ 
+#### FR-12: Share Transfer Restrictions
+- **Requirement:** Share transfers must be blocked until redemption period starts to prevent early trading
+- **Implementation:** Transfer restriction logic in `_transfer()` function of TokenizedAllocationMechanism
+- **Acceptance Criteria:**
+  - Shares cannot be transferred before `globalRedemptionStart`
+  - After redemption starts, shares are freely transferable
+  - Restriction applies to both `transfer()` and `transferFrom()`
+  
+#### FR-13: Optimal Alpha Calculation for Quadratic Funding
 - **Requirement:** System must support dynamic calculation of optimal alpha parameter to ensure 1:1 shares-to-assets ratio (ignoring decimals) given a fixed matching pool
 - **Implementation:** `calculateOptimalAlpha(matchingPoolAmount, totalUserDeposits)` in QuadraticVotingMechanism and `_calculateOptimalAlpha()` in ProperQF
 - **Acceptance Criteria:**
@@ -325,7 +377,11 @@ This pattern enables complete code reuse while maintaining storage isolation and
 2. **Registration Cutoff**: Users can only register before `startBlock + votingDelay + votingPeriod`
 3. **Tally Finalization**: Can only occur after `startBlock + votingDelay + votingPeriod`
 4. **Timelock Enforcement**: Shares redeemable only after `block.timestamp ≥ eta`
-5. **Grace Period**: Proposals expire after `eta + GRACE_PERIOD` if not executed
+5. **Grace Period**: 
+   - Share redemption window: From `globalRedemptionStart` to `globalRedemptionStart + gracePeriod`
+   - Proposals transition to `Expired` state after grace period ends
+   - `_availableWithdrawLimit()` returns 0 after grace period (enforced at mechanism level)
+   - Owner can call `sweep()` only after grace period expires (enforced in TokenizedAllocationMechanism)
 
 ### Power Conservation Invariants
 1. **Non-Increasing Power**: `_processVoteHook()` must return `newPower ≤ oldPower`
@@ -408,9 +464,10 @@ Voters are community members who deposit assets to gain voting power and partici
 - Proposal state transitions (Defeated/Succeeded/Queued)
 - Final allocation determined by successful proposals
 
-**Current Limitations:**
-- **No asset recovery mechanism** for voters after voting concludes
-- Deposited assets remain in vault even if all voting power is not consumed
+**Asset Recovery:**
+- **Voter deposits**: No direct recovery mechanism for voters after voting concludes
+- **Unclaimed shares**: Owner can recover unclaimed assets via `sweep()` after grace period expires
+- **Timeline protection**: Sweep is blocked during redemption window to protect recipients
 
 ---
 
@@ -481,6 +538,26 @@ Admins are trusted operators who manage the voting lifecycle and ensure proper g
 - Communicate redemption timeline to recipients
 - Ensure proper execution of funding round outcomes
 
+#### Phase 4: Asset Recovery & Cleanup
+**User Story:** "As an admin, I want to recover any unclaimed funds after the grace period to prevent permanent lock"
+
+**Actions:**
+1. **Monitor Redemptions**: Track which recipients have claimed their shares
+2. **Wait for Grace Period**: Ensure `block.timestamp > globalRedemptionStart + gracePeriod`
+3. **Sweep Unclaimed Assets**: Call `mechanism.sweep(tokenAddress, receiverAddress)` for each token
+4. **Sweep ETH if needed**: Call `mechanism.sweep(address(0), receiverAddress)` for ETH
+
+**System Response:**
+- Sweep function validates grace period has expired
+- Transfers all remaining tokens/ETH to specified receiver
+- Emits Swept events for each recovery
+- Contract is now clean of stuck funds
+
+**Key Responsibilities:**
+- **Wait for full grace period** to ensure all recipients had fair chance to claim
+- **Document swept assets** for transparency and accounting
+- **Communicate to community** about unclaimed fund recovery
+
 ---
 
 ### 💰 RECIPIENT JOURNEY
@@ -540,10 +617,11 @@ Recipients are the beneficiaries of successful funding proposals who receive all
 - Assets transferred from mechanism vault to recipient
 
 **Key Benefits:**
-- **ERC20 Shares**: Can be transferred, traded, or delegated after redemption
+- **ERC20 Shares**: Become transferable once redemption period starts (not before)
 - **Flexible Redemption**: Can redeem partial amounts over time
 - **Timelock Protection**: Prevents immediate extraction, enables intervention if needed
 - **Fair Conversion**: Share value based on actual vote allocation
+- **Transfer Timeline**: Shares locked until `globalRedemptionStart`, then freely transferable
 
 #### Phase 4: Asset Utilization
 **User Story:** "As a funded recipient, I want to use allocated resources for the intended purpose"
@@ -582,8 +660,14 @@ Recipients are the beneficiaries of successful funding proposals who receive all
 ### 🛡️ Security & Governance Features
 
 - **Timelock Protection**: Delays execution to enable intervention if needed
+- **Grace Period Protection**: Defines clear redemption window with automatic expiration
 - **Hook Customization**: Allows different voting strategies while maintaining security
-- **Owner Controls**: Admin functions for emergency management
+- **Two-Step Ownership Transfer**: Prevents accidental loss of admin control
+- **Emergency Pause**: Owner can halt all operations in critical situations
+- **Role-Based Access**: Separate roles for owner, management, keeper, and emergency admin
+- **EIP-712 Signatures**: Gasless transactions with replay protection
+- **Transfer Restrictions**: Shares locked until redemption period starts
+- **Asset Recovery**: Sweep function prevents permanent fund lock after grace period
 - **Event Transparency**: Complete audit trail via blockchain events
 
 ## Hook Implementation Guidelines
