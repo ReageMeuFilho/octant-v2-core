@@ -197,7 +197,6 @@ contract TokenizedPatternDemoTest is Test {
         assertEq(proposal.proposer, alice);
         assertEq(proposal.recipient, charlie);
         assertEq(proposal.description, "Fund Charlie's project");
-        assertFalse(proposal.claimed);
         assertFalse(proposal.canceled);
     }
 
@@ -278,8 +277,7 @@ contract TokenizedPatternDemoTest is Test {
         assertEq(_tokenized(address(mechanism)).votingPower(bob), 150 ether);
 
         // Check has voted flags
-        assertTrue(_tokenized(address(mechanism)).hasVoted(pid, alice));
-        assertTrue(_tokenized(address(mechanism)).hasVoted(pid, bob));
+        // SimpleVoting now allows multiple votes, so we don't check hasVoted
     }
 
     function testPartialVoting() public {

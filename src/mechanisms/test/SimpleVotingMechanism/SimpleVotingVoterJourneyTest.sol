@@ -174,7 +174,7 @@ contract SimpleVotingVoterJourneyTest is Test {
         _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, LARGE_DEPOSIT);
 
         assertEq(_tokenized(address(mechanism)).votingPower(alice), 0);
-        assertTrue(_tokenized(address(mechanism)).hasVoted(pid1, alice));
+        // SimpleVoting now allows multiple votes per person, so we don't check hasVoted
 
         // Partial power voting across proposals
         vm.prank(bob);
@@ -225,13 +225,17 @@ contract SimpleVotingVoterJourneyTest is Test {
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, LARGE_DEPOSIT + 1);
 
-        // Cannot vote twice
+        // SimpleVoting now allows multiple votes per person
+        // Alice can vote multiple times with remaining power
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether);
-
-        vm.expectRevert(abi.encodeWithSelector(TokenizedAllocationMechanism.AlreadyVoted.selector, alice, pid));
+        
+        // Alice can vote again with her remaining power
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.Against, 100 ether);
+        
+        // Verify Alice has used 200 ether total voting power
+        assertEq(_tokenized(address(mechanism)).votingPower(alice), LARGE_DEPOSIT - 200 ether);
 
         // Cannot vote after voting period
         vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
@@ -285,8 +289,8 @@ contract SimpleVotingVoterJourneyTest is Test {
         assertEq(powerAfterVote2, 500 ether);
 
         // Verify vote records
-        assertTrue(_tokenized(address(mechanism)).hasVoted(pid1, alice));
-        assertTrue(_tokenized(address(mechanism)).hasVoted(pid2, alice));
+        // SimpleVoting now allows multiple votes per person, so we don't check hasVoted
+        // SimpleVoting now allows multiple votes per person, so we don't check hasVoted
         assertEq(_tokenized(address(mechanism)).getRemainingVotingPower(alice), 500 ether);
     }
 }

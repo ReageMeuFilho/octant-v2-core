@@ -185,7 +185,7 @@ contract QuadraticVotingVoterJourneyTest is Test {
 
         assertEq(alicePrevPower - aliceNewPower, 31 * 31, "Alice should have spent 961 voting power");
         assertEq(aliceNewPower, LARGE_DEPOSIT - (31 * 31));
-        assertTrue(_tokenized(address(mechanism)).hasVoted(pid1, alice));
+        assertTrue(mechanism.hasVoted(pid1, alice));
 
         // Bob votes with weight 10, cost = 10^2 = 100 voting power
         _castVote(bob, pid1, 10);
@@ -227,7 +227,7 @@ contract QuadraticVotingVoterJourneyTest is Test {
         // Cannot vote twice
         _castVote(alice, pid, 8);
 
-        vm.expectRevert(abi.encodeWithSelector(TokenizedAllocationMechanism.AlreadyVoted.selector, alice, pid));
+        vm.expectRevert(abi.encodeWithSelector(QuadraticVotingMechanism.AlreadyVoted.selector, alice, pid));
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 10);
 
@@ -276,8 +276,8 @@ contract QuadraticVotingVoterJourneyTest is Test {
         assertEq(powerAfterVote2, 1000 ether - (10 * 10) - (10 * 10)); // 1000 ether - 200 voting power units
 
         // Verify vote records
-        assertTrue(_tokenized(address(mechanism)).hasVoted(pid1, alice));
-        assertTrue(_tokenized(address(mechanism)).hasVoted(pid2, alice));
+        assertTrue(mechanism.hasVoted(pid1, alice));
+        assertTrue(mechanism.hasVoted(pid2, alice));
         assertEq(_tokenized(address(mechanism)).getRemainingVotingPower(alice), 1000 ether - 200);
     }
 }

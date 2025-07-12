@@ -343,8 +343,8 @@ contract QuadraticVotingProposalStateTest is Test {
         assertFalse(success3);
     }
 
-    /// @notice Test EXECUTED state - shares redeemed after timelock
-    function testProposalState_Executed() public {
+    /// @notice Test share redemption after timelock - proposal remains in Queued state
+    function testProposalState_ShareRedemption() public {
         uint256 startBlock = _tokenized(address(mechanism)).startBlock();
         vm.roll(startBlock - 1);
 
@@ -377,9 +377,8 @@ contract QuadraticVotingProposalStateTest is Test {
         vm.prank(dave);
         uint256 assetsReceived = _tokenized(address(mechanism)).redeem(expectedShares, dave, dave);
 
-        // Mark as claimed to simulate EXECUTED state
-        // Note: The current implementation doesn't automatically set claimed=true
-        // but the state logic checks for shares balance and redeemable time
+        // After redemption, the proposal remains in Queued state
+        // The state logic checks for shares balance and redeemable time
 
         // Verify redemption effects
         assertEq(_tokenized(address(mechanism)).balanceOf(dave), 0);

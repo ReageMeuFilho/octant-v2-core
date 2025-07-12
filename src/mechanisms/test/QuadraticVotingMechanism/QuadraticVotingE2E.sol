@@ -551,15 +551,15 @@ contract QuadraticVotingE2E is Test {
         assertEq(_tokenized(address(mechanism)).votingPower(charlie), 200 ether - 196 ether, "Charlie remaining power");
 
         // Verify all vote records
-        assertTrue(_tokenized(address(mechanism)).hasVoted(pid1, alice), "Alice voted on pid1");
-        assertTrue(_tokenized(address(mechanism)).hasVoted(pid2, alice), "Alice voted on pid2");
-        assertTrue(_tokenized(address(mechanism)).hasVoted(pid3, alice), "Alice voted on pid3");
-        assertTrue(_tokenized(address(mechanism)).hasVoted(pid1, bob), "Bob voted on pid1");
-        assertTrue(_tokenized(address(mechanism)).hasVoted(pid2, bob), "Bob voted on pid2");
-        assertFalse(_tokenized(address(mechanism)).hasVoted(pid3, bob), "Bob didn't vote on pid3");
-        assertFalse(_tokenized(address(mechanism)).hasVoted(pid1, charlie), "Charlie didn't vote on pid1");
-        assertFalse(_tokenized(address(mechanism)).hasVoted(pid2, charlie), "Charlie didn't vote on pid2");
-        assertTrue(_tokenized(address(mechanism)).hasVoted(pid3, charlie), "Charlie voted on pid3");
+        assertTrue(mechanism.hasVoted(pid1, alice), "Alice voted on pid1");
+        assertTrue(mechanism.hasVoted(pid2, alice), "Alice voted on pid2");
+        assertTrue(mechanism.hasVoted(pid3, alice), "Alice voted on pid3");
+        assertTrue(mechanism.hasVoted(pid1, bob), "Bob voted on pid1");
+        assertTrue(mechanism.hasVoted(pid2, bob), "Bob voted on pid2");
+        assertFalse(mechanism.hasVoted(pid3, bob), "Bob didn't vote on pid3");
+        assertFalse(mechanism.hasVoted(pid1, charlie), "Charlie didn't vote on pid1");
+        assertFalse(mechanism.hasVoted(pid2, charlie), "Charlie didn't vote on pid2");
+        assertTrue(mechanism.hasVoted(pid3, charlie), "Charlie voted on pid3");
 
         // Verify vote tallies using getTally from ProperQF
         // console.log("=== Verifying Vote Tallies ===");
