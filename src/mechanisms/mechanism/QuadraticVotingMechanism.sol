@@ -37,8 +37,6 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
 
     /// @notice Only keeper or management can propose
     function _beforeProposeHook(address proposer) internal view virtual override returns (bool) {
-        if (proposer == address(0)) revert ZeroAddressCannotPropose();
-
         // Get keeper and management addresses from TokenizedAllocationMechanism
         address keeper = _tokenizedAllocation().keeper();
         address management = _tokenizedAllocation().management();
@@ -153,9 +151,8 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
     }
 
     /// @dev Get available withdraw limit for share owner with global timelock and grace period enforcement
-    /// @param shareOwner Address attempting to withdraw shares
     /// @return availableLimit Amount of assets that can be withdrawn (0 if timelock active or expired)
-    function _availableWithdrawLimit(address shareOwner) internal view virtual override returns (uint256) {
+    function _availableWithdrawLimit(address /* shareOwner */) internal view virtual override returns (uint256) {
         // Get the global redemption start time
         uint256 globalRedemptionStart = _getGlobalRedemptionStart();
 
@@ -175,15 +172,7 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
             return 0; // Cannot withdraw after grace period expires
         }
 
-        // Within valid redemption window - return max assets this user can withdraw
-        // Convert share balance to assets using current exchange rate
-        uint256 shareBalance = _tokenizedAllocation().balanceOf(shareOwner);
-        if (shareBalance == 0) {
-            return 0;
-        }
-
-        // Convert shares to assets - this gives the maximum assets withdrawable
-        return _tokenizedAllocation().convertToAssets(shareBalance);
+        return type(uint256).max;
     }
 
     /// @notice Calculate total assets including matching pool + user deposits for finalization

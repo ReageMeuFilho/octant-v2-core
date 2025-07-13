@@ -2,11 +2,9 @@
 pragma solidity ^0.8.0;
 
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
-import { SafeCast } from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 abstract contract ProperQF {
     using Math for uint256;
-    using SafeCast for uint256;
 
     // Custom Errors
     error ContributionMustBePositive();
@@ -23,19 +21,19 @@ abstract contract ProperQF {
     bytes32 private constant STORAGE_SLOT = bytes32(uint256(keccak256("proper.qf.storage")) - 1);
 
     struct Project {
-        uint128 sumContributions; // Sum of contributions (Sum_j) - up to ~340 trillion with 18 decimals
-        uint128 sumSquareRoots; // Sum of square roots (S_j) - up to ~340 trillion with 18 decimals
-        uint128 quadraticFunding; // Quadratic term (F_quad_j) - up to ~340 trillion with 18 decimals
-        uint128 linearFunding; // Linear term (F_linear_j) - up to ~340 trillion with 18 decimals
+        uint256 sumContributions; // Sum of contributions (Sum_j)
+        uint256 sumSquareRoots; // Sum of square roots (S_j)
+        uint256 quadraticFunding; // Quadratic term (F_quad_j)
+        uint256 linearFunding; // Linear term (F_linear_j)
     }
 
     /// @notice Main storage struct containing all mutable state for ProperQF
     struct ProperQFStorage {
         mapping(uint256 => Project) projects; // Mapping of project IDs to project data
-        uint128 alphaNumerator; // Numerator for alpha (e.g., 6 for 0.6) - max 340 trillion
-        uint128 alphaDenominator; // Denominator for alpha (e.g., 10 for 0.6) - max 340 trillion
-        uint128 totalQuadraticSum; // Sum of all quadratic terms across projects
-        uint128 totalLinearSum; // Sum of all linear terms across projects
+        uint256 alphaNumerator; // Numerator for alpha (e.g., 6 for 0.6)
+        uint256 alphaDenominator; // Denominator for alpha (e.g., 10 for 0.6)
+        uint256 totalQuadraticSum; // Sum of all quadratic terms across projects
+        uint256 totalLinearSum; // Sum of all linear terms across projects
         uint256 totalFunding; // Total funding across all projects - keep as uint256 for precision
     }
 
@@ -65,22 +63,22 @@ abstract contract ProperQF {
 
     /// @notice Public getter for alphaNumerator (delegating to storage)
     function alphaNumerator() public view returns (uint256) {
-        return uint256(_getProperQFStorage().alphaNumerator);
+        return _getProperQFStorage().alphaNumerator;
     }
 
     /// @notice Public getter for alphaDenominator (delegating to storage)
     function alphaDenominator() public view returns (uint256) {
-        return uint256(_getProperQFStorage().alphaDenominator);
+        return _getProperQFStorage().alphaDenominator;
     }
 
     /// @notice Public getter for totalQuadraticSum (delegating to storage)
     function totalQuadraticSum() public view returns (uint256) {
-        return uint256(_getProperQFStorage().totalQuadraticSum);
+        return _getProperQFStorage().totalQuadraticSum;
     }
 
     /// @notice Public getter for totalLinearSum (delegating to storage)
     function totalLinearSum() public view returns (uint256) {
-        return uint256(_getProperQFStorage().totalLinearSum);
+        return _getProperQFStorage().totalLinearSum;
     }
 
     /// @notice Public getter for totalFunding (delegating to storage)
@@ -123,36 +121,33 @@ abstract contract ProperQF {
      */
     function _processVoteUnchecked(uint256 projectId, uint256 contribution, uint256 voteWeight) internal {
         ProperQFStorage storage s = _getProperQFStorage();
-        Project storage project = s.projects[projectId];
+        Project memory project = s.projects[projectId];
 
-        // Update project sums using SafeCast for overflow protection
-        uint128 newSumSquareRoots = project.sumSquareRoots + voteWeight.toUint128();
-        uint128 newSumContributions = project.sumContributions + contribution.toUint128();
+        // Update project sums
+        uint256 newSumSquareRoots = project.sumSquareRoots + voteWeight;
+        uint256 newSumContributions = project.sumContributions + contribution;
 
-        // Check for overflow on quadratic calculation and cast safely
-        uint256 quadraticResult = uint256(newSumSquareRoots) * uint256(newSumSquareRoots);
-        uint128 newQuadraticFunding = quadraticResult.toUint128();
+        // Calculate quadratic funding - no overflow risk with uint256
+        uint256 newQuadraticFunding = newSumSquareRoots * newSumSquareRoots;
 
         // Update global sums with underflow protection (keep checked for safety)
         if (s.totalQuadraticSum < project.quadraticFunding) revert QuadraticSumUnderflow();
         if (s.totalLinearSum < project.linearFunding) revert LinearSumUnderflow();
 
-        // Update global sums with SafeCast overflow protection
-        uint256 newTotalQuadraticSum = uint256(s.totalQuadraticSum) -
-            uint256(project.quadraticFunding) +
-            uint256(newQuadraticFunding);
-        uint256 newTotalLinearSum = uint256(s.totalLinearSum) -
-            uint256(project.linearFunding) +
-            uint256(newSumContributions);
+        // Update global sums
+        uint256 newTotalQuadraticSum = s.totalQuadraticSum - project.quadraticFunding + newQuadraticFunding;
+        uint256 newTotalLinearSum = s.totalLinearSum - project.linearFunding + newSumContributions;
 
-        s.totalQuadraticSum = newTotalQuadraticSum.toUint128();
-        s.totalLinearSum = newTotalLinearSum.toUint128();
+        s.totalQuadraticSum = newTotalQuadraticSum;
+        s.totalLinearSum = newTotalLinearSum;
 
         // Update project state - batch storage writes
         project.sumSquareRoots = newSumSquareRoots;
         project.sumContributions = newSumContributions;
         project.quadraticFunding = newQuadraticFunding;
         project.linearFunding = newSumContributions;
+
+        s.projects[projectId] = project;
 
         // Update total funding after vote processing
         s.totalFunding = _calculateWeightedTotalFunding();
@@ -164,11 +159,9 @@ abstract contract ProperQF {
      */
     function _calculateWeightedTotalFunding() internal view returns (uint256) {
         ProperQFStorage storage s = _getProperQFStorage();
-        // Convert to uint256 for calculation to prevent overflow
-        uint256 weightedQuadratic = (uint256(s.totalQuadraticSum) * uint256(s.alphaNumerator)) /
-            uint256(s.alphaDenominator);
-        uint256 weightedLinear = (uint256(s.totalLinearSum) *
-            (uint256(s.alphaDenominator) - uint256(s.alphaNumerator))) / uint256(s.alphaDenominator);
+        // Calculate weighted funding
+        uint256 weightedQuadratic = (s.totalQuadraticSum * s.alphaNumerator) / s.alphaDenominator;
+        uint256 weightedLinear = (s.totalLinearSum * (s.alphaDenominator - s.alphaNumerator)) / s.alphaDenominator;
         return weightedQuadratic + weightedLinear;
     }
 
@@ -207,13 +200,12 @@ abstract contract ProperQF {
         ProperQFStorage storage s = _getProperQFStorage();
         Project storage project = s.projects[projectId];
 
-        // Convert to uint256 for calculations and return all relevant metrics for the project
+        // Return all relevant metrics for the project
         return (
-            uint256(project.sumContributions), // Total contributions
-            uint256(project.sumSquareRoots), // Sum of square roots
-            (uint256(project.quadraticFunding) * uint256(s.alphaNumerator)) / uint256(s.alphaDenominator), // Alpha-weighted quadratic funding
-            (uint256(project.sumContributions) * (uint256(s.alphaDenominator) - uint256(s.alphaNumerator))) /
-                uint256(s.alphaDenominator) // Alpha-weighted linear funding (1-α) × Sum_j
+            project.sumContributions, // Total contributions
+            project.sumSquareRoots, // Sum of square roots
+            (project.quadraticFunding * s.alphaNumerator) / s.alphaDenominator, // Alpha-weighted quadratic funding
+            (project.sumContributions * (s.alphaDenominator - s.alphaNumerator)) / s.alphaDenominator // Alpha-weighted linear funding (1-α) × Sum_j
         );
     }
 
@@ -231,12 +223,12 @@ abstract contract ProperQF {
         ProperQFStorage storage s = _getProperQFStorage();
 
         // Store old values for event emission
-        uint256 oldNumerator = uint256(s.alphaNumerator);
-        uint256 oldDenominator = uint256(s.alphaDenominator);
+        uint256 oldNumerator = s.alphaNumerator;
+        uint256 oldDenominator = s.alphaDenominator;
 
-        // Update state using SafeCast
-        s.alphaNumerator = newNumerator.toUint128();
-        s.alphaDenominator = newDenominator.toUint128();
+        // Update state - no SafeCast needed with uint256
+        s.alphaNumerator = newNumerator;
+        s.alphaDenominator = newDenominator;
 
         // Recalculate total funding with new alpha
         s.totalFunding = _calculateWeightedTotalFunding();
@@ -251,7 +243,7 @@ abstract contract ProperQF {
      */
     function getAlpha() public view returns (uint256, uint256) {
         ProperQFStorage storage s = _getProperQFStorage();
-        return (uint256(s.alphaNumerator), uint256(s.alphaDenominator));
+        return (s.alphaNumerator, s.alphaDenominator);
     }
 
     /**
