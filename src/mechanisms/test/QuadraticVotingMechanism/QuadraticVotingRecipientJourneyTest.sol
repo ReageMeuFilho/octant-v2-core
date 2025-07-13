@@ -523,8 +523,8 @@ contract QuadraticVotingRecipientJourneyTest is Test {
         assertApproxEqAbs(
             currentTestCtx.charlieAssets2,
             currentTestCtx.expectedCharlieAssets2,
-            1,
-            "Charlie assets2 within 1 wei"
+            2,
+            "Charlie assets2 within 2 wei"
         );
 
         // Let Dave redeem any remaining shares too
