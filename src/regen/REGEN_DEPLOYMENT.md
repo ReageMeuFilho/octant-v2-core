@@ -9,10 +9,14 @@
 ## Parameters
 
 ```solidity
-struct DeploymentConfig {
+struct CreateStakerParams {
     IERC20 rewardsToken;
-    IERC20 stakeToken;             // Must be IERC20Staking for full variant
+    IERC20 stakeToken;             // Must be IERC20Staking for WITH_DELEGATION variant
     address admin;                 // Use multisig
+    IWhitelist stakerWhitelist;    // address(0) = no restrictions
+    IWhitelist contributionWhitelist; // address(0) = no restrictions
+    IWhitelist allocationMechanismWhitelist; // Required, only audited mechanisms
+    IEarningPowerCalculator earningPowerCalculator;
     uint256 maxBumpTip;           // In reward token's smallest unit
     uint256 maxClaimFee;          // In reward token's smallest unit
     uint256 minimumStakeAmount;   // In stake token's smallest unit
@@ -23,8 +27,14 @@ struct DeploymentConfig {
 ## Deployment
 
 ```solidity
-RegenStakerFactory factory = new RegenStakerFactory(bytecode1, bytecode2);
-address staker = factory.createStaker(variant, params, salt, bytecode);
+// Deploy factory with canonical bytecodes
+RegenStakerFactory factory = new RegenStakerFactory(regenStakerBytecode, noDelegationBytecode);
+
+// For delegation variant (IERC20Staking tokens)
+address staker = factory.createStakerWithDelegation(params, salt, regenStakerBytecode);
+
+// For non-delegation variant (standard ERC20 tokens)
+address staker = factory.createStakerWithoutDelegation(params, salt, noDelegationBytecode);
 ```
 
 ## Post-Deployment

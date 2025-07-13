@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 import { RegenStaker } from "src/regen/RegenStaker.sol";
+import { RegenStakerBase } from "src/regen/RegenStakerBase.sol";
 import { RegenEarningPowerCalculator } from "src/regen/RegenEarningPowerCalculator.sol";
 import { Whitelist } from "src/utils/Whitelist.sol";
 import { IWhitelist } from "src/utils/IWhitelist.sol";
@@ -27,6 +28,10 @@ import { AllocationConfig } from "src/mechanisms/BaseAllocationMechanism.sol";
  */
 contract RegenIntegrationTest is Test {
     RegenStaker regenStaker;
+
+    // Event declarations
+    event RewardDurationSet(uint256 newDuration);
+
     RegenEarningPowerCalculator calculator;
     Whitelist stakerWhitelist;
     Whitelist contributorWhitelist;
@@ -188,7 +193,7 @@ contract RegenIntegrationTest is Test {
     function setUp() public virtual {
         rewardTokenDecimals = uint8(bound(vm.randomUint(), 6, 18));
         stakeTokenDecimals = uint8(bound(vm.randomUint(), 6, 18));
-        uint256 rewardDuration = bound(vm.randomUint(), MIN_REWARD_DURATION, MAX_REWARD_DURATION);
+        uint256 rewardDuration = bound(vm.randomUint(), uint128(MIN_REWARD_DURATION), MAX_REWARD_DURATION);
 
         vm.startPrank(ADMIN);
 
@@ -210,7 +215,7 @@ contract RegenIntegrationTest is Test {
             calculator,
             MAX_BUMP_TIP,
             ADMIN,
-            rewardDuration,
+            uint128(rewardDuration),
             MAX_CLAIM_FEE,
             0,
             stakerWhitelist,
@@ -232,7 +237,7 @@ contract RegenIntegrationTest is Test {
     ) public {
         tipAmount = bound(tipAmount, 0, MAX_BUMP_TIP);
         feeAmount = bound(feeAmount, 0, MAX_CLAIM_FEE);
-        minimumStakeAmount = bound(minimumStakeAmount, 0, getStakeAmount(1000));
+        minimumStakeAmount = bound(uint128(minimumStakeAmount), 0, getStakeAmount(1000));
 
         vm.startPrank(ADMIN);
         RegenStaker localRegenStaker = new RegenStaker(
@@ -241,9 +246,9 @@ contract RegenIntegrationTest is Test {
             calculator,
             tipAmount,
             ADMIN,
-            MIN_REWARD_DURATION,
+            uint128(MIN_REWARD_DURATION),
             feeAmount,
-            minimumStakeAmount,
+            uint128(minimumStakeAmount),
             IWhitelist(address(0)),
             IWhitelist(address(0)),
             allocationMechanismWhitelist
@@ -277,7 +282,7 @@ contract RegenIntegrationTest is Test {
     ) public {
         tipAmount = bound(tipAmount, 0, MAX_BUMP_TIP);
         feeAmount = bound(feeAmount, 0, MAX_CLAIM_FEE);
-        minimumStakeAmount = bound(minimumStakeAmount, 0, getStakeAmount(1000));
+        minimumStakeAmount = bound(uint128(minimumStakeAmount), 0, getStakeAmount(1000));
 
         vm.startPrank(ADMIN);
         Whitelist providedStakerWhitelist = new Whitelist();
@@ -292,9 +297,9 @@ contract RegenIntegrationTest is Test {
             calculator,
             tipAmount,
             ADMIN,
-            MIN_REWARD_DURATION,
+            uint128(MIN_REWARD_DURATION),
             feeAmount,
-            minimumStakeAmount,
+            uint128(minimumStakeAmount),
             providedStakerWhitelist,
             providedContributorWhitelist,
             allocationMechanismWhitelist
@@ -347,7 +352,7 @@ contract RegenIntegrationTest is Test {
         newMinimum = bound(newMinimum, 0, getStakeAmount(10000));
 
         vm.prank(ADMIN);
-        regenStaker.setMinimumStakeAmount(newMinimum);
+        regenStaker.setMinimumStakeAmount(uint128(newMinimum));
 
         assertEq(regenStaker.minimumStakeAmount(), newMinimum);
     }
@@ -358,7 +363,7 @@ contract RegenIntegrationTest is Test {
 
         vm.startPrank(nonAdmin);
         vm.expectRevert(abi.encodeWithSelector(Staker.Staker__Unauthorized.selector, bytes32("not admin"), nonAdmin));
-        regenStaker.setMinimumStakeAmount(newMinimum);
+        regenStaker.setMinimumStakeAmount(uint128(newMinimum));
         vm.stopPrank();
     }
 
@@ -367,7 +372,7 @@ contract RegenIntegrationTest is Test {
         stakeAmount = bound(stakeAmount, 1, minimumAmount - 1);
 
         vm.prank(ADMIN);
-        regenStaker.setMinimumStakeAmount(minimumAmount);
+        regenStaker.setMinimumStakeAmount(uint128(minimumAmount));
 
         address user = makeAddr("user");
         whitelistUser(user, true, false, true);
@@ -376,7 +381,7 @@ contract RegenIntegrationTest is Test {
         vm.startPrank(user);
         stakeToken.approve(address(regenStaker), stakeAmount);
         vm.expectRevert(
-            abi.encodeWithSelector(RegenStaker.MinimumStakeAmountNotMet.selector, minimumAmount, stakeAmount)
+            abi.encodeWithSelector(RegenStakerBase.MinimumStakeAmountNotMet.selector, minimumAmount, stakeAmount)
         );
         regenStaker.stake(stakeAmount, user, user);
         vm.stopPrank();
@@ -393,7 +398,7 @@ contract RegenIntegrationTest is Test {
         vm.assume(stakeAmount >= minimumAmount);
 
         vm.prank(ADMIN);
-        regenStaker.setMinimumStakeAmount(minimumAmount);
+        regenStaker.setMinimumStakeAmount(uint128(minimumAmount));
 
         address user = makeAddr("user");
         whitelistUser(user, true, false, true);
@@ -428,7 +433,7 @@ contract RegenIntegrationTest is Test {
         vm.assume(remainingAfterWithdraw + additionalStake < minimumAmount);
 
         vm.prank(ADMIN);
-        regenStaker.setMinimumStakeAmount(minimumAmount);
+        regenStaker.setMinimumStakeAmount(uint128(minimumAmount));
 
         address user = makeAddr("user");
         whitelistUser(user, true, false, true);
@@ -439,7 +444,11 @@ contract RegenIntegrationTest is Test {
         Staker.DepositIdentifier depositId = regenStaker.stake(initialStake, user, user);
 
         vm.expectRevert(
-            abi.encodeWithSelector(RegenStaker.MinimumStakeAmountNotMet.selector, minimumAmount, remainingAfterWithdraw)
+            abi.encodeWithSelector(
+                RegenStakerBase.MinimumStakeAmountNotMet.selector,
+                minimumAmount,
+                remainingAfterWithdraw
+            )
         );
         regenStaker.withdraw(depositId, withdrawAmount);
         vm.stopPrank();
@@ -465,7 +474,7 @@ contract RegenIntegrationTest is Test {
         stakeToken.approve(address(regenStaker), stakeAmount);
 
         vm.expectRevert(
-            abi.encodeWithSelector(RegenStaker.NotWhitelisted.selector, regenStaker.stakerWhitelist(), user)
+            abi.encodeWithSelector(RegenStakerBase.NotWhitelisted.selector, regenStaker.stakerWhitelist(), user)
         );
         regenStaker.stake(partialStakeAmount, user);
         vm.stopPrank();
@@ -648,7 +657,7 @@ contract RegenIntegrationTest is Test {
 
         vm.startPrank(contributor);
         vm.expectRevert(abi.encodeWithSelector(Pausable.EnforcedPause.selector));
-        regenStaker.contribute(depositId, allocationMechanism, contributor, contributeAmount, deadline, v, r, s);
+        regenStaker.contribute(depositId, allocationMechanism, contributeAmount, deadline, v, r, s);
         vm.stopPrank();
 
         vm.prank(ADMIN);
@@ -1360,12 +1369,12 @@ contract RegenIntegrationTest is Test {
 
         vm.startPrank(contributor);
         vm.expectRevert(abi.encodeWithSelector(Staker.Staker__InvalidAddress.selector));
-        regenStaker.contribute(depositId, address(0), contributor, contributionAmount, deadline, v, r, s);
+        regenStaker.contribute(depositId, address(0), contributionAmount, deadline, v, r, s);
         vm.stopPrank();
     }
 
     function testFuzz_SetRewardDuration(uint256 newDuration) public {
-        newDuration = bound(newDuration, MIN_REWARD_DURATION, MAX_REWARD_DURATION);
+        newDuration = bound(newDuration, uint128(MIN_REWARD_DURATION), MAX_REWARD_DURATION);
 
         // current duration
         uint256 currentDuration = regenStaker.rewardDuration();
@@ -1373,45 +1382,45 @@ contract RegenIntegrationTest is Test {
 
         vm.prank(ADMIN);
         vm.expectEmit(true, true, true, true);
-        emit RegenStaker.RewardDurationSet(newDuration);
-        regenStaker.setRewardDuration(newDuration);
+        emit RewardDurationSet(newDuration);
+        regenStaker.setRewardDuration(uint128(newDuration));
 
         assertEq(regenStaker.rewardDuration(), newDuration);
     }
 
     function testFuzz_RevertIf_NonAdminCannotSetRewardDuration(address nonAdmin, uint256 newDuration) public {
         vm.assume(nonAdmin != ADMIN);
-        newDuration = bound(newDuration, MIN_REWARD_DURATION, MAX_REWARD_DURATION);
+        newDuration = bound(newDuration, uint128(MIN_REWARD_DURATION), MAX_REWARD_DURATION);
 
         vm.startPrank(nonAdmin);
         vm.expectRevert(abi.encodeWithSelector(Staker.Staker__Unauthorized.selector, bytes32("not admin"), nonAdmin));
-        regenStaker.setRewardDuration(newDuration);
+        regenStaker.setRewardDuration(uint128(newDuration));
         vm.stopPrank();
     }
 
     function testFuzz_RevertIf_SetRewardDurationTooLow() public {
         vm.startPrank(ADMIN);
-        vm.expectRevert(abi.encodeWithSelector(RegenStaker.InvalidRewardDuration.selector, 6 days));
+        vm.expectRevert(abi.encodeWithSelector(RegenStakerBase.InvalidRewardDuration.selector, 6 days));
         regenStaker.setRewardDuration(6 days);
         vm.stopPrank();
     }
 
     function testFuzz_RevertIf_SetRewardDurationToZero() public {
         vm.startPrank(ADMIN);
-        vm.expectRevert(abi.encodeWithSelector(RegenStaker.InvalidRewardDuration.selector, 0));
-        regenStaker.setRewardDuration(0);
+        vm.expectRevert(abi.encodeWithSelector(RegenStakerBase.InvalidRewardDuration.selector, 0));
+        regenStaker.setRewardDuration(uint128(0));
         vm.stopPrank();
     }
 
     function testFuzz_RevertIf_SetRewardDurationTooHigh() public {
         vm.startPrank(ADMIN);
-        vm.expectRevert(abi.encodeWithSelector(RegenStaker.InvalidRewardDuration.selector, 3001 days));
+        vm.expectRevert(abi.encodeWithSelector(RegenStakerBase.InvalidRewardDuration.selector, 3001 days));
         regenStaker.setRewardDuration(3001 days);
         vm.stopPrank();
     }
 
     function testFuzz_RevertIf_SetRewardDurationDuringActiveReward(uint256 newDuration) public {
-        newDuration = bound(newDuration, MIN_REWARD_DURATION, MAX_REWARD_DURATION);
+        newDuration = bound(newDuration, uint128(MIN_REWARD_DURATION), MAX_REWARD_DURATION);
 
         address staker = makeAddr("staker");
         whitelistUser(staker, true, false, true);
@@ -1432,13 +1441,13 @@ contract RegenIntegrationTest is Test {
         vm.warp(block.timestamp + regenStaker.rewardDuration() / 2);
 
         vm.startPrank(ADMIN);
-        vm.expectRevert(abi.encodeWithSelector(RegenStaker.CannotChangeRewardDurationDuringActiveReward.selector));
-        regenStaker.setRewardDuration(newDuration);
+        vm.expectRevert(abi.encodeWithSelector(RegenStakerBase.CannotChangeRewardDurationDuringActiveReward.selector));
+        regenStaker.setRewardDuration(uint128(newDuration));
         vm.stopPrank();
     }
 
     function testFuzz_Constructor_WithCustomRewardDuration(uint256 customDuration) public {
-        customDuration = bound(customDuration, MIN_REWARD_DURATION, MAX_REWARD_DURATION);
+        customDuration = bound(uint128(customDuration), uint128(MIN_REWARD_DURATION), MAX_REWARD_DURATION);
 
         vm.startPrank(ADMIN);
         RegenStaker localRegenStaker = new RegenStaker(
@@ -1447,7 +1456,7 @@ contract RegenIntegrationTest is Test {
             calculator,
             MAX_BUMP_TIP,
             ADMIN,
-            customDuration,
+            uint128(customDuration),
             MAX_CLAIM_FEE,
             0,
             IWhitelist(address(0)),
@@ -1461,7 +1470,7 @@ contract RegenIntegrationTest is Test {
 
     function testFuzz_Constructor_WithZeroRewardDurationReverts() public {
         vm.startPrank(ADMIN);
-        vm.expectRevert(abi.encodeWithSelector(RegenStaker.InvalidRewardDuration.selector, 0));
+        vm.expectRevert(abi.encodeWithSelector(RegenStakerBase.InvalidRewardDuration.selector, 0));
         new RegenStaker(
             IERC20(address(rewardToken)),
             IERC20Staking(address(stakeToken)),
@@ -1486,10 +1495,10 @@ contract RegenIntegrationTest is Test {
         stakeAmountBase = bound(stakeAmountBase, 1, 100_000);
         customDurationDays = bound(customDurationDays, 30, 365);
         uint256 customDuration = customDurationDays * 1 days;
-        rewardAmountBase = bound(rewardAmountBase, customDuration, 100_000_000);
+        rewardAmountBase = bound(rewardAmountBase, uint128(customDuration), 100_000_000);
 
         vm.prank(ADMIN);
-        regenStaker.setRewardDuration(customDuration);
+        regenStaker.setRewardDuration(uint128(customDuration));
 
         address staker = makeAddr("staker");
         whitelistUser(staker, true, false, true);
@@ -1525,11 +1534,11 @@ contract RegenIntegrationTest is Test {
         stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
         customDurationDays = bound(customDurationDays, 30, 100);
         uint256 customDuration = customDurationDays * 1 days;
-        rewardAmountBase = bound(rewardAmountBase, customDuration, 100_000_000);
+        rewardAmountBase = bound(rewardAmountBase, uint128(customDuration), 100_000_000);
         secondStakerJoinPercent = bound(secondStakerJoinPercent, 10, 90);
 
         vm.prank(ADMIN);
-        regenStaker.setRewardDuration(customDuration);
+        regenStaker.setRewardDuration(uint128(customDuration));
 
         address stakerA = makeAddr("stakerA");
         address stakerB = makeAddr("stakerB");
@@ -1591,11 +1600,11 @@ contract RegenIntegrationTest is Test {
         stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
         customDurationDays = bound(customDurationDays, 30, 100);
         uint256 customDuration = customDurationDays * 1 days;
-        rewardAmountBase = bound(rewardAmountBase, customDuration, 100_000_000);
+        rewardAmountBase = bound(rewardAmountBase, uint128(customDuration), 100_000_000);
         firstClaimTimePercent = bound(firstClaimTimePercent, 10, 90);
 
         vm.prank(ADMIN);
-        regenStaker.setRewardDuration(customDuration);
+        regenStaker.setRewardDuration(uint128(customDuration));
 
         address staker = makeAddr("staker");
         whitelistUser(staker, true, false, true);
@@ -1654,7 +1663,7 @@ contract RegenIntegrationTest is Test {
         rewardAmountBase = bound(rewardAmountBase, max(firstDuration, secondDuration), 100_000_000);
 
         vm.prank(ADMIN);
-        regenStaker.setRewardDuration(firstDuration);
+        regenStaker.setRewardDuration(uint128(firstDuration));
 
         address staker = makeAddr("staker");
         whitelistUser(staker, true, false, true);
@@ -1675,7 +1684,7 @@ contract RegenIntegrationTest is Test {
         vm.warp(block.timestamp + firstDuration + 1);
 
         vm.prank(ADMIN);
-        regenStaker.setRewardDuration(secondDuration);
+        regenStaker.setRewardDuration(uint128(secondDuration));
 
         vm.prank(ADMIN);
         regenStaker.notifyRewardAmount(rewardAmount);
@@ -1719,7 +1728,7 @@ contract RegenIntegrationTest is Test {
             calculator,
             MAX_BUMP_TIP,
             ADMIN,
-            MIN_REWARD_DURATION,
+            uint128(MIN_REWARD_DURATION),
             MAX_CLAIM_FEE,
             0,
             stakerWhitelist,
@@ -1727,7 +1736,7 @@ contract RegenIntegrationTest is Test {
             allocationMechanismWhitelist
         );
         compoundRegenStaker.setRewardNotifier(ADMIN, true);
-        compoundRegenStaker.setMinimumStakeAmount(minimumAmount);
+        compoundRegenStaker.setMinimumStakeAmount(uint128(minimumAmount));
         vm.stopPrank();
 
         address user = makeAddr("user");
@@ -1735,7 +1744,7 @@ contract RegenIntegrationTest is Test {
 
         // Temporarily set minimum to 0 to allow initial stake
         vm.prank(ADMIN);
-        compoundRegenStaker.setMinimumStakeAmount(0);
+        compoundRegenStaker.setMinimumStakeAmount(uint128(0));
 
         sameToken.mint(user, stakeAmount);
         sameToken.mint(address(compoundRegenStaker), rewardAmount);
@@ -1752,7 +1761,7 @@ contract RegenIntegrationTest is Test {
 
         // Reset minimum amount
         vm.prank(ADMIN);
-        compoundRegenStaker.setMinimumStakeAmount(minimumAmount);
+        compoundRegenStaker.setMinimumStakeAmount(uint128(minimumAmount));
 
         uint256 unclaimedBefore = compoundRegenStaker.unclaimedReward(depositId);
         uint256 expectedNewBalance = stakeAmount + unclaimedBefore;
@@ -1760,7 +1769,11 @@ contract RegenIntegrationTest is Test {
         if (expectedNewBalance < minimumAmount) {
             vm.prank(user);
             vm.expectRevert(
-                abi.encodeWithSelector(RegenStaker.MinimumStakeAmountNotMet.selector, minimumAmount, expectedNewBalance)
+                abi.encodeWithSelector(
+                    RegenStakerBase.MinimumStakeAmountNotMet.selector,
+                    minimumAmount,
+                    expectedNewBalance
+                )
             );
             compoundRegenStaker.compoundRewards(depositId);
         } else {
@@ -1776,7 +1789,7 @@ contract RegenIntegrationTest is Test {
         uint256 timeElapsedPercent
     ) public {
         stakeAmountBase = bound(stakeAmountBase, 1, 100_000);
-        rewardAmountBase = bound(rewardAmountBase, MIN_REWARD_DURATION, MAX_REWARD_DURATION + 1_000_000_000);
+        rewardAmountBase = bound(rewardAmountBase, uint128(MIN_REWARD_DURATION), MAX_REWARD_DURATION + 1_000_000_000);
         timeElapsedPercent = bound(timeElapsedPercent, 1, 100);
 
         MockERC20Staking sameToken = new MockERC20Staking(18);
@@ -1788,7 +1801,7 @@ contract RegenIntegrationTest is Test {
             calculator,
             MAX_BUMP_TIP,
             ADMIN,
-            MIN_REWARD_DURATION,
+            uint128(MIN_REWARD_DURATION),
             MAX_CLAIM_FEE,
             0,
             stakerWhitelist,
@@ -1841,7 +1854,7 @@ contract RegenIntegrationTest is Test {
         uint256 feeAmountBase
     ) public {
         stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
-        rewardAmountBase = bound(rewardAmountBase, MIN_REWARD_DURATION, MAX_REWARD_DURATION + 1_000_000_000);
+        rewardAmountBase = bound(rewardAmountBase, uint128(MIN_REWARD_DURATION), MAX_REWARD_DURATION + 1_000_000_000);
         feeAmountBase = bound(feeAmountBase, 0, rewardAmountBase / 10);
 
         MockERC20Staking sameToken = new MockERC20Staking(18);
@@ -1853,7 +1866,7 @@ contract RegenIntegrationTest is Test {
             calculator,
             MAX_BUMP_TIP,
             ADMIN,
-            MIN_REWARD_DURATION,
+            uint128(MIN_REWARD_DURATION),
             MAX_CLAIM_FEE,
             0,
             stakerWhitelist,
@@ -1923,7 +1936,7 @@ contract RegenIntegrationTest is Test {
         uint256 compoundTimes
     ) public {
         stakeAmountBase = bound(stakeAmountBase, 10, 10_000);
-        rewardAmountBase = bound(rewardAmountBase, MIN_REWARD_DURATION, MAX_REWARD_DURATION + 1_000_000_000);
+        rewardAmountBase = bound(rewardAmountBase, uint128(MIN_REWARD_DURATION), MAX_REWARD_DURATION + 1_000_000_000);
         compoundTimes = bound(compoundTimes, 2, 5);
 
         MockERC20Staking sameToken = new MockERC20Staking(18);
@@ -1935,7 +1948,7 @@ contract RegenIntegrationTest is Test {
             calculator,
             MAX_BUMP_TIP,
             ADMIN,
-            MIN_REWARD_DURATION,
+            uint128(MIN_REWARD_DURATION),
             MAX_CLAIM_FEE,
             0,
             stakerWhitelist,
@@ -1995,7 +2008,7 @@ contract RegenIntegrationTest is Test {
         currentTestCtx.user2StakeBase = bound(user2StakeBase, 1, 10_000);
         currentTestCtx.rewardAmountBase = bound(
             rewardAmountBase,
-            MIN_REWARD_DURATION,
+            uint128(MIN_REWARD_DURATION),
             MAX_REWARD_DURATION + 1_000_000_000
         );
         currentTestCtx.user2JoinTimePercent = bound(user2JoinTimePercent, 10, 90);
@@ -2009,7 +2022,7 @@ contract RegenIntegrationTest is Test {
             calculator,
             MAX_BUMP_TIP,
             ADMIN,
-            MIN_REWARD_DURATION,
+            uint128(MIN_REWARD_DURATION),
             MAX_CLAIM_FEE,
             0,
             stakerWhitelist,
@@ -2130,7 +2143,7 @@ contract RegenIntegrationTest is Test {
         uint256 compoundTimePercent
     ) public {
         stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
-        rewardAmountBase = bound(rewardAmountBase, MIN_REWARD_DURATION, MAX_REWARD_DURATION + 1_000_000_000);
+        rewardAmountBase = bound(rewardAmountBase, uint128(MIN_REWARD_DURATION), MAX_REWARD_DURATION + 1_000_000_000);
         compoundTimePercent = bound(compoundTimePercent, 10, 90);
 
         MockERC20Staking sameToken = new MockERC20Staking(18);
@@ -2142,7 +2155,7 @@ contract RegenIntegrationTest is Test {
             calculator,
             MAX_BUMP_TIP,
             ADMIN,
-            MIN_REWARD_DURATION,
+            uint128(MIN_REWARD_DURATION),
             MAX_CLAIM_FEE,
             0,
             stakerWhitelist,
@@ -2199,7 +2212,7 @@ contract RegenIntegrationTest is Test {
         uint8 decimals
     ) public {
         stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
-        rewardAmountBase = bound(rewardAmountBase, MIN_REWARD_DURATION, MAX_REWARD_DURATION + 1_000_000_000);
+        rewardAmountBase = bound(rewardAmountBase, uint128(MIN_REWARD_DURATION), MAX_REWARD_DURATION + 1_000_000_000);
         decimals = uint8(bound(decimals, 6, 18));
 
         MockERC20Staking sameToken = new MockERC20Staking(decimals);
@@ -2211,7 +2224,7 @@ contract RegenIntegrationTest is Test {
             calculator,
             MAX_BUMP_TIP,
             ADMIN,
-            MIN_REWARD_DURATION,
+            uint128(MIN_REWARD_DURATION),
             MAX_CLAIM_FEE,
             0,
             stakerWhitelist,
@@ -2365,7 +2378,6 @@ contract RegenIntegrationTest is Test {
         currentTestCtx.actualContribution = regenStaker.contribute(
             currentTestCtx.depositId,
             currentTestCtx.allocationMechanism,
-            alice, // voting delegatee
             currentTestCtx.contributeAmount,
             currentTestCtx.deadline,
             currentTestCtx.v,
@@ -2472,7 +2484,6 @@ contract RegenIntegrationTest is Test {
         currentTestCtx.actualContribution = regenStaker.contribute(
             currentTestCtx.depositId,
             currentTestCtx.allocationMechanism,
-            alice,
             currentTestCtx.contributeAmount,
             currentTestCtx.deadline,
             currentTestCtx.v,
@@ -2547,8 +2558,8 @@ contract RegenIntegrationTest is Test {
         rewardToken.approve(allocationMechanism, contributeAmount);
 
         // Should revert with CantAfford
-        vm.expectRevert(abi.encodeWithSelector(RegenStaker.CantAfford.selector, contributeAmount, unclaimedAmount));
-        regenStaker.contribute(depositId, allocationMechanism, alice, contributeAmount, deadline, v, r, s);
+        vm.expectRevert(abi.encodeWithSelector(RegenStakerBase.CantAfford.selector, contributeAmount, unclaimedAmount));
+        regenStaker.contribute(depositId, allocationMechanism, contributeAmount, deadline, v, r, s);
         vm.stopPrank();
     }
 
@@ -2593,9 +2604,9 @@ contract RegenIntegrationTest is Test {
 
         // Should revert with NotWhitelisted
         vm.expectRevert(
-            abi.encodeWithSelector(RegenStaker.NotWhitelisted.selector, regenStaker.contributionWhitelist(), alice)
+            abi.encodeWithSelector(RegenStakerBase.NotWhitelisted.selector, regenStaker.contributionWhitelist(), alice)
         );
-        regenStaker.contribute(depositId, allocationMechanism, alice, contributeAmount, deadline, v, r, s);
+        regenStaker.contribute(depositId, allocationMechanism, contributeAmount, deadline, v, r, s);
         vm.stopPrank();
     }
 
@@ -2643,7 +2654,7 @@ contract RegenIntegrationTest is Test {
 
         // Should revert with EnforcedPause
         vm.expectRevert(abi.encodeWithSelector(Pausable.EnforcedPause.selector));
-        regenStaker.contribute(depositId, allocationMechanism, alice, contributeAmount, deadline, v, r, s);
+        regenStaker.contribute(depositId, allocationMechanism, contributeAmount, deadline, v, r, s);
         vm.stopPrank();
     }
 
@@ -2687,7 +2698,7 @@ contract RegenIntegrationTest is Test {
 
         // Should revert with ExpiredSignature from TokenizedAllocationMechanism
         vm.expectRevert(); // The exact error will be from TokenizedAllocationMechanism
-        regenStaker.contribute(depositId, allocationMechanism, alice, contributeAmount, deadline, v, r, s);
+        regenStaker.contribute(depositId, allocationMechanism, contributeAmount, deadline, v, r, s);
         vm.stopPrank();
     }
 
@@ -2745,12 +2756,12 @@ contract RegenIntegrationTest is Test {
         // Should revert with NotWhitelisted for allocation mechanism
         vm.expectRevert(
             abi.encodeWithSelector(
-                RegenStaker.NotWhitelisted.selector,
+                RegenStakerBase.NotWhitelisted.selector,
                 regenStaker.allocationMechanismWhitelist(),
                 allocationMechanism
             )
         );
-        regenStaker.contribute(depositId, allocationMechanism, alice, contributeAmount, deadline, v, r, s);
+        regenStaker.contribute(depositId, allocationMechanism, contributeAmount, deadline, v, r, s);
         vm.stopPrank();
     }
 

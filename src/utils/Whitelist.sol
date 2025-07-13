@@ -9,7 +9,9 @@ import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 /// @notice A simple whitelist contract that allows for adding and removing addresses from a whitelist
 contract Whitelist is IWhitelist, Ownable {
     error IllegalWhitelistOperation(address account, string reason);
+
     event WhitelistAltered(address indexed account, WhitelistOperation indexed operation);
+
     error EmptyArray();
 
     enum WhitelistOperation {

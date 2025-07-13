@@ -17,16 +17,16 @@ address staker = factory.createStakerWithoutDelegation(params, salt, bytecode);
 ```solidity
 struct CreateStakerParams {
     IERC20 rewardsToken;
-    IERC20 stakeToken;                    // Must be IERC20Staking for full variant
+    IERC20 stakeToken;                    // Must be IERC20Staking for WITH_DELEGATION variant
     address admin;
     IWhitelist stakerWhitelist;           // address(0) = no restrictions
     IWhitelist contributionWhitelist;     // address(0) = no restrictions  
-    IWhitelist allocationMechanismWhitelist;  // Required
+    IWhitelist allocationMechanismWhitelist;  // Required, only audited mechanisms
     IEarningPowerCalculator earningPowerCalculator;
     uint256 maxBumpTip;                   // In reward token's smallest unit
     uint256 maxClaimFee;                  // In reward token's smallest unit  
     uint256 minimumStakeAmount;           // In stake token's smallest unit
-    uint256 rewardDuration;               // 7-3000 days
+    uint256 rewardDuration;               // 7-3000 days (≥30 days recommended)
 }
 ```
 

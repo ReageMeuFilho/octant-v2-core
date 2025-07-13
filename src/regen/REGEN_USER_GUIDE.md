@@ -13,7 +13,7 @@ stakeMore(depositId, amount)
 withdraw(depositId, amount)
 claimReward(depositId) → amount
 compoundRewards(depositId) → amount  // reward token = stake token only
-contribute(depositId, mechanism, delegatee, amount, deadline, v, r, s) → amount
+contribute(depositId, mechanism, amount, deadline, v, r, s) → amount
 ```
 
 ## Key Parameters
