@@ -414,21 +414,13 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
 
         AllocationStorage storage stor = _getStorage();
 
-        // Get current nonce and increment
-        uint256 currentNonce = stor.nonces[user];
-
         // Build struct hash
-        bytes32 structHash = keccak256(abi.encode(SIGNUP_TYPEHASH, user, deposit, currentNonce, deadline));
+        bytes32 structHash = keccak256(abi.encode(SIGNUP_TYPEHASH, user, deposit, stor.nonces[user]++, deadline));
 
         // Recover signer
         address recoveredAddress = _recover(structHash, v, r, s);
         if (recoveredAddress == address(0)) revert InvalidSignature();
         if (recoveredAddress != user) revert InvalidSigner(recoveredAddress, user);
-
-        // Increment nonce
-        unchecked {
-            stor.nonces[user] = currentNonce + 1;
-        }
 
         // Execute signup logic
         _executeSignup(user, deposit);
@@ -535,9 +527,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         if (block.timestamp > deadline) revert ExpiredSignature(deadline, block.timestamp);
 
         AllocationStorage storage stor = _getStorage();
-
-        // Get current nonce and increment
-        uint256 currentNonce = stor.nonces[voter];
+        uint256 currentNonce = stor.nonces[voter]++;
 
         // Build struct hash
         bytes32 structHash = keccak256(
@@ -548,11 +538,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         address recoveredAddress = _recover(structHash, v, r, s);
         if (recoveredAddress == address(0)) revert InvalidSignature();
         if (recoveredAddress != voter) revert InvalidSigner(recoveredAddress, voter);
-
-        // Increment nonce
-        unchecked {
-            stor.nonces[voter] = currentNonce + 1;
-        }
 
         // Execute vote logic
         _executeCastVote(voter, pid, choice, weight);
