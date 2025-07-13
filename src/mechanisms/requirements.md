@@ -17,7 +17,7 @@ This implementation serves as a comprehensive reference for applying the Yearn V
 
 The allocation mechanism system follows the **Yearn V3 Tokenized Strategy Pattern** with four main components:
 
-1. **TokenizedAllocationMechanism.sol** - Shared implementation containing all standard logic (voting, proposals, ERC4626 vault functionality, storage management)
+1. **TokenizedAllocationMechanism.sol** - Shared implementation containing all standard logic (voting, proposals, vault share functionality, storage management)
 2. **BaseAllocationMechanism.sol** - Lightweight proxy contract with fallback delegation and hook definitions
 3. **ProperQF.sol** - Abstract contract providing incremental quadratic funding algorithm with alpha-weighted distribution (used by quadratic voting strategies)
 4. **QuadraticVotingMechanism.sol** - Concrete implementation of quadratic funding using the ProperQF strategy
@@ -302,12 +302,12 @@ This pattern enables complete code reuse while maintaining storage isolation and
 
 #### FR-8: Share Redemption & Asset Distribution
 - **Requirement:** Recipients must be able to redeem allocated shares for underlying assets after timelock
-- **Implementation:** Standard ERC4626 `redeem(shares, receiver, owner)` function with timelock validation
+- **Implementation:** Share redemption `redeem(shares, receiver, owner)` function with timelock validation
 - **Acceptance Criteria:**
   - Recipients can redeem shares only after timelock period expires
   - Shares are burned upon redemption, reducing total supply
   - Underlying assets transferred to recipient from mechanism vault
-  - Redemption amount follows ERC4626 share-to-asset conversion
+  - Redemption amount follows standard share-to-asset conversion
   - Recipients can redeem partial amounts or full allocation
   - **Grace Period Enforcement**: Shares become unredeemable after `globalRedemptionStart + gracePeriod`
 
@@ -613,7 +613,7 @@ Recipients are the beneficiaries of successful funding proposals who receive all
 **System Response:**
 - Shares minted directly to recipient (ERC20-compatible)
 - Timelock enforced (typically 1+ days for security)
-- Share-to-asset conversion follows ERC4626 standard
+- Share-to-asset conversion follows standard vault accounting
 - Assets transferred from mechanism vault to recipient
 
 **Key Benefits:**
@@ -698,7 +698,7 @@ All hooks follow a dual-layer pattern:
 
 ### Integration Requirements
 - ERC20 asset must be specified at deployment time via AllocationConfig
-- Vault share minting system integrated into TokenizedAllocationMechanism (ERC4626 compliant)
+- Vault share minting system integrated into TokenizedAllocationMechanism with standard accounting
 - Event emission provides off-chain integration points for monitoring and indexing
 - Factory pattern ensures proper owner context (deployer becomes owner, not factory)
 

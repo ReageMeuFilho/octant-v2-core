@@ -2,11 +2,11 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import { OctantQFMechanism } from "../mechanism/OctantQFMechanism.sol";
-import { TokenizedAllocationMechanism } from "../TokenizedAllocationMechanism.sol";
+import { OctantQFMechanism } from "src/mechanisms/mechanism/OctantQFMechanism.sol";
+import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocationMechanism.sol";
 import { Whitelist } from "src/utils/Whitelist.sol";
 import { IWhitelist } from "src/utils/IWhitelist.sol";
-import { AllocationConfig } from "../BaseAllocationMechanism.sol";
+import { AllocationConfig } from "src/mechanisms/BaseAllocationMechanism.sol";
 import { ERC20Mock } from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
