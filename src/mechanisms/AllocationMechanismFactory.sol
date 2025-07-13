@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import { TokenizedAllocationMechanism } from "./TokenizedAllocationMechanism.sol";
-import { SimpleVotingMechanism } from "./mechanism/SimpleVotingMechanism.sol";
+import { SimpleVotingMechanism } from "test/mocks/SimpleVotingMechanism.sol";
 import { QuadraticVotingMechanism } from "./mechanism/QuadraticVotingMechanism.sol";
 import { AllocationConfig } from "./BaseAllocationMechanism.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
