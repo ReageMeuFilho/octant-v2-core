@@ -60,6 +60,8 @@ contract QuadraticVotingProposalStateTest is Test {
 
         address mechanismAddr = factory.deployQuadraticVotingMechanism(config, 50, 100); // 50% alpha
         mechanism = QuadraticVotingMechanism(payable(mechanismAddr));
+        _tokenized(address(mechanism)).setKeeper(alice);
+        _tokenized(address(mechanism)).setManagement(bob);
 
         // Pre-fund matching pool - this will be included in total assets during finalize
         uint256 matchingPoolAmount = 2000 ether;
@@ -168,7 +170,6 @@ contract QuadraticVotingProposalStateTest is Test {
         // Recipient cannot receive anything from canceled proposal
         TokenizedAllocationMechanism.Proposal memory proposal = _tokenized(address(mechanism)).proposals(pid);
         assertTrue(proposal.canceled);
-        assertEq(proposal.earliestRedeemableTime, 0);
 
         // Cannot vote on canceled proposal
         vm.expectRevert();
@@ -278,7 +279,6 @@ contract QuadraticVotingProposalStateTest is Test {
 
         // Proposal can be queued by admin
         TokenizedAllocationMechanism.Proposal memory proposal = _tokenized(address(mechanism)).proposals(pid);
-        assertEq(proposal.earliestRedeemableTime, 0); // Not queued yet
         assertFalse(proposal.canceled);
 
         // Verify vote tallies are correct using getTally() from ProperQF
@@ -328,13 +328,12 @@ contract QuadraticVotingProposalStateTest is Test {
         assertEq(_tokenized(address(mechanism)).proposalShares(pid), expectedShares);
 
         // Timelock is active
-        TokenizedAllocationMechanism.Proposal memory proposal = _tokenized(address(mechanism)).proposals(pid);
-        assertEq(proposal.earliestRedeemableTime, timestampBefore + TIMELOCK_DELAY);
-        assertEq(_tokenized(address(mechanism)).redeemableAfter(charlie), timestampBefore + TIMELOCK_DELAY);
-        assertGt(proposal.earliestRedeemableTime, block.timestamp);
+        uint256 globalRedemptionStart = _tokenized(address(mechanism)).globalRedemptionStart();
+        assertEq(globalRedemptionStart, timestampBefore + TIMELOCK_DELAY);
+        assertEq(_tokenized(address(mechanism)).globalRedemptionStart(), globalRedemptionStart);
 
         // Cannot redeem during timelock
-        vm.expectRevert("ERC4626: redeem more than max");
+        vm.expectRevert("Allocation: redeem more than max");
         vm.prank(charlie);
         _tokenized(address(mechanism)).redeem(expectedShares, charlie, charlie);
 
@@ -344,8 +343,8 @@ contract QuadraticVotingProposalStateTest is Test {
         assertFalse(success3);
     }
 
-    /// @notice Test EXECUTED state - shares redeemed after timelock
-    function testProposalState_Executed() public {
+    /// @notice Test share redemption after timelock - proposal remains in Queued state
+    function testProposalState_ShareRedemption() public {
         uint256 startBlock = _tokenized(address(mechanism)).startBlock();
         vm.roll(startBlock - 1);
 
@@ -378,9 +377,8 @@ contract QuadraticVotingProposalStateTest is Test {
         vm.prank(dave);
         uint256 assetsReceived = _tokenized(address(mechanism)).redeem(expectedShares, dave, dave);
 
-        // Mark as claimed to simulate EXECUTED state
-        // Note: The current implementation doesn't automatically set claimed=true
-        // but the state logic checks for shares balance and redeemable time
+        // After redemption, the proposal remains in Queued state
+        // The state logic checks for shares balance and redeemable time
 
         // Verify redemption effects
         assertEq(_tokenized(address(mechanism)).balanceOf(dave), 0);
@@ -436,7 +434,7 @@ contract QuadraticVotingProposalStateTest is Test {
         assertEq(_tokenized(address(mechanism)).balanceOf(eve), 900);
 
         // Redemption should fail due to expiration
-        vm.expectRevert("ERC4626: redeem more than max");
+        vm.expectRevert("Allocation: redeem more than max");
         vm.prank(eve);
         _tokenized(address(mechanism)).redeem(900, eve, eve);
     }

@@ -89,6 +89,10 @@ contract QuadraticVotingAdminJourneyTest is Test {
 
         address mechanismAddr = factory.deployQuadraticVotingMechanism(config, 50, 100); // 50% alpha
         mechanism = QuadraticVotingMechanism(payable(mechanismAddr));
+
+        // Set alice as keeper and bob as management so they can create proposals
+        _tokenized(address(mechanism)).setKeeper(alice);
+        _tokenized(address(mechanism)).setManagement(bob);
     }
 
     /// @notice Test admin deployment and configuration verification
@@ -252,7 +256,7 @@ contract QuadraticVotingAdminJourneyTest is Test {
         uint256 actualShares = _tokenized(address(mechanism)).proposalShares(pidSuccessful);
         assertTrue(actualShares > 0, "Successful proposal should receive shares");
         assertEq(_tokenized(address(mechanism)).balanceOf(charlie), actualShares);
-        assertEq(_tokenized(address(mechanism)).redeemableAfter(charlie), timestampBefore + TIMELOCK_DELAY);
+        assertEq(_tokenized(address(mechanism)).globalRedemptionStart(), timestampBefore + TIMELOCK_DELAY);
 
         // Cannot queue failed proposal
         assertEq(
@@ -290,6 +294,11 @@ contract QuadraticVotingAdminJourneyTest is Test {
         // Transfer ownership
         (bool success3, ) = address(mechanism).call(abi.encodeWithSignature("transferOwnership(address)", newOwner));
         require(success3, "Transfer ownership failed");
+
+        // New owner accepts ownership
+        vm.prank(newOwner);
+        (bool success3b, ) = address(mechanism).call(abi.encodeWithSignature("acceptOwnership()"));
+        require(success3b, "Accept ownership failed");
         assertEq(_tokenized(address(mechanism)).owner(), newOwner);
 
         // Old owner cannot perform owner functions
@@ -341,6 +350,11 @@ contract QuadraticVotingAdminJourneyTest is Test {
             abi.encodeWithSignature("transferOwnership(address)", emergencyAdmin)
         );
         require(success3, "Transfer ownership failed");
+
+        // New owner accepts ownership
+        vm.prank(emergencyAdmin);
+        (bool success3b, ) = address(mechanism).call(abi.encodeWithSignature("acceptOwnership()"));
+        require(success3b, "Accept ownership failed");
 
         // New owner manages crisis
         vm.startPrank(emergencyAdmin);

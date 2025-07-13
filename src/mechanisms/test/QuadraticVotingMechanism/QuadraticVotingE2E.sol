@@ -14,14 +14,62 @@ import { ERC20Mock } from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 /// @notice Complete end-to-end testing of the quadratic voting mechanism
 /// @dev Tests the full user journey from registration through final redemption
 contract QuadraticVotingE2E is Test {
+    // General purpose struct to avoid stack too deep errors
+    struct TestData {
+        // Common data
+        uint256 startBlock;
+        uint256 pid1;
+        uint256 pid2;
+        uint256 pid3;
+        uint256 pid4;
+        address dave;
+        address recipient4;
+        // Tally data for multiple snapshots
+        uint256 p1Contributions1;
+        uint256 p1SqrtSum1;
+        uint256 p1Quadratic1;
+        uint256 p1Linear1;
+        uint256 p2Contributions1;
+        uint256 p2SqrtSum1;
+        uint256 p2Quadratic1;
+        uint256 p2Linear1;
+        uint256 p1Contributions2;
+        uint256 p1SqrtSum2;
+        uint256 p1Quadratic2;
+        uint256 p1Linear2;
+        uint256 p2Contributions2;
+        uint256 p2SqrtSum2;
+        uint256 p2Quadratic2;
+        uint256 p2Linear2;
+        uint256 p1Contributions3;
+        uint256 p1SqrtSum3;
+        uint256 p1Quadratic3;
+        uint256 p1Linear3;
+        // Alpha and funding data
+        uint256 newAlphaNumerator;
+        uint256 newAlphaDenominator;
+        uint256 totalUserDeposits;
+        uint256 totalQuadraticSum;
+        uint256 totalLinearSum;
+        uint256 fixedMatchingPool;
+        uint256 optimalAlphaNumerator;
+        uint256 optimalAlphaDenominator;
+        uint256 totalAssets;
+        uint256 totalFunding;
+        uint256 finalAlphaNumerator;
+        uint256 finalAlphaDenominator;
+        uint256 finalMatchingPool;
+        uint256 finalTotalFunding;
+        uint256 finalTotalAssets;
+    }
     AllocationMechanismFactory factory;
     ERC20Mock token;
     QuadraticVotingMechanism mechanism;
 
     // Test actors
-    address alice = address(0x101); // Voter 1
-    address bob = address(0x102); // Voter 2
-    address charlie = address(0x103); // Voter 3
+    address alice = address(0x101); // Voter 1 and Keeper (can create proposals)
+    address bob = address(0x102); // Voter 2 and Management (can create proposals)
+    address charlie = address(0x103); // Voter 3 (cannot create proposals)
     address recipient1 = address(0x201); // Project recipient 1
     address recipient2 = address(0x202); // Project recipient 2
     address recipient3 = address(0x203); // Project recipient 3
@@ -52,7 +100,8 @@ contract QuadraticVotingE2E is Test {
     }
 
     /// @notice Helper function to create a proposal
-    /// @param proposer Address creating the proposal
+    /// @dev In QuadraticVotingMechanism, only keeper/management can create proposals
+    /// @param proposer Address creating the proposal (must be keeper/management)
     /// @param recipient Address that will receive funds if proposal passes
     /// @param description Description of the proposal
     /// @return pid The proposal ID
@@ -184,6 +233,10 @@ contract QuadraticVotingE2E is Test {
         address mechanismAddr = factory.deployQuadraticVotingMechanism(config, ALPHA_NUMERATOR, ALPHA_DENOMINATOR);
         mechanism = QuadraticVotingMechanism(payable(mechanismAddr));
 
+        // Set alice as keeper and bob as management (both can create proposals)
+        _tokenized(address(mechanism)).setKeeper(alice);
+        _tokenized(address(mechanism)).setManagement(bob);
+
         console.log("=== E2E TEST SETUP COMPLETE ===");
         console.log("Mechanism deployed at:", address(mechanism));
         console.log("Test token deployed at:", address(token));
@@ -191,6 +244,8 @@ contract QuadraticVotingE2E is Test {
         console.log("Alice balance:", token.balanceOf(alice));
         console.log("Bob balance:", token.balanceOf(bob));
         console.log("Charlie balance:", token.balanceOf(charlie));
+        console.log("Keeper:", _tokenized(address(mechanism)).keeper());
+        console.log("Management:", _tokenized(address(mechanism)).management());
     }
 
     /// @notice Verify the setup configuration and initial state
@@ -301,7 +356,7 @@ contract QuadraticVotingE2E is Test {
         _signupUser(alice, DEPOSIT_AMOUNT);
         _signupUser(bob, DEPOSIT_AMOUNT);
 
-        // Create first proposal
+        // Create first proposal (alice is the keeper)
         uint256 pid1 = _createProposal(alice, recipient1, "Education Initiative");
 
         // Verify proposal creation
@@ -309,7 +364,7 @@ contract QuadraticVotingE2E is Test {
 
         // Get proposal details
         TokenizedAllocationMechanism.Proposal memory proposal1 = _tokenized(address(mechanism)).proposals(pid1);
-        assertEq(proposal1.proposer, alice, "Proposer should be Alice");
+        assertEq(proposal1.proposer, alice, "Proposer should be alice (keeper)");
         assertEq(proposal1.recipient, recipient1, "Recipient should be recipient1");
         assertEq(proposal1.description, "Education Initiative", "Description should match");
         assertEq(
@@ -317,36 +372,29 @@ contract QuadraticVotingE2E is Test {
             uint8(TokenizedAllocationMechanism.ProposalState.Pending),
             "Proposal should be Pending"
         );
-        assertEq(proposal1.earliestRedeemableTime, 0, "Earliest redeemable time should be 0");
 
-        // Create second proposal from different user
-        uint256 pid2 = _createProposal(bob, recipient2, "Healthcare Project");
+        // Create second proposal
+        uint256 pid2 = _createProposal(alice, recipient2, "Healthcare Project");
 
         // Verify second proposal
         assertTrue(pid2 > pid1, "Second proposal ID should be greater than first");
 
         TokenizedAllocationMechanism.Proposal memory proposal2 = _tokenized(address(mechanism)).proposals(pid2);
-        assertEq(proposal2.proposer, bob, "Proposer should be Bob");
+        assertEq(proposal2.proposer, alice, "Proposer should be alice (keeper)");
         assertEq(proposal2.recipient, recipient2, "Recipient should be recipient2");
         assertEq(proposal2.description, "Healthcare Project", "Description should match");
 
         // Test edge cases
+        // Charlie (who is not keeper/management) cannot propose
+        vm.expectRevert(abi.encodeWithSelector(TokenizedAllocationMechanism.ProposeNotAllowed.selector, charlie));
+        _createProposal(charlie, recipient3, "Should fail - not keeper/management");
 
-        // Unregistered user cannot propose
-        vm.expectRevert();
-        _createProposal(charlie, recipient3, "Should fail - unregistered");
-
-        // User with zero voting power cannot propose (Charlie is registered but has no voting power)
-        _signupUser(charlie, 0);
-        vm.expectRevert();
-        _createProposal(charlie, recipient3, "Should fail - no voting power");
-
-        // Same user can create multiple proposals
+        // Alice (keeper) can create multiple proposals
         uint256 pid3 = _createProposal(alice, recipient3, "Alice's Second Project");
         assertTrue(pid3 > pid2, "Third proposal ID should be greater than second");
 
         TokenizedAllocationMechanism.Proposal memory proposal3 = _tokenized(address(mechanism)).proposals(pid3);
-        assertEq(proposal3.proposer, alice, "Proposer should still be Alice");
+        assertEq(proposal3.proposer, alice, "Proposer should be alice (keeper)");
         assertEq(proposal3.recipient, recipient3, "Recipient should be recipient3");
     }
 
@@ -368,7 +416,7 @@ contract QuadraticVotingE2E is Test {
         console.log("=== Phase 2: Proposal Creation ===");
         uint256 pid1 = _createProposal(alice, recipient1, "Green Energy Initiative");
         uint256 pid2 = _createProposal(bob, recipient2, "Community Development");
-        uint256 pid3 = _createProposal(charlie, recipient3, "Education Technology");
+        uint256 pid3 = _createProposal(alice, recipient3, "Education Technology"); // alice creates for charlie's project
 
         // Verify all proposals are created correctly
         assertTrue(pid1 < pid2 && pid2 < pid3, "Proposal IDs should be sequential");
@@ -475,7 +523,7 @@ contract QuadraticVotingE2E is Test {
 
         uint256 pid1 = _createProposal(alice, recipient1, "Education");
         uint256 pid2 = _createProposal(bob, recipient2, "Healthcare");
-        uint256 pid3 = _createProposal(charlie, recipient3, "Environment");
+        uint256 pid3 = _createProposal(alice, recipient3, "Environment"); // alice creates for charlie's project
 
         vm.roll(startBlock + VOTING_DELAY + 1);
 
@@ -503,15 +551,15 @@ contract QuadraticVotingE2E is Test {
         assertEq(_tokenized(address(mechanism)).votingPower(charlie), 200 ether - 196 ether, "Charlie remaining power");
 
         // Verify all vote records
-        assertTrue(_tokenized(address(mechanism)).hasVoted(pid1, alice), "Alice voted on pid1");
-        assertTrue(_tokenized(address(mechanism)).hasVoted(pid2, alice), "Alice voted on pid2");
-        assertTrue(_tokenized(address(mechanism)).hasVoted(pid3, alice), "Alice voted on pid3");
-        assertTrue(_tokenized(address(mechanism)).hasVoted(pid1, bob), "Bob voted on pid1");
-        assertTrue(_tokenized(address(mechanism)).hasVoted(pid2, bob), "Bob voted on pid2");
-        assertFalse(_tokenized(address(mechanism)).hasVoted(pid3, bob), "Bob didn't vote on pid3");
-        assertFalse(_tokenized(address(mechanism)).hasVoted(pid1, charlie), "Charlie didn't vote on pid1");
-        assertFalse(_tokenized(address(mechanism)).hasVoted(pid2, charlie), "Charlie didn't vote on pid2");
-        assertTrue(_tokenized(address(mechanism)).hasVoted(pid3, charlie), "Charlie voted on pid3");
+        assertTrue(mechanism.hasVoted(pid1, alice), "Alice voted on pid1");
+        assertTrue(mechanism.hasVoted(pid2, alice), "Alice voted on pid2");
+        assertTrue(mechanism.hasVoted(pid3, alice), "Alice voted on pid3");
+        assertTrue(mechanism.hasVoted(pid1, bob), "Bob voted on pid1");
+        assertTrue(mechanism.hasVoted(pid2, bob), "Bob voted on pid2");
+        assertFalse(mechanism.hasVoted(pid3, bob), "Bob didn't vote on pid3");
+        assertFalse(mechanism.hasVoted(pid1, charlie), "Charlie didn't vote on pid1");
+        assertFalse(mechanism.hasVoted(pid2, charlie), "Charlie didn't vote on pid2");
+        assertTrue(mechanism.hasVoted(pid3, charlie), "Charlie voted on pid3");
 
         // Verify vote tallies using getTally from ProperQF
         // console.log("=== Verifying Vote Tallies ===");
@@ -806,5 +854,1129 @@ contract QuadraticVotingE2E is Test {
         // console.log("Total assets:", totalAssets);
         // console.log("Total shares:", totalShares);
         // console.log("1e18 shares converts to:", assetsFor1Share, "assets");
+    }
+
+    /// @notice Test optimal alpha with small matching pool - alpha should be low fractional value
+    function testOptimalAlphaSmallMatchingPool() public {
+        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
+        vm.roll(startBlock - 1);
+
+        // Setup: 2 users, modest deposits
+        uint256 totalUserDeposits = 800 ether + 600 ether;
+        _signupUser(alice, 800 ether);
+        _signupUser(bob, 600 ether);
+
+        // Create 2 proposals
+        uint256 pid1 = _createProposal(alice, recipient1, "Education Project");
+        uint256 pid2 = _createProposal(bob, recipient2, "Healthcare Project");
+
+        // Move to voting period
+        vm.roll(startBlock + VOTING_DELAY + 1);
+
+        // Cast moderate votes to create quadratic advantage
+        _castVote(alice, pid1, 20e9); // Cost: 400 ether
+        _castVote(bob, pid1, 15e9); // Cost: 225 ether
+        _castVote(alice, pid2, 15e9); // Cost: 225 ether
+        _castVote(bob, pid2, 18e9); // Cost: 324 ether
+
+        console.log("=== SMALL MATCHING POOL TEST ===");
+
+        // Get totals
+        uint256 totalQuadraticSum = mechanism.totalQuadraticSum();
+        uint256 totalLinearSum = mechanism.totalLinearSum();
+
+        // Project 1: (20e9 + 15e9)² = (35e9)² = 1225 ether
+        // Project 2: (15e9 + 18e9)² = (33e9)² = 1089 ether
+        // Total quadratic sum = 1225 + 1089 = 2314 ether
+        assertEq(totalQuadraticSum, 2314 ether, "Total quadratic sum should be 2314 ether");
+
+        // Total linear sum = 400 + 225 + 225 + 324 = 1174 ether
+        assertEq(totalLinearSum, 1174 ether, "Total linear sum should be 1174 ether");
+
+        // Small matching pool - only 200 ether
+        uint256 smallMatchingPool = 200 ether;
+
+        // Calculate optimal alpha using mechanism's function
+        (uint256 optimalAlphaNumerator, uint256 optimalAlphaDenominator) = mechanism.calculateOptimalAlpha(
+            smallMatchingPool,
+            totalUserDeposits
+        );
+
+        console.log("Small matching pool:", smallMatchingPool);
+        console.log("Calculated optimal alpha:", optimalAlphaNumerator, "/", optimalAlphaDenominator);
+
+        // Verify fractional alpha (should be between 0 and 1)
+        assertTrue(optimalAlphaNumerator > 0, "Alpha numerator should be positive");
+        assertTrue(optimalAlphaNumerator < optimalAlphaDenominator, "Alpha should be less than 1");
+
+        // Apply optimal alpha and add matching pool
+        token.mint(address(this), smallMatchingPool);
+        token.transfer(address(mechanism), smallMatchingPool);
+        mechanism.setAlpha(optimalAlphaNumerator, optimalAlphaDenominator);
+
+        // Finalize and queue
+        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        _tokenized(address(mechanism)).finalizeVoteTally();
+        _tokenized(address(mechanism)).queueProposal(pid1);
+        _tokenized(address(mechanism)).queueProposal(pid2);
+
+        // Verify 1:1 ratio maintained (allow small rounding tolerance)
+        uint256 assetsFor1Share = _tokenized(address(mechanism)).convertToAssets(1e18);
+        assertApproxEqAbs(assetsFor1Share, 1e18, 10, "1:1 ratio should be maintained with small matching pool");
+
+        uint256 totalShares = _tokenized(address(mechanism)).totalSupply();
+        uint256 totalAssets = token.balanceOf(address(mechanism));
+        assertApproxEqAbs(totalShares, totalAssets, 10, "Total shares should approximately equal total assets");
+
+        console.log("Alpha:", optimalAlphaNumerator, "/", optimalAlphaDenominator);
+        console.log("Total assets:", totalAssets);
+        console.log("Total shares:", totalShares);
+    }
+
+    /// @notice Test optimal alpha with medium matching pool - alpha should be moderate fractional value
+    function testOptimalAlphaMediumMatchingPool() public {
+        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
+        vm.roll(startBlock - 1);
+
+        // Setup: 2 users with different deposit amounts
+        uint256 totalUserDeposits = 1200 ether + 800 ether;
+        _signupUser(alice, 1200 ether);
+        _signupUser(bob, 800 ether);
+
+        // Create 2 proposals
+        uint256 pid1 = _createProposal(alice, recipient1, "Infrastructure Project");
+        uint256 pid2 = _createProposal(bob, recipient2, "Research Project");
+
+        // Move to voting period
+        vm.roll(startBlock + VOTING_DELAY + 1);
+
+        // Cast strategic votes
+        _castVote(alice, pid1, 25e9); // Cost: 625 ether
+        _castVote(bob, pid1, 20e9); // Cost: 400 ether
+        _castVote(alice, pid2, 20e9); // Cost: 400 ether (Alice remaining: 1200-625-400=175)
+        _castVote(bob, pid2, 15e9); // Cost: 225 ether (Bob remaining: 800-400-225=175)
+
+        console.log("=== MEDIUM MATCHING POOL TEST ===");
+
+        // Get totals
+        uint256 totalQuadraticSum = mechanism.totalQuadraticSum();
+        uint256 totalLinearSum = mechanism.totalLinearSum();
+
+        // Project 1: (25e9 + 20e9)² = (45e9)² = 2025 ether
+        // Project 2: (20e9 + 15e9)² = (35e9)² = 1225 ether
+        // Total quadratic sum = 2025 + 1225 = 3250 ether
+        assertEq(totalQuadraticSum, 3250 ether, "Total quadratic sum should be 3250 ether");
+
+        // Total linear sum = 625 + 400 + 400 + 225 = 1650 ether
+        assertEq(totalLinearSum, 1650 ether, "Total linear sum should be 1650 ether");
+
+        // Medium matching pool - 600 ether (moderate funding)
+        uint256 mediumMatchingPool = 600 ether;
+
+        // Calculate optimal alpha
+        (uint256 optimalAlphaNumerator, uint256 optimalAlphaDenominator) = mechanism.calculateOptimalAlpha(
+            mediumMatchingPool,
+            totalUserDeposits
+        );
+
+        console.log("Medium matching pool:", mediumMatchingPool);
+        console.log("Calculated optimal alpha:", optimalAlphaNumerator, "/", optimalAlphaDenominator);
+
+        // Verify fractional alpha in medium range
+        assertTrue(optimalAlphaNumerator > 0, "Alpha numerator should be positive");
+        assertTrue(optimalAlphaNumerator < optimalAlphaDenominator, "Alpha should be less than 1");
+
+        // Apply optimal alpha and add matching pool
+        token.mint(address(this), mediumMatchingPool);
+        token.transfer(address(mechanism), mediumMatchingPool);
+        mechanism.setAlpha(optimalAlphaNumerator, optimalAlphaDenominator);
+
+        // Finalize and queue
+        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        _tokenized(address(mechanism)).finalizeVoteTally();
+        _tokenized(address(mechanism)).queueProposal(pid1);
+        _tokenized(address(mechanism)).queueProposal(pid2);
+
+        // Verify 1:1 ratio maintained
+        uint256 assetsFor1Share = _tokenized(address(mechanism)).convertToAssets(1e18);
+        assertEq(assetsFor1Share, 1e18, "1:1 ratio should be maintained with medium matching pool");
+
+        uint256 totalShares = _tokenized(address(mechanism)).totalSupply();
+        uint256 totalAssets = token.balanceOf(address(mechanism));
+        assertEq(totalShares, totalAssets, "Total shares should equal total assets");
+
+        console.log("Alpha:", optimalAlphaNumerator, "/", optimalAlphaDenominator);
+        console.log("Total assets:", totalAssets);
+        console.log("Total shares:", totalShares);
+    }
+
+    /// @notice Test optimal alpha with varied voting patterns - multiple voters, diverse vote distribution
+    function testOptimalAlphaVariedVotingPatterns() public {
+        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
+        vm.roll(startBlock - 1);
+
+        // Setup: 3 users with different deposit amounts
+        uint256 totalUserDeposits = 900 ether + 700 ether + 400 ether;
+        _signupUser(alice, 900 ether);
+        _signupUser(bob, 700 ether);
+        _signupUser(charlie, 400 ether);
+
+        // Create 3 proposals
+        uint256 pid1 = _createProposal(alice, recipient1, "Social Impact Project");
+        uint256 pid2 = _createProposal(bob, recipient2, "Tech Innovation Project");
+        uint256 pid3 = _createProposal(alice, recipient3, "Community Project"); // alice creates for charlie's project
+
+        // Move to voting period
+        vm.roll(startBlock + VOTING_DELAY + 1);
+
+        // Create diverse voting patterns
+        _castVote(alice, pid1, 22e9); // Cost: 484 ether
+        _castVote(alice, pid2, 18e9); // Cost: 324 ether
+        _castVote(bob, pid1, 15e9); // Cost: 225 ether
+        _castVote(bob, pid3, 20e9); // Cost: 400 ether
+        _castVote(charlie, pid2, 12e9); // Cost: 144 ether
+        _castVote(charlie, pid3, 16e9); // Cost: 256 ether
+
+        console.log("=== VARIED VOTING PATTERNS TEST ===");
+
+        // Get totals
+        uint256 totalQuadraticSum = mechanism.totalQuadraticSum();
+        uint256 totalLinearSum = mechanism.totalLinearSum();
+
+        // Project 1: (22e9 + 15e9)² = (37e9)² = 1369 ether
+        // Project 2: (18e9 + 12e9)² = (30e9)² = 900 ether
+        // Project 3: (20e9 + 16e9)² = (36e9)² = 1296 ether
+        // Total quadratic sum = 1369 + 900 + 1296 = 3565 ether
+        assertEq(totalQuadraticSum, 3565 ether, "Total quadratic sum should be 3565 ether");
+
+        // Total linear sum = 484 + 324 + 225 + 400 + 144 + 256 = 1833 ether
+        assertEq(totalLinearSum, 1833 ether, "Total linear sum should be 1833 ether");
+
+        // Moderate matching pool for varied scenario
+        uint256 variedMatchingPool = 500 ether;
+
+        // Calculate optimal alpha
+        (uint256 optimalAlphaNumerator, uint256 optimalAlphaDenominator) = mechanism.calculateOptimalAlpha(
+            variedMatchingPool,
+            totalUserDeposits
+        );
+
+        console.log("Varied matching pool:", variedMatchingPool);
+        console.log("Calculated optimal alpha:", optimalAlphaNumerator, "/", optimalAlphaDenominator);
+
+        // Verify fractional alpha
+        assertTrue(optimalAlphaNumerator > 0, "Alpha numerator should be positive");
+        assertTrue(optimalAlphaNumerator < optimalAlphaDenominator, "Alpha should be less than 1");
+
+        // Apply optimal alpha and add matching pool
+        token.mint(address(this), variedMatchingPool);
+        token.transfer(address(mechanism), variedMatchingPool);
+        mechanism.setAlpha(optimalAlphaNumerator, optimalAlphaDenominator);
+
+        // Finalize and queue all proposals
+        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        _tokenized(address(mechanism)).finalizeVoteTally();
+        _tokenized(address(mechanism)).queueProposal(pid1);
+        _tokenized(address(mechanism)).queueProposal(pid2);
+        _tokenized(address(mechanism)).queueProposal(pid3);
+
+        // Verify 1:1 ratio maintained (allow small rounding tolerance)
+        uint256 assetsFor1Share = _tokenized(address(mechanism)).convertToAssets(1e18);
+        assertApproxEqAbs(assetsFor1Share, 1e18, 10, "1:1 ratio should be maintained with varied voting patterns");
+
+        uint256 totalShares = _tokenized(address(mechanism)).totalSupply();
+        uint256 totalAssets = token.balanceOf(address(mechanism));
+        assertApproxEqAbs(totalShares, totalAssets, 10, "Total shares should approximately equal total assets");
+
+        // Verify individual recipient shares
+        uint256 recipient1Shares = _tokenized(address(mechanism)).balanceOf(recipient1);
+        uint256 recipient2Shares = _tokenized(address(mechanism)).balanceOf(recipient2);
+        uint256 recipient3Shares = _tokenized(address(mechanism)).balanceOf(recipient3);
+
+        assertTrue(recipient1Shares > 0, "Recipient 1 should receive shares");
+        assertTrue(recipient2Shares > 0, "Recipient 2 should receive shares");
+        assertTrue(recipient3Shares > 0, "Recipient 3 should receive shares");
+        assertEq(
+            recipient1Shares + recipient2Shares + recipient3Shares,
+            totalShares,
+            "Individual shares should sum to total"
+        );
+
+        console.log("Alpha:", optimalAlphaNumerator, "/", optimalAlphaDenominator);
+        console.log("Total assets:", totalAssets);
+        console.log("Total shares:", totalShares);
+        console.log("Recipient 1 shares:", recipient1Shares);
+        console.log("Recipient 2 shares:", recipient2Shares);
+        console.log("Recipient 3 shares:", recipient3Shares);
+    }
+
+    /// @notice Test precision with very large scale deposits and votes
+    function testOptimalAlphaPrecisionLargeScale() public {
+        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
+        vm.roll(startBlock - 1);
+
+        // Use very large deposits to test precision boundaries
+        uint256 largeDeposit1 = 100_000_000 ether; // 100M tokens
+        uint256 largeDeposit2 = 80_000_000 ether; // 80M tokens
+        uint256 totalUserDeposits = largeDeposit1 + largeDeposit2;
+
+        // Mint large amounts for testing
+        token.mint(alice, largeDeposit1);
+        token.mint(bob, largeDeposit2);
+
+        _signupUser(alice, largeDeposit1);
+        _signupUser(bob, largeDeposit2);
+
+        // Create proposals
+        uint256 pid1 = _createProposal(alice, recipient1, "Large Scale Project 1");
+        uint256 pid2 = _createProposal(bob, recipient2, "Large Scale Project 2");
+
+        // Move to voting period
+        vm.roll(startBlock + VOTING_DELAY + 1);
+
+        // Cast large votes that fit within available voting power
+        _castVote(alice, pid1, 8000e9); // Cost: 64M ether
+        _castVote(bob, pid1, 6000e9); // Cost: 36M ether
+        _castVote(alice, pid2, 6000e9); // Cost: 36M ether (Alice total: 100M ether)
+        _castVote(bob, pid2, 6500e9); // Cost: 42.25M ether (Bob total: 78.25M ether)
+
+        console.log("=== LARGE SCALE PRECISION TEST ===");
+
+        // Get totals
+        uint256 totalQuadraticSum = mechanism.totalQuadraticSum();
+        uint256 totalLinearSum = mechanism.totalLinearSum();
+
+        console.log("Total Quadratic Sum:", totalQuadraticSum);
+        console.log("Total Linear Sum:", totalLinearSum);
+
+        // Use a proportionally large matching pool
+        uint256 largeMatchingPool = 50_000_000 ether; // 50M tokens
+
+        // Calculate optimal alpha with large numbers
+        (uint256 optimalAlphaNumerator, uint256 optimalAlphaDenominator) = mechanism.calculateOptimalAlpha(
+            largeMatchingPool,
+            totalUserDeposits
+        );
+
+        console.log("Large matching pool:", largeMatchingPool);
+        console.log("Calculated optimal alpha:", optimalAlphaNumerator, "/", optimalAlphaDenominator);
+
+        // Verify fractional alpha
+        assertTrue(optimalAlphaNumerator > 0, "Alpha numerator should be positive");
+        assertTrue(optimalAlphaNumerator <= optimalAlphaDenominator, "Alpha should be <= 1");
+
+        // Apply optimal alpha and add matching pool
+        token.mint(address(this), largeMatchingPool);
+        token.transfer(address(mechanism), largeMatchingPool);
+        mechanism.setAlpha(optimalAlphaNumerator, optimalAlphaDenominator);
+
+        // Finalize and queue
+        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        _tokenized(address(mechanism)).finalizeVoteTally();
+        _tokenized(address(mechanism)).queueProposal(pid1);
+        _tokenized(address(mechanism)).queueProposal(pid2);
+
+        // Verify 1:1 ratio maintained despite large scale (allow larger tolerance)
+        uint256 assetsFor1Share = _tokenized(address(mechanism)).convertToAssets(1e18);
+        assertApproxEqAbs(assetsFor1Share, 1e18, 1000, "1:1 ratio should be maintained at large scale");
+
+        uint256 totalShares = _tokenized(address(mechanism)).totalSupply();
+        uint256 totalAssets = token.balanceOf(address(mechanism));
+        assertApproxEqAbs(
+            totalShares,
+            totalAssets,
+            1000,
+            "Total shares should approximately equal total assets at large scale"
+        );
+
+        console.log("Large scale alpha:", optimalAlphaNumerator, "/", optimalAlphaDenominator);
+        console.log("Large scale total assets:", totalAssets);
+        console.log("Large scale total shares:", totalShares);
+    }
+
+    /// @notice Test precision with extremely small matching pool (near-zero alpha)
+    function testOptimalAlphaPrecisionTinyMatchingPool() public {
+        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
+        vm.roll(startBlock - 1);
+
+        // Setup with moderate deposits
+        uint256 totalUserDeposits = 1000 ether + 800 ether;
+        _signupUser(alice, 1000 ether);
+        _signupUser(bob, 800 ether);
+
+        // Create proposals
+        uint256 pid1 = _createProposal(alice, recipient1, "Project With Tiny Pool 1");
+        uint256 pid2 = _createProposal(bob, recipient2, "Project With Tiny Pool 2");
+
+        // Move to voting period
+        vm.roll(startBlock + VOTING_DELAY + 1);
+
+        // Cast votes that create large quadratic advantage
+        _castVote(alice, pid1, 25e9); // Cost: 625 ether
+        _castVote(bob, pid1, 20e9); // Cost: 400 ether
+        _castVote(alice, pid2, 15e9); // Cost: 225 ether
+        _castVote(bob, pid2, 18e9); // Cost: 324 ether
+
+        console.log("=== TINY MATCHING POOL PRECISION TEST ===");
+
+        // Get totals
+        uint256 totalQuadraticSum = mechanism.totalQuadraticSum();
+        uint256 totalLinearSum = mechanism.totalLinearSum();
+
+        console.log("Total Quadratic Sum:", totalQuadraticSum);
+        console.log("Total Linear Sum:", totalLinearSum);
+
+        // Use extremely tiny matching pool (1 wei)
+        uint256 tinyMatchingPool = 1;
+
+        // Calculate optimal alpha with tiny matching pool
+        (uint256 optimalAlphaNumerator, uint256 optimalAlphaDenominator) = mechanism.calculateOptimalAlpha(
+            tinyMatchingPool,
+            totalUserDeposits
+        );
+
+        console.log("Tiny matching pool:", tinyMatchingPool);
+        console.log("Calculated optimal alpha:", optimalAlphaNumerator, "/", optimalAlphaDenominator);
+
+        // With tiny matching pool, alpha should be very small but not zero
+        assertTrue(optimalAlphaNumerator > 0, "Alpha numerator should be positive even with tiny pool");
+        assertTrue(optimalAlphaNumerator < optimalAlphaDenominator, "Alpha should be less than 1");
+
+        // Apply optimal alpha and add matching pool
+        token.mint(address(this), tinyMatchingPool);
+        token.transfer(address(mechanism), tinyMatchingPool);
+        mechanism.setAlpha(optimalAlphaNumerator, optimalAlphaDenominator);
+
+        // Finalize and queue
+        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        _tokenized(address(mechanism)).finalizeVoteTally();
+        _tokenized(address(mechanism)).queueProposal(pid1);
+        _tokenized(address(mechanism)).queueProposal(pid2);
+
+        // Verify 1:1 ratio maintained even with tiny matching pool
+        uint256 assetsFor1Share = _tokenized(address(mechanism)).convertToAssets(1e18);
+        assertApproxEqAbs(assetsFor1Share, 1e18, 100, "1:1 ratio should be maintained with tiny matching pool");
+
+        uint256 totalShares = _tokenized(address(mechanism)).totalSupply();
+        uint256 totalAssets = token.balanceOf(address(mechanism));
+        assertApproxEqAbs(
+            totalShares,
+            totalAssets,
+            100,
+            "Total shares should approximately equal total assets with tiny pool"
+        );
+
+        console.log("Tiny pool alpha:", optimalAlphaNumerator, "/", optimalAlphaDenominator);
+        console.log("Tiny pool total assets:", totalAssets);
+        console.log("Tiny pool total shares:", totalShares);
+    }
+
+    /// @notice Test precision with extreme alpha fraction (very close to 1)
+    function testOptimalAlphaPrecisionNearFullQuadratic() public {
+        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
+        vm.roll(startBlock - 1);
+
+        // Setup with specific deposits
+        uint256 totalUserDeposits = 500 ether + 500 ether;
+        _signupUser(alice, 500 ether);
+        _signupUser(bob, 500 ether);
+
+        // Create proposals
+        uint256 pid1 = _createProposal(alice, recipient1, "Near Full Quadratic 1");
+        uint256 pid2 = _createProposal(bob, recipient2, "Near Full Quadratic 2");
+
+        // Move to voting period
+        vm.roll(startBlock + VOTING_DELAY + 1);
+
+        // Cast votes to create measurable quadratic advantage
+        _castVote(alice, pid1, 15e9); // Cost: 225 ether (Alice remaining: 275 ether)
+        _castVote(bob, pid1, 10e9); // Cost: 100 ether (Bob remaining: 400 ether)
+        _castVote(alice, pid2, 16e9); // Cost: 256 ether (Alice remaining: 19 ether)
+        // Project 1: (15e9 + 10e9)² = (25e9)² = 625 ether, linear = 325 ether
+        // Project 2: (16e9)² = 256 ether, linear = 256 ether
+        // Total: quadratic = 881 ether, linear = 581 ether
+        // Quadratic advantage = 881 - 581 = 300 ether
+
+        console.log("=== NEAR FULL QUADRATIC PRECISION TEST ===");
+
+        // Get totals
+        uint256 totalQuadraticSum = mechanism.totalQuadraticSum();
+        uint256 totalLinearSum = mechanism.totalLinearSum();
+
+        console.log("Total Quadratic Sum:", totalQuadraticSum);
+        console.log("Total Linear Sum:", totalLinearSum);
+
+        // Use matching pool that's almost enough for full quadratic funding
+        uint256 quadraticAdvantage = totalQuadraticSum - totalLinearSum;
+        require(quadraticAdvantage > 10, "Need sufficient quadratic advantage for this test");
+        uint256 nearFullMatchingPool = quadraticAdvantage - 1; // 1 wei short of full quadratic
+
+        // Calculate optimal alpha (should be very close to 1)
+        (uint256 optimalAlphaNumerator, uint256 optimalAlphaDenominator) = mechanism.calculateOptimalAlpha(
+            nearFullMatchingPool,
+            totalUserDeposits
+        );
+
+        console.log("Near-full matching pool:", nearFullMatchingPool);
+        console.log("Quadratic advantage:", quadraticAdvantage);
+        console.log("Calculated optimal alpha:", optimalAlphaNumerator, "/", optimalAlphaDenominator);
+
+        // Alpha should be very close to 1 (could be exactly 1 if we have just enough matching funds)
+        assertTrue(optimalAlphaNumerator > 0, "Alpha numerator should be positive");
+        assertTrue(optimalAlphaNumerator <= optimalAlphaDenominator, "Alpha should be <= 1");
+        assertTrue(optimalAlphaNumerator * 100 >= optimalAlphaDenominator * 95, "Alpha should be >= 0.95");
+
+        // Apply optimal alpha and add matching pool
+        token.mint(address(this), nearFullMatchingPool);
+        token.transfer(address(mechanism), nearFullMatchingPool);
+        mechanism.setAlpha(optimalAlphaNumerator, optimalAlphaDenominator);
+
+        // Finalize and queue
+        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        _tokenized(address(mechanism)).finalizeVoteTally();
+        _tokenized(address(mechanism)).queueProposal(pid1);
+        _tokenized(address(mechanism)).queueProposal(pid2);
+
+        // Verify 1:1 ratio is not violated (it's OK to be over 1:1, but not under)
+        uint256 assetsFor1Share = _tokenized(address(mechanism)).convertToAssets(1e18);
+        assertGe(
+            assetsFor1Share,
+            1e18,
+            "1:1 ratio should not be violated - users should get at least 1:1 assets per share"
+        );
+
+        uint256 totalShares = _tokenized(address(mechanism)).totalSupply();
+        uint256 totalAssets = token.balanceOf(address(mechanism));
+        assertGe(
+            totalAssets,
+            totalShares,
+            "Total assets should be at least equal to total shares (never under-collateralized)"
+        );
+
+        console.log("Near-full alpha:", optimalAlphaNumerator, "/", optimalAlphaDenominator);
+        console.log("Near-full total assets:", totalAssets);
+        console.log("Near-full total shares:", totalShares);
+    }
+
+    /// @notice Test precision with huge quadratic advantage (large denominator)
+    function testOptimalAlphaPrecisionHugeQuadraticAdvantage() public {
+        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
+        vm.roll(startBlock - 1);
+
+        // Setup with large deposits for big votes
+        uint256 largeDeposit1 = 10000 ether;
+        uint256 largeDeposit2 = 8000 ether;
+        uint256 totalUserDeposits = largeDeposit1 + largeDeposit2;
+
+        // Mint additional tokens for large deposits
+        token.mint(alice, largeDeposit1);
+        token.mint(bob, largeDeposit2);
+
+        _signupUser(alice, largeDeposit1);
+        _signupUser(bob, largeDeposit2);
+
+        // Create proposals
+        uint256 pid1 = _createProposal(alice, recipient1, "Huge Advantage Project 1");
+        uint256 pid2 = _createProposal(bob, recipient2, "Huge Advantage Project 2");
+
+        // Move to voting period
+        vm.roll(startBlock + VOTING_DELAY + 1);
+
+        // Cast very large votes to create huge quadratic advantage
+        _castVote(alice, pid1, 80e9); // Cost: 6400 ether
+        _castVote(bob, pid1, 60e9); // Cost: 3600 ether (total: 10000 ether for pid1)
+        _castVote(alice, pid2, 60e9); // Cost: 3600 ether (Alice total: 10000 ether)
+        _castVote(bob, pid2, 65e9); // Cost: 4225 ether (Bob remaining: 175 ether)
+
+        console.log("=== HUGE QUADRATIC ADVANTAGE PRECISION TEST ===");
+
+        // Get totals
+        uint256 totalQuadraticSum = mechanism.totalQuadraticSum();
+        uint256 totalLinearSum = mechanism.totalLinearSum();
+
+        console.log("Total Quadratic Sum:", totalQuadraticSum);
+        console.log("Total Linear Sum:", totalLinearSum);
+
+        // Project 1: (80e9 + 60e9)² = (140e9)² = 19600 ether
+        // Project 2: (60e9 + 65e9)² = (125e9)² = 15625 ether
+        // Total quadratic sum = 35225 ether, linear sum = 17825 ether
+        // Quadratic advantage = 17400 ether (huge denominator for alpha)
+
+        uint256 moderateMatchingPool = 5000 ether; // Much smaller than quadratic advantage
+
+        // Calculate optimal alpha (should have large denominator)
+        (uint256 optimalAlphaNumerator, uint256 optimalAlphaDenominator) = mechanism.calculateOptimalAlpha(
+            moderateMatchingPool,
+            totalUserDeposits
+        );
+
+        console.log("Moderate matching pool:", moderateMatchingPool);
+        console.log("Calculated optimal alpha:", optimalAlphaNumerator, "/", optimalAlphaDenominator);
+
+        // Verify alpha fraction with large denominator
+        assertTrue(optimalAlphaNumerator > 0, "Alpha numerator should be positive");
+        assertTrue(optimalAlphaDenominator > 10000 ether, "Alpha denominator should be very large");
+        assertTrue(optimalAlphaNumerator < optimalAlphaDenominator, "Alpha should be less than 1");
+
+        // Apply optimal alpha and add matching pool
+        token.mint(address(this), moderateMatchingPool);
+        token.transfer(address(mechanism), moderateMatchingPool);
+        mechanism.setAlpha(optimalAlphaNumerator, optimalAlphaDenominator);
+
+        // Finalize and queue
+        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        _tokenized(address(mechanism)).finalizeVoteTally();
+        _tokenized(address(mechanism)).queueProposal(pid1);
+        _tokenized(address(mechanism)).queueProposal(pid2);
+
+        // Verify 1:1 ratio maintained even with huge quadratic advantage
+        uint256 assetsFor1Share = _tokenized(address(mechanism)).convertToAssets(1e18);
+        assertApproxEqAbs(assetsFor1Share, 1e18, 100, "1:1 ratio should be maintained with huge quadratic advantage");
+
+        uint256 totalShares = _tokenized(address(mechanism)).totalSupply();
+        uint256 totalAssets = token.balanceOf(address(mechanism));
+        assertApproxEqAbs(
+            totalShares,
+            totalAssets,
+            100,
+            "Total shares should approximately equal total assets with huge advantage"
+        );
+
+        console.log("Huge advantage alpha:", optimalAlphaNumerator, "/", optimalAlphaDenominator);
+        console.log("Huge advantage total assets:", totalAssets);
+        console.log("Huge advantage total shares:", totalShares);
+    }
+
+    /// @notice Test that ratios >1:1 only occur when alpha=1 and there are excess matching funds
+    function testRatioGreaterThan1OnlyWithAlpha1AndExcessFunds() public {
+        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
+        vm.roll(startBlock - 1);
+
+        // Setup with moderate deposits
+        uint256 totalUserDeposits = 1000 ether + 800 ether;
+        _signupUser(alice, 1000 ether);
+        _signupUser(bob, 800 ether);
+
+        // Create proposals
+        uint256 pid1 = _createProposal(alice, recipient1, "Test Project 1");
+        uint256 pid2 = _createProposal(bob, recipient2, "Test Project 2");
+
+        // Move to voting period
+        vm.roll(startBlock + VOTING_DELAY + 1);
+
+        // Cast votes to create known quadratic advantage
+        _castVote(alice, pid1, 20e9); // Cost: 400 ether
+        _castVote(bob, pid1, 15e9); // Cost: 225 ether
+        _castVote(alice, pid2, 15e9); // Cost: 225 ether
+        _castVote(bob, pid2, 18e9); // Cost: 324 ether
+
+        console.log("=== EXCESS FUNDS AND ALPHA=1 VALIDATION TEST ===");
+
+        // Get totals
+        uint256 totalQuadraticSum = mechanism.totalQuadraticSum();
+        uint256 totalLinearSum = mechanism.totalLinearSum();
+
+        console.log("Total Quadratic Sum:", totalQuadraticSum);
+        console.log("Total Linear Sum:", totalLinearSum);
+
+        // Calculate quadratic advantage and matching funds needed for full quadratic funding
+        uint256 quadraticAdvantage = totalQuadraticSum - totalLinearSum;
+        uint256 matchingFundsForFullQuadratic = quadraticAdvantage;
+        uint256 excessMatchingFunds = matchingFundsForFullQuadratic + 500 ether; // Extra 500 ether
+
+        console.log("Quadratic advantage:", quadraticAdvantage);
+        console.log("Matching funds for full quadratic:", matchingFundsForFullQuadratic);
+        console.log("Excess matching funds:", excessMatchingFunds);
+
+        // Calculate optimal alpha with excess funds (should be alpha = 1)
+        (uint256 optimalAlphaNumerator, uint256 optimalAlphaDenominator) = mechanism.calculateOptimalAlpha(
+            excessMatchingFunds,
+            totalUserDeposits
+        );
+
+        console.log("Calculated optimal alpha:", optimalAlphaNumerator, "/", optimalAlphaDenominator);
+
+        // Verify alpha = 1 with excess funds
+        assertEq(optimalAlphaNumerator, 1, "Alpha numerator should be 1 with excess matching funds");
+        assertEq(optimalAlphaDenominator, 1, "Alpha denominator should be 1 with excess matching funds");
+
+        // Apply excess matching funds and alpha = 1
+        token.mint(address(this), excessMatchingFunds);
+        token.transfer(address(mechanism), excessMatchingFunds);
+        mechanism.setAlpha(optimalAlphaNumerator, optimalAlphaDenominator);
+
+        // Finalize and queue
+        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        _tokenized(address(mechanism)).finalizeVoteTally();
+        _tokenized(address(mechanism)).queueProposal(pid1);
+        _tokenized(address(mechanism)).queueProposal(pid2);
+
+        // Verify ratio is >1:1 when alpha=1 and there are excess funds
+        uint256 assetsFor1Share = _tokenized(address(mechanism)).convertToAssets(1e18);
+        uint256 totalShares = _tokenized(address(mechanism)).totalSupply();
+        uint256 totalAssets = token.balanceOf(address(mechanism));
+
+        console.log("Assets for 1 share:", assetsFor1Share);
+        console.log("Total assets:", totalAssets);
+        console.log("Total shares:", totalShares);
+
+        // With alpha=1 and excess matching funds, the ratio should be >1:1
+        assertGt(assetsFor1Share, 1e18, "Ratio should be >1:1 when alpha=1 and there are excess matching funds");
+        assertGt(
+            totalAssets,
+            totalShares,
+            "Total assets should exceed total shares when there are excess matching funds"
+        );
+
+        // Verify that total shares equals total quadratic funding (since alpha=1)
+        assertEq(totalShares, totalQuadraticSum, "With alpha=1, total shares should equal total quadratic sum");
+
+        // Verify that excess funds remain in the contract (not allocated to shares)
+        uint256 expectedExcessAssets = totalUserDeposits + excessMatchingFunds;
+        assertEq(
+            totalAssets,
+            expectedExcessAssets,
+            "Total assets should include user deposits + excess matching funds"
+        );
+
+        console.log("=== VALIDATION COMPLETE ===");
+        console.log("Confirmed: >1:1 ratio only occurs with alpha=1 and excess matching funds");
+        console.log("Ratio:", assetsFor1Share, "assets per 1e18 shares");
+    }
+
+    /// @notice Test that ratios should never exceed 1:1 when alpha < 1 (fractional alpha)
+    function testRatioNeverExceeds1With1WhenAlphaLessThan1() public {
+        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
+        vm.roll(startBlock - 1);
+
+        // Setup
+        uint256 totalUserDeposits = 1000 ether + 600 ether;
+        _signupUser(alice, 1000 ether);
+        _signupUser(bob, 600 ether);
+
+        // Create proposals
+        uint256 pid1 = _createProposal(alice, recipient1, "Fractional Alpha Project 1");
+        uint256 pid2 = _createProposal(bob, recipient2, "Fractional Alpha Project 2");
+
+        // Move to voting period
+        vm.roll(startBlock + VOTING_DELAY + 1);
+
+        // Cast votes to create quadratic advantage (adjusted for available voting power)
+        _castVote(alice, pid1, 25e9); // Cost: 625 ether (Alice remaining: 375 ether)
+        _castVote(bob, pid1, 20e9); // Cost: 400 ether (Bob remaining: 200 ether)
+        _castVote(alice, pid2, 15e9); // Cost: 225 ether (Alice remaining: 150 ether)
+        _castVote(bob, pid2, 14e9); // Cost: 196 ether (Bob remaining: 4 ether)
+
+        console.log("=== FRACTIONAL ALPHA RATIO VALIDATION TEST ===");
+
+        // Use insufficient matching funds to force fractional alpha
+        uint256 limitedMatchingPool = 400 ether; // Less than full quadratic advantage
+
+        // Calculate optimal alpha (should be < 1)
+        (uint256 optimalAlphaNumerator, uint256 optimalAlphaDenominator) = mechanism.calculateOptimalAlpha(
+            limitedMatchingPool,
+            totalUserDeposits
+        );
+
+        console.log("Limited matching pool:", limitedMatchingPool);
+        console.log("Calculated optimal alpha:", optimalAlphaNumerator, "/", optimalAlphaDenominator);
+
+        // Verify alpha < 1
+        assertTrue(
+            optimalAlphaNumerator < optimalAlphaDenominator,
+            "Alpha should be less than 1 with limited matching funds"
+        );
+
+        // Apply limited matching funds and fractional alpha
+        token.mint(address(this), limitedMatchingPool);
+        token.transfer(address(mechanism), limitedMatchingPool);
+        mechanism.setAlpha(optimalAlphaNumerator, optimalAlphaDenominator);
+
+        // Finalize and queue
+        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        _tokenized(address(mechanism)).finalizeVoteTally();
+        _tokenized(address(mechanism)).queueProposal(pid1);
+        _tokenized(address(mechanism)).queueProposal(pid2);
+
+        // Verify ratio should be exactly 1:1 or very close (never >1:1) when alpha < 1
+        uint256 assetsFor1Share = _tokenized(address(mechanism)).convertToAssets(1e18);
+        uint256 totalShares = _tokenized(address(mechanism)).totalSupply();
+        uint256 totalAssets = token.balanceOf(address(mechanism));
+
+        console.log("Assets for 1 share:", assetsFor1Share);
+        console.log("Total assets:", totalAssets);
+        console.log("Total shares:", totalShares);
+
+        // With fractional alpha, ratio should be 1:1 (or very close due to rounding)
+        assertApproxEqAbs(assetsFor1Share, 1e18, 10, "Ratio should be approximately 1:1 when alpha < 1");
+        assertApproxEqAbs(
+            totalAssets,
+            totalShares,
+            10,
+            "Total assets should approximately equal total shares when alpha < 1"
+        );
+
+        // Verify that we're not over-collateralized when alpha < 1
+        assertLe(assetsFor1Share, 1e18 + 10, "Ratio should not significantly exceed 1:1 when alpha < 1");
+
+        console.log("=== VALIDATION COMPLETE ===");
+        console.log("Confirmed: ratio approximately 1:1 when alpha < 1 (fractional alpha)");
+        console.log("Ratio:", assetsFor1Share, "assets per 1e18 shares");
+    }
+
+    /// @notice Test changing alpha after voting to verify if it causes incorrect funding distribution
+    function testChangingAlphaAfterVotingBehavior() public {
+        // Initialize struct to hold all test data
+        TestData memory data;
+        data.startBlock = _tokenized(address(mechanism)).startBlock();
+        vm.roll(data.startBlock - 1);
+
+        // Setup users and projects
+        _signupUser(alice, 1000 ether);
+        _signupUser(bob, 800 ether);
+
+        data.pid1 = _createProposal(alice, recipient1, "Alpha Change Test Project 1");
+        data.pid2 = _createProposal(bob, recipient2, "Alpha Change Test Project 2");
+
+        // Move to voting period
+        vm.roll(data.startBlock + VOTING_DELAY + 1);
+
+        // Cast votes with initial alpha = 1.0 (100% quadratic funding)
+        // Verify initial alpha is 1.0
+        (uint256 initialAlphaNumerator, uint256 initialAlphaDenominator) = mechanism.getAlpha();
+        assertEq(initialAlphaNumerator, 1, "Initial alpha numerator should be 1");
+        assertEq(initialAlphaDenominator, 1, "Initial alpha denominator should be 1");
+
+        // Alice votes 30 on Project 1 (costs 900 ether)
+        _castVote(alice, data.pid1, 30e9); // Cost: 900 ether
+
+        // Check Project 1 funding with alpha=1.0
+        (data.p1Contributions1, data.p1SqrtSum1, data.p1Quadratic1, data.p1Linear1) = mechanism.getTally(data.pid1);
+
+        // Bob votes 25 on Project 2 (costs 625 ether)
+        _castVote(bob, data.pid2, 25e9); // Cost: 625 ether
+
+        // Check Project 2 funding with alpha=1.0
+        (data.p2Contributions1, data.p2SqrtSum1, data.p2Quadratic1, data.p2Linear1) = mechanism.getTally(data.pid2);
+
+        // NOW CHANGE ALPHA TO 0.5 (50% quadratic, 50% linear) AFTER VOTING
+        mechanism.setAlpha(1, 2); // Alpha = 0.5
+
+        (data.newAlphaNumerator, data.newAlphaDenominator) = mechanism.getAlpha();
+
+        // Check if Project 1 funding changes with new alpha
+        (data.p1Contributions2, data.p1SqrtSum2, data.p1Quadratic2, data.p1Linear2) = mechanism.getTally(data.pid1);
+
+        // Check if Project 2 funding changes with new alpha
+        (data.p2Contributions2, data.p2SqrtSum2, data.p2Quadratic2, data.p2Linear2) = mechanism.getTally(data.pid2);
+
+        // Verify raw data hasn't changed (contributions and sqrt sums should be identical)
+        assertEq(data.p1Contributions1, data.p1Contributions2, "Project 1 contributions should be unchanged");
+        assertEq(data.p1SqrtSum1, data.p1SqrtSum2, "Project 1 sqrt sum should be unchanged");
+        assertEq(data.p2Contributions1, data.p2Contributions2, "Project 2 contributions should be unchanged");
+        assertEq(data.p2SqrtSum1, data.p2SqrtSum2, "Project 2 sqrt sum should be unchanged");
+
+        // Verify funding amounts changed correctly with new alpha
+        // For Project 1: Alice voted 30e9, so quadratic = (30e9)^2 = 900 ether, linear = 900 ether
+        // With alpha=0.5: quadratic_weighted = 0.5 * 900 = 450, linear_weighted = 0.5 * 900 = 450
+        uint256 expectedP1Quadratic = 450 ether;
+        uint256 expectedP1Linear = 450 ether;
+        assertEq(data.p1Quadratic2, expectedP1Quadratic, "Project 1 quadratic funding should be 450 with alpha=0.5");
+        assertEq(data.p1Linear2, expectedP1Linear, "Project 1 linear funding should be 450 with alpha=0.5");
+
+        // For Project 2: Bob voted 25e9, so quadratic = (25e9)^2 = 625 ether, linear = 625 ether
+        // With alpha=0.5: quadratic_weighted = 0.5 * 625 = 312.5, linear_weighted = 0.5 * 625 = 312.5
+        uint256 expectedP2Quadratic = 312.5 ether;
+        uint256 expectedP2Linear = 312.5 ether;
+        assertEq(data.p2Quadratic2, expectedP2Quadratic, "Project 2 quadratic funding should be 312.5 with alpha=0.5");
+        assertEq(data.p2Linear2, expectedP2Linear, "Project 2 linear funding should be 312.5 with alpha=0.5");
+
+        // NOW ADD THIRD VOTE AFTER ALPHA CHANGE to verify new votes use new alpha correctly
+
+        // Charlie votes 20e9 on Project 1 (costs 400 ether)
+        _signupUser(charlie, 500 ether); // Give Charlie some voting power
+        _castVote(charlie, data.pid1, 20e9); // Cost: 400 ether
+
+        // Check Project 1 funding after Charlie's vote
+        (data.p1Contributions3, data.p1SqrtSum3, data.p1Quadratic3, data.p1Linear3) = mechanism.getTally(data.pid1);
+
+        // Project 1 should now have: Alice(30e9) + Charlie(20e9) = 50e9 total sqrt sum
+        // Quadratic = (50e9)^2 = 2500 ether, Linear = Alice(900) + Charlie(400) = 1300 ether
+        // With alpha=0.5: quadratic_weighted = 0.5 * 2500 = 1250, linear_weighted = 0.5 * 1300 = 650
+        uint256 expectedP1QuadraticFinal = 1250 ether;
+        uint256 expectedP1LinearFinal = 650 ether;
+        assertEq(data.p1SqrtSum3, 50e9, "Project 1 should have sqrt sum of 50e9");
+        assertEq(data.p1Contributions3, 1300 ether, "Project 1 should have contributions of 1300 ether");
+        assertEq(data.p1Quadratic3, expectedP1QuadraticFinal, "Project 1 final quadratic should be 1250");
+        assertEq(data.p1Linear3, expectedP1LinearFinal, "Project 1 final linear should be 650");
+
+        // Add matching funds for full test
+        uint256 matchingFunds = 1000 ether;
+        token.mint(address(this), matchingFunds);
+        token.transfer(address(mechanism), matchingFunds);
+
+        // Finalize and test actual share distribution
+        vm.roll(data.startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        _tokenized(address(mechanism)).finalizeVoteTally();
+        _tokenized(address(mechanism)).queueProposal(data.pid1);
+        _tokenized(address(mechanism)).queueProposal(data.pid2);
+
+        // Verify shares were minted according to final alpha=0.5 calculations
+        uint256 recipient1Shares = _tokenized(address(mechanism)).balanceOf(recipient1);
+        uint256 recipient2Shares = _tokenized(address(mechanism)).balanceOf(recipient2);
+
+        // Expected shares should match final funding calculations with alpha=0.5
+        uint256 expectedP1Shares = data.p1Quadratic3 + data.p1Linear3; // 1250 + 650 = 1900
+        uint256 expectedP2Shares = data.p2Quadratic2 + data.p2Linear2; // 312.5 + 312.5 = 625
+
+        assertEq(recipient1Shares, expectedP1Shares, "Recipient 1 should receive shares equal to final funding");
+        assertEq(recipient2Shares, expectedP2Shares, "Recipient 2 should receive shares equal to final funding");
+    }
+
+    function testTotalFundingMatchesAssetsWithOptimalAlpha() public {
+        // Initialize struct to hold all test data
+        TestData memory data;
+        data.startBlock = _tokenized(address(mechanism)).startBlock();
+        vm.roll(data.startBlock - 1);
+
+        // Setup users with varying deposits
+        _signupUser(alice, 1200 ether);
+        _signupUser(bob, 800 ether);
+        _signupUser(charlie, 1000 ether);
+        data.totalUserDeposits = 3000 ether;
+
+        // Create 3 proposals to test diverse voting patterns
+        data.pid1 = _createProposal(alice, recipient1, "Education Project");
+        data.pid2 = _createProposal(bob, recipient2, "Healthcare Project");
+        data.pid3 = _createProposal(alice, recipient3, "Environmental Project"); // alice creates for charlie's project
+
+        // Move to voting period
+        vm.roll(data.startBlock + VOTING_DELAY + 1);
+
+        // Complex voting pattern across multiple projects
+        _castVote(alice, data.pid1, 25e9); // Cost: 625 ether
+        _castVote(alice, data.pid2, 15e9); // Cost: 225 ether
+        _castVote(bob, data.pid1, 20e9); // Cost: 400 ether
+        _castVote(bob, data.pid3, 18e9); // Cost: 324 ether
+        _castVote(charlie, data.pid2, 22e9); // Cost: 484 ether
+        _castVote(charlie, data.pid3, 12e9); // Cost: 144 ether
+
+        // Fixed matching pool amount
+        data.fixedMatchingPool = 500 ether;
+
+        // Get current totals
+        data.totalQuadraticSum = mechanism.totalQuadraticSum();
+        data.totalLinearSum = mechanism.totalLinearSum();
+
+        // Calculate optimal alpha
+        (data.optimalAlphaNumerator, data.optimalAlphaDenominator) = mechanism.calculateOptimalAlpha(
+            data.fixedMatchingPool,
+            data.totalUserDeposits
+        );
+
+        // Apply optimal alpha and add matching pool
+        token.mint(address(this), data.fixedMatchingPool);
+        token.transfer(address(mechanism), data.fixedMatchingPool);
+
+        // Check totalFunding before setAlpha
+        uint256 totalFundingBeforeAlpha = mechanism.totalFunding();
+
+        mechanism.setAlpha(data.optimalAlphaNumerator, data.optimalAlphaDenominator);
+
+        // Check totalFunding after setAlpha
+        uint256 totalFundingAfterAlpha = mechanism.totalFunding();
+
+        // Verify that setAlpha immediately updates totalFunding
+        assertTrue(totalFundingAfterAlpha != totalFundingBeforeAlpha, "setAlpha should update totalFunding");
+
+        // Calculate expected total funding with optimal alpha
+        uint256 expectedTotalFunding = (data.totalQuadraticSum * data.optimalAlphaNumerator) /
+            data.optimalAlphaDenominator +
+            (data.totalLinearSum * (data.optimalAlphaDenominator - data.optimalAlphaNumerator)) /
+            data.optimalAlphaDenominator;
+
+        // Check if setAlpha updated totalFunding correctly
+        assertEq(totalFundingAfterAlpha, expectedTotalFunding, "setAlpha should update totalFunding correctly");
+
+        // Finalize to update totalFunding storage
+        vm.roll(data.startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        _tokenized(address(mechanism)).finalizeVoteTally();
+
+        // Verify totalFunding matches expected calculation
+        uint256 actualTotalFunding = mechanism.totalFunding();
+
+        assertEq(actualTotalFunding, expectedTotalFunding, "Total funding should match alpha-weighted calculation");
+
+        // Verify total assets available
+        data.totalAssets = token.balanceOf(address(mechanism));
+
+        assertEq(
+            data.totalAssets,
+            data.totalUserDeposits + data.fixedMatchingPool,
+            "Total assets should equal deposits plus matching pool"
+        );
+
+        // With optimal alpha, total funding should approximately equal total assets
+        assertApproxEqAbs(
+            actualTotalFunding,
+            data.totalAssets,
+            10,
+            "Total funding should approximately match total assets"
+        );
+
+        // Queue all proposals and verify shares
+        _tokenized(address(mechanism)).queueProposal(data.pid1);
+        _tokenized(address(mechanism)).queueProposal(data.pid2);
+        _tokenized(address(mechanism)).queueProposal(data.pid3);
+
+        // Verify individual project funding adds up to total
+        (, , uint256 q1, uint256 l1) = mechanism.getTally(data.pid1);
+        (, , uint256 q2, uint256 l2) = mechanism.getTally(data.pid2);
+        (, , uint256 q3, uint256 l3) = mechanism.getTally(data.pid3);
+
+        uint256 sumOfProjectFunding = (q1 + l1) + (q2 + l2) + (q3 + l3);
+
+        assertApproxEqAbs(
+            sumOfProjectFunding,
+            actualTotalFunding,
+            10,
+            "Sum of project funding should equal total funding within precision"
+        );
+
+        // Verify 1:1 asset-to-share ratio is maintained
+        uint256 assetsFor1Share = _tokenized(address(mechanism)).convertToAssets(1e18);
+
+        assertGe(assetsFor1Share, 1e18, "Should maintain at least 1:1 asset-to-share ratio");
+    }
+
+    function testDiverseVotingPatternsWithFixedMatchingPool() public {
+        // Initialize struct to hold all test data
+        TestData memory data;
+        data.startBlock = _tokenized(address(mechanism)).startBlock();
+        vm.roll(data.startBlock - 1);
+
+        // Setup 4 users with different deposit amounts
+        _signupUser(alice, 1500 ether);
+        _signupUser(bob, 1000 ether);
+        _signupUser(charlie, 800 ether);
+        data.dave = address(0x104);
+        token.mint(data.dave, 2000 ether);
+        _signupUser(data.dave, 700 ether);
+        data.totalUserDeposits = 4000 ether;
+
+        // Create 4 proposals
+        data.pid1 = _createProposal(alice, recipient1, "AI Research");
+        data.pid2 = _createProposal(bob, recipient2, "Climate Tech");
+        data.pid3 = _createProposal(alice, recipient3, "Public Health"); // alice creates for charlie's project
+        data.recipient4 = address(0x204);
+        data.pid4 = _createProposal(bob, data.recipient4, "Education Access"); // bob creates for dave's project
+
+        // Move to voting period
+        vm.roll(data.startBlock + VOTING_DELAY + 1);
+
+        // Pattern 1: Heavy concentration on one project
+        _castVote(alice, data.pid1, 35e9); // Cost: 1225 ether
+        _castVote(bob, data.pid1, 25e9); // Cost: 625 ether
+
+        // Pattern 2: Moderate support across multiple projects
+        _castVote(charlie, data.pid1, 10e9); // Cost: 100 ether
+        _castVote(charlie, data.pid2, 15e9); // Cost: 225 ether
+        _castVote(charlie, data.pid3, 20e9); // Cost: 400 ether
+
+        // Pattern 3: Small votes spread widely
+        _castVote(data.dave, data.pid1, 5e9); // Cost: 25 ether
+        _castVote(data.dave, data.pid2, 8e9); // Cost: 64 ether
+        _castVote(data.dave, data.pid3, 12e9); // Cost: 144 ether
+        _castVote(data.dave, data.pid4, 18e9); // Cost: 324 ether
+
+        // Additional votes to create interesting dynamics
+        _castVote(alice, data.pid2, 12e9); // Cost: 144 ether (remaining from 1500-1225=275)
+        _castVote(bob, data.pid3, 15e9); // Cost: 225 ether (remaining from 1000-625=375)
+
+        // Get voting results
+        data.totalQuadraticSum = mechanism.totalQuadraticSum();
+        data.totalLinearSum = mechanism.totalLinearSum();
+
+        // Test with multiple fixed matching pool sizes
+        uint256[3] memory matchingPoolSizes = [uint256(600 ether), uint256(1200 ether), uint256(2000 ether)];
+
+        for (uint256 i = 0; i < matchingPoolSizes.length; i++) {
+            uint256 matchingPool = matchingPoolSizes[i];
+
+            // Calculate optimal alpha for this matching pool size
+            (uint256 alphaNumerator, uint256 alphaDenominator) = mechanism.calculateOptimalAlpha(
+                matchingPool,
+                data.totalUserDeposits
+            );
+
+            // Calculate expected total funding
+            uint256 expectedTotalFunding = (data.totalQuadraticSum * alphaNumerator) /
+                alphaDenominator +
+                (data.totalLinearSum * (alphaDenominator - alphaNumerator)) /
+                alphaDenominator;
+
+            uint256 expectedTotalAssets = data.totalUserDeposits + matchingPool;
+
+            // With optimal alpha, these should be approximately equal
+            assertApproxEqAbs(
+                expectedTotalFunding,
+                expectedTotalAssets,
+                10,
+                "Total funding should match total assets with optimal alpha"
+            );
+
+            // Verify alpha is within valid bounds
+            assertTrue(alphaNumerator <= alphaDenominator, "Alpha should be <= 1");
+            if (expectedTotalAssets > data.totalLinearSum && data.totalQuadraticSum > data.totalLinearSum) {
+                assertTrue(alphaNumerator > 0, "Alpha should be positive when matching pool can provide benefit");
+            }
+        }
+
+        // Test finalization with the largest matching pool
+        data.finalMatchingPool = 2000 ether;
+        token.mint(address(this), data.finalMatchingPool);
+        token.transfer(address(mechanism), data.finalMatchingPool);
+
+        (data.finalAlphaNumerator, data.finalAlphaDenominator) = mechanism.calculateOptimalAlpha(
+            data.finalMatchingPool,
+            data.totalUserDeposits
+        );
+
+        mechanism.setAlpha(data.finalAlphaNumerator, data.finalAlphaDenominator);
+
+        // Finalize and verify total funding is updated correctly
+        vm.roll(data.startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        _tokenized(address(mechanism)).finalizeVoteTally();
+
+        data.finalTotalFunding = mechanism.totalFunding();
+        data.finalTotalAssets = token.balanceOf(address(mechanism));
+
+        assertApproxEqAbs(
+            data.finalTotalFunding,
+            data.finalTotalAssets,
+            10,
+            "Final total funding should match total assets"
+        );
+
+        // Queue all proposals and verify individual funding
+        _tokenized(address(mechanism)).queueProposal(data.pid1);
+        _tokenized(address(mechanism)).queueProposal(data.pid2);
+        _tokenized(address(mechanism)).queueProposal(data.pid3);
+        _tokenized(address(mechanism)).queueProposal(data.pid4);
+
+        // Calculate sum of individual project funding
+        uint256 totalProjectFunding = 0;
+        for (uint256 pid = data.pid1; pid <= data.pid4; pid++) {
+            (, , uint256 q, uint256 l) = mechanism.getTally(pid);
+            uint256 projectFunding = q + l;
+            totalProjectFunding += projectFunding;
+        }
+
+        assertApproxEqAbs(
+            totalProjectFunding,
+            data.finalTotalFunding,
+            10,
+            "Sum of project funding should equal total funding within precision"
+        );
     }
 }

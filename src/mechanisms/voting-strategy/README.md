@@ -101,5 +101,56 @@ The incremental update algorithm adheres to the mathematical definitions and mai
 - **Accurate**: Outputs match a full recalculation.
 - **Efficient**: Updates scale with the number of new contributions, not the total number of contributions.
 
+---
+
+## Optimal Alpha Calculation for 1:1 Shares-to-Assets Ratio
+
+### Objective
+Calculate the optimal alpha parameter that ensures total funding equals total available assets, maintaining a 1:1 shares-to-assets ratio.
+
+### Mathematical Formulation
+
+Given:
+- Total funding formula: $F_{total} = \alpha \cdot \sum_j S_j^2 + (1-\alpha) \cdot \sum_j \text{Sum}_j$
+- Total available assets: $A_{total} = \text{UserDeposits} + \text{MatchingPool}$
+- Where $S_j = \sum_i \sqrt{c_{i,j}}$ (sum of square roots for project j)
+- And $\text{Sum}_j = \sum_i c_{i,j}$ (sum of contributions for project j)
+
+We want to find $\alpha$ such that:
+$$F_{total} = A_{total}$$
+
+### Solving for Optimal Alpha
+
+Starting with the equation:
+$$\alpha \cdot \sum_j S_j^2 + (1-\alpha) \cdot \sum_j \text{Sum}_j = \text{UserDeposits} + \text{MatchingPool}$$
+
+Expanding:
+$$\alpha \cdot \sum_j S_j^2 + \sum_j \text{Sum}_j - \alpha \cdot \sum_j \text{Sum}_j = A_{total}$$
+
+Rearranging:
+$$\alpha \cdot (\sum_j S_j^2 - \sum_j \text{Sum}_j) = A_{total} - \sum_j \text{Sum}_j$$
+
+Therefore:
+$$\alpha = \frac{A_{total} - \sum_j \text{Sum}_j}{\sum_j S_j^2 - \sum_j \text{Sum}_j}$$
+
+### Implementation Considerations
+
+1. **Edge Case: No Quadratic Advantage**
+   - If $\sum_j S_j^2 \leq \sum_j \text{Sum}_j$, set $\alpha = 0$ (pure linear funding)
+
+2. **Edge Case: Insufficient Assets**
+   - If $A_{total} \leq \sum_j \text{Sum}_j$, set $\alpha = 0$ (not enough for even linear funding)
+
+3. **Edge Case: Excess Assets**
+   - If $A_{total} - \sum_j \text{Sum}_j \geq \sum_j S_j^2 - \sum_j \text{Sum}_j$, set $\alpha = 1$ (full quadratic funding)
+
+### Use Cases
+
+1. **Fixed Matching Pool**: An admin has a fixed budget for matching funds and wants to maximize quadratic funding benefits while ensuring all funds are distributed
+
+2. **Dynamic Allocation**: As voting progresses, the optimal alpha can be recalculated to adjust the funding formula based on actual participation
+
+3. **Budget Constraints**: Ensures that the total shares minted exactly match the available assets, preventing over-allocation or under-utilization
+
 Let me know if additional clarifications or examples are needed.
 

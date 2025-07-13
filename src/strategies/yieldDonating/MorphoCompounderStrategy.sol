@@ -13,16 +13,8 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 contract MorphoCompounderStrategy is BaseHealthCheck {
     using SafeERC20 for IERC20;
 
-    ///@notice yearn governance
-    address public constant GOV = 0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52;
-
     // morpho vault
     address public immutable compounderVault;
-
-    modifier onlyGovernance() {
-        require(msg.sender == GOV, "!gov");
-        _;
-    }
 
     constructor(
         address _compounderVault,
@@ -49,13 +41,6 @@ contract MorphoCompounderStrategy is BaseHealthCheck {
         // make sure asset is Morpho's asset
         IERC20(_asset).forceApprove(_compounderVault, type(uint256).max);
         compounderVault = _compounderVault;
-    }
-
-    /// @notice Sweep of non-asset ERC20 tokens to governance (onlyGovernance)
-    /// @param _token The ERC20 token to sweep
-    function sweep(address _token) external onlyGovernance {
-        require(_token != address(asset), "!asset");
-        IERC20(_token).safeTransfer(GOV, IERC20(_token).balanceOf(address(this)));
     }
 
     function availableDepositLimit(address /*_owner*/) public view override returns (uint256) {

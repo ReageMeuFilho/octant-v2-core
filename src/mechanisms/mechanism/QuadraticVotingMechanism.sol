@@ -4,9 +4,7 @@ pragma solidity ^0.8.20;
 import { BaseAllocationMechanism, AllocationConfig } from "src/mechanisms/BaseAllocationMechanism.sol";
 import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocationMechanism.sol";
 import { ProperQF } from "src/mechanisms/voting-strategy/ProperQF.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /// @title Quadratic Voting Mechanism
 /// @notice Implements quadratic funding for proposal allocation using the ProperQF strategy
@@ -17,13 +15,13 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
     error AlphaDenominatorMustBePositive();
     error ZeroAddressCannotPropose();
     error OnlyForVotesSupported();
-    error VoteWeightTooLarge();
     error InsufficientVotingPowerForQuadraticCost();
-    error TotalVotingPowerOverflow();
-    using Math for uint256;
+    error AlreadyVoted(address voter, uint256 pid);
 
     /// @notice Total voting power distributed across all proposals
-    uint256 public totalVotingPower;
+
+    /// @notice Mapping to track if a voter has voted on a proposal
+    mapping(uint256 => mapping(address => bool)) public hasVoted;
 
     constructor(
         address _implementation,
@@ -37,10 +35,14 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
         _setAlpha(_alphaNumerator, _alphaDenominator);
     }
 
-    /// @notice Only registered users with voting power can propose
+    /// @notice Only keeper or management can propose
     function _beforeProposeHook(address proposer) internal view override returns (bool) {
-        if (proposer == address(0)) revert ZeroAddressCannotPropose();
-        return _getVotingPower(proposer) > 0;
+        // Get keeper and management addresses from TokenizedAllocationMechanism
+        address keeper = _tokenizedAllocation().keeper();
+        address management = _tokenizedAllocation().management();
+
+        // Allow if proposer is either keeper or management
+        return proposer == keeper || proposer == management;
     }
 
     /// @notice Validate proposal ID exists
@@ -76,15 +78,15 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
     /// @dev The cost of voting is quadratic: to cast `weight` votes, you pay `weight^2` voting power
     function _processVoteHook(
         uint256 pid,
-        address,
+        address voter,
         TokenizedAllocationMechanism.VoteType choice,
         uint256 weight,
         uint256 oldPower
     ) internal override returns (uint256) {
         if (choice != TokenizedAllocationMechanism.VoteType.For) revert OnlyForVotesSupported();
 
-        // Validate weight to prevent overflow in quadratic cost calculation
-        if (weight > type(uint128).max) revert VoteWeightTooLarge();
+        // Check if voter has already voted on this proposal
+        if (hasVoted[pid][voter]) revert AlreadyVoted(voter, pid);
 
         // Quadratic cost: to vote with weight W, you pay W^2 voting power
         uint256 quadraticCost = weight * weight;
@@ -96,10 +98,8 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
         // We know: quadraticCost = weight^2, so sqrt(quadraticCost) = weight (perfect square root relationship)
         _processVoteUnchecked(pid, quadraticCost, weight);
 
-        // Track total voting power used with overflow protection
-        uint256 newTotalVotingPower = totalVotingPower + weight;
-        if (newTotalVotingPower < totalVotingPower) revert TotalVotingPowerOverflow();
-        totalVotingPower = newTotalVotingPower;
+        // Mark that voter has voted on this proposal
+        hasVoted[pid][voter] = true;
 
         // Return remaining voting power after quadratic cost
         return oldPower - quadraticCost;
@@ -150,26 +150,26 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
         return false;
     }
 
-    /// @dev Get available withdraw limit for share owner with timelock and grace period enforcement
+    /// @dev Get available withdraw limit for share owner with global timelock and grace period enforcement
     /// @param shareOwner Address attempting to withdraw shares
     /// @return availableLimit Amount of assets that can be withdrawn (0 if timelock active or expired)
     function _availableWithdrawLimit(address shareOwner) internal view override returns (uint256) {
-        // Get the redeemable time for this share owner
-        uint256 redeemableTime = _getRedeemableAfter(shareOwner);
+        // Get the global redemption start time
+        uint256 globalRedemptionStart = _getGlobalRedemptionStart();
 
-        // If no redeemable time set, allow unlimited withdrawal (shouldn't happen in normal flow)
-        if (redeemableTime == 0) {
-            return type(uint256).max;
+        // If no global redemption time set, no withdrawals allowed
+        if (globalRedemptionStart == 0) {
+            return 0;
         }
 
         // Check if still in timelock period
-        if (block.timestamp < redeemableTime) {
+        if (block.timestamp < globalRedemptionStart) {
             return 0; // Cannot withdraw during timelock
         }
 
-        // Check if grace period has expired
+        // Check if global grace period has expired
         uint256 gracePeriod = _getGracePeriod();
-        if (block.timestamp > redeemableTime + gracePeriod) {
+        if (block.timestamp > globalRedemptionStart + gracePeriod) {
             return 0; // Cannot withdraw after grace period expires
         }
 
@@ -227,5 +227,24 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
 
         // Update alpha using ProperQF's internal function
         _setAlpha(newNumerator, newDenominator);
+    }
+
+    /// @notice Calculate optimal alpha for 1:1 shares-to-assets ratio given fixed matching pool amount
+    /// @param matchingPoolAmount Fixed amount of matching funds available
+    /// @param totalUserDeposits Total user deposits in the mechanism
+    /// @return optimalAlphaNumerator Calculated alpha numerator
+    /// @return optimalAlphaDenominator Calculated alpha denominator
+    /// @dev Uses current mechanism state for quadratic and linear sums
+    function calculateOptimalAlpha(
+        uint256 matchingPoolAmount,
+        uint256 totalUserDeposits
+    ) external view returns (uint256 optimalAlphaNumerator, uint256 optimalAlphaDenominator) {
+        return _calculateOptimalAlpha(matchingPoolAmount, totalQuadraticSum(), totalLinearSum(), totalUserDeposits);
+    }
+
+    /// @notice Reject ETH deposits to prevent permanent fund loss
+    /// @dev Override BaseAllocationMechanism's receive() to prevent accidental ETH deposits
+    receive() external payable override {
+        revert("ETH not supported - use ERC20 tokens only");
     }
 }

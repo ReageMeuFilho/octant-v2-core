@@ -190,6 +190,8 @@ contract QuadraticVotingRecipientJourneyTest is Test {
 
         address mechanismAddr = factory.deployQuadraticVotingMechanism(config, 50, 100); // 50% alpha
         mechanism = QuadraticVotingMechanism(payable(mechanismAddr));
+        _tokenized(address(mechanism)).setKeeper(alice);
+        _tokenized(address(mechanism)).setManagement(bob);
 
         // Pre-fund matching pool - this will be included in total assets during finalize
         uint256 matchingPoolAmount = 2000 ether;
@@ -213,9 +215,7 @@ contract QuadraticVotingRecipientJourneyTest is Test {
         assertEq(proposal1.proposer, alice);
         assertEq(proposal1.recipient, charlie);
         assertEq(proposal1.description, "Charlie's Clean Energy Initiative");
-        assertFalse(proposal1.claimed);
         assertFalse(proposal1.canceled);
-        assertEq(proposal1.earliestRedeemableTime, 0);
 
         // Multiple recipients can have proposals
         _createProposal(bob, dave, "Dave's Education Platform");
@@ -253,7 +253,7 @@ contract QuadraticVotingRecipientJourneyTest is Test {
         // Create proposals for different recipients
         currentTestCtx.pidCharlie = _createProposal(alice, charlie, "Charlie's Project");
         currentTestCtx.pidDave = _createProposal(bob, dave, "Dave's Project");
-        currentTestCtx.pidEve = _createProposal(frank, eve, "Eve's Project");
+        currentTestCtx.pidEve = _createProposal(alice, eve, "Eve's Project");
 
         vm.roll(currentTestCtx.startBlock + VOTING_DELAY + 1);
 
@@ -351,12 +351,12 @@ contract QuadraticVotingRecipientJourneyTest is Test {
         assertEq(_tokenized(address(mechanism)).proposalShares(pid), actualShares);
 
         // Timelock enforcement
-        uint256 redeemableTime = _tokenized(address(mechanism)).redeemableAfter(charlie);
+        uint256 redeemableTime = _tokenized(address(mechanism)).globalRedemptionStart();
         assertEq(redeemableTime, timestampBefore + TIMELOCK_DELAY);
         assertGt(redeemableTime, block.timestamp);
 
         // Cannot redeem before timelock
-        vm.expectRevert("ERC4626: redeem more than max");
+        vm.expectRevert("Allocation: redeem more than max");
         vm.prank(charlie);
         _tokenized(address(mechanism)).redeem(actualShares, charlie, charlie);
 
@@ -604,6 +604,14 @@ contract QuadraticVotingRecipientJourneyTest is Test {
         uint256 charlieShares = _tokenized(address(mechanism)).balanceOf(charlie);
         assertTrue(charlieShares > 0, "Charlie should receive shares");
 
+        // Test that transfers are blocked before redemption period
+        vm.prank(charlie);
+        vm.expectRevert("Transfers not allowed until redemption period");
+        _tokenized(address(mechanism)).transfer(dave, charlieShares / 3);
+
+        // Fast forward to redemption period start
+        vm.warp(block.timestamp + TIMELOCK_DELAY);
+
         // Test share transferability (use reasonable portion of actual shares)
         uint256 transferAmount = charlieShares / 3; // Transfer 1/3 of shares
         vm.prank(charlie);
@@ -628,9 +636,6 @@ contract QuadraticVotingRecipientJourneyTest is Test {
         assertEq(_tokenized(address(mechanism)).balanceOf(charlie), charlieShares - transferAmount - allowanceAmount);
         assertEq(_tokenized(address(mechanism)).balanceOf(eve), allowanceAmount);
         assertEq(_tokenized(address(mechanism)).allowance(charlie, dave), 0);
-
-        // Fast forward and test redemption by transferees
-        vm.warp(block.timestamp + TIMELOCK_DELAY + 1);
 
         // Dave can redeem transferred shares
         vm.prank(dave);

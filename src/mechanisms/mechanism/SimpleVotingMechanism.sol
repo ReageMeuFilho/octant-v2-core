@@ -3,13 +3,21 @@ pragma solidity ^0.8.20;
 
 import { BaseAllocationMechanism, AllocationConfig } from "src/mechanisms/BaseAllocationMechanism.sol";
 import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocationMechanism.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 /// @title Simple Voting Mechanism with Share Distribution
 /// @notice Implements a basic 1:1 voting mechanism where net votes directly convert to shares
 /// @dev Follows the Yearn V3 pattern with minimal implementation surface
 contract SimpleVotingMechanism is BaseAllocationMechanism {
+    /// @notice Vote tally storage for simple voting
+    struct VoteTally {
+        uint256 sharesFor;
+        uint256 sharesAgainst;
+        uint256 sharesAbstain;
+    }
+
+    /// @notice Mapping of proposal ID to vote tallies
+    mapping(uint256 => VoteTally) public voteTallies;
     constructor(
         address _implementation,
         AllocationConfig memory _config
@@ -60,7 +68,10 @@ contract SimpleVotingMechanism is BaseAllocationMechanism {
         uint256 oldPower
     ) internal override returns (uint256) {
         // Get current vote tallies
-        (uint256 sharesFor, uint256 sharesAgainst, uint256 sharesAbstain) = _getVoteTally(pid);
+        VoteTally storage tally = voteTallies[pid];
+        uint256 sharesFor = tally.sharesFor;
+        uint256 sharesAgainst = tally.sharesAgainst;
+        uint256 sharesAbstain = tally.sharesAbstain;
 
         // Update based on vote choice
         if (choice == TokenizedAllocationMechanism.VoteType.For) {
@@ -71,8 +82,10 @@ contract SimpleVotingMechanism is BaseAllocationMechanism {
             sharesAbstain += weight;
         }
 
-        // Update storage via TokenizedAllocation
-        TokenizedAllocationMechanism(address(this)).updateVoteTally(pid, sharesFor, sharesAgainst, sharesAbstain);
+        // Update storage directly
+        tally.sharesFor = sharesFor;
+        tally.sharesAgainst = sharesAgainst;
+        tally.sharesAbstain = sharesAbstain;
 
         // Return reduced voting power
         return oldPower - weight;
@@ -80,14 +93,18 @@ contract SimpleVotingMechanism is BaseAllocationMechanism {
 
     /// @dev Check if proposal has enough net votes for quorum
     function _hasQuorumHook(uint256 pid) internal view override returns (bool) {
-        (uint256 forVotes, uint256 againstVotes, ) = _getVoteTally(pid);
+        VoteTally storage tally = voteTallies[pid];
+        uint256 forVotes = tally.sharesFor;
+        uint256 againstVotes = tally.sharesAgainst;
         uint256 net = forVotes > againstVotes ? forVotes - againstVotes : 0;
         return net >= _getQuorumShares();
     }
 
     /// @dev Simple net vote to shares conversion
     function _convertVotesToShares(uint256 pid) internal view override returns (uint256 sharesToMint) {
-        (uint256 forVotes, uint256 againstVotes, ) = _getVoteTally(pid);
+        VoteTally storage tally = voteTallies[pid];
+        uint256 forVotes = tally.sharesFor;
+        uint256 againstVotes = tally.sharesAgainst;
 
         // Calculate net votes (For - Against)
         uint256 netVotes = forVotes > againstVotes ? forVotes - againstVotes : 0;
@@ -122,12 +139,12 @@ contract SimpleVotingMechanism is BaseAllocationMechanism {
     /// @param shareOwner Address attempting to withdraw shares
     /// @return availableLimit Amount of assets that can be withdrawn (0 if timelock active or expired)
     function _availableWithdrawLimit(address shareOwner) internal view override returns (uint256) {
-        // Get the redeemable time for this share owner
-        uint256 redeemableTime = _getRedeemableAfter(shareOwner);
+        // Get the global redemption start time
+        uint256 redeemableTime = _getGlobalRedemptionStart();
 
-        // If no redeemable time set, allow unlimited withdrawal (shouldn't happen in normal flow)
+        // If no redeemable time set, no withdrawals allowed
         if (redeemableTime == 0) {
-            return type(uint256).max;
+            return 0;
         }
 
         // Check if still in timelock period
@@ -157,5 +174,11 @@ contract SimpleVotingMechanism is BaseAllocationMechanism {
         // For simple voting, total assets is just the actual token balance
         // This reflects all user deposits without any matching pools
         return asset.balanceOf(address(this));
+    }
+
+    /// @notice Reject ETH deposits to prevent permanent fund loss
+    /// @dev Override BaseAllocationMechanism's receive() to prevent accidental ETH deposits
+    receive() external payable override {
+        revert("ETH not supported - use ERC20 tokens only");
     }
 }

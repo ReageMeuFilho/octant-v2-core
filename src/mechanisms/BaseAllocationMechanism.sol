@@ -150,9 +150,9 @@ abstract contract BaseAllocationMechanism is IBaseAllocationStrategy {
     // and use onlySelf modifier to ensure security
 
     modifier onlySelf() {
-        // In delegatecall context, address(this) is the proxy and msg.sender is the external caller
-        // We need to allow calls from the TokenizedAllocationMechanism
-        require(msg.sender == address(this) || msg.sender == tokenizedAllocationAddress, "!self");
+        // In delegatecall context, msg.sender must be address(this) to ensure
+        // hooks can only be called via delegatecall from TokenizedAllocationMechanism
+        require(msg.sender == address(this), "!self");
         _;
     }
 
@@ -218,17 +218,15 @@ abstract contract BaseAllocationMechanism is IBaseAllocationStrategy {
         return TokenizedAllocationMechanism(address(this));
     }
 
-    /// @notice Get redeemable time for a share owner
-    /// @param shareOwner Address to check redeemable time for
-    /// @return Timestamp when shares become redeemable
-    function _getRedeemableAfter(address shareOwner) internal view returns (uint256) {
-        return _tokenizedAllocation().redeemableAfter(shareOwner);
-    }
-
     /// @notice Get grace period from configuration
     /// @return Grace period in seconds
     function _getGracePeriod() internal view returns (uint256) {
         return _tokenizedAllocation().gracePeriod();
+    }
+
+    /// @dev Get global redemption start timestamp
+    function _getGlobalRedemptionStart() internal view returns (uint256) {
+        return _tokenizedAllocation().globalRedemptionStart();
     }
 
     // ---------- Fallback Function ----------
@@ -281,14 +279,6 @@ abstract contract BaseAllocationMechanism is IBaseAllocationStrategy {
     /// @dev Helper for concrete implementations
     function _getProposal(uint256 pid) internal view returns (TokenizedAllocationMechanism.Proposal memory) {
         return _tokenizedAllocation().proposals(pid);
-    }
-
-    /// @notice Get vote tallies
-    /// @dev Helper for concrete implementations
-    function _getVoteTally(
-        uint256 pid
-    ) internal view returns (uint256 sharesFor, uint256 sharesAgainst, uint256 sharesAbstain) {
-        return _tokenizedAllocation().getVoteTally(pid);
     }
 
     /// @notice Get voting power for an address

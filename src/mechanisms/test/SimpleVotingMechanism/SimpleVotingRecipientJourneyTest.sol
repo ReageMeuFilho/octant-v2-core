@@ -84,9 +84,7 @@ contract SimpleVotingRecipientJourneyTest is Test {
         assertEq(proposal1.proposer, alice);
         assertEq(proposal1.recipient, charlie);
         assertEq(proposal1.description, "Charlie's Clean Energy Initiative");
-        assertFalse(proposal1.claimed);
         assertFalse(proposal1.canceled);
-        assertEq(proposal1.earliestRedeemableTime, 0);
 
         // Multiple recipients can have proposals
         vm.prank(bob);
@@ -166,14 +164,14 @@ contract SimpleVotingRecipientJourneyTest is Test {
         _tokenized(address(mechanism)).castVote(pidEve, TokenizedAllocationMechanism.VoteType.For, 100 ether);
 
         // Recipients can monitor progress in real-time
-        (uint256 charlieFor, uint256 charlieAgainst, ) = _tokenized(address(mechanism)).getVoteTally(pidCharlie);
+        (uint256 charlieFor, uint256 charlieAgainst, ) = mechanism.voteTallies(pidCharlie);
         assertEq(charlieFor, 1000 ether);
         assertEq(charlieAgainst, 0);
 
-        (uint256 daveFor, , ) = _tokenized(address(mechanism)).getVoteTally(pidDave);
+        (uint256 daveFor, , ) = mechanism.voteTallies(pidDave);
         assertEq(daveFor, 150 ether);
 
-        (uint256 eveFor, uint256 eveAgainst, ) = _tokenized(address(mechanism)).getVoteTally(pidEve);
+        (uint256 eveFor, uint256 eveAgainst, ) = mechanism.voteTallies(pidEve);
         assertEq(eveFor, 100 ether);
         assertEq(eveAgainst, 200 ether);
 
@@ -246,12 +244,12 @@ contract SimpleVotingRecipientJourneyTest is Test {
         assertEq(_tokenized(address(mechanism)).proposalShares(pid), expectedShares);
 
         // Timelock enforcement
-        uint256 redeemableTime = _tokenized(address(mechanism)).redeemableAfter(charlie);
+        uint256 redeemableTime = _tokenized(address(mechanism)).globalRedemptionStart();
         assertEq(redeemableTime, timestampBefore + TIMELOCK_DELAY);
         assertGt(redeemableTime, block.timestamp);
 
         // Cannot redeem before timelock
-        vm.expectRevert("ERC4626: redeem more than max");
+        vm.expectRevert("Allocation: redeem more than max");
         vm.prank(charlie);
         _tokenized(address(mechanism)).redeem(expectedShares, charlie, charlie);
 
@@ -401,7 +399,15 @@ contract SimpleVotingRecipientJourneyTest is Test {
         uint256 charlieShares = 500 ether;
         assertEq(_tokenized(address(mechanism)).balanceOf(charlie), charlieShares);
 
-        // Test share transferability
+        // Test that transfers are blocked before redemption period
+        vm.prank(charlie);
+        vm.expectRevert("Transfers not allowed until redemption period");
+        _tokenized(address(mechanism)).transfer(dave, 100 ether);
+
+        // Fast forward to redemption period start
+        vm.warp(block.timestamp + TIMELOCK_DELAY);
+
+        // Now test share transferability
         uint256 transferAmount = 200 ether;
         vm.prank(charlie);
         _tokenized(address(mechanism)).transfer(dave, transferAmount);
@@ -425,9 +431,6 @@ contract SimpleVotingRecipientJourneyTest is Test {
         assertEq(_tokenized(address(mechanism)).balanceOf(charlie), charlieShares - transferAmount - allowanceAmount);
         assertEq(_tokenized(address(mechanism)).balanceOf(eve), allowanceAmount);
         assertEq(_tokenized(address(mechanism)).allowance(charlie, dave), 0);
-
-        // Fast forward and test redemption by transferees
-        vm.warp(block.timestamp + TIMELOCK_DELAY + 1);
 
         // Calculate expected assets based on proper accounting
         // Total deposits: 1000 ether (alice's deposit)

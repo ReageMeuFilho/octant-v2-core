@@ -47,6 +47,7 @@ contract QuadraticVotingDefeatedStateTest is Test {
 
         address mechanismAddr = factory.deployQuadraticVotingMechanism(config, 50, 100); // 50% alpha
         mechanism = QuadraticVotingMechanism(payable(mechanismAddr));
+        _tokenized(address(mechanism)).setKeeper(alice);
     }
 
     function testDebugDefeatedState() public {

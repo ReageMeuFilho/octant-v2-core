@@ -42,6 +42,7 @@ contract QuadraticVotingSimpleTimelockTest is Test {
 
         address mechanismAddr = factory.deployQuadraticVotingMechanism(config, 50, 100); // 50% alpha
         mechanism = QuadraticVotingMechanism(payable(mechanismAddr));
+        _tokenized(address(mechanism)).setKeeper(alice);
     }
 
     function testSimpleTimelock() public {
@@ -77,7 +78,7 @@ contract QuadraticVotingSimpleTimelockTest is Test {
 
         console.log("=== BEFORE QUEUING ===");
         console.log("Current timestamp:", block.timestamp);
-        console.log("Charlie redeemableAfter:", _tokenized(address(mechanism)).redeemableAfter(charlie));
+        console.log("Charlie redeemableAfter:", _tokenized(address(mechanism)).globalRedemptionStart());
         console.log("Charlie balance:", _tokenized(address(mechanism)).balanceOf(charlie));
         console.log("Charlie maxRedeem:", _tokenized(address(mechanism)).maxRedeem(charlie));
 
@@ -90,14 +91,14 @@ contract QuadraticVotingSimpleTimelockTest is Test {
         console.log("Current timestamp:", block.timestamp);
         console.log("Timelock delay:", _tokenized(address(mechanism)).timelockDelay());
         console.log("Expected redeemable time:", queueTime + 1000);
-        console.log("Charlie redeemableAfter:", _tokenized(address(mechanism)).redeemableAfter(charlie));
+        console.log("Charlie redeemableAfter:", _tokenized(address(mechanism)).globalRedemptionStart());
         console.log("Charlie balance:", _tokenized(address(mechanism)).balanceOf(charlie));
         console.log("Charlie maxRedeem:", _tokenized(address(mechanism)).maxRedeem(charlie));
 
         // Verify shares were minted and timelock set correctly
         assertGt(_tokenized(address(mechanism)).balanceOf(charlie), 0, "Should have shares after queue");
         assertEq(
-            _tokenized(address(mechanism)).redeemableAfter(charlie),
+            _tokenized(address(mechanism)).globalRedemptionStart(),
             queueTime + 1000,
             "Should have correct redeemableAfter"
         );

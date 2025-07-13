@@ -77,6 +77,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     error AlreadyRegistered(address user);
     error DepositTooLarge(uint256 deposit, uint256 maxAllowed);
     error VotingPowerTooLarge(uint256 votingPower, uint256 maxAllowed);
+    error InsufficientDeposit(uint256 deposit);
     error ProposeNotAllowed(address proposer);
     error InvalidRecipient(address recipient);
     error RecipientUsed(address recipient);
@@ -90,9 +91,9 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     error ProposalCanceledError(uint256 pid);
     error NoQuorum(uint256 pid, uint256 forVotes, uint256 againstVotes, uint256 required);
     error AlreadyQueued(uint256 pid);
+    error QueueingClosedAfterRedemption();
     error NoAllocation(uint256 pid, uint256 sharesToMint);
     error VotingClosed(uint256 currentBlock, uint256 startBlock, uint256 endBlock);
-    error AlreadyVoted(address voter, uint256 pid);
     error InvalidWeight(uint256 weight, uint256 votingPower);
     error WeightTooLarge(uint256 weight, uint256 maxAllowed);
     error PowerIncreased(uint256 oldPower, uint256 newPower);
@@ -108,9 +109,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
 
     /// @notice Maximum safe value for mathematical operations
     uint256 public constant MAX_SAFE_VALUE = type(uint128).max;
-
-    /// @notice API version this TokenizedStrategy implements.
-    string internal constant API_VERSION = "3.0.4";
 
     /// @notice Used for calculations.
     uint256 internal constant MAX_BPS = 10_000;
@@ -149,24 +147,15 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         Defeated,
         Succeeded,
         Queued,
-        Expired,
-        Executed
+        Expired
     }
 
     struct Proposal {
         uint256 sharesRequested;
-        uint256 earliestRedeemableTime;
         address proposer;
         address recipient;
         string description;
-        bool claimed;
         bool canceled;
-    }
-
-    struct ProposalVote {
-        uint256 sharesFor;
-        uint256 sharesAgainst;
-        uint256 sharesAbstain;
     }
 
     /// @notice Main storage struct containing all allocation mechanism state
@@ -184,12 +173,14 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         uint256 quorumShares;
         // Access control
         address owner;
+        address pendingOwner;
         bool paused;
         bool initialized;
         // Voting state
         bool tallyFinalized;
         uint256 proposalIdCounter;
-        // ERC4626 Vault Storage (merged from DistributionMechanism)
+        uint256 globalRedemptionStart; // Global timestamp when all redemptions and transfers can begin
+        // Allocation Mechanism Vault Storage (merged from DistributionMechanism)
         mapping(address => uint256) nonces; // Mapping of nonces used for permit functions
         mapping(address => uint256) balances; // Mapping to track current balances for each account that holds shares
         mapping(address => mapping(address => uint256)) allowances; // Mapping to track the allowances for the strategies shares
@@ -198,18 +189,12 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         // Strategy Management
         address keeper; // Address given permission to call {report} and {tend}
         address management; // Main address that can set all configurable variables
-        address pendingManagement; // Address that is pending to take over `management`
         address emergencyAdmin; // Address to act in emergencies as well as `management`
         uint8 decimals; // The amount of decimals that `asset` and strategy use
-        uint8 entered; // To prevent reentrancy. Use uint8 for gas savings
-        bool shutdown; // Bool that can be used to stop deposits into the strategy
         // Mappings
         mapping(uint256 => Proposal) proposals;
-        mapping(uint256 => ProposalVote) proposalVotes;
         mapping(address => bool) recipientUsed;
-        mapping(uint256 => mapping(address => bool)) hasVoted;
         mapping(address => uint256) votingPower;
-        mapping(address => uint256) redeemableAfter;
         mapping(uint256 => uint256) proposalShares;
         // EIP712 storage
         bytes32 domainSeparator; // Cached domain separator
@@ -217,22 +202,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     }
 
     // ---------- Storage Access for Hooks ----------
-
-    /// @notice Get storage reference for use in hooks
-    /// @dev This allows hook implementations to access and modify storage
-    function getProposalVoteStorage(uint256 pid) external view returns (ProposalVote memory) {
-        return _getStorage().proposalVotes[pid];
-    }
-
-    /// @notice Update vote tallies from hooks
-    /// @dev Only callable via delegatecall from the strategy contract
-    function updateVoteTally(uint256 pid, uint256 sharesFor, uint256 sharesAgainst, uint256 sharesAbstain) external {
-        require(address(this) == msg.sender, "Only self");
-        AllocationStorage storage s = _getStorage();
-        s.proposalVotes[pid].sharesFor = sharesFor;
-        s.proposalVotes[pid].sharesAgainst = sharesAgainst;
-        s.proposalVotes[pid].sharesAbstain = sharesAbstain;
-    }
 
     /// @notice Emitted when a user completes registration
     event UserRegistered(address indexed user, uint256 votingPower);
@@ -246,24 +215,22 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     event ProposalQueued(uint256 indexed pid, uint256 eta, uint256 shareAmount);
     /// @notice Emitted when a proposal is canceled
     event ProposalCanceled(uint256 indexed pid, address indexed proposer);
+    /// @notice Emitted when ownership transfer is initiated
+    event OwnershipTransferInitiated(address indexed currentOwner, address indexed pendingOwner);
     /// @notice Emitted when ownership is transferred
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+    /// @notice Emitted when keeper is updated
+    event KeeperUpdated(address indexed previousKeeper, address indexed newKeeper);
+    /// @notice Emitted when management is updated
+    event ManagementUpdated(address indexed previousManagement, address indexed newManagement);
     /// @notice Emitted when contract is paused/unpaused
     event PausedStatusChanged(bool paused);
+    /// @notice Emitted when global redemption period is set
+    event GlobalRedemptionPeriodSet(uint256 redemptionStart, uint256 redemptionEnd);
+    /// @notice Emitted when tokens are swept after grace period
+    event Swept(address indexed token, address indexed receiver, uint256 amount);
 
     // Additional events from DistributionMechanism
-    /// @notice Emitted when a strategy is shutdown.
-    event StrategyShutdown();
-    /// @notice Emitted on the initialization of any new `strategy` that uses `asset` with this specific `apiVersion`.
-    event NewTokenizedStrategy(address indexed strategy, address indexed asset, string apiVersion);
-    /// @notice Emitted when the 'keeper' address is updated to 'newKeeper'.
-    event UpdateKeeper(address indexed newKeeper);
-    /// @notice Emitted when the 'management' address is updated to 'newManagement'.
-    event UpdateManagement(address indexed newManagement);
-    /// @notice Emitted when the 'emergencyAdmin' address is updated to 'newEmergencyAdmin'.
-    event UpdateEmergencyAdmin(address indexed newEmergencyAdmin);
-    /// @notice Emitted when the `pendingManagement` address is updated to `newPendingManagement`.
-    event UpdatePendingManagement(address indexed newPendingManagement);
     /// @notice Emitted when the allowance of a `spender` for an `owner` is set by a call to {approve}. `value` is the new allowance.
     event Approval(address indexed owner, address indexed spender, uint256 value);
     /// @notice Emitted when `value` tokens are moved from one account (`from`) to another (`to`).
@@ -447,21 +414,13 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
 
         AllocationStorage storage stor = _getStorage();
 
-        // Get current nonce and increment
-        uint256 currentNonce = stor.nonces[user];
-
         // Build struct hash
-        bytes32 structHash = keccak256(abi.encode(SIGNUP_TYPEHASH, user, deposit, currentNonce, deadline));
+        bytes32 structHash = keccak256(abi.encode(SIGNUP_TYPEHASH, user, deposit, stor.nonces[user]++, deadline));
 
         // Recover signer
         address recoveredAddress = _recover(structHash, v, r, s);
         if (recoveredAddress == address(0)) revert InvalidSignature();
         if (recoveredAddress != user) revert InvalidSigner(recoveredAddress, user);
-
-        // Increment nonce
-        unchecked {
-            stor.nonces[user] = currentNonce + 1;
-        }
 
         // Execute signup logic
         _executeSignup(user, deposit);
@@ -486,6 +445,9 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
 
         uint256 newPower = IBaseAllocationStrategy(address(this)).getVotingPowerHook(user, deposit);
         if (newPower > MAX_SAFE_VALUE) revert VotingPowerTooLarge(newPower, MAX_SAFE_VALUE);
+
+        // Prevent registration with zero voting power when deposit is non-zero
+        if (newPower == 0 && deposit > 0) revert InsufficientDeposit(deposit);
 
         s.votingPower[user] = newPower;
         emit UserRegistered(user, newPower);
@@ -519,10 +481,9 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         if (bytes(description).length == 0) revert EmptyDescription();
         if (bytes(description).length > 1000) revert DescriptionTooLong(bytes(description).length, 1000);
 
-        s.proposalIdCounter++;
-        pid = s.proposalIdCounter;
+        pid = ++s.proposalIdCounter;
 
-        s.proposals[pid] = Proposal(0, 0, proposer, recipient, description, false, false);
+        s.proposals[pid] = Proposal(0, proposer, recipient, description, false);
         s.recipientUsed[recipient] = true;
 
         emit ProposalCreated(pid, proposer, recipient, description);
@@ -565,9 +526,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         if (block.timestamp > deadline) revert ExpiredSignature(deadline, block.timestamp);
 
         AllocationStorage storage stor = _getStorage();
-
-        // Get current nonce and increment
-        uint256 currentNonce = stor.nonces[voter];
+        uint256 currentNonce = stor.nonces[voter]++;
 
         // Build struct hash
         bytes32 structHash = keccak256(
@@ -578,11 +537,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         address recoveredAddress = _recover(structHash, v, r, s);
         if (recoveredAddress == address(0)) revert InvalidSignature();
         if (recoveredAddress != voter) revert InvalidSigner(recoveredAddress, voter);
-
-        // Increment nonce
-        unchecked {
-            stor.nonces[voter] = currentNonce + 1;
-        }
 
         // Execute vote logic
         _executeCastVote(voter, pid, choice, weight);
@@ -607,8 +561,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
                 s.startBlock + s.votingDelay + s.votingPeriod
             );
 
-        if (s.hasVoted[pid][voter]) revert AlreadyVoted(voter, pid);
-
         uint256 oldPower = s.votingPower[voter];
         if (weight == 0) revert InvalidWeight(weight, oldPower);
         if (weight > MAX_SAFE_VALUE) revert WeightTooLarge(weight, MAX_SAFE_VALUE);
@@ -625,7 +577,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         if (newPower > oldPower) revert PowerIncreased(oldPower, newPower);
 
         s.votingPower[voter] = newPower;
-        s.hasVoted[pid][voter] = true;
         emit VotesCast(voter, pid, weight);
     }
 
@@ -646,27 +597,34 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         // This allows for custom logic like matching pools in quadratic funding
         s.totalAssets = IBaseAllocationStrategy(address(this)).calculateTotalAssetsHook();
 
+        // Set global redemption start time for all proposals
+        s.globalRedemptionStart = block.timestamp + s.timelockDelay;
+
         s.tallyFinalized = true;
         emit VoteTallyFinalized();
+        emit GlobalRedemptionPeriodSet(s.globalRedemptionStart, s.globalRedemptionStart + s.gracePeriod);
     }
 
     // ---------- Queue Proposal ----------
 
     /// @notice Queue proposal and trigger share distribution
     /// @param pid Proposal ID to queue
-    function queueProposal(uint256 pid) external onlyOwner nonReentrant onlyInitialized {
+    function queueProposal(uint256 pid) external nonReentrant onlyInitialized {
         AllocationStorage storage s = _getStorage();
 
         if (!s.tallyFinalized) revert TallyNotFinalized();
+        // Check if redemption period has started - no new queuing after redemption begins
+        if (s.globalRedemptionStart != 0 && block.timestamp >= s.globalRedemptionStart) {
+            revert QueueingClosedAfterRedemption();
+        }
         if (!IBaseAllocationStrategy(address(this)).validateProposalHook(pid)) revert InvalidProposal(pid);
 
         Proposal storage p = s.proposals[pid];
         if (p.canceled) revert ProposalCanceledError(pid);
 
-        if (!IBaseAllocationStrategy(address(this)).hasQuorumHook(pid))
-            revert NoQuorum(pid, s.proposalVotes[pid].sharesFor, s.proposalVotes[pid].sharesAgainst, s.quorumShares);
+        if (!IBaseAllocationStrategy(address(this)).hasQuorumHook(pid)) revert NoQuorum(pid, 0, 0, s.quorumShares);
 
-        if (p.earliestRedeemableTime != 0) revert AlreadyQueued(pid);
+        if (s.proposalShares[pid] != 0) revert AlreadyQueued(pid);
 
         uint256 sharesToMint = IBaseAllocationStrategy(address(this)).convertVotesToShares(pid);
         if (sharesToMint == 0) revert NoAllocation(pid, sharesToMint);
@@ -686,11 +644,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
             _mint(s, recipient, sharesToMint);
         }
 
-        uint256 earliestRedeemableTime = block.timestamp + s.timelockDelay;
-        p.earliestRedeemableTime = earliestRedeemableTime;
-        s.redeemableAfter[recipient] = earliestRedeemableTime;
-
-        emit ProposalQueued(pid, earliestRedeemableTime, sharesToMint);
+        emit ProposalQueued(pid, s.globalRedemptionStart, sharesToMint);
     }
 
     // ---------- State Machine ----------
@@ -713,9 +667,12 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         if (block.number <= s.startBlock + s.votingDelay + s.votingPeriod || !s.tallyFinalized)
             return ProposalState.Active;
         if (!IBaseAllocationStrategy(address(this)).hasQuorumHook(pid)) return ProposalState.Defeated;
-        if (p.earliestRedeemableTime == 0) return ProposalState.Succeeded;
-        if (p.claimed) return ProposalState.Executed;
-        if (block.timestamp > p.earliestRedeemableTime + s.gracePeriod) return ProposalState.Expired;
+        // Check if proposal has been queued (has shares allocated)
+        if (s.proposalShares[pid] == 0) return ProposalState.Succeeded;
+        // Check global grace period expiration
+        if (s.globalRedemptionStart != 0 && block.timestamp > s.globalRedemptionStart + s.gracePeriod) {
+            return ProposalState.Expired;
+        }
         return ProposalState.Queued;
     }
 
@@ -731,23 +688,13 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         Proposal storage p = s.proposals[pid];
         if (msg.sender != p.proposer) revert NotProposer(msg.sender, p.proposer);
         if (p.canceled) revert AlreadyCanceled(pid);
-        if (p.earliestRedeemableTime != 0) revert AlreadyQueued(pid);
+        if (s.proposalShares[pid] != 0) revert AlreadyQueued(pid);
 
         p.canceled = true;
         emit ProposalCanceled(pid, p.proposer);
     }
 
     // ---------- View Functions ----------
-
-    /// @notice Get current vote tallies for a proposal
-    function getVoteTally(
-        uint256 pid
-    ) external view onlyInitialized returns (uint256 sharesFor, uint256 sharesAgainst, uint256 sharesAbstain) {
-        AllocationStorage storage s = _getStorage();
-        if (!IBaseAllocationStrategy(address(this)).validateProposalHook(pid)) revert InvalidProposal(pid);
-        ProposalVote storage votes = s.proposalVotes[pid];
-        return (votes.sharesFor, votes.sharesAgainst, votes.sharesAbstain);
-    }
 
     /// @notice Get remaining voting power for an address
     function getRemainingVotingPower(address voter) external view onlyInitialized returns (uint256) {
@@ -776,6 +723,10 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         return _getStorage().owner;
     }
 
+    function pendingOwner() external view onlyInitialized returns (address) {
+        return _getStorage().pendingOwner;
+    }
+
     function tallyFinalized() external view onlyInitialized returns (bool) {
         return _getStorage().tallyFinalized;
     }
@@ -784,20 +735,8 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         return _getStorage().proposals[pid];
     }
 
-    function proposalVotes(uint256 pid) external view onlyInitialized returns (ProposalVote memory) {
-        return _getStorage().proposalVotes[pid];
-    }
-
-    function hasVoted(uint256 pid, address voter) external view onlyInitialized returns (bool) {
-        return _getStorage().hasVoted[pid][voter];
-    }
-
     function votingPower(address user) external view onlyInitialized returns (uint256) {
         return _getStorage().votingPower[user];
-    }
-
-    function redeemableAfter(address recipient) external view onlyInitialized returns (uint256) {
-        return _getStorage().redeemableAfter[recipient];
     }
 
     function proposalShares(uint256 pid) external view onlyInitialized returns (uint256) {
@@ -829,6 +768,10 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         return _getStorage().gracePeriod;
     }
 
+    function globalRedemptionStart() external view onlyInitialized returns (uint256) {
+        return _getStorage().globalRedemptionStart;
+    }
+
     /// @notice Returns the current nonce for an address
     /// @param account The address to check
     /// @return The current nonce
@@ -838,13 +781,53 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
 
     // ---------- Emergency Functions ----------
 
-    /// @notice Transfer ownership to a new address
+    /// @notice Initiate ownership transfer to a new address (step 1 of 2)
+    /// @param newOwner The address to transfer ownership to
     function transferOwnership(address newOwner) external onlyOwner onlyInitialized {
         if (newOwner == address(0)) revert Unauthorized();
         AllocationStorage storage s = _getStorage();
+        s.pendingOwner = newOwner;
+        emit OwnershipTransferInitiated(s.owner, newOwner);
+    }
+
+    /// @notice Accept ownership transfer (step 2 of 2)
+    /// @dev Must be called by the pending owner to complete the transfer
+    function acceptOwnership() external onlyInitialized {
+        AllocationStorage storage s = _getStorage();
+        if (msg.sender != s.pendingOwner) revert Unauthorized();
+
         address oldOwner = s.owner;
-        s.owner = newOwner;
-        emit OwnershipTransferred(oldOwner, newOwner);
+        s.owner = s.pendingOwner;
+        s.pendingOwner = address(0);
+        emit OwnershipTransferred(oldOwner, s.owner);
+    }
+
+    /// @notice Cancel pending ownership transfer
+    /// @dev Can only be called by current owner
+    function cancelOwnershipTransfer() external onlyOwner onlyInitialized {
+        AllocationStorage storage s = _getStorage();
+        if (s.pendingOwner == address(0)) revert Unauthorized();
+
+        s.pendingOwner = address(0);
+        emit OwnershipTransferInitiated(s.owner, address(0));
+    }
+
+    /// @notice Update keeper address
+    function setKeeper(address newKeeper) external onlyOwner onlyInitialized {
+        if (newKeeper == address(0)) revert Unauthorized();
+        AllocationStorage storage s = _getStorage();
+        address oldKeeper = s.keeper;
+        s.keeper = newKeeper;
+        emit KeeperUpdated(oldKeeper, newKeeper);
+    }
+
+    /// @notice Update management address
+    function setManagement(address newManagement) external onlyOwner onlyInitialized {
+        if (newManagement == address(0)) revert Unauthorized();
+        AllocationStorage storage s = _getStorage();
+        address oldManagement = s.management;
+        s.management = newManagement;
+        emit ManagementUpdated(oldManagement, newManagement);
     }
 
     /// @notice Emergency pause all operations
@@ -866,25 +849,37 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         return _getStorage().paused;
     }
 
-    // ---------- Share Minting for Distribution ----------
-
-    /// @notice Mint shares to a recipient (only callable by strategy via delegatecall)
-    /// @param recipient Address to receive the minted shares
-    /// @param amount Number of shares to mint
-    function mintShares(address recipient, uint256 amount) external onlyInitialized {
-        // This function is designed to be called by strategies via delegatecall
-        // In delegatecall context, msg.sender == address(this) (the strategy contract)
-        require(msg.sender == address(this), "Only self");
-
+    /// @notice Sweep remaining tokens after grace period expires
+    /// @dev Can only be called by owner after global grace period ends
+    /// @param token The token to sweep (use address(0) for ETH)
+    /// @param receiver The address to receive the swept tokens
+    function sweep(address token, address receiver) external onlyOwner onlyInitialized nonReentrant {
         AllocationStorage storage s = _getStorage();
-        _mint(s, recipient, amount);
 
-        // Note: totalAssets is updated in finalizeVoteTally() to reflect actual contract balance
-        // This prevents share price manipulation and ensures accurate accounting
+        // Ensure grace period has expired for everyone
+        require(s.globalRedemptionStart != 0, "Redemption period not started");
+        require(block.timestamp > s.globalRedemptionStart + s.gracePeriod, "Grace period not expired");
+        require(receiver != address(0), "Invalid receiver");
+
+        if (token == address(0)) {
+            // Sweep ETH
+            uint256 balance = address(this).balance;
+            require(balance > 0, "No ETH to sweep");
+            (bool success, ) = receiver.call{ value: balance }("");
+            require(success, "ETH transfer failed");
+            emit Swept(token, receiver, balance);
+        } else {
+            // Sweep any ERC20 token
+            IERC20 tokenContract = IERC20(token);
+            uint256 balance = tokenContract.balanceOf(address(this));
+            require(balance > 0, "No tokens to sweep");
+            tokenContract.safeTransfer(receiver, balance);
+            emit Swept(token, receiver, balance);
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
-                        ERC4626 VAULT FUNCTIONALITY
+                        ALLOCATION VAULT FUNCTIONALITY
     //////////////////////////////////////////////////////////////*/
 
     /**
@@ -919,7 +914,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     ) public nonReentrant returns (uint256) {
         // Get the storage slot for all following calls.
         AllocationStorage storage S = _getStorage();
-        require(shares <= _maxRedeem(S, shareOwner), "ERC4626: redeem more than max");
+        require(shares <= _maxRedeem(S, shareOwner), "Allocation: redeem more than max");
         // slither-disable-next-line uninitialized-local
         uint256 assets;
         // Check for rounding error or 0 value.
@@ -1040,7 +1035,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     }
 
     /*//////////////////////////////////////////////////////////////
-                    INTERNAL 4626 VIEW METHODS
+                    INTERNAL VAULT VIEW METHODS
     //////////////////////////////////////////////////////////////*/
 
     /// @dev Internal implementation of {totalAssets}.
@@ -1115,7 +1110,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     }
 
     /*//////////////////////////////////////////////////////////////
-                    INTERNAL 4626 WRITE METHODS
+                    INTERNAL VAULT WRITE METHODS
     //////////////////////////////////////////////////////////////*/
 
     /**
@@ -1146,17 +1141,12 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         // Cache `asset` since it is used multiple times..
         ERC20 _asset = ERC20(address(S.asset));
 
+        // Ensure sufficient balance for withdrawal
         uint256 idle = _asset.balanceOf(address(this));
-        // slither-disable-next-line uninitialized-local
-        uint256 loss;
-        // Check if we need to withdraw funds.
-        if (idle < assets) {
-            // Return the actual amount withdrawn. Adjust for potential under withdraws.
-            assets = _asset.balanceOf(address(this));
-        }
+        require(idle >= assets, "Insufficient balance for withdrawal");
 
         // Update assets based on how much we took.
-        S.totalAssets -= (assets + loss);
+        S.totalAssets -= assets;
 
         _burn(S, shareOwner, shares);
 
@@ -1274,6 +1264,11 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         require(from != address(0), "ERC20: transfer from the zero address");
         require(to != address(0), "ERC20: transfer to the zero address");
         require(to != address(this), "ERC20 transfer to strategy");
+
+        // Block transfers until redemption period starts
+        if (S.globalRedemptionStart == 0 || block.timestamp < S.globalRedemptionStart) {
+            revert("Transfers not allowed until redemption period");
+        }
 
         S.balances[from] -= amount;
         unchecked {

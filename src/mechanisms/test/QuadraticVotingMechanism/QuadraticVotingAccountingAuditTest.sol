@@ -203,6 +203,11 @@ contract QuadraticVotingAccountingAuditTest is Test {
 
         address mechanismAddr = factory.deployQuadraticVotingMechanism(config, ALPHA_NUMERATOR, ALPHA_DENOMINATOR);
         mechanism = QuadraticVotingMechanism(payable(mechanismAddr));
+
+        // Set alice as keeper and management for proposers
+        _tokenized(address(mechanism)).setKeeper(alice);
+        _tokenized(address(mechanism)).setManagement(alice);
+        _tokenized(address(mechanism)).setManagement(bob);
     }
 
     /// @notice Capture complete accounting state for audit verification
@@ -543,12 +548,12 @@ contract QuadraticVotingAccountingAuditTest is Test {
         // Verify timelock setup
         currentTestCtx.expectedRedeemableTime = currentTestCtx.queueTimestamp + TIMELOCK_DELAY;
         assertEq(
-            _tokenized(address(mechanism)).redeemableAfter(recipient1),
+            _tokenized(address(mechanism)).globalRedemptionStart(),
             currentTestCtx.expectedRedeemableTime,
             "Recipient1 timelock incorrect"
         );
         assertEq(
-            _tokenized(address(mechanism)).redeemableAfter(recipient2),
+            _tokenized(address(mechanism)).globalRedemptionStart(),
             currentTestCtx.expectedRedeemableTime,
             "Recipient2 timelock incorrect"
         );

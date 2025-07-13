@@ -75,9 +75,7 @@ contract SimpleVotingDefeatedStateTest is Test {
         console.log("Votes cast: 150 ether");
 
         // Check vote tally before finalization
-        (uint256 forVotes, uint256 againstVotes, uint256 abstainVotes) = _tokenized(address(mechanism)).getVoteTally(
-            pid
-        );
+        (uint256 forVotes, uint256 againstVotes, uint256 abstainVotes) = mechanism.voteTallies(pid);
         console.log("For votes:", forVotes / 1e18);
         console.log("Against votes:", againstVotes / 1e18);
         console.log("Abstain votes:", abstainVotes / 1e18);
