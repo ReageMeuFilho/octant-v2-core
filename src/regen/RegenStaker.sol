@@ -12,7 +12,7 @@ import { DelegationSurrogateVotes } from "staker/DelegationSurrogateVotes.sol";
 import { IERC20Delegates } from "staker/interfaces/IERC20Delegates.sol";
 
 // === Base Imports ===
-import { RegenStakerBase, Staker, SafeERC20, IERC20, IERC20Permit, IWhitelist, IEarningPowerCalculator } from "src/regen/RegenStakerBase.sol";
+import { RegenStakerBase, Staker, SafeERC20, IERC20, IWhitelist, IEarningPowerCalculator } from "src/regen/RegenStakerBase.sol";
 
 // === Contract Header ===
 /// @title RegenStaker
@@ -26,7 +26,6 @@ import { RegenStakerBase, Staker, SafeERC20, IERC20, IERC20Permit, IWhitelist, I
 /// ├─────────────────────────────────────┼─────────────────┼──────────────────────────────────┤
 /// │ Delegation Support                  │ ✓ Full Support  │ ✗ No Support                     │
 /// │ Surrogate Deployment                │ ✓ Per Delegatee │ ✗ Contract as Surrogate          │
-/// │ Whitelist Authorization             │ deposit.owner   │ deposit.owner                    │
 /// │ Token Holder                        │ Surrogates      │ Contract Directly                │
 /// │ Voting Capability                   │ ✓ via Surrogate │ ✗ Not Available                  │
 /// │ Gas Cost (First Delegatee)          │ Higher          │ Lower                            │
@@ -65,9 +64,9 @@ contract RegenStaker is RegenStakerBase {
         IEarningPowerCalculator _earningPowerCalculator,
         uint256 _maxBumpTip,
         address _admin,
-        uint256 _rewardDuration,
+        uint128 _rewardDuration,
         uint256 _maxClaimFee,
-        uint256 _minimumStakeAmount,
+        uint128 _minimumStakeAmount,
         IWhitelist _stakerWhitelist,
         IWhitelist _contributionWhitelist,
         IWhitelist _allocationMechanismWhitelist
@@ -91,6 +90,7 @@ contract RegenStaker is RegenStakerBase {
     }
 
     // === Overridden Functions ===
+
     /// @inheritdoc Staker
     function surrogates(address _delegatee) public view override returns (DelegationSurrogate) {
         return _surrogates[_delegatee];
@@ -156,29 +156,15 @@ contract RegenStaker is RegenStakerBase {
     }
 
     /// @inheritdoc RegenStakerBase
-    /// @dev For RegenStaker, we check deposit.owner for stakeMore operations using the owner-centric model.
-    /// @dev OWNER-CENTRIC SECURITY: Both initial staking and stakeMore operations verify that the deposit owner
-    ///      is whitelisted. This prevents whitelist circumvention through delegation or stakeOnBehalf calls.
-    /// @dev DELEGATION COMPATIBILITY: Delegation still works - authorized delegates can perform stakeMore
-    ///      operations, but the whitelist always checks the actual deposit owner, not the caller.
-    /// @dev CONSISTENT MODEL: Both RegenStaker and RegenStakerWithoutDelegateSurrogateVotes now use
-    ///      the same owner-centric authorization, ensuring consistent security across variants.
-    /// @dev SECURITY BENEFIT: Only whitelisted users can own deposits and benefit from staking rewards,
-    ///      eliminating potential whitelist bypass through delegation mechanisms.
-    function _getStakeMoreWhitelistTarget(Deposit storage deposit) internal view override returns (address) {
-        return deposit.owner;
-    }
-
-    /// @inheritdoc RegenStakerBase
     /// @dev Transfers tokens to the delegation surrogate for the delegatee
     function _transferForCompound(address _delegatee, uint256 _amount) internal override {
         DelegationSurrogate surrogate = _fetchOrDeploySurrogate(_delegatee);
         SafeERC20.safeTransfer(STAKE_TOKEN, address(surrogate), _amount);
     }
 
-    /// @notice Indicates if this staker variant supports delegation
-    /// @return true if delegation is supported
-    function supportsDelegation() external pure returns (bool) {
-        return true;
+    /// @inheritdoc RegenStakerBase
+    /// @dev Always checks deposit.owner for whitelist authorization, preventing bypass through delegation.
+    function _getStakeMoreWhitelistTarget(Deposit storage deposit) internal view override returns (address) {
+        return deposit.owner;
     }
 }

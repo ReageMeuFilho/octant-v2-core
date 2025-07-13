@@ -24,7 +24,6 @@ import { RegenStakerBase, Staker, IERC20, IERC20Permit, IWhitelist, IEarningPowe
 /// ├─────────────────────────────────────┼─────────────────┼──────────────────────────────────┤
 /// │ Delegation Support                  │ ✓ Full Support  │ ✗ No Support                     │
 /// │ Surrogate Deployment                │ ✓ Per Delegatee │ ✗ Contract as Surrogate          │
-/// │ Whitelist Authorization             │ deposit.owner   │ deposit.owner                    │
 /// │ Token Holder                        │ Surrogates      │ Contract Directly                │
 /// │ Voting Capability                   │ ✓ via Surrogate │ ✗ Not Available                  │
 /// │ Gas Cost (First Delegatee)          │ Higher          │ Lower                            │
@@ -63,9 +62,9 @@ contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
         IEarningPowerCalculator _earningPowerCalculator,
         uint256 _maxBumpTip,
         address _admin,
-        uint256 _rewardDuration,
+        uint128 _rewardDuration,
         uint256 _maxClaimFee,
-        uint256 _minimumStakeAmount,
+        uint128 _minimumStakeAmount,
         IWhitelist _stakerWhitelist,
         IWhitelist _contributionWhitelist,
         IWhitelist _allocationMechanismWhitelist
@@ -168,15 +167,7 @@ contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
     }
 
     /// @inheritdoc RegenStakerBase
-    /// @dev For RegenStakerWithoutDelegateSurrogateVotes, we check deposit.owner for stakeMore operations.
-    /// @dev OWNER-CENTRIC SECURITY: Both initial staking and stakeMore operations verify that the deposit owner
-    ///      is whitelisted, preventing whitelist circumvention and ensuring consistent authorization.
-    /// @dev AUTHORIZATION MODEL: Uses the same owner-centric authorization as RegenStaker, ensuring
-    ///      consistent security across all variants. Only whitelisted users can own deposits.
-    /// @dev DELEGATION LIMITATION: While this variant doesn't support token delegation, the authorization
-    ///      model is consistent: whitelist checks always verify the deposit owner regardless of caller.
-    /// @dev SECURITY BENEFIT: Eliminates potential whitelist bypass scenarios and maintains clear
-    ///      ownership boundaries for staking operations.
+    /// @dev Always checks deposit.owner for whitelist authorization, preventing bypass scenarios.
     function _getStakeMoreWhitelistTarget(Deposit storage deposit) internal view override returns (address) {
         return deposit.owner;
     }
@@ -185,11 +176,5 @@ contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
     /// @dev No transfer needed since tokens stay in this contract (contract acts as its own surrogate)
     function _transferForCompound(address, /* _delegatee */ uint256 /* _amount */) internal pure override {
         // No transfer needed - tokens stay in this contract
-    }
-
-    /// @notice Indicates if this staker variant supports delegation
-    /// @return false if delegation is not supported
-    function supportsDelegation() external pure returns (bool) {
-        return false;
     }
 }
