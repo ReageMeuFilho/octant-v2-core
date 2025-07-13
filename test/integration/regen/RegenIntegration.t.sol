@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 import { RegenStaker } from "src/regen/RegenStaker.sol";
+import { RegenStakerBase } from "src/regen/RegenStakerBase.sol";
 import { RegenEarningPowerCalculator } from "src/regen/RegenEarningPowerCalculator.sol";
 import { Whitelist } from "src/utils/Whitelist.sol";
 import { IWhitelist } from "src/utils/IWhitelist.sol";
@@ -27,6 +28,10 @@ import { AllocationConfig } from "src/mechanisms/BaseAllocationMechanism.sol";
  */
 contract RegenIntegrationTest is Test {
     RegenStaker regenStaker;
+
+    // Event declarations
+    event RewardDurationSet(uint256 newDuration);
+
     RegenEarningPowerCalculator calculator;
     Whitelist stakerWhitelist;
     Whitelist contributorWhitelist;
@@ -376,7 +381,7 @@ contract RegenIntegrationTest is Test {
         vm.startPrank(user);
         stakeToken.approve(address(regenStaker), stakeAmount);
         vm.expectRevert(
-            abi.encodeWithSelector(RegenStaker.MinimumStakeAmountNotMet.selector, minimumAmount, stakeAmount)
+            abi.encodeWithSelector(RegenStakerBase.MinimumStakeAmountNotMet.selector, minimumAmount, stakeAmount)
         );
         regenStaker.stake(stakeAmount, user, user);
         vm.stopPrank();
@@ -439,7 +444,11 @@ contract RegenIntegrationTest is Test {
         Staker.DepositIdentifier depositId = regenStaker.stake(initialStake, user, user);
 
         vm.expectRevert(
-            abi.encodeWithSelector(RegenStaker.MinimumStakeAmountNotMet.selector, minimumAmount, remainingAfterWithdraw)
+            abi.encodeWithSelector(
+                RegenStakerBase.MinimumStakeAmountNotMet.selector,
+                minimumAmount,
+                remainingAfterWithdraw
+            )
         );
         regenStaker.withdraw(depositId, withdrawAmount);
         vm.stopPrank();
@@ -465,7 +474,7 @@ contract RegenIntegrationTest is Test {
         stakeToken.approve(address(regenStaker), stakeAmount);
 
         vm.expectRevert(
-            abi.encodeWithSelector(RegenStaker.NotWhitelisted.selector, regenStaker.stakerWhitelist(), user)
+            abi.encodeWithSelector(RegenStakerBase.NotWhitelisted.selector, regenStaker.stakerWhitelist(), user)
         );
         regenStaker.stake(partialStakeAmount, user);
         vm.stopPrank();
@@ -1373,7 +1382,7 @@ contract RegenIntegrationTest is Test {
 
         vm.prank(ADMIN);
         vm.expectEmit(true, true, true, true);
-        emit RegenStaker.RewardDurationSet(newDuration);
+        emit RewardDurationSet(newDuration);
         regenStaker.setRewardDuration(newDuration);
 
         assertEq(regenStaker.rewardDuration(), newDuration);
@@ -1391,21 +1400,21 @@ contract RegenIntegrationTest is Test {
 
     function testFuzz_RevertIf_SetRewardDurationTooLow() public {
         vm.startPrank(ADMIN);
-        vm.expectRevert(abi.encodeWithSelector(RegenStaker.InvalidRewardDuration.selector, 6 days));
+        vm.expectRevert(abi.encodeWithSelector(RegenStakerBase.InvalidRewardDuration.selector, 6 days));
         regenStaker.setRewardDuration(6 days);
         vm.stopPrank();
     }
 
     function testFuzz_RevertIf_SetRewardDurationToZero() public {
         vm.startPrank(ADMIN);
-        vm.expectRevert(abi.encodeWithSelector(RegenStaker.InvalidRewardDuration.selector, 0));
+        vm.expectRevert(abi.encodeWithSelector(RegenStakerBase.InvalidRewardDuration.selector, 0));
         regenStaker.setRewardDuration(0);
         vm.stopPrank();
     }
 
     function testFuzz_RevertIf_SetRewardDurationTooHigh() public {
         vm.startPrank(ADMIN);
-        vm.expectRevert(abi.encodeWithSelector(RegenStaker.InvalidRewardDuration.selector, 3001 days));
+        vm.expectRevert(abi.encodeWithSelector(RegenStakerBase.InvalidRewardDuration.selector, 3001 days));
         regenStaker.setRewardDuration(3001 days);
         vm.stopPrank();
     }
@@ -1432,7 +1441,7 @@ contract RegenIntegrationTest is Test {
         vm.warp(block.timestamp + regenStaker.rewardDuration() / 2);
 
         vm.startPrank(ADMIN);
-        vm.expectRevert(abi.encodeWithSelector(RegenStaker.CannotChangeRewardDurationDuringActiveReward.selector));
+        vm.expectRevert(abi.encodeWithSelector(RegenStakerBase.CannotChangeRewardDurationDuringActiveReward.selector));
         regenStaker.setRewardDuration(newDuration);
         vm.stopPrank();
     }
@@ -1461,7 +1470,7 @@ contract RegenIntegrationTest is Test {
 
     function testFuzz_Constructor_WithZeroRewardDurationReverts() public {
         vm.startPrank(ADMIN);
-        vm.expectRevert(abi.encodeWithSelector(RegenStaker.InvalidRewardDuration.selector, 0));
+        vm.expectRevert(abi.encodeWithSelector(RegenStakerBase.InvalidRewardDuration.selector, 0));
         new RegenStaker(
             IERC20(address(rewardToken)),
             IERC20Staking(address(stakeToken)),
@@ -1760,7 +1769,11 @@ contract RegenIntegrationTest is Test {
         if (expectedNewBalance < minimumAmount) {
             vm.prank(user);
             vm.expectRevert(
-                abi.encodeWithSelector(RegenStaker.MinimumStakeAmountNotMet.selector, minimumAmount, expectedNewBalance)
+                abi.encodeWithSelector(
+                    RegenStakerBase.MinimumStakeAmountNotMet.selector,
+                    minimumAmount,
+                    expectedNewBalance
+                )
             );
             compoundRegenStaker.compoundRewards(depositId);
         } else {
@@ -2545,7 +2558,7 @@ contract RegenIntegrationTest is Test {
         rewardToken.approve(allocationMechanism, contributeAmount);
 
         // Should revert with CantAfford
-        vm.expectRevert(abi.encodeWithSelector(RegenStaker.CantAfford.selector, contributeAmount, unclaimedAmount));
+        vm.expectRevert(abi.encodeWithSelector(RegenStakerBase.CantAfford.selector, contributeAmount, unclaimedAmount));
         regenStaker.contribute(depositId, allocationMechanism, contributeAmount, deadline, v, r, s);
         vm.stopPrank();
     }
@@ -2591,7 +2604,7 @@ contract RegenIntegrationTest is Test {
 
         // Should revert with NotWhitelisted
         vm.expectRevert(
-            abi.encodeWithSelector(RegenStaker.NotWhitelisted.selector, regenStaker.contributionWhitelist(), alice)
+            abi.encodeWithSelector(RegenStakerBase.NotWhitelisted.selector, regenStaker.contributionWhitelist(), alice)
         );
         regenStaker.contribute(depositId, allocationMechanism, contributeAmount, deadline, v, r, s);
         vm.stopPrank();
@@ -2743,7 +2756,7 @@ contract RegenIntegrationTest is Test {
         // Should revert with NotWhitelisted for allocation mechanism
         vm.expectRevert(
             abi.encodeWithSelector(
-                RegenStaker.NotWhitelisted.selector,
+                RegenStakerBase.NotWhitelisted.selector,
                 regenStaker.allocationMechanismWhitelist(),
                 allocationMechanism
             )

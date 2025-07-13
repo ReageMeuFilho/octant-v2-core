@@ -8,6 +8,9 @@ import { IERC20, IWhitelist, IEarningPowerCalculator } from "src/regen/RegenStak
 /// @notice Deploys RegenStaker contracts with explicit variant selection
 /// @author [Golem Foundation](https://golem.foundation)
 /// @dev SECURITY: Tracks canonical bytecode per variant from first deployment by factory deployer
+/// @dev SECURITY ASSUMPTION: Factory deployer is trusted to provide correct canonical bytecode.
+///      If deployer is compromised, all future deployments could use unauthorized code.
+///      This is an acceptable risk given the controlled deployment environment.
 contract RegenStakerFactory {
     mapping(RegenStakerVariant => bytes32) public canonicalBytecodeHash;
 
@@ -101,7 +104,7 @@ contract RegenStakerFactory {
     /// @param deployer Address that will deploy
     /// @return Predicted contract address
     function predictStakerAddress(bytes32 salt, address deployer) external view returns (address) {
-        return CREATE3.predictDeterministicAddress(keccak256(abi.encodePacked(salt, deployer)));
+        return CREATE3.predictDeterministicAddress(keccak256(abi.encode(salt, deployer, block.chainid)));
     }
 
     /// @notice SECURITY: Validate bytecode against canonical version
@@ -128,7 +131,7 @@ contract RegenStakerFactory {
 
         stakerAddress = CREATE3.deployDeterministic(
             bytes.concat(code, constructorParams),
-            keccak256(abi.encodePacked(salt, msg.sender))
+            keccak256(abi.encode(salt, msg.sender, block.chainid))
         );
 
         emit StakerDeploy(msg.sender, params.admin, stakerAddress, salt, variant);

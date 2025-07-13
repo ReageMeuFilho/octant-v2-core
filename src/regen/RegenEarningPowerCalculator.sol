@@ -37,9 +37,7 @@ contract RegenEarningPowerCalculator is IWhitelistedEarningPowerCalculator, Owna
     /// @param stakedAmount The amount of staked tokens
     /// @param staker The address of the staker
     /// @return The earning power of the staker
-    /// @dev Returns 0 if the staker is not whitelisted (when whitelist is active).
-    /// Otherwise, returns the minimum of stakedAmount and uint96 max to prevent overflow
-    /// in earning power calculations.
+    /// @dev Example: For stakedAmount=100, returns 100 if whitelisted; 0 otherwise.
     function getEarningPower(
         uint256 stakedAmount,
         address staker,
