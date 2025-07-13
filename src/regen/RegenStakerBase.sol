@@ -52,6 +52,17 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @notice Maximum allowed reward duration to prevent excessively long reward periods.
     uint256 public constant MAX_REWARD_DURATION = 3000 days;
 
+    // === Structs ===
+    /// @notice Struct to hold shared configuration state
+    /// @dev Groups related configuration variables for better storage efficiency and easier inheritance.
+    struct SharedState {
+        uint128 rewardDuration;
+        uint128 minimumStakeAmount;
+        IWhitelist stakerWhitelist;
+        IWhitelist contributionWhitelist;
+        IWhitelist allocationMechanismWhitelist;
+    }
+
     // === Custom Errors ===
     /// @notice Error thrown when an address is not whitelisted
     /// @param whitelist The whitelist contract
@@ -89,17 +100,6 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
 
     /// @notice Error thrown when attempting to disable allocation whitelist
     error DisablingAllocationMechanismWhitelistNotAllowed();
-
-    // === Structs ===
-    /// @notice Struct to hold shared configuration state
-    /// @dev Groups related configuration variables for better storage efficiency and easier inheritance.
-    struct SharedState {
-        uint128 rewardDuration;
-        uint128 minimumStakeAmount;
-        IWhitelist stakerWhitelist;
-        IWhitelist contributionWhitelist;
-        IWhitelist allocationMechanismWhitelist;
-    }
 
     // === State Variables ===
     /// @notice Shared configuration state instance
