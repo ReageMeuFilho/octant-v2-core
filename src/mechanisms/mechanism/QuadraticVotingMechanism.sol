@@ -37,8 +37,6 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
 
     /// @notice Only keeper or management can propose
     function _beforeProposeHook(address proposer) internal view override returns (bool) {
-        if (proposer == address(0)) revert ZeroAddressCannotPropose();
-
         // Get keeper and management addresses from TokenizedAllocationMechanism
         address keeper = _tokenizedAllocation().keeper();
         address management = _tokenizedAllocation().management();

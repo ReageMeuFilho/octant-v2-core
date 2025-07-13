@@ -481,8 +481,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         if (bytes(description).length == 0) revert EmptyDescription();
         if (bytes(description).length > 1000) revert DescriptionTooLong(bytes(description).length, 1000);
 
-        s.proposalIdCounter++;
-        pid = s.proposalIdCounter;
+        pid = ++s.proposalIdCounter;
 
         s.proposals[pid] = Proposal(0, proposer, recipient, description, false);
         s.recipientUsed[recipient] = true;
