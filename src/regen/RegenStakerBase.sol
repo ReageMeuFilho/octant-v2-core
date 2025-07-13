@@ -219,9 +219,9 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         IEarningPowerCalculator _earningPowerCalculator,
         uint256 _maxBumpTip,
         address _admin,
-        uint256 _rewardDuration,
+        uint128 _rewardDuration,
         uint256 _maxClaimFee,
-        uint256 _minimumStakeAmount,
+        uint128 _minimumStakeAmount,
         IWhitelist _stakerWhitelist,
         IWhitelist _contributionWhitelist,
         IWhitelist _allocationMechanismWhitelist,
@@ -253,19 +253,19 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @param _contributionWhitelist The whitelist for contributors
     /// @param _allocationMechanismWhitelist The whitelist for allocation mechanisms
     function _initializeSharedState(
-        uint256 _rewardDuration,
-        uint256 _minimumStakeAmount,
+        uint128 _rewardDuration,
+        uint128 _minimumStakeAmount,
         IWhitelist _stakerWhitelist,
         IWhitelist _contributionWhitelist,
         IWhitelist _allocationMechanismWhitelist
     ) internal {
         require(
             _rewardDuration >= MIN_REWARD_DURATION && _rewardDuration <= MAX_REWARD_DURATION,
-            InvalidRewardDuration(_rewardDuration)
+            InvalidRewardDuration(uint256(_rewardDuration))
         );
 
-        sharedState.rewardDuration = _rewardDuration.toUint128();
-        sharedState.minimumStakeAmount = _minimumStakeAmount.toUint128();
+        sharedState.rewardDuration = _rewardDuration;
+        sharedState.minimumStakeAmount = _minimumStakeAmount;
         sharedState.stakerWhitelist = _stakerWhitelist;
         sharedState.contributionWhitelist = _contributionWhitelist;
         sharedState.allocationMechanismWhitelist = _allocationMechanismWhitelist;
@@ -281,17 +281,17 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     ///      selecting reward durations.
     /// @dev Can only be called by admin and not during active reward period
     /// @param _rewardDuration New reward duration in seconds (7 days minimum, 3000 days maximum)
-    function setRewardDuration(uint256 _rewardDuration) external {
+    function setRewardDuration(uint128 _rewardDuration) external {
         _revertIfNotAdmin();
         require(block.timestamp > rewardEndTime, CannotChangeRewardDurationDuringActiveReward());
         require(
             _rewardDuration >= MIN_REWARD_DURATION && _rewardDuration <= MAX_REWARD_DURATION,
-            InvalidRewardDuration(_rewardDuration)
+            InvalidRewardDuration(uint256(_rewardDuration))
         );
         require(sharedState.rewardDuration != _rewardDuration, NoOperation());
 
         emit RewardDurationSet(_rewardDuration);
-        sharedState.rewardDuration = _rewardDuration.toUint128();
+        sharedState.rewardDuration = _rewardDuration;
     }
 
     /// @notice Internal implementation of notifyRewardAmount using custom reward duration
@@ -388,14 +388,14 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @dev OPERATIONAL IMPACT: Affects all new stakes immediately. Consider user communication before changes.
     /// @dev Can only be called by admin
     /// @param _minimumStakeAmount New minimum stake amount in wei (0 = no minimum)
-    function setMinimumStakeAmount(uint256 _minimumStakeAmount) external {
+    function setMinimumStakeAmount(uint128 _minimumStakeAmount) external {
         _revertIfNotAdmin();
         require(
             _minimumStakeAmount <= sharedState.minimumStakeAmount || block.timestamp >= rewardEndTime,
             CannotRaiseMinimumStakeAmountDuringActiveReward()
         );
         emit MinimumStakeAmountSet(_minimumStakeAmount);
-        sharedState.minimumStakeAmount = _minimumStakeAmount.toUint128();
+        sharedState.minimumStakeAmount = _minimumStakeAmount;
     }
 
     /// @notice Pauses the contract, disabling all user operations except view functions
