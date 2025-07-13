@@ -109,53 +109,6 @@ contract RegenStaker is RegenStakerBase {
     }
 
     /// @inheritdoc RegenStakerBase
-    function _stake(
-        address _depositor,
-        uint256 _amount,
-        address _delegatee,
-        address _claimer
-    ) internal override returns (DepositIdentifier _depositId) {
-        return super._stake(_depositor, _amount, _delegatee, _claimer);
-    }
-
-    /// @inheritdoc RegenStakerBase
-    function _stakeMore(Deposit storage deposit, DepositIdentifier _depositId, uint256 _amount) internal override {
-        super._stakeMore(deposit, _depositId, _amount);
-    }
-
-    /// @inheritdoc RegenStakerBase
-    function _withdraw(Deposit storage deposit, DepositIdentifier _depositId, uint256 _amount) internal override {
-        super._withdraw(deposit, _depositId, _amount);
-    }
-
-    /// @inheritdoc RegenStakerBase
-    function _alterDelegatee(
-        Deposit storage deposit,
-        DepositIdentifier _depositId,
-        address _newDelegatee
-    ) internal override {
-        super._alterDelegatee(deposit, _depositId, _newDelegatee);
-    }
-
-    /// @inheritdoc RegenStakerBase
-    function _alterClaimer(
-        Deposit storage deposit,
-        DepositIdentifier _depositId,
-        address _newClaimer
-    ) internal override {
-        super._alterClaimer(deposit, _depositId, _newClaimer);
-    }
-
-    /// @inheritdoc RegenStakerBase
-    function _claimReward(
-        DepositIdentifier _depositId,
-        Deposit storage deposit,
-        address _claimer
-    ) internal override returns (uint256) {
-        return super._claimReward(_depositId, deposit, _claimer);
-    }
-
-    /// @inheritdoc RegenStakerBase
     /// @dev Transfers tokens to the delegation surrogate for the delegatee
     function _transferForCompound(address _delegatee, uint256 _amount) internal override {
         DelegationSurrogate surrogate = _fetchOrDeploySurrogate(_delegatee);
