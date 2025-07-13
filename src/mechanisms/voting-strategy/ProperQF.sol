@@ -121,7 +121,7 @@ abstract contract ProperQF {
      */
     function _processVoteUnchecked(uint256 projectId, uint256 contribution, uint256 voteWeight) internal {
         ProperQFStorage storage s = _getProperQFStorage();
-        Project storage project = s.projects[projectId];
+        Project memory project = s.projects[projectId];
 
         // Update project sums
         uint256 newSumSquareRoots = project.sumSquareRoots + voteWeight;
@@ -146,6 +146,8 @@ abstract contract ProperQF {
         project.sumContributions = newSumContributions;
         project.quadraticFunding = newQuadraticFunding;
         project.linearFunding = newSumContributions;
+
+        s.projects[projectId] = project;
 
         // Update total funding after vote processing
         s.totalFunding = _calculateWeightedTotalFunding();
