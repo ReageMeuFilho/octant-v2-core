@@ -44,8 +44,8 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
      * @inheritdoc TokenizedStrategy
      * @dev Overrides report to handle asset appreciation in yield-bearing tokens.
      * This implementation specifically:
-     * 1. Gets current exchange rate and calculates total ETH value
-     * 2. Compares total ETH to current supply to determine profit/loss
+     * 1. Gets current exchange rate and calculates total underlying value
+     * 2. Compares total underlying value to current supply to determine profit/loss
      * 3. For profit: mints shares to dragonRouter (feeRecipient)
      * 4. For loss: burns shares from dragonRouter (donationAddress) for protection
      * 5. Updates exchange rate and emits harvest event
@@ -73,19 +73,19 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
             S.totalAssets = totalAssetsBalance;
         }
 
-        uint256 totalETH = totalAssetsBalance.mulDiv(rateNow, WadRayMath.RAY); // asset → ETH
-        uint256 supply = _totalSupply(S); // shares denom. in ETH
+        uint256 totalValue = totalAssetsBalance.mulDiv(rateNow, WadRayMath.RAY); // asset → underlying value
+        uint256 supply = _totalSupply(S); // shares denom. in underlying value
 
-        if (totalETH > supply) {
-            profit = totalETH - supply; // positive yield
+        if (totalValue > supply) {
+            profit = totalValue - supply; // positive yield
 
             _mint(S, S.dragonRouter, profit);
 
             emit DonationMinted(S.dragonRouter, profit, rateNow.rayToWad());
             // do not burn shares if the rate is the same as the last rate
-        } else if (totalETH < supply) {
+        } else if (totalValue < supply) {
             // Rare: negative yield (slash). Use loss protection mechanism.
-            loss = supply - totalETH;
+            loss = supply - totalValue;
             _handleDragonLossProtection(S, loss);
         }
 
