@@ -36,7 +36,9 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
     }
 
     /// @notice Only keeper or management can propose
-    function _beforeProposeHook(address proposer) internal view override returns (bool) {
+    function _beforeProposeHook(address proposer) internal view virtual override returns (bool) {
+        if (proposer == address(0)) revert ZeroAddressCannotPropose();
+
         // Get keeper and management addresses from TokenizedAllocationMechanism
         address keeper = _tokenizedAllocation().keeper();
         address management = _tokenizedAllocation().management();
@@ -46,17 +48,17 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
     }
 
     /// @notice Validate proposal ID exists
-    function _validateProposalHook(uint256 pid) internal view override returns (bool) {
+    function _validateProposalHook(uint256 pid) internal view virtual override returns (bool) {
         return _proposalExists(pid);
     }
 
     /// @notice Allow all users to register (can be restricted in derived contracts)
-    function _beforeSignupHook(address) internal pure override returns (bool) {
+    function _beforeSignupHook(address) internal view virtual override returns (bool) {
         return true;
     }
 
     /// @notice Calculate voting power by converting from asset decimals to 18 decimals
-    function _getVotingPowerHook(address, uint256 deposit) internal view override returns (uint256) {
+    function _getVotingPowerHook(address, uint256 deposit) internal view virtual override returns (uint256) {
         // Get asset decimals
         uint8 assetDecimals = IERC20Metadata(address(asset)).decimals();
 
@@ -82,7 +84,7 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
         TokenizedAllocationMechanism.VoteType choice,
         uint256 weight,
         uint256 oldPower
-    ) internal override returns (uint256) {
+    ) internal virtual override returns (uint256) {
         if (choice != TokenizedAllocationMechanism.VoteType.For) revert OnlyForVotesSupported();
 
         // Check if voter has already voted on this proposal
@@ -106,7 +108,7 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
     }
 
     /// @notice Check quorum based on quadratic funding threshold
-    function _hasQuorumHook(uint256 pid) internal view override returns (bool) {
+    function _hasQuorumHook(uint256 pid) internal view virtual override returns (bool) {
         // Get the project's funding metrics
         // getTally() returns: alpha-weighted quadratic funding + alpha-weighted linear funding
         (, , uint256 quadraticFunding, uint256 linearFunding) = getTally(pid);
@@ -120,7 +122,7 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
     }
 
     /// @notice Convert quadratic funding to shares
-    function _convertVotesToShares(uint256 pid) internal view override returns (uint256) {
+    function _convertVotesToShares(uint256 pid) internal view virtual override returns (uint256) {
         // Get project funding metrics
         // getTally() returns: alpha-weighted quadratic funding + alpha-weighted linear funding
         (, , uint256 quadraticFunding, uint256 linearFunding) = getTally(pid);
@@ -131,12 +133,12 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
     }
 
     /// @notice Allow finalization once voting period ends
-    function _beforeFinalizeVoteTallyHook() internal pure override returns (bool) {
+    function _beforeFinalizeVoteTallyHook() internal pure virtual override returns (bool) {
         return true;
     }
 
     /// @notice Get recipient address for proposal
-    function _getRecipientAddressHook(uint256 pid) internal view override returns (address) {
+    function _getRecipientAddressHook(uint256 pid) internal view virtual override returns (address) {
         TokenizedAllocationMechanism.Proposal memory proposal = _getProposal(pid);
         if (proposal.recipient == address(0)) revert TokenizedAllocationMechanism.InvalidRecipient(proposal.recipient);
         return proposal.recipient;
@@ -144,7 +146,7 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
 
     /// @notice Handle custom share distribution - returns false to use default minting
     /// @return handled False to indicate default minting should be used
-    function _requestCustomDistributionHook(address, uint256) internal pure override returns (bool) {
+    function _requestCustomDistributionHook(address, uint256) internal pure virtual override returns (bool) {
         // Return false to indicate we want to use the default share minting in TokenizedAllocationMechanism
         // This allows the base implementation to handle the minting via _mint()
         return false;
@@ -152,7 +154,7 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
 
     /// @dev Get available withdraw limit for share owner with global timelock and grace period enforcement
     /// @return availableLimit Amount of assets that can be withdrawn (0 if timelock active or expired)
-    function _availableWithdrawLimit(address /* shareOwner */) internal view override returns (uint256) {
+    function _availableWithdrawLimit(address /* shareOwner */) internal view virtual override returns (uint256) {
         // Get the global redemption start time
         uint256 globalRedemptionStart = _getGlobalRedemptionStart();
 
@@ -178,7 +180,7 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
     /// @notice Calculate total assets including matching pool + user deposits for finalization
     /// @dev This snapshots the total asset balance in the contract during finalize
     /// @return Total assets available for allocation (matching pool + user signup deposits)
-    function _calculateTotalAssetsHook() internal view override returns (uint256) {
+    function _calculateTotalAssetsHook() internal view virtual override returns (uint256) {
         // Return current asset balance of the contract
         // This includes both:
         // 1. Matching pool funds (pre-funded in setUp)
