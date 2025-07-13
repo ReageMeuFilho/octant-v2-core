@@ -104,7 +104,7 @@ contract RegenStakerFactory {
     /// @param deployer Address that will deploy
     /// @return Predicted contract address
     function predictStakerAddress(bytes32 salt, address deployer) external view returns (address) {
-        return CREATE3.predictDeterministicAddress(keccak256(abi.encode(salt, deployer, block.chainid)));
+        return CREATE3.predictDeterministicAddress(keccak256(abi.encode(salt, deployer)));
     }
 
     /// @notice SECURITY: Validate bytecode against canonical version
@@ -131,7 +131,7 @@ contract RegenStakerFactory {
 
         stakerAddress = CREATE3.deployDeterministic(
             bytes.concat(code, constructorParams),
-            keccak256(abi.encode(salt, msg.sender, block.chainid))
+            keccak256(abi.encode(salt, msg.sender))
         );
 
         emit StakerDeploy(msg.sender, params.admin, stakerAddress, salt, variant);
