@@ -45,6 +45,9 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
     // Mapping of user address to their lockup info
     mapping(address => LockupInfo) public voluntaryLockups;
 
+    // Regen governance address
+    address public regenGovernance;
+
     // Cooldown period for rage quit
     uint256 public rageQuitCooldownPeriod;
 
@@ -55,7 +58,7 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
 
     // Define onlyRegenGovernance modifier
     modifier onlyRegenGovernance() {
-        // Implement access control logic
+        if (msg.sender != regenGovernance) revert NotRegenGovernance();
         _;
     }
 
@@ -63,11 +66,12 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
         address _asset,
         string memory _name,
         string memory _symbol,
-        address _roleManager,
+        address _roleManager, // role manager is also the regen governance address
         uint256 _profitMaxUnlockTime
     ) public override(MultistrategyVault, IMultistrategyVault) {
         rageQuitCooldownPeriod = INITIAL_RAGE_QUIT_COOLDOWN_PERIOD;
         super.initialize(_asset, _name, _symbol, _roleManager, _profitMaxUnlockTime);
+        regenGovernance = _roleManager;
     }
 
     /**
@@ -137,6 +141,14 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
         uint256 assets = _convertToAssets(shares, Rounding.ROUND_DOWN);
         // Always return the actual amount of assets withdrawn.
         return _redeem(msg.sender, receiver, owner, assets, shares, maxLoss, strategiesArray);
+    }
+
+    /**
+     * @notice Set the regen governance address
+     * @param _regenGovernance New regen governance address
+     */
+    function setRegenGovernance(address _regenGovernance) external onlyRegenGovernance {
+        regenGovernance = _regenGovernance;
     }
 
     /**

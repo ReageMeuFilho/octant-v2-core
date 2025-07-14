@@ -9,6 +9,7 @@ interface IMultistrategyLockedVault is IMultistrategyVault {
     error SharesStillLocked();
     error RageQuitAlreadyInitiated();
     error NoSharesToRageQuit();
+    error NotRegenGovernance();
 
     // Events
     event RageQuitInitiated(address indexed user, uint256 lockupTime, uint256 unlockTime);
@@ -22,4 +23,5 @@ interface IMultistrategyLockedVault is IMultistrategyVault {
 
     function initiateRageQuit() external;
     function setRageQuitCooldownPeriod(uint256 _rageQuitCooldownPeriod) external;
+    function setRegenGovernance(address _regenGovernance) external;
 }
