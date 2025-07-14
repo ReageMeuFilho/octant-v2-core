@@ -106,6 +106,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     error ExpiredSignature(uint256 deadline, uint256 currentTime);
     error InvalidSignature();
     error InvalidSigner(address recovered, address expected);
+    error UnauthorizedRelayer(address actual, address expected);
 
     /// @notice Maximum safe value for mathematical operations
     uint256 public constant MAX_SAFE_VALUE = type(uint128).max;
@@ -120,9 +121,9 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     bytes32 private constant TYPE_HASH =
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
 
-    /// @notice Signup typehash for EIP712 structured data
+    /// @notice EIP712 typehash for Signup including relayer (updated for relayer support)
     bytes32 private constant SIGNUP_TYPEHASH =
-        keccak256("Signup(address user,uint256 deposit,uint256 nonce,uint256 deadline)");
+        keccak256("Signup(address user,uint256 deposit,address relayer,uint256 nonce,uint256 deadline)");
 
     /// @notice CastVote typehash for EIP712 structured data
     bytes32 private constant CAST_VOTE_TYPEHASH =
@@ -397,13 +398,19 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     /// @notice Register with voting power using EIP-2612 style signature
     /// @param user Address of the user signing up
     /// @param deposit Amount of underlying to deposit
+    /// @param relayer Expected transaction submitter (msg.sender must match this)
     /// @param deadline Expiration timestamp for the signature
     /// @param v Signature parameter
     /// @param r Signature parameter
     /// @param s Signature parameter
+    /// @dev SECURITY: Includes expected relayer in signature to prevent front-running by unauthorized parties.
+    ///      For direct calls, set relayer = user (or msg.sender).
+    ///      For relayers, user signs with the trusted relayer's address; only that relayer can submit.
+    ///      Tokens are pulled from the signed user, allowing gasless flows without relayer providing funds.
     function signupWithSignature(
         address user,
         uint256 deposit,
+        address relayer,
         uint256 deadline,
         uint8 v,
         bytes32 r,
@@ -412,10 +419,15 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         // Check deadline
         if (block.timestamp > deadline) revert ExpiredSignature(deadline, block.timestamp);
 
+        // Check relayer authorization
+        if (msg.sender != relayer) revert UnauthorizedRelayer(msg.sender, relayer);
+
         AllocationStorage storage stor = _getStorage();
 
-        // Build struct hash
-        bytes32 structHash = keccak256(abi.encode(SIGNUP_TYPEHASH, user, deposit, stor.nonces[user]++, deadline));
+        // Build struct hash (include relayer)
+        bytes32 structHash = keccak256(
+            abi.encode(SIGNUP_TYPEHASH, user, deposit, relayer, stor.nonces[user]++, deadline)
+        );
 
         // Recover signer
         address recoveredAddress = _recover(structHash, v, r, s);
@@ -427,6 +439,8 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     }
 
     /// @dev Internal signup execution logic
+    /// @param user Address to credit voting power/registration to and pull tokens from
+    /// @param deposit Amount of underlying to pull
     function _executeSignup(address user, uint256 deposit) private {
         AllocationStorage storage s = _getStorage();
 

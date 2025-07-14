@@ -490,9 +490,12 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
             amountContributedToAllocationMechanism
         );
 
+        // Call signupWithSignature with relayer set to address(this)
+        // Note: Signature must be generated with relayer = address(RegenStaker) for this to validate
         TokenizedAllocationMechanism(_allocationMechanismAddress).signupWithSignature(
             msg.sender,
             amountContributedToAllocationMechanism,
+            address(this), // relayer: this contract is submitting the tx
             _deadline,
             _v,
             _r,

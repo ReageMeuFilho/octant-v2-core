@@ -61,7 +61,7 @@ contract RegenIntegrationTest is Test {
     bytes32 private constant TYPE_HASH =
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
     bytes32 private constant SIGNUP_TYPEHASH =
-        keccak256("Signup(address user,uint256 deposit,uint256 nonce,uint256 deadline)");
+        keccak256("Signup(address user,uint256 deposit,address relayer,uint256 nonce,uint256 deadline)");
     string private constant EIP712_VERSION = "1";
 
     // Test accounts with known private keys for signature testing
@@ -2288,7 +2288,9 @@ contract RegenIntegrationTest is Test {
         uint256 nonce,
         uint256 deadline
     ) internal view returns (bytes32) {
-        bytes32 structHash = keccak256(abi.encode(SIGNUP_TYPEHASH, user, deposit, nonce, deadline));
+        bytes32 structHash = keccak256(
+            abi.encode(SIGNUP_TYPEHASH, user, deposit, address(regenStaker), nonce, deadline)
+        );
         bytes32 domainSeparator = TokenizedAllocationMechanism(allocationMechanism).DOMAIN_SEPARATOR();
         return keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
     }

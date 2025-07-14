@@ -18,7 +18,7 @@ contract EIP712SignatureTest is Test {
     bytes32 private constant TYPE_HASH =
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
     bytes32 private constant SIGNUP_TYPEHASH =
-        keccak256("Signup(address user,uint256 deposit,uint256 nonce,uint256 deadline)");
+        keccak256("Signup(address user,uint256 deposit,address relayer,uint256 nonce,uint256 deadline)");
     bytes32 private constant CAST_VOTE_TYPEHASH =
         keccak256(
             "CastVote(address voter,uint256 proposalId,uint8 choice,uint256 weight,uint256 nonce,uint256 deadline)"
@@ -102,10 +102,11 @@ contract EIP712SignatureTest is Test {
     function _getSignupDigest(
         address user,
         uint256 deposit,
+        address expectedRelayer,
         uint256 nonce,
         uint256 deadline
     ) internal view returns (bytes32) {
-        bytes32 structHash = keccak256(abi.encode(SIGNUP_TYPEHASH, user, deposit, nonce, deadline));
+        bytes32 structHash = keccak256(abi.encode(SIGNUP_TYPEHASH, user, deposit, expectedRelayer, nonce, deadline));
         bytes32 domainSeparator = _tokenized(address(mechanism)).DOMAIN_SEPARATOR();
         return keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
     }
@@ -161,7 +162,7 @@ contract EIP712SignatureTest is Test {
         // Prepare signature
         uint256 nonce = _tokenized(address(mechanism)).nonces(alice);
         uint256 deadline = block.timestamp + 1 hours;
-        bytes32 digest = _getSignupDigest(alice, DEPOSIT_AMOUNT, nonce, deadline);
+        bytes32 digest = _getSignupDigest(alice, DEPOSIT_AMOUNT, address(this), nonce, deadline);
         (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, ALICE_PRIVATE_KEY);
 
         // Approve tokens
@@ -169,7 +170,7 @@ contract EIP712SignatureTest is Test {
         token.approve(address(mechanism), DEPOSIT_AMOUNT);
 
         // Execute signup with signature
-        _tokenized(address(mechanism)).signupWithSignature(alice, DEPOSIT_AMOUNT, deadline, v, r, s);
+        _tokenized(address(mechanism)).signupWithSignature(alice, DEPOSIT_AMOUNT, address(this), deadline, v, r, s);
 
         // Verify results
         assertEq(_tokenized(address(mechanism)).votingPower(alice), DEPOSIT_AMOUNT, "Voting power incorrect");
@@ -182,10 +183,10 @@ contract EIP712SignatureTest is Test {
 
         uint256 nonce = _tokenized(address(mechanism)).nonces(bob);
         uint256 deadline = block.timestamp + 1 hours;
-        bytes32 digest = _getSignupDigest(bob, 0, nonce, deadline);
+        bytes32 digest = _getSignupDigest(bob, 0, address(this), nonce, deadline);
         (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, BOB_PRIVATE_KEY);
 
-        _tokenized(address(mechanism)).signupWithSignature(bob, 0, deadline, v, r, s);
+        _tokenized(address(mechanism)).signupWithSignature(bob, 0, address(this), deadline, v, r, s);
 
         assertEq(_tokenized(address(mechanism)).votingPower(bob), 0, "Should have 0 voting power");
         assertEq(token.balanceOf(bob), INITIAL_BALANCE, "Balance should not change");
@@ -198,13 +199,13 @@ contract EIP712SignatureTest is Test {
 
         // First signup
         uint256 deadline = block.timestamp + 1 hours;
-        bytes32 digest = _getSignupDigest(alice, 100 ether, initialNonce, deadline);
+        bytes32 digest = _getSignupDigest(alice, 100 ether, address(this), initialNonce, deadline);
         (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, ALICE_PRIVATE_KEY);
 
         vm.prank(alice);
         token.approve(address(mechanism), 100 ether);
 
-        _tokenized(address(mechanism)).signupWithSignature(alice, 100 ether, deadline, v, r, s);
+        _tokenized(address(mechanism)).signupWithSignature(alice, 100 ether, address(this), deadline, v, r, s);
 
         assertEq(_tokenized(address(mechanism)).nonces(alice), initialNonce + 1, "Nonce should increment");
     }
@@ -214,7 +215,7 @@ contract EIP712SignatureTest is Test {
 
         uint256 nonce = _tokenized(address(mechanism)).nonces(alice);
         uint256 deadline = block.timestamp + 1 hours;
-        bytes32 digest = _getSignupDigest(alice, DEPOSIT_AMOUNT, nonce, deadline);
+        bytes32 digest = _getSignupDigest(alice, DEPOSIT_AMOUNT, address(this), nonce, deadline);
         (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, ALICE_PRIVATE_KEY);
 
         // Create an invalid signature that will recover to address(0)
@@ -223,7 +224,7 @@ contract EIP712SignatureTest is Test {
         s = bytes32(0);
 
         vm.expectRevert(TokenizedAllocationMechanism.InvalidSignature.selector);
-        _tokenized(address(mechanism)).signupWithSignature(alice, DEPOSIT_AMOUNT, deadline, v, r, s);
+        _tokenized(address(mechanism)).signupWithSignature(alice, DEPOSIT_AMOUNT, address(this), deadline, v, r, s);
     }
 
     function test_SignupWithSignature_WrongSigner() public {
@@ -231,13 +232,13 @@ contract EIP712SignatureTest is Test {
 
         uint256 nonce = _tokenized(address(mechanism)).nonces(alice);
         uint256 deadline = block.timestamp + 1 hours;
-        bytes32 digest = _getSignupDigest(alice, DEPOSIT_AMOUNT, nonce, deadline);
+        bytes32 digest = _getSignupDigest(alice, DEPOSIT_AMOUNT, address(this), nonce, deadline);
 
         // Sign with Bob's key instead of Alice's
         (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, BOB_PRIVATE_KEY);
 
         vm.expectRevert(abi.encodeWithSelector(TokenizedAllocationMechanism.InvalidSigner.selector, bob, alice));
-        _tokenized(address(mechanism)).signupWithSignature(alice, DEPOSIT_AMOUNT, deadline, v, r, s);
+        _tokenized(address(mechanism)).signupWithSignature(alice, DEPOSIT_AMOUNT, address(this), deadline, v, r, s);
     }
 
     function test_SignupWithSignature_ExpiredDeadline() public {
@@ -245,13 +246,13 @@ contract EIP712SignatureTest is Test {
 
         uint256 nonce = _tokenized(address(mechanism)).nonces(alice);
         uint256 deadline = block.timestamp - 1; // Expired
-        bytes32 digest = _getSignupDigest(alice, DEPOSIT_AMOUNT, nonce, deadline);
+        bytes32 digest = _getSignupDigest(alice, DEPOSIT_AMOUNT, address(this), nonce, deadline);
         (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, ALICE_PRIVATE_KEY);
 
         vm.expectRevert(
             abi.encodeWithSelector(TokenizedAllocationMechanism.ExpiredSignature.selector, deadline, block.timestamp)
         );
-        _tokenized(address(mechanism)).signupWithSignature(alice, DEPOSIT_AMOUNT, deadline, v, r, s);
+        _tokenized(address(mechanism)).signupWithSignature(alice, DEPOSIT_AMOUNT, address(this), deadline, v, r, s);
     }
 
     function test_SignupWithSignature_ReplayAttack() public {
@@ -259,18 +260,18 @@ contract EIP712SignatureTest is Test {
 
         uint256 nonce = _tokenized(address(mechanism)).nonces(alice);
         uint256 deadline = block.timestamp + 1 hours;
-        bytes32 digest = _getSignupDigest(alice, 100 ether, nonce, deadline);
+        bytes32 digest = _getSignupDigest(alice, 100 ether, address(this), nonce, deadline);
         (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, ALICE_PRIVATE_KEY);
 
         vm.prank(alice);
         token.approve(address(mechanism), 200 ether);
 
         // First signup succeeds
-        _tokenized(address(mechanism)).signupWithSignature(alice, 100 ether, deadline, v, r, s);
+        _tokenized(address(mechanism)).signupWithSignature(alice, 100 ether, address(this), deadline, v, r, s);
 
         // Try to replay the same signature
         vm.expectRevert(); // Will revert with wrong nonce
-        _tokenized(address(mechanism)).signupWithSignature(alice, 100 ether, deadline, v, r, s);
+        _tokenized(address(mechanism)).signupWithSignature(alice, 100 ether, address(this), deadline, v, r, s);
     }
 
     function test_SignupWithSignature_RelayerExecution() public {
@@ -278,7 +279,7 @@ contract EIP712SignatureTest is Test {
 
         uint256 nonce = _tokenized(address(mechanism)).nonces(alice);
         uint256 deadline = block.timestamp + 1 hours;
-        bytes32 digest = _getSignupDigest(alice, DEPOSIT_AMOUNT, nonce, deadline);
+        bytes32 digest = _getSignupDigest(alice, DEPOSIT_AMOUNT, relayer, nonce, deadline);
         (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, ALICE_PRIVATE_KEY);
 
         // Alice approves tokens
@@ -287,9 +288,44 @@ contract EIP712SignatureTest is Test {
 
         // Relayer submits the transaction
         vm.prank(relayer);
-        _tokenized(address(mechanism)).signupWithSignature(alice, DEPOSIT_AMOUNT, deadline, v, r, s);
+        _tokenized(address(mechanism)).signupWithSignature(alice, DEPOSIT_AMOUNT, relayer, deadline, v, r, s);
 
         assertEq(_tokenized(address(mechanism)).votingPower(alice), DEPOSIT_AMOUNT, "Alice should have voting power");
+    }
+
+    function test_SignupWithSignature_PreventsFrontRunning() public {
+        // This test demonstrates that the front-running attack is prevented
+        // Alice signs with a specific relayer, but an attacker tries to submit
+        vm.roll(_tokenized(address(mechanism)).startBlock() - 1);
+
+        uint256 nonce = _tokenized(address(mechanism)).nonces(alice);
+        uint256 deadline = block.timestamp + 1 hours;
+
+        // Alice signs with relayer as the expected submitter
+        bytes32 digest = _getSignupDigest(alice, DEPOSIT_AMOUNT, relayer, nonce, deadline);
+        (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, ALICE_PRIVATE_KEY);
+
+        // Alice approves tokens
+        vm.prank(alice);
+        token.approve(address(mechanism), DEPOSIT_AMOUNT);
+
+        // Attacker (charlie) tries to front-run by submitting Alice's signature
+        // This should fail with UnauthorizedRelayer error
+        vm.prank(charlie);
+        vm.expectRevert(
+            abi.encodeWithSelector(TokenizedAllocationMechanism.UnauthorizedRelayer.selector, charlie, relayer)
+        );
+        _tokenized(address(mechanism)).signupWithSignature(alice, DEPOSIT_AMOUNT, relayer, deadline, v, r, s);
+
+        // Verify Alice is not registered (attack failed)
+        assertEq(_tokenized(address(mechanism)).votingPower(alice), 0, "Alice should not be registered");
+
+        // Now the legitimate relayer can submit successfully
+        vm.prank(relayer);
+        _tokenized(address(mechanism)).signupWithSignature(alice, DEPOSIT_AMOUNT, relayer, deadline, v, r, s);
+
+        // Verify Alice is now registered
+        assertEq(_tokenized(address(mechanism)).votingPower(alice), DEPOSIT_AMOUNT, "Alice should be registered");
     }
 
     // ============ Cast Vote with Signature Tests ============
@@ -529,14 +565,14 @@ contract EIP712SignatureTest is Test {
         // Signup with signature
         uint256 signupNonce = _tokenized(address(mechanism)).nonces(alice);
         uint256 signupDeadline = block.timestamp + 1 hours;
-        bytes32 signupDigest = _getSignupDigest(alice, DEPOSIT_AMOUNT, signupNonce, signupDeadline);
+        bytes32 signupDigest = _getSignupDigest(alice, DEPOSIT_AMOUNT, relayer, signupNonce, signupDeadline);
         (uint8 sv, bytes32 sr, bytes32 ss) = _signDigest(signupDigest, ALICE_PRIVATE_KEY);
 
         vm.prank(alice);
         token.approve(address(mechanism), DEPOSIT_AMOUNT);
 
         vm.prank(relayer);
-        _tokenized(address(mechanism)).signupWithSignature(alice, DEPOSIT_AMOUNT, signupDeadline, sv, sr, ss);
+        _tokenized(address(mechanism)).signupWithSignature(alice, DEPOSIT_AMOUNT, relayer, signupDeadline, sv, sr, ss);
 
         // Create proposal (still needs direct call)
         vm.roll(_tokenized(address(mechanism)).startBlock());
@@ -581,13 +617,13 @@ contract EIP712SignatureTest is Test {
         // Bob uses signature signup
         uint256 bobNonce = _tokenized(address(mechanism)).nonces(bob);
         uint256 bobDeadline = block.timestamp + 1 hours;
-        bytes32 bobDigest = _getSignupDigest(bob, DEPOSIT_AMOUNT, bobNonce, bobDeadline);
+        bytes32 bobDigest = _getSignupDigest(bob, DEPOSIT_AMOUNT, address(this), bobNonce, bobDeadline);
         (uint8 bv, bytes32 br, bytes32 bs) = _signDigest(bobDigest, BOB_PRIVATE_KEY);
 
         vm.prank(bob);
         token.approve(address(mechanism), DEPOSIT_AMOUNT);
 
-        _tokenized(address(mechanism)).signupWithSignature(bob, DEPOSIT_AMOUNT, bobDeadline, bv, br, bs);
+        _tokenized(address(mechanism)).signupWithSignature(bob, DEPOSIT_AMOUNT, address(this), bobDeadline, bv, br, bs);
 
         // Create proposal
         vm.roll(_tokenized(address(mechanism)).startBlock());
@@ -629,13 +665,13 @@ contract EIP712SignatureTest is Test {
 
         // Signup increments nonce
         uint256 signupDeadline = block.timestamp + 1 hours;
-        bytes32 signupDigest = _getSignupDigest(alice, 100 ether, initialNonce, signupDeadline);
+        bytes32 signupDigest = _getSignupDigest(alice, 100 ether, address(this), initialNonce, signupDeadline);
         (uint8 sv, bytes32 sr, bytes32 ss) = _signDigest(signupDigest, ALICE_PRIVATE_KEY);
 
         vm.prank(alice);
         token.approve(address(mechanism), 100 ether);
 
-        _tokenized(address(mechanism)).signupWithSignature(alice, 100 ether, signupDeadline, sv, sr, ss);
+        _tokenized(address(mechanism)).signupWithSignature(alice, 100 ether, address(this), signupDeadline, sv, sr, ss);
 
         assertEq(_tokenized(address(mechanism)).nonces(alice), initialNonce + 1, "Nonce should increment after signup");
 
@@ -678,10 +714,10 @@ contract EIP712SignatureTest is Test {
         vm.roll(_tokenized(address(mechanism)).startBlock() - 1);
 
         uint256 deadline = block.timestamp + 1 hours;
-        bytes32 digest = _getSignupDigest(alice, 0, 0, deadline);
+        bytes32 digest = _getSignupDigest(alice, 0, address(this), 0, deadline);
         (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, ALICE_PRIVATE_KEY);
 
-        _tokenized(address(mechanism)).signupWithSignature(alice, 0, deadline, v, r, s);
+        _tokenized(address(mechanism)).signupWithSignature(alice, 0, address(this), deadline, v, r, s);
 
         assertEq(_tokenized(address(mechanism)).nonces(alice), 1, "Nonce should be 1 after signup");
         assertEq(_tokenized(address(mechanism)).nonces(bob), 0, "Bob's nonce should still be 0");
@@ -712,14 +748,14 @@ contract EIP712SignatureTest is Test {
         // Measure signature signup gas
         uint256 nonce = _tokenized(address(mechanism)).nonces(bob);
         uint256 deadline = block.timestamp + 1 hours;
-        bytes32 digest = _getSignupDigest(bob, DEPOSIT_AMOUNT, nonce, deadline);
+        bytes32 digest = _getSignupDigest(bob, DEPOSIT_AMOUNT, address(this), nonce, deadline);
         (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, BOB_PRIVATE_KEY);
 
         vm.prank(bob);
         token.approve(address(mechanism), DEPOSIT_AMOUNT);
 
         gasStart = gasleft();
-        _tokenized(address(mechanism)).signupWithSignature(bob, DEPOSIT_AMOUNT, deadline, v, r, s);
+        _tokenized(address(mechanism)).signupWithSignature(bob, DEPOSIT_AMOUNT, address(this), deadline, v, r, s);
         uint256 signatureSignupGas = gasStart - gasleft();
 
         console.log("Direct signup gas:", directSignupGas);
