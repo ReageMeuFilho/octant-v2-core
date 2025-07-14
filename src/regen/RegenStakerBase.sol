@@ -480,8 +480,12 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
 
         emit RewardClaimed(_depositId, msg.sender, amountContributedToAllocationMechanism, deposit.earningPower);
 
-        // First withdraw rewards to the contributor
-        SafeERC20.safeTransfer(REWARD_TOKEN, msg.sender, amountContributedToAllocationMechanism);
+        // approve the allocation mechanism to spend the rewards
+        SafeERC20.safeIncreaseAllowance(
+            REWARD_TOKEN,
+            _allocationMechanismAddress,
+            amountContributedToAllocationMechanism
+        );
 
         emit RewardContributed(
             _depositId,
@@ -490,7 +494,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
             amountContributedToAllocationMechanism
         );
 
-        TokenizedAllocationMechanism(_allocationMechanismAddress).signupWithSignature(
+        TokenizedAllocationMechanism(_allocationMechanismAddress).signupOnBehalfWithSignature(
             msg.sender,
             amountContributedToAllocationMechanism,
             _deadline,
@@ -502,6 +506,9 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         if (fee > 0) {
             SafeERC20.safeTransfer(REWARD_TOKEN, claimFeeParameters.feeCollector, fee);
         }
+
+        // check that allowance is zero
+        require(REWARD_TOKEN.allowance(address(this), _allocationMechanismAddress) == 0, "allowance not zero");
 
         return amountContributedToAllocationMechanism;
     }
