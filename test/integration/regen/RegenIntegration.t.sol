@@ -61,7 +61,7 @@ contract RegenIntegrationTest is Test {
     bytes32 private constant TYPE_HASH =
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
     bytes32 private constant SIGNUP_TYPEHASH =
-        keccak256("Signup(address user,uint256 deposit,uint256 nonce,uint256 deadline)");
+        keccak256("Signup(address user,address payer,uint256 deposit,uint256 nonce,uint256 deadline)");
     string private constant EIP712_VERSION = "1";
 
     // Test accounts with known private keys for signature testing
@@ -652,7 +652,14 @@ contract RegenIntegrationTest is Test {
         uint256 nonce = TokenizedAllocationMechanism(allocationMechanism).nonces(contributor);
         uint256 deadline = block.timestamp + 1 hours;
 
-        bytes32 digest = _getSignupDigest(allocationMechanism, contributor, contributeAmount, nonce, deadline);
+        bytes32 digest = _getSignupDigest(
+            allocationMechanism,
+            contributor,
+            address(regenStaker),
+            contributeAmount,
+            nonce,
+            deadline
+        );
         (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, contributorPrivateKey);
 
         vm.startPrank(contributor);
@@ -2284,11 +2291,12 @@ contract RegenIntegrationTest is Test {
     function _getSignupDigest(
         address allocationMechanism,
         address user,
+        address payer,
         uint256 deposit,
         uint256 nonce,
         uint256 deadline
     ) internal view returns (bytes32) {
-        bytes32 structHash = keccak256(abi.encode(SIGNUP_TYPEHASH, user, deposit, nonce, deadline));
+        bytes32 structHash = keccak256(abi.encode(SIGNUP_TYPEHASH, user, payer, deposit, nonce, deadline));
         bytes32 domainSeparator = TokenizedAllocationMechanism(allocationMechanism).DOMAIN_SEPARATOR();
         return keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
     }
@@ -2363,6 +2371,7 @@ contract RegenIntegrationTest is Test {
         currentTestCtx.digest = _getSignupDigest(
             currentTestCtx.allocationMechanism,
             alice,
+            address(regenStaker),
             currentTestCtx.netContribution,
             currentTestCtx.nonce,
             currentTestCtx.deadline
@@ -2467,6 +2476,7 @@ contract RegenIntegrationTest is Test {
         currentTestCtx.digest = _getSignupDigest(
             currentTestCtx.allocationMechanism,
             alice,
+            address(regenStaker),
             currentTestCtx.netContribution,
             currentTestCtx.nonce,
             currentTestCtx.deadline
@@ -2549,7 +2559,14 @@ contract RegenIntegrationTest is Test {
         uint256 nonce = TokenizedAllocationMechanism(allocationMechanism).nonces(alice);
         uint256 deadline = block.timestamp + 1 hours;
 
-        bytes32 digest = _getSignupDigest(allocationMechanism, alice, contributeAmount, nonce, deadline);
+        bytes32 digest = _getSignupDigest(
+            allocationMechanism,
+            alice,
+            address(regenStaker),
+            contributeAmount,
+            nonce,
+            deadline
+        );
         (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, ALICE_PRIVATE_KEY);
 
         // Give Alice tokens and approve for the expected flow
@@ -2594,7 +2611,14 @@ contract RegenIntegrationTest is Test {
         uint256 nonce = TokenizedAllocationMechanism(allocationMechanism).nonces(alice);
         uint256 deadline = block.timestamp + 1 hours;
 
-        bytes32 digest = _getSignupDigest(allocationMechanism, alice, contributeAmount, nonce, deadline);
+        bytes32 digest = _getSignupDigest(
+            allocationMechanism,
+            alice,
+            address(regenStaker),
+            contributeAmount,
+            nonce,
+            deadline
+        );
         (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, ALICE_PRIVATE_KEY);
 
         // Give Alice tokens and approve for the expected flow
@@ -2644,7 +2668,14 @@ contract RegenIntegrationTest is Test {
         uint256 nonce = TokenizedAllocationMechanism(allocationMechanism).nonces(alice);
         uint256 deadline = block.timestamp + 1 hours;
 
-        bytes32 digest = _getSignupDigest(allocationMechanism, alice, contributeAmount, nonce, deadline);
+        bytes32 digest = _getSignupDigest(
+            allocationMechanism,
+            alice,
+            address(regenStaker),
+            contributeAmount,
+            nonce,
+            deadline
+        );
         (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, ALICE_PRIVATE_KEY);
 
         // Give Alice tokens and approve for the expected flow
@@ -2688,7 +2719,14 @@ contract RegenIntegrationTest is Test {
         uint256 nonce = TokenizedAllocationMechanism(allocationMechanism).nonces(alice);
         uint256 deadline = block.timestamp - 1; // Expired
 
-        bytes32 digest = _getSignupDigest(allocationMechanism, alice, contributeAmount, nonce, deadline);
+        bytes32 digest = _getSignupDigest(
+            allocationMechanism,
+            alice,
+            address(regenStaker),
+            contributeAmount,
+            nonce,
+            deadline
+        );
         (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, ALICE_PRIVATE_KEY);
 
         // Give Alice tokens and approve for the expected flow
@@ -2745,7 +2783,14 @@ contract RegenIntegrationTest is Test {
         uint256 nonce = TokenizedAllocationMechanism(allocationMechanism).nonces(alice);
         uint256 deadline = block.timestamp + 1 hours;
 
-        bytes32 digest = _getSignupDigest(allocationMechanism, alice, contributeAmount, nonce, deadline);
+        bytes32 digest = _getSignupDigest(
+            allocationMechanism,
+            alice,
+            address(regenStaker),
+            contributeAmount,
+            nonce,
+            deadline
+        );
         (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, ALICE_PRIVATE_KEY);
 
         // Give Alice tokens and approve for the expected flow

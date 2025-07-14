@@ -122,7 +122,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
 
     /// @notice Signup typehash for EIP712 structured data
     bytes32 private constant SIGNUP_TYPEHASH =
-        keccak256("Signup(address user,uint256 deposit,uint256 nonce,uint256 deadline)");
+        keccak256("Signup(address user,address payer,uint256 deposit,uint256 nonce,uint256 deadline)");
 
     /// @notice CastVote typehash for EIP712 structured data
     bytes32 private constant CAST_VOTE_TYPEHASH =
@@ -391,7 +391,34 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     /// @notice Register to gain voting power by depositing underlying tokens
     /// @param deposit Amount of underlying to deposit (may be zero)
     function signup(uint256 deposit) external nonReentrant whenNotPaused onlyInitialized {
-        _executeSignup(msg.sender, deposit);
+        _executeSignup(msg.sender, deposit, msg.sender);
+    }
+
+    /// @notice Register on behalf of another user using EIP-2612 style signature
+    /// @param user Address of the user signing up
+    /// @param deposit Amount of underlying to deposit
+    /// @param deadline Expiration timestamp for the signature
+    /// @param v Signature parameter
+    /// @param r Signature parameter
+    /// @param s Signature parameter
+    /// @dev The deposit will be taken from msg.sender, not the user
+    function signupOnBehalfWithSignature(
+        address user,
+        uint256 deposit,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external nonReentrant whenNotPaused onlyInitialized {
+        _validateSignature(
+            user,
+            keccak256(abi.encode(SIGNUP_TYPEHASH, user, msg.sender, deposit, _getStorage().nonces[user]++, deadline)),
+            deadline,
+            v,
+            r,
+            s
+        );
+        _executeSignup(user, deposit, msg.sender);
     }
 
     /// @notice Register with voting power using EIP-2612 style signature
@@ -401,6 +428,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     /// @param v Signature parameter
     /// @param r Signature parameter
     /// @param s Signature parameter
+    /// @dev The deposit will be taken from the user themselves
     function signupWithSignature(
         address user,
         uint256 deposit,
@@ -409,25 +437,37 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         bytes32 r,
         bytes32 s
     ) external nonReentrant whenNotPaused onlyInitialized {
+        _validateSignature(
+            user,
+            keccak256(abi.encode(SIGNUP_TYPEHASH, user, user, deposit, _getStorage().nonces[user]++, deadline)),
+            deadline,
+            v,
+            r,
+            s
+        );
+        _executeSignup(user, deposit, user);
+    }
+
+    /// @dev Validates signature parameters
+    function _validateSignature(
+        address expectedSigner,
+        bytes32 structHash,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) private view {
         // Check deadline
         if (block.timestamp > deadline) revert ExpiredSignature(deadline, block.timestamp);
-
-        AllocationStorage storage stor = _getStorage();
-
-        // Build struct hash
-        bytes32 structHash = keccak256(abi.encode(SIGNUP_TYPEHASH, user, deposit, stor.nonces[user]++, deadline));
 
         // Recover signer
         address recoveredAddress = _recover(structHash, v, r, s);
         if (recoveredAddress == address(0)) revert InvalidSignature();
-        if (recoveredAddress != user) revert InvalidSigner(recoveredAddress, user);
-
-        // Execute signup logic
-        _executeSignup(user, deposit);
+        if (recoveredAddress != expectedSigner) revert InvalidSigner(recoveredAddress, expectedSigner);
     }
 
     /// @dev Internal signup execution logic
-    function _executeSignup(address user, uint256 deposit) private {
+    function _executeSignup(address user, uint256 deposit, address payer) private {
         AllocationStorage storage s = _getStorage();
 
         // Call hook for validation via interface (Yearn V3 pattern)
@@ -441,7 +481,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         if (s.votingPower[user] != 0) revert AlreadyRegistered(user);
         if (deposit > MAX_SAFE_VALUE) revert DepositTooLarge(deposit, MAX_SAFE_VALUE);
 
-        if (deposit > 0) s.asset.safeTransferFrom(user, address(this), deposit);
+        if (deposit > 0) s.asset.safeTransferFrom(payer, address(this), deposit);
 
         uint256 newPower = IBaseAllocationStrategy(address(this)).getVotingPowerHook(user, deposit);
         if (newPower > MAX_SAFE_VALUE) revert VotingPowerTooLarge(newPower, MAX_SAFE_VALUE);
@@ -522,23 +562,15 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         bytes32 r,
         bytes32 s
     ) external nonReentrant whenNotPaused onlyInitialized {
-        // Check deadline
-        if (block.timestamp > deadline) revert ExpiredSignature(deadline, block.timestamp);
-
-        AllocationStorage storage stor = _getStorage();
-        uint256 currentNonce = stor.nonces[voter]++;
-
-        // Build struct hash
-        bytes32 structHash = keccak256(
-            abi.encode(CAST_VOTE_TYPEHASH, voter, pid, uint8(choice), weight, currentNonce, deadline)
+        uint256 nonce = _getStorage().nonces[voter]++;
+        _validateSignature(
+            voter,
+            keccak256(abi.encode(CAST_VOTE_TYPEHASH, voter, pid, uint8(choice), weight, nonce, deadline)),
+            deadline,
+            v,
+            r,
+            s
         );
-
-        // Recover signer
-        address recoveredAddress = _recover(structHash, v, r, s);
-        if (recoveredAddress == address(0)) revert InvalidSignature();
-        if (recoveredAddress != voter) revert InvalidSigner(recoveredAddress, voter);
-
-        // Execute vote logic
         _executeCastVote(voter, pid, choice, weight);
     }
 
