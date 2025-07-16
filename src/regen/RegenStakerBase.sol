@@ -722,6 +722,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     ) internal virtual override whenNotPaused nonReentrant {
         require(_amount > 0, ZeroOperation());
         _checkWhitelisted(sharedState.stakerWhitelist, _getStakeMoreWhitelistTarget(deposit));
+        _checkWhitelisted(sharedState.stakerWhitelist, deposit.delegatee);
         super._stakeMore(deposit, _depositId, _amount);
         _revertIfMinimumStakeAmountNotMet(_depositId);
     }
