@@ -591,6 +591,45 @@ contract TokenizedPatternDemoTest is Test {
         );
     }
 
+    // ========== INITIALIZATION SECURITY TESTS ==========
+
+    function testCannotReinitialize() public {
+        // Attempt to initialize the mechanism again should revert
+        vm.expectRevert(TokenizedAllocationMechanism.AlreadyInitialized.selector);
+        _tokenized(address(mechanism)).initialize(
+            owner,
+            IERC20(address(token)),
+            "Test Voting 2",
+            "TVOTE2",
+            200,
+            2000,
+            200 ether,
+            2 days,
+            14 days,
+            block.number + 20
+        );
+    }
+
+    function testFactoryOriginalCannotBeInitialized() public {
+        // Get the original implementation from the factory
+        address original = factory.tokenizedAllocationImplementation();
+
+        // Attempt to initialize the original should revert (constructor sets initialized = true)
+        vm.expectRevert(TokenizedAllocationMechanism.AlreadyInitialized.selector);
+        TokenizedAllocationMechanism(original).initialize(
+            owner,
+            IERC20(address(token)),
+            "Should Fail",
+            "FAIL",
+            100,
+            1000,
+            100 ether,
+            1 days,
+            7 days,
+            block.number + 10
+        );
+    }
+
     // ========== SHARE MINTING TESTS ==========
 
     function testShareMintingOnProposalQueue() public {
