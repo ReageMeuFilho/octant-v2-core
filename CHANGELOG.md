@@ -1,5 +1,42 @@
 
 
+## [0.6.0-develop.0](https://github.com/golemfoundation/octant-v2-core/compare/v0.5.11-develop.0...v0.6.0-develop.0) (2025-07-16)
+
+
+### Features
+
+* add missing admin and user functions to RegenStakerWithoutDelegateSurrogateVotes ([1469e8a](https://github.com/golemfoundation/octant-v2-core/commit/1469e8a103e20c029174b1edab735aefd2751f2a))
+* add missing contribute function to RegenStakerWithoutDelegateSurrogateVotes ([1b239d1](https://github.com/golemfoundation/octant-v2-core/commit/1b239d141b33f17bd5258b1bc3e221a9ab9e70c1))
+* **allocation:** add token sweep functionality after grace period ([057681f](https://github.com/golemfoundation/octant-v2-core/commit/057681fdf8bd216ab57f1029d1e76029cee61f77))
+* implement two-step ownership transfer to prevent permanent lock ([a7624a2](https://github.com/golemfoundation/octant-v2-core/commit/a7624a2a5e16d47ab3825ceef5d85cc7ddfdc7ed))
+* improve RegenStaker contribute function security and API ([4929e06](https://github.com/golemfoundation/octant-v2-core/commit/4929e066a2df03e6b7f441f20eb2bf33d4c149f1))
+* introduce signUpOnBehalf ([666e9e6](https://github.com/golemfoundation/octant-v2-core/commit/666e9e65bf0115a4d7733b12d3f0b2e757715173))
+* **qf:** add optimal alpha calculation for 1:1 share ratio ([bc4d340](https://github.com/golemfoundation/octant-v2-core/commit/bc4d34012b9fbde492e8affddc05bcb0cb8fb936))
+* **qf:** implement whitelist-controlled quadratic funding mechanism ([3b845e3](https://github.com/golemfoundation/octant-v2-core/commit/3b845e3404523d792d1149412ac53d832d4c4d88))
+* **strategy:** add optimal alpha calculation for quadratic funding ([a17ee53](https://github.com/golemfoundation/octant-v2-core/commit/a17ee53ce42ce6b5bf1e710d517876499695e544))
+* **voting:** restrict proposal creation to keeper/management roles ([7092582](https://github.com/golemfoundation/octant-v2-core/commit/7092582a38b1e76af108a983f72d5c40f23cf254))
+
+
+### Bug Fixes
+
+* address final audit finding in _claimReward ([fe4c3f5](https://github.com/golemfoundation/octant-v2-core/commit/fe4c3f5f347864b731dfce03160089ffa4958489))
+* **auth:** restrict hook access to delegatecall only ([31336ab](https://github.com/golemfoundation/octant-v2-core/commit/31336ab843585c3786cae7a3027f6a9ad2152b09))
+* **funding:** update total funding calculation to use weighted formula ([1e32fe8](https://github.com/golemfoundation/octant-v2-core/commit/1e32fe8146866b8a4e373d43a388c374a11817f7))
+* onlyRegenGovernance in MultistrategyLockedVault ([206d7d3](https://github.com/golemfoundation/octant-v2-core/commit/206d7d345d7d5c8c7fa2852e05307eccfac46320))
+* prevent ETH permanent fund loss by rejecting ETH deposits ([4ce82fc](https://github.com/golemfoundation/octant-v2-core/commit/4ce82fc0a8a68238c8a9798fa6936b21363605f4))
+* prevent share dilution attack through delayed proposal queueing ([d435b13](https://github.com/golemfoundation/octant-v2-core/commit/d435b13466446454b002ac1baaff8975b8b9df79))
+* prevent zero voting power registration from decimal scaling ([76ddbde](https://github.com/golemfoundation/octant-v2-core/commit/76ddbde8a4d3530d8bc13a58a6fcba843dcdd622))
+* **ProperQF:** resolve overflow in quadratic calculations for 18-decimal token ([541fbc7](https://github.com/golemfoundation/octant-v2-core/commit/541fbc781d7f8ec5a2372e8126daa7524fdca5b5))
+* refine zero voting power check to allow zero-deposit registrations ([d76a03a](https://github.com/golemfoundation/octant-v2-core/commit/d76a03af19d3b249f85d66c8ff4fed9784832b2b))
+* remove balance adjustment in _withdraw for accurate previewRedeem ([8936b91](https://github.com/golemfoundation/octant-v2-core/commit/8936b914f71ac1cc0f1e285a87ede6d11c69f050))
+* **security:** prevent whitelist circumvention via delegation ([1a0c922](https://github.com/golemfoundation/octant-v2-core/commit/1a0c922fea29c7bb1bfb95d89a8fe2f826bd09d7))
+
+
+### Reverts
+
+* Revert "Revert "refactor(QuadraticVoting): simplify _availableWithdrawLimit"" ([1226206](https://github.com/golemfoundation/octant-v2-core/commit/12262067758007f3334475f6de90ec519f7b4892))
+* Revert "refactor(QuadraticVoting): simplify _availableWithdrawLimit" ([941e84d](https://github.com/golemfoundation/octant-v2-core/commit/941e84dd457279fe3ea126a2de7561cea39fd8b5))
+
 ## [0.5.11-develop.0](https://github.com/golemfoundation/octant-v2-core/compare/v0.5.10-develop.0...v0.5.11-develop.0) (2025-07-10)
 
 ## [0.5.10-develop.0](https://github.com/golemfoundation/octant-v2-core/compare/v0.5.9-develop.0...v0.5.10-develop.0) (2025-07-10)
