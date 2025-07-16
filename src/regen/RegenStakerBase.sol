@@ -469,12 +469,6 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         // Prevent zero-amount contributions after fee deduction
         require(amountContributedToAllocationMechanism > 0, ZeroOperation());
 
-        uint256 currentAllowance = REWARD_TOKEN.allowance(msg.sender, _allocationMechanismAddress);
-        require(
-            currentAllowance >= amountContributedToAllocationMechanism,
-            CantAfford(amountContributedToAllocationMechanism, currentAllowance)
-        );
-
         uint256 scaledAmountConsumed = _amount * SCALE_FACTOR;
         deposit.scaledUnclaimedRewardCheckpoint = deposit.scaledUnclaimedRewardCheckpoint - scaledAmountConsumed;
 
