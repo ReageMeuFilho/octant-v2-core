@@ -101,7 +101,6 @@ contract RegenStaker is RegenStakerBase {
     ///      costing ~250k-350k gas. Subsequent operations with the same delegatee reuse existing surrogate.
     ///      Consider pre-deploying surrogates for frequently used delegatees during low gas price periods.
     function _fetchOrDeploySurrogate(address _delegatee) internal override returns (DelegationSurrogate _surrogate) {
-        _checkWhitelisted(sharedState.stakerWhitelist, _delegatee);
         _surrogate = _surrogates[_delegatee];
         if (address(_surrogate) == address(0)) {
             _surrogate = new DelegationSurrogateVotes(VOTING_TOKEN, _delegatee);
