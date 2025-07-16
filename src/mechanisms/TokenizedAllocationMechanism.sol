@@ -359,6 +359,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         if (_startBlock == 0) revert ZeroStartBlock();
         if (bytes(_name).length == 0) revert EmptyName();
         if (bytes(_symbol).length == 0) revert EmptySymbol();
+        if (s.initialized == true) revert AlreadyInitialized();
 
         // Set configuration
         s.owner = _owner;
