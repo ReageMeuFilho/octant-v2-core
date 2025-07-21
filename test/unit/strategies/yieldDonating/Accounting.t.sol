@@ -4,6 +4,7 @@ pragma solidity >=0.8.18;
 import { console } from "forge-std/console.sol";
 import { Setup, IMockStrategy } from "./utils/Setup.sol";
 import { IBaseStrategy } from "src/strategies/yieldDonating/YieldDonatingTokenizedStrategy.sol";
+import { YieldDonatingTokenizedStrategy } from "src/strategies/yieldDonating/YieldDonatingTokenizedStrategy.sol";
 
 contract AccountingTest is Setup {
     function setUp() public override {
@@ -845,5 +846,162 @@ contract AccountingTest is Setup {
         // (may be 0 or undefined, but shouldn't revert)
         uint256 pps = strategy.pricePerShare();
         assertEq(pps, 0, "PPS should be 0 when no assets remain");
+    }
+
+    // ===== BURN CONVERSION TESTS =====
+
+    /**
+     * @notice Test burn conversion accounting fix for dragon loss protection
+     * @dev Verifies that asset value is calculated before burning shares to prevent inflated loss coverage
+     */
+    function test_burnConversion_correctAccounting() public {
+        // Enable burning for this test
+        vm.prank(management);
+        YieldDonatingTokenizedStrategy(address(strategy)).setEnableBurning(true);
+
+        // Setup: totalShares == totalAssets == 100, dragon has 20 shares, loss = 25
+        mintAndDepositIntoStrategy(strategy, user, 100e18);
+        vm.prank(keeper);
+        strategy.report();
+        
+        vm.prank(user);
+        strategy.transfer(donationAddress, 20e18);
+        
+        // Simulate 25 token loss
+        yieldSource.simulateLoss(25e18);
+        
+        // Calculate what 20 shares are worth BEFORE burning (this is what the fix does)
+        uint256 shareValueBeforeBurn = strategy.convertToAssets(20e18);
+        assertEq(shareValueBeforeBurn, 20e18, "20 shares should be worth 20 assets before burn");
+        
+        // Report the loss (triggers the fixed _handleDragonLossProtection)
+        vm.prank(keeper);
+        (, uint256 reportedLoss) = strategy.report();
+        
+        assertEq(reportedLoss, 25e18, "Should report full 25 token loss");
+        
+        // VERIFICATION: Fix ensures correct accounting
+        // 1. All dragon shares burned
+        assertEq(strategy.balanceOf(donationAddress), 0, "All dragon shares should be burned");
+        
+        // 2. Shares reduced by burned amount only
+        assertEq(strategy.totalSupply(), 80e18, "Should have 80 shares (100 - 20 burned)");
+        
+        // 3. Assets reduced by full loss amount
+        assertEq(strategy.totalAssets(), 75e18, "Should have 75 assets (100 - 25 loss)");
+        
+        // 4. User gets fair share of remaining assets
+        uint256 userShares = strategy.balanceOf(user);
+        uint256 userAssetValue = strategy.convertToAssets(userShares);
+        assertEq(userAssetValue, 75e18, "User should get fair share of 75 remaining assets");
+    }
+    
+    /**
+     * @notice Test burn conversion across different scenarios
+     */
+    function test_burnConversion_variousScenarios() public {
+        // Enable burning
+        vm.prank(management);
+        YieldDonatingTokenizedStrategy(address(strategy)).setEnableBurning(true);
+
+        // Scenario 1: Loss fully covered by dragon shares
+        mintAndDepositIntoStrategy(strategy, user, 100e18);
+        vm.prank(keeper);
+        strategy.report();
+        
+        vm.prank(user);
+        strategy.transfer(donationAddress, 30e18);
+        
+        yieldSource.simulateLoss(20e18);
+        vm.prank(keeper);
+        strategy.report();
+        
+        // Should only burn 20 shares to cover 20 token loss
+        assertEq(strategy.balanceOf(donationAddress), 10e18, "10 dragon shares should remain");
+        assertEq(strategy.totalSupply(), 80e18, "Should have 80 total shares (100 - 20 burned)");
+        assertEq(strategy.totalAssets(), 80e18, "Should have 80 total assets (100 - 20 loss)");
+        
+        // Scenario 2: Minimal dragon shares, large loss
+        vm.startPrank(user);
+        strategy.transfer(donationAddress, 9e18); // Dragon router now has 19 total shares
+        vm.stopPrank();
+        
+        yieldSource.simulateLoss(50e18);
+        vm.prank(keeper);
+        strategy.report();
+        
+        // Should burn all 19 dragon shares, covering 19 tokens
+        assertEq(strategy.balanceOf(donationAddress), 0, "All dragon shares should be burned");
+        assertEq(strategy.totalSupply(), 61e18, "Should have 61 total shares (80 - 19)");
+        assertEq(strategy.totalAssets(), 30e18, "Should have 30 total assets (80 - 50)");
+    }
+
+    /**
+     * @notice Test burn conversion with burning disabled
+     */
+    function test_burnConversion_burningDisabled() public {
+        // Disable burning
+        vm.prank(management);
+        YieldDonatingTokenizedStrategy(address(strategy)).setEnableBurning(false);
+        
+        mintAndDepositIntoStrategy(strategy, user, 100e18);
+        vm.prank(keeper);
+        strategy.report();
+        
+        // Transfer shares to dragon
+        vm.prank(user);
+        strategy.transfer(donationAddress, 30e18);
+        
+        // Simulate loss
+        yieldSource.simulateLoss(25e18);
+        
+        uint256 dragonBalanceBefore = strategy.balanceOf(donationAddress);
+        
+        // Report the loss
+        vm.prank(keeper);
+        (, uint256 loss) = strategy.report();
+        
+        assertEq(loss, 25e18, "Should report 25 token loss");
+        
+        // Verify no shares were burned
+        assertEq(
+            strategy.balanceOf(donationAddress), 
+            dragonBalanceBefore, 
+            "Dragon balance should remain unchanged when burning disabled"
+        );
+        
+        // Verify assets reduced but shares unchanged
+        assertEq(strategy.totalAssets(), 75e18, "Total assets should be 75 after loss");
+        assertEq(strategy.totalSupply(), 100e18, "Total shares should remain 100");
+    }
+
+    /**
+     * @notice Test conversion rate consistency during burn operations
+     */
+    function test_burnConversion_rateConsistency() public {
+        // Enable burning
+        vm.prank(management);
+        YieldDonatingTokenizedStrategy(address(strategy)).setEnableBurning(true);
+
+        mintAndDepositIntoStrategy(strategy, user, 100e18);
+        vm.prank(keeper);
+        strategy.report();
+        
+        // Transfer 20 shares to dragon
+        vm.prank(user);
+        strategy.transfer(donationAddress, 20e18);
+        
+        // Calculate value of 20 shares BEFORE any loss/burn
+        uint256 shareValue = strategy.convertToAssets(20e18);
+        assertEq(shareValue, 20e18, "20 shares should be worth 20 assets at 1:1");
+        
+        // Simulate loss and report
+        yieldSource.simulateLoss(25e18);
+        vm.prank(keeper);
+        strategy.report();
+        
+        // After the fix, the 20 burned shares should have covered exactly 20 assets of loss
+        assertEq(strategy.totalAssets(), 75e18, "Should have 75 assets (100 - 25 loss)");
+        assertEq(strategy.totalSupply(), 80e18, "Should have 80 shares (100 - 20 burned)");
     }
 }
