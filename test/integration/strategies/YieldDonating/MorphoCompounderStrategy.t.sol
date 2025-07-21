@@ -323,6 +323,72 @@ contract MorphoCompounderDonatingStrategyTest is Test {
         );
     }
 
+    /// @notice Test that _harvestAndReport includes idle funds and donations work correctly
+    function testHarvestAndReportIncludesIdleFundsWithDonation() public {
+        uint256 depositAmount = 10000e6; // 10,000 USDC
+        uint256 vaultProfit = 500e6; // 500 USDC profit in vault
+        uint256 idleProfit = 500e6; // 500 USDC idle profit
+        uint256 totalProfit = vaultProfit + idleProfit; // 1,000 USDC total
+
+        // Ensure user has enough balance
+        airdrop(ERC20(USDC), user, depositAmount);
+
+        // Deposit funds to strategy
+        vm.startPrank(user);
+        IERC4626(address(strategy)).deposit(depositAmount, user);
+        vm.stopPrank();
+
+        // Record initial state
+        uint256 initialTotalAssets = IERC4626(address(strategy)).totalAssets();
+        uint256 morphoSharesBefore = IERC4626(MORPHO_VAULT).balanceOf(address(strategy));
+
+        // Simulate vault profit by mocking Morpho vault return value
+        vm.mockCall(
+            address(MORPHO_VAULT),
+            abi.encodeWithSelector(IERC4626.convertToAssets.selector, morphoSharesBefore),
+            abi.encode(depositAmount + vaultProfit)
+        );
+
+        // Transfer idle funds to strategy to simulate additional profit
+        airdrop(ERC20(USDC), address(strategy), idleProfit);
+
+        // Check donation balance before report
+        uint256 donationBalanceBefore = ERC20(address(strategy)).balanceOf(donationAddress);
+
+        // Verify _harvestAndReport correctly includes idle funds
+        uint256 idleAssets = ERC20(USDC).balanceOf(address(strategy));
+        assertEq(idleAssets, idleProfit, "Strategy should have idle funds equal to idle profit");
+
+        // Call report to trigger donation
+        vm.prank(keeper);
+        (uint256 reportedProfit, uint256 loss) = IMockStrategy(address(strategy)).report();
+
+        vm.clearMockedCalls();
+
+        // The reported profit should include BOTH vault profit AND idle profit
+        // This demonstrates the fix is working correctly
+        assertEq(reportedProfit, totalProfit, "Reported profit should include both vault and idle profits");
+        assertEq(loss, 0, "Should have no loss");
+
+        // Verify donation occurred
+        uint256 donationBalanceAfter = ERC20(address(strategy)).balanceOf(donationAddress);
+        assertGt(donationBalanceAfter, donationBalanceBefore, "Donation address should receive profit");
+        assertEq(
+            donationBalanceAfter - donationBalanceBefore,
+            totalProfit,
+            "Donation should equal the total profit (vault + idle)"
+        );
+
+        // Verify total assets increased by the total profit
+        uint256 finalTotalAssets = IERC4626(address(strategy)).totalAssets();
+        assertApproxEqRel(
+            finalTotalAssets - initialTotalAssets,
+            totalProfit,
+            1e14,
+            "Total assets should increase by total profit"
+        );
+    }
+
     /// @notice Test that constructor validates asset compatibility
     function testConstructorAssetValidation() public {
         // Try to deploy with wrong asset - should revert

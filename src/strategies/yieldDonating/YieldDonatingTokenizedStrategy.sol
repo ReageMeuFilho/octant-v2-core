@@ -92,7 +92,7 @@ contract YieldDonatingTokenizedStrategy is TokenizedStrategy {
             if (sharesBurned > 0) {
                 // Convert shares to assets BEFORE burning to get correct value
                 uint256 assetValueBurned = _convertToAssets(S, sharesBurned, Math.Rounding.Floor);
-                
+
                 // Burn shares from dragon router
                 _burn(S, S.dragonRouter, sharesBurned);
 
