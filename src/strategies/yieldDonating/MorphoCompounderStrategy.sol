@@ -66,9 +66,14 @@ contract MorphoCompounderStrategy is BaseHealthCheck {
     }
 
     function _harvestAndReport() internal view override returns (uint256 _totalAssets) {
-        // get strategy's balance
+        // get strategy's balance in the vault
         uint256 shares = IERC4626(compounderVault).balanceOf(address(this));
-        _totalAssets = IERC4626(compounderVault).convertToAssets(shares);
+        uint256 vaultAssets = IERC4626(compounderVault).convertToAssets(shares);
+
+        // include idle funds as per BaseStrategy specification
+        uint256 idleAssets = IERC20(asset).balanceOf(address(this));
+
+        _totalAssets = vaultAssets + idleAssets;
 
         return _totalAssets;
     }
