@@ -70,7 +70,8 @@ contract SkyCompounderStrategyFactory {
         address _donationAddress,
         bool _enableBurning,
         bytes32 _salt,
-        address _tokenizedStrategyAddress
+        address _tokenizedStrategyAddress,
+        bool _allowDepositDuringLoss
     ) external returns (address strategyAddress) {
         bytes memory bytecode = abi.encodePacked(
             type(SkyCompounderStrategy).creationCode,
@@ -82,7 +83,8 @@ contract SkyCompounderStrategyFactory {
                 _emergencyAdmin,
                 _donationAddress,
                 _enableBurning,
-                _tokenizedStrategyAddress
+                _tokenizedStrategyAddress,
+                _allowDepositDuringLoss
             )
         );
 

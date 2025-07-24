@@ -70,7 +70,8 @@ contract Setup is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
-            false // enableBurning
+            false, // enableBurning
+            true // allowDepositDuringLoss
         );
 
         vm.etch(TOKENIZED_STRATEGY_ADDRESS, address(implementation).code);

@@ -33,8 +33,6 @@ contract Setup is Test {
     address public performanceFeeRecipient = address(6);
     address public donationAddress = address(7);
 
-    address public TOKENIZED_STRATEGY_ADDRESS = address(0x8cf7246a74704bBE59c9dF614ccB5e3d9717d8Ac);
-
     // Integer variables that will be used repeatedly.
     uint256 public decimals = 18;
     uint256 public MAX_BPS = 10_000;
@@ -67,10 +65,9 @@ contract Setup is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
-            true // enableBurning
+            true, // enableBurning
+            true // allowDepositDuringLoss
         );
-
-        vm.etch(TOKENIZED_STRATEGY_ADDRESS, address(implementation).code);
 
         // create a mock yield source to deposit into
         yieldSource = new MockYieldSource(address(asset));

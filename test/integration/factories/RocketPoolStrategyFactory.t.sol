@@ -88,7 +88,8 @@ contract RocketPoolStrategyFactoryTest is Test {
                 emergencyAdmin,
                 donationAddress,
                 false, // enableBurning
-                address(implementation)
+                address(implementation),
+                true // allowDepositDuringLoss
             )
         );
         address expectedStrategyAddress = Create2.computeAddress(strategySalt, keccak256(bytecode), address(factory));
@@ -111,7 +112,8 @@ contract RocketPoolStrategyFactoryTest is Test {
             donationAddress,
             false, // enableBurning
             strategySalt,
-            address(implementation)
+            address(implementation),
+            true // allowDepositDuringLoss
         );
         vm.stopPrank();
 
@@ -153,7 +155,8 @@ contract RocketPoolStrategyFactoryTest is Test {
             donationAddress,
             false, // enableBurning
             firstSalt,
-            address(implementation)
+            address(implementation),
+            true // allowDepositDuringLoss
         );
 
         // Create second strategy for same user
@@ -165,7 +168,8 @@ contract RocketPoolStrategyFactoryTest is Test {
             donationAddress,
             false, // enableBurning
             secondSalt,
-            address(implementation)
+            address(implementation),
+            true // allowDepositDuringLoss
         );
         vm.stopPrank();
 
@@ -211,7 +215,8 @@ contract RocketPoolStrategyFactoryTest is Test {
                 donationAddress,
                 false, // enableBurning
                 salt,
-                address(implementation)
+                address(implementation),
+                true // allowDepositDuringLoss
             );
             vm.stopPrank();
         }
@@ -256,7 +261,8 @@ contract RocketPoolStrategyFactoryTest is Test {
                 donationAddress,
                 false, // enableBurning
                 strategySalt,
-                address(implementation)
+                address(implementation),
+                true // allowDepositDuringLoss
             );
             vm.stopPrank();
         }
@@ -281,7 +287,8 @@ contract RocketPoolStrategyFactoryTest is Test {
             donationAddress,
             false, // enableBurning
             differentSalt,
-            address(implementation)
+            address(implementation),
+            true // allowDepositDuringLoss
         );
         vm.stopPrank();
 
@@ -320,7 +327,8 @@ contract RocketPoolStrategyFactoryTest is Test {
             fuzzDonationAddress,
             false, // enableBurning
             salt,
-            address(implementation)
+            address(implementation),
+            true // allowDepositDuringLoss
         );
         vm.stopPrank();
 
@@ -355,7 +363,8 @@ contract RocketPoolStrategyFactoryTest is Test {
                 donationAddress,
                 false, // enableBurning
                 salt,
-                address(implementation)
+                address(implementation),
+                true // allowDepositDuringLoss
             );
             vm.stopPrank();
         }

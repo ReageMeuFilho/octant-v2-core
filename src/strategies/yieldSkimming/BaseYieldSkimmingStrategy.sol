@@ -23,7 +23,8 @@ abstract contract BaseYieldSkimmingStrategy is BaseYieldSkimmingHealthCheck {
         address _emergencyAdmin,
         address _donationAddress,
         bool _enableBurning,
-        address _tokenizedStrategyAddress
+        address _tokenizedStrategyAddress,
+        bool _allowDepositDuringLoss
     )
         BaseYieldSkimmingHealthCheck(
             _asset,
@@ -33,7 +34,8 @@ abstract contract BaseYieldSkimmingStrategy is BaseYieldSkimmingHealthCheck {
             _emergencyAdmin,
             _donationAddress,
             _enableBurning,
-            _tokenizedStrategyAddress
+            _tokenizedStrategyAddress,
+            _allowDepositDuringLoss
         )
     {}
 

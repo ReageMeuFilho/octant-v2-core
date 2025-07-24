@@ -18,6 +18,17 @@ import { YieldDonatingTokenizedStrategy } from "src/strategies/yieldDonating/Yie
 contract MorphoCompounderDonatingStrategyTest is Test {
     using SafeERC20 for ERC20;
 
+    // Setup parameters struct to avoid stack too deep
+    struct SetupParams {
+        address management;
+        address keeper;
+        address emergencyAdmin;
+        address donationAddress;
+        string strategyName;
+        bytes32 salt;
+        address implementationAddress;
+    }
+
     // Strategy instance
     MorphoCompounderStrategy public strategy;
 
@@ -70,6 +81,17 @@ contract MorphoCompounderDonatingStrategyTest is Test {
         emergencyAdmin = address(0x3);
         donationAddress = address(0x4);
 
+        // Create setup params to avoid stack too deep
+        SetupParams memory params = SetupParams({
+            management: management,
+            keeper: keeper,
+            emergencyAdmin: emergencyAdmin,
+            donationAddress: donationAddress,
+            strategyName: strategyName,
+            salt: keccak256("OCT_MORPHO_COMPOUNDER_STRATEGY_V1"),
+            implementationAddress: address(implementation)
+        });
+
         // MorphoCompounderStrategyFactory
         factory = new MorphoCompounderStrategyFactory{
             salt: keccak256("OCT_MORPHO_COMPOUNDER_STRATEGY_VAULT_FACTORY_V1")
@@ -79,14 +101,15 @@ contract MorphoCompounderDonatingStrategyTest is Test {
         strategy = MorphoCompounderStrategy(
             factory.createStrategy(
                 MORPHO_VAULT,
-                strategyName,
-                management,
-                keeper,
-                emergencyAdmin,
-                donationAddress,
+                params.strategyName,
+                params.management,
+                params.keeper,
+                params.emergencyAdmin,
+                params.donationAddress,
                 false, // enableBurning
-                keccak256("OCT_MORPHO_COMPOUNDER_STRATEGY_V1"),
-                address(implementation)
+                params.salt,
+                params.implementationAddress,
+                true // allowDepositDuringLoss
             )
         );
 
@@ -402,7 +425,8 @@ contract MorphoCompounderDonatingStrategyTest is Test {
             emergencyAdmin,
             donationAddress,
             true, // enableBurning
-            address(implementation)
+            address(implementation),
+            true // allowDepositDuringLoss
         );
     }
 

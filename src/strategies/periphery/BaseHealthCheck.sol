@@ -44,7 +44,8 @@ abstract contract BaseHealthCheck is BaseStrategy, IBaseHealthCheck {
         address _emergencyAdmin,
         address _donationAddress,
         bool _enableBurning,
-        address _tokenizedStrategyAddress
+        address _tokenizedStrategyAddress,
+        bool _allowDepositDuringLoss
     )
         BaseStrategy(
             _asset,
@@ -54,7 +55,8 @@ abstract contract BaseHealthCheck is BaseStrategy, IBaseHealthCheck {
             _emergencyAdmin,
             _donationAddress,
             _enableBurning,
-            _tokenizedStrategyAddress
+            _tokenizedStrategyAddress,
+            _allowDepositDuringLoss
         )
     {}
 

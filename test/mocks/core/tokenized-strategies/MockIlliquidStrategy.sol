@@ -26,7 +26,8 @@ contract MockIlliquidStrategy is BaseStrategy {
             _emergencyAdmin,
             _donationAddress,
             false,
-            _tokenizedStrategyAddress
+            _tokenizedStrategyAddress,
+            true
         )
     {
         yieldSource = _yieldSource;
