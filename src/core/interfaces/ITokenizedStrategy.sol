@@ -81,7 +81,8 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
         address _keeper,
         address _emergencyAdmin,
         address _dragonRouter,
-        bool _enableBurning
+        bool _enableBurning,
+        bool _allowDepositDuringLoss
     ) external;
 
     /*//////////////////////////////////////////////////////////////

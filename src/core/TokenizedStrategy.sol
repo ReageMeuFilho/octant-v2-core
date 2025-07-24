@@ -225,6 +225,7 @@ abstract contract TokenizedStrategy {
         
         // Burning mechanism control
         bool enableBurning; // Whether to burn shares from dragon router during loss protection
+        bool allowDepositDuringLoss; // Whether to allow deposits when there is an ongoing loss
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -415,7 +416,8 @@ abstract contract TokenizedStrategy {
         address _keeper,
         address _emergencyAdmin,
         address _dragonRouter,
-        bool _enableBurning
+        bool _enableBurning,
+        bool _allowDepositDuringLoss
     ) public virtual {
         // Cache storage pointer.
         StrategyData storage S = _strategyStorage();
@@ -432,6 +434,9 @@ abstract contract TokenizedStrategy {
 
         // Set last report to this block.
         S.lastReport = uint96(block.timestamp);
+
+        // Set the allow deposit during loss flag
+        S.allowDepositDuringLoss = _allowDepositDuringLoss;
 
         // Set the default management address. Can't be 0.
         require(_management != address(0), "ZERO ADDRESS");
@@ -471,6 +476,9 @@ abstract contract TokenizedStrategy {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
 
+        // If there is a loss, use safeDeposit
+        require(S.lossAmount == 0, "use safeDeposit");
+
         // Deposit full balance if using max uint.
         if (assets == type(uint256).max) {
             assets = S.asset.balanceOf(msg.sender);
@@ -494,6 +502,8 @@ abstract contract TokenizedStrategy {
     function mint(uint256 shares, address receiver) external nonReentrant returns (uint256 assets) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
+
+        require(S.lossAmount == 0, "use safeMint");
 
         // Checking max mint will also check if shutdown.
         require(shares <= _maxMint(S, receiver), "ERC4626: mint more than max");
@@ -554,6 +564,54 @@ abstract contract TokenizedStrategy {
     function redeem(uint256 shares, address receiver, address owner) external returns (uint256) {
         // We default to not limiting a potential loss.
         return redeem(shares, receiver, owner, MAX_BPS);
+    }
+
+    /**
+     * @notice Safe deposit function that checks minimum shares received.
+     * @dev Can be used anytime, but required when lossAmount > 0 if allowDepositDuringLoss is true.
+     * @param assets The amount of underlying to deposit.
+     * @param receiver The address to receive the shares.
+     * @param minSharesOut The minimum shares that must be received.
+     * @return shares The actual amount of shares issued.
+     */
+    function safeDeposit(
+        uint256 assets,
+        address receiver,
+        uint256 minSharesOut
+    ) external nonReentrant returns (uint256 shares) {
+        StrategyData storage S = _strategyStorage();
+
+        if (assets == type(uint256).max) {
+            assets = S.asset.balanceOf(msg.sender);
+        }
+
+        require(assets <= _maxDeposit(S, receiver), "ERC4626: deposit more than max");
+        require((shares = _convertToShares(S, assets, Math.Rounding.Floor)) >= minSharesOut, "slippage");
+        require(shares != 0, "ZERO_SHARES");
+
+        _deposit(S, receiver, assets, shares);
+    }
+
+    /**
+     * @notice Safe mint function that checks maximum assets spent.
+     * @dev Can be used anytime, but required when lossAmount > 0 if allowDepositDuringLoss is true.
+     * @param shares The amount of shares to mint.
+     * @param receiver The address to receive the shares.
+     * @param maxAssets The maximum assets that can be spent.
+     * @return assets The actual amount of assets deposited.
+     */
+    function safeMint(
+        uint256 shares,
+        address receiver,
+        uint256 maxAssets
+    ) external nonReentrant returns (uint256 assets) {
+        StrategyData storage S = _strategyStorage();
+
+        require(shares <= _maxMint(S, receiver), "ERC4626: mint more than max");
+        require((assets = _convertToAssets(S, shares, Math.Rounding.Ceil)) <= maxAssets, "slippage");
+        require(assets != 0, "ZERO_ASSETS");
+
+        _deposit(S, receiver, assets, shares);
     }
 
     /**

@@ -95,6 +95,19 @@ contract RocketPoolStrategyTest is Test {
         uint256 assetsReceived;
     }
 
+    // Setup parameters struct to avoid stack too deep
+    struct SetupParams {
+        address management;
+        address keeper;
+        address emergencyAdmin;
+        address donationAddress;
+        string vaultSharesName;
+        bytes32 strategySalt;
+        address implementationAddress;
+        bool enableBurning;
+        bool allowDepositDuringLoss;
+    }
+
     /**
      * @notice Helper function to airdrop tokens to a specified address
      * @param _asset The ERC20 token to airdrop
@@ -125,20 +138,34 @@ contract RocketPoolStrategyTest is Test {
         emergencyAdmin = address(0x3);
         donationAddress = address(0x4);
 
+        // Create setup params to avoid stack too deep
+        SetupParams memory params = SetupParams({
+            management: management,
+            keeper: keeper,
+            emergencyAdmin: emergencyAdmin,
+            donationAddress: donationAddress,
+            vaultSharesName: vaultSharesName,
+            strategySalt: strategySalt,
+            implementationAddress: address(implementation),
+            enableBurning: true,
+            allowDepositDuringLoss: true
+        });
+
         // Deploy factory
         factory = new RocketPoolStrategyFactory();
 
         // Deploy strategy using the factory's createStrategy method
-        vm.startPrank(management);
+        vm.startPrank(params.management);
         address strategyAddress = factory.createStrategy(
-            vaultSharesName,
-            management,
-            keeper,
-            emergencyAdmin,
-            donationAddress,
-            true, // enableBurning
-            strategySalt,
-            address(implementation)
+            params.vaultSharesName,
+            params.management,
+            params.keeper,
+            params.emergencyAdmin,
+            params.donationAddress,
+            params.enableBurning,
+            params.strategySalt,
+            params.implementationAddress,
+            params.allowDepositDuringLoss
         );
         vm.stopPrank();
 

@@ -94,7 +94,8 @@ contract MorphoCompounderStrategyFactoryTest is Test {
             donationAddress,
             false, // enableBurning
             strategySalt,
-            address(implementation)
+            address(implementation),
+            true // allowDepositDuringLoss
         );
         vm.stopPrank();
 
@@ -127,7 +128,8 @@ contract MorphoCompounderStrategyFactoryTest is Test {
             donationAddress,
             false, // enableBurning
             firstSalt,
-            address(implementation)
+            address(implementation),
+            true // allowDepositDuringLoss
         );
 
         // Create second strategy for same user
@@ -142,7 +144,8 @@ contract MorphoCompounderStrategyFactoryTest is Test {
             donationAddress,
             false, // enableBurning
             secondSalt,
-            address(implementation)
+            address(implementation),
+            true // allowDepositDuringLoss
         );
         vm.stopPrank();
 
@@ -177,7 +180,8 @@ contract MorphoCompounderStrategyFactoryTest is Test {
             donationAddress,
             false, // enableBurning
             firstSalt,
-            address(implementation)
+            address(implementation),
+            true // allowDepositDuringLoss
         );
         vm.stopPrank();
 
@@ -194,7 +198,8 @@ contract MorphoCompounderStrategyFactoryTest is Test {
             donationAddress,
             false, // enableBurning
             secondSalt,
-            address(implementation)
+            address(implementation),
+            true // allowDepositDuringLoss
         );
         vm.stopPrank();
 
@@ -226,7 +231,8 @@ contract MorphoCompounderStrategyFactoryTest is Test {
             donationAddress,
             false, // enableBurning
             strategySalt,
-            address(implementation)
+            address(implementation),
+            true // allowDepositDuringLoss
         );
         vm.stopPrank();
 
@@ -243,7 +249,8 @@ contract MorphoCompounderStrategyFactoryTest is Test {
             donationAddress,
             false, // enableBurning
             strategySalt,
-            address(implementation)
+            address(implementation),
+            true // allowDepositDuringLoss
         );
         vm.stopPrank();
 
@@ -263,7 +270,8 @@ contract MorphoCompounderStrategyFactoryTest is Test {
             donationAddress,
             false, // enableBurning
             differentSalt,
-            address(implementation)
+            address(implementation),
+            true // allowDepositDuringLoss
         );
         vm.stopPrank();
 

@@ -116,7 +116,7 @@ contract AccountingTest is Setup {
         vm.stopPrank();
 
         // should have pulled out the deposit plus profit that was reported but not the second airdrop
-        assertEq(asset.balanceOf(_address), beforeBalance + _amount, "!balance");
+        assertEq(asset.balanceOf(_address), beforeBalance + _amount);
         // assert donation address has the airdrop
         assertEq(asset.balanceOf(donationAddress), toAirdrop, "!donationAddress");
         assertEq(asset.balanceOf(address(strategy)), 0, "!strategy");
@@ -528,7 +528,8 @@ contract AccountingTest is Setup {
         vm.prank(_address);
         asset.approve(address(strategy), _amount);
 
-        vm.expectRevert("ZERO_SHARES");
+        // Should revert with "use safeDeposit" because lossAmount > 0
+        vm.expectRevert("use safeDeposit");
         vm.prank(_address);
         strategy.deposit(_amount, _address);
 
@@ -567,7 +568,8 @@ contract AccountingTest is Setup {
         vm.prank(_address);
         asset.approve(address(strategy), _amount);
 
-        vm.expectRevert("ZERO_ASSETS");
+        // Should revert with "use safeMint" because lossAmount > 0
+        vm.expectRevert("use safeMint");
         vm.prank(_address);
         strategy.mint(_amount, _address);
 

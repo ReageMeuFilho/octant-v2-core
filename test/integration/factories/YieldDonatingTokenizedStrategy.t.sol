@@ -69,7 +69,8 @@ contract YieldDonatingTokenizedStrategyTest is Test {
             mockKeeper,
             mockEmergencyAdmin,
             mockDragonRouter,
-            true // enableBurning
+            true, // enableBurning
+            true // allowDepositDuringLoss
         );
     }
 
