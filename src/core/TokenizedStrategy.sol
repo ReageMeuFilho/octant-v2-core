@@ -881,6 +881,9 @@ abstract contract TokenizedStrategy {
     function _maxDeposit(StrategyData storage S, address receiver) internal view returns (uint256) {
         // Cannot deposit when shutdown or to the strategy.
         if (S.shutdown || receiver == address(this)) return 0;
+        
+        // If there's a loss and deposits are not allowed during loss, return 0
+        if (S.lossAmount > 0 && !S.allowDepositDuringLoss) return 0;
 
         return IBaseStrategy(address(this)).availableDepositLimit(receiver);
     }
@@ -889,6 +892,9 @@ abstract contract TokenizedStrategy {
     function _maxMint(StrategyData storage S, address receiver) internal view returns (uint256 maxMint_) {
         // Cannot mint when shutdown or to the strategy.
         if (S.shutdown || receiver == address(this)) return 0;
+        
+        // If there's a loss and deposits are not allowed during loss, return 0
+        if (S.lossAmount > 0 && !S.allowDepositDuringLoss) return 0;
 
         maxMint_ = IBaseStrategy(address(this)).availableDepositLimit(receiver);
         if (maxMint_ != type(uint256).max) {
