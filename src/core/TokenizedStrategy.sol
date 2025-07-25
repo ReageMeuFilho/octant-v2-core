@@ -881,7 +881,7 @@ abstract contract TokenizedStrategy {
     function _maxDeposit(StrategyData storage S, address receiver) internal view returns (uint256) {
         // Cannot deposit when shutdown or to the strategy.
         if (S.shutdown || receiver == address(this)) return 0;
-        
+
         // If there's a loss and deposits are not allowed during loss, return 0
         if (S.lossAmount > 0 && !S.allowDepositDuringLoss) return 0;
 
@@ -892,7 +892,7 @@ abstract contract TokenizedStrategy {
     function _maxMint(StrategyData storage S, address receiver) internal view returns (uint256 maxMint_) {
         // Cannot mint when shutdown or to the strategy.
         if (S.shutdown || receiver == address(this)) return 0;
-        
+
         // If there's a loss and deposits are not allowed during loss, return 0
         if (S.lossAmount > 0 && !S.allowDepositDuringLoss) return 0;
 
@@ -982,7 +982,7 @@ abstract contract TokenizedStrategy {
         uint256 assets,
         uint256 shares,
         uint256 maxLoss
-    ) internal returns (uint256) {
+    ) internal virtual returns (uint256) {
         require(receiver != address(0), "ZERO ADDRESS");
         require(maxLoss <= MAX_BPS, "exceeds MAX_BPS");
 
@@ -1221,7 +1221,7 @@ abstract contract TokenizedStrategy {
      *
      * @return . The price per share.
      */
-    function pricePerShare() external view returns (uint256) {
+    function pricePerShare() public view returns (uint256) {
         StrategyData storage S = _strategyStorage();
         return _convertToAssets(S, 10 ** S.decimals, Math.Rounding.Floor);
     }
