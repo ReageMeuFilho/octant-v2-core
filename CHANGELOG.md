@@ -1,5 +1,23 @@
 
 
+## [0.7.0-develop.0](https://github.com/golemfoundation/octant-v2-core/compare/v0.6.0-develop.0...v0.7.0-develop.0) (2025-07-25)
+
+
+### Features
+
+* combine strategy proxy abis ([84f5759](https://github.com/golemfoundation/octant-v2-core/commit/84f5759f2a06775a802678ac35f4189645c6035f))
+
+
+### Bug Fixes
+
+* remove unecessary allowance ([a66c09d](https://github.com/golemfoundation/octant-v2-core/commit/a66c09dbe2adf9274c931a6fe63848285f02019f))
+* **security:** add reinitialization protection ([f370c1f](https://github.com/golemfoundation/octant-v2-core/commit/f370c1fc3c027910eac64def375b611a11d5ef14))
+
+
+### Reverts
+
+* Revert "fix(security): prevent whitelist circumvention via delegation" ([b56e7e6](https://github.com/golemfoundation/octant-v2-core/commit/b56e7e6078f7954ecf4de7ac3310cf9d0d27e614))
+
 ## [0.6.0-develop.0](https://github.com/golemfoundation/octant-v2-core/compare/v0.5.11-develop.0...v0.6.0-develop.0) (2025-07-16)
 
 
