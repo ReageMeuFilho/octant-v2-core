@@ -189,8 +189,11 @@ contract Setup is Test {
         vm.prank(_user);
         yieldSource.approve(address(_strategy), _amount);
 
-        vm.prank(_user);
-        _strategy.deposit(_amount, _user);
+        vm.startPrank(_user);
+
+        strategy.safeDeposit(_amount, _user, 0); // no min shares out
+
+        vm.stopPrank();
     }
 
     function mintAndDepositIntoYieldSource(
