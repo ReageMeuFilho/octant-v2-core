@@ -828,7 +828,7 @@ contract AccountingTestHere is Setup {
         // Withdraw
         vm.startPrank(depositor);
         vars.depositorShares = strategy.balanceOf(depositor);
-        vars.withdrawnAssets = strategy.redeem(vars.depositorShares, depositor, depositor);
+        vars.withdrawnAssets = strategy.redeem(strategy.balanceOf(depositor), depositor, depositor);
         vm.stopPrank();
 
         vars.withdrawnUnderlying = (vars.withdrawnAssets * vars.recoveryRate) / 1e18;
