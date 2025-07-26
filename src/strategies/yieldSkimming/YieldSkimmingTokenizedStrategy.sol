@@ -25,9 +25,10 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     using WadRayMath for uint256;
     using SafeERC20 for ERC20;
 
-    /// @dev The exchange rate at the last harvest, scaled by RAY (1e27)
+    /// @dev Storage for yield skimming strategy
     struct YieldSkimmingStorage {
-        uint256 lastRateRay;
+        uint256 lastRateRay; // Rate from last report (for calculating underlying value changes)
+        uint256 recoveryRateRay; // Rate at which users would break even (used for share minting during recovery)
     }
 
     // exchange rate storage slot
@@ -64,10 +65,11 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         returns (uint256 profit, uint256 loss)
     {
         StrategyData storage S = super._strategyStorage();
+        YieldSkimmingStorage storage YS = _strategyYieldSkimmingStorage();
 
         // Cache frequently used values
         uint256 rateNow = _currentRateRay();
-        uint256 lastRateRay = _strategyYieldSkimmingStorage().lastRateRay;
+        uint256 lastRateRay = YS.lastRateRay;
 
         uint256 previousValue = S.totalAssets.mulDiv(lastRateRay, WadRayMath.RAY);
 
@@ -105,6 +107,8 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
                     uint256 excessUnderlying = underlyingGain - lossInUnderlying;
                     if (excessUnderlying > 0) {
                         _handleDonationMinting(S, rateNow);
+                        // Update recovery rate now that we're fully recovered and have excess profit
+                        YS.recoveryRateRay = rateNow;
                     }
                     profit = excessUnderlying.mulDiv(WadRayMath.RAY, rateNow);
                 } else {
@@ -113,8 +117,9 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
                     profit = 0;
                 }
             } else if (profit > 0) {
-                // Regular profit case
+                // Regular profit case - no losses, so mint shares and update recovery rate
                 _handleDonationMinting(S, rateNow);
+                YS.recoveryRateRay = rateNow;
             }
         } else if (currentValue < previousValue) {
             // Negative yield (slashing event)
@@ -201,9 +206,13 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     }
 
     function _deposit(StrategyData storage S, address receiver, uint256 assets, uint256 shares) internal override {
-        // tracking the last rate ray for the first deposit
-        if (_strategyYieldSkimmingStorage().lastRateRay == 0) {
-            _strategyYieldSkimmingStorage().lastRateRay = _currentRateRay();
+        YieldSkimmingStorage storage YS = _strategyYieldSkimmingStorage();
+
+        // // tracking the last rate ray for the first deposit
+        if (YS.recoveryRateRay == 0) {
+            uint256 currentRate = _currentRateRay();
+            YS.lastRateRay = currentRate;
+            YS.recoveryRateRay = currentRate;
         }
 
         // Cache storage variables used more than once.
@@ -259,20 +268,27 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     }
     function _calculateTunedM(
         uint256 totalSupplyAmount,
-        uint256 totalAssetsVar,
+        uint256 totalAssetsAmount,
         uint256 currentRate
-    ) internal pure returns (uint256) {
+    ) internal view returns (uint256) {
         if (totalSupplyAmount == 0) return 0;
-        // First, handle rate appreciation
-        if (currentRate > WadRayMath.RAY) {
-            // Calculate yield from rate appreciation
-            uint256 rateDifference = currentRate - WadRayMath.RAY;
-            return totalAssetsVar.mulDiv(rateDifference, WadRayMath.RAY);
+
+        YieldSkimmingStorage storage S = _strategyYieldSkimmingStorage();
+        uint256 recoveryRate = S.recoveryRateRay;
+
+        // Only mint shares if current rate exceeds the recovery rate (break-even point)
+        if (currentRate > recoveryRate && recoveryRate > 0) {
+            // Calculate how many shares we need to mint for appreciation beyond recovery
+            // M = totalSupply * (currentRate - recoveryRate) / recoveryRate
+            uint256 rateDifference = currentRate - recoveryRate;
+            return totalSupplyAmount.mulDiv(rateDifference, recoveryRate);
         }
-        // Second, handle direct asset increases (airdrops) when rate = 1
-        // To maintain PPS = 1, we need totalAssets = totalSupply
-        if (totalAssetsVar > totalSupplyAmount) {
-            return totalAssetsVar - totalSupplyAmount;
+
+        // Second, handle direct asset increases (airdrops) when rate unchanged
+        // To maintain PPS = currentRate, we need totalAssets * currentRate = totalSupply
+        uint256 expectedSupply = totalAssetsAmount.mulDiv(currentRate, WadRayMath.RAY);
+        if (expectedSupply > totalSupplyAmount) {
+            return expectedSupply - totalSupplyAmount;
         }
         return 0;
     }

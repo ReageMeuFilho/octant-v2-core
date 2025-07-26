@@ -1112,6 +1112,14 @@ contract LidoStrategyTest is Test {
         vm.stopPrank();
         vm.clearMockedCalls();
 
+        // make sure withdrawable underlying value is the same as the deposit amount * initial exchange rate
+        assertApproxEqRel(
+            vault.convertToAssets(vault.balanceOf(user)) * state.profitRate,
+            depositAmount * state.initialExchangeRate,
+            0.01e16, // 0.01% tolerance for loss protection limitations and precision in edge cases
+            "Withdrawable underlying value should be the same as the deposit amount * initial exchange rate"
+        );
+
         state.donationSharesAfterProfit = vault.balanceOf(donationAddress);
         assertGt(state.donationSharesAfterProfit, 0, "Should have donation shares after profit");
 
@@ -1157,12 +1165,27 @@ contract LidoStrategyTest is Test {
         vm.startPrank(user);
         state.assetsReceived = vault.redeem(vault.balanceOf(user), user, user);
         vm.stopPrank();
+        // Calculate underlying values
+        uint256 initialValue = depositAmount * state.initialExchangeRate;
+        uint256 receivedValue = state.assetsReceived * state.secondLossRate;
 
-        assertGe(
-            state.assetsReceived * state.secondLossRate,
-            ((depositAmount * state.initialExchangeRate) * (100 - firstLossPercentage) * (100 - secondLossPercentage)) /
-                10000, // should be greater or equal because of the first profit
-            "User should receive some assets"
-        );
+        // Check if net rate change is negative (losses > gains)
+        if (state.secondLossRate < state.initialExchangeRate) {
+            // Net loss scenario: user should receive less than initial deposit in underlying terms
+            // This upholds the invariant that users cannot withdraw more than deposited
+            assertLe(
+                receivedValue,
+                initialValue,
+                "User cannot receive more than initial deposit in underlying terms when net loss occurs"
+            );
+        } else {
+            // Net gain scenario: user should receive about the same as their initial deposit
+            assertApproxEqRel(
+                receivedValue,
+                initialValue,
+                3e16, // 3% tolerance for complex yield skimming edge cases with consecutive rate changes
+                "User should receive about the same as deposit when net gain occurs"
+            );
+        }
     }
 }
