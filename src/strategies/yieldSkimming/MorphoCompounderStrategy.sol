@@ -3,6 +3,7 @@ pragma solidity ^0.8.25;
 
 import { BaseYieldSkimmingStrategy } from "src/strategies/yieldSkimming/BaseYieldSkimmingStrategy.sol";
 import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
+import { WadRayMath } from "src/utils/libs/Maths/WadRay.sol";
 
 /**
  * @title MorphoCompounderStrategy
@@ -10,6 +11,8 @@ import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
  * @dev This strategy tracks the value of deposits and captures yield as the price per share increases
  */
 contract MorphoCompounderStrategy is BaseYieldSkimmingStrategy {
+    using WadRayMath for uint256;
+
     constructor(
         address _asset,
         string memory _name,

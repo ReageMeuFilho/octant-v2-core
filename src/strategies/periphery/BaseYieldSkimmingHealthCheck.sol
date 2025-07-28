@@ -101,6 +101,24 @@ abstract contract BaseYieldSkimmingHealthCheck is BaseStrategy, IBaseHealthCheck
     }
 
     /**
+     * @notice Returns the current exchange rate in RAY format
+     * @return The current exchange rate in RAY format.
+     */
+    function getCurrentRateRay() public view returns (uint256) {
+        uint256 currentRate = IYieldSkimmingStrategy(address(this)).getCurrentExchangeRate();
+        uint256 decimals = IYieldSkimmingStrategy(address(this)).decimalsOfExchangeRate();
+
+        // if decimals is less than 18, we need to scale up and then convert to ray
+        if (decimals < 18) {
+            return (currentRate * 10 ** (18 - decimals)).wadToRay();
+        } else if (decimals > 18) {
+            return (currentRate / 10 ** (decimals - 18)).rayToWad();
+        } else {
+            return currentRate.wadToRay();
+        }
+    }
+
+    /**
      * @notice Set the `lossLimitRatio`.
      * @dev Denominated in basis points. I.E. 1_000 == 10%.
      * @param _newLossLimitRatio The new loss limit ratio.
@@ -150,8 +168,8 @@ abstract contract BaseYieldSkimmingHealthCheck is BaseStrategy, IBaseHealthCheck
             return;
         }
 
-        uint256 currentExchangeRate = IYieldSkimmingStrategy(address(this)).getLastRateRay().rayToWad();
-        uint256 newExchangeRate = IYieldSkimmingStrategy(address(this)).getCurrentExchangeRate();
+        uint256 currentExchangeRate = IYieldSkimmingStrategy(address(this)).getLastRateRay();
+        uint256 newExchangeRate = IYieldSkimmingStrategy(address(this)).getCurrentRateRay();
 
         if (currentExchangeRate < newExchangeRate) {
             require(
