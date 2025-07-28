@@ -172,7 +172,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         burnable = Math.min(lossAmount, dragonRouterAssets);
 
         if (burnable > 0) {
-            uint256 sharesToBurn = _convertToShares(S, burnable, Math.Rounding.Floor);
+            uint256 sharesToBurn = super._convertToShares(S, burnable, Math.Rounding.Floor);
             _burn(S, S.dragonRouter, sharesToBurn);
             emit DonationBurned(S.dragonRouter, burnable, exchangeRate);
         }

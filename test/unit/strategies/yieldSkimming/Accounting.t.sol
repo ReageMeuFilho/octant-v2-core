@@ -7,7 +7,7 @@ import { IYieldSkimmingStrategy } from "src/strategies/yieldSkimming/IYieldSkimm
 import { MockStrategySkimming } from "test/mocks/core/tokenized-strategies/MockStrategySkimming.sol";
 import { WadRayMath } from "src/utils/libs/maths/WadRay.sol";
 
-contract AccountingTestHere is Setup {
+contract AccountingTest is Setup {
     function setUp() public override {
         super.setUp();
     }
