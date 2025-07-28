@@ -75,6 +75,13 @@ contract YieldDonatingTokenizedStrategy is TokenizedStrategy {
         emit Reported(profit, loss);
     }
 
+    /**
+     * @notice Overrides the base convertToShares function to use the _convertToSharesWithLoss function
+     * @param S Storage struct pointer to access strategy's storage variables
+     * @param assets The amount of assets to convert to shares
+     * @param _rounding The rounding mode to use
+     * @return The amount of shares
+     */
     function _convertToShares(
         StrategyData storage S,
         uint256 assets,
@@ -94,8 +101,8 @@ contract YieldDonatingTokenizedStrategy is TokenizedStrategy {
      */
     function _handleDragonLossProtection(StrategyData storage S, uint256 loss) internal {
         if (S.enableBurning) {
-            // Convert loss to shares that should be burned
-            uint256 sharesToBurn = _convertToSharesWithLoss(S, loss, Math.Rounding.Ceil);
+            // Convert loss to shares that should be burned (without the loss value)
+            uint256 sharesToBurn = super._convertToShares(S, loss, Math.Rounding.Ceil);
 
             // Can only burn up to available shares from dragon router
             uint256 sharesBurned = Math.min(sharesToBurn, S.balances[S.dragonRouter]);

@@ -43,4 +43,10 @@ interface IMockStrategy is IDragonTokenizedStrategy, IBaseStrategy {
     function dragonRouterChangeTimestamp() external view returns (uint256);
 
     function cancelDragonRouterChange() external;
+
+    function lossAmount() external view returns (uint256);
+
+    function enableBurning() external view returns (bool);
+
+    function setEnableBurning(bool _enableBurning) external;
 }

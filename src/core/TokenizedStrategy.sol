@@ -329,6 +329,14 @@ abstract contract TokenizedStrategy {
         require(_sender == S.emergencyAdmin || _sender == S.management, "!emergency authorized");
     }
 
+    /**
+     * @notice Returns the loss amount.
+     * @return The loss amount.
+     */
+    function lossAmount() public view returns (uint256) {
+        return _strategyStorage().lossAmount;
+    }
+
     /*//////////////////////////////////////////////////////////////
                                CONSTANTS
     //////////////////////////////////////////////////////////////*/

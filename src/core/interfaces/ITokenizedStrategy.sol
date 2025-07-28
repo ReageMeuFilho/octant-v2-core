@@ -239,6 +239,12 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
      */
     function isShutdown() external view returns (bool);
 
+    /**
+     * @notice Returns the loss amount.
+     * @return The loss amount.
+     */
+    function lossAmount() external view returns (uint256);
+
     /*//////////////////////////////////////////////////////////////
                               SETTERS
     //////////////////////////////////////////////////////////////*/
