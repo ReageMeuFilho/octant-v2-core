@@ -37,7 +37,16 @@ contract MockTokenizedStrategyWithLoss is TokenizedStrategy, IBaseStrategy {
         bool _enableBurning,
         bool _allowDepositDuringLoss
     ) public override {
-        super.initialize(_asset, _name, _management, _keeper, _emergencyAdmin, _dragonRouter, _enableBurning, _allowDepositDuringLoss);
+        super.initialize(
+            _asset,
+            _name,
+            _management,
+            _keeper,
+            _emergencyAdmin,
+            _dragonRouter,
+            _enableBurning,
+            _allowDepositDuringLoss
+        );
         mockTotalAssets = 0;
         mockAvailableDepositLimit = type(uint256).max;
         mockAvailableWithdrawLimit = type(uint256).max;
@@ -172,7 +181,7 @@ contract MockTokenizedStrategyWithLoss is TokenizedStrategy, IBaseStrategy {
             _lossAmount = mockTotalAssets;
         }
         mockTotalAssets -= _lossAmount;
-        
+
         // Add to loss tracking
         StrategyData storage S = _strategyStorage();
         S.lossAmount += _lossAmount;
@@ -249,7 +258,7 @@ contract MockTokenizedStrategyWithLoss is TokenizedStrategy, IBaseStrategy {
     ) external {
         // Set up the scenario
         mockTotalAssets = _currentTotalAssets;
-        
+
         StrategyData storage S = _strategyStorage();
         S.lossAmount = _lossAmount;
         S.totalAssets = _currentTotalAssets;
@@ -263,7 +272,7 @@ contract MockTokenizedStrategyWithLoss is TokenizedStrategy, IBaseStrategy {
         mockAvailableDepositLimit = type(uint256).max;
         mockAvailableWithdrawLimit = type(uint256).max;
         shouldRevertOnHarvest = false;
-        
+
         StrategyData storage S = _strategyStorage();
         S.lossAmount = 0;
         S.totalAssets = 0;
