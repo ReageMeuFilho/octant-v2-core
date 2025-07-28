@@ -259,12 +259,14 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         uint256 exchangeRate = IYieldSkimmingStrategy(address(this)).getCurrentExchangeRate();
         uint256 exchangeRateDecimals = IYieldSkimmingStrategy(address(this)).decimalsOfExchangeRate();
 
-        uint256 scaledRate = exchangeRateDecimals == 18
-            ? exchangeRate
-            : exchangeRateDecimals < 18
-                ? exchangeRate * 10 ** (18 - exchangeRateDecimals)
-                : exchangeRate / 10 ** (exchangeRateDecimals - 18);
-        return scaledRate.wadToRay();
+        // Convert directly to RAY (27 decimals) to avoid precision loss
+        if (exchangeRateDecimals == 27) {
+            return exchangeRate;
+        } else if (exchangeRateDecimals < 27) {
+            return exchangeRate * 10 ** (27 - exchangeRateDecimals);
+        } else {
+            return exchangeRate / 10 ** (exchangeRateDecimals - 27);
+        }
     }
     function _calculateTunedM(
         uint256 totalSupplyAmount,
