@@ -42,8 +42,8 @@ import { IMultistrategyLockedVault } from "src/core/interfaces/IMultistrategyLoc
  *
  */
 contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVault {
-    // Mapping of user address to their lockup info
-    mapping(address => LockupInfo) public voluntaryLockups;
+    // Mapping of user address to their custody info
+    mapping(address => CustodyInfo) public custodyInfo;
 
     // Regen governance address
     address public regenGovernance;
@@ -90,27 +90,34 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
     }
 
     /**
-     * @notice Initiate rage quit process to unlock shares earlier
-     * Consults all strategies via hooks to determine the appropriate unlock time
+     * @notice Initiate rage quit process to unlock specific amount of shares
+     * @param shares Amount of shares to lock for rage quit
      */
-    function initiateRageQuit() external {
-        if (balanceOf(msg.sender) == 0) revert NoSharesToRageQuit();
+    function initiateRageQuit(uint256 shares) external {
+        if (shares == 0) revert InvalidShareAmount();
+        uint256 userBalance = balanceOf(msg.sender);
+        if (userBalance < shares) revert InsufficientBalance();
 
-        LockupInfo storage lockup = voluntaryLockups[msg.sender];
-        if (block.timestamp <= lockup.unlockTime) revert RageQuitAlreadyInitiated();
+        CustodyInfo storage custody = custodyInfo[msg.sender];
 
-        // Default unlock time based on vault's rage quit cooldown
-        uint256 defaultUnlockTime = block.timestamp + rageQuitCooldownPeriod;
+        // Check if user already has shares in custody
+        if (custody.lockedShares > 0) {
+            revert RageQuitAlreadyInitiated();
+        }
 
-        lockup.unlockTime = defaultUnlockTime;
+        // Available shares = total balance - already locked shares
+        uint256 availableShares = userBalance - custody.lockedShares;
+        if (availableShares < shares) revert InsufficientAvailableShares();
 
-        lockup.lockupTime = block.timestamp; // Set starting point for gradual unlocking
+        // Lock the shares in custody
+        custody.lockedShares = shares;
+        custody.unlockTime = block.timestamp + rageQuitCooldownPeriod;
 
-        emit RageQuitInitiated(msg.sender, lockup.lockupTime, defaultUnlockTime);
+        emit RageQuitInitiated(msg.sender, shares, custody.unlockTime);
     }
 
     /**
-     * @notice Override withdrawal functions to check if shares are unlocked
+     * @notice Override withdrawal functions to handle custodied shares
      */
     function withdraw(
         uint256 assets,
@@ -119,15 +126,14 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
         uint256 maxLoss,
         address[] calldata strategiesArray
     ) public override(MultistrategyVault, IMultistrategyVault) nonReentrant returns (uint256) {
-        _checkUnlocked(owner);
-        voluntaryLockups[owner].lockupTime = 0;
         uint256 shares = _convertToShares(assets, Rounding.ROUND_UP);
+        _processCustodyWithdrawal(owner, shares);
         _redeem(msg.sender, receiver, owner, assets, shares, maxLoss, strategiesArray);
         return shares;
     }
 
     /**
-     * @notice Override redeem function to check if shares are unlocked
+     * @notice Override redeem function to handle custodied shares
      */
     function redeem(
         uint256 shares,
@@ -136,8 +142,7 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
         uint256 maxLoss,
         address[] calldata strategiesArray
     ) public override(MultistrategyVault, IMultistrategyVault) nonReentrant returns (uint256) {
-        _checkUnlocked(owner);
-        voluntaryLockups[owner].lockupTime = 0;
+        _processCustodyWithdrawal(owner, shares);
         uint256 assets = _convertToAssets(shares, Rounding.ROUND_DOWN);
         // Always return the actual amount of assets withdrawn.
         return _redeem(msg.sender, receiver, owner, assets, shares, maxLoss, strategiesArray);
@@ -152,14 +157,94 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
     }
 
     /**
-     * @notice Check if shares can be withdrawn based on lockup
+     * @notice Process withdrawal of custodied shares
      * @param owner Owner of the shares
+     * @param shares Amount of shares to withdraw
      */
-    function _checkUnlocked(address owner) internal view {
-        LockupInfo memory lockup = voluntaryLockups[owner];
+    function _processCustodyWithdrawal(address owner, uint256 shares) internal {
+        CustodyInfo storage custody = custodyInfo[owner];
 
-        if (block.timestamp <= lockup.unlockTime || lockup.lockupTime == 0) {
+        // Check if there are custodied shares
+        if (custody.lockedShares == 0) {
+            revert NoCustodiedShares();
+        }
+
+        // Ensure cooldown period has passed
+        if (block.timestamp < custody.unlockTime) {
             revert SharesStillLocked();
         }
+
+        // Ensure user has sufficient balance
+        uint256 userBalance = balanceOf(owner);
+        if (userBalance < shares) {
+            revert InsufficientBalance();
+        }
+
+        // Can only withdraw up to locked amount
+        if (shares > custody.lockedShares) {
+            revert ExceedsCustodiedAmount();
+        }
+
+        // Reduce locked shares by withdrawn amount
+        custody.lockedShares -= shares;
+
+        // If all custodied shares withdrawn, reset custody info
+        if (custody.lockedShares == 0) {
+            delete custodyInfo[owner];
+        }
+    }
+
+    /**
+     * @notice Override internal transfer to prevent locked shares from being transferred
+     * @param sender_ Address sending shares
+     * @param receiver_ Address receiving shares  
+     * @param amount_ Amount of shares to transfer
+     */
+    function _transfer(address sender_, address receiver_, uint256 amount_) internal override {
+        // Check if sender has locked shares that would prevent this transfer
+        CustodyInfo memory custody = custodyInfo[sender_];
+        
+        if (custody.lockedShares > 0) {
+            uint256 senderBalance = balanceOf(sender_);
+            uint256 availableShares = senderBalance - custody.lockedShares;
+            
+            // Revert if trying to transfer more than available shares
+            if (amount_ > availableShares) {
+                revert TransferExceedsAvailableShares();
+            }
+        }
+        
+        // Call parent implementation
+        super._transfer(sender_, receiver_, amount_);
+    }
+
+    /**
+     * @notice Get custody info for a user
+     * @param user Address to check
+     * @return lockedShares Amount of shares locked
+     * @return unlockTime When shares can be withdrawn
+     */
+    function getCustodyInfo(
+        address user
+    ) external view returns (uint256 lockedShares, uint256 unlockTime) {
+        CustodyInfo memory custody = custodyInfo[user];
+        return (custody.lockedShares, custody.unlockTime);
+    }
+
+    /**
+     * @notice Cancel rage quit and unlock custodied shares
+     */
+    function cancelRageQuit() external {
+        CustodyInfo storage custody = custodyInfo[msg.sender];
+
+        if (custody.lockedShares == 0) {
+            revert NoActiveRageQuit();
+        }
+
+        // Clear custody info
+        uint256 freedShares = custody.lockedShares;
+        delete custodyInfo[msg.sender];
+
+        emit RageQuitCancelled(msg.sender, freedShares);
     }
 }
