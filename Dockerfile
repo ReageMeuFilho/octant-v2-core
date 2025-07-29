@@ -12,6 +12,7 @@ WORKDIR /app
 COPY package.json yarn.lock .yarnrc.yml foundry.toml soldeer.lock ./
 RUN corepack enable && corepack install
 RUN PATH="$PATH:/root/.foundry/bin" yarn install --immutable
+RUN PATH="$PATH:/root/.foundry/bin" forge soldeer install
 
 COPY ./ ./
 
