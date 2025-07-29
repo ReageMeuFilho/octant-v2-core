@@ -87,7 +87,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
             loss = S.totalAssets;
             uint256 burnable = _handleDragonLossProtection(S, loss, 0);
             S.lossAmount += loss - burnable;
-            _finalizeReport(S, 0, rateNow);
+            _finalizeReport(S, 0);
             emit Reported(0, loss);
             return (0, loss);
         }
@@ -134,7 +134,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
             S.lossAmount = adjustedOldLoss + (loss - burnable);
         }
 
-        _finalizeReport(S, rateNow, rateNow);
+        _finalizeReport(S, rateNow);
         emit Reported(profit, loss);
         return (profit, loss);
     }
@@ -197,13 +197,12 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     /**
      * @dev Finalizes the report by updating timestamps and rates
      * @param S The strategy data storage
-     * @param rateToStore The exchange rate to store
-     * @param rateForEvent The exchange rate for the harvest event
+     * @param rate The exchange rate to store
      */
-    function _finalizeReport(StrategyData storage S, uint256 rateToStore, uint256 rateForEvent) internal {
+    function _finalizeReport(StrategyData storage S, uint256 rate) internal {
         S.lastReport = uint96(block.timestamp);
-        _strategyYieldSkimmingStorage().lastRateRay = rateToStore;
-        emit Harvest(msg.sender, rateForEvent.rayToWad());
+        _strategyYieldSkimmingStorage().lastRateRay = rate;
+        emit Harvest(msg.sender, rate.rayToWad());
     }
 
     /**
@@ -222,7 +221,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     function _deposit(StrategyData storage S, address receiver, uint256 assets, uint256 shares) internal override {
         YieldSkimmingStorage storage YS = _strategyYieldSkimmingStorage();
 
-        // // tracking the lastof ra rate ray for the first deposit
+        // // tracking the last rate ray for the first deposit
         if (YS.recoveryRateRay == 0) {
             uint256 currentRate = _currentRateRay();
             YS.lastRateRay = currentRate;
