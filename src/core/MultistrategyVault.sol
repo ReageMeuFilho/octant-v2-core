@@ -1313,7 +1313,7 @@ contract MultistrategyVault is IMultistrategyVault {
     /**
      * @dev Transfers tokens from sender to receiver
      */
-    function _transfer(address sender_, address receiver_, uint256 amount_) internal {
+    function _transfer(address sender_, address receiver_, uint256 amount_) internal virtual {
         uint256 senderBalance = _balanceOf[sender_];
         require(senderBalance >= amount_, InsufficientFunds());
         _balanceOf[sender_] = senderBalance - amount_;
