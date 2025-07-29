@@ -17,10 +17,13 @@ interface IMultistrategyLockedVault is IMultistrategyVault {
     error NoCustodiedShares();
     error NoActiveRageQuit();
     error TransferExceedsAvailableShares();
+    error NoPendingRageQuitCooldownPeriodChange();
+    error RageQuitCooldownPeriodChangeDelayNotElapsed();
 
     // Events
     event RageQuitInitiated(address indexed user, uint256 shares, uint256 unlockTime);
-    event RageQuitCooldownPeriodSet(uint256 rageQuitCooldownPeriod);
+    event RageQuitCooldownPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
+    event PendingRageQuitCooldownPeriodChange(uint256 newPeriod, uint256 effectiveTimestamp);
     event RageQuitCancelled(address indexed user, uint256 freedShares);
 
     // Storage for lockup information per user
@@ -36,7 +39,11 @@ interface IMultistrategyLockedVault is IMultistrategyVault {
     }
 
     function initiateRageQuit(uint256 shares) external;
-    function setRageQuitCooldownPeriod(uint256 _rageQuitCooldownPeriod) external;
+    function proposeRageQuitCooldownPeriodChange(uint256 _rageQuitCooldownPeriod) external;
+    function finalizeRageQuitCooldownPeriodChange() external;
+    function cancelRageQuitCooldownPeriodChange() external;
+    function getPendingRageQuitCooldownPeriod() external view returns (uint256);
+    function getRageQuitCooldownPeriodChangeTimestamp() external view returns (uint256);
     function setRegenGovernance(address _regenGovernance) external;
     function cancelRageQuit() external;
     function getCustodyInfo(
