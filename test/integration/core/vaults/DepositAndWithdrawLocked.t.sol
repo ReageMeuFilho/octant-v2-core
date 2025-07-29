@@ -70,12 +70,17 @@ contract DepositAndWithdrawLockedTest is Test {
     }
 
     function initiateAndCompleteRageQuit(address user) internal {
-        // Initiate rage quit for user
-        vm.prank(user);
-        vault.initiateRageQuit();
+        // Only initiate rage quit if user has balance
+        uint256 userBalance = vault.balanceOf(user);
+        if (userBalance > 0) {
+            // Initiate rage quit for user
+            vm.startPrank(user);
+            vault.initiateRageQuit(userBalance);
+            vm.stopPrank();
 
-        // Fast forward past cooldown period
-        vm.warp(block.timestamp + vault.rageQuitCooldownPeriod() + 1);
+            // Fast forward past cooldown period
+            vm.warp(block.timestamp + vault.rageQuitCooldownPeriod() + 1);
+        }
     }
 
     function testDepositAndWithdraws() public {
@@ -141,16 +146,10 @@ contract DepositAndWithdrawLockedTest is Test {
         assertEq(vault.totalDebt(), 0, "Total debt should be 0");
         assertEq(vault.pricePerShare(), 10 ** asset.decimals(), "Price per share should be 1:1");
 
-        // Withdraw remaining half
-        // initiate rage quit
-        initiateAndCompleteRageQuit(fish);
-
-        // warp to unlock time
-        vm.warp(block.timestamp + vault.rageQuitCooldownPeriod() + 1);
-
-        // withdraw
-        vm.prank(fish);
+        // Withdraw remaining half (can withdraw remaining custodied shares from same rage quit)
+        vm.startPrank(fish);
         vault.withdraw(halfAmount, fish, fish, 0, new address[](0));
+        vm.stopPrank();
 
         checkVaultEmpty(vault);
         assertEq(asset.balanceOf(address(vault)), 0, "Vault should have no assets");
