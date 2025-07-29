@@ -172,6 +172,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         burnable = Math.min(lossAmount, dragonRouterAssets);
 
         if (burnable > 0) {
+            // do not use _convertToSharesWithLoss here (not accounting for lossAmount)
             uint256 sharesToBurn = super._convertToShares(S, burnable, Math.Rounding.Floor);
             _burn(S, S.dragonRouter, sharesToBurn);
             emit DonationBurned(S.dragonRouter, burnable, exchangeRate);
@@ -205,10 +206,23 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         emit Harvest(msg.sender, rateForEvent.rayToWad());
     }
 
+    /**
+     * @dev Internal deposit function that handles asset transfers and share minting
+     * @param S The strategy data storage
+     * @param receiver The address that will receive the minted shares
+     * @param assets The amount of assets being deposited
+     * @param shares The amount of shares to mint
+     *
+     * @notice Key differences from TokenizedStrategy._deposit:
+     * **Rate Initialization**: On first deposit, initializes both lastRateRay and recoveryRateRay
+     *    to establish baseline exchange rates for future yield calculations
+     * The initialization on first deposit is crucial for the yield skimming mechanism
+     * as it establishes the baseline from which appreciation is measured.
+     */
     function _deposit(StrategyData storage S, address receiver, uint256 assets, uint256 shares) internal override {
         YieldSkimmingStorage storage YS = _strategyYieldSkimmingStorage();
 
-        // // tracking the last rate ray for the first deposit
+        // // tracking the lastof ra rate ray for the first deposit
         if (YS.recoveryRateRay == 0) {
             uint256 currentRate = _currentRateRay();
             YS.lastRateRay = currentRate;
@@ -236,12 +250,31 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     }
 
     /**
-     * @dev Convert assets to shares
+     * @dev Converts assets to shares, accounting for any unrealized losses
      * @param S The strategy data storage
      * @param assets The amount of assets to convert
-     * @param rounding The rounding mode
-     * @dev This function is overridden to account for the loss amount
+     * @param rounding The rounding mode for division
      * @return The amount of shares
+     *
+     * @notice This override implements loss socialization for new depositors:
+     *
+     * **Loss Socialization Mechanism:**
+     * When the strategy has unrealized losses (S.lossAmount > 0), new depositors
+     * receive fewer shares for their assets. This ensures they share in the existing
+     * losses proportionally.
+     *
+     * **Example:**
+     * - Strategy has 100 assets, 100 shares, and 20 loss (slashing event)
+     * - Without loss accounting: New deposit of 100 assets = 100 shares (unfair to existing holders)
+     * - With loss accounting: New deposit of 100 assets = 83.33 shares
+     * - Formula: shares = assets * totalSupply / (totalAssets + lossAmount)
+     *
+     * **Recovery Benefit:**
+     * When the strategy recovers (underlying appreciates), all shareholders benefit
+     * proportionally. The depositor who entered during loss will see their shares
+     * appreciate back to their original value as losses are recovered.
+     *
+     * This mechanism ensures fair treatment of all depositors regardless of entry timing.
      */
     function _convertToShares(
         StrategyData storage S,
@@ -268,6 +301,27 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
             return exchangeRate / 10 ** (exchangeRateDecimals - 27);
         }
     }
+
+    /**
+     * @dev Calculates the amount of shares to mint to dragonRouter for yield capture
+     * @param totalSupplyAmount The current total supply of shares
+     * @param totalAssetsAmount The current total assets held by the strategy
+     * @param currentRate The current exchange rate in RAY format (1e27)
+     * @return The amount of shares to mint to dragonRouter
+     *
+     * @notice This function implements the yield skimming mechanism by minting new shares
+     * when the underlying asset appreciates. It handles two scenarios:
+     *
+     * 1. **Rate Appreciation**: When the current exchange rate exceeds the recovery rate,
+     *    indicating yield generation beyond the break-even point. The function mints shares
+     *    proportional to the rate difference to capture this yield.
+     *
+     * 2. **Direct Asset Increases**: When assets increase without rate changes (e.g., airdrops),
+     *    the function mints shares to maintain the price per share at the current rate.
+     *
+     * The recovery rate serves as a baseline - no shares are minted until depositors would
+     * be whole again (able to withdraw their initial underlying value).
+     */
     function _calculateTunedM(
         uint256 totalSupplyAmount,
         uint256 totalAssetsAmount,
