@@ -75,10 +75,17 @@ contract LockedVaultTest is Test {
         // Bound to valid range: 1 day to 30 days (vault maximum)
         cooldownPeriod = bound(cooldownPeriod, 1 days, 30 days);
         
-        // Should be able to set rage quit cooldown period within valid range
+        // Should be able to propose and finalize rage quit cooldown period change
         vm.startPrank(gov);
-        vault.setRageQuitCooldownPeriod(cooldownPeriod);
+        vault.proposeRageQuitCooldownPeriodChange(cooldownPeriod);
+        assertEq(vault.getPendingRageQuitCooldownPeriod(), cooldownPeriod, "Pending period should be set");
+        
+        // Fast forward past delay period
+        vm.warp(block.timestamp + vault.RAGE_QUIT_COOLDOWN_CHANGE_DELAY() + 1);
+        
+        vault.finalizeRageQuitCooldownPeriodChange();
         assertEq(vault.rageQuitCooldownPeriod(), cooldownPeriod, "Rage quit cooldown period should be updated");
+        assertEq(vault.getPendingRageQuitCooldownPeriod(), 0, "Pending period should be cleared");
         vm.stopPrank();
     }
 
@@ -88,7 +95,7 @@ contract LockedVaultTest is Test {
         
         vm.startPrank(gov);
         vm.expectRevert(IMultistrategyLockedVault.InvalidRageQuitCooldownPeriod.selector);
-        vault.setRageQuitCooldownPeriod(invalidPeriod);
+        vault.proposeRageQuitCooldownPeriodChange(invalidPeriod);
         vm.stopPrank();
     }
 
@@ -309,7 +316,9 @@ contract LockedVaultTest is Test {
         // Change cooldown period (this doesn't affect existing rage quits)
         vm.stopPrank();
         vm.startPrank(gov);
-        vault.setRageQuitCooldownPeriod(newCooldown);
+        vault.proposeRageQuitCooldownPeriodChange(newCooldown);
+        vm.warp(block.timestamp + vault.RAGE_QUIT_COOLDOWN_CHANGE_DELAY() + 1);
+        vault.finalizeRageQuitCooldownPeriodChange();
         vm.stopPrank();
 
         // Fast forward partway through cooldown
