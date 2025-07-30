@@ -108,13 +108,13 @@ abstract contract BaseYieldSkimmingHealthCheck is BaseStrategy, IBaseHealthCheck
         uint256 currentRate = IYieldSkimmingStrategy(address(this)).getCurrentExchangeRate();
         uint256 decimals = IYieldSkimmingStrategy(address(this)).decimalsOfExchangeRate();
 
-        // if decimals is less than 18, we need to scale up and then convert to ray
-        if (decimals < 18) {
-            return (currentRate * 10 ** (18 - decimals)).wadToRay();
-        } else if (decimals > 18) {
-            return (currentRate / 10 ** (decimals - 18)).rayToWad();
+        // Convert directly to RAY (27 decimals) to avoid precision loss
+        if (decimals < 27) {
+            return currentRate * 10 ** (27 - decimals);
+        } else if (decimals > 27) {
+            return currentRate / 10 ** (decimals - 27);
         } else {
-            return currentRate.wadToRay();
+            return currentRate;
         }
     }
 
