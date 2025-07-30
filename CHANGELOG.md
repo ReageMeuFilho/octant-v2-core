@@ -1,5 +1,15 @@
 
 
+## [0.7.1-develop.0](https://github.com/golemfoundation/octant-v2-core/compare/v0.7.0-develop.0...v0.7.1-develop.0) (2025-07-30)
+
+
+### Bug Fixes
+
+* add to ci release ([8739bbc](https://github.com/golemfoundation/octant-v2-core/commit/8739bbc5fc3b3bb1d7debd7db3094b2ee138ec13))
+* install forge deps in docker container ([3ce848c](https://github.com/golemfoundation/octant-v2-core/commit/3ce848c1242db237b591d3ea4e4724ec6fdd15fe))
+* install soldeer deps in release ([762e87e](https://github.com/golemfoundation/octant-v2-core/commit/762e87e93400ea1cc58269ba3eef60eeef849bac))
+* remove foreign command from postinstall script ([dd93a1e](https://github.com/golemfoundation/octant-v2-core/commit/dd93a1e551ccd23f6a1db760124d745ee3aff19d))
+
 ## [0.7.0-develop.0](https://github.com/golemfoundation/octant-v2-core/compare/v0.6.0-develop.0...v0.7.0-develop.0) (2025-07-25)
 
 
