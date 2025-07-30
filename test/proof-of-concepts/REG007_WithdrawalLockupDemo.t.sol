@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
-import {Test} from "forge-std/Test.sol";
-import {RegenStakerWithoutDelegateSurrogateVotes} from "src/regen/RegenStakerWithoutDelegateSurrogateVotes.sol";
-import {RegenEarningPowerCalculator} from "src/regen/RegenEarningPowerCalculator.sol";
-import {MockERC20Staking} from "test/mocks/MockERC20Staking.sol";
-import {MockERC20} from "test/mocks/MockERC20.sol";
-import {Whitelist} from "src/utils/Whitelist.sol";
-import {Staker} from "staker/Staker.sol";
+import { Test } from "forge-std/Test.sol";
+import { RegenStakerWithoutDelegateSurrogateVotes } from "src/regen/RegenStakerWithoutDelegateSurrogateVotes.sol";
+import { RegenEarningPowerCalculator } from "src/regen/RegenEarningPowerCalculator.sol";
+import { MockERC20Staking } from "test/mocks/MockERC20Staking.sol";
+import { MockERC20 } from "test/mocks/MockERC20.sol";
+import { Whitelist } from "src/utils/Whitelist.sol";
+import { Staker } from "staker/Staker.sol";
 
 /**
  * @title REG-007 Withdrawal Lockup Demo
@@ -33,8 +33,17 @@ contract REG007WithdrawalLockupDemoTest is Test {
         RegenEarningPowerCalculator calc = new RegenEarningPowerCalculator(address(this), earningPowerWhitelist);
 
         regenStaker = new RegenStakerWithoutDelegateSurrogateVotes(
-            rewardToken, stakeToken, calc, 1000, admin, 30 days, 0, 0,
-            stakerWhitelist, new Whitelist(), new Whitelist()
+            rewardToken,
+            stakeToken,
+            calc,
+            1000,
+            admin,
+            30 days,
+            0,
+            0,
+            stakerWhitelist,
+            new Whitelist(),
+            new Whitelist()
         );
 
         stakerWhitelist.addToWhitelist(user);
@@ -47,10 +56,10 @@ contract REG007WithdrawalLockupDemoTest is Test {
         vm.startPrank(user);
         stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
         Staker.DepositIdentifier depositId = regenStaker.stake(STAKE_AMOUNT, makeAddr("delegatee"), user);
-        
+
         assertEq(stakeToken.balanceOf(address(regenStaker)), STAKE_AMOUNT);
         assertEq(stakeToken.balanceOf(user), 0);
-        
+
         // Withdrawal fails - funds permanently stuck
         vm.expectRevert(); // ERC20InsufficientAllowance
         regenStaker.withdraw(depositId, STAKE_AMOUNT / 2);
@@ -61,7 +70,7 @@ contract REG007WithdrawalLockupDemoTest is Test {
         // Contract acts as its own surrogate
         address surrogate = address(regenStaker.surrogates(makeAddr("any")));
         assertEq(surrogate, address(regenStaker));
-        
+
         // But has no self-approval for transferFrom
         uint256 selfAllowance = stakeToken.allowance(address(regenStaker), address(regenStaker));
         assertEq(selfAllowance, 0);
