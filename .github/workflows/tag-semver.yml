@@ -75,11 +75,13 @@ jobs:
           MAX_OPEX_SPLIT: "5"
           MIN_METAPOOL_SPLIT: "0"
           CONTRACT_ADDRESSES: "/app/ci/contract_addresses.txt"
+          VERSION_TAG: "${{ github.ref_name }}"
         run: |
           cd /app
           mkdir -p ci
           touch .env
           yarn deploy:tenderly && (
+            echo "VERSION_TAG=${VERSION_TAG}" >> $CONTRACT_ADDRESSES
             cp $CONTRACT_ADDRESSES $GITHUB_OUTPUT
             echo "# Smart contract addresses\n\n| Contract name | Address |\n|---|---|" > $GITHUB_STEP_SUMMARY
             grep ADDRESS $CONTRACT_ADDRESSES | awk -F '=' '{gsub("_ADDRESS", "", $1); print "| `" $1 "` | `" $2 "` |"}' >> $GITHUB_STEP_SUMMARY
