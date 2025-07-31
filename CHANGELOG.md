@@ -1,5 +1,7 @@
 
 
+## [0.7.2-develop.0](https://github.com/golemfoundation/octant-v2-core/compare/v0.7.1-develop.0...v0.7.2-develop.0) (2025-07-31)
+
 ## [0.7.1-develop.0](https://github.com/golemfoundation/octant-v2-core/compare/v0.7.0-develop.0...v0.7.1-develop.0) (2025-07-30)
 
 
