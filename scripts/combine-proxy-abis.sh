@@ -29,3 +29,10 @@ jq -s '{"abi": (.[0].abi + .[1].abi)|unique}' \
   out/RocketPoolStrategy.sol/RocketPoolStrategy.json \
   out/YieldSkimmingTokenizedStrategy.sol/YieldSkimmingTokenizedStrategy.json \
   > out/RocketPoolStrategy.sol/RocketPoolYieldSkimmingTokenizedStrategy.json
+
+
+# Combine ABIs from QuadraticVotingMechanism and TokenizedAllocationMechanism
+jq -s '{"abi": (.[0].abi + .[1].abi)|unique}' \
+  out/QuadraticVotingMechanism.sol/QuadraticVotingMechanism.json \
+  out/TokenizedAllocationMechanism.sol/TokenizedAllocationMechanism.json \
+  > out/QuadraticVotingMechanism.sol/QuadraticVotingMechanismTokenizedAllocationMechanism.json
