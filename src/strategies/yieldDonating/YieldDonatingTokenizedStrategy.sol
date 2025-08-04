@@ -16,6 +16,10 @@ import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
  */
 contract YieldDonatingTokenizedStrategy is TokenizedStrategy {
     using Math for uint256;
+
+    /// @dev Events for donation tracking
+    event DonationMinted(address indexed dragonRouter, uint256 amount);
+    event DonationBurned(address indexed dragonRouter, uint256 amount);
     /**
      * @inheritdoc TokenizedStrategy
      * @dev This implementation overrides the base report function to mint profit-derived shares to dragonRouter.
@@ -54,6 +58,7 @@ contract YieldDonatingTokenizedStrategy is TokenizedStrategy {
                 S.lossAmount = 0;
                 // mint the shares to the dragon router
                 _mint(S, _dragonRouter, sharesToMint);
+                emit DonationMinted(_dragonRouter, profit - lossAmount);
             } else {
                 S.lossAmount -= profit;
             }
@@ -113,6 +118,7 @@ contract YieldDonatingTokenizedStrategy is TokenizedStrategy {
 
                 // Burn shares from dragon router
                 _burn(S, S.dragonRouter, sharesBurned);
+                emit DonationBurned(S.dragonRouter, assetValueBurned);
 
                 // Add any remaining loss that couldn't be covered by burning
                 if (loss > assetValueBurned) {
