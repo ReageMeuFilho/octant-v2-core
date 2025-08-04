@@ -44,11 +44,7 @@ contract PaymentSplitter is Initializable, Context {
     mapping(IERC20 => mapping(address => uint256)) private _erc20Released;
 
     /**
-     * @dev Creates an instance of `PaymentSplitter` where each account in `payees` is assigned the number of shares at
-     * the matching position in the `shares` array.
-     *
-     * All addresses in `payees` must be non-zero. Both arrays must have the same non-zero length, and there must be no
-     * duplicates in `payees`.
+     * @dev Disables initializers to ensure this contract can only be initialized via proxy.
      */
     constructor() payable {
         _disableInitializers();
@@ -67,6 +63,16 @@ contract PaymentSplitter is Initializable, Context {
         emit PaymentReceived(_msgSender(), msg.value);
     }
 
+    /**
+     * @dev Initializes the PaymentSplitter where each account in `payees` is assigned the number of shares at
+     * the matching position in the `shares_` array.
+     *
+     * All addresses in `payees` must be non-zero. Both arrays must have the same non-zero length, and there must be no
+     * duplicates in `payees`. This function can only be called once due to the `initializer` modifier.
+     *
+     * @param payees Array of addresses that will receive payments
+     * @param shares_ Array of shares corresponding to each payee
+     */
     function initialize(address[] memory payees, uint256[] memory shares_) public payable initializer {
         require(payees.length == shares_.length, "PaymentSplitter: payees and shares length mismatch");
         require(payees.length > 0, "PaymentSplitter: no payees");
