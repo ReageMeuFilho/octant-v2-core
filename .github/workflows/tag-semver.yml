@@ -95,11 +95,30 @@ jobs:
           name: contract_addresses
           path: /app/ci/contract_addresses.txt
 
+  update-contract-secret:
+    name: Update secret
+    runs-on:
+      - general
+    needs:
+      - deploy-contract
+    container:
+      image: gcr.io/google.com/cloudsdktool/cloud-sdk:stable
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Add new secret version
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_B64: ${{ secrets.GCP_SECRET_VERSION_ADDER_SERVICE_ACCOUNT }}
+          GCP_PROJECT: ${{ vars.GCP_PROJECT }}
+        run: ci/update_gcp_secret.sh ${{ inputs.env-type }}
+
+
   restart-services:
     name: Restart develop services
     runs-on: general
     needs:
-      - deploy-contract
+      - update-contract-secret
 
     steps:
       - name: Update frontend contracts
