@@ -111,7 +111,7 @@ jobs:
         env:
           GOOGLE_APPLICATION_CREDENTIALS_B64: ${{ secrets.GCP_SECRET_VERSION_ADDER_SERVICE_ACCOUNT }}
           GCP_PROJECT: ${{ vars.GCP_PROJECT }}
-        run: ci/update_gcp_secret.sh ${{ inputs.env-type }}
+        run: ci/update_gcp_secret.sh develop
 
 
   restart-services:
