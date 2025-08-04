@@ -107,7 +107,11 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@v4
 
-      - name: Download contract addresses artifact
+      - name: Install dependencies
+        run: |
+          apt-get update && apt-get install -y --no-install-recommends jq
+
+      - name: Download artifact with contract addresses
         uses: actions/download-artifact@v4
         with:
           name: contract_addresses
