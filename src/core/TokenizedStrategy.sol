@@ -355,6 +355,9 @@ abstract contract TokenizedStrategy {
     /// @notice Cooldown period for dragon router changes (14 days).
     uint256 internal constant DRAGON_ROUTER_COOLDOWN = 14 days;
 
+    /// @notice Permit type hash for EIP-2612 permit functionality.
+    bytes32 internal constant PERMIT_TYPEHASH = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+
     /**
      * @dev Custom storage slot that will be used to store the
      * `StrategyData` struct that holds each strategies
@@ -1689,9 +1692,7 @@ abstract contract TokenizedStrategy {
                         DOMAIN_SEPARATOR(),
                         keccak256(
                             abi.encode(
-                                keccak256(
-                                    "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
-                                ),
+                                PERMIT_TYPEHASH,
                                 owner,
                                 spender,
                                 value,
