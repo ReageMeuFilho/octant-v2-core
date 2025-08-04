@@ -362,7 +362,7 @@ abstract contract TokenizedStrategy {
     bytes32 internal constant EIP712DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
 
     /// @notice Hash of the vault name for EIP-712 domain separator.
-    bytes32 internal constant NAME_HASH = keccak256("Yearn Vault");
+    bytes32 internal constant NAME_HASH = keccak256("Octant Vault");
 
     /// @notice Hash of the API version for EIP-712 domain separator.
     bytes32 internal constant VERSION_HASH = keccak256(bytes(API_VERSION));
