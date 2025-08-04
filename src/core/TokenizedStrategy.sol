@@ -358,6 +358,15 @@ abstract contract TokenizedStrategy {
     /// @notice Permit type hash for EIP-2612 permit functionality.
     bytes32 internal constant PERMIT_TYPEHASH = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
 
+    /// @notice EIP712Domain type hash for EIP-712 domain separator.
+    bytes32 internal constant EIP712DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+
+    /// @notice Hash of the vault name for EIP-712 domain separator.
+    bytes32 internal constant NAME_HASH = keccak256("Yearn Vault");
+
+    /// @notice Hash of the API version for EIP-712 domain separator.
+    bytes32 internal constant VERSION_HASH = keccak256(bytes(API_VERSION));
+
     /**
      * @dev Custom storage slot that will be used to store the
      * `StrategyData` struct that holds each strategies
@@ -1723,9 +1732,9 @@ abstract contract TokenizedStrategy {
         return
             keccak256(
                 abi.encode(
-                    keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                    keccak256("Yearn Vault"),
-                    keccak256(bytes(API_VERSION)),
+                    EIP712DOMAIN_TYPEHASH,
+                    NAME_HASH,
+                    VERSION_HASH,
                     block.chainid,
                     address(this)
                 )
