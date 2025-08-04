@@ -1389,11 +1389,11 @@ abstract contract TokenizedStrategy {
 
     /**
      * @notice Returns the symbol of the strategies token.
-     * @dev Will be 'ys + asset symbol'.
+     * @dev Will be 'os + asset symbol'.
      * @return . The symbol the strategy is using for its tokens.
      */
     function symbol() external view returns (string memory) {
-        return string(abi.encodePacked("ys", _strategyStorage().asset.symbol()));
+        return string(abi.encodePacked("os", _strategyStorage().asset.symbol()));
     }
 
     /**
