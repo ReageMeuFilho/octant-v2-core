@@ -1,5 +1,12 @@
 
 
+## [0.8.0-develop.0](https://github.com/golemfoundation/octant-v2-core/compare/v0.7.2-develop.0...v0.8.0-develop.0) (2025-08-04)
+
+
+### Features
+
+* combine QuadraticVotingMechanism and TokenizedAllocationMechanism abis ([cc212c4](https://github.com/golemfoundation/octant-v2-core/commit/cc212c463596cfa257bfe971f5eadd09a61b317d))
+
 ## [0.7.2-develop.0](https://github.com/golemfoundation/octant-v2-core/compare/v0.7.1-develop.0...v0.7.2-develop.0) (2025-07-31)
 
 ## [0.7.1-develop.0](https://github.com/golemfoundation/octant-v2-core/compare/v0.7.0-develop.0...v0.7.1-develop.0) (2025-07-30)
