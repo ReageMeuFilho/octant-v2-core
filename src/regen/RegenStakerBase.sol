@@ -391,7 +391,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     function setMinimumStakeAmount(uint128 _minimumStakeAmount) external {
         _revertIfNotAdmin();
         require(
-            _minimumStakeAmount <= sharedState.minimumStakeAmount || block.timestamp >= rewardEndTime,
+            _minimumStakeAmount <= sharedState.minimumStakeAmount || block.timestamp > rewardEndTime,
             CannotRaiseMinimumStakeAmountDuringActiveReward()
         );
         emit MinimumStakeAmountSet(_minimumStakeAmount);
