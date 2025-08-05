@@ -105,16 +105,6 @@ contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
         return DelegationSurrogate(address(this));
     }
 
-    /// @inheritdoc Staker
-    /// @notice Override to handle token transfers when contract acts as its own surrogate
-    /// @dev Since surrogates are always address(this), we skip transfers from contract to itself
-    function _stakeTokenSafeTransferFrom(address _from, address _to, uint256 _value) internal override {
-        // Skip transfers from contract to itself (surrogate to surrogate when both are this contract)
-        if (_from == address(this) && _to == address(this)) {
-            return;
-        }
-        super._stakeTokenSafeTransferFrom(_from, _to, _value);
-    }
 
     /// @inheritdoc RegenStakerBase
     /// @dev Always checks deposit.owner for whitelist authorization, preventing bypass scenarios.
