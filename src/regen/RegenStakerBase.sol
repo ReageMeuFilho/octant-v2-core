@@ -534,7 +534,9 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         _checkpointReward(deposit);
 
         uint256 unclaimedAmount = deposit.scaledUnclaimedRewardCheckpoint / SCALE_FACTOR;
-        require(unclaimedAmount > 0, ZeroOperation());
+        if (unclaimedAmount == 0) {
+            return 0;
+        }
 
         ClaimFeeParameters memory feeParams = claimFeeParameters;
         uint256 fee = feeParams.feeAmount;
