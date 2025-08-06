@@ -107,12 +107,6 @@ contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
 
 
     /// @inheritdoc RegenStakerBase
-    /// @dev Always checks deposit.owner for whitelist authorization, preventing bypass scenarios.
-    function _getStakeMoreWhitelistTarget(Deposit storage deposit) internal view override returns (address) {
-        return deposit.owner;
-    }
-
-    /// @inheritdoc RegenStakerBase
     /// @dev No transfer needed since tokens stay in this contract (contract acts as its own surrogate)
     function _transferForCompound(address, /* _delegatee */ uint256 /* _amount */) internal pure override {
         // No transfer needed - tokens stay in this contract

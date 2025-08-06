@@ -114,10 +114,4 @@ contract RegenStaker is RegenStakerBase {
         DelegationSurrogate surrogate = _fetchOrDeploySurrogate(_delegatee);
         SafeERC20.safeTransfer(STAKE_TOKEN, address(surrogate), _amount);
     }
-
-    /// @inheritdoc RegenStakerBase
-    /// @dev Always checks deposit.owner for whitelist authorization, preventing bypass through delegation.
-    function _getStakeMoreWhitelistTarget(Deposit storage deposit) internal view override returns (address) {
-        return deposit.owner;
-    }
 }

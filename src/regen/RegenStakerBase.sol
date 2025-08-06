@@ -707,10 +707,10 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
 
     /// @inheritdoc Staker
     /// @notice Overrides to prevent staking 0 tokens.
-    /// @notice Overrides to prevent pushing the amount below the minimum stake amount.
+    /// @notice Overrides to ensure the final stake amount meets the minimum requirement.
     /// @notice Overrides to prevent staking more when the contract is paused.
-    /// @notice Overrides to prevent staking more if the staker is not whitelisted.
-    /// @dev Uses reentrancy guard
+    /// @notice Overrides to prevent staking more if the deposit owner is not whitelisted.
+    /// @dev Uses reentrancy guard; validates deposit.owner against staker whitelist before proceeding
     /// @param deposit The deposit storage
     /// @param _depositId The deposit identifier
     /// @param _amount The additional amount to stake
@@ -720,19 +720,10 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         uint256 _amount
     ) internal virtual override whenNotPaused nonReentrant {
         require(_amount > 0, ZeroOperation());
-        _checkWhitelisted(sharedState.stakerWhitelist, _getStakeMoreWhitelistTarget(deposit));
+        _checkWhitelisted(sharedState.stakerWhitelist, deposit.owner);
         super._stakeMore(deposit, _depositId, _amount);
         _revertIfMinimumStakeAmountNotMet(_depositId);
     }
-
-    /// @notice Virtual function to get the address to check for stakeMore whitelist
-    /// @dev Override in derived contracts to return deposit.owner for owner-centric authorization.
-    /// @dev OWNER-CENTRIC MODEL: All variants should return deposit.owner to ensure consistent
-    ///      security across the system and prevent whitelist circumvention.
-    /// @dev SECURITY: Only whitelisted users can own deposits and benefit from staking rewards.
-    /// @param deposit The deposit storage reference
-    /// @return The address to check against the whitelist (should be deposit.owner)
-    function _getStakeMoreWhitelistTarget(Deposit storage deposit) internal view virtual returns (address);
 
     /// @notice Abstract function for transferring tokens during compound rewards
     /// @dev Implementing contracts must define how to handle token transfers for compounding
