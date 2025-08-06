@@ -304,16 +304,13 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
 
         rewardPerTokenAccumulatedCheckpoint = rewardPerTokenAccumulated();
 
-        uint256 totalRewards;
         if (block.timestamp >= rewardEndTime) {
             // Scale to maintain precision across variable durations
             scaledRewardRate = (_amount * SCALE_FACTOR) / sharedState.rewardDuration;
-            totalRewards = _amount * SCALE_FACTOR;
         } else {
             uint256 _remainingReward = scaledRewardRate * (rewardEndTime - block.timestamp);
             // Scale to maintain precision across variable durations
             scaledRewardRate = (_remainingReward + _amount * SCALE_FACTOR) / sharedState.rewardDuration;
-            totalRewards = _remainingReward + _amount * SCALE_FACTOR;
         }
 
         rewardEndTime = block.timestamp + sharedState.rewardDuration;
@@ -321,8 +318,12 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
 
         if (scaledRewardRate < SCALE_FACTOR) revert Staker__InvalidRewardRate();
 
-        // Avoid "divide before multiply" by restructuring the balance check
-        if (totalRewards > (REWARD_TOKEN.balanceOf(address(this)) * SCALE_FACTOR)) {
+        // This check cannot _guarantee_ sufficient rewards have been transferred to the contract,
+        // because it cannot isolate the unclaimed rewards owed to stakers left in the balance. While
+        // this check is useful for preventing degenerate cases, it is not sufficient. Therefore, it is
+        // critical that only safe reward notifier contracts are approved to call this method by the
+        // admin.
+        if ((scaledRewardRate * sharedState.rewardDuration) > (REWARD_TOKEN.balanceOf(address(this)) * SCALE_FACTOR)) {
             revert Staker__InsufficientRewardBalance();
         }
 
