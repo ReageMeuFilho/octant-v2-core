@@ -205,7 +205,7 @@ contract SkyCompounderStrategy is BaseHealthCheck, UniswapV3Swapper, ISkyCompoun
     }
 
     function _uniV2swapFrom(address _from, address _to, uint256 _amountIn, uint256 _minAmountOut) internal {
-        if (_amountIn > minAmountToSell) {
+        if (_amountIn >= minAmountToSell) {
             IUniswapV2Router02(UNIV2ROUTER).swapExactTokensForTokens(
                 _amountIn,
                 _minAmountOut,
