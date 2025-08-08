@@ -1755,7 +1755,8 @@ contract RegenIntegrationTest is Test {
         compoundRegenStaker.setMinimumStakeAmount(uint128(0));
 
         sameToken.mint(user, stakeAmount);
-        sameToken.mint(address(compoundRegenStaker), rewardAmount);
+        // Protection requires balance >= totalStaked + rewardAmount
+        sameToken.mint(address(compoundRegenStaker), stakeAmount + rewardAmount);
 
         vm.startPrank(user);
         sameToken.approve(address(compoundRegenStaker), stakeAmount);
@@ -1826,7 +1827,8 @@ contract RegenIntegrationTest is Test {
         uint256 rewardAmount = getRewardAmount(rewardAmountBase);
 
         sameToken.mint(user, stakeAmount);
-        sameToken.mint(address(compoundRegenStaker), rewardAmount);
+        // Protection requires balance >= totalStaked + rewardAmount
+        sameToken.mint(address(compoundRegenStaker), stakeAmount + rewardAmount);
 
         vm.startPrank(user);
         sameToken.approve(address(compoundRegenStaker), stakeAmount);
@@ -1902,7 +1904,8 @@ contract RegenIntegrationTest is Test {
         }
 
         sameToken.mint(user, stakeAmount);
-        sameToken.mint(address(compoundRegenStaker), rewardAmount);
+        // Protection requires balance >= totalStaked + rewardAmount
+        sameToken.mint(address(compoundRegenStaker), stakeAmount + rewardAmount);
 
         vm.startPrank(user);
         sameToken.approve(address(compoundRegenStaker), stakeAmount);
@@ -1973,7 +1976,8 @@ contract RegenIntegrationTest is Test {
         uint256 rewardAmount = getRewardAmount(rewardAmountBase);
 
         sameToken.mint(user, stakeAmount);
-        sameToken.mint(address(compoundRegenStaker), rewardAmount * compoundTimes);
+        // Multiple compounds need extra buffer for totalStaked growth
+        sameToken.mint(address(compoundRegenStaker), stakeAmount + rewardAmount * compoundTimes * 2);
 
         vm.startPrank(user);
         sameToken.approve(address(compoundRegenStaker), stakeAmount);
@@ -2051,7 +2055,11 @@ contract RegenIntegrationTest is Test {
 
         currentTestCtx.sameToken.mint(currentTestCtx.user1, currentTestCtx.user1Stake);
         currentTestCtx.sameToken.mint(currentTestCtx.user2, currentTestCtx.user2Stake);
-        currentTestCtx.sameToken.mint(address(currentTestCtx.compoundRegenStaker), currentTestCtx.rewardAmount);
+        // Protection requires balance >= totalStaked + rewardAmount
+        currentTestCtx.sameToken.mint(
+            address(currentTestCtx.compoundRegenStaker),
+            currentTestCtx.user1Stake + currentTestCtx.user2Stake + currentTestCtx.rewardAmount
+        );
 
         vm.startPrank(currentTestCtx.user1);
         currentTestCtx.sameToken.approve(address(currentTestCtx.compoundRegenStaker), currentTestCtx.user1Stake);
@@ -2180,7 +2188,8 @@ contract RegenIntegrationTest is Test {
         uint256 rewardAmount = getRewardAmount(rewardAmountBase);
 
         sameToken.mint(user, stakeAmount);
-        sameToken.mint(address(compoundRegenStaker), rewardAmount);
+        // Protection requires balance >= totalStaked + rewardAmount
+        sameToken.mint(address(compoundRegenStaker), stakeAmount + rewardAmount);
 
         vm.startPrank(user);
         sameToken.approve(address(compoundRegenStaker), stakeAmount);
@@ -2249,7 +2258,8 @@ contract RegenIntegrationTest is Test {
         uint256 rewardAmount = rewardAmountBase * (10 ** decimals);
 
         sameToken.mint(user, stakeAmount);
-        sameToken.mint(address(compoundRegenStaker), rewardAmount);
+        // Protection requires balance >= totalStaked + rewardAmount
+        sameToken.mint(address(compoundRegenStaker), stakeAmount + rewardAmount);
 
         vm.startPrank(user);
         sameToken.approve(address(compoundRegenStaker), stakeAmount);

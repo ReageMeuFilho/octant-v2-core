@@ -700,8 +700,8 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         return super._claimReward(_depositId, deposit, _claimer);
     }
 
-    /// @notice Override notifyRewardAmount to use custom reward duration
-    /// @dev Virtual for child overrides
+    /// @notice Override notifyRewardAmount to support variable reward duration
+    /// @dev Child contracts may add additional guards as needed
     /// @param _amount The reward amount
     function notifyRewardAmount(uint256 _amount) external virtual override {
         _notifyRewardAmountWithCustomDuration(_amount);
