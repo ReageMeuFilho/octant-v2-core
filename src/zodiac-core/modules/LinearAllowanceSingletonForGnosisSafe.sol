@@ -244,6 +244,6 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
         uint256 timeElapsed = block.timestamp - allowance.lastBookedAtInSeconds;
         uint256 newAccrued = (timeElapsed * allowance.dripRatePerDay) / 1 days;
 
-        return newAccrued > 0 ? newAccrued : 0;
+        return newAccrued;
     }
 }
