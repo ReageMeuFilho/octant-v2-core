@@ -41,6 +41,12 @@ import { RegenStakerBase, Staker, IERC20, IERC20Permit, IWhitelist, IEarningPowe
 ///
 /// @dev USE CASE: Choose this variant for simple ERC20 staking without governance requirements.
 contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
+    // === Custom Errors ===
+    /// @notice Error thrown when reward notification would corrupt user deposits (same-token scenario)
+    /// @param currentBalance The actual token balance in the contract
+    /// @param required The minimum balance needed (totalStaked + reward amount)
+    error InsufficientRewardBalance(uint256 currentBalance, uint256 required);
+    
     // === Constructor ===
     /// @notice Constructor for the RegenStakerWithoutDelegateSurrogateVotes contract.
     /// @param _rewardsToken The token that will be used to reward contributors.
@@ -86,6 +92,24 @@ contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
     {}
 
     // === Overridden Functions ===
+    
+    /// @notice Protect same-token scenarios for this variant where all tokens are held in the main contract
+    /// @dev Validates sufficient balance when STAKE_TOKEN == REWARD_TOKEN to prevent reward notifications
+    ///      from corrupting user deposits. This check is critical for this variant since stakes and rewards
+    ///      share the same contract address.
+    /// @param _amount The reward amount to notify
+    function notifyRewardAmount(uint256 _amount) external override {        
+        if (address(REWARD_TOKEN) == address(STAKE_TOKEN)) {
+            uint256 currentBalance = REWARD_TOKEN.balanceOf(address(this));
+            uint256 required = totalStaked + _amount;
+            if (currentBalance < required) {
+                revert InsufficientRewardBalance(currentBalance, required);
+            }
+        }
+        
+        _notifyRewardAmountWithCustomDuration(_amount);
+    }
+    
     /// @inheritdoc Staker
     /// @notice Returns this contract as the "surrogate" since we hold tokens directly
     /// @dev ARCHITECTURE: This variant uses address(this) as surrogate to eliminate delegation complexity
@@ -104,7 +128,6 @@ contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
     function _fetchOrDeploySurrogate(address /* _delegatee */) internal view override returns (DelegationSurrogate) {
         return DelegationSurrogate(address(this));
     }
-
 
     /// @inheritdoc RegenStakerBase
     /// @dev No transfer needed since tokens stay in this contract (contract acts as its own surrogate)
