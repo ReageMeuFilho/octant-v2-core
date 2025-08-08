@@ -215,7 +215,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
         if (token == NATIVE_TOKEN) {
             ISafe(payable(safe)).execTransactionFromModule(to, amount, "", Enum.Operation.Call);
         } else {
-            bytes memory data = abi.encodeWithSelector(IERC20.transfer.selector, to, amount);
+            bytes memory data = abi.encodeCall(IERC20.transfer, (to, amount));
             ISafe(payable(safe)).execTransactionFromModule(token, 0, data, Enum.Operation.Call);
         }
 
