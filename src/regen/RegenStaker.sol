@@ -7,12 +7,11 @@ pragma solidity ^0.8.0;
 
 // === Variant-Specific Imports ===
 import { IERC20Staking } from "staker/interfaces/IERC20Staking.sol";
-import { DelegationSurrogate } from "staker/DelegationSurrogate.sol";
 import { DelegationSurrogateVotes } from "staker/DelegationSurrogateVotes.sol";
 import { IERC20Delegates } from "staker/interfaces/IERC20Delegates.sol";
 
 // === Base Imports ===
-import { RegenStakerBase, Staker, SafeERC20, IERC20, IWhitelist, IEarningPowerCalculator } from "src/regen/RegenStakerBase.sol";
+import { RegenStakerBase, Staker, SafeERC20, IERC20, DelegationSurrogate, IWhitelist, IEarningPowerCalculator } from "src/regen/RegenStakerBase.sol";
 
 // === Contract Header ===
 /// @title RegenStaker
@@ -106,12 +105,5 @@ contract RegenStaker is RegenStakerBase {
             _surrogate = new DelegationSurrogateVotes(VOTING_TOKEN, _delegatee);
             _surrogates[_delegatee] = _surrogate;
         }
-    }
-
-    /// @inheritdoc RegenStakerBase
-    /// @dev Transfers tokens to the delegation surrogate for the delegatee
-    function _transferForCompound(address _delegatee, uint256 _amount) internal override {
-        DelegationSurrogate surrogate = _fetchOrDeploySurrogate(_delegatee);
-        SafeERC20.safeTransfer(STAKE_TOKEN, address(surrogate), _amount);
     }
 }

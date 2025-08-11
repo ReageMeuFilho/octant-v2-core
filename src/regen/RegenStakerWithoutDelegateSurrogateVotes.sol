@@ -5,11 +5,9 @@
 
 pragma solidity ^0.8.0;
 
-// === Variant-Specific Imports ===
-import { DelegationSurrogate } from "staker/DelegationSurrogate.sol";
-
 // === Base Imports ===
-import { RegenStakerBase, Staker, IERC20, IERC20Permit, IWhitelist, IEarningPowerCalculator } from "src/regen/RegenStakerBase.sol";
+// Note: DelegationSurrogate is now imported via RegenStakerBase
+import { RegenStakerBase, Staker, IERC20, DelegationSurrogate, IWhitelist, IEarningPowerCalculator } from "src/regen/RegenStakerBase.sol";
 
 // === Contract Header ===
 /// @title RegenStakerWithoutDelegateSurrogateVotes
@@ -129,9 +127,4 @@ contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
         return DelegationSurrogate(address(this));
     }
 
-    /// @inheritdoc RegenStakerBase
-    /// @dev No transfer needed since tokens stay in this contract (contract acts as its own surrogate)
-    function _transferForCompound(address, /* _delegatee */ uint256 /* _amount */) internal pure override {
-        // No transfer needed - tokens stay in this contract
-    }
 }

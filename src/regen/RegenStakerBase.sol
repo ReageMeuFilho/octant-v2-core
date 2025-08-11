@@ -12,7 +12,7 @@ import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.s
 import { IERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 
 // Staker Library Imports
-import { Staker, SafeCast, SafeERC20, IERC20 } from "staker/Staker.sol";
+import { Staker, DelegationSurrogate, SafeCast, SafeERC20, IERC20 } from "staker/Staker.sol";
 import { StakerOnBehalf } from "staker/extensions/StakerOnBehalf.sol";
 import { StakerPermitAndStake } from "staker/extensions/StakerPermitAndStake.sol";
 
@@ -45,13 +45,6 @@ import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocation
 abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, StakerPermitAndStake, StakerOnBehalf {
     using SafeCast for uint256;
 
-    // === Constants ===
-    /// @notice Minimum allowed reward duration in seconds (7 days).
-    uint256 public constant MIN_REWARD_DURATION = 7 days;
-
-    /// @notice Maximum allowed reward duration to prevent excessively long reward periods.
-    uint256 public constant MAX_REWARD_DURATION = 3000 days;
-
     // === Structs ===
     /// @notice Struct to hold shared configuration state
     /// @dev Groups related configuration variables for better storage efficiency and easier inheritance.
@@ -62,6 +55,13 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         IWhitelist contributionWhitelist;
         IWhitelist allocationMechanismWhitelist;
     }
+
+    // === Constants ===
+    /// @notice Minimum allowed reward duration in seconds (7 days).
+    uint256 public constant MIN_REWARD_DURATION = 7 days;
+
+    /// @notice Maximum allowed reward duration to prevent excessively long reward periods.
+    uint256 public constant MAX_REWARD_DURATION = 3000 days;
 
     // === Custom Errors ===
     /// @notice Error thrown when an address is not whitelisted
@@ -149,6 +149,10 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         uint256 newEarningPower
     );
 
+    /// @notice Error thrown when a required surrogate is missing
+    /// @param delegatee The delegatee for which a surrogate was expected
+    error SurrogateNotFound(address delegatee);
+
     /// @notice Emitted when the minimum stake amount is updated
     /// @param newMinimumStakeAmount The new minimum stake amount
     event MinimumStakeAmountSet(uint256 newMinimumStakeAmount);
@@ -233,6 +237,12 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     {
         MAX_CLAIM_FEE = _maxClaimFee;
         _setClaimFeeParameters(ClaimFeeParameters({ feeAmount: 0, feeCollector: address(0) }));
+
+        // Enable self-transfers for compound operations when stake and reward tokens are the same
+        // This allows compoundRewards to use _stakeTokenSafeTransferFrom with address(this) as source
+        if (address(STAKE_TOKEN) == address(REWARD_TOKEN)) {
+            SafeERC20.safeIncreaseAllowance(STAKE_TOKEN, address(this), type(uint256).max);
+        }
 
         // Initialize shared state
         _initializeSharedState(
@@ -563,15 +573,27 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         totalStaked += compoundedAmount;
         depositorTotalStaked[depositOwner] += compoundedAmount;
 
+        // Preserve sub-wei dust like claimReward by subtracting the scaled amount claimed
+        // This is done BEFORE updating balance/earning power to match base _claimReward pattern
+        deposit.scaledUnclaimedRewardCheckpoint =
+            deposit.scaledUnclaimedRewardCheckpoint -
+            (unclaimedAmount * SCALE_FACTOR);
+
         deposit.balance = newBalance.toUint96();
         deposit.earningPower = newEarningPower.toUint96();
-        deposit.scaledUnclaimedRewardCheckpoint = 0;
 
         if (fee > 0) {
             SafeERC20.safeTransfer(REWARD_TOKEN, feeParams.feeCollector, fee);
         }
 
-        _transferForCompound(deposit.delegatee, compoundedAmount);
+        // Transfer compounded rewards using the same pattern as _stakeMore for consistency
+        // The surrogate must already exist since the deposit exists (created during initial stake)
+        // This ensures child contracts can customize behavior through _stakeTokenSafeTransferFrom
+        DelegationSurrogate _surrogate = surrogates(deposit.delegatee);
+        if (address(_surrogate) == address(0)) {
+            revert SurrogateNotFound(deposit.delegatee);
+        }
+        _stakeTokenSafeTransferFrom(address(this), address(_surrogate), compoundedAmount);
 
         emit RewardClaimed(_depositId, msg.sender, compoundedAmount, oldEarningPower);
         emit StakeDeposited(depositOwner, _depositId, compoundedAmount, newBalance, newEarningPower);
@@ -700,10 +722,11 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         return super._claimReward(_depositId, deposit, _claimer);
     }
 
-    /// @notice Override notifyRewardAmount to support variable reward duration
-    /// @dev Child contracts may add additional guards as needed
+
+    /// @notice Override notifyRewardAmount to use custom reward duration
+    /// @dev nonReentrant as a belts-and-braces guard against exotic ERC20 callback reentry
     /// @param _amount The reward amount
-    function notifyRewardAmount(uint256 _amount) external virtual override {
+    function notifyRewardAmount(uint256 _amount) external virtual override nonReentrant {
         _notifyRewardAmountWithCustomDuration(_amount);
     }
 
@@ -726,10 +749,4 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         super._stakeMore(deposit, _depositId, _amount);
         _revertIfMinimumStakeAmountNotMet(_depositId);
     }
-
-    /// @notice Abstract function for transferring tokens during compound rewards
-    /// @dev Implementing contracts must define how to handle token transfers for compounding
-    /// @param _delegatee The delegatee address (may be used for surrogate transfers)
-    /// @param _amount The amount to transfer
-    function _transferForCompound(address _delegatee, uint256 _amount) internal virtual;
 }
