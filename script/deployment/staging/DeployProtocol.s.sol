@@ -14,6 +14,7 @@ import { DeployPaymentSplitterFactory } from "script/deploy/DeployPaymentSplitte
 import { DeploySkyCompounderStrategyFactory } from "script/deploy/DeploySkyCompounderStrategyFactory.sol";
 import { DeployMorphoCompounderStrategyFactory } from "script/deploy/DeployMorphoCompounderStrategyFactory.sol";
 import { DeployRegenStakerFactory } from "script/deploy/DeployRegenStakerFactory.sol";
+import { DeployAllocationMechanismFactory } from "script/deploy/DeployAllocationMechanismFactory.sol";
 
 /**
  * @title DeployProtocol
@@ -32,6 +33,7 @@ contract DeployProtocol is Script {
     DeploySkyCompounderStrategyFactory public deploySkyCompounderStrategyFactory;
     DeployMorphoCompounderStrategyFactory public deployMorphoCompounderStrategyFactory;
     DeployRegenStakerFactory public deployRegenStakerFactory;
+    DeployAllocationMechanismFactory public deployAllocationMechanismFactory;
 
     // Deployed contract addresses
     address public moduleProxyFactoryAddress;
@@ -47,6 +49,7 @@ contract DeployProtocol is Script {
     address public skyCompounderStrategyFactoryAddress;
     address public morphoCompounderStrategyFactoryAddress;
     address public regenStakerFactoryAddress;
+    address public allocationMechanismFactoryAddress;
 
     error DeploymentFailed();
 
@@ -62,6 +65,7 @@ contract DeployProtocol is Script {
         deploySkyCompounderStrategyFactory = new DeploySkyCompounderStrategyFactory();
         deployMorphoCompounderStrategyFactory = new DeployMorphoCompounderStrategyFactory();
         deployRegenStakerFactory = new DeployRegenStakerFactory();
+        deployAllocationMechanismFactory = new DeployAllocationMechanismFactory();
     }
 
     function run() public {
@@ -121,6 +125,10 @@ contract DeployProtocol is Script {
         deployRegenStakerFactory.deploy();
         regenStakerFactoryAddress = address(deployRegenStakerFactory.regenStakerFactory());
 
+        // Deploy Allocation Mechanism Factory
+        deployAllocationMechanismFactory.deploy();
+        allocationMechanismFactoryAddress = address(deployAllocationMechanismFactory.allocationMechanismFactory());
+
         // Log deployment addresses
         console2.log("\nDeployment Summary:");
         console2.log("------------------");
@@ -139,6 +147,7 @@ contract DeployProtocol is Script {
         console2.log("Sky Compounder Strategy Factory:          ", skyCompounderStrategyFactoryAddress);
         console2.log("Morpho Compounder Strategy Vault Factory: ", morphoCompounderStrategyFactoryAddress);
         console2.log("Regen Staker Factory:                     ", regenStakerFactoryAddress);
+        console2.log("Allocation Mechanism Factory:             ", allocationMechanismFactoryAddress);
         console2.log("------------------");
         console2.log("Top Hat ID:                ", vm.toString(deployHatsProtocol.topHatId()));
         console2.log("Autonomous Admin Hat ID:   ", vm.toString(deployHatsProtocol.autonomousAdminHatId()));
@@ -201,6 +210,10 @@ contract DeployProtocol is Script {
         vm.writeLine(
             contractAddressFilename,
             string.concat("REGEN_STAKER_FACTORY_ADDRESS=", vm.toString(regenStakerFactoryAddress))
+        );
+        vm.writeLine(
+            contractAddressFilename,
+            string.concat("ALLOCATION_MECHANISM_FACTORY_ADDRESS=", vm.toString(allocationMechanismFactoryAddress))
         );
         vm.writeLine(contractAddressFilename, string.concat("HATS_ADDRESS=", vm.toString(hatsAddress)));
         vm.writeLine(
