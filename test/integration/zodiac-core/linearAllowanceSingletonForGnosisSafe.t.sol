@@ -340,10 +340,7 @@ contract TestLinearAllowanceIntegration is Test {
         vm.prank(address(allowanceExecutor));
         vm.expectRevert(
             abi.encodeWithSelector(
-                ILinearAllowanceSingleton.TransferFailed.selector,
-                address(failingSafe),
-                address(allowanceExecutor),
-                address(token)
+                ILinearAllowanceSingleton.SafeTransactionFailed.selector
             )
         );
         allowanceModule.executeAllowanceTransfer(address(failingSafe), address(token), payable(address(recipient)));
@@ -371,10 +368,7 @@ contract TestLinearAllowanceIntegration is Test {
         vm.prank(address(executor));
         vm.expectRevert(
             abi.encodeWithSelector(
-                ILinearAllowanceSingleton.TransferFailed.selector,
-                address(failingSafe),
-                address(executor),
-                address(0)
+                ILinearAllowanceSingleton.SafeTransactionFailed.selector
             )
         );
         allowanceModule.executeAllowanceTransfer(address(failingSafe), address(0), payable(address(rejector)));
