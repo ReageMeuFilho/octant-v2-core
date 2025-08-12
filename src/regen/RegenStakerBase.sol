@@ -92,6 +92,9 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @notice Error thrown when raising minimum stake amount during active reward
     error CannotRaiseMinimumStakeAmountDuringActiveReward();
 
+    /// @notice Error thrown when attempting to increase max bump tip during active reward
+    error CannotRaiseMaxBumpTipDuringActiveReward();
+
     /// @notice Error thrown for zero amount operations
     error ZeroOperation();
 
@@ -411,6 +414,22 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         sharedState.minimumStakeAmount = _minimumStakeAmount;
     }
 
+    /// @notice Sets the maximum bump tip with governance protection
+    /// @dev TIMING RESTRICTION: During active reward period only decreases are allowed; increases must wait until after rewardEndTime.
+    /// @dev SECURITY: Prevents malicious admin from extracting unclaimed rewards via tip manipulation.
+    /// @dev GOVERNANCE PROTECTION: Aligns with setMinimumStakeAmount protection for consistency.
+    /// @dev Can only be called by admin and not during active reward period
+    /// @param _newMaxBumpTip New maximum bump tip value in wei
+    function setMaxBumpTip(uint256 _newMaxBumpTip) external virtual override {
+        _revertIfNotAdmin();
+        // Allow decreases anytime; increases only after reward period ends
+        require(
+            _newMaxBumpTip <= maxBumpTip || block.timestamp > rewardEndTime,
+            CannotRaiseMaxBumpTipDuringActiveReward()
+        );
+        _setMaxBumpTip(_newMaxBumpTip);
+    }
+
     /// @notice Pauses the contract, disabling all user operations except view functions
     /// @dev EMERGENCY USE: Intended for security incidents or critical maintenance.
     /// @dev SCOPE: Affects stake, withdraw, claim, contribute, and compound operations.
@@ -721,7 +740,6 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     ) internal virtual override whenNotPaused nonReentrant returns (uint256) {
         return super._claimReward(_depositId, deposit, _claimer);
     }
-
 
     /// @notice Override notifyRewardAmount to use custom reward duration
     /// @dev nonReentrant as a belts-and-braces guard against exotic ERC20 callback reentry
