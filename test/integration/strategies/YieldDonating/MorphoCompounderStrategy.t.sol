@@ -271,11 +271,60 @@ contract MorphoCompounderDonatingStrategyTest is Test {
         assertGt(IERC4626(address(strategy)).totalAssets(), totalAssetsBefore, "Total assets should increase");
     }
 
-    /// @notice Test available deposit limit
-    function testAvailableDepositLimit() public view {
+    /// @notice Test available deposit limit without idle assets
+    function testAvailableDepositLimitWithoutIdleAssets() public view {
         uint256 limit = strategy.availableDepositLimit(user);
         uint256 morphoLimit = IERC4626(MORPHO_VAULT).maxDeposit(address(strategy));
-        assertEq(limit, morphoLimit, "Available deposit limit should match Morpho vault limit");
+        uint256 idleBalance = ERC20(USDC).balanceOf(address(strategy));
+        
+        // Since there are no idle assets initially, limit should equal morpho limit
+        assertEq(idleBalance, 0, "Strategy should have no idle assets initially");
+        assertEq(limit, morphoLimit, "Available deposit limit should match Morpho vault limit when no idle assets");
+    }
+
+    /// @notice Test available deposit limit with idle assets (TRST-M-8 fix)
+    function testAvailableDepositLimitWithIdleAssets() public {
+        uint256 idleAmount = 1000e6; // 1,000 USDC idle assets
+        
+        // Airdrop idle assets to strategy to simulate undeployed funds
+        airdrop(ERC20(USDC), address(strategy), idleAmount);
+        
+        // Get the limits
+        uint256 limit = strategy.availableDepositLimit(user);
+        uint256 morphoLimit = IERC4626(MORPHO_VAULT).maxDeposit(address(strategy));
+        uint256 idleBalance = ERC20(USDC).balanceOf(address(strategy));
+        
+        // Verify idle assets are present
+        assertEq(idleBalance, idleAmount, "Strategy should have idle assets");
+        
+        // The available deposit limit should be morpho limit minus idle balance
+        uint256 expectedLimit = morphoLimit > idleAmount ? morphoLimit - idleAmount : 0;
+        assertEq(limit, expectedLimit, "Available deposit limit should account for idle assets");
+        assertLt(limit, morphoLimit, "Available deposit limit should be less than morpho limit when idle assets exist");
+    }
+
+    /// @notice Test available deposit limit edge case where idle assets exceed morpho limit
+    function testAvailableDepositLimitIdleAssetsExceedMorphoLimit() public {
+        uint256 morphoLimit = IERC4626(MORPHO_VAULT).maxDeposit(address(strategy));
+        
+        // Skip test if morpho limit is too high for this test
+        vm.assume(morphoLimit < type(uint256).max / 2);
+        
+        uint256 excessIdleAmount = morphoLimit + 1000e6; // Idle assets exceed morpho limit
+        
+        // Airdrop excess idle assets to strategy
+        airdrop(ERC20(USDC), address(strategy), excessIdleAmount);
+        
+        // Get the limit
+        uint256 limit = strategy.availableDepositLimit(user);
+        uint256 idleBalance = ERC20(USDC).balanceOf(address(strategy));
+        
+        // Verify idle assets are present and exceed morpho limit
+        assertEq(idleBalance, excessIdleAmount, "Strategy should have excess idle assets");
+        assertGt(idleBalance, morphoLimit, "Idle assets should exceed morpho limit");
+        
+        // The available deposit limit should be 0 since idle assets exceed morpho capacity
+        assertEq(limit, 0, "Available deposit limit should be 0 when idle assets exceed morpho limit");
     }
 
     /// @notice Fuzz test emergency withdraw functionality
