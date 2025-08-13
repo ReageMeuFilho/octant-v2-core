@@ -541,10 +541,14 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         require(_amount <= unclaimedAmount, CantAfford(_amount, unclaimedAmount));
 
         uint256 fee = claimFeeParameters.feeAmount;
+        
+        // Early return if user benefit would be zero or negative
+        // Ensures users always receive some value after fees
+        if (_amount <= fee) {
+            return 0;
+        }
+        
         amountContributedToAllocationMechanism = _calculateNetContribution(_amount, fee);
-
-        // Prevent zero-amount contributions after fee deduction
-        require(amountContributedToAllocationMechanism > 0, ZeroOperation());
 
         uint256 scaledAmountConsumed = _amount * SCALE_FACTOR;
         deposit.scaledUnclaimedRewardCheckpoint = deposit.scaledUnclaimedRewardCheckpoint - scaledAmountConsumed;
@@ -618,7 +622,9 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         ClaimFeeParameters memory feeParams = claimFeeParameters;
         uint256 fee = feeParams.feeAmount;
 
-        if (unclaimedAmount < fee) {
+        // Early return if user benefit would be zero or negative
+        // Ensures users always receive some value after fees
+        if (unclaimedAmount <= fee) {
             return 0;
         }
 
@@ -702,6 +708,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     }
 
     // === Overridden Functions ===
+
     /// @inheritdoc Staker
     /// @notice Overrides to prevent staking 0 tokens.
     /// @notice Overrides to prevent staking below the minimum stake amount.
@@ -773,7 +780,9 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
 
     /// @inheritdoc Staker
     /// @notice Overrides to prevent claiming when the contract is paused.
+    /// @notice Override to prevent fee collection when user receives no benefit after fees
     /// @dev Uses reentrancy guard
+    /// @dev Returns 0 without any state changes or transfers if reward <= fee
     /// @param _depositId The deposit identifier
     /// @param deposit The deposit storage
     /// @param _claimer The claimer address
@@ -783,6 +792,17 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         Deposit storage deposit,
         address _claimer
     ) internal virtual override whenNotPaused nonReentrant returns (uint256) {
+        _checkpointGlobalReward();
+        _checkpointReward(deposit);
+
+        uint256 _reward = deposit.scaledUnclaimedRewardCheckpoint / SCALE_FACTOR;
+
+        // Early return if user benefit would be zero or negative
+        // Ensures users always receive some value after fees
+        if (_reward <= claimFeeParameters.feeAmount) {
+            return 0;
+        }
+
         return super._claimReward(_depositId, deposit, _claimer);
     }
 

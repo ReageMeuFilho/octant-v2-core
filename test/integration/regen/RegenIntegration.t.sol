@@ -1920,7 +1920,7 @@ contract RegenIntegrationTest is Test {
         (uint96 balanceBefore, , , , , , ) = compoundRegenStaker.deposits(depositId);
         uint256 feeCollectorBalanceBefore = sameToken.balanceOf(feeCollector);
 
-        if (unclaimedBefore < feeAmount) {
+        if (unclaimedBefore <= feeAmount) {
             vm.prank(user);
             uint256 compoundedAmount = compoundRegenStaker.compoundRewards(depositId);
             assertEq(compoundedAmount, 0);
