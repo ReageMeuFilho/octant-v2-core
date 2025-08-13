@@ -550,10 +550,28 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         
         amountContributedToAllocationMechanism = _calculateNetContribution(_amount, fee);
 
+        // Prevent zero-amount contributions after fee deduction
+        require(amountContributedToAllocationMechanism > 0, ZeroOperation());
+
         uint256 scaledAmountConsumed = _amount * SCALE_FACTOR;
         deposit.scaledUnclaimedRewardCheckpoint = deposit.scaledUnclaimedRewardCheckpoint - scaledAmountConsumed;
 
-        emit RewardClaimed(_depositId, msg.sender, amountContributedToAllocationMechanism, deposit.earningPower);
+        // Defensive earning power update - maintaining consistency with base Staker pattern
+        uint256 _oldEarningPower = deposit.earningPower;
+        uint256 _newEarningPower = earningPowerCalculator.getEarningPower(
+            deposit.balance, deposit.owner, deposit.delegatee
+        );
+        
+        // Update earning power totals before modifying deposit state
+        totalEarningPower = _calculateTotalEarningPower(
+            _oldEarningPower, _newEarningPower, totalEarningPower
+        );
+        depositorTotalEarningPower[deposit.owner] = _calculateTotalEarningPower(
+            _oldEarningPower, _newEarningPower, depositorTotalEarningPower[deposit.owner]
+        );
+        deposit.earningPower = _newEarningPower.toUint96();
+
+        emit RewardClaimed(_depositId, msg.sender, amountContributedToAllocationMechanism, _newEarningPower);
 
         // approve the allocation mechanism to spend the rewards
         SafeERC20.safeIncreaseAllowance(
