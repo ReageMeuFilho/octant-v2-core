@@ -832,4 +832,72 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         super._stakeMore(deposit, _depositId, _amount);
         _revertIfMinimumStakeAmountNotMet(_depositId);
     }
+
+    /// @inheritdoc Staker
+    /// @notice Override to add nonReentrant modifier and fix checks-effects-interactions pattern
+    /// @dev Adds reentrancy protection and corrects state update ordering
+    /// @dev Updates state BEFORE external transfer to prevent reentrancy vulnerabilities
+    /// @param _depositId The deposit identifier to bump earning power for
+    /// @param _tipReceiver The receiver of the reward for updating a deposit's earning power
+    /// @param _requestedTip The amount of tip requested by the third-party
+    function bumpEarningPower(
+        DepositIdentifier _depositId,
+        address _tipReceiver,
+        uint256 _requestedTip
+    ) external virtual override nonReentrant {
+        if (_requestedTip > maxBumpTip) revert Staker__InvalidTip();
+
+        Deposit storage deposit = deposits[_depositId];
+
+        _checkpointGlobalReward();
+        _checkpointReward(deposit);
+
+        uint256 _unclaimedRewards = deposit.scaledUnclaimedRewardCheckpoint / SCALE_FACTOR;
+
+        (uint256 _newEarningPower, bool _isQualifiedForBump) = earningPowerCalculator.getNewEarningPower(
+            deposit.balance,
+            deposit.owner,
+            deposit.delegatee,
+            deposit.earningPower
+        );
+        if (!_isQualifiedForBump || _newEarningPower == deposit.earningPower) {
+            revert Staker__Unqualified(_newEarningPower);
+        }
+
+        if (_newEarningPower > deposit.earningPower && _unclaimedRewards < _requestedTip) {
+            revert Staker__InsufficientUnclaimedRewards();
+        }
+
+        // Note: underflow causes a revert if the requested tip is more than unclaimed rewards
+        if (_newEarningPower < deposit.earningPower && (_unclaimedRewards - _requestedTip) < maxBumpTip) {
+            revert Staker__InsufficientUnclaimedRewards();
+        }
+
+        emit EarningPowerBumped(
+            _depositId,
+            deposit.earningPower,
+            _newEarningPower,
+            msg.sender,
+            _tipReceiver,
+            _requestedTip
+        );
+
+        // Update global earning power & deposit earning power based on this bump
+        totalEarningPower = _calculateTotalEarningPower(deposit.earningPower, _newEarningPower, totalEarningPower);
+        depositorTotalEarningPower[deposit.owner] = _calculateTotalEarningPower(
+            deposit.earningPower,
+            _newEarningPower,
+            depositorTotalEarningPower[deposit.owner]
+        );
+        deposit.earningPower = _newEarningPower.toUint96();
+
+        // CRITICAL: Update state BEFORE external call (checks-effects-interactions pattern)
+        // This prevents reentrancy attacks via malicious reward tokens with callbacks
+        deposit.scaledUnclaimedRewardCheckpoint =
+            deposit.scaledUnclaimedRewardCheckpoint -
+            (_requestedTip * SCALE_FACTOR);
+
+        // External call AFTER all state updates
+        SafeERC20.safeTransfer(REWARD_TOKEN, _tipReceiver, _requestedTip);
+    }
 }
