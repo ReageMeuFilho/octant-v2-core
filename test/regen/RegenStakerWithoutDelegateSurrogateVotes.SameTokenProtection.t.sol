@@ -95,18 +95,18 @@ contract RegenStakerWithoutDelegateSurrogateVotesSameTokenProtectionTest is Test
         token.approve(address(staker), STAKE_AMOUNT);
         staker.stake(STAKE_AMOUNT, user1);
         vm.stopPrank();
-        
+
         // Try to notify as unauthorized user (not notifier)
         // Even with sufficient balance, should fail on auth check first
         token.mint(address(staker), REWARD_AMOUNT); // Contract has sufficient balance
-        
+
         vm.prank(user1); // user1 is not a notifier
         vm.expectRevert(abi.encodeWithSelector(Staker.Staker__Unauthorized.selector, bytes32("not notifier"), user1));
         staker.notifyRewardAmount(REWARD_AMOUNT);
-        
+
         // One auth failure is sufficient to validate access control ordering for readability
     }
-    
+
     /// @notice Test success case: exact balance requirement (covers normal success path too)
     function test_notifyReward_withExactBalance() public {
         // User stakes tokens
@@ -118,11 +118,11 @@ contract RegenStakerWithoutDelegateSurrogateVotesSameTokenProtectionTest is Test
         // Notifier adds EXACT reward amount
         vm.startPrank(notifier);
         token.transfer(address(staker), REWARD_AMOUNT);
-        
+
         // Should succeed - we have exactly stakes + rewards
         staker.notifyRewardAmount(REWARD_AMOUNT);
         vm.stopPrank();
-        
+
         // Verify balance
         assertEq(token.balanceOf(address(staker)), STAKE_AMOUNT + REWARD_AMOUNT);
     }
@@ -138,7 +138,7 @@ contract RegenStakerWithoutDelegateSurrogateVotesSameTokenProtectionTest is Test
         // Notifier tries to notify MORE rewards than available
         vm.startPrank(notifier);
         token.transfer(address(staker), 100e18); // Only transfer 100, but try to notify 500
-        
+
         // Should revert - would need to eat into user deposits
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -191,7 +191,7 @@ contract RegenStakerWithoutDelegateSurrogateVotesSameTokenProtectionTest is Test
             )
         );
         staker.notifyRewardAmount(300e18); // Would need balance >= 1250 + 300 = 1550
-        
+
         // Add enough tokens and notify a valid amount
         token.transfer(address(staker), 300e18);
         staker.notifyRewardAmount(300e18); // Now balance is ~1800, totalStaked ~1250, so this works
@@ -230,7 +230,7 @@ contract RegenStakerWithoutDelegateSurrogateVotesSameTokenProtectionTest is Test
         // Admin intends to notify 1,000 tokens but accidentally types 10,000 (extra zero)
         vm.startPrank(notifier);
         token.transfer(address(staker), 1_000e18); // Only transfer the intended amount
-        
+
         // The typo notification should fail, protecting user deposits
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -240,7 +240,7 @@ contract RegenStakerWithoutDelegateSurrogateVotesSameTokenProtectionTest is Test
             )
         );
         staker.notifyRewardAmount(10_000e18); // Typo: extra zero
-        
+
         // Correct notification works
         staker.notifyRewardAmount(1_000e18);
         vm.stopPrank();
@@ -265,7 +265,7 @@ contract RegenStakerWithoutDelegateSurrogateVotesSameTokenProtectionTest is Test
         // Try to notify rewards
         vm.startPrank(notifier);
         token.transfer(address(staker), actualTransfer);
-        
+
         if (actualTransfer >= rewardAmt) {
             // Should succeed
             staker.notifyRewardAmount(rewardAmt);
