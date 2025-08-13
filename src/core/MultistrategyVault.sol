@@ -496,7 +496,7 @@ contract MultistrategyVault is IMultistrategyVault {
 
     /// REPORTING MANAGEMENT ///
 
-    function processReport(address strategy_) external returns (uint256, uint256) {
+    function processReport(address strategy_) external nonReentrant returns (uint256, uint256) {
         _enforceRole(msg.sender, Roles.REPORTING_MANAGER);
 
         // slither-disable-next-line uninitialized-local
