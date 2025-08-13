@@ -37,7 +37,7 @@ contract RegenSameTokenHandler is Test {
     }
 
     function compound(uint256 depositId) external {
-        vm.warp(block.timestamp + (depositId % 7 + 1) * 1 days);
+        vm.warp(block.timestamp + ((depositId % 7) + 1) * 1 days);
         vm.prank(user);
         staker.compoundRewards(Staker.DepositIdentifier.wrap(depositId % 4));
     }
@@ -57,5 +57,3 @@ contract RegenSameTokenHandler is Test {
         vm.stopPrank();
     }
 }
-
-

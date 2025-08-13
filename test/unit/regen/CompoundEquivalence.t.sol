@@ -7,6 +7,7 @@ import { RegenStakerWithoutDelegateSurrogateVotes } from "src/regen/RegenStakerW
 import { Staker } from "staker/Staker.sol";
 import { RegenEarningPowerCalculator } from "src/regen/RegenEarningPowerCalculator.sol";
 import { IWhitelist } from "src/utils/IWhitelist.sol";
+import { Whitelist } from "src/utils/Whitelist.sol";
 import { MockERC20Permit } from "test/mocks/MockERC20Permit.sol";
 
 contract CompoundEquivalenceTest is Test {
@@ -27,10 +28,12 @@ contract CompoundEquivalenceTest is Test {
     RegenEarningPowerCalculator internal calculator;
     RegenStakerWithoutDelegateSurrogateVotes internal stakerA; // compound path
     RegenStakerWithoutDelegateSurrogateVotes internal stakerB; // claim+stakeMore path
+    Whitelist internal allocationWhitelist;
 
     function setUp() public {
         token = new MockERC20Permit(18);
         calculator = new RegenEarningPowerCalculator(ADMIN, IWhitelist(address(0)));
+        allocationWhitelist = new Whitelist();
 
         stakerA = new RegenStakerWithoutDelegateSurrogateVotes(
             token,
@@ -43,7 +46,7 @@ contract CompoundEquivalenceTest is Test {
             MIN_STAKE,
             IWhitelist(address(0)),
             IWhitelist(address(0)),
-            IWhitelist(address(0))
+            IWhitelist(address(allocationWhitelist))
         );
 
         stakerB = new RegenStakerWithoutDelegateSurrogateVotes(
@@ -57,7 +60,7 @@ contract CompoundEquivalenceTest is Test {
             MIN_STAKE,
             IWhitelist(address(0)),
             IWhitelist(address(0)),
-            IWhitelist(address(0))
+            IWhitelist(address(allocationWhitelist))
         );
 
         // fund user and stakers for rewards
@@ -151,7 +154,7 @@ contract CompoundEquivalenceTest is Test {
             MIN_STAKE,
             IWhitelist(address(0)),
             IWhitelist(address(0)),
-            IWhitelist(address(0))
+            IWhitelist(address(allocationWhitelist))
         );
         RegenStakerWithoutDelegateSurrogateVotes B = new RegenStakerWithoutDelegateSurrogateVotes(
             tkn,
@@ -164,7 +167,7 @@ contract CompoundEquivalenceTest is Test {
             MIN_STAKE,
             IWhitelist(address(0)),
             IWhitelist(address(0)),
-            IWhitelist(address(0))
+            IWhitelist(address(allocationWhitelist))
         );
 
         // fund

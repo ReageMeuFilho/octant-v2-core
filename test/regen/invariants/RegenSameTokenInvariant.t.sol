@@ -55,5 +55,3 @@ contract RegenSameTokenInvariant is StdInvariant, Test {
         }
     }
 }
-
-

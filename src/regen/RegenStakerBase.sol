@@ -218,7 +218,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @param _minimumStakeAmount The min stake amount
     /// @param _stakerWhitelist Staker whitelist
     /// @param _contributionWhitelist Contribution whitelist
-    /// @param _allocationMechanismWhitelist Allocation mechanism whitelist
+    /// @param _allocationMechanismWhitelist Allocation mechanism whitelist (cannot be address(0))
     /// @param _eip712Name The EIP712 domain name
     constructor(
         IERC20 _rewardsToken,
@@ -276,15 +276,42 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
             _rewardDuration >= MIN_REWARD_DURATION && _rewardDuration <= MAX_REWARD_DURATION,
             InvalidRewardDuration(uint256(_rewardDuration))
         );
+        // Align initialization invariants with setters: allocation mechanism whitelist cannot be disabled
+        require(
+            address(_allocationMechanismWhitelist) != address(0),
+            DisablingAllocationMechanismWhitelistNotAllowed()
+        );
+        // Sanity check: Allocation mechanism whitelist must be distinct from other whitelists
+        require(
+            address(_allocationMechanismWhitelist) != address(_stakerWhitelist) &&
+                address(_allocationMechanismWhitelist) != address(_contributionWhitelist),
+            Staker__InvalidAddress()
+        );
 
+        // Emit events first to match setter ordering
+        emit RewardDurationSet(_rewardDuration);
+        emit MinimumStakeAmountSet(_minimumStakeAmount);
+
+        if (address(_stakerWhitelist) == address(0)) {
+            emit StakerWhitelistDisabled();
+        } else {
+            emit StakerWhitelistSet(_stakerWhitelist);
+        }
+
+        if (address(_contributionWhitelist) == address(0)) {
+            emit ContributionWhitelistDisabled();
+        } else {
+            emit ContributionWhitelistSet(_contributionWhitelist);
+        }
+
+        emit AllocationMechanismWhitelistSet(_allocationMechanismWhitelist);
+
+        // Assign to storage after emits for consistency with setters
         sharedState.rewardDuration = _rewardDuration;
         sharedState.minimumStakeAmount = _minimumStakeAmount;
         sharedState.stakerWhitelist = _stakerWhitelist;
         sharedState.contributionWhitelist = _contributionWhitelist;
         sharedState.allocationMechanismWhitelist = _allocationMechanismWhitelist;
-
-        emit RewardDurationSet(_rewardDuration);
-        emit MinimumStakeAmountSet(_minimumStakeAmount);
     }
 
     /// @notice Sets the reward duration for future reward notifications
@@ -351,11 +378,17 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @param _stakerWhitelist New staker whitelist contract (address(0) = no restrictions)
     function setStakerWhitelist(IWhitelist _stakerWhitelist) external {
         require(sharedState.stakerWhitelist != _stakerWhitelist, NoOperation());
+        // Sanity check: staker whitelist must be distinct from allocation mechanism whitelist
+        require(
+            address(_stakerWhitelist) != address(sharedState.allocationMechanismWhitelist),
+            Staker__InvalidAddress()
+        );
         _revertIfNotAdmin();
         if (address(_stakerWhitelist) == address(0)) {
             emit StakerWhitelistDisabled();
+        } else {
+            emit StakerWhitelistSet(_stakerWhitelist);
         }
-        emit StakerWhitelistSet(_stakerWhitelist);
         sharedState.stakerWhitelist = _stakerWhitelist;
     }
 
@@ -367,11 +400,17 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @param _contributionWhitelist New contribution whitelist contract (address(0) = no restrictions)
     function setContributionWhitelist(IWhitelist _contributionWhitelist) external {
         require(sharedState.contributionWhitelist != _contributionWhitelist, NoOperation());
+        // Prevent footgun: ensure distinct from allocation mechanism whitelist
+        require(
+            address(_contributionWhitelist) != address(sharedState.allocationMechanismWhitelist),
+            Staker__InvalidAddress()
+        );
         _revertIfNotAdmin();
         if (address(_contributionWhitelist) == address(0)) {
             emit ContributionWhitelistDisabled();
+        } else {
+            emit ContributionWhitelistSet(_contributionWhitelist);
         }
-        emit ContributionWhitelistSet(_contributionWhitelist);
         sharedState.contributionWhitelist = _contributionWhitelist;
     }
 
@@ -391,6 +430,12 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         require(
             address(_allocationMechanismWhitelist) != address(0),
             DisablingAllocationMechanismWhitelistNotAllowed()
+        );
+        // Prevent footgun: allocation mechanism whitelist must be distinct from other whitelists
+        require(
+            address(_allocationMechanismWhitelist) != address(sharedState.stakerWhitelist) &&
+                address(_allocationMechanismWhitelist) != address(sharedState.contributionWhitelist),
+            Staker__InvalidAddress()
         );
         _revertIfNotAdmin();
         emit AllocationMechanismWhitelistSet(_allocationMechanismWhitelist);

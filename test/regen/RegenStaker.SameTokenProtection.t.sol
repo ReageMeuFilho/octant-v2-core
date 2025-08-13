@@ -79,22 +79,22 @@ contract RegenStakerSameTokenProtectionTest is Test {
 
         // Base Staker requires reward balance >= notified amount
         vm.startPrank(notifier);
-        
+
         // Should revert - base Staker check: no rewards transferred yet
         vm.expectRevert(Staker.Staker__InsufficientRewardBalance.selector);
         staker.notifyRewardAmount(REWARD_AMOUNT);
-        
+
         // Transfer LESS than reward amount - should still fail base check
         token.transfer(address(staker), REWARD_AMOUNT - 1);
         vm.expectRevert(Staker.Staker__InsufficientRewardBalance.selector);
         staker.notifyRewardAmount(REWARD_AMOUNT);
-        
+
         // Transfer exactly reward amount - should succeed
         // Note: Does NOT need totalStaked since stakes are segregated in surrogates
         token.transfer(address(staker), 1); // Add the missing 1 wei to reach REWARD_AMOUNT
         staker.notifyRewardAmount(REWARD_AMOUNT);
         vm.stopPrank();
-        
+
         // This demonstrates that surrogate segregation makes the same-token scenario safe
         // without needing the additional protection that WithoutDelegate variant requires
     }
