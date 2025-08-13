@@ -1278,4 +1278,256 @@ contract SkyCompounderTest is Test {
     // ===== ECONOMIC INVARIANT TESTS =====
 
 
+        uint256 userDeposit = 1000e18;
+        uint256 lossAmount = 300e18;
+        uint256 recoveryProfit = 400e18; // Net profit of 100e18
+
+        // User deposits
+        vm.startPrank(user);
+        vault.deposit(userDeposit, user);
+        vm.stopPrank();
+
+        uint256 userSharesInitial = vault.balanceOf(user);
+        console.log("Initial state:");
+        console.log("  User deposited:", userDeposit);
+        console.log("  User shares:", userSharesInitial);
+        console.log("  Price per share:", vault.pricePerShare());
+
+        // Disable health check
+        vm.startPrank(management);
+        strategy.setDoHealthCheck(false);
+        vm.stopPrank();
+
+        // Create loss
+        uint256 stakingBalance = strategy.balanceOfStake();
+        vm.mockCall(
+            STAKING,
+            abi.encodeWithSelector(ERC20.balanceOf.selector, address(strategy)),
+            abi.encode(stakingBalance - lossAmount)
+        );
+
+        vm.startPrank(keeper);
+        vault.report();
+        vm.stopPrank();
+
+        console.log("After loss:");
+        console.log("  Total assets:", vault.totalAssets());
+        console.log("  Price per share:", vault.pricePerShare());
+
+        // Simulate recovery with profit
+        uint256 currentMockedBalance = stakingBalance - lossAmount;
+        airdrop(ERC20(USDS), STAKING, recoveryProfit);
+
+        vm.mockCall(
+            STAKING,
+            abi.encodeWithSelector(ERC20.balanceOf.selector, address(strategy)),
+            abi.encode(currentMockedBalance + recoveryProfit) // 700 + 400 = 1100
+        );
+
+        vm.startPrank(keeper);
+        vault.report();
+        vm.stopPrank();
+
+        console.log("After recovery:");
+        console.log("  Total assets:", vault.totalAssets());
+        console.log("  Price per share:", vault.pricePerShare());
+        console.log("  Dragon shares:", vault.balanceOf(donationAddress));
+
+        // User withdraws all shares
+        vm.startPrank(user);
+        uint256 withdrawnAmount = vault.redeem(userSharesInitial, user, user);
+        vm.stopPrank();
+
+        console.log("User withdrawal:");
+        console.log("  Amount withdrawn:", withdrawnAmount);
+        console.log("  User shares remaining:", vault.balanceOf(user));
+
+        // Economic invariant: User should recover exactly their original deposit
+        assertEq(withdrawnAmount, userDeposit, "User should recover original principal");
+        assertEq(vault.balanceOf(user), 0, "User should have no shares left");
+
+        // Dragon router should have shares representing the net profit
+        uint256 dragonShares = vault.balanceOf(donationAddress);
+        uint256 netProfit = recoveryProfit - lossAmount; // 100e18
+        assertEq(dragonShares, netProfit, "Dragon router shares should equal net profit");
+    }
+
+    /// @notice Test fairness across multiple users during loss/profit cycles
+    function testEconomicInvariant_MultipleUsers() public {
+        console.log("=== Economic Invariant: Multiple Users Fairness ===");
+
+        // Split into helper function to avoid stack too deep
+        _testMultipleUsersSetup();
+    }
+
+    function _testMultipleUsersSetup() internal {
+        address user2 = address(0x5678);
+        address user3 = address(0x9ABC);
+
+        // Setup deposits
+        airdrop(ERC20(USDS), user, 1000e18);
+        airdrop(ERC20(USDS), user2, 2000e18);
+        airdrop(ERC20(USDS), user3, 3000e18);
+
+        // User 1 deposit
+        vm.startPrank(user);
+        ERC20(USDS).approve(address(strategy), type(uint256).max);
+        vault.deposit(1000e18, user);
+        vm.stopPrank();
+
+        // User 2 deposit
+        vm.startPrank(user2);
+        ERC20(USDS).approve(address(strategy), type(uint256).max);
+        vault.deposit(2000e18, user2);
+        vm.stopPrank();
+
+        // User 3 deposit
+        vm.startPrank(user3);
+        ERC20(USDS).approve(address(strategy), type(uint256).max);
+        vault.deposit(3000e18, user3);
+        vm.stopPrank();
+
+        console.log("Initial deposits complete. Total assets:", vault.totalAssets());
+
+        // Disable health check
+        vm.startPrank(management);
+        strategy.setDoHealthCheck(false);
+        vm.stopPrank();
+
+        // Create 25% loss
+        uint256 stakingBalance = strategy.balanceOfStake();
+        vm.mockCall(
+            STAKING,
+            abi.encodeWithSelector(ERC20.balanceOf.selector, address(strategy)),
+            abi.encode(stakingBalance - 1500e18) // 25% of 6000
+        );
+
+        vm.startPrank(keeper);
+        vault.report();
+        vm.stopPrank();
+
+        console.log("After 25% loss. Total assets:", vault.totalAssets());
+
+        // Recover with profit
+        airdrop(ERC20(USDS), STAKING, 2100e18); // 1500 loss recovery + 600 profit
+        vm.mockCall(
+            STAKING,
+            abi.encodeWithSelector(ERC20.balanceOf.selector, address(strategy)),
+            abi.encode(stakingBalance - 1500e18 + 2100e18)
+        );
+
+        vm.startPrank(keeper);
+        vault.report();
+        vm.stopPrank();
+
+        console.log("After recovery. Total assets:", vault.totalAssets());
+        console.log("Dragon shares:", vault.balanceOf(donationAddress));
+
+        // Test withdrawals
+        _testUserWithdrawals(user, user2, user3);
+    }
+
+    function _testUserWithdrawals(address user1, address user2, address user3) internal {
+        uint256 shares;
+        uint256 withdrawn;
+
+        // User 1 withdrawal
+        shares = vault.balanceOf(user1);
+        vm.prank(user1);
+        withdrawn = vault.redeem(shares, user1, user1);
+        console.log("User1 withdrew:", withdrawn);
+        assertEq(withdrawn, 1000e18, "User1 should recover original deposit");
+
+        // User 2 withdrawal
+        shares = vault.balanceOf(user2);
+        vm.prank(user2);
+        withdrawn = vault.redeem(shares, user2, user2);
+        console.log("User2 withdrew:", withdrawn);
+        assertEq(withdrawn, 2000e18, "User2 should recover original deposit");
+
+        // User 3 withdrawal
+        shares = vault.balanceOf(user3);
+        vm.prank(user3);
+        withdrawn = vault.redeem(shares, user3, user3);
+        console.log("User3 withdrew:", withdrawn);
+        assertEq(withdrawn, 3000e18, "User3 should recover original deposit");
+
+        // Verify dragon router has the net profit
+        assertEq(vault.balanceOf(donationAddress), 600e18, "Dragon router should have net profit shares");
+    }
+
+    /// @notice Test that dust assets are properly reported in totalAssets
+    /// @dev Addresses TRST-L-6: SkyCompounderStrategy should report all assets including dust
+    function testDustAssetsAreProperlyReported() public {
+        uint256 depositAmount = 10000e18; // 10,000 USDS
+        uint256 dustAmount = 50; // 50 wei dust (below ASSET_DUST threshold of 100)
+        
+        // Setup user with USDS
+        airdrop(ERC20(USDS), user, depositAmount);
+        
+        // User deposits into vault
+        vm.startPrank(user);
+        vault.deposit(depositAmount, user);
+        vm.stopPrank();
+        
+        // Verify all assets are staked
+        assertEq(strategy.balanceOfStake(), depositAmount, "All deposited assets should be staked");
+        assertEq(strategy.balanceOfAsset(), 0, "No idle assets initially");
+        
+        // Simulate dust assets remaining in strategy (e.g., from rounding errors)
+        deal(USDS, address(strategy), dustAmount);
+        
+        // Verify dust assets are present
+        assertEq(strategy.balanceOfAsset(), dustAmount, "Dust assets should be present");
+        
+        // Get total assets before report
+        uint256 totalAssetsBefore = vault.totalAssets();
+        
+        // Report to update totalAssets calculation
+        vm.prank(keeper);
+        vault.report();
+        
+        // Get total assets after report
+        uint256 totalAssetsAfter = vault.totalAssets();
+        
+        // Verify that dust assets are included in totalAssets
+        // Total assets should include both staked assets and dust
+        uint256 expectedTotalAssets = strategy.balanceOfStake() + strategy.balanceOfAsset();
+        assertEq(totalAssetsAfter, expectedTotalAssets, "Total assets should include dust assets");
+        
+        // Specifically verify dust is not ignored
+        assertGe(totalAssetsAfter, totalAssetsBefore + dustAmount, "Total assets should increase by at least dust amount");
+        
+        // Verify the fix: dust assets are included even though below ASSET_DUST threshold
+        assertTrue(strategy.balanceOfAsset() < 100, "Dust amount should be below ASSET_DUST threshold");
+        assertTrue(totalAssetsAfter > strategy.balanceOfStake(), "Total assets should be greater than just staked amount");
+    }
+
+    /// @notice Test edge case where only dust assets exist in strategy
+    function testOnlyDustAssetsReported() public {
+        uint256 dustAmount = 99; // Just below ASSET_DUST threshold
+        
+        // Give strategy only dust assets, no staking
+        deal(USDS, address(strategy), dustAmount);
+        
+        // Verify only dust assets exist
+        assertEq(strategy.balanceOfAsset(), dustAmount, "Only dust assets should exist");
+        assertEq(strategy.balanceOfStake(), 0, "No staked assets should exist");
+        
+        // Disable health check to allow small-scale operation
+        vm.prank(management);
+        strategy.setDoHealthCheck(false);
+        
+        // Report to calculate totalAssets
+        vm.prank(keeper);
+        (uint256 profit, uint256 loss) = vault.report();
+        
+        // Verify dust assets are properly reported
+        uint256 totalAssets = vault.totalAssets();
+        assertEq(totalAssets, dustAmount, "Total assets should equal dust amount");
+        
+        // The profit will be equal to dust amount since this is a gain from 0 baseline
+        assertEq(profit, dustAmount, "Profit should equal dust amount as it's a gain from 0");
+        assertEq(loss, 0, "No loss should be reported");
+    }
 }
