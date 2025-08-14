@@ -27,8 +27,8 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
 
     /// @dev Storage for yield skimming strategy
     struct YieldSkimmingStorage {
-        uint256 lastRateRay; // Rate from last report (for calculating underlying value changes)
-        uint256 recoveryRateRay; // Rate at which users would break even (used for share minting during recovery)
+        uint256 totalValueDebt; // Track ETH value owed to users
+        uint256 dragonValueDebt; // ETH value allocated to dragon
     }
 
     // exchange rate storage slot
@@ -42,20 +42,138 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     event DonationBurned(address indexed dragonRouter, uint256 amount, uint256 exchangeRate);
 
     /**
+     * @dev Modifier to protect deposits when strategy is in loss state
+     * Ensures dragon buffer is sufficient to cover any current losses
+     */
+    modifier depositProtection() {
+        YieldSkimmingStorage storage YS = _strategyYieldSkimmingStorage();
+        StrategyData storage S = _strategyStorage();
+
+        uint256 currentRate = _currentRateRay();
+        uint256 totalAssets = S.totalAssets;
+        uint256 currentValue = totalAssets.mulDiv(currentRate, WadRayMath.RAY);
+        uint256 totalOwedValue = YS.totalValueDebt + YS.dragonValueDebt;
+
+        if (currentValue < totalOwedValue) {
+            // Loss state - check if dragon buffer sufficient
+            uint256 valueLoss = totalOwedValue - currentValue;
+            require(YS.dragonValueDebt >= valueLoss, "Insufficient dragon buffer for deposits");
+        }
+        _;
+    }
+
+    /**
+     * @notice Deposit assets into the strategy with value debt tracking
+     * @dev Implements deposit protection and tracks ETH value debt
+     * @param assets The amount of assets to deposit
+     * @param receiver The address to receive the shares
+     * @return shares The amount of shares minted (1 share = 1 ETH value)
+     */
+    function deposit(
+        uint256 assets,
+        address receiver
+    ) external override nonReentrant depositProtection returns (uint256 shares) {
+        StrategyData storage S = _strategyStorage();
+        YieldSkimmingStorage storage YS = _strategyYieldSkimmingStorage();
+
+        // Deposit full balance if using max uint.
+        if (assets == type(uint256).max) {
+            assets = S.asset.balanceOf(msg.sender);
+        }
+
+        // Checking max deposit will also check if shutdown.
+        require(assets <= _maxDeposit(S, receiver), "ERC4626: deposit more than max");
+
+        uint256 currentRate = _currentRateRay();
+        
+        // Issue shares based on value (1 share = 1 ETH value)
+        shares = assets.mulDiv(currentRate, WadRayMath.RAY);
+        require(shares != 0, "ZERO_SHARES");
+
+        // Update value debt
+        YS.totalValueDebt += shares;
+
+        // Call internal deposit to handle transfers and minting
+        _deposit(S, receiver, assets, shares);
+
+        return shares;
+    }
+
+    /**
+     * @notice Redeem shares from the strategy with value debt tracking
+     * @dev Shares represent ETH value (1 share = 1 ETH value)
+     * @param shares The amount of shares to redeem
+     * @param receiver The address to receive the assets
+     * @param owner The address whose shares are being redeemed
+     * @return assets The amount of assets returned
+     */
+    function redeem(
+        uint256 shares,
+        address receiver,
+        address owner
+    ) external override nonReentrant returns (uint256 assets) {
+        StrategyData storage S = _strategyStorage();
+        YieldSkimmingStorage storage YS = _strategyYieldSkimmingStorage();
+
+        // Check share ownership
+        require(_balanceOf(S, owner) >= shares, "ERC4626: redeem more than max");
+
+        // If msg.sender is not owner, check allowance
+        if (msg.sender != owner) {
+            _spendAllowance(S, owner, msg.sender, shares);
+        }
+
+        uint256 currentRate = _currentRateRay();
+        uint256 totalShares = _totalSupply(S);
+
+        // Shares represent ETH value
+        uint256 valueToReturn = shares; // 1 share = 1 ETH value
+
+        // Convert value to assets at current rate
+        assets = valueToReturn.mulDiv(WadRayMath.RAY, currentRate);
+
+        // Check available assets
+        uint256 availableAssets = S.totalAssets;
+        if (assets > availableAssets) {
+            // Proportional distribution if insufficient
+            assets = shares.mulDiv(availableAssets, totalShares);
+            valueToReturn = assets.mulDiv(currentRate, WadRayMath.RAY);
+        }
+
+        // Update value debt
+        if (owner == S.dragonRouter) {
+            YS.dragonValueDebt = YS.dragonValueDebt > valueToReturn ? YS.dragonValueDebt - valueToReturn : 0;
+        } else {
+            YS.totalValueDebt = YS.totalValueDebt > valueToReturn ? YS.totalValueDebt - valueToReturn : 0;
+        }
+
+        // Burn shares
+        _burn(S, owner, shares);
+
+        // Update total assets
+        S.totalAssets -= assets;
+
+        // Withdraw from strategy and transfer
+        IBaseStrategy(address(this)).freeFunds(assets);
+        S.asset.safeTransfer(receiver, assets);
+
+        emit Withdraw(msg.sender, receiver, owner, assets, shares);
+
+        return assets;
+    }
+
+    /**
      * @inheritdoc TokenizedStrategy
-     * @dev Overrides report to handle yield appreciation and loss recovery in yield-bearing tokens.
+     * @dev Overrides report to handle yield appreciation and loss recovery using value debt approach.
      *
      * Key behaviors:
-     * 1. **Exchange Rate Tracking**: Compares current vs. previous exchange rates to detect yield changes
-     * 2. **Loss Handling**: When exchange rates drop, tracks losses in `S.lossAmount` and attempts
-     *    to burn dragonRouter shares for protection
-     * 3. **Recovery Logic**: During recovery from losses, only mints shares for excess profit beyond
-     *    full loss recovery to ensure depositors can withdraw their initial underlying value
-     * 4. **Yield Capture**: For regular profits or excess recovery profits, mints shares to dragonRouter
-     * 5. **Rate Persistence**: Updates `lastRateRay` for future comparisons
+     * 1. **Value Debt Tracking**: Compares current total value vs owed value (totalValueDebt + dragonValueDebt)
+     * 2. **Profit Capture**: When current value exceeds owed value, mints shares to dragonRouter
+     * 3. **Loss Protection**: When current value is less than owed value, burns dragon shares
+     * 4. **User Protection**: If dragon buffer insufficient, reduces user value debt proportionally
      *
-     * @return profit The profit in assets (converted from underlying appreciation)
-     * @return loss The loss in assets (converted from underlying depreciation)
+     * @return profit The profit in assets
+     * @return loss The loss in assets
      */
     function report()
         public
@@ -67,12 +185,6 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         StrategyData storage S = super._strategyStorage();
         YieldSkimmingStorage storage YS = _strategyYieldSkimmingStorage();
 
-        // Cache frequently used values
-        uint256 rateNow = _currentRateRay();
-        uint256 lastRateRay = YS.lastRateRay;
-
-        uint256 previousValue = S.totalAssets.mulDiv(lastRateRay, WadRayMath.RAY);
-
         // Update total assets from harvest
         uint256 currentTotalAssets = IBaseStrategy(address(this)).harvestAndReport();
         uint256 totalAssetsBalance = S.asset.balanceOf(address(this));
@@ -80,129 +192,49 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
             S.totalAssets = totalAssetsBalance;
         }
 
-        uint256 currentValue = S.totalAssets.mulDiv(rateNow, WadRayMath.RAY); // asset → underlying value
+        uint256 currentRate = _currentRateRay();
+        uint256 totalAssets = S.totalAssets;
+        uint256 currentValue = totalAssets.mulDiv(currentRate, WadRayMath.RAY);
+        uint256 totalOwedValue = YS.totalValueDebt + YS.dragonValueDebt;
 
-        // Handle total loss scenario (rate = 0)
-        if (rateNow == 0) {
-            loss = S.totalAssets;
-            uint256 burnable = _handleDragonLossProtection(S, loss, 0);
-            S.lossAmount += loss - burnable;
-            _finalizeReport(S, 0);
-            emit Reported(0, loss);
-            return (0, loss);
-        }
+        if (currentValue > totalOwedValue) {
+            // Yield captured!
+            uint256 profitValue = currentValue - totalOwedValue;
+            uint256 profitShares = profitValue; // 1 share = 1 ETH value
 
-        // Calculate profit/loss based on underlying value changes
-        if (currentValue > previousValue) {
-            uint256 underlyingGain = currentValue - previousValue;
-            profit = (underlyingGain * WadRayMath.RAY) / rateNow;
+            // Convert profit value to assets for reporting
+            profit = profitValue.mulDiv(WadRayMath.RAY, currentRate);
 
-            if (S.lossAmount > 0) {
-                // Handle loss recovery scenario
-                uint256 lossInUnderlying = (S.lossAmount * lastRateRay) / WadRayMath.RAY;
+            _mint(S, S.dragonRouter, profitShares);
+            YS.dragonValueDebt += profitValue;
 
-                if (underlyingGain > lossInUnderlying) {
-                    // Full recovery + excess profit
-                    S.lossAmount = 0;
-                    uint256 excessUnderlying = underlyingGain - lossInUnderlying;
-                    if (excessUnderlying > 0) {
-                        _handleDonationMinting(S, rateNow);
-                        // Update recovery rate now that we're fully recovered and have excess profit
-                        YS.recoveryRateRay = rateNow;
-                    }
-                    profit = excessUnderlying.mulDiv(WadRayMath.RAY, rateNow);
-                } else {
-                    // Partial recovery
-                    S.lossAmount = ((lossInUnderlying - underlyingGain) * WadRayMath.RAY) / rateNow;
-                    profit = 0;
-                }
-            } else if (profit > 0) {
-                // Regular profit case - no losses, so mint shares and update recovery rate
-                _handleDonationMinting(S, rateNow);
-                YS.recoveryRateRay = rateNow;
+            emit DonationMinted(S.dragonRouter, profitShares, currentRate.rayToWad());
+        } else if (currentValue < totalOwedValue && YS.dragonValueDebt > 0) {
+            // Loss - burn dragon shares to protect users
+            uint256 lossValue = totalOwedValue - currentValue;
+            uint256 dragonBurn = Math.min(lossValue, YS.dragonValueDebt);
+
+            // Convert loss value to assets for reporting
+            loss = lossValue.mulDiv(WadRayMath.RAY, currentRate);
+
+            _burn(S, S.dragonRouter, dragonBurn);
+            YS.dragonValueDebt -= dragonBurn;
+
+            emit DonationBurned(S.dragonRouter, dragonBurn, currentRate.rayToWad());
+
+            // If loss exceeds dragon buffer, reduce user value debt
+            if (lossValue > dragonBurn) {
+                uint256 userLoss = lossValue - dragonBurn;
+                YS.totalValueDebt = YS.totalValueDebt > userLoss ? YS.totalValueDebt - userLoss : 0;
             }
-        } else if (currentValue < previousValue) {
-            // Negative yield (slashing event)
-            uint256 underlyingLoss = previousValue - currentValue;
-            loss = (underlyingLoss * WadRayMath.RAY) / rateNow;
-
-            uint256 burnable = _handleDragonLossProtection(S, loss, rateNow.rayToWad());
-
-            // Update total loss amount
-            uint256 oldLossInUnderlying = (S.lossAmount * lastRateRay) / WadRayMath.RAY;
-            uint256 adjustedOldLoss = (oldLossInUnderlying * WadRayMath.RAY) / rateNow;
-            S.lossAmount = adjustedOldLoss + (loss - burnable);
         }
 
-        _finalizeReport(S, rateNow);
-        emit Reported(profit, loss);
-        return (profit, loss);
-    }
-
-    /**
-     * @dev Get the last reported exchange rate
-     * @return The last exchange rate in RAY format
-     */
-    function getLastRateRay() external view returns (uint256) {
-        return _strategyYieldSkimmingStorage().lastRateRay;
-    }
-
-    /**
-     * @dev Get the current exchange rate
-     * @return The current exchange rate in RAY format
-     */
-    function getCurrentRateRay() external view returns (uint256) {
-        return _currentRateRay();
-    }
-
-    /**
-     * @dev Handles burning dragon router shares for loss protection
-     * @param S The strategy data storage
-     * @param lossAmount The amount of loss in assets
-     * @param exchangeRate The current exchange rate (for events)
-     * @return burnable The amount that was actually burned
-     */
-    function _handleDragonLossProtection(
-        StrategyData storage S,
-        uint256 lossAmount,
-        uint256 exchangeRate
-    ) internal returns (uint256 burnable) {
-        uint256 dragonRouterAssets = _convertToAssets(S, _balanceOf(S, S.dragonRouter), Math.Rounding.Floor);
-
-        burnable = Math.min(lossAmount, dragonRouterAssets);
-
-        if (burnable > 0) {
-            // do not use _convertToSharesWithLoss here (not accounting for lossAmount)
-            uint256 sharesToBurn = super._convertToShares(S, burnable, Math.Rounding.Floor);
-            _burn(S, S.dragonRouter, sharesToBurn);
-            emit DonationBurned(S.dragonRouter, burnable, exchangeRate);
-        }
-
-        return burnable;
-    }
-
-    /**
-     * @dev Handles minting shares to dragon router for profit capture
-     * @param S The strategy data storage
-     * @param currentRate The current exchange rate
-     */
-    function _handleDonationMinting(StrategyData storage S, uint256 currentRate) internal {
-        uint256 tunedM = _calculateTunedM(_totalSupply(S), S.totalAssets, currentRate);
-        if (tunedM > 0) {
-            _mint(S, S.dragonRouter, tunedM);
-            emit DonationMinted(S.dragonRouter, tunedM, currentRate.rayToWad());
-        }
-    }
-
-    /**
-     * @dev Finalizes the report by updating timestamps and rates
-     * @param S The strategy data storage
-     * @param rate The exchange rate to store
-     */
-    function _finalizeReport(StrategyData storage S, uint256 rate) internal {
+        // Update last report timestamp
         S.lastReport = uint96(block.timestamp);
-        _strategyYieldSkimmingStorage().lastRateRay = rate;
-        emit Harvest(msg.sender, rate.rayToWad());
+        emit Harvest(msg.sender, currentRate.rayToWad());
+        emit Reported(profit, loss);
+
+        return (profit, loss);
     }
 
     /**
@@ -211,23 +243,8 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
      * @param receiver The address that will receive the minted shares
      * @param assets The amount of assets being deposited
      * @param shares The amount of shares to mint
-     *
-     * @notice Key differences from TokenizedStrategy._deposit:
-     * **Rate Initialization**: On first deposit, initializes both lastRateRay and recoveryRateRay
-     *    to establish baseline exchange rates for future yield calculations
-     * The initialization on first deposit is crucial for the yield skimming mechanism
-     * as it establishes the baseline from which appreciation is measured.
      */
     function _deposit(StrategyData storage S, address receiver, uint256 assets, uint256 shares) internal override {
-        YieldSkimmingStorage storage YS = _strategyYieldSkimmingStorage();
-
-        // // tracking the last rate ray for the first deposit
-        if (YS.recoveryRateRay == 0) {
-            uint256 currentRate = _currentRateRay();
-            YS.lastRateRay = currentRate;
-            YS.recoveryRateRay = currentRate;
-        }
-
         // Cache storage variables used more than once.
         ERC20 _asset = S.asset;
 
@@ -243,44 +260,81 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         // mint shares
         _mint(S, receiver, shares);
 
-        // Add minted shares to principal
-
         emit Deposit(msg.sender, receiver, assets, shares);
     }
 
     /**
-     * @dev Converts assets to shares, accounting for any unrealized losses
-     * @param S The strategy data storage
+     * @notice Withdraw assets from the strategy
+     * @dev Converts assets to shares and calls redeem
+     * @param assets The amount of assets to withdraw
+     * @param receiver The address to receive the assets
+     * @param owner The address whose shares are being redeemed
+     * @return shares The amount of shares burned
+     */
+    function withdraw(uint256 assets, address receiver, address owner) external override returns (uint256 shares) {
+        uint256 currentRate = _currentRateRay();
+        shares = assets.mulDiv(currentRate, WadRayMath.RAY, Math.Rounding.Ceil);
+
+        uint256 actualAssets = this.redeem(shares, receiver, owner);
+        require(actualAssets >= assets, "Insufficient assets");
+
+        return shares;
+    }
+
+    /**
+     * @dev Converts assets to shares using value debt approach
      * @param assets The amount of assets to convert
      * @param rounding The rounding mode for division
-     * @return The amount of shares
-     *
-     * @notice This override implements loss socialization for new depositors:
-     *
-     * **Loss Socialization Mechanism:**
-     * When the strategy has unrealized losses (S.lossAmount > 0), new depositors
-     * receive fewer shares for their assets. This ensures they share in the existing
-     * losses proportionally.
-     *
-     * **Example:**
-     * - Strategy has 100 assets, 100 shares, and 20 loss (slashing event)
-     * - Without loss accounting: New deposit of 100 assets = 100 shares (unfair to existing holders)
-     * - With loss accounting: New deposit of 100 assets = 83.33 shares
-     * - Formula: shares = assets * totalSupply / (totalAssets + lossAmount)
-     *
-     * **Recovery Benefit:**
-     * When the strategy recovers (underlying appreciates), all shareholders benefit
-     * proportionally. The depositor who entered during loss will see their shares
-     * appreciate back to their original value as losses are recovered.
-     *
-     * This mechanism ensures fair treatment of all depositors regardless of entry timing.
+     * @return The amount of shares (1 share = 1 ETH value)
      */
     function _convertToShares(
-        StrategyData storage S,
+        StrategyData storage,
         uint256 assets,
         Math.Rounding rounding
     ) internal view virtual override returns (uint256) {
-        return _convertToSharesWithLoss(S, assets, rounding);
+        uint256 currentRate = _currentRateRay();
+        return assets.mulDiv(currentRate, WadRayMath.RAY, rounding);
+    }
+
+    /**
+     * @dev Converts shares to assets using value debt approach
+     * @param shares The amount of shares to convert
+     * @param rounding The rounding mode for division
+     * @return The amount of assets
+     */
+    function _convertToAssets(
+        StrategyData storage,
+        uint256 shares,
+        Math.Rounding rounding
+    ) internal view virtual override returns (uint256) {
+        uint256 currentRate = _currentRateRay();
+        // shares represent ETH value, convert to assets
+        return shares.mulDiv(WadRayMath.RAY, currentRate, rounding);
+    }
+
+    /**
+     * @notice Get the total ETH value debt owed to users
+     * @return The total value debt
+     */
+    function getTotalValueDebt() external view returns (uint256) {
+        return _strategyYieldSkimmingStorage().totalValueDebt;
+    }
+
+    /**
+     * @notice Get the ETH value debt allocated to dragon router
+     * @return The dragon value debt
+     */
+    function getDragonValueDebt() external view returns (uint256) {
+        return _strategyYieldSkimmingStorage().dragonValueDebt;
+    }
+
+    /**
+     * @notice Get the total owed value (user debt + dragon debt)
+     * @return The total owed value
+     */
+    function getTotalOwedValue() external view returns (uint256) {
+        YieldSkimmingStorage storage YS = _strategyYieldSkimmingStorage();
+        return YS.totalValueDebt + YS.dragonValueDebt;
     }
 
     /**
@@ -299,53 +353,6 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         } else {
             return exchangeRate / 10 ** (exchangeRateDecimals - 27);
         }
-    }
-
-    /**
-     * @dev Calculates the amount of shares to mint to dragonRouter for yield capture
-     * @param totalSupplyAmount The current total supply of shares
-     * @param totalAssetsAmount The current total assets held by the strategy
-     * @param currentRate The current exchange rate in RAY format (1e27)
-     * @return The amount of shares to mint to dragonRouter
-     *
-     * @notice This function implements the yield skimming mechanism by minting new shares
-     * when the underlying asset appreciates. It handles two scenarios:
-     *
-     * 1. **Rate Appreciation**: When the current exchange rate exceeds the recovery rate,
-     *    indicating yield generation beyond the break-even point. The function mints shares
-     *    proportional to the rate difference to capture this yield.
-     *
-     * 2. **Direct Asset Increases**: When assets increase without rate changes (e.g., airdrops),
-     *    the function mints shares to maintain the price per share at the current rate.
-     *
-     * The recovery rate serves as a baseline - no shares are minted until depositors would
-     * be whole again (able to withdraw their initial underlying value).
-     */
-    function _calculateTunedM(
-        uint256 totalSupplyAmount,
-        uint256 totalAssetsAmount,
-        uint256 currentRate
-    ) internal view returns (uint256) {
-        if (totalSupplyAmount == 0) return 0;
-
-        YieldSkimmingStorage storage S = _strategyYieldSkimmingStorage();
-        uint256 recoveryRate = S.recoveryRateRay;
-
-        // Only mint shares if current rate exceeds the recovery rate (break-even point)
-        if (currentRate > recoveryRate && recoveryRate > 0) {
-            // Calculate how many shares we need to mint for appreciation beyond recovery
-            // M = totalSupply * (currentRate - recoveryRate) / recoveryRate
-            uint256 rateDifference = currentRate - recoveryRate;
-            return totalSupplyAmount.mulDiv(rateDifference, recoveryRate);
-        }
-
-        // Second, handle direct asset increases (airdrops) when rate unchanged
-        // To maintain PPS = currentRate, we need totalAssets * currentRate = totalSupply
-        uint256 expectedSupply = totalAssetsAmount.mulDiv(currentRate, WadRayMath.RAY);
-        if (expectedSupply > totalSupplyAmount) {
-            return expectedSupply - totalSupplyAmount;
-        }
-        return 0;
     }
 
     function _strategyYieldSkimmingStorage() internal pure returns (YieldSkimmingStorage storage S) {
