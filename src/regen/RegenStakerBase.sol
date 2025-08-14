@@ -358,6 +358,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
 
         if (scaledRewardRate < SCALE_FACTOR) revert Staker__InvalidRewardRate();
 
+        // @dev KNOWN ISSUE: Unclaimed rewards not included in balance check
         // This check cannot _guarantee_ sufficient rewards have been transferred to the contract,
         // because it cannot isolate the unclaimed rewards owed to stakers left in the balance. While
         // this check is useful for preventing degenerate cases, it is not sufficient. Therefore, it is
