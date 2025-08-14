@@ -231,7 +231,6 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         // Cache storage variables used more than once.
         ERC20 _asset = S.asset;
 
-        // Need to transfer before minting or ERC777s could reenter.
         _asset.safeTransferFrom(msg.sender, address(this), assets);
 
         // We can deploy the full loose balance currently held.
