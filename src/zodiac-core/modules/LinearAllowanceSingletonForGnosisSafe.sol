@@ -230,14 +230,8 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
 
     function _calculateCurrentAllowance(LinearAllowance memory a) internal view returns (LinearAllowance memory) {
         uint256 newAccrued = _calculateNewAccrued(a);
-
-        if (a.lastBookedAtInSeconds == 0) {
-            a.lastBookedAtInSeconds = block.timestamp.toUint64();
-        } else if (newAccrued > 0) {
-            a.totalUnspent += newAccrued;
-            a.lastBookedAtInSeconds = block.timestamp.toUint64();
-        }
-
+        a.totalUnspent += newAccrued;
+        a.lastBookedAtInSeconds = block.timestamp.toUint64();
         return a;
     }
 
