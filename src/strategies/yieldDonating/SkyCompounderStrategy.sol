@@ -64,8 +64,6 @@ contract SkyCompounderStrategy is BaseHealthCheck, UniswapV3Swapper, ISkyCompoun
         require(IStaking(_staking).paused() == false, "paused");
         require(USDS == IStaking(_staking).stakingToken(), "!stakingToken");
         rewardsToken = IStaking(_staking).rewardsToken();
-        ERC20(USDS).forceApprove(_staking, type(uint256).max);
-        ERC20(rewardsToken).forceApprove(UNIV2ROUTER, type(uint256).max);
         staking = _staking;
         base = USDS;
         minAmountToSell = 50e18; // Set the min amount for the swapper to sell
@@ -182,6 +180,7 @@ contract SkyCompounderStrategy is BaseHealthCheck, UniswapV3Swapper, ISkyCompoun
     }
 
     function _deployFunds(uint256 _amount) internal override {
+        _checkAllowance(staking, address(asset), _amount);
         IStaking(staking).stake(_amount, referral);
     }
 
@@ -219,6 +218,7 @@ contract SkyCompounderStrategy is BaseHealthCheck, UniswapV3Swapper, ISkyCompoun
 
     function _uniV2swapFrom(address _from, address _to, uint256 _amountIn, uint256 _minAmountOut) internal {
         if (_amountIn >= minAmountToSell) {
+            _checkAllowance(UNIV2ROUTER, _from, _amountIn);
             IUniswapV2Router02(UNIV2ROUTER).swapExactTokensForTokens(
                 _amountIn,
                 _minAmountOut,
