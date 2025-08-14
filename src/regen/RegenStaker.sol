@@ -95,6 +95,20 @@ contract RegenStaker is RegenStakerBase {
         return _surrogates[_delegatee];
     }
 
+    /// @notice Predicts the address of a surrogate that would be deployed for a given delegatee
+    /// @param _delegatee The address that will receive delegated voting power
+    /// @return The predicted address of the surrogate contract
+    /// @dev EIP-1014 (CREATE2): last 20 bytes of keccak256(0xff ++ deployer ++ salt ++ keccak256(init_code))
+    function predictSurrogateAddress(address _delegatee) public view returns (address) {
+        bytes32 salt = keccak256(abi.encodePacked(_delegatee));
+        bytes32 bytecodeHash = keccak256(
+            abi.encodePacked(type(DelegationSurrogateVotes).creationCode, abi.encode(VOTING_TOKEN, _delegatee))
+        );
+
+        // EIP-1014: 0xff domain separator
+        return address(uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), address(this), salt, bytecodeHash)))));
+    }
+
     /// @inheritdoc Staker
     /// @dev GAS WARNING: First use of a new delegatee deploys a DelegationSurrogateVotes contract
     ///      costing ~250k-350k gas. Subsequent operations with the same delegatee reuse existing surrogate.
@@ -102,7 +116,11 @@ contract RegenStaker is RegenStakerBase {
     function _fetchOrDeploySurrogate(address _delegatee) internal override returns (DelegationSurrogate _surrogate) {
         _surrogate = _surrogates[_delegatee];
         if (address(_surrogate) == address(0)) {
-            _surrogate = new DelegationSurrogateVotes(VOTING_TOKEN, _delegatee);
+            _surrogate = new DelegationSurrogateVotes{ salt: keccak256(abi.encodePacked(_delegatee)) }(
+                VOTING_TOKEN,
+                _delegatee
+            );
+
             _surrogates[_delegatee] = _surrogate;
         }
     }
