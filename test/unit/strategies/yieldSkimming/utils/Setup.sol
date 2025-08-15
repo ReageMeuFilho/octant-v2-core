@@ -96,7 +96,7 @@ contract Setup is Test {
     }
 
     function setUpStrategy() public returns (address) {
-        // we save the mock base strategy as a IMockStrategy to give it the needed interface
+        // Create a mock strategy that works with yield skimming tests
         IMockStrategy _strategy = IMockStrategy(
             address(
                 new MockStrategySkimming(
@@ -191,7 +191,8 @@ contract Setup is Test {
 
         vm.startPrank(_user);
 
-        strategy.safeDeposit(_amount, _user, 0); // no min shares out
+        // Use the proper deposit method that calls YieldSkimmingTokenizedStrategy.deposit()
+        _strategy.deposit(_amount, _user);
 
         vm.stopPrank();
     }

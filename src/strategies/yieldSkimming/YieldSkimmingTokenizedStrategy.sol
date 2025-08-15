@@ -147,8 +147,12 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         // Calculate actual value returned for debt tracking (before redemption)
         uint256 valueToReturn = shares; // 1 share = 1 ETH value (regardless of actual assets received)
 
-        // Use super.redeem for standard ERC4626 mechanics (allowance, conversion, transfer, etc.)
-        assets = super.redeem(shares, receiver, owner, MAX_BPS);
+        // Validate inputs and check limits (replaces super.redeem validation)
+        require(shares <= _maxRedeem(S, owner), "ERC4626: redeem more than max");
+        require((assets = _convertToAssets(S, shares, Math.Rounding.Floor)) != 0, "ZERO_ASSETS");
+
+        // Execute withdrawal logic (replaces super.redeem call)
+        assets = _performWithdrawal(S, receiver, owner, assets, shares, MAX_BPS);
 
         // Update value debt after successful redemption (only for users)
         if (owner != S.dragonRouter) {
@@ -160,7 +164,6 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         } else {
             YS.dragonValueDebt = YS.dragonValueDebt > valueToReturn ? YS.dragonValueDebt - valueToReturn : 0;
         }
-        // Dragon withdrawals don't affect user debt tracking
 
         return assets;
     }
@@ -186,27 +189,28 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         // Dragon cannot withdraw during insolvency - must protect users
         _requireDragonSolvency(owner);
 
-        // Convert assets to shares using solvency-aware logic
-        shares = _convertToShares(S, assets, Math.Rounding.Ceil);
+        // Validate inputs and check limits (replaces super.withdraw validation)
+        require(assets <= _maxWithdraw(S, owner), "ERC4626: withdraw more than max");
+        require((shares = _convertToShares(S, assets, Math.Rounding.Ceil)) != 0, "ZERO_SHARES");
 
         // Calculate actual value returned for debt tracking (before withdrawal)
         uint256 valueToReturn = shares; // 1 share = 1 ETH value
 
-        // Use super.withdraw for standard ERC4626 mechanics
-        uint256 actualShares = super.withdraw(assets, receiver, owner, maxLoss);
+        // Execute withdrawal logic (replaces super.withdraw call)
+        _performWithdrawal(S, receiver, owner, assets, shares, maxLoss);
 
         // Update value debt after successful withdrawal (only for users)
         if (owner != S.dragonRouter) {
             YS.totalValueDebt = YS.totalValueDebt > valueToReturn ? YS.totalValueDebt - valueToReturn : 0;
             // if actual shares is the total shares, then we can reset the total value debt to 0
-            if (actualShares == _totalSupply(S)) {
+            if (shares == _totalSupply(S)) {
                 YS.totalValueDebt = 0;
             }
         } else {
             YS.dragonValueDebt = YS.dragonValueDebt > valueToReturn ? YS.dragonValueDebt - valueToReturn : 0;
         }
 
-        return actualShares;
+        return shares;
     }
 
     /**
@@ -328,18 +332,26 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
             // update the dragon value debt
             YS.dragonValueDebt += profitValue;
 
+            // Update last reported rate after profit to track high-water mark
+            YS.lastReportedRate = currentRate;
+
             emit DonationMinted(S.dragonRouter, profitShares, currentRate.rayToWad());
         } else if (currentValue < YS.totalValueDebt + YS.dragonValueDebt && currentRate < YS.lastReportedRate) {
             // Loss - burn dragon shares first
             uint256 lossValue = YS.totalValueDebt + YS.dragonValueDebt - currentValue;
             uint256 dragonBalance = _balanceOf(S, S.dragonRouter);
 
+            // Report the total loss in assets (gross loss before dragon protection)
+            // Handle division by zero case when currentRate is 0
+            if (currentRate > 0) {
+                loss = lossValue.mulDiv(WadRayMath.RAY, currentRate);
+            } else {
+                // If rate is 0, total loss is all assets
+                loss = S.totalAssets;
+            }
+
             if (dragonBalance > 0) {
                 uint256 dragonBurn = Math.min(lossValue, dragonBalance);
-
-                // Convert loss value to assets for reporting
-                loss = lossValue.mulDiv(WadRayMath.RAY, currentRate);
-
                 _burn(S, S.dragonRouter, dragonBurn);
 
                 // update the dragon value debt
@@ -357,6 +369,14 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         emit Reported(profit, loss);
 
         return (profit, loss);
+    }
+
+    /**
+     * @notice Get the last reported rate
+     * @return The last reported rate
+     */
+    function getLastRateRay() external view returns (uint256) {
+        return _strategyYieldSkimmingStorage().lastReportedRate;
     }
 
     /**
@@ -455,7 +475,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
      */
     function _rebalanceDebtOnDragonTransfer(uint256 transferAmount) internal {
         YieldSkimmingStorage storage YS = _strategyYieldSkimmingStorage();
-        
+
         // Direct transfer: shares represent ETH value 1:1 in this system
         // Dragon loses debt obligation, users gain debt obligation
         YS.dragonValueDebt -= transferAmount;
@@ -500,6 +520,79 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         } else {
             return exchangeRate / 10 ** (exchangeRateDecimals - 27);
         }
+    }
+
+    /**
+     * @dev Internal function that replicates TokenizedStrategy._withdraw logic without nonReentrant conflict
+     * @dev Simplified for yield skimming strategy - no loss handling since funds aren't deployed elsewhere
+     * @param S Strategy storage
+     * @param receiver Address to receive the assets
+     * @param owner Address whose shares are being burned
+     * @param assets Amount of assets to withdraw
+     * @param shares Amount of shares to burn
+     * @param maxLoss Maximum acceptable loss in basis points (ignored for yield skimming)
+     * @return actualAssets The actual amount of assets withdrawn
+     */
+    function _performWithdrawal(
+        StrategyData storage S,
+        address receiver,
+        address owner,
+        uint256 assets,
+        uint256 shares,
+        uint256 maxLoss
+    ) internal returns (uint256 actualAssets) {
+        require(receiver != address(0), "ZERO ADDRESS");
+        require(maxLoss <= MAX_BPS, "exceeds MAX_BPS");
+
+        // Spend allowance if applicable.
+        if (msg.sender != owner) {
+            _spendAllowance(S, owner, msg.sender, shares);
+        }
+
+        // Cache `asset` since it is used multiple times..
+        ERC20 _asset = S.asset;
+        uint256 idle = _asset.balanceOf(address(this));
+
+        uint256 loss;
+        
+        // Check if we need to withdraw funds from yield source.
+        if (idle < assets) {
+            // Tell Strategy to free what we need from yield source.
+            unchecked {
+                IBaseStrategy(address(this)).freeFunds(assets - idle);
+            }
+
+            // Update idle balance after freeing funds
+            idle = _asset.balanceOf(address(this));
+
+            // If we still don't have enough, we have a loss (yield source lost value)
+            if (idle < assets) {
+                unchecked {
+                    loss = assets - idle;
+                }
+                
+                // If a non-default max loss parameter was set, check it
+                if (maxLoss < MAX_BPS) {
+                    require(loss <= (assets * maxLoss) / MAX_BPS, "too much loss");
+                }
+                
+                // Lower the amount to be withdrawn to what's actually available
+                assets = idle;
+            }
+        }
+
+        // Update totalAssets based on both withdrawn assets and any loss
+        S.totalAssets -= (assets + loss);
+
+        _burn(S, owner, shares);
+
+        // Transfer the amount of underlying to the receiver.
+        _asset.safeTransfer(receiver, assets);
+
+        emit Withdraw(msg.sender, receiver, owner, assets, shares);
+
+        // Return the actual amount of assets withdrawn.
+        return assets;
     }
 
     function _strategyYieldSkimmingStorage() internal pure returns (YieldSkimmingStorage storage S) {

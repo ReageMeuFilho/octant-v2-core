@@ -9,4 +9,6 @@ interface IYieldSkimmingStrategy {
     function decimalsOfExchangeRate() external view returns (uint256);
 
     function getCurrentRateRay() external view returns (uint256);
+
+    function getTotalValueDebt() external view returns (uint256);
 }
