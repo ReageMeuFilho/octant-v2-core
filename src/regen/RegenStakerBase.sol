@@ -34,6 +34,10 @@ import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocation
 ///         - Reward compounding (when REWARD_TOKEN == STAKE_TOKEN)
 ///         - Reward contribution to whitelisted allocation mechanisms
 ///         - Admin controls (pause/unpause, config updates)
+/// @notice Token requirements: STAKE_TOKEN and REWARD_TOKEN must be standard ERC-20 tokens.
+///         Unsupported token behaviors include fee-on-transfer/deflationary mechanisms, rebasing,
+///         or non-standard return values. Accounting assumes transferred amount equals requested
+///         amount; non-standard tokens can break deposits, withdrawals, or reward accounting.
 /// @dev Integer division causes ~1 wei precision loss, negligible due to SCALE_FACTOR (1e36).
 /// @dev This base is abstract, with variants implementing token-specific behaviors (e.g., delegation surrogates).
 /// @dev Earning power updates are required after balance changes; some are automatic, others via bumpEarningPower.

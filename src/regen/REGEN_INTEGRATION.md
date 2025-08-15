@@ -45,3 +45,4 @@ event RewardContributed(bytes32 indexed depositId, address indexed contributor, 
 - **Signature Replay**: Use nonces and deadlines in EIP-712 signatures
 - **Whitelist Changes**: Monitor whitelist updates
 - **Allocation Mechanism Trust**: Malicious mechanisms can misappropriate public good contributions
+- **Token Requirements**: STAKE_TOKEN and REWARD_TOKEN must be standard ERC-20. Fee-on-transfer/deflationary or rebasing tokens are unsupported. Accounting assumes transferred amount equals requested amount; non-standard tokens may break staking, withdrawals, or rewards.
