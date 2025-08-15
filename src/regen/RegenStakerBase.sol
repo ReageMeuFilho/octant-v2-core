@@ -611,7 +611,6 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     function compoundRewards(
         DepositIdentifier _depositId
     ) external virtual whenNotPaused nonReentrant returns (uint256 compoundedAmount) {
-        _checkWhitelisted(sharedState.stakerWhitelist, msg.sender);
         if (address(REWARD_TOKEN) != address(STAKE_TOKEN)) {
             revert CompoundingNotSupported();
         }
@@ -622,6 +621,9 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         if (deposit.claimer != msg.sender && depositOwner != msg.sender) {
             revert Staker__Unauthorized("not claimer or owner", msg.sender);
         }
+
+        // Enforce owner whitelist for stake-increasing operation
+        _checkWhitelisted(sharedState.stakerWhitelist, depositOwner);
 
         _checkpointGlobalReward();
         _checkpointReward(deposit);
