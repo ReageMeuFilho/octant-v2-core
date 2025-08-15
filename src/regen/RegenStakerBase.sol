@@ -34,11 +34,7 @@ import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocation
 ///         - Reward compounding (when REWARD_TOKEN == STAKE_TOKEN)
 ///         - Reward contribution to whitelisted allocation mechanisms
 ///         - Admin controls (pause/unpause, config updates)
-/// @dev PRECISION IMPLICATIONS: Variable reward durations affect calculation precision. The original Staker contract assumed a fixed
-///      30-day duration for optimal precision. This contract allows 7-3000 days, providing flexibility with excellent precision.
-///      The SCALE_FACTOR (1e36) ensures minimal precision loss consistently ~1 wei across all reward durations (7-3000 days),
-///      representing negligible error (< 0.0001%) for typical reward amounts. Duration does not significantly affect precision
-///      due to the robust scaling factor design.
+/// @dev Integer division causes ~1 wei precision loss, negligible due to SCALE_FACTOR (1e36).
 /// @dev This base is abstract, with variants implementing token-specific behaviors (e.g., delegation surrogates).
 /// @dev Earning power updates are required after balance changes; some are automatic, others via bumpEarningPower.
 /// @dev If rewards should not be taxable, set MAX_CLAIM_FEE to 0 in deployment.
@@ -315,9 +311,6 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     }
 
     /// @notice Sets the reward duration for future reward notifications
-    /// @dev PRECISION NOTE: The SCALE_FACTOR (1e36) ensures minimal precision loss across all
-    ///      reward durations (7-3000 days). Actual precision loss is consistently ~1 wei regardless
-    ///      of duration, representing negligible error (< 0.0001%) for typical reward amounts.
     /// @dev GAS IMPLICATIONS: Shorter reward durations may result in higher gas costs for certain
     ///      operations due to more frequent reward rate calculations. Consider gas costs when
     ///      selecting reward durations.
