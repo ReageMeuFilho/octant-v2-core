@@ -88,6 +88,12 @@ contract RegenStaker is RegenStakerBase {
         VOTING_TOKEN = IERC20Delegates(address(_stakeToken));
     }
 
+    // === Events ===
+    /// @notice Emitted when a new delegation surrogate is deployed
+    /// @param delegatee The address that receives the voting power
+    /// @param surrogate The address of the deployed surrogate contract
+    event SurrogateDeployed(address indexed delegatee, address indexed surrogate);
+
     // === Overridden Functions ===
 
     /// @inheritdoc Staker
@@ -109,6 +115,14 @@ contract RegenStaker is RegenStakerBase {
         return address(uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), address(this), salt, bytecodeHash)))));
     }
 
+    /// @notice Gets the delegatee address for a given surrogate
+    /// @param _surrogate The surrogate contract address
+    /// @return The address that this surrogate delegates voting power to
+    /// @dev Returns zero address if the surrogate doesn't delegate (invalid surrogate)
+    function getDelegateeFromSurrogate(address _surrogate) external view returns (address) {
+        return VOTING_TOKEN.delegates(_surrogate);
+    }
+
     /// @inheritdoc Staker
     /// @dev GAS WARNING: First use of a new delegatee deploys a DelegationSurrogateVotes contract
     ///      costing ~250k-350k gas. Subsequent operations with the same delegatee reuse existing surrogate.
@@ -122,6 +136,7 @@ contract RegenStaker is RegenStakerBase {
             );
 
             _surrogates[_delegatee] = _surrogate;
+            emit SurrogateDeployed(_delegatee, address(_surrogate));
         }
     }
 }
