@@ -85,7 +85,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         require(assets <= _maxDeposit(S, receiver), "ERC4626: deposit more than max");
 
         uint256 currentRate = _currentRateRay();
-        
+
         // Issue shares based on value (1 share = 1 ETH value)
         shares = assets.mulDiv(currentRate, WadRayMath.RAY);
         require(shares != 0, "ZERO_SHARES");
@@ -125,20 +125,18 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
 
         uint256 currentRate = _currentRateRay();
         uint256 totalShares = _totalSupply(S);
+        uint256 currentVaultValue = S.totalAssets.mulDiv(currentRate, WadRayMath.RAY);
 
-        // Shares represent ETH value
-        uint256 valueToReturn = shares; // 1 share = 1 ETH value
-
-        // Convert value to assets at current rate
-        assets = valueToReturn.mulDiv(WadRayMath.RAY, currentRate);
-
-        // Check available assets
-        uint256 availableAssets = S.totalAssets;
-        if (assets > availableAssets) {
-            // Proportional distribution if insufficient
-            assets = shares.mulDiv(availableAssets, totalShares);
-            valueToReturn = assets.mulDiv(currentRate, WadRayMath.RAY);
+        // Dragon cannot withdraw during insolvency - must protect users
+        if (totalShares > 0 && currentVaultValue < totalShares && owner == S.dragonRouter) {
+            revert("Dragon cannot withdraw during insolvency");
         }
+
+        // Use solvency-aware conversion (handles both solvent and insolvent cases)
+        assets = _convertToAssets(S, shares, Math.Rounding.Floor);
+
+        // Calculate actual value returned for debt tracking
+        uint256 valueToReturn = shares; // 1 share = 1 ETH value (regardless of actual assets received)
 
         // Update value debt
         if (owner == S.dragonRouter) {
@@ -154,9 +152,9 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         S.totalAssets -= assets;
 
         // Withdraw from strategy and transfer
-        IBaseStrategy(address(this)).freeFunds(assets);
         S.asset.safeTransfer(receiver, assets);
 
+        // Emit event (simplified to avoid stack too deep)
         emit Withdraw(msg.sender, receiver, owner, assets, shares);
 
         return assets;
@@ -264,52 +262,54 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     }
 
     /**
-     * @notice Withdraw assets from the strategy
-     * @dev Converts assets to shares and calls redeem
-     * @param assets The amount of assets to withdraw
-     * @param receiver The address to receive the assets
-     * @param owner The address whose shares are being redeemed
-     * @return shares The amount of shares burned
-     */
-    function withdraw(uint256 assets, address receiver, address owner) external override returns (uint256 shares) {
-        uint256 currentRate = _currentRateRay();
-        shares = assets.mulDiv(currentRate, WadRayMath.RAY, Math.Rounding.Ceil);
-
-        uint256 actualAssets = this.redeem(shares, receiver, owner);
-        require(actualAssets >= assets, "Insufficient assets");
-
-        return shares;
-    }
-
-    /**
-     * @dev Converts assets to shares using value debt approach
+     * @dev Converts assets to shares using value debt approach with solvency awareness
+     * @param S Strategy storage
      * @param assets The amount of assets to convert
      * @param rounding The rounding mode for division
      * @return The amount of shares (1 share = 1 ETH value)
      */
     function _convertToShares(
-        StrategyData storage,
+        StrategyData storage S,
         uint256 assets,
         Math.Rounding rounding
     ) internal view virtual override returns (uint256) {
         uint256 currentRate = _currentRateRay();
-        return assets.mulDiv(currentRate, WadRayMath.RAY, rounding);
+        uint256 totalShares = _totalSupply(S);
+        uint256 currentVaultValue = S.totalAssets.mulDiv(currentRate, WadRayMath.RAY);
+
+        if (totalShares > 0 && currentVaultValue < totalShares) {
+            // Vault insolvent - reverse the proportional calculation
+            // If assets get proportionally reduced, shares needed are higher
+            return assets.mulDiv(totalShares, S.totalAssets, rounding);
+        } else {
+            // Vault solvent - normal rate-based conversion
+            return assets.mulDiv(currentRate, WadRayMath.RAY, rounding);
+        }
     }
 
     /**
-     * @dev Converts shares to assets using value debt approach
+     * @dev Converts shares to assets using value debt approach with solvency awareness
+     * @param S Strategy storage
      * @param shares The amount of shares to convert
      * @param rounding The rounding mode for division
-     * @return The amount of assets
+     * @return The amount of assets user would actually receive
      */
     function _convertToAssets(
-        StrategyData storage,
+        StrategyData storage S,
         uint256 shares,
         Math.Rounding rounding
     ) internal view virtual override returns (uint256) {
         uint256 currentRate = _currentRateRay();
-        // shares represent ETH value, convert to assets
-        return shares.mulDiv(WadRayMath.RAY, currentRate, rounding);
+        uint256 totalShares = _totalSupply(S);
+        uint256 currentVaultValue = S.totalAssets.mulDiv(currentRate, WadRayMath.RAY);
+
+        if (totalShares > 0 && currentVaultValue < totalShares) {
+            // Vault insolvent - proportional distribution
+            return shares.mulDiv(S.totalAssets, totalShares, rounding);
+        } else {
+            // Vault solvent - normal rate-based conversion
+            return shares.mulDiv(WadRayMath.RAY, currentRate, rounding);
+        }
     }
 
     /**

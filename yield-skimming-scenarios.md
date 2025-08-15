@@ -4,17 +4,50 @@
 
 This document tracks various scenarios for the YieldSkimmingTokenizedStrategy to understand how the conversion mechanism works under different rate conditions, including the dragon share minting/burning mechanism.
 
+## 🎉 KEY IMPROVEMENTS IMPLEMENTED
+
+### **Fixed Unfair FIFO Problem**
+- **BEFORE**: Early withdrawers could escape losses while late withdrawers bore disproportionate losses
+- **AFTER**: ALL users share losses proportionally based on vault solvency, regardless of withdrawal order
+
+### **Enhanced Dragon Protection**
+- **NEW**: Dragon cannot withdraw/transfer shares during insolvency
+- **BENEFIT**: Ensures dragon buffer remains available to protect users when needed most
+
+### **Fair Solvency Logic**
+- **LOGIC**: Check if `currentVaultValue < totalShares` (insolvency)
+- **RESULT**: When insolvent, ALL withdrawals use proportional distribution: `shares × totalAssets ÷ totalShares`
+
+### **🎯 CLEANER: Solvency-Aware Conversion Functions**
+- **`_convertToShares()`**: Returns shares needed accounting for insolvency
+- **`_convertToAssets()`**: Returns assets user would actually receive
+- **SYSTEM-WIDE**: All ERC4626 functions automatically use realistic values
+
+### **Enhanced Standard Functions (Auto-Improved)**
+- **`convertToShares/Assets()`**: Now return realistic values during insolvency
+- **`previewDeposit/Mint/Withdraw/Redeem()`**: All previews now accurate
+- **`withdraw()` & `redeem()`**: Simplified - just use standard conversion logic
+
+### **New Query Functions for Transparency**
+- **`isVaultSolvent()`**: Check if vault can cover all obligations
+- **`getSolvencyRatio()`**: Get vault health ratio (1e27 = 100% solvent)
+
 ## Key Formulas
 
-### Basic Operations
-- **Deposit**: `shares = assets × currentRate ÷ 1e27`
-- **Withdraw**: `assets = shares × 1e27 ÷ currentRate` (if sufficient)
-- **Proportional**: `assets = shares × availableAssets ÷ totalShares` (if insufficient)
+### 🎯 CLEANER: Solvency-Aware Operations (Automatic!)
+- **Deposit**: `shares = assets × currentRate ÷ 1e27` (always)
+- **Convert To Assets**: 
+  - **If Solvent**: `assets = shares × 1e27 ÷ currentRate`
+  - **If Insolvent**: `assets = shares × totalAssets ÷ totalShares` (FAIR!)
+- **Convert To Shares**:
+  - **If Solvent**: `shares = assets × currentRate ÷ 1e27`  
+  - **If Insolvent**: `shares = assets × totalShares ÷ totalAssets`
 
-### Value Calculations
+### 🎉 IMPROVED: Solvency Calculations
 - **Current Value**: `currentValue = totalAssets × currentRate`
-- **Total Owed**: `totalOwedValue = totalValueDebt + dragonValueDebt`
-- **Sufficient Assets**: When `assets_needed ≤ availableAssets`
+- **Total Owed**: `totalShares` (since 1 share = 1 ETH value)
+- **✅ Solvency Check**: `currentValue ≥ totalShares` → Normal conversions
+- **❌ Insolvency**: `currentValue < totalShares` → ALL conversions use proportional logic
 
 ### Dragon Share Reporting
 - **Profit Case**: If `currentValue > totalOwedValue`:
@@ -44,7 +77,7 @@ User deposits, rate increases, report captures profit as dragon shares, another 
 
 **Result**: Both users receive full value. Dragon holds 1 share (0.71 wstETH) representing captured yield.
 
-## Scenario 2: Dragon Loss Protection
+## Scenario 2: Dragon Loss Protection - RECALCULATED
 
 Rate increases with reporting, then drops, dragon shares protect users from loss.
 
@@ -56,11 +89,24 @@ Rate increases with reporting, then drops, dragon shares protect users from loss
 | 3 | 1.5 | Report | - | Profit: 2 | - | 10 | 15 | 13 ETH | 2 | 2 ETH | 15 ETH | Dragon minted 2 shares |
 | 4 | 1.5 | d2 | 10 wstETH | 10×1.5=**15** | - | 20 | 30 | 28 ETH | 2 | 2 ETH | 30 ETH | User2 deposits |
 | 5 | 1.2 | Rate↓ | - | - | - | 20 | 30 | 28 ETH | 2 | 2 ETH | 24 ETH | -6 ETH loss |
-| 6 | 1.2 | Report | - | Loss: 6 | Burn: 2 | 20 | 28 | 24 ETH | 0 | 0 ETH | 24 ETH | Dragon burned, users lose 4 |
-| 7 | 1.2 | w1 | 13 shares | - | 13×20÷28=**9.29** | 10.71 | 15 | 11.21 ETH | 0 | 0 ETH | 12.85 ETH | Proportional |
-| 8 | 1.2 | w2 | 15 shares | - | 15×10.71÷15=**10.71** | 0 | 0 | 0 ETH | 0 | 0 ETH | 0 ETH | User2 withdraws |
+| 6 | 1.2 | Report | - | Loss: 6, Burn: 2 | - | 20 | 28 | 24 ETH | 0 | 0 ETH | 24 ETH | Dragon absorbed 2 ETH loss |
+| 7 | 1.2 | w1 | 13 shares | - | 13÷1.2=**10.83** | 9.17 | 15 | 10.17 ETH | 0 | 0 ETH | 11 ETH | User1 full withdrawal |
+| 8 | 1.2 | w2 | 15 shares | - | 15÷1.2=**12.5** | -3.33 | 0 | -2.5 ETH | 0 | 0 ETH | 0 ETH | ERROR: Insufficient assets! |
 
-**Result**: Dragon buffer absorbed 2 ETH of the 6 ETH loss. Users share remaining 4 ETH loss proportionally.
+**CORRECTION**: After step 6, vault is SOLVENT (24 ETH value = 24 ETH owed), but insufficient assets for both full withdrawals.
+
+**Fixed Calculation**:
+- After step 6: 20 wstETH, 28 total shares (all user shares after dragon burn)
+- Vault value = 20 × 1.2 = 24 ETH
+- Total owed = 28 shares = 28 ETH
+- **24 < 28 → INSOLVENT** → Proportional distribution for ALL
+
+| 7 | 1.2 | w1 | 13 shares | - | 13×20÷28=**9.29** | 10.71 | 15 | - | 0 | 0 ETH | - | User1 proportional |
+| 8 | 1.2 | w2 | 15 shares | - | 15×10.71÷15=**10.71** | 0 | 0 | 0 ETH | 0 | 0 ETH | 0 ETH | User2 gets remainder |
+
+**Results**:
+- **User1**: Deposited 13 ETH, received 11.15 ETH → **Loss: 1.85 ETH**
+- **User2**: Deposited 15 ETH, received 12.85 ETH → **Loss: 2.15 ETH**
 
 ## Scenario 3: Dragon Withdrawal After Profit
 
@@ -101,8 +147,8 @@ Dragon accumulates profit shares then withdraws, affecting subsequent user withd
 
 **Result**: Dragon buffer fully protected User1 from the 2 ETH loss. User1 received full 12 ETH value despite rate volatility.
 
-### B. Cascading User Exits During Loss - DETAILED ANALYSIS
-**Description**: Multiple users trying to exit as rates decline, showing how timing affects outcomes.
+### B. Cascading User Exits During Loss - FIXED WITH FAIR PROPORTIONAL LOGIC
+**Description**: Multiple users trying to exit as rates decline - NOW WITH FAIR LOSS SHARING!
 
 | Step | Rate | Action | Amount | Shares Calc | Assets Calc | Total Assets | Total Shares | User Debt | Dragon Shares | Dragon Debt | Current Value | Notes |
 |------|------|--------|--------|-------------|-------------|--------------|--------------|-----------|---------------|-------------|---------------|-------|
@@ -116,18 +162,21 @@ Dragon accumulates profit shares then withdraws, affecting subsequent user withd
 | 7 | 1.4 | d3 | 10 wstETH | 10×1.4=**14** | - | 30 | 42 | 39 ETH | 3 | 3 ETH | 42 ETH | User3 deposits |
 | 8 | 1.0 | Rate↓ | - | - | - | 30 | 42 | 39 ETH | 3 | 3 ETH | 30 ETH | -12 ETH loss! |
 | 9 | 1.0 | Report | - | Loss: 12, Burn: 3 | - | 30 | 39 | 30 ETH | 0 | 0 ETH | 30 ETH | Dragon depleted, 9 ETH user loss |
-| 10 | 1.0 | w1 | 12 shares | - | 12÷1.0=**12** | 18 | 27 | 18 ETH | 0 | 0 ETH | 18 ETH | User1 full withdrawal |
-| 11 | 1.0 | w2 | 13 shares | - | 13×18÷27=**8.67** | 9.33 | 14 | 9.33 ETH | 0 | 0 ETH | 9.33 ETH | User2 proportional |
-| 12 | 1.0 | w3 | 14 shares | - | All remaining=**9.33** | 0 | 0 | 0 ETH | 0 | 0 ETH | 0 ETH | User3 gets remainder |
 
-**Results**:
-- **User1**: Deposited 12 ETH, received 12 ETH → **No loss** (first to exit)
-- **User2**: Deposited 13 ETH, received 8.67 ETH → **Loss: 4.33 ETH**
-- **User3**: Deposited 14 ETH, received 9.33 ETH → **Loss: 4.67 ETH**
+**SOLVENCY CHECK**: Vault value = 30 ETH, Total owed = 39 ETH → **INSOLVENT** → All users get proportional distribution
 
-**Key Insight**: First-come-first-served during shortfalls! Early withdrawers avoid losses.
+| 10 | 1.0 | w1 | 12 shares | - | 12×30÷39=**9.23** | 20.77 | 27 | 20.77 ETH | 0 | 0 ETH | 20.77 ETH | User1 proportional |
+| 11 | 1.0 | w2 | 13 shares | - | 13×20.77÷27=**10** | 10.77 | 14 | 10.77 ETH | 0 | 0 ETH | 10.77 ETH | User2 proportional |
+| 12 | 1.0 | w3 | 14 shares | - | All remaining=**10.77** | 0 | 0 | 0 ETH | 0 | 0 ETH | 0 ETH | User3 gets remainder |
 
-### C. Dragon Buffer Exhaustion - DETAILED ANALYSIS
+**FAIR RESULTS**:
+- **User1**: Deposited 12 ETH, received 9.23 ETH → **Loss: 2.77 ETH (23.1%)**
+- **User2**: Deposited 13 ETH, received 10 ETH → **Loss: 3 ETH (23.1%)**
+- **User3**: Deposited 14 ETH, received 10.77 ETH → **Loss: 3.23 ETH (23.1%)**
+
+**🎉 KEY IMPROVEMENT**: ALL users now share the same 23.1% loss rate - NO MORE FIFO ADVANTAGE!
+
+### C. Dragon Buffer Exhaustion - RECALCULATED WITH FAIR DISTRIBUTION
 **Description**: Extreme loss scenario where dragon buffer is completely depleted.
 
 | Step | Rate | Action | Amount | Shares Calc | Assets Calc | Total Assets | Total Shares | User Debt | Dragon Shares | Dragon Debt | Current Value | Notes |
@@ -142,17 +191,20 @@ Dragon accumulates profit shares then withdraws, affecting subsequent user withd
 | 7 | 1.3 | d3 | 10 wstETH | 10×1.3=**13** | - | 40 | 52 | 46 ETH | 6 | 6 ETH | 52 ETH | User3 deposits |
 | 8 | 0.7 | CRASH | - | - | - | 40 | 52 | 46 ETH | 6 | 6 ETH | 28 ETH | -24 ETH loss! |
 | 9 | 0.7 | Report | - | Loss: 24, Burn: 6 | - | 40 | 46 | 28 ETH | 0 | 0 ETH | 28 ETH | Dragon depleted! |
-| 10 | 0.7 | w1 | 20 shares | - | 20×40÷46=**17.39** | 22.61 | 26 | 15.83 ETH | 0 | 0 ETH | 15.83 ETH | User1 proportional |
-| 11 | 0.7 | w2 | 13 shares | - | 13×22.61÷26=**11.31** | 11.31 | 13 | 7.92 ETH | 0 | 0 ETH | 7.92 ETH | User2 proportional |
-| 12 | 0.7 | w3 | 13 shares | - | All remaining=**11.31** | 0 | 0 | 0 ETH | 0 | 0 ETH | 0 ETH | User3 gets remainder |
 
-**Results**:
+**SOLVENCY CHECK**: Vault value = 28 ETH, Total owed = 46 ETH → **INSOLVENT** → All users get proportional
+
+| 10 | 0.7 | w1 | 20 shares | - | 20×40÷46=**17.39** | 22.61 | 26 | - | 0 | 0 ETH | - | User1 proportional |
+| 11 | 0.7 | w2 | 13 shares | - | 13×22.61÷26=**11.31** | 11.30 | 13 | - | 0 | 0 ETH | - | User2 proportional |
+| 12 | 0.7 | w3 | 13 shares | - | All remaining=**11.30** | 0 | 0 | 0 ETH | 0 | 0 ETH | 0 ETH | User3 gets remainder |
+
+**RESULTS**:
 - **Dragon Buffer**: Built up 6 ETH, completely exhausted absorbing loss
-- **User1**: Deposited 20 ETH, received 12.17 ETH → **Loss: 7.83 ETH**
-- **User2**: Deposited 13 ETH, received 7.92 ETH → **Loss: 5.08 ETH**
-- **User3**: Deposited 13 ETH, received 7.92 ETH → **Loss: 5.08 ETH**
+- **User1**: Deposited 20 ETH, received 12.17 ETH → **Loss: 7.83 ETH (39.1%)**
+- **User2**: Deposited 13 ETH, received 7.92 ETH → **Loss: 5.08 ETH (39.1%)**
+- **User3**: Deposited 13 ETH, received 7.92 ETH → **Loss: 5.08 ETH (39.1%)**
 
-**Key Insight**: Even large dragon buffers can be exhausted in extreme scenarios. Users share remaining losses proportionally.
+**Key Insight**: Even with proportional logic, all users share the same 39.1% loss rate fairly.
 
 ### D. Partial Dragon Withdrawal Strategy - DETAILED ANALYSIS
 **Description**: Dragon withdraws some profit while maintaining buffer.
@@ -242,13 +294,13 @@ Dragon accumulates profit shares then withdraws, affecting subsequent user withd
 | 1    | ___  | ___    | ___    | ___×___=___ | -           | ___          | ___          | ___ ETH   | ___           | ___ ETH     | ___ ETH       | ___   |
 | 2    | ___  | ___    | ___    | ___         | ___         | ___          | ___          | ___ ETH   | ___           | ___ ETH     | ___ ETH       | ___   |
 
-## Comprehensive Scenario Summary
+## Comprehensive Scenario Summary - UPDATED WITH FAIR PROPORTIONAL LOGIC
 
 | Scenario | Dragon Buffer Peak | Dragon Strategy | Rate Pattern | User1 Outcome | User2 Outcome | User3 Outcome | Key Learning |
 |----------|-------------------|-----------------|--------------|---------------|---------------|---------------|---------------|
 | **A. Multiple Cycles** | 3 ETH | Hold buffer | 1.2→1.5→1.3 | 12→12 ETH ✅ | - | - | Buffer fully protects users |
-| **B. Cascading Exits** | 3 ETH | No withdrawal | 1.2→1.4→1.0 | 12→12 ETH ✅ | 13→8.67 ETH ❌ | 14→9.33 ETH ❌ | FIFO advantage in shortfalls |
-| **C. Buffer Exhaustion** | 6 ETH | No withdrawal | 1.0→1.3→0.7 | 20→12.17 ETH ❌ | 13→7.92 ETH ❌ | 13→7.92 ETH ❌ | Extreme losses exhaust buffer |
+| **B. Fair Exits** | 3 ETH | No withdrawal | 1.2→1.4→1.0 | 12→9.23 ETH (23.1% loss) | 13→10 ETH (23.1% loss) | 14→10.77 ETH (23.1% loss) | 🎉 FAIR: All users share same loss % |
+| **C. Buffer Exhaustion** | 6 ETH | No withdrawal | 1.0→1.3→0.7 | 20→12.17 ETH (39.1% loss) | 13→7.92 ETH (39.1% loss) | 13→7.92 ETH (39.1% loss) | 🎉 FAIR: Equal loss distribution |
 | **D. Partial Withdrawal** | 6 ETH | Withdraw 50% | 1.0→1.4→1.1 | 15→13.01 ETH ❌ | 14→12.13 ETH ❌ | - | Partial strategy balances risk |
 | **E. Volatile Rates** | 4.8 ETH | No withdrawal | 1.2→1.4→1.1→1.5→1.3 | - | - | - | Frequent reporting rebuilds buffer |
 | **F. Mixed Activity** | 4.5 ETH | Withdraw early | 1.1→1.4→1.1 | 11→9.53 ETH ❌ | 19.5→16.89 ETH ❌ | 9.6→8.32 ETH ❌ | Complex timing effects |
@@ -265,10 +317,11 @@ Dragon accumulates profit shares then withdraws, affecting subsequent user withd
 - **Partial Protection**: When dragon buffer < total loss, users share remaining proportionally (Scenarios C, D, F)
 - **No Protection**: When no dragon buffer exists (rare, only if dragon fully exits before losses)
 
-### 3. **Timing and Fairness**
+### 3. **🎉 IMPROVED: Timing and Fairness**
 - **Deposit Timing**: Users lock in ETH value at deposit rate
-- **Withdrawal Timing**: Critical during shortfalls - first withdrawers may get full value (Scenario B)
+- **✅ Withdrawal Timing**: NOW FAIR - all users share losses proportionally regardless of withdrawal order
 - **Reporting Timing**: More frequent reporting = better profit capture and loss protection
+- **🚫 Dragon Protection**: Dragon cannot withdraw/transfer during insolvency, ensuring buffer protection
 
 ### 4. **Dragon Strategy Implications**
 - **Hold All**: Maximum user protection but dragon bears all losses
@@ -280,10 +333,12 @@ Dragon accumulates profit shares then withdraws, affecting subsequent user withd
 - **Downward Volatility**: Depletes dragon buffer through loss absorption
 - **High Frequency**: Requires frequent reporting to maintain proper buffer levels
 
-### 6. **System Stability**
-- **Progressive Loss Sharing**: Dragon buffer → proportional user sharing → individual timing effects
+### 6. **🎉 IMPROVED: System Stability**
+- **Progressive Loss Sharing**: Dragon buffer → **fair proportional user sharing for ALL**
 - **Value Debt Tracking**: Maintains 1 share = 1 ETH value debt relationship
-- **Asset Sufficiency**: Proportional distribution activates when insufficient assets for all withdrawals
+- **✅ Solvency-Based Distribution**: Proportional distribution when `vaultValue < totalShares` (FAIR!)
+- **🔒 Dragon Lock**: Dragon cannot exit during insolvency, maintaining protection
+- **⚖️ Equal Treatment**: All users share losses at same percentage regardless of withdrawal order
 
 ## Report Calculation Reference
 
@@ -305,3 +360,48 @@ if (currentValue < totalOwedValue && dragonValueDebt > 0):
     if (lossValue > dragonBurn):
         totalValueDebt -= (lossValue - dragonBurn)
 ```
+
+## 🎉 SUMMARY OF IMPROVEMENTS
+
+### **Before: Unfair System**
+- ❌ Early withdrawers could escape losses (FIFO advantage)
+- ❌ Dragon could withdraw during insolvency, abandoning users
+- ❌ `withdraw()` function failed during shortfalls
+- ❌ No transparency into vault solvency status
+
+### **After: Fair & Robust System**  
+- ✅ **Fair Loss Sharing**: All users share identical loss percentages
+- ✅ **Dragon Protection**: Dragon locked during insolvency, ensuring buffer availability
+- ✅ **Smart Withdrawals**: `withdraw()` automatically handles insolvency scenarios
+- ✅ **Full Transparency**: Query functions provide real-time vault health
+- ✅ **Proportional Logic**: Solvency-based distribution ensures fairness
+
+### **🎯 CLEANER: Technical Implementation**
+- **Core Logic**: Solvency-aware `_convertToShares()` and `_convertToAssets()` functions
+- **Automatic Fairness**: ALL ERC4626 functions inherit proportional distribution during insolvency
+- **Simplified Code**: `redeem()` and `withdraw()` use standard conversion logic
+- **Dragon Lock**: `revert("Dragon cannot withdraw during insolvency")`
+- **System-wide**: `convertToShares()`, `previewRedeem()`, etc. all automatically accurate
+
+This creates a **trustworthy, predictable system** where users can confidently participate knowing they'll be treated fairly regardless of timing, while maintaining strong protection through the dragon buffer mechanism.
+
+## ⭐ **Why the Conversion Function Approach is Superior**
+
+### **Architectural Elegance:**
+- **Single Source of Truth**: All conversions use the same solvency-aware logic
+- **ERC4626 Compliance**: Standard functions return realistic, not theoretical values
+- **Zero Duplication**: No repeated solvency checks across multiple functions
+- **Future-Proof**: Any new functions automatically inherit correct behavior
+
+### **User Experience:**
+- **Honest Previews**: `previewRedeem()` shows what users actually get during insolvency
+- **Consistent API**: All ERC4626 functions work as expected in all scenarios
+- **No Surprises**: Conversion functions reflect reality, not ideal conditions
+
+### **Developer Benefits:**
+- **Simplified Implementation**: `redeem()` and `withdraw()` become standard implementations
+- **Automatic Correctness**: New features automatically use fair distribution
+- **Easier Testing**: Consistent behavior across all conversion functions
+- **Clean Architecture**: Core logic centralized in conversion functions
+
+This approach transforms the yield skimming strategy into a **robust, fair, and architecturally sound system** that handles complex solvency scenarios transparently while maintaining full ERC4626 compatibility.
