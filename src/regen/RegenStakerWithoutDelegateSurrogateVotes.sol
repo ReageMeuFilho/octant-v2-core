@@ -8,6 +8,7 @@ pragma solidity ^0.8.0;
 // === Base Imports ===
 // Note: DelegationSurrogate is now imported via RegenStakerBase
 import { RegenStakerBase, Staker, IERC20, DelegationSurrogate, IWhitelist, IEarningPowerCalculator } from "src/regen/RegenStakerBase.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 // === Contract Header ===
 /// @title RegenStakerWithoutDelegateSurrogateVotes
@@ -39,11 +40,15 @@ import { RegenStakerBase, Staker, IERC20, DelegationSurrogate, IWhitelist, IEarn
 ///
 /// @dev USE CASE: Choose this variant for simple ERC20 staking without governance requirements.
 contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
+
     // === Custom Errors ===
     /// @notice Error thrown when reward notification would corrupt user deposits (same-token scenario)
     /// @param currentBalance The actual token balance in the contract
     /// @param required The minimum balance needed (totalStaked + reward amount)
     error InsufficientRewardBalance(uint256 currentBalance, uint256 required);
+
+    /// @notice Error thrown when attempting delegation operations that are not supported in this variant
+    error DelegationNotSupported();
 
     // === Constructor ===
     /// @notice Constructor for the RegenStakerWithoutDelegateSurrogateVotes contract.
@@ -125,5 +130,31 @@ contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
     /// @dev SIMPLIFICATION: Eliminates need for complex token transfer overrides
     function _fetchOrDeploySurrogate(address /* _delegatee */) internal view override returns (DelegationSurrogate) {
         return DelegationSurrogate(address(this));
+    }
+
+    /// @inheritdoc Staker
+    /// @notice Override to support withdrawals when this contract acts as its own surrogate
+    /// @dev Since this contract uses address(this) as surrogate, use safeTransfer for contract-to-user paths.
+    function _stakeTokenSafeTransferFrom(address _from, address _to, uint256 _value) internal override {
+        // Skip self-transfers (optimization)
+        if (_from == address(this) && _to == address(this)) {
+            return;
+        }
+        
+        // Use safeTransfer for withdrawals (contract -> user)
+        if (_from == address(this)) {
+            SafeERC20.safeTransfer(STAKE_TOKEN, _to, _value);
+            return;
+        }
+        
+        // Default behavior for deposits (user -> contract)
+        super._stakeTokenSafeTransferFrom(_from, _to, _value);
+    }
+
+    /// @inheritdoc Staker
+    /// @notice Delegation changes are not supported in this variant
+    /// @dev Always reverts since this contract doesn't use delegation surrogates - always uses address(this)
+    function alterDelegatee(DepositIdentifier, address) external pure override {
+        revert DelegationNotSupported();
     }
 }
