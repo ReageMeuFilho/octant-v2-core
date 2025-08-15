@@ -34,6 +34,39 @@ import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocation
 ///         - Reward compounding (when REWARD_TOKEN == STAKE_TOKEN)
 ///         - Reward contribution to whitelisted allocation mechanisms
 ///         - Admin controls (pause/unpause, config updates)
+///
+/// @dev CLAIMER PERMISSION MODEL:
+///      Claimers are trusted entities designated by deposit owners with specific permissions:
+///
+///      Permission Matrix:
+///      ┌─────────────────────────┬──────────┬─────────┐
+///      │ Operation               │ Owner    │ Claimer │
+///      ├─────────────────────────┼──────────┼─────────┤
+///      │ Claim rewards           │ ✓        │ ✓       │
+///      │ Compound rewards*†      │ ✓        │ ✓       │
+///      │ Contribute to public‡   │ ✓        │ ✓       │
+///      │ Stake more              │ ✓        │ ✗       │
+///      │ Withdraw                │ ✓        │ ✗       │
+///      │ Alter delegatee         │ ✓        │ ✗       │
+///      │ Alter claimer           │ ✓        │ ✗       │
+///      └─────────────────────────┴──────────┴─────────┘
+///      * Compounding increases deposit stake (intended behavior)
+///      † Compounding requires the deposit owner to be whitelisted; caller may be owner or claimer
+///      ‡ Claimer may contribute only if on the contribution whitelist; mechanism must be whitelisted
+///      § VOTING POWER: The contributor (msg.sender) receives voting power in the allocation mechanism,
+///         NOT the deposit owner. When a claimer contributes, the claimer gets voting power.
+///
+///      When designating a claimer, owners explicitly trust them with:
+///      1. Claiming accrued rewards on their behalf
+///      2. Compounding rewards to increase stake position (when REWARD_TOKEN == STAKE_TOKEN)
+///      3. Contributing unclaimed rewards to whitelisted allocation mechanisms (subject to contribution whitelist)
+///      4. Receiving voting power in allocation mechanisms when they contribute (claimer gets voting power, not owner)
+///
+///      Security boundaries are maintained:
+///      - Claimers cannot withdraw principal or rewards to arbitrary addresses
+///      - Claimers cannot modify deposit parameters
+///      - Owners can revoke claimer designation at any time via alterClaimer()
+///
 /// @notice Token requirements: STAKE_TOKEN and REWARD_TOKEN must be standard ERC-20 tokens.
 ///         Unsupported token behaviors include fee-on-transfer/deflationary mechanisms, rebasing,
 ///         or non-standard return values. Accounting assumes transferred amount equals requested
@@ -498,9 +531,15 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @dev TRUST MODEL: Allocation mechanisms must be whitelisted by protocol governance.
     ///      Only contribute to mechanisms you trust, as the protocol cannot recover funds
     ///      sent to malicious or buggy allocation mechanisms.
+    /// @dev VOTING POWER ASSIGNMENT: The contributor (msg.sender) receives voting power in the
+    ///      allocation mechanism, NOT necessarily the deposit owner. When a claimer contributes
+    ///      owner's rewards, the CLAIMER receives the voting power. This is intended behavior
+    ///      as part of the claimer trust model.
     /// @dev SECURITY: This function first withdraws rewards to the contributor, then the contributor
     ///      must have pre-approved the allocation mechanism to pull the tokens.
     /// @dev SECURITY AUDIT: Ensure allocation mechanisms are immutable post-whitelisting.
+    /// @dev AUTHZ: Authorized caller is the deposit owner or the designated claimer; the claimer acts
+    ///      as the owner's agent for rewards and may contribute if on the contribution whitelist.
     /// @dev Requires contract not paused and uses reentrancy guard
     /// @param _depositId The deposit identifier to contribute from
     /// @param _allocationMechanismAddress Whitelisted allocation mechanism to receive contribution
@@ -539,13 +578,13 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         require(_amount <= unclaimedAmount, CantAfford(_amount, unclaimedAmount));
 
         uint256 fee = claimFeeParameters.feeAmount;
-        
+
         // Early return if user benefit would be zero or negative
         // Ensures users always receive some value after fees
         if (_amount <= fee) {
             return 0;
         }
-        
+
         amountContributedToAllocationMechanism = _calculateNetContribution(_amount, fee);
 
         // Prevent zero-amount contributions after fee deduction
@@ -557,15 +596,17 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         // Defensive earning power update - maintaining consistency with base Staker pattern
         uint256 _oldEarningPower = deposit.earningPower;
         uint256 _newEarningPower = earningPowerCalculator.getEarningPower(
-            deposit.balance, deposit.owner, deposit.delegatee
+            deposit.balance,
+            deposit.owner,
+            deposit.delegatee
         );
-        
+
         // Update earning power totals before modifying deposit state
-        totalEarningPower = _calculateTotalEarningPower(
-            _oldEarningPower, _newEarningPower, totalEarningPower
-        );
+        totalEarningPower = _calculateTotalEarningPower(_oldEarningPower, _newEarningPower, totalEarningPower);
         depositorTotalEarningPower[deposit.owner] = _calculateTotalEarningPower(
-            _oldEarningPower, _newEarningPower, depositorTotalEarningPower[deposit.owner]
+            _oldEarningPower,
+            _newEarningPower,
+            depositorTotalEarningPower[deposit.owner]
         );
         deposit.earningPower = _newEarningPower.toUint96();
 
@@ -609,6 +650,10 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @dev FEE HANDLING: Claim fees are deducted before compounding. Zero fee results in zero compound.
     /// @dev EARNING POWER: Compounding updates earning power based on new total balance.
     /// @dev GAS OPTIMIZATION: More efficient than separate claim + stake operations.
+    /// @dev CLAIMER PERMISSIONS: This function grants claimers the ability to increase deposit stakes
+    ///      through compounding. This is INTENDED BEHAVIOR - when an owner designates a claimer, they
+    ///      explicitly trust them with both reward claiming AND limited staking operations (compounding).
+    ///      Claimers cannot withdraw funds or alter deposit parameters, maintaining security boundaries.
     /// @dev Requires contract not paused and uses reentrancy guard
     /// @param _depositId The deposit to compound rewards for
     /// @return compoundedAmount Amount of rewards compounded (after fees)
