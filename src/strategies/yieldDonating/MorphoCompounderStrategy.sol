@@ -44,7 +44,8 @@ contract MorphoCompounderStrategy is BaseHealthCheck {
     }
 
     function availableDepositLimit(address /*_owner*/) public view override returns (uint256) {
-        return IERC4626(compounderVault).maxDeposit(address(this));
+        return IERC4626(compounderVault).maxDeposit(address(this)) < asset.balanceOf(address(this)) ? 0 : 
+            IERC4626(compounderVault).maxDeposit(address(this)) - asset.balanceOf(address(this));
     }
 
     function availableWithdrawLimit(address /*_owner*/) public view override returns (uint256) {
