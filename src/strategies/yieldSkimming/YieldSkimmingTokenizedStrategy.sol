@@ -285,6 +285,10 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
      * @inheritdoc TokenizedStrategy
      * @dev Overrides report to handle yield appreciation and loss recovery using value debt approach.
      *
+     * Health check effectiveness depends on report() frequency. Exchange rate checks
+     * become less effective over time if reports are infrequent, as profit limits may be exceeded.
+     * Management should ensure regular reporting or adjust profit/loss ratios based on expected frequency.
+     *
      * Key behaviors:
      * 1. **Value Debt Tracking**: Compares current total value vs user debt (totalValueDebt only)
      * 2. **Profit Capture**: When current value exceeds owed value, mints shares to dragonRouter
@@ -554,7 +558,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         uint256 idle = _asset.balanceOf(address(this));
 
         uint256 loss;
-        
+
         // Check if we need to withdraw funds from yield source.
         if (idle < assets) {
             // Tell Strategy to free what we need from yield source.
@@ -570,12 +574,12 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
                 unchecked {
                     loss = assets - idle;
                 }
-                
+
                 // If a non-default max loss parameter was set, check it
                 if (maxLoss < MAX_BPS) {
                     require(loss <= (assets * maxLoss) / MAX_BPS, "too much loss");
                 }
-                
+
                 // Lower the amount to be withdrawn to what's actually available
                 assets = idle;
             }
