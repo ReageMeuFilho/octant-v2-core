@@ -24,6 +24,9 @@ contract SkyCompounderStrategy is BaseHealthCheck, UniswapV3Swapper, ISkyCompoun
     ///@notice yearn's referral code
     uint16 public referral = 13425;
 
+    ///@notice Minimum amount out for swaps (absolute value)
+    uint256 public minAmountOut = 0; // Default 0 = no protection
+
     address public immutable staking;
     address public immutable rewardsToken;
 
@@ -145,6 +148,17 @@ contract SkyCompounderStrategy is BaseHealthCheck, UniswapV3Swapper, ISkyCompoun
         emit ReferralUpdated(_referral);
     }
 
+    /**
+     * @notice Set the minimum amount out for swaps
+     * @param _minAmountOut minimum amount out (absolute value)
+     * @dev This protects against MEV attacks by ensuring minimum output amounts.
+     * Set to 0 to disable protection (not recommended for production).
+     */
+    function setMinAmountOut(uint256 _minAmountOut) external onlyManagement {
+        minAmountOut = _minAmountOut;
+        emit MinAmountOutUpdated(_minAmountOut);
+    }
+
     function availableDepositLimit(address /*_owner*/) public view override returns (uint256) {
         bool paused = IStaking(staking).paused();
         if (paused) return 0;
@@ -176,18 +190,19 @@ contract SkyCompounderStrategy is BaseHealthCheck, UniswapV3Swapper, ISkyCompoun
     }
 
     function _harvestAndReport() internal override returns (uint256 _totalAssets) {
-        // MEV PROTECTION: The swaps below use minAmountOut=0 which creates front-running vulnerability.
-        // Strategy keepers MUST use private RPCs (Flashbots Protect) to prevent sandwich attacks
-        // until proper slippage protection is implemented. Without private mempool protection,
-        // MEV bots can extract significant value from these reward swaps.
         if (claimRewards) {
             IStaking(staking).getReward();
-            if (useUniV3) {
-                // UniV3
-                _swapFrom(rewardsToken, address(asset), balanceOfRewards(), 0); // minAmountOut = 0 since we only sell rewards
-            } else {
-                // UniV2
-                _uniV2swapFrom(rewardsToken, address(asset), balanceOfRewards(), 0); // minAmountOut = 0 since we only sell rewards
+            // MEV PROTECTION: Use setMinAmountOut() to configure slippage protection.
+            // Strategy keepers should set appropriate minAmountOut values and use private RPCS to prevent sandwich attacks.
+            uint256 rewardBalance = balanceOfRewards();
+            if (rewardBalance > 0) {
+                if (useUniV3) {
+                    // UniV3
+                    _swapFrom(rewardsToken, address(asset), rewardBalance, minAmountOut);
+                } else {
+                    // UniV2
+                    _uniV2swapFrom(rewardsToken, address(asset), rewardBalance, minAmountOut);
+                }
             }
         }
 
