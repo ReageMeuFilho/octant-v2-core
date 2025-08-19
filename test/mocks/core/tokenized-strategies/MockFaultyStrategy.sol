@@ -32,8 +32,7 @@ contract MockFaultyStrategy is BaseStrategy {
             _emergencyAdmin,
             _donationAddress,
             false,
-            _tokenizedStrategyAddress,
-            true
+            _tokenizedStrategyAddress
         )
     {
         yieldSource = _yieldSource;

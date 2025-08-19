@@ -12,8 +12,7 @@ contract MorphoCompounderWrapper is MorphoCompounderStrategy {
         address _emergencyAdmin,
         address _donationAddress,
         bool _enableBurning,
-        address _tokenizedStrategyAddress,
-        bool _allowDepositDuringLoss
+        address _tokenizedStrategyAddress
     )
         MorphoCompounderStrategy(
             _asset,
@@ -23,8 +22,7 @@ contract MorphoCompounderWrapper is MorphoCompounderStrategy {
             _emergencyAdmin,
             _donationAddress,
             _enableBurning,
-            _tokenizedStrategyAddress,
-            _allowDepositDuringLoss
+            _tokenizedStrategyAddress
         )
     {}
 

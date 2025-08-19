@@ -164,8 +164,7 @@ contract MorphoCompounderStrategyTest is Test {
             params.emergencyAdmin,
             params.donationAddress,
             false, // enableBurning
-            address(tokenizedStrategy),
-            params.allowDepositDuringLoss
+            address(tokenizedStrategy)
         );
 
         // Deploy strategy using the factory's createStrategy method

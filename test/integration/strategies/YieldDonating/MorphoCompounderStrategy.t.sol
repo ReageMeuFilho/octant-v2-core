@@ -425,8 +425,7 @@ contract MorphoCompounderDonatingStrategyTest is Test {
             emergencyAdmin,
             donationAddress,
             true, // enableBurning
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
     }
 

@@ -49,8 +49,7 @@ contract BurningMechanismTest is Test {
             keeper,
             emergencyAdmin,
             dragonRouter,
-            true, // enableBurning initially true
-            true // allowDepositDuringLoss
+            true // enableBurning initially true
         );
 
         yieldSkimmingStrategy.initialize(
@@ -60,8 +59,7 @@ contract BurningMechanismTest is Test {
             keeper,
             emergencyAdmin,
             dragonRouter,
-            false, // enableBurning initially false
-            true // allowDepositDuringLoss
+            false // enableBurning initially false
         );
     }
 

@@ -153,8 +153,7 @@ abstract contract BaseStrategy {
         address _emergencyAdmin,
         address _donationAddress,
         bool _enableBurning,
-        address _tokenizedStrategyAddress,
-        bool _allowDepositDuringLoss
+        address _tokenizedStrategyAddress
     ) {
         asset = ERC20(_asset);
         TOKENIZED_STRATEGY_ADDRESS = _tokenizedStrategyAddress;
@@ -173,8 +172,7 @@ abstract contract BaseStrategy {
                     _keeper,
                     _emergencyAdmin,
                     _donationAddress,
-                    _enableBurning,
-                    _allowDepositDuringLoss
+                    _enableBurning
                 )
             )
         );

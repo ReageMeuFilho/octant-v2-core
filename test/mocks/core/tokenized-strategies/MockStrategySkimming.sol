@@ -40,8 +40,7 @@ contract MockStrategySkimming is BaseStrategy {
             _emergencyAdmin,
             _donationAddress,
             false,
-            _tokenizedStrategyAddress,
-            true
+            _tokenizedStrategyAddress
         )
     {
         initialize(_yieldSource, _yieldSource);

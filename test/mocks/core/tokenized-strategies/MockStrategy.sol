@@ -28,8 +28,7 @@ contract MockStrategy is BaseStrategy {
             _emergencyAdmin,
             _donationAddress,
             false,
-            _tokenizedStrategyAddress,
-            true
+            _tokenizedStrategyAddress
         )
     {
         initialize(_asset, _yieldSource);

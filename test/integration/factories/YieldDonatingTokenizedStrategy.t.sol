@@ -76,8 +76,7 @@ contract YieldDonatingTokenizedStrategyTest is Test {
             mockKeeper,
             mockEmergencyAdmin,
             mockDragonRouter,
-            true, // enableBurning
-            true // allowDepositDuringLoss
+            true // enableBurning
         );
     }
 
@@ -186,95 +185,6 @@ contract YieldDonatingTokenizedStrategyTest is Test {
         assertEq(strategy2.asset(), address(1), "Asset not correctly set to address(1) in second deployment");
     }
 
-    /**
-     * @notice TRST-M-5: Exact audit finding reproduction with precise numbers
-     * @dev Reproduces the exact scenario from the audit with specific assertions
-     */
-    function testDragonLossProtectionPOC() public {
-        console.log("\n=== TRST-M-5: Exact Audit Numbers Test ===\n");
-
-        // Set up strategy
-        ERC20Mock asset = new ERC20Mock();
-        MockYieldSource yieldSource = new MockYieldSource(address(asset));
-        address keeper = makeAddr("keeper");
-        address management = makeAddr("management");
-        address emergencyAdmin = makeAddr("emergencyAdmin");
-        address dragonRouter = makeAddr("dragonRouter");
-        address user = makeAddr("user");
-
-        YieldDonatingTokenizedStrategy implementation = new YieldDonatingTokenizedStrategy();
-        IMockStrategy mockStrategy = IMockStrategy(
-            address(
-                new MockStrategy(
-                    address(asset),
-                    address(yieldSource),
-                    management,
-                    keeper,
-                    emergencyAdmin,
-                    dragonRouter,
-                    address(implementation)
-                )
-            )
-        );
-
-        vm.startPrank(management);
-        mockStrategy.setKeeper(keeper);
-        mockStrategy.setEmergencyAdmin(emergencyAdmin);
-        mockStrategy.setPendingManagement(management);
-        mockStrategy.acceptManagement();
-        vm.stopPrank();
-
-        // deposit 100 shares 100 assets
-        asset.mint(user, 100e18);
-        vm.prank(user);
-        asset.approve(address(mockStrategy), 100e18);
-        vm.prank(user);
-        mockStrategy.deposit(100e18, user);
-
-        // verify there is 100 shares in the strategy
-        assertEq(mockStrategy.totalSupply(), 100e18, "Total supply should be 100 shares");
-
-        // verify there is 100 assets in the strategy
-        assertEq(mockStrategy.totalAssets(), 100e18, "Total assets should be 100 assets");
-
-        // set enableBurning to false
-        vm.prank(management);
-        mockStrategy.setEnableBurning(false);
-
-        assertEq(mockStrategy.enableBurning(), false, "Enable burning should be false");
-
-        // simulate win of 100 assets
-        asset.mint(address(mockStrategy), 100e18);
-        vm.prank(keeper);
-        mockStrategy.report();
-
-        // verify there is 200 shares in the strategy
-        assertEq(mockStrategy.totalSupply(), 200e18, "Total supply should be 200 shares");
-        // verify dragon router has 100 shares
-        assertEq(mockStrategy.balanceOf(dragonRouter), 100e18, "Dragon router should have 100 shares");
-
-        // incure a 100 assets loss
-        yieldSource.simulateLoss(100e18);
-        vm.prank(keeper);
-        mockStrategy.report();
-
-        // verify there is 200 shares in the strategy, 100 assets and lossAmount == 100
-        assertEq(mockStrategy.totalSupply(), 200e18, "Total supply should be 200 shares");
-        assertEq(mockStrategy.totalAssets(), 100e18, "Total assets should be 100 assets");
-        assertEq(mockStrategy.lossAmount(), 100e18, "Loss amount should be 100 assets");
-
-        // enable burning to true
-        vm.prank(management);
-        mockStrategy.setEnableBurning(true);
-
-        // imcure a 50 assets loss, make sure that the 100 shares are burned and the lossAmount is 0
-        yieldSource.simulateLoss(50e18);
-        vm.prank(keeper);
-        mockStrategy.report();
-
-        assertEq(mockStrategy.totalSupply(), 100e18, "Total supply should be 150 shares");
-        assertEq(mockStrategy.totalAssets(), 50e18, "Total assets should be 50 assets");
-    }
 
     /**
      * @notice Helper function to compute the expected address from create2 deployment

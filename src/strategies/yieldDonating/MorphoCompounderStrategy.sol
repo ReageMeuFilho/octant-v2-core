@@ -25,8 +25,7 @@ contract MorphoCompounderStrategy is BaseHealthCheck {
         address _emergencyAdmin,
         address _donationAddress,
         bool _enableBurning,
-        address _tokenizedStrategyAddress,
-        bool _allowDepositDuringLoss
+        address _tokenizedStrategyAddress
     )
         BaseHealthCheck(
             _asset,
@@ -36,8 +35,7 @@ contract MorphoCompounderStrategy is BaseHealthCheck {
             _emergencyAdmin,
             _donationAddress,
             _enableBurning,
-            _tokenizedStrategyAddress,
-            _allowDepositDuringLoss
+            _tokenizedStrategyAddress
         )
     {
         // make sure asset is Morpho's asset

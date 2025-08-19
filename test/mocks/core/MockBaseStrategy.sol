@@ -24,8 +24,7 @@ contract MockStrategy is BaseStrategy {
             msg.sender,
             msg.sender,
             false,
-            _tokenizedStrategyAddress,
-            true
+            _tokenizedStrategyAddress
         )
     {
         initialize(_asset, _yieldSource);
