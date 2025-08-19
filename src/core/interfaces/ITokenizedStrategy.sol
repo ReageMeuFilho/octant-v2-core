@@ -81,8 +81,7 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
         address _keeper,
         address _emergencyAdmin,
         address _dragonRouter,
-        bool _enableBurning,
-        bool _allowDepositDuringLoss
+        bool _enableBurning
     ) external;
 
     /*//////////////////////////////////////////////////////////////
@@ -100,26 +99,6 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
      * @return shares The actual amount of shares burnt.
      */
     function withdraw(uint256 assets, address receiver, address owner, uint256 maxLoss) external returns (uint256);
-
-    /**
-     * @notice Safe deposit function that checks minimum shares received.
-     * @dev Can be used anytime, but required when lossAmount > 0 if allowDepositDuringLoss is true.
-     * @param assets The amount of underlying to deposit.
-     * @param receiver The address to receive the shares.
-     * @param minSharesOut The minimum shares that must be received.
-     * @return shares The actual amount of shares issued.
-     */
-    function safeDeposit(uint256 assets, address receiver, uint256 minSharesOut) external returns (uint256 shares);
-
-    /**
-     * @notice Safe mint function that checks maximum assets spent.
-     * @dev Can be used anytime, but required when lossAmount > 0 if allowDepositDuringLoss is true.
-     * @param shares The amount of shares to mint.
-     * @param receiver The address to receive the shares.
-     * @param maxAssets The maximum assets that can be spent.
-     * @return assets The actual amount of assets deposited.
-     */
-    function safeMint(uint256 shares, address receiver, uint256 maxAssets) external returns (uint256);
 
     /**
      * @notice Redeems exactly `shares` from `owner` and
@@ -258,12 +237,6 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
      * @return Whether or not the strategy is shutdown.
      */
     function isShutdown() external view returns (bool);
-
-    /**
-     * @notice Returns the loss amount.
-     * @return The loss amount.
-     */
-    function lossAmount() external view returns (uint256);
 
     /*//////////////////////////////////////////////////////////////
                               SETTERS

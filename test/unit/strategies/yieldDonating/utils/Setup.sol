@@ -65,8 +65,7 @@ contract Setup is Test {
             keeper,
             emergencyAdmin,
             donationAddress,
-            true, // enableBurning
-            true // allowDepositDuringLoss
+            true // enableBurning
         );
 
         // create a mock yield source to deposit into

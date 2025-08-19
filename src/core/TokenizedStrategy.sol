@@ -220,12 +220,8 @@ abstract contract TokenizedStrategy {
         uint8 entered; // To prevent reentrancy. Use uint8 for gas savings.
         bool shutdown; // Bool that can be used to stop deposits into the strategy.
         
-        // Loss tracking for yield strategies
-        uint256 lossAmount; // Accumulated losses to offset against future profits
-        
         // Burning mechanism control
         bool enableBurning; // Whether to burn shares from dragon router during loss protection
-        bool allowDepositDuringLoss; // Whether to allow deposits when there is an ongoing loss
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -329,14 +325,6 @@ abstract contract TokenizedStrategy {
         require(_sender == S.emergencyAdmin || _sender == S.management, "!emergency authorized");
     }
 
-    /**
-     * @notice Returns the loss amount.
-     * @return The loss amount.
-     */
-    function lossAmount() public view returns (uint256) {
-        return _strategyStorage().lossAmount;
-    }
-
     /*//////////////////////////////////////////////////////////////
                                CONSTANTS
     //////////////////////////////////////////////////////////////*/
@@ -438,8 +426,7 @@ abstract contract TokenizedStrategy {
         address _keeper,
         address _emergencyAdmin,
         address _dragonRouter,
-        bool _enableBurning,
-        bool _allowDepositDuringLoss
+        bool _enableBurning
     ) public virtual {
         // Cache storage pointer.
         StrategyData storage S = _strategyStorage();
@@ -456,9 +443,6 @@ abstract contract TokenizedStrategy {
 
         // Set last report to this block.
         S.lastReport = uint96(block.timestamp);
-
-        // Set the allow deposit during loss flag
-        S.allowDepositDuringLoss = _allowDepositDuringLoss;
 
         // Set the default management address. Can't be 0.
         require(_management != address(0), "ZERO ADDRESS");
@@ -498,9 +482,6 @@ abstract contract TokenizedStrategy {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
 
-        // If there is a loss, use safeDeposit
-        require(S.lossAmount == 0, "use safeDeposit");
-
         // Deposit full balance if using max uint.
         if (assets == type(uint256).max) {
             assets = S.asset.balanceOf(msg.sender);
@@ -524,8 +505,6 @@ abstract contract TokenizedStrategy {
     function mint(uint256 shares, address receiver) external virtual nonReentrant returns (uint256 assets) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
-
-        require(S.lossAmount == 0, "use safeMint");
 
         // Checking max mint will also check if shutdown.
         require(shares <= _maxMint(S, receiver), "ERC4626: mint more than max");
@@ -586,54 +565,6 @@ abstract contract TokenizedStrategy {
     function redeem(uint256 shares, address receiver, address owner) external virtual returns (uint256) {
         // We default to not limiting a potential loss.
         return redeem(shares, receiver, owner, MAX_BPS);
-    }
-
-    /**
-     * @notice Safe deposit function that checks minimum shares received.
-     * @dev Can be used anytime, but required when lossAmount > 0 if allowDepositDuringLoss is true.
-     * @param assets The amount of underlying to deposit.
-     * @param receiver The address to receive the shares.
-     * @param minSharesOut The minimum shares that must be received.
-     * @return shares The actual amount of shares issued.
-     */
-    function safeDeposit(
-        uint256 assets,
-        address receiver,
-        uint256 minSharesOut
-    ) external nonReentrant returns (uint256 shares) {
-        StrategyData storage S = _strategyStorage();
-
-        if (assets == type(uint256).max) {
-            assets = S.asset.balanceOf(msg.sender);
-        }
-
-        require(assets <= _maxDeposit(S, receiver), "ERC4626: deposit more than max");
-        require((shares = _convertToShares(S, assets, Math.Rounding.Floor)) >= minSharesOut, "slippage");
-        require(shares != 0, "ZERO_SHARES");
-
-        _deposit(S, receiver, assets, shares);
-    }
-
-    /**
-     * @notice Safe mint function that checks maximum assets spent.
-     * @dev Can be used anytime, but required when lossAmount > 0 if allowDepositDuringLoss is true.
-     * @param shares The amount of shares to mint.
-     * @param receiver The address to receive the shares.
-     * @param maxAssets The maximum assets that can be spent.
-     * @return assets The actual amount of assets deposited.
-     */
-    function safeMint(
-        uint256 shares,
-        address receiver,
-        uint256 maxAssets
-    ) external nonReentrant returns (uint256 assets) {
-        StrategyData storage S = _strategyStorage();
-
-        require(shares <= _maxMint(S, receiver), "ERC4626: mint more than max");
-        require((assets = _convertToAssets(S, shares, Math.Rounding.Ceil)) <= maxAssets, "slippage");
-        require(assets != 0, "ZERO_ASSETS");
-
-        _deposit(S, receiver, assets, shares);
     }
 
     /**
@@ -870,23 +801,6 @@ abstract contract TokenizedStrategy {
         return assets.mulDiv(totalSupply_, totalAssets_, _rounding);
     }
 
-    function _convertToSharesWithLoss(
-        StrategyData storage S,
-        uint256 assets,
-        Math.Rounding _rounding
-    ) internal view returns (uint256) {
-        // Saves an extra SLOAD if values are non-zero.
-        uint256 totalSupply_ = _totalSupply(S);
-        // If supply is 0, PPS = 1.
-        if (totalSupply_ == 0) return assets;
-
-        uint256 totalAssets_ = _totalAssets(S);
-        // If assets are 0 but supply is not PPS = 0.
-        if (totalAssets_ == 0) return 0;
-
-        return assets.mulDiv(totalSupply_, totalAssets_ + S.lossAmount, _rounding);
-    }
-
     /// @dev Internal implementation of {convertToAssets}.
     function _convertToAssets(
         StrategyData storage S,
@@ -904,9 +818,6 @@ abstract contract TokenizedStrategy {
         // Cannot deposit when shutdown or to the strategy.
         if (S.shutdown || receiver == address(this)) return 0;
 
-        // If there's a loss and deposits are not allowed during loss, return 0
-        if (S.lossAmount > 0 && !S.allowDepositDuringLoss) return 0;
-
         return IBaseStrategy(address(this)).availableDepositLimit(receiver);
     }
 
@@ -914,9 +825,6 @@ abstract contract TokenizedStrategy {
     function _maxMint(StrategyData storage S, address receiver) internal view returns (uint256 maxMint_) {
         // Cannot mint when shutdown or to the strategy.
         if (S.shutdown || receiver == address(this)) return 0;
-
-        // If there's a loss and deposits are not allowed during loss, return 0
-        if (S.lossAmount > 0 && !S.allowDepositDuringLoss) return 0;
 
         maxMint_ = IBaseStrategy(address(this)).availableDepositLimit(receiver);
         if (maxMint_ != type(uint256).max) {

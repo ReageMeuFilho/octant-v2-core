@@ -34,19 +34,9 @@ contract MockTokenizedStrategyWithLoss is TokenizedStrategy, IBaseStrategy {
         address _keeper,
         address _emergencyAdmin,
         address _dragonRouter,
-        bool _enableBurning,
-        bool _allowDepositDuringLoss
+        bool _enableBurning
     ) public override {
-        super.initialize(
-            _asset,
-            _name,
-            _management,
-            _keeper,
-            _emergencyAdmin,
-            _dragonRouter,
-            _enableBurning,
-            _allowDepositDuringLoss
-        );
+        super.initialize(_asset, _name, _management, _keeper, _emergencyAdmin, _dragonRouter, _enableBurning);
         mockTotalAssets = 0;
         mockAvailableDepositLimit = type(uint256).max;
         mockAvailableWithdrawLimit = type(uint256).max;
@@ -62,11 +52,6 @@ contract MockTokenizedStrategyWithLoss is TokenizedStrategy, IBaseStrategy {
     }
 
     function availableDepositLimit(address) external view override returns (uint256) {
-        // If there's a loss and deposits are not allowed, return 0
-        StrategyData storage S = _strategyStorage();
-        if (S.lossAmount > 0 && !S.allowDepositDuringLoss) {
-            return 0;
-        }
         return mockAvailableDepositLimit;
     }
 
@@ -112,22 +97,6 @@ contract MockTokenizedStrategyWithLoss is TokenizedStrategy, IBaseStrategy {
      */
     function setMockTotalAssets(uint256 _totalAssets) external {
         mockTotalAssets = _totalAssets;
-    }
-
-    /**
-     * @dev Directly set loss amount for testing
-     */
-    function setLossAmount(uint256 _lossAmount) external {
-        StrategyData storage S = _strategyStorage();
-        S.lossAmount = _lossAmount;
-    }
-
-    /**
-     * @dev Get current loss amount
-     */
-    function getLossAmount() external view returns (uint256) {
-        StrategyData storage S = _strategyStorage();
-        return S.lossAmount;
     }
 
     /**
@@ -181,10 +150,6 @@ contract MockTokenizedStrategyWithLoss is TokenizedStrategy, IBaseStrategy {
             _lossAmount = mockTotalAssets;
         }
         mockTotalAssets -= _lossAmount;
-
-        // Add to loss tracking
-        StrategyData storage S = _strategyStorage();
-        S.lossAmount += _lossAmount;
     }
 
     /**
@@ -210,14 +175,6 @@ contract MockTokenizedStrategyWithLoss is TokenizedStrategy, IBaseStrategy {
     }
 
     /**
-     * @dev Get the allowDepositDuringLoss flag for testing
-     */
-    function getAllowDepositDuringLoss() external view returns (bool) {
-        StrategyData storage S = _strategyStorage();
-        return S.allowDepositDuringLoss;
-    }
-
-    /**
      * @dev Mint shares directly to an address (for testing)
      */
     function mintShares(address _to, uint256 _shares) external {
@@ -235,32 +192,20 @@ contract MockTokenizedStrategyWithLoss is TokenizedStrategy, IBaseStrategy {
 
     /* =============== CONVERSION OVERRIDE =============== */
 
-    /**
-     * @dev Override to use loss-aware conversion like YieldDonatingTokenizedStrategy
-     */
-    function _convertToShares(
-        StrategyData storage S,
-        uint256 assets,
-        Math.Rounding _rounding
-    ) internal view override returns (uint256) {
-        return _convertToSharesWithLoss(S, assets, _rounding);
-    }
-
     /* =============== TESTING UTILITIES =============== */
 
     /**
-     * @dev Create a scenario with deposits, total assets, and loss
+     * @dev Create a scenario with deposits and total assets
      */
     function setupTestScenario(
         uint256, // _initialDeposits - unused
         uint256 _currentTotalAssets,
-        uint256 _lossAmount
+        uint256 // _lossAmount - no longer used
     ) external {
         // Set up the scenario
         mockTotalAssets = _currentTotalAssets;
 
         StrategyData storage S = _strategyStorage();
-        S.lossAmount = _lossAmount;
         S.totalAssets = _currentTotalAssets;
     }
 
@@ -274,7 +219,6 @@ contract MockTokenizedStrategyWithLoss is TokenizedStrategy, IBaseStrategy {
         shouldRevertOnHarvest = false;
 
         StrategyData storage S = _strategyStorage();
-        S.lossAmount = 0;
         S.totalAssets = 0;
     }
 }
