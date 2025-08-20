@@ -83,7 +83,6 @@ contract QuadraticVotingAdminJourneyTest is Test {
             quorumShares: QUORUM_REQUIREMENT,
             timelockDelay: TIMELOCK_DELAY,
             gracePeriod: 7 days,
-            startBlock: block.number + 50,
             owner: address(0)
         });
 
@@ -124,7 +123,6 @@ contract QuadraticVotingAdminJourneyTest is Test {
             quorumShares: 300,
             timelockDelay: 2 days,
             gracePeriod: 14 days,
-            startBlock: block.number + 100,
             owner: address(0)
         });
 
@@ -140,9 +138,6 @@ contract QuadraticVotingAdminJourneyTest is Test {
 
     /// @notice Test admin monitoring during voting process
     function testAdminMonitoring_VotingProcess() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
-
         // Setup realistic voting scenario
         _signupUser(alice, LARGE_DEPOSIT);
         _signupUser(bob, MEDIUM_DEPOSIT);
@@ -153,8 +148,8 @@ contract QuadraticVotingAdminJourneyTest is Test {
 
         assertEq(_tokenized(address(mechanism)).getProposalCount(), 2);
 
-        // Admin monitors voting progress
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        // Admin monitors voting progress - advance to voting period
+        vm.warp(block.timestamp + VOTING_DELAY + 1);
 
         _castVote(alice, pid1, 22);
         _castVote(bob, pid1, 8);
@@ -183,14 +178,12 @@ contract QuadraticVotingAdminJourneyTest is Test {
 
     /// @notice Test admin finalization process
     function testAdminFinalization_Process() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
-
         // Setup voting
         _signupUser(alice, LARGE_DEPOSIT);
         uint256 pid = _createProposal(alice, charlie, "Test Proposal");
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        // Advance to voting period
+        vm.warp(block.timestamp + VOTING_DELAY + 1);
 
         _castVote(alice, pid, 20);
 
@@ -199,7 +192,7 @@ contract QuadraticVotingAdminJourneyTest is Test {
         _tokenized(address(mechanism)).finalizeVoteTally();
 
         // Successful finalization after voting period
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(block.timestamp + VOTING_PERIOD + 1);
         assertFalse(_tokenized(address(mechanism)).tallyFinalized());
 
         _tokenized(address(mechanism)).finalizeVoteTally();
@@ -212,9 +205,6 @@ contract QuadraticVotingAdminJourneyTest is Test {
 
     /// @notice Test admin proposal queuing and execution
     function testAdminExecution_ProposalQueuing() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
-
         // Setup successful and failed proposals
         _signupUser(alice, LARGE_DEPOSIT);
         _signupUser(bob, MEDIUM_DEPOSIT);
@@ -222,7 +212,8 @@ contract QuadraticVotingAdminJourneyTest is Test {
         uint256 pidSuccessful = _createProposal(alice, charlie, "Successful Project");
         uint256 pidFailed = _createProposal(bob, dave, "Failed Project");
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        // Advance to voting period
+        vm.warp(block.timestamp + VOTING_DELAY + 1);
 
         // Create outcomes: one success, one failure
         _castVote(alice, pidSuccessful, 25);
@@ -231,7 +222,8 @@ contract QuadraticVotingAdminJourneyTest is Test {
         // Failed proposal gets insufficient votes
         _castVote(bob, pidFailed, 8);
 
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        // Advance past voting period
+        vm.warp(block.timestamp + VOTING_PERIOD + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
 
@@ -315,16 +307,14 @@ contract QuadraticVotingAdminJourneyTest is Test {
 
     /// @notice Test admin crisis management and recovery
     function testAdminCrisis_ManagementRecovery() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
-
         // Setup scenario with potential failures
         _signupUser(alice, LARGE_DEPOSIT);
         _signupUser(bob, MEDIUM_DEPOSIT);
 
         uint256 pid = _createProposal(alice, charlie, "Test proposal");
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        // Advance to voting period
+        vm.warp(block.timestamp + VOTING_DELAY + 1);
 
         _castVote(alice, pid, 20);
 
@@ -369,7 +359,7 @@ contract QuadraticVotingAdminJourneyTest is Test {
         vm.stopPrank();
 
         // Complete voting cycle to verify system integrity
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(block.timestamp + VOTING_PERIOD + 1);
 
         vm.startPrank(emergencyAdmin);
         (bool success6, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));

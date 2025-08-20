@@ -72,7 +72,6 @@ contract EIP712SignatureTest is Test {
             quorumShares: QUORUM_SHARES,
             timelockDelay: 1 days,
             gracePeriod: 7 days,
-            startBlock: block.number + 10,
             owner: address(this)
         });
 
@@ -156,7 +155,7 @@ contract EIP712SignatureTest is Test {
 
     function test_SignupWithSignature_Success() public {
         // Move to valid signup period
-        vm.roll(_tokenized(address(mechanism)).startBlock() - 1);
+        vm.warp(block.timestamp + 1);
 
         // Prepare signature
         uint256 nonce = _tokenized(address(mechanism)).nonces(alice);
@@ -178,7 +177,7 @@ contract EIP712SignatureTest is Test {
     }
 
     function test_SignupWithSignature_ZeroDeposit() public {
-        vm.roll(_tokenized(address(mechanism)).startBlock() - 1);
+        vm.warp(block.timestamp + 1);
 
         uint256 nonce = _tokenized(address(mechanism)).nonces(bob);
         uint256 deadline = block.timestamp + 1 hours;
@@ -192,7 +191,7 @@ contract EIP712SignatureTest is Test {
     }
 
     function test_SignupWithSignature_NonceIncrement() public {
-        vm.roll(_tokenized(address(mechanism)).startBlock() - 1);
+        vm.warp(block.timestamp + 1);
 
         uint256 initialNonce = _tokenized(address(mechanism)).nonces(alice);
 
@@ -210,7 +209,7 @@ contract EIP712SignatureTest is Test {
     }
 
     function test_SignupWithSignature_InvalidSignature() public {
-        vm.roll(_tokenized(address(mechanism)).startBlock() - 1);
+        vm.warp(block.timestamp + 1);
 
         uint256 nonce = _tokenized(address(mechanism)).nonces(alice);
         uint256 deadline = block.timestamp + 1 hours;
@@ -227,7 +226,7 @@ contract EIP712SignatureTest is Test {
     }
 
     function test_SignupWithSignature_WrongSigner() public {
-        vm.roll(_tokenized(address(mechanism)).startBlock() - 1);
+        vm.warp(block.timestamp + 1);
 
         uint256 nonce = _tokenized(address(mechanism)).nonces(alice);
         uint256 deadline = block.timestamp + 1 hours;
@@ -241,7 +240,7 @@ contract EIP712SignatureTest is Test {
     }
 
     function test_SignupWithSignature_ExpiredDeadline() public {
-        vm.roll(_tokenized(address(mechanism)).startBlock() - 1);
+        vm.warp(block.timestamp + 1);
 
         uint256 nonce = _tokenized(address(mechanism)).nonces(alice);
         uint256 deadline = block.timestamp - 1; // Expired
@@ -255,7 +254,7 @@ contract EIP712SignatureTest is Test {
     }
 
     function test_SignupWithSignature_ReplayAttack() public {
-        vm.roll(_tokenized(address(mechanism)).startBlock() - 1);
+        vm.warp(block.timestamp + 1);
 
         uint256 nonce = _tokenized(address(mechanism)).nonces(alice);
         uint256 deadline = block.timestamp + 1 hours;
@@ -274,7 +273,7 @@ contract EIP712SignatureTest is Test {
     }
 
     function test_SignupWithSignature_RelayerExecution() public {
-        vm.roll(_tokenized(address(mechanism)).startBlock() - 1);
+        vm.warp(block.timestamp + 1);
 
         uint256 nonce = _tokenized(address(mechanism)).nonces(alice);
         uint256 deadline = block.timestamp + 1 hours;
@@ -296,21 +295,18 @@ contract EIP712SignatureTest is Test {
 
     function test_CastVoteWithSignature_Success() public {
         // Setup: Alice signs up first
-        vm.roll(_tokenized(address(mechanism)).startBlock() - 1);
+        vm.warp(block.timestamp + 1);
         vm.startPrank(alice);
         token.approve(address(mechanism), DEPOSIT_AMOUNT);
         _tokenized(address(mechanism)).signup(DEPOSIT_AMOUNT);
         vm.stopPrank();
-
-        // Move to proposal phase
-        vm.roll(_tokenized(address(mechanism)).startBlock());
 
         // Create a proposal
         vm.prank(alice);
         uint256 pid = _tokenized(address(mechanism)).propose(address(0x123), "Test proposal");
 
         // Move to voting phase
-        vm.roll(_tokenized(address(mechanism)).startBlock() + VOTING_DELAY);
+        vm.warp(block.timestamp + VOTING_DELAY);
 
         // Prepare vote signature
         uint256 nonce = _tokenized(address(mechanism)).nonces(alice);
@@ -345,7 +341,7 @@ contract EIP712SignatureTest is Test {
 
     function test_CastVoteWithSignature_AllChoices() public {
         // Setup users and proposals
-        vm.roll(_tokenized(address(mechanism)).startBlock() - 1);
+        vm.warp(block.timestamp + 1);
 
         // All users signup
         address[3] memory users = [alice, bob, charlie];
@@ -359,7 +355,6 @@ contract EIP712SignatureTest is Test {
         }
 
         // Create proposals
-        vm.roll(_tokenized(address(mechanism)).startBlock());
         uint256[3] memory pids;
         for (uint i = 0; i < 3; i++) {
             vm.prank(alice);
@@ -367,7 +362,7 @@ contract EIP712SignatureTest is Test {
         }
 
         // Move to voting phase
-        vm.roll(_tokenized(address(mechanism)).startBlock() + VOTING_DELAY);
+        vm.warp(block.timestamp + VOTING_DELAY);
 
         // Test each vote type
         TokenizedAllocationMechanism.VoteType[3] memory voteTypes = [
@@ -405,17 +400,16 @@ contract EIP712SignatureTest is Test {
 
     function test_CastVoteWithSignature_InvalidSignature() public {
         // Setup
-        vm.roll(_tokenized(address(mechanism)).startBlock() - 1);
+        vm.warp(block.timestamp + 1);
         vm.startPrank(alice);
         token.approve(address(mechanism), DEPOSIT_AMOUNT);
         _tokenized(address(mechanism)).signup(DEPOSIT_AMOUNT);
         vm.stopPrank();
 
-        vm.roll(_tokenized(address(mechanism)).startBlock());
         vm.prank(alice);
         uint256 pid = _tokenized(address(mechanism)).propose(address(0x123), "Test");
 
-        vm.roll(_tokenized(address(mechanism)).startBlock() + VOTING_DELAY);
+        vm.warp(block.timestamp + VOTING_DELAY);
 
         uint256 nonce = _tokenized(address(mechanism)).nonces(alice);
         uint256 deadline = block.timestamp + 1 hours;
@@ -442,17 +436,16 @@ contract EIP712SignatureTest is Test {
 
     function test_CastVoteWithSignature_ExpiredDeadline() public {
         // Setup
-        vm.roll(_tokenized(address(mechanism)).startBlock() - 1);
+        vm.warp(block.timestamp + 1);
         vm.startPrank(alice);
         token.approve(address(mechanism), DEPOSIT_AMOUNT);
         _tokenized(address(mechanism)).signup(DEPOSIT_AMOUNT);
         vm.stopPrank();
 
-        vm.roll(_tokenized(address(mechanism)).startBlock());
         vm.prank(alice);
         uint256 pid = _tokenized(address(mechanism)).propose(address(0x123), "Test");
 
-        vm.roll(_tokenized(address(mechanism)).startBlock() + VOTING_DELAY);
+        vm.warp(block.timestamp + VOTING_DELAY);
 
         uint256 nonce = _tokenized(address(mechanism)).nonces(alice);
         uint256 deadline = block.timestamp - 1; // Expired
@@ -476,18 +469,17 @@ contract EIP712SignatureTest is Test {
 
     function test_CastVoteWithSignature_ReplayAttack() public {
         // Setup
-        vm.roll(_tokenized(address(mechanism)).startBlock() - 1);
+        vm.warp(block.timestamp + 1);
         vm.startPrank(alice);
         token.approve(address(mechanism), DEPOSIT_AMOUNT);
         _tokenized(address(mechanism)).signup(DEPOSIT_AMOUNT);
         vm.stopPrank();
 
-        vm.roll(_tokenized(address(mechanism)).startBlock());
         vm.prank(alice);
         uint256 pid1 = _tokenized(address(mechanism)).propose(address(0x123), "Test 1");
         // Create second proposal but we don't use pid2 in this test
 
-        vm.roll(_tokenized(address(mechanism)).startBlock() + VOTING_DELAY);
+        vm.warp(block.timestamp + VOTING_DELAY);
 
         uint256 nonce = _tokenized(address(mechanism)).nonces(alice);
         uint256 deadline = block.timestamp + 1 hours;
@@ -524,7 +516,7 @@ contract EIP712SignatureTest is Test {
 
     function test_E2E_SignupAndVote() public {
         // Complete flow using only signatures
-        vm.roll(_tokenized(address(mechanism)).startBlock() - 1);
+        vm.warp(block.timestamp + 1);
 
         // Signup with signature
         uint256 signupNonce = _tokenized(address(mechanism)).nonces(alice);
@@ -539,12 +531,11 @@ contract EIP712SignatureTest is Test {
         _tokenized(address(mechanism)).signupWithSignature(alice, DEPOSIT_AMOUNT, signupDeadline, sv, sr, ss);
 
         // Create proposal (still needs direct call)
-        vm.roll(_tokenized(address(mechanism)).startBlock());
         vm.prank(alice);
         uint256 pid = _tokenized(address(mechanism)).propose(address(0x123), "E2E Test");
 
         // Vote with signature
-        vm.roll(_tokenized(address(mechanism)).startBlock() + VOTING_DELAY);
+        vm.warp(block.timestamp + VOTING_DELAY);
 
         uint256 voteNonce = _tokenized(address(mechanism)).nonces(alice);
         uint256 voteDeadline = block.timestamp + 1 hours;
@@ -570,7 +561,7 @@ contract EIP712SignatureTest is Test {
     }
 
     function test_E2E_MixedMethods() public {
-        vm.roll(_tokenized(address(mechanism)).startBlock() - 1);
+        vm.warp(block.timestamp + 1);
 
         // Alice uses direct signup
         vm.startPrank(alice);
@@ -590,12 +581,11 @@ contract EIP712SignatureTest is Test {
         _tokenized(address(mechanism)).signupWithSignature(bob, DEPOSIT_AMOUNT, bobDeadline, bv, br, bs);
 
         // Create proposal
-        vm.roll(_tokenized(address(mechanism)).startBlock());
         vm.prank(alice);
         uint256 pid = _tokenized(address(mechanism)).propose(address(0x123), "Mixed test");
 
         // Voting phase
-        vm.roll(_tokenized(address(mechanism)).startBlock() + VOTING_DELAY);
+        vm.warp(block.timestamp + VOTING_DELAY);
 
         // Alice votes directly
         vm.prank(alice);
@@ -623,7 +613,7 @@ contract EIP712SignatureTest is Test {
     }
 
     function test_NonceSharing() public {
-        vm.roll(_tokenized(address(mechanism)).startBlock() - 1);
+        vm.warp(block.timestamp + 1);
 
         uint256 initialNonce = _tokenized(address(mechanism)).nonces(alice);
 
@@ -640,12 +630,11 @@ contract EIP712SignatureTest is Test {
         assertEq(_tokenized(address(mechanism)).nonces(alice), initialNonce + 1, "Nonce should increment after signup");
 
         // Create proposal for voting
-        vm.roll(_tokenized(address(mechanism)).startBlock());
         vm.prank(alice);
         uint256 pid = _tokenized(address(mechanism)).propose(address(0x123), "Test");
 
         // Vote uses next nonce
-        vm.roll(_tokenized(address(mechanism)).startBlock() + VOTING_DELAY);
+        vm.warp(block.timestamp + VOTING_DELAY);
 
         uint256 voteNonce = _tokenized(address(mechanism)).nonces(alice);
         assertEq(voteNonce, initialNonce + 1, "Vote should use incremented nonce");
@@ -675,7 +664,7 @@ contract EIP712SignatureTest is Test {
         assertEq(_tokenized(address(mechanism)).nonces(bob), 0, "Initial nonce should be 0");
 
         // Use a signature to increment nonce
-        vm.roll(_tokenized(address(mechanism)).startBlock() - 1);
+        vm.warp(block.timestamp + 1);
 
         uint256 deadline = block.timestamp + 1 hours;
         bytes32 digest = _getSignupDigest(alice, 0, 0, deadline);
@@ -699,7 +688,7 @@ contract EIP712SignatureTest is Test {
     // ============ Gas Comparison Tests ============
 
     function test_GasComparison_DirectVsSignature() public {
-        vm.roll(_tokenized(address(mechanism)).startBlock() - 1);
+        vm.warp(block.timestamp + 1);
 
         // Measure direct signup gas
         vm.startPrank(alice);

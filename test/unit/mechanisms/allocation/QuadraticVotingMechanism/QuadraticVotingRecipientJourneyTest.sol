@@ -184,7 +184,7 @@ contract QuadraticVotingRecipientJourneyTest is Test {
             quorumShares: QUORUM_REQUIREMENT,
             timelockDelay: TIMELOCK_DELAY,
             gracePeriod: 7 days,
-            startBlock: block.number + 50,
+
             owner: address(0)
         });
 
@@ -242,8 +242,13 @@ contract QuadraticVotingRecipientJourneyTest is Test {
     /// @notice Test recipient monitoring and outcome tracking
     function testRecipientMonitoring_OutcomeTracking() public {
         _clearTestContext();
-        currentTestCtx.startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(currentTestCtx.startBlock - 1);
+        
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism was deployed
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Setup voting scenario with multiple outcomes
         _signupUser(alice, LARGE_DEPOSIT);
@@ -255,7 +260,8 @@ contract QuadraticVotingRecipientJourneyTest is Test {
         currentTestCtx.pidDave = _createProposal(bob, dave, "Dave's Project");
         currentTestCtx.pidEve = _createProposal(alice, eve, "Eve's Project");
 
-        vm.roll(currentTestCtx.startBlock + VOTING_DELAY + 1);
+        // Use absolute warp for voting
+        vm.warp(votingStartTime + 1);
 
         // Create different voting outcomes
         // Charlie: Successful (meets quorum)
@@ -292,7 +298,7 @@ contract QuadraticVotingRecipientJourneyTest is Test {
         assertTrue(currentTestCtx.eveFor > 0, "Eve should have funding from For votes");
 
         // End voting and finalize
-        vm.roll(currentTestCtx.startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
 
@@ -313,8 +319,12 @@ contract QuadraticVotingRecipientJourneyTest is Test {
 
     /// @notice Test recipient share allocation and redemption
     function testRecipientShares_AllocationRedemption() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism was deployed
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Setup successful proposal scenario
         _signupUser(alice, LARGE_DEPOSIT);
@@ -322,13 +332,14 @@ contract QuadraticVotingRecipientJourneyTest is Test {
 
         uint256 pid = _createProposal(alice, charlie, "Charlie's Successful Project");
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        // Use absolute warp for voting
+        vm.warp(votingStartTime + 1);
 
         // Generate successful vote outcome
         _castVote(alice, pid, 30);
         _castVote(bob, pid, 20);
 
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
 
@@ -383,8 +394,13 @@ contract QuadraticVotingRecipientJourneyTest is Test {
     /// @notice Test recipient partial redemption and share management
     function testRecipientShares_PartialRedemption() public {
         _clearTestContext();
-        currentTestCtx.startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(currentTestCtx.startBlock - 1);
+        
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism was deployed
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Setup multiple successful recipients
         vm.startPrank(alice);
@@ -400,13 +416,14 @@ contract QuadraticVotingRecipientJourneyTest is Test {
         currentTestCtx.pid1 = _createProposal(alice, charlie, "Charlie's Project");
         currentTestCtx.pid2 = _createProposal(bob, dave, "Dave's Project");
 
-        vm.roll(currentTestCtx.startBlock + VOTING_DELAY + 1);
+        // Use absolute warp for voting
+        vm.warp(votingStartTime + 1);
 
         // Vote for both proposals
         _castVote(alice, currentTestCtx.pid1, 30);
         _castVote(bob, currentTestCtx.pid2, 25);
 
-        vm.roll(currentTestCtx.startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
 
@@ -578,8 +595,12 @@ contract QuadraticVotingRecipientJourneyTest is Test {
 
     /// @notice Test recipient share transferability and ERC20 functionality
     function testRecipientShares_TransferabilityERC20() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism was deployed
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Setup successful allocation
         vm.startPrank(alice);
@@ -589,11 +610,12 @@ contract QuadraticVotingRecipientJourneyTest is Test {
 
         uint256 pid = _createProposal(alice, charlie, "Charlie's Project");
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        // Use absolute warp for voting
+        vm.warp(votingStartTime + 1);
 
         _castVote(alice, pid, 30);
 
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
 
@@ -606,7 +628,7 @@ contract QuadraticVotingRecipientJourneyTest is Test {
 
         // Test that transfers are blocked before redemption period
         vm.prank(charlie);
-        vm.expectRevert("Transfers not allowed until redemption period");
+        vm.expectRevert("Transfers only allowed during redemption period");
         _tokenized(address(mechanism)).transfer(dave, charlieShares / 3);
 
         // Fast forward to redemption period start

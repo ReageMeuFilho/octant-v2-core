@@ -48,7 +48,6 @@ contract SweepFunctionalityTest is Test {
             quorumShares: 200 ether,
             timelockDelay: TIMELOCK_DELAY,
             gracePeriod: GRACE_PERIOD,
-            startBlock: block.number + 5,
             owner: address(this) // Factory will override this to be msg.sender
         });
 
@@ -60,8 +59,12 @@ contract SweepFunctionalityTest is Test {
     }
 
     function testSweepAfterGracePeriod() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism was deployed
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Setup allocation
         vm.startPrank(alice);
@@ -71,11 +74,11 @@ contract SweepFunctionalityTest is Test {
         vm.stopPrank();
 
         // Vote and finalize
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.warp(votingStartTime + 1);
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 500 ether);
 
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
 
         _tokenized(address(mechanism)).finalizeVoteTally();
 
@@ -138,9 +141,14 @@ contract SweepFunctionalityTest is Test {
     }
 
     function testSweepRequiresGracePeriodExpired() public {
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism was deployed
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingEndTime = deploymentTime + votingDelay + votingPeriod;
+        
         // Setup and finalize to set globalRedemptionStart
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
         _tokenized(address(mechanism)).finalizeVoteTally();
 
         // Try to sweep before grace period expires
@@ -150,8 +158,11 @@ contract SweepFunctionalityTest is Test {
     }
 
     function testSweepInvalidReceiver() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism was deployed
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingEndTime = deploymentTime + votingDelay + votingPeriod;
 
         // Setup and finalize
         vm.startPrank(alice);
@@ -159,7 +170,7 @@ contract SweepFunctionalityTest is Test {
         _tokenized(address(mechanism)).signup(1000 ether);
         vm.stopPrank();
 
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
 
         _tokenized(address(mechanism)).finalizeVoteTally();
 
@@ -183,17 +194,19 @@ contract SweepFunctionalityTest is Test {
             quorumShares: 200 ether,
             timelockDelay: TIMELOCK_DELAY,
             gracePeriod: GRACE_PERIOD,
-            startBlock: block.number + 5,
             owner: address(this)
         });
 
         address emptyMechanism = factory.deploySimpleVotingMechanism(config);
 
-        uint256 startBlock = _tokenized(emptyMechanism).startBlock();
-        vm.roll(startBlock - 1);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism was deployed
+        uint256 votingDelay = _tokenized(emptyMechanism).votingDelay();
+        uint256 votingPeriod = _tokenized(emptyMechanism).votingPeriod();
+        uint256 votingEndTime = deploymentTime + votingDelay + votingPeriod;
 
         // Setup and finalize without any deposits
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
 
         _tokenized(emptyMechanism).finalizeVoteTally();
 

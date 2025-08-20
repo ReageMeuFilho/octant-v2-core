@@ -36,7 +36,6 @@ contract DebugQuorum is Test {
             quorumShares: 500, // Adjusted for quadratic funding
             timelockDelay: 1000,
             gracePeriod: 5000,
-            startBlock: block.number + 5,
             owner: address(0)
         });
 
@@ -48,8 +47,12 @@ contract DebugQuorum is Test {
     }
 
     function testDebugQuorum() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // Get absolute timeline from contract
+        uint256 deploymentTime = block.timestamp;
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Setup
         vm.startPrank(alice);
@@ -63,7 +66,7 @@ contract DebugQuorum is Test {
         console.log("Quorum requirement:", _tokenized(address(mechanism)).quorumShares());
 
         // Try different vote weights to find minimum for quorum
-        vm.roll(startBlock + 11);
+        vm.warp(votingStartTime + 1);
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 31); // 31^2 = 961 > 200 ether quorum
 
@@ -113,7 +116,7 @@ contract DebugQuorum is Test {
         console.log("Meets quorum (correct calc)?", correctWeightedFunding >= 200 ether);
 
         // Try to finalize
-        vm.roll(startBlock + 111);
+        vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
 

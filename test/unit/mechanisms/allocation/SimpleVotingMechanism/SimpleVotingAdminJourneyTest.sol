@@ -50,7 +50,6 @@ contract SimpleVotingAdminJourneyTest is Test {
             quorumShares: QUORUM_REQUIREMENT,
             timelockDelay: TIMELOCK_DELAY,
             gracePeriod: 7 days,
-            startBlock: block.number + 50,
             owner: address(0)
         });
 
@@ -87,7 +86,6 @@ contract SimpleVotingAdminJourneyTest is Test {
             quorumShares: 100 ether,
             timelockDelay: 2 days,
             gracePeriod: 14 days,
-            startBlock: block.number + 100,
             owner: address(0)
         });
 
@@ -103,8 +101,10 @@ contract SimpleVotingAdminJourneyTest is Test {
 
     /// @notice Test admin monitoring during voting process
     function testAdminMonitoring_VotingProcess() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism was deployed
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingStartTime = deploymentTime + votingDelay;
 
         // Setup realistic voting scenario
         vm.startPrank(alice);
@@ -127,7 +127,7 @@ contract SimpleVotingAdminJourneyTest is Test {
         assertEq(_tokenized(address(mechanism)).getProposalCount(), 2);
 
         // Admin monitors voting progress
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.warp(votingStartTime + 1);
 
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, 600 ether);
@@ -162,8 +162,12 @@ contract SimpleVotingAdminJourneyTest is Test {
 
     /// @notice Test admin finalization process
     function testAdminFinalization_Process() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism was deployed
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Setup voting
         vm.startPrank(alice);
@@ -174,7 +178,7 @@ contract SimpleVotingAdminJourneyTest is Test {
         vm.prank(alice);
         uint256 pid = _tokenized(address(mechanism)).propose(charlie, "Test Proposal");
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.warp(votingStartTime + 1);
 
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 500 ether);
@@ -184,7 +188,7 @@ contract SimpleVotingAdminJourneyTest is Test {
         _tokenized(address(mechanism)).finalizeVoteTally();
 
         // Successful finalization after voting period
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
         assertFalse(_tokenized(address(mechanism)).tallyFinalized());
 
         _tokenized(address(mechanism)).finalizeVoteTally();
@@ -197,8 +201,12 @@ contract SimpleVotingAdminJourneyTest is Test {
 
     /// @notice Test admin proposal queuing and execution
     function testAdminExecution_ProposalQueuing() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism was deployed
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Setup successful and failed proposals
         vm.startPrank(alice);
@@ -217,7 +225,7 @@ contract SimpleVotingAdminJourneyTest is Test {
         vm.prank(bob);
         uint256 pidFailed = _tokenized(address(mechanism)).propose(dave, "Failed Project");
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.warp(votingStartTime + 1);
 
         // Create outcomes: one success, one failure
         vm.prank(alice);
@@ -230,7 +238,7 @@ contract SimpleVotingAdminJourneyTest is Test {
         vm.prank(bob);
         _tokenized(address(mechanism)).castVote(pidFailed, TokenizedAllocationMechanism.VoteType.For, 100 ether);
 
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
 
@@ -310,8 +318,12 @@ contract SimpleVotingAdminJourneyTest is Test {
 
     /// @notice Test admin crisis management and recovery
     function testAdminCrisis_ManagementRecovery() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism was deployed
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Setup scenario with potential failures
         vm.startPrank(alice);
@@ -327,7 +339,7 @@ contract SimpleVotingAdminJourneyTest is Test {
         vm.prank(alice);
         uint256 pid = _tokenized(address(mechanism)).propose(charlie, "Test proposal");
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.warp(votingStartTime + 1);
 
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 500 ether);
@@ -374,7 +386,7 @@ contract SimpleVotingAdminJourneyTest is Test {
         vm.stopPrank();
 
         // Complete voting cycle to verify system integrity
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
 
         vm.startPrank(emergencyAdmin);
         (bool success6, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));

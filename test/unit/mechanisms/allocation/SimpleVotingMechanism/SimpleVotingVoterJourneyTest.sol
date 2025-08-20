@@ -56,7 +56,6 @@ contract SimpleVotingVoterJourneyTest is Test {
             quorumShares: QUORUM_REQUIREMENT,
             timelockDelay: 1 days,
             gracePeriod: 7 days,
-            startBlock: block.number + 50,
             owner: address(0)
         });
 
@@ -66,8 +65,13 @@ contract SimpleVotingVoterJourneyTest is Test {
 
     /// @notice Test voter registration with various deposit amounts
     function testVoterRegistration_VariousDeposits() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // Get absolute timeline from contract
+        uint256 deploymentTime = block.timestamp;
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        
+        // Stay before voting starts for registration
+        vm.warp(votingStartTime - 1);
 
         // Large deposit registration
         vm.startPrank(alice);
@@ -105,8 +109,15 @@ contract SimpleVotingVoterJourneyTest is Test {
 
     /// @notice Test voter registration edge cases
     function testVoterRegistration_EdgeCases() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // Get absolute timeline from contract
+        uint256 deploymentTime = block.timestamp;
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
+        
+        // Stay before voting starts for registration
+        vm.warp(votingStartTime - 1);
 
         // Register alice first
         vm.startPrank(alice);
@@ -122,7 +133,7 @@ contract SimpleVotingVoterJourneyTest is Test {
         vm.stopPrank();
 
         // Cannot register after voting period ends
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
         vm.startPrank(henry);
         token.approve(address(mechanism), MEDIUM_DEPOSIT);
         vm.expectRevert();
@@ -130,7 +141,7 @@ contract SimpleVotingVoterJourneyTest is Test {
         vm.stopPrank();
 
         // Can register at the last valid moment
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD - 1);
+        vm.warp(votingEndTime - 1);
         vm.startPrank(bob);
         token.approve(address(mechanism), MEDIUM_DEPOSIT);
         _tokenized(address(mechanism)).signup(MEDIUM_DEPOSIT);
@@ -141,8 +152,13 @@ contract SimpleVotingVoterJourneyTest is Test {
 
     /// @notice Test comprehensive voting patterns
     function testVotingPatterns_Comprehensive() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // Get absolute timeline from contract
+        uint256 deploymentTime = block.timestamp;
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        
+        // Stay before voting starts for registration
+        vm.warp(votingStartTime - 1);
 
         // Register voters
         vm.startPrank(alice);
@@ -167,7 +183,8 @@ contract SimpleVotingVoterJourneyTest is Test {
         vm.prank(bob);
         uint256 pid2 = _tokenized(address(mechanism)).propose(dave, "Fund Dave's Project");
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        // Move to voting period
+        vm.warp(votingStartTime + 1);
 
         // Full power voting
         vm.prank(alice);
@@ -201,8 +218,15 @@ contract SimpleVotingVoterJourneyTest is Test {
 
     /// @notice Test voting error conditions
     function testVoting_ErrorConditions() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // Get absolute timeline from contract
+        uint256 deploymentTime = block.timestamp;
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
+        
+        // Stay before voting starts for registration
+        vm.warp(votingStartTime - 1);
 
         vm.startPrank(alice);
         token.approve(address(mechanism), LARGE_DEPOSIT);
@@ -213,12 +237,13 @@ contract SimpleVotingVoterJourneyTest is Test {
         uint256 pid = _tokenized(address(mechanism)).propose(charlie, "Test Proposal");
 
         // Cannot vote before voting period
-        vm.roll(startBlock + 50);
+        vm.warp(votingStartTime - 50);
         vm.expectRevert();
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether);
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        // Move to voting period
+        vm.warp(votingStartTime + 1);
 
         // Cannot vote with more power than available
         vm.expectRevert();
@@ -238,13 +263,13 @@ contract SimpleVotingVoterJourneyTest is Test {
         assertEq(_tokenized(address(mechanism)).votingPower(alice), LARGE_DEPOSIT - 200 ether);
 
         // Cannot vote after voting period
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
         vm.expectRevert();
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether);
 
-        // Unregistered user cannot vote
-        vm.roll(startBlock + VOTING_DELAY + 500);
+        // Unregistered user cannot vote (back in voting period)
+        vm.warp(votingStartTime + 500);
         vm.expectRevert();
         vm.prank(henry);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 1);
@@ -252,8 +277,13 @@ contract SimpleVotingVoterJourneyTest is Test {
 
     /// @notice Test voter power conservation and management
     function testVoterPower_ConservationAndManagement() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // Get absolute timeline from contract
+        uint256 deploymentTime = block.timestamp;
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        
+        // Stay before voting starts for registration
+        vm.warp(votingStartTime - 1);
 
         vm.startPrank(alice);
         token.approve(address(mechanism), LARGE_DEPOSIT);
@@ -265,7 +295,8 @@ contract SimpleVotingVoterJourneyTest is Test {
         vm.prank(alice);
         uint256 pid2 = _tokenized(address(mechanism)).propose(dave, "Proposal 2");
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        // Move to voting period
+        vm.warp(votingStartTime + 1);
 
         // Track power consumption across multiple votes
         uint256 initialPower = _tokenized(address(mechanism)).votingPower(alice);

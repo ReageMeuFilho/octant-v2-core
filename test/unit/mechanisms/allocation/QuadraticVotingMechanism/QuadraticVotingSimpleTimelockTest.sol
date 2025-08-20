@@ -36,7 +36,7 @@ contract QuadraticVotingSimpleTimelockTest is Test {
             quorumShares: 500, // Adjusted for quadratic funding
             timelockDelay: 1000, // 1000 seconds for easier testing
             gracePeriod: 5000, // 5000 seconds
-            startBlock: block.number + 5,
+
             owner: address(0)
         });
 
@@ -46,11 +46,12 @@ contract QuadraticVotingSimpleTimelockTest is Test {
     }
 
     function testSimpleTimelock() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
-
-        // Start with clean timestamp to avoid previous test interference
-        vm.warp(500000);
+        // Get absolute timeline from contract
+        uint256 deploymentTime = block.timestamp;
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Setup
         vm.startPrank(alice);
@@ -59,7 +60,7 @@ contract QuadraticVotingSimpleTimelockTest is Test {
         uint256 pid = _tokenized(address(mechanism)).propose(charlie, "Test");
         vm.stopPrank();
 
-        vm.roll(startBlock + 11);
+        vm.warp(votingStartTime + 1);
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 25); // Cost: 25^2 = 625
 
@@ -72,7 +73,7 @@ contract QuadraticVotingSimpleTimelockTest is Test {
         console.log("  quadraticFunding:", quadraticFunding);
         console.log("  linearFunding:", linearFunding);
 
-        vm.roll(startBlock + 111);
+        vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
 

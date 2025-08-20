@@ -48,7 +48,7 @@ contract QuadraticVotingTimelockEnforcementTest is Test {
             quorumShares: QUORUM_REQUIREMENT,
             timelockDelay: TIMELOCK_DELAY,
             gracePeriod: GRACE_PERIOD,
-            startBlock: block.number + 50,
+
             owner: address(0)
         });
 
@@ -65,11 +65,15 @@ contract QuadraticVotingTimelockEnforcementTest is Test {
 
     /// @notice Test timelock enforcement prevents early redemption
     function testTimelockEnforcement_PreventEarlyRedemption() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
-
         // Start with clean timestamp
-        vm.warp(100000); // Start at timestamp 100000 to avoid edge cases
+        vm.warp(10);
+
+        // Get absolute timeline from contract
+        uint256 deploymentTime = block.timestamp;
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod; // Start at timestamp 100000 to avoid edge cases
 
         // Setup successful proposal
         vm.startPrank(alice);
@@ -78,12 +82,12 @@ contract QuadraticVotingTimelockEnforcementTest is Test {
         uint256 pid = _tokenized(address(mechanism)).propose(charlie, "Charlie's Project");
         vm.stopPrank();
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.warp(votingStartTime + 1);
 
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 30); // 30^2 = 900 > 500 quorum
 
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
 
@@ -126,11 +130,15 @@ contract QuadraticVotingTimelockEnforcementTest is Test {
 
     /// @notice Test successful redemption in valid timelock window
     function testTimelockEnforcement_ValidRedemptionWindow() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
-
         // Start with clean timestamp
-        vm.warp(200000); // Different timestamp to avoid interference
+        vm.warp(20);
+
+        // Get absolute timeline from contract
+        uint256 deploymentTime = block.timestamp;
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod; // Different timestamp to avoid interference
 
         // Setup successful proposal
         vm.startPrank(alice);
@@ -139,12 +147,12 @@ contract QuadraticVotingTimelockEnforcementTest is Test {
         uint256 pid = _tokenized(address(mechanism)).propose(charlie, "Charlie's Project");
         vm.stopPrank();
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.warp(votingStartTime + 1);
 
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 30); // 30^2 = 900 > 500 quorum
 
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
 
@@ -195,8 +203,12 @@ contract QuadraticVotingTimelockEnforcementTest is Test {
 
     /// @notice Test grace period expiration prevents redemption
     function testTimelockEnforcement_GracePeriodExpiration() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // Get absolute timeline from contract
+        uint256 deploymentTime = block.timestamp;
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Setup successful proposal
         vm.startPrank(alice);
@@ -205,12 +217,12 @@ contract QuadraticVotingTimelockEnforcementTest is Test {
         uint256 pid = _tokenized(address(mechanism)).propose(charlie, "Charlie's Expired Project");
         vm.stopPrank();
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.warp(votingStartTime + 1);
 
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 30); // 30^2 = 900 > 500 quorum
 
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
 
@@ -250,11 +262,15 @@ contract QuadraticVotingTimelockEnforcementTest is Test {
 
     /// @notice Test multiple recipients with different timelock schedules
     function testTimelockEnforcement_MultipleRecipients() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
-
         // Start with clean timestamp
-        vm.warp(300000); // Different timestamp to avoid interference
+        vm.warp(30);
+
+        // Get absolute timeline from contract
+        uint256 deploymentTime = block.timestamp;
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod; // Different timestamp to avoid interference
 
         // Setup multiple voters and recipients
         vm.startPrank(alice);
@@ -274,7 +290,7 @@ contract QuadraticVotingTimelockEnforcementTest is Test {
         vm.prank(bob);
         uint256 pid2 = _tokenized(address(mechanism)).propose(bob, "Bob's Later Project");
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.warp(votingStartTime + 1);
 
         // Vote for both
         vm.prank(alice);
@@ -283,7 +299,7 @@ contract QuadraticVotingTimelockEnforcementTest is Test {
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 30); // 30^2 = 900 > 500 quorum
 
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
 

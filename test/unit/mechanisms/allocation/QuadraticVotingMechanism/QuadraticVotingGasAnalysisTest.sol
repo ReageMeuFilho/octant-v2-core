@@ -45,7 +45,6 @@ contract QuadraticVotingGasAnalysisTest is Test {
             quorumShares: 1000 ether,
             timelockDelay: 10, // timelock blocks
             gracePeriod: 50, // grace period blocks
-            startBlock: block.number + 5, // start voting in 5 blocks
             owner: address(this) // will be set by factory
         });
 
@@ -71,6 +70,11 @@ contract QuadraticVotingGasAnalysisTest is Test {
         // Setup users with voting power
         _setupUsers();
 
+        // Get absolute timeline from contract
+        uint256 deploymentTime = block.timestamp;
+        uint256 votingDelay = _tokenized().votingDelay();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+
         // Create proposals for cold storage testing
         vm.prank(alice);
         uint256 pid1 = _tokenized().propose(recipient1, "First Project");
@@ -83,8 +87,8 @@ contract QuadraticVotingGasAnalysisTest is Test {
 
         console.log("Created 3 proposals for cold storage testing");
 
-        // Advance to voting period (start block + voting delay + 1)
-        vm.roll(block.number + 5 + 5 + 1); // start block + voting delay + 1
+        // Advance to voting period
+        vm.warp(votingStartTime + 1);
 
         // Test cold storage voting (first votes on each project)
         console.log("\n--- COLD STORAGE OPERATIONS ---");
@@ -159,8 +163,13 @@ contract QuadraticVotingGasAnalysisTest is Test {
 
         console.log("Created 3 proposals for warm storage testing");
 
-        // Advance to voting period (start block + voting delay + 1)
-        vm.roll(block.number + 5 + 5 + 1); // start block + voting delay + 1
+        // Get absolute timeline from contract
+        uint256 deploymentTime2 = block.timestamp;
+        uint256 votingDelay2 = _tokenized().votingDelay();
+        uint256 votingStartTime2 = deploymentTime2 + votingDelay2;
+
+        // Advance to voting period
+        vm.warp(votingStartTime2 + 1);
 
         // First create some votes to "warm up" the storage
         vm.prank(alice2);
@@ -222,8 +231,13 @@ contract QuadraticVotingGasAnalysisTest is Test {
         vm.prank(alice);
         uint256 pid = _tokenized().propose(recipient1, "Repeated Voting Project");
 
-        // Advance to voting period (start block + voting delay + 1)
-        vm.roll(block.number + 5 + 5 + 1); // start block + voting delay + 1
+        // Get absolute timeline from contract  
+        uint256 deploymentTime3 = block.timestamp;
+        uint256 votingDelay3 = _tokenized().votingDelay();
+        uint256 votingStartTime3 = deploymentTime3 + votingDelay3;
+
+        // Advance to voting period
+        vm.warp(votingStartTime3 + 1);
 
         console.log("Testing multiple votes from Alice on same project...");
 
@@ -287,8 +301,13 @@ contract QuadraticVotingGasAnalysisTest is Test {
         vm.prank(alice);
         uint256 pid3 = _tokenized().propose(recipient3, "Large Weight Project");
 
-        // Advance to voting period (start block + voting delay + 1)
-        vm.roll(block.number + 5 + 5 + 1); // start block + voting delay + 1
+        // Get absolute timeline from contract
+        uint256 deploymentTime4 = block.timestamp;
+        uint256 votingDelay4 = _tokenized().votingDelay();
+        uint256 votingStartTime4 = deploymentTime4 + votingDelay4;
+
+        // Advance to voting period
+        vm.warp(votingStartTime4 + 1);
 
         console.log("Testing different vote weights on new projects...");
 
@@ -373,8 +392,13 @@ contract QuadraticVotingGasAnalysisTest is Test {
         vm.prank(david);
         uint256 pid5 = _tokenized().propose(makeAddr("recipient5"), "Project 5");
 
-        // Advance to voting period (start block + voting delay + 1)
-        vm.roll(block.number + 5 + 5 + 1); // start block + voting delay + 1
+        // Get absolute timeline from contract
+        uint256 deploymentTime5 = block.timestamp;
+        uint256 votingDelay5 = _tokenized().votingDelay();
+        uint256 votingStartTime5 = deploymentTime5 + votingDelay5;
+
+        // Advance to voting period
+        vm.warp(votingStartTime5 + 1);
 
         console.log("Testing Alice voting sequentially across 5 projects...");
 

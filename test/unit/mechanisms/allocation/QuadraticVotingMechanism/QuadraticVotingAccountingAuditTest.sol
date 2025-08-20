@@ -115,7 +115,7 @@ contract QuadraticVotingAccountingAuditTest is Test {
         uint256 pid1;
         uint256 pid2;
         uint256 pid3;
-        uint256 startBlock;
+        uint256 startTime;
         uint256 queueTimestamp;
         uint256 expectedRedeemableTime;
         // Expected funding and calculations
@@ -164,7 +164,7 @@ contract QuadraticVotingAccountingAuditTest is Test {
         delete currentTestCtx.pid1;
         delete currentTestCtx.pid2;
         delete currentTestCtx.pid3;
-        delete currentTestCtx.startBlock;
+        delete currentTestCtx.startTime;
         delete currentTestCtx.queueTimestamp;
         delete currentTestCtx.expectedRedeemableTime;
         delete currentTestCtx.expectedFundingPerProposal;
@@ -197,7 +197,7 @@ contract QuadraticVotingAccountingAuditTest is Test {
             quorumShares: QUORUM_REQUIREMENT,
             timelockDelay: TIMELOCK_DELAY,
             gracePeriod: 7 days,
-            startBlock: block.number + 50,
+
             owner: address(0)
         });
 
@@ -308,8 +308,8 @@ contract QuadraticVotingAccountingAuditTest is Test {
     function testCompleteAccountingAudit_ThreeVotersTwoProposals() public {
         // Clear and initialize test context
         _clearTestContext();
-        currentTestCtx.startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(currentTestCtx.startBlock - 1);
+        currentTestCtx.startTime = block.timestamp;
+        // No need to set initial time as mechanism uses current timestamp
 
         // ==================== PHASE 1: INITIAL STATE ====================
         AccountingState memory initialState = _captureAccountingState(0, 0);
@@ -378,7 +378,7 @@ contract QuadraticVotingAccountingAuditTest is Test {
 
         // ==================== PHASE 4: VOTING PHASE ====================
         console.log("=== PHASE 4: VOTING PHASE ===");
-        vm.roll(currentTestCtx.startBlock + VOTING_DELAY + 1);
+        vm.warp(currentTestCtx.startTime + VOTING_DELAY + 1);
 
         // All three users vote on both proposals with same weight (20)
         console.log("Vote weight:", VOTE_WEIGHT);
@@ -489,7 +489,7 @@ contract QuadraticVotingAccountingAuditTest is Test {
 
         // ==================== PHASE 5: FINALIZATION ====================
         console.log("=== PHASE 5: FINALIZATION ===");
-        vm.roll(currentTestCtx.startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(currentTestCtx.startTime + VOTING_DELAY + VOTING_PERIOD + 1);
 
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
@@ -694,8 +694,8 @@ contract QuadraticVotingAccountingAuditTest is Test {
     /// @notice Test capital-constrained scenario with fixed matching pool and calculated alpha
     /// @dev Tests different vote patterns with alpha = matching_pool / (totalQuadraticSum - totalLinearSum)
     function testCapitalConstrainedAudit_FixedMatchingPool() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        uint256 startTime = block.timestamp;
+        // No need to set initial time as mechanism uses current timestamp
 
         // ==================== SETUP WITH DIFFERENT VOTE PATTERNS ====================
         console.log("=== CAPITAL CONSTRAINED AUDIT: FIXED MATCHING POOL ===");
@@ -726,7 +726,7 @@ contract QuadraticVotingAccountingAuditTest is Test {
         vm.prank(bob);
         uint256 pid2 = _tokenized(address(mechanism)).propose(recipient2, "Community Education");
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.warp(startTime + VOTING_DELAY + 1);
 
         // DIFFERENT VOTE PATTERNS - Asymmetric voting
         // Project 1: Gets strong support (more votes)
@@ -750,7 +750,7 @@ contract QuadraticVotingAccountingAuditTest is Test {
         console.log("Project 2 vote costs: 225 + 144 = 369");
         console.log("Total linear sum: 1250 + 369 = 1619");
 
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(startTime + VOTING_DELAY + VOTING_PERIOD + 1);
 
         // ==================== CALCULATE OPTIMAL ALPHA ====================
         console.log("=== CALCULATING OPTIMAL ALPHA ===");
@@ -917,8 +917,8 @@ contract QuadraticVotingAccountingAuditTest is Test {
 
         // Clear and initialize test context
         _clearTestContext();
-        currentTestCtx.startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(currentTestCtx.startBlock - 1);
+        currentTestCtx.startTime = block.timestamp;
+        // No need to set initial time as mechanism uses current timestamp
 
         // === SETUP PHASE ===
         console.log("=== SETUP PHASE ===");
@@ -951,7 +951,7 @@ contract QuadraticVotingAccountingAuditTest is Test {
         vm.prank(alice);
         currentTestCtx.pid3 = _tokenized(address(mechanism)).propose(recipient3, "Climate Action");
 
-        vm.roll(currentTestCtx.startBlock + VOTING_DELAY + 1);
+        vm.warp(currentTestCtx.startTime + VOTING_DELAY + 1);
 
         // === SYMMETRIC VOTING PATTERN ===
         console.log("=== VOTING PATTERNS ===");
@@ -974,7 +974,7 @@ contract QuadraticVotingAccountingAuditTest is Test {
         _tokenized(address(mechanism)).castVote(currentTestCtx.pid3, TokenizedAllocationMechanism.VoteType.For, 15); // Cost: 225
         vm.stopPrank();
 
-        vm.roll(currentTestCtx.startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(currentTestCtx.startTime + VOTING_DELAY + VOTING_PERIOD + 1);
 
         // === QUADRATIC FUNDING CALCULATIONS ===
         console.log("=== VERIFYING QUADRATIC FUNDING ===");

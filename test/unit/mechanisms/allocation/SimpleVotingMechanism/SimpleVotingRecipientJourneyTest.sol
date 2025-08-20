@@ -52,7 +52,6 @@ contract SimpleVotingRecipientJourneyTest is Test {
             quorumShares: QUORUM_REQUIREMENT,
             timelockDelay: TIMELOCK_DELAY,
             gracePeriod: 7 days,
-            startBlock: block.number + 50,
             owner: address(0)
         });
 
@@ -62,8 +61,6 @@ contract SimpleVotingRecipientJourneyTest is Test {
 
     /// @notice Test recipient proposal advocacy and creation
     function testRecipientAdvocacy_ProposalCreation() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
 
         // Recipients need proposers with voting power
         vm.startPrank(alice);
@@ -115,8 +112,12 @@ contract SimpleVotingRecipientJourneyTest is Test {
 
     /// @notice Test recipient monitoring and outcome tracking
     function testRecipientMonitoring_OutcomeTracking() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism was deployed
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Setup voting scenario with multiple outcomes
         vm.startPrank(alice);
@@ -144,7 +145,7 @@ contract SimpleVotingRecipientJourneyTest is Test {
         vm.prank(frank);
         uint256 pidEve = _tokenized(address(mechanism)).propose(eve, "Eve's Project");
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.warp(votingStartTime + 1);
 
         // Create different voting outcomes
         // Charlie: Successful (meets quorum)
@@ -176,7 +177,7 @@ contract SimpleVotingRecipientJourneyTest is Test {
         assertEq(eveAgainst, 200 ether);
 
         // End voting and finalize
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
 
@@ -197,8 +198,12 @@ contract SimpleVotingRecipientJourneyTest is Test {
 
     /// @notice Test recipient share allocation and redemption
     function testRecipientShares_AllocationRedemption() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism was deployed
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Setup successful proposal scenario
         vm.startPrank(alice);
@@ -214,7 +219,7 @@ contract SimpleVotingRecipientJourneyTest is Test {
         vm.prank(alice);
         uint256 pid = _tokenized(address(mechanism)).propose(charlie, "Charlie's Successful Project");
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.warp(votingStartTime + 1);
 
         // Generate successful vote outcome
         vm.prank(alice);
@@ -223,7 +228,7 @@ contract SimpleVotingRecipientJourneyTest is Test {
         vm.prank(bob);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 300 ether);
 
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
 
@@ -277,8 +282,12 @@ contract SimpleVotingRecipientJourneyTest is Test {
 
     /// @notice Test recipient partial redemption and share management
     function testRecipientShares_PartialRedemption() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism was deployed
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Setup multiple successful recipients
         vm.startPrank(alice);
@@ -297,7 +306,7 @@ contract SimpleVotingRecipientJourneyTest is Test {
         vm.prank(bob);
         uint256 pid2 = _tokenized(address(mechanism)).propose(dave, "Dave's Project");
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.warp(votingStartTime + 1);
 
         // Vote for both proposals
         vm.prank(alice);
@@ -306,7 +315,7 @@ contract SimpleVotingRecipientJourneyTest is Test {
         vm.prank(bob);
         _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 400 ether);
 
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
 
@@ -371,8 +380,12 @@ contract SimpleVotingRecipientJourneyTest is Test {
 
     /// @notice Test recipient share transferability and ERC20 functionality
     function testRecipientShares_TransferabilityERC20() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism was deployed
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Setup successful allocation
         vm.startPrank(alice);
@@ -383,12 +396,12 @@ contract SimpleVotingRecipientJourneyTest is Test {
         vm.prank(alice);
         uint256 pid = _tokenized(address(mechanism)).propose(charlie, "Charlie's Project");
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.warp(votingStartTime + 1);
 
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 500 ether);
 
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
 
@@ -401,7 +414,7 @@ contract SimpleVotingRecipientJourneyTest is Test {
 
         // Test that transfers are blocked before redemption period
         vm.prank(charlie);
-        vm.expectRevert("Transfers not allowed until redemption period");
+        vm.expectRevert("Transfers only allowed during redemption period");
         _tokenized(address(mechanism)).transfer(dave, 100 ether);
 
         // Fast forward to redemption period start

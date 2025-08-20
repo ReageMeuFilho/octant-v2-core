@@ -50,7 +50,6 @@ contract TokenizedPatternDemoTest is Test {
             quorumShares: 100 ether,
             timelockDelay: 1 days,
             gracePeriod: 7 days,
-            startBlock: block.number + 10,
             owner: address(0) // Will be overridden by factory
         });
         address mechanismAddr = factory.deploySimpleVotingMechanism(config);
@@ -81,7 +80,7 @@ contract TokenizedPatternDemoTest is Test {
         assertEq(_tokenized(address(mechanism)).quorumShares(), 100 ether);
         assertEq(_tokenized(address(mechanism)).timelockDelay(), 1 days);
         assertEq(_tokenized(address(mechanism)).gracePeriod(), 7 days);
-        assertEq(_tokenized(address(mechanism)).startBlock(), block.number + 10);
+        assertEq(_tokenized(address(mechanism)).startBlock(), block.number);
     }
 
     function testStorageIsolation() public {
@@ -95,7 +94,6 @@ contract TokenizedPatternDemoTest is Test {
             quorumShares: 50 ether,
             timelockDelay: 2 days,
             gracePeriod: 14 days,
-            startBlock: block.number + 5,
             owner: address(0) // Will be overridden by factory
         });
         address mechanism2Addr = factory.deploySimpleVotingMechanism(config2);
@@ -237,8 +235,10 @@ contract TokenizedPatternDemoTest is Test {
     // ========== VOTING TESTS ==========
 
     function testBasicVoting() public {
-        // Setup
-        vm.roll(block.number + 10);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism was deployed
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingStartTime = deploymentTime + votingDelay;
 
         // Register users
         vm.startPrank(alice);
@@ -256,7 +256,7 @@ contract TokenizedPatternDemoTest is Test {
         uint256 pid = _tokenized(address(mechanism)).propose(charlie, "Fund Charlie");
 
         // Move to voting period
-        vm.roll(block.number + 101); // Past voting delay
+        vm.warp(votingStartTime + 1);
 
         // Vote For
         vm.prank(alice);
@@ -281,8 +281,10 @@ contract TokenizedPatternDemoTest is Test {
     }
 
     function testPartialVoting() public {
-        // Setup
-        vm.roll(block.number + 10);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism was deployed
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingStartTime = deploymentTime + votingDelay;
 
         vm.startPrank(alice);
         token.approve(address(mechanism), 100 ether);
@@ -292,7 +294,7 @@ contract TokenizedPatternDemoTest is Test {
         vm.prank(alice);
         uint256 pid = _tokenized(address(mechanism)).propose(charlie, "Fund Charlie");
 
-        vm.roll(block.number + 101);
+        vm.warp(votingStartTime + 1);
 
         // Alice votes with only part of her power
         vm.prank(alice);
@@ -308,8 +310,12 @@ contract TokenizedPatternDemoTest is Test {
     // ========== FINALIZATION TESTS ==========
 
     function testVoteTallyFinalization() public {
-        // Setup complete voting scenario
-        vm.roll(block.number + 10);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism was deployed
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         vm.startPrank(alice);
         token.approve(address(mechanism), 100 ether);
@@ -319,13 +325,13 @@ contract TokenizedPatternDemoTest is Test {
         vm.prank(alice);
         uint256 pid = _tokenized(address(mechanism)).propose(charlie, "Fund Charlie");
 
-        vm.roll(block.number + 101);
+        vm.warp(votingStartTime + 1);
 
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether);
 
         // Move past voting period
-        vm.roll(block.number + 1000);
+        vm.warp(votingEndTime + 1);
 
         // Finalize tally (only owner can do this)
         assertFalse(_tokenized(address(mechanism)).tallyFinalized());
@@ -338,8 +344,12 @@ contract TokenizedPatternDemoTest is Test {
     // ========== PROPOSAL QUEUING TESTS ==========
 
     function testSuccessfulProposalQueuing() public {
-        // Setup voting scenario that meets quorum
-        vm.roll(block.number + 10);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism was deployed
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         vm.startPrank(alice);
         token.approve(address(mechanism), 150 ether);
@@ -349,13 +359,13 @@ contract TokenizedPatternDemoTest is Test {
         vm.prank(alice);
         uint256 pid = _tokenized(address(mechanism)).propose(charlie, "Fund Charlie");
 
-        vm.roll(block.number + 101);
+        vm.warp(votingStartTime + 1);
 
         // Vote with enough to meet quorum (100 ether)
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 150 ether);
 
-        vm.roll(block.number + 1000); // End voting
+        vm.warp(votingEndTime + 1); // End voting
         // Call through the mechanism proxy to preserve owner context
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "finalizeVoteTally failed");
@@ -377,10 +387,15 @@ contract TokenizedPatternDemoTest is Test {
     // ========== PROPOSAL STATE TESTS ==========
 
     function testProposalStates() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism was deployed
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
-        // Before start block - register and propose
-        vm.roll(startBlock - 1);
+        // Before voting starts - register and propose
+        vm.warp(deploymentTime + 10);
 
         vm.startPrank(alice);
         token.approve(address(mechanism), 150 ether);
@@ -390,26 +405,20 @@ contract TokenizedPatternDemoTest is Test {
         vm.prank(alice);
         uint256 pid = _tokenized(address(mechanism)).propose(charlie, "Fund Charlie");
 
-        // Pending state (before start block)
+        // Pending state (during voting delay)
+        vm.warp(votingStartTime - 50); // During voting delay
         assertEq(
             uint(_tokenized(address(mechanism)).state(pid)),
             uint(TokenizedAllocationMechanism.ProposalState.Pending)
         );
 
-        // Active state (during voting delay)
-        vm.roll(startBlock + 50); // During voting delay
-        assertEq(
-            uint(_tokenized(address(mechanism)).state(pid)),
-            uint(TokenizedAllocationMechanism.ProposalState.Active)
-        );
-
         // Vote to meet quorum (during active voting period)
-        vm.roll(startBlock + 150); // Past voting delay (100), within voting period
+        vm.warp(votingStartTime + 50); // Past voting delay, within voting period
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 150 ether);
 
         // Still active until finalized
-        vm.roll(startBlock + 1200); // Past voting period (100 + 1000)
+        vm.warp(votingEndTime + 100); // Past voting period
         assertEq(
             uint(_tokenized(address(mechanism)).state(pid)),
             uint(TokenizedAllocationMechanism.ProposalState.Active)
@@ -436,7 +445,12 @@ contract TokenizedPatternDemoTest is Test {
     // ========== HOOK IMPLEMENTATION TESTS ==========
 
     function testSimpleVotingHooks() public {
-        vm.roll(block.number + 10);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism was deployed
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Test _beforeSignupHook (always returns true in SimpleVoting)
         vm.startPrank(alice);
@@ -456,7 +470,7 @@ contract TokenizedPatternDemoTest is Test {
         vm.prank(bob);
         _tokenized(address(mechanism)).propose(dave, "Should fail");
 
-        vm.roll(block.number + 101);
+        vm.warp(votingStartTime + 1);
 
         // Test _processVoteHook (simple tally update)
         vm.prank(alice);
@@ -465,7 +479,7 @@ contract TokenizedPatternDemoTest is Test {
         (uint256 forVotes, , ) = mechanism.voteTallies(pid);
         assertEq(forVotes, 100 ether);
 
-        vm.roll(block.number + 1000);
+        vm.warp(votingEndTime + 1);
         // Call through the mechanism proxy to preserve owner context
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "finalizeVoteTally failed");
@@ -487,8 +501,12 @@ contract TokenizedPatternDemoTest is Test {
     }
 
     function testCompleteVotingLifecycle() public {
-        // Setup: Multiple users, multiple proposals, complex voting
-        vm.roll(block.number + 10);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism was deployed
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Register users with different amounts
         vm.startPrank(alice);
@@ -514,7 +532,7 @@ contract TokenizedPatternDemoTest is Test {
         uint256 pid2 = _tokenized(address(mechanism)).propose(eve, "Fund Eve");
 
         // Move to voting period
-        vm.roll(block.number + 101);
+        vm.warp(votingStartTime + 1);
 
         // Complex voting pattern
         vm.prank(alice);
@@ -547,7 +565,7 @@ contract TokenizedPatternDemoTest is Test {
         assertEq(_tokenized(address(mechanism)).votingPower(dave), 0); // 150 - 75 - 75
 
         // End voting and finalize
-        vm.roll(block.number + 1000);
+        vm.warp(votingEndTime + 1);
         // Call through the mechanism proxy to preserve owner context
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "finalizeVoteTally failed");
@@ -605,8 +623,7 @@ contract TokenizedPatternDemoTest is Test {
             2000,
             200 ether,
             2 days,
-            14 days,
-            block.number + 20
+            14 days
         );
     }
 
@@ -625,16 +642,19 @@ contract TokenizedPatternDemoTest is Test {
             1000,
             100 ether,
             1 days,
-            7 days,
-            block.number + 10
+            7 days
         );
     }
 
     // ========== SHARE MINTING TESTS ==========
 
     function testShareMintingOnProposalQueue() public {
-        // Setup: Register user, create proposal, vote, and queue
-        vm.roll(block.number + 10);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism was deployed
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         vm.startPrank(alice);
         token.approve(address(mechanism), 150 ether);
@@ -644,13 +664,13 @@ contract TokenizedPatternDemoTest is Test {
         vm.prank(alice);
         uint256 pid = _tokenized(address(mechanism)).propose(charlie, "Fund Charlie");
 
-        vm.roll(block.number + 101);
+        vm.warp(votingStartTime + 1);
 
         // Vote with enough to meet quorum (100 ether)
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 150 ether);
 
-        vm.roll(block.number + 1000); // End voting
+        vm.warp(votingEndTime + 1); // End voting
 
         // Finalize voting
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
@@ -678,8 +698,12 @@ contract TokenizedPatternDemoTest is Test {
     }
 
     function testMultipleProposalShareMinting() public {
-        // Setup multiple users and proposals
-        vm.roll(block.number + 10);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism was deployed
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Register multiple users
         vm.startPrank(alice);
@@ -699,7 +723,7 @@ contract TokenizedPatternDemoTest is Test {
         vm.prank(bob);
         uint256 pid2 = _tokenized(address(mechanism)).propose(dave, "Fund Dave");
 
-        vm.roll(block.number + 101);
+        vm.warp(votingStartTime + 1);
 
         // Vote on both proposals
         vm.prank(alice);
@@ -708,7 +732,7 @@ contract TokenizedPatternDemoTest is Test {
         vm.prank(bob);
         _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 200 ether);
 
-        vm.roll(block.number + 1000);
+        vm.warp(votingEndTime + 1);
 
         // Finalize voting
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
@@ -733,8 +757,12 @@ contract TokenizedPatternDemoTest is Test {
     }
 
     function testShareRedemption() public {
-        // Setup: Create proposal, vote, queue to mint shares
-        vm.roll(block.number + 10);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism was deployed
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         vm.startPrank(alice);
         token.approve(address(mechanism), 150 ether);
@@ -744,12 +772,12 @@ contract TokenizedPatternDemoTest is Test {
         vm.prank(alice);
         uint256 pid = _tokenized(address(mechanism)).propose(charlie, "Fund Charlie");
 
-        vm.roll(block.number + 101);
+        vm.warp(votingStartTime + 1);
 
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 150 ether);
 
-        vm.roll(block.number + 1000);
+        vm.warp(votingEndTime + 1);
 
         // Finalize and queue
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));

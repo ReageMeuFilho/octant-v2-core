@@ -41,7 +41,7 @@ contract QuadraticVotingDefeatedStateTest is Test {
             quorumShares: QUORUM_REQUIREMENT,
             timelockDelay: 1 days,
             gracePeriod: 7 days,
-            startBlock: block.number + 50,
+
             owner: address(0)
         });
 
@@ -51,9 +51,22 @@ contract QuadraticVotingDefeatedStateTest is Test {
     }
 
     function testDebugDefeatedState() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
-
+        // Fetch actual timeline values from the contract
+        // The mechanism sets startTime = block.timestamp during initialization
+        // We can calculate the timeline from the deployment time and configuration
+        uint256 deploymentTime = block.timestamp; // Time when mechanism was deployed in setUp()
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        
+        // Calculate absolute timeline timestamps
+        uint256 startTime = deploymentTime; // Contract sets this during initialization
+        uint256 votingStartTime = startTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
+        
+        console.log("Timeline - Start:", startTime);
+        console.log("Timeline - Voting Start:", votingStartTime);
+        console.log("Timeline - Voting End:", votingEndTime);
+        
         // Setup voter
         vm.startPrank(alice);
         token.approve(address(mechanism), LARGE_DEPOSIT);
@@ -67,7 +80,9 @@ contract QuadraticVotingDefeatedStateTest is Test {
         vm.prank(alice);
         uint256 pid = _tokenized(address(mechanism)).propose(frank, "Frank's Low Vote Proposal");
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        // Warp to absolute voting start time (not relative)
+        vm.warp(votingStartTime + 1);
+        console.log("Warped to voting time:", block.timestamp);
 
         // Vote with insufficient amount for quorum - QuadraticFunding calculation needed
         vm.prank(alice);
@@ -84,8 +99,9 @@ contract QuadraticVotingDefeatedStateTest is Test {
         console.log("Against votes (always 0 in QuadraticVoting):", againstVotes / 1e18);
         console.log("Abstain votes (always 0 in QuadraticVoting):", abstainVotes / 1e18);
 
-        // Finalize voting
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        // Warp to absolute voting end time for finalization (not relative)
+        vm.warp(votingEndTime + 1);
+        console.log("Warped to finalization time:", block.timestamp);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
 

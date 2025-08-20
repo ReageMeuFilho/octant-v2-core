@@ -55,7 +55,7 @@ contract QuadraticVotingCrossJourneyTest is Test {
             quorumShares: QUORUM_REQUIREMENT,
             timelockDelay: TIMELOCK_DELAY,
             gracePeriod: 7 days,
-            startBlock: block.number + 50,
+
             owner: address(0)
         });
 
@@ -72,8 +72,7 @@ contract QuadraticVotingCrossJourneyTest is Test {
 
     /// @notice Test complete end-to-end integration across all user journeys
     function testCompleteEndToEnd_Integration() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // No need to manipulate time before setup - mechanism starts immediately at deployment
 
         // PHASE 1: ADMIN SETUP AND COMMUNITY ONBOARDING
 
@@ -107,7 +106,8 @@ contract QuadraticVotingCrossJourneyTest is Test {
 
         // PHASE 3: DEMOCRATIC VOTING PROCESS
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        // Advance to voting period
+        vm.warp(block.timestamp + VOTING_DELAY + 1);
 
         // Complex voting patterns
         // Alice: Strategic voter supporting energy and education (deposit: 1000 ether)
@@ -130,7 +130,8 @@ contract QuadraticVotingCrossJourneyTest is Test {
 
         // PHASE 4: ADMIN FINALIZATION AND EXECUTION
 
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        // Advance past voting period
+        vm.warp(block.timestamp + VOTING_PERIOD + 1);
 
         // Admin finalizes voting
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
@@ -223,8 +224,7 @@ contract QuadraticVotingCrossJourneyTest is Test {
 
     /// @notice Test crisis recovery and system resilience
     function testCrisisRecovery_SystemResilience() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // No need to manipulate time before setup - mechanism starts immediately at deployment
 
         // Setup scenario with potential failures
         vm.startPrank(alice);
@@ -240,7 +240,8 @@ contract QuadraticVotingCrossJourneyTest is Test {
         vm.prank(alice);
         uint256 pid = _tokenized(address(mechanism)).propose(charlie, "Test proposal");
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        // Advance to voting period
+        vm.warp(block.timestamp + VOTING_DELAY + 1);
 
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 30);
@@ -286,7 +287,7 @@ contract QuadraticVotingCrossJourneyTest is Test {
         vm.stopPrank();
 
         // Complete voting cycle
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(block.timestamp + VOTING_PERIOD + 1);
 
         vm.startPrank(emergencyAdmin);
         (bool success6, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
@@ -307,8 +308,7 @@ contract QuadraticVotingCrossJourneyTest is Test {
 
     /// @notice Test edge cases and boundary conditions across journeys
     function testEdgeCases_BoundaryConditions() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // No need to manipulate time before setup - mechanism starts immediately at deployment
 
         // Maximum safe values
         vm.startPrank(alice);
@@ -337,17 +337,17 @@ contract QuadraticVotingCrossJourneyTest is Test {
         uint256 pid = _tokenized(address(mechanism)).propose(charlie, "Boundary test");
 
         // Exactly at voting start
-        vm.roll(startBlock + VOTING_DELAY);
+        vm.warp(block.timestamp + VOTING_DELAY);
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 25);
 
         // Exactly at voting end
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD);
+        vm.warp(block.timestamp + VOTING_PERIOD);
         vm.prank(bob);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 10);
 
-        // One block later should fail
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        // One second later should fail
+        vm.warp(block.timestamp + 1);
         vm.expectRevert();
         vm.prank(bob);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 1);
@@ -355,8 +355,10 @@ contract QuadraticVotingCrossJourneyTest is Test {
 
     /// @notice Test proposal cancellation across journeys
     function testProposalCancellation_CrossJourney() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // ✅ CORRECT: Fetch absolute timeline from contract following CLAUDE.md pattern
+        uint256 deploymentTime = block.timestamp; // When mechanism was deployed
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingStartTime = deploymentTime + votingDelay;
 
         vm.startPrank(alice);
         token.approve(address(mechanism), LARGE_DEPOSIT);
@@ -367,21 +369,20 @@ contract QuadraticVotingCrossJourneyTest is Test {
         vm.prank(alice);
         uint256 pid = _tokenized(address(mechanism)).propose(charlie, "Cancellable proposal");
 
-        // Should be in Pending state
-        vm.roll(startBlock - 1);
+        // Should be in Pending state initially (before votingStartTime)
         assertEq(
             uint(_tokenized(address(mechanism)).state(pid)),
             uint(TokenizedAllocationMechanism.ProposalState.Pending)
         );
 
-        // During voting delay
-        vm.roll(startBlock + 50);
+        // During voting delay period, still Pending
+        vm.warp(votingStartTime - 50);
         assertEq(
             uint(_tokenized(address(mechanism)).state(pid)),
-            uint(TokenizedAllocationMechanism.ProposalState.Active)
+            uint(TokenizedAllocationMechanism.ProposalState.Pending)
         );
 
-        // Proposer cancels
+        // Proposer cancels during Pending state
         vm.prank(alice);
         _tokenized(address(mechanism)).cancelProposal(pid);
 
@@ -390,8 +391,8 @@ contract QuadraticVotingCrossJourneyTest is Test {
             uint(TokenizedAllocationMechanism.ProposalState.Canceled)
         );
 
-        // Cannot vote on canceled proposal
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        // Cannot vote on canceled proposal even after voting starts
+        vm.warp(votingStartTime + 1);
         vm.expectRevert();
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 10);
@@ -407,8 +408,7 @@ contract QuadraticVotingCrossJourneyTest is Test {
 
     /// @notice Test multi-proposal complex scenarios
     function testMultiProposal_ComplexScenarios() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // No need to manipulate time before setup - mechanism starts immediately at deployment
 
         // Setup diverse voter base
         vm.startPrank(alice);
@@ -436,7 +436,8 @@ contract QuadraticVotingCrossJourneyTest is Test {
         vm.prank(alice);
         uint256 pid3 = _tokenized(address(mechanism)).propose(eve, "Healthcare Access");
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        // Advance to voting period
+        vm.warp(block.timestamp + VOTING_DELAY + 1);
 
         // Strategic voting with power distribution
         // Alice: Supports infrastructure but opposes healthcare
@@ -458,7 +459,7 @@ contract QuadraticVotingCrossJourneyTest is Test {
         _tokenized(address(mechanism)).castVote(pid3, TokenizedAllocationMechanism.VoteType.For, 10);
 
         // Finalize and determine outcomes
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(block.timestamp + VOTING_PERIOD + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
 
