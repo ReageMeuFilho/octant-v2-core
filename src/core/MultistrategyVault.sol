@@ -1247,27 +1247,7 @@ contract MultistrategyVault is IMultistrategyVault {
         uint256 assetsNeeded
     ) external view returns (uint256) {
         require(currentDebt >= assetsNeeded, NotEnoughDebt());
-
-        // The actual amount that the debt is currently worth.
-        uint256 vaultShares = IERC4626Payable(strategy).balanceOf(address(this));
-        uint256 strategyAssets = IERC4626Payable(strategy).convertToAssets(vaultShares);
-
-        // If no losses, return 0
-        if (strategyAssets >= currentDebt || currentDebt == 0) {
-            return 0;
-        }
-
-        // Users will withdraw assetsNeeded divided by loss ratio (strategyAssets / currentDebt - 1).
-        // NOTE: If there are unrealised losses, the user will take his share.
-        uint256 numerator = assetsNeeded * strategyAssets;
-        uint256 usersShareOfLoss = assetsNeeded - numerator / currentDebt;
-
-        // Always round up.
-        if (numerator % currentDebt != 0) {
-            usersShareOfLoss += 1;
-        }
-
-        return usersShareOfLoss;
+        return _assessShareOfUnrealisedLosses(strategy, currentDebt, assetsNeeded);
     }
 
     /**
