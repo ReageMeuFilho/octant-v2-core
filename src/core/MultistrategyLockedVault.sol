@@ -212,7 +212,7 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
      *      - Uses current cooldown period (not pending changes)
      * @custom:security Prevents cooldown bypass through share transfers
      */
-    function initiateRageQuit(uint256 shares) external {
+    function initiateRageQuit(uint256 shares) external nonReentrant {
         if (shares == 0) revert InvalidShareAmount();
         uint256 userBalance = balanceOf(msg.sender);
         if (userBalance < shares) revert InsufficientBalance();
