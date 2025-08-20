@@ -1629,12 +1629,6 @@ contract MultistrategyVault is IMultistrategyVault {
         uint256 numerator = assetsNeeded_ * strategyAssets;
         uint256 usersShareOfLoss = assetsNeeded_ - numerator / strategyCurrentDebt_;
 
-        // Always round up.
-        // slither-disable-next-line weak-prng
-        if (numerator % strategyCurrentDebt_ != 0) {
-            usersShareOfLoss += 1;
-        }
-
         return usersShareOfLoss;
     }
 
