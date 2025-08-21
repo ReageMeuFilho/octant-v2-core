@@ -18,6 +18,9 @@ contract SimpleVotingMechanism is BaseAllocationMechanism {
 
     /// @notice Mapping of proposal ID to vote tallies
     mapping(uint256 => VoteTally) public voteTallies;
+    
+    /// @notice Mapping to track which users have already signed up to prevent multiple registrations
+    mapping(address => bool) public hasSignedUp;
     constructor(
         address _implementation,
         AllocationConfig memory _config
@@ -25,9 +28,18 @@ contract SimpleVotingMechanism is BaseAllocationMechanism {
 
     // ---------- Internal Hook Implementations ----------
 
-    /// @dev Allow all users to sign up
-    function _beforeSignupHook(address) internal pure override returns (bool) {
-        return true;
+    /// @dev Allow users to sign up only if they haven't already registered
+    /// @dev Maintains explicit tracking to prevent re-registration even after voting power is spent
+    function _beforeSignupHook(address user) internal override returns (bool) {
+        // Check if user has already signed up
+        if (hasSignedUp[user]) {
+            return false; // Block re-registration
+        }
+        
+        // Mark user as having signed up
+        hasSignedUp[user] = true;
+        
+        return true; // Allow registration
     }
 
     /// @dev Only allow users with voting power to propose

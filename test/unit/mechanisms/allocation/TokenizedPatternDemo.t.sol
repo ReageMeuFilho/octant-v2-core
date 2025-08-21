@@ -155,7 +155,7 @@ contract TokenizedPatternDemoTest is Test {
         assertEq(token.balanceOf(address(mechanism)), 0);
     }
 
-    function testRegistrationFailures() public {
+    function testMultipleRegistrationBlocked() public {
         vm.roll(block.number + 10);
 
         // Register alice first
@@ -164,12 +164,17 @@ contract TokenizedPatternDemoTest is Test {
         _tokenized(address(mechanism)).signup(100 ether);
         vm.stopPrank();
 
-        // Cannot register twice
+        // Cannot register multiple times in SimpleVotingMechanism (blocks re-registration)
+        uint256 alicePowerBefore = _tokenized(address(mechanism)).votingPower(alice);
         vm.startPrank(alice);
         token.approve(address(mechanism), 50 ether);
-        vm.expectRevert(abi.encodeWithSelector(TokenizedAllocationMechanism.AlreadyRegistered.selector, alice));
+        vm.expectRevert(abi.encodeWithSignature("RegistrationBlocked(address)", alice));
         _tokenized(address(mechanism)).signup(50 ether);
         vm.stopPrank();
+        
+        // Verify voting power unchanged after blocked re-registration
+        uint256 alicePowerAfter = _tokenized(address(mechanism)).votingPower(alice);
+        assertEq(alicePowerAfter, alicePowerBefore, "Re-registration should be blocked, voting power unchanged");
     }
 
     // ========== PROPOSAL TESTS ==========

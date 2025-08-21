@@ -26,7 +26,7 @@ The system uses a hook-based architecture that allows implementers to customize 
 
 ### QuadraticVotingMechanism Implementation
 
-QuadraticVotingMechanism.sol is a concrete implementation that demonstrates the power of the Yearn V3 pattern:
+QuadraticVotingMechanism.sol is an **abstract base contract** that provides the foundation for both Quadratic Funding (QF) and Quadratic Voting (QV) implementations:
 
 **Key Features:**
 - **Quadratic Cost Voting**: To cast W votes, users pay W² voting power (prevents plutocracy)
@@ -35,6 +35,8 @@ QuadraticVotingMechanism.sol is a concrete implementation that demonstrates the 
 - **Single Vote Per Proposal**: Users can only vote once per proposal (prevents vote splitting attacks)
 - **Decimal Normalization**: Converts all voting power to 18 decimals for consistent calculations
 
+**Implementation Variants:**
+- **Quadratic Funding (QF)**: Users pay for voice credits → multiple signups appropriate for topping up
 **Hook Implementations:**
 1. **`_beforeProposeHook`**: Restricts proposal creation to keeper/management roles
 2. **`_getVotingPowerHook`**: Normalizes deposit amounts to 18 decimals regardless of asset decimals
@@ -101,9 +103,12 @@ The system implements **permissionless proposal queuing**, enabling flexible gov
 - **`_beforeSignupHook(address user)`** - Controls user registration eligibility
   - **Security Assumptions**: 
     - MUST return false for address(0) to prevent zero address registration
-    - MUST be view function to prevent state manipulation during validation
+    - CAN be stateful to implement custom registration tracking
     - SHOULD implement consistent eligibility criteria that cannot be gamed
-    - MUST NOT allow re-registration if user already has voting power
+    - MUST customize re-registration policy based on mechanism type:
+      - **QF Variants**: Allow multiple signups for voice credit top-ups
+      - **QV Variants**: Generally restrict to single signup for allocated voice credits
+      - **Custom Logic**: Implement mechanism-specific registration rules
 - **`_beforeProposeHook(address proposer)`** - Validates proposal creation rights
   - **Security Assumptions**:
     - MUST verify proposer has legitimate right to create proposals (e.g., voting power > 0, role-based access)
@@ -243,9 +248,10 @@ This pattern enables complete code reuse while maintaining storage isolation and
 - **Requirement:** Users must be able to register with optional asset deposits to gain voting power
 - **Implementation:** `signup(uint256 deposit)` function in TokenizedAllocationMechanism with `_beforeSignupHook()` and `_getVotingPowerHook()` in strategy
 - **Acceptance Criteria:**
-  - Users can only register once during voting period
+  - Registration restrictions are mechanism-specific via `_beforeSignupHook()` implementation
   - Registration requires hook validation to pass via `IBaseAllocationStrategy` interface
   - Voting power is calculated through customizable hook in strategy contract
+  - Multiple signups accumulate voting power (if allowed by mechanism - appropriate for QF, should be restricted for QV)
   - Asset deposits are transferred securely using ERC20 transferFrom
   - Operation blocked when contract is paused (`whenNotPaused` modifier)
 
@@ -393,7 +399,11 @@ This pattern enables complete code reuse while maintaining storage isolation and
 
 ### Power Conservation Invariants
 1. **Non-Increasing Power**: `_processVoteHook()` must return `newPower ≤ oldPower`
-2. **Single Registration**: Each address can only call `signup()` once
+2. **Multiple Registration Policy**: Registration restrictions are mechanism-specific via `_beforeSignupHook()`
+   - **QuadraticVotingMechanism (Abstract)**: Allows multiple signups by default - serves as base for both QF and QV variants
+   - **Quadratic Funding (QF) Variants**: Multiple signups appropriate since users pay for additional voice credits  
+   - **Quadratic Voting (QV) Variants**: Should generally restrict to single signup since QV assumes users claim allocated voice credits once
+   - **Custom Mechanisms**: Can implement any signup policy through hook customization
 
 ### State Consistency Invariants
 1. **Unique Recipients**: Each recipient address used in at most one proposal
@@ -431,7 +441,7 @@ Voters are community members who deposit assets to gain voting power and partici
 - Voter can now participate in voting
 
 **Key Constraints:**
-- One-time registration only (cannot re-register)
+- Registration policy varies by mechanism (see Multiple Registration Policy in System Invariants)
 - Must register before voting period ends
 - **No asset recovery** - deposited tokens locked until mechanism concludes
 - Voting power calculation customizable per mechanism

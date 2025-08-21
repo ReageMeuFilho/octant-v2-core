@@ -125,12 +125,16 @@ contract SimpleVotingVoterJourneyTest is Test {
         _tokenized(address(mechanism)).signup(LARGE_DEPOSIT);
         vm.stopPrank();
 
-        // Cannot register twice
+        // Cannot register multiple times in SimpleVotingMechanism (blocks re-registration)
         vm.startPrank(alice);
         token.approve(address(mechanism), SMALL_DEPOSIT);
-        vm.expectRevert(abi.encodeWithSelector(TokenizedAllocationMechanism.AlreadyRegistered.selector, alice));
+        vm.expectRevert(abi.encodeWithSignature("RegistrationBlocked(address)", alice));
         _tokenized(address(mechanism)).signup(SMALL_DEPOSIT);
         vm.stopPrank();
+        
+        // Verify voting power unchanged after blocked re-registration
+        uint256 alicePowerAfter = _tokenized(address(mechanism)).votingPower(alice);
+        assertEq(alicePowerAfter, LARGE_DEPOSIT, "Re-registration should be blocked, voting power unchanged");
 
         // Cannot register after voting period ends
         vm.warp(votingEndTime + 1);

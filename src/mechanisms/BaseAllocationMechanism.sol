@@ -75,7 +75,7 @@ abstract contract BaseAllocationMechanism is IBaseAllocationStrategy {
     /// @dev Hook to allow or block registration
     /// @param user Address attempting to register
     /// @return allow True if registration should proceed
-    function _beforeSignupHook(address user) internal view virtual returns (bool);
+    function _beforeSignupHook(address user) internal virtual returns (bool);
 
     /// @dev Hook to allow or block proposal creation
     /// @param proposer Address proposing
@@ -154,7 +154,7 @@ abstract contract BaseAllocationMechanism is IBaseAllocationStrategy {
         _;
     }
 
-    function beforeSignupHook(address user) external view onlySelf returns (bool) {
+    function beforeSignupHook(address user) external onlySelf returns (bool) {
         return _beforeSignupHook(user);
     }
 

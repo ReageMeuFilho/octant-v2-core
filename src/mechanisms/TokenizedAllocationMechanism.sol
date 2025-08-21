@@ -11,7 +11,7 @@ import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 /// @dev Follows Yearn V3 pattern where shared implementation calls base strategy via interface
 interface IBaseAllocationStrategy {
     /// @dev Hook to allow or block registration
-    function beforeSignupHook(address user) external view returns (bool);
+    function beforeSignupHook(address user) external returns (bool);
 
     /// @dev Hook to allow or block proposal creation
     function beforeProposeHook(address proposer) external view returns (bool);
@@ -488,7 +488,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         if (block.timestamp > s.votingEndTime)
             revert VotingEnded(block.timestamp, s.votingEndTime);
 
-        if (s.votingPower[user] != 0) revert AlreadyRegistered(user);
         if (deposit > MAX_SAFE_VALUE) revert DepositTooLarge(deposit, MAX_SAFE_VALUE);
 
         if (deposit > 0) s.asset.safeTransferFrom(payer, address(this), deposit);
@@ -499,7 +498,11 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         // Prevent registration with zero voting power when deposit is non-zero
         if (newPower == 0 && deposit > 0) revert InsufficientDeposit(deposit);
 
-        s.votingPower[user] = newPower;
+        // Add to existing voting power to support multiple signups
+        uint256 totalPower = s.votingPower[user] + newPower;
+        if (totalPower > MAX_SAFE_VALUE) revert VotingPowerTooLarge(totalPower, MAX_SAFE_VALUE);
+        
+        s.votingPower[user] = totalPower;
         emit UserRegistered(user, newPower);
     }
 

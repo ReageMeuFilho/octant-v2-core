@@ -152,12 +152,16 @@ contract QuadraticVotingVoterJourneyTest is Test {
         // Register alice first
         _signupUser(alice, LARGE_DEPOSIT);
 
-        // Cannot register twice
+        // Can register multiple times in QuadraticVotingMechanism (accumulates voting power)
+        uint256 alicePowerBefore = _tokenized(address(mechanism)).votingPower(alice);
         vm.startPrank(alice);
         token.approve(address(mechanism), SMALL_DEPOSIT);
-        vm.expectRevert(abi.encodeWithSelector(TokenizedAllocationMechanism.AlreadyRegistered.selector, alice));
         _tokenized(address(mechanism)).signup(SMALL_DEPOSIT);
         vm.stopPrank();
+        
+        // Verify voting power accumulated
+        uint256 alicePowerAfter = _tokenized(address(mechanism)).votingPower(alice);
+        assertEq(alicePowerAfter, alicePowerBefore + SMALL_DEPOSIT, "Multiple signups should accumulate voting power");
 
         // Cannot register after voting period ends
         vm.warp(votingEndTime + 1);

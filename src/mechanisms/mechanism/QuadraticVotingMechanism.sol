@@ -52,8 +52,15 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
         return _proposalExists(pid);
     }
 
-    /// @notice Allow all users to register (can be restricted in derived contracts)
-    function _beforeSignupHook(address) internal view virtual override returns (bool) {
+    /// @notice Allow all users to register, including multiple signups (can be restricted in derived contracts)
+    /// @dev Returns true for all users, allowing unlimited signups to accumulate voting power
+    /// @dev IMPORTANT: While technically possible, pure quadratic voting mechanisms should restrict users
+    /// @dev to single signups to prevent double-spending of vote credits. In QV, users receive a fixed
+    /// @dev allocation of vote credits and should only be able to claim them once. Multiple signups may
+    /// @dev be appropriate for quadratic funding (QF) variants where users contribute their own funds
+    /// @dev to increase voting power, but quadratic voting (QV) variants should override this hook to
+    /// @dev prevent re-registration and double-spending of allocated vote credits.
+    function _beforeSignupHook(address) internal virtual override returns (bool) {
         return true;
     }
 
