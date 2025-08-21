@@ -470,18 +470,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         uint256 currentRate = _currentRateRay();
         uint256 currentVaultValue = S.totalAssets.mulDiv(currentRate, WadRayMath.RAY);
 
-        return YS.totalValueDebt > 0 && currentVaultValue < YS.totalValueDebt;
-    }
-
-    /**
-     * @dev Checks insolvency against total obligations (user + dragon) value debt
-     */
-    function _isObligationsInsolvent() internal view returns (bool) {
-        StrategyData storage S = _strategyStorage();
-        YieldSkimmingStorage storage YS = _strategyYieldSkimmingStorage();
-        uint256 currentRate = _currentRateRay();
-        uint256 currentVaultValue = S.totalAssets.mulDiv(currentRate, WadRayMath.RAY);
-        return currentVaultValue < (YS.totalValueDebt + YS.dragonValueDebt);
+        return YS.totalValueDebt > 0 && currentVaultValue < YS.totalValueDebt + YS.dragonValueDebt;
     }
 
     /**
@@ -494,7 +483,6 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         // Direct transfer: shares represent ETH value 1:1 in this system
         // Dragon loses debt obligation, users gain debt obligation
         require(YS.dragonValueDebt >= transferAmount, "Insufficient dragon debt");
-        require(!_isObligationsInsolvent(), "Transfers blocked during insolvency");
         YS.dragonValueDebt -= transferAmount;
         YS.totalValueDebt += transferAmount;
     }
@@ -507,7 +495,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         StrategyData storage S = _strategyStorage();
 
         // Only check if account is dragon router
-        if (account == S.dragonRouter && _isObligationsInsolvent()) {
+        if (account == S.dragonRouter && _isVaultInsolvent()) {
             revert("Dragon cannot operate during insolvency");
         }
     }
