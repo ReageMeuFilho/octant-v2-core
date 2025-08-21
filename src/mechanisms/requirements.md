@@ -48,6 +48,14 @@ QuadraticVotingMechanism.sol is a concrete implementation that demonstrates the 
 - Can be dynamically calculated via `calculateOptimalAlpha()` to ensure 1:1 shares-to-assets ratio (ignoring decimals)
 - Adjustable by owner via `setAlpha()` for fine-tuning funding distribution
 
+**Rounding Discrepancy (Mathematical Precision):**
+- Due to integer division, total funding calculation differs from sum of individual project funding
+- **Global**: `F(c) = ⌊α × ||Φ^LR(c)||₁⌋ + ⌊(1-α) × ||Φ^CAP(c)||₁⌋` (alpha applied to aggregated sums)
+- **Individual**: `Fp(c) = ⌊α × Φ^LR(c)_p⌋ + ⌊(1-α) × Φ^CAP(c)_p⌋` (alpha applied per project)
+- **Invariant**: `∑p∈P Fp(c) ≤ F(c)` with error bound `ε ∈ {0, 1, ..., 2(|P| - 1)}`
+- **Practical Impact**: The discrepancy is negligible dust (≤ 2 wei per project) that ensures no over-allocation
+- **Fund Distribution**: All available funds are still distributed - the error bound represents minimal rounding loss
+
 **Security Features:**
 - Rejects ETH deposits via custom `receive()` function (prevents permanent fund loss)
 - Validates all mathematical operations to prevent overflow/underflow
