@@ -8,12 +8,12 @@ import { IMultistrategyLockedVault } from "src/core/interfaces/IMultistrategyLoc
 /**
  * @title MultistrategyLockedVault
  * @notice A locked vault with custody-based rage quit mechanism and two-step cooldown period changes
- * 
+ *
  * @dev This vault implements a secure custody system that prevents rage quit cooldown bypass attacks
  * and provides user protection through a two-step governance process for cooldown period changes.
  *
  * ## Custody Mechanism:
- * 
+ *
  * 1. **Share Locking During Rage Quit:**
  *    - Users must initiate rage quit for a specific number of shares
  *    - Those shares are placed in custody and cannot be transferred
@@ -57,7 +57,7 @@ import { IMultistrategyLockedVault } from "src/core/interfaces/IMultistrategyLoc
  *    - No retroactive application of cooldown changes
  *
  * ## Example Scenarios:
- * 
+ *
  * **Scenario A - Basic Custody Flow:**
  * 1. User has 1000 shares, initiates rage quit for 500 shares
  * 2. 500 shares locked in custody, 500 shares remain transferable
@@ -81,7 +81,7 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
 
     // Cooldown period for rage quit
     uint256 public rageQuitCooldownPeriod;
-    
+
     // Two-step rage quit cooldown period change variables
     uint256 public pendingRageQuitCooldownPeriod;
     uint256 public rageQuitCooldownPeriodChangeTimestamp;
@@ -105,7 +105,7 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
      * @notice Initialize the locked vault with custody mechanism
      * @param _asset Address of the underlying asset token
      * @param _name Name of the vault token
-     * @param _symbol Symbol of the vault token  
+     * @param _symbol Symbol of the vault token
      * @param _roleManager Address that manages vault roles (also becomes regen governance)
      * @param _profitMaxUnlockTime Maximum time for profit unlocking
      * @dev Initializes both the base MultistrategyVault and locked vault features:
@@ -138,39 +138,39 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
         ) {
             revert InvalidRageQuitCooldownPeriod();
         }
-        
+
         if (_rageQuitCooldownPeriod == rageQuitCooldownPeriod) {
             revert InvalidRageQuitCooldownPeriod();
         }
-        
+
         pendingRageQuitCooldownPeriod = _rageQuitCooldownPeriod;
         rageQuitCooldownPeriodChangeTimestamp = block.timestamp;
-        
+
         uint256 effectiveTimestamp = block.timestamp + RAGE_QUIT_COOLDOWN_CHANGE_DELAY;
         emit PendingRageQuitCooldownPeriodChange(_rageQuitCooldownPeriod, effectiveTimestamp);
     }
-    
+
     /**
      * @notice Finalize the rage quit cooldown period change after the grace period
      * @dev Can only be called after the grace period has elapsed
      */
-    function finalizeRageQuitCooldownPeriodChange() external {
+    function finalizeRageQuitCooldownPeriodChange() external onlyRegenGovernance {
         if (pendingRageQuitCooldownPeriod == 0) {
             revert NoPendingRageQuitCooldownPeriodChange();
         }
-        
+
         if (block.timestamp < rageQuitCooldownPeriodChangeTimestamp + RAGE_QUIT_COOLDOWN_CHANGE_DELAY) {
             revert RageQuitCooldownPeriodChangeDelayNotElapsed();
         }
-        
+
         uint256 oldPeriod = rageQuitCooldownPeriod;
         rageQuitCooldownPeriod = pendingRageQuitCooldownPeriod;
         pendingRageQuitCooldownPeriod = 0;
         rageQuitCooldownPeriodChangeTimestamp = 0;
-        
+
         emit RageQuitCooldownPeriodChanged(oldPeriod, rageQuitCooldownPeriod);
     }
-    
+
     /**
      * @notice Cancel a pending rage quit cooldown period change
      * @dev Can only be called by governance during the grace period
@@ -179,10 +179,10 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
         if (pendingRageQuitCooldownPeriod == 0) {
             revert NoPendingRageQuitCooldownPeriodChange();
         }
-        
+
         pendingRageQuitCooldownPeriod = 0;
         rageQuitCooldownPeriodChangeTimestamp = 0;
-        
+
         emit PendingRageQuitCooldownPeriodChange(0, 0);
     }
 
@@ -193,7 +193,7 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
     function getPendingRageQuitCooldownPeriod() external view returns (uint256) {
         return pendingRageQuitCooldownPeriod;
     }
-    
+
     /**
      * @notice Get the timestamp when rage quit cooldown period change was initiated
      * @return Timestamp of the change initiation (0 if none)
@@ -340,17 +340,17 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
     function _transfer(address sender_, address receiver_, uint256 amount_) internal override {
         // Check if sender has locked shares that would prevent this transfer
         CustodyInfo memory custody = custodyInfo[sender_];
-        
+
         if (custody.lockedShares > 0) {
             uint256 senderBalance = balanceOf(sender_);
             uint256 availableShares = senderBalance - custody.lockedShares;
-            
+
             // Revert if trying to transfer more than available shares
             if (amount_ > availableShares) {
                 revert TransferExceedsAvailableShares();
             }
         }
-        
+
         // Call parent implementation
         super._transfer(sender_, receiver_, amount_);
     }
@@ -366,9 +366,7 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
      *      - unlockTime > block.timestamp means custody is still in cooldown
      *      - unlockTime <= block.timestamp means custody is unlocked for withdrawal
      */
-    function getCustodyInfo(
-        address user
-    ) external view returns (uint256 lockedShares, uint256 unlockTime) {
+    function getCustodyInfo(address user) external view returns (uint256 lockedShares, uint256 unlockTime) {
         CustodyInfo memory custody = custodyInfo[user];
         return (custody.lockedShares, custody.unlockTime);
     }
