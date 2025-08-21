@@ -1123,8 +1123,21 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     ) internal view returns (uint256) {
         // Saves an extra SLOAD if values are non-zero.
         uint256 totalSupply_ = _totalSupply(S);
-        // If supply is 0, PPS = 1.
-        if (totalSupply_ == 0) return assets;
+        // If supply is 0, convert assets from asset decimals to 18 decimals (share decimals)
+        if (totalSupply_ == 0) {
+            uint8 assetDecimals = S.decimals;
+            if (assetDecimals == 18) {
+                return assets;
+            } else if (assetDecimals < 18) {
+                // Scale up: multiply by 10^(18 - assetDecimals)
+                uint256 scaleFactor = 10 ** (18 - assetDecimals);
+                return assets * scaleFactor;
+            } else {
+                // Scale down: divide by 10^(assetDecimals - 18)
+                uint256 scaleFactor = 10 ** (assetDecimals - 18);
+                return assets / scaleFactor;
+            }
+        }
 
         uint256 totalAssets_ = _totalAssets(S);
         // If assets are 0 but supply is not PPS = 0.
@@ -1142,7 +1155,23 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         // Saves an extra SLOAD if totalSupply() is non-zero.
         uint256 supply = _totalSupply(S);
 
-        return supply == 0 ? shares : shares.mulDiv(_totalAssets(S), supply, _rounding);
+        if (supply == 0) {
+            // Convert shares from 18 decimals to asset decimals
+            uint8 assetDecimals = S.decimals;
+            if (assetDecimals == 18) {
+                return shares;
+            } else if (assetDecimals < 18) {
+                // Scale down: divide by 10^(18 - assetDecimals)
+                uint256 scaleFactor = 10 ** (18 - assetDecimals);
+                return shares / scaleFactor;
+            } else {
+                // Scale up: multiply by 10^(assetDecimals - 18)
+                uint256 scaleFactor = 10 ** (assetDecimals - 18);
+                return shares * scaleFactor;
+            }
+        }
+
+        return shares.mulDiv(_totalAssets(S), supply, _rounding);
     }
 
     /// @dev Internal implementation of {maxRedeem}.
