@@ -280,6 +280,10 @@ contract MorphoCompounderStrategyTest is Test {
         // Check total assets after harvest
         uint256 totalAssetsAfter = vault.totalAssets();
         assertEq(totalAssetsAfter, totalAssetsBefore, "Total assets should not change after harvest");
+
+        // Maintain obligations solvency by keeping current rate equal to last reported rate during redemption
+        vm.mockCall(YIELD_VAULT, abi.encodeWithSignature("pricePerShare()"), abi.encode(newExchangeRate));
+
         // Withdraw everything for user
         vm.startPrank(user);
         uint256 sharesToRedeem = vault.balanceOf(user);
@@ -366,7 +370,14 @@ contract MorphoCompounderStrategyTest is Test {
             state.donationBalanceBefore2,
             "Donation address should have received profit after second harvest"
         );
-        // Both users withdraw
+        // Maintain obligations solvency by keeping current rate equal to last reported rate during redemption
+        vm.mockCall(YIELD_VAULT, abi.encodeWithSignature("pricePerShare()"), abi.encode(state.newExchangeRate2));
+
+        // redeem the shares of the donation address first to ensure obligations solvency
+        vm.startPrank(donationAddress);
+        vault.redeem(vault.balanceOf(donationAddress), donationAddress, donationAddress);
+        vm.stopPrank();
+        // Then both users withdraw
         vm.startPrank(state.user1);
         state.user1Shares = vault.balanceOf(state.user1);
         state.user1Assets = vault.redeem(vault.balanceOf(state.user1), state.user1, state.user1);
@@ -374,10 +385,6 @@ contract MorphoCompounderStrategyTest is Test {
         vm.startPrank(state.user2);
         state.user2Shares = vault.balanceOf(state.user2);
         state.user2Assets = vault.redeem(vault.balanceOf(state.user2), state.user2, state.user2);
-        vm.stopPrank();
-        // redeem the shares of the donation address
-        vm.startPrank(donationAddress);
-        vault.redeem(vault.balanceOf(donationAddress), donationAddress, donationAddress);
         vm.stopPrank();
         // User 1 deposited before first yield accrual, so should have earned more
         assertApproxEqRel(

@@ -355,16 +355,19 @@ contract LidoStrategyTest is Test {
         state.totalAssetsAfter = vault.totalAssets();
         assertEq(state.totalAssetsAfter, state.totalAssetsBefore, "Total assets should not change after harvest");
 
-        // Withdraw everything for user
-        vm.startPrank(user);
-        state.sharesToRedeem = vault.balanceOf(user);
+        // Ensure obligations solvency by keeping current rate equal to last reported rate during redemption
+        vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(state.newExchangeRate));
 
-        state.assetsReceived = vault.redeem(state.sharesToRedeem, user, user);
-        vm.stopPrank();
-
-        // withdraw the donation address shares
+        // withdraw the donation address shares first to ensure obligations solvency
         vm.startPrank(donationAddress);
         state.donationAssetsReceived = vault.redeem(vault.balanceOf(donationAddress), donationAddress, donationAddress);
+        vm.stopPrank();
+        vm.clearMockedCalls();
+
+        // then user withdraws
+        vm.startPrank(user);
+        state.sharesToRedeem = vault.balanceOf(user);
+        state.assetsReceived = vault.redeem(state.sharesToRedeem, user, user);
         vm.stopPrank();
 
         assertApproxEqRel(
@@ -464,7 +467,15 @@ contract LidoStrategyTest is Test {
             "Donation address should have received profit after second harvest"
         );
 
-        // Both users withdraw
+        // Keep current exchange rate at last reported during redemptions to ensure obligations solvency
+        vm.mockCall(WSTETH, abi.encodeWithSignature("stEthPerToken()"), abi.encode(state.newExchangeRate2));
+
+        // redeem the shares of the donation address first
+        vm.startPrank(donationAddress);
+        vault.redeem(vault.balanceOf(donationAddress), donationAddress, donationAddress);
+        vm.stopPrank();
+
+        // Then both users withdraw
         vm.startPrank(state.user1);
         state.user1Shares = vault.balanceOf(state.user1);
         state.user1Assets = vault.redeem(vault.balanceOf(state.user1), state.user1, state.user1);
@@ -475,10 +486,7 @@ contract LidoStrategyTest is Test {
         state.user2Assets = vault.redeem(vault.balanceOf(state.user2), state.user2, state.user2);
         vm.stopPrank();
 
-        // redeem the shares of the donation address
-        vm.startPrank(donationAddress);
-        vault.redeem(vault.balanceOf(donationAddress), donationAddress, donationAddress);
-        vm.stopPrank();
+        vm.clearMockedCalls();
 
         // User 1 deposited before first yield accrual, so should have earned more
         assertApproxEqRel(

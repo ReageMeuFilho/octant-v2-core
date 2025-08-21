@@ -306,16 +306,18 @@ contract RocketPoolStrategyTest is Test {
         uint256 totalAssetsAfter = vault.totalAssets();
         assertEq(totalAssetsAfter, totalAssetsBefore, "Total assets should not change after harvest");
 
-        // Withdraw everything for user
-        vm.startPrank(user);
-        uint256 sharesToRedeem = vault.balanceOf(user);
+        // Maintain obligations solvency by keeping current rate equal to last reported rate during redemption
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(newExchangeRate));
 
-        uint256 assetsReceived = vault.redeem(sharesToRedeem, user, user);
-        vm.stopPrank();
-
-        // withdraw the donation address shares
+        // withdraw the donation address shares first to ensure obligations solvency
         vm.startPrank(donationAddress);
         vault.redeem(vault.balanceOf(donationAddress), donationAddress, donationAddress);
+        vm.stopPrank();
+
+        // then user withdraws
+        vm.startPrank(user);
+        uint256 sharesToRedeem = vault.balanceOf(user);
+        uint256 assetsReceived = vault.redeem(sharesToRedeem, user, user);
         vm.stopPrank();
 
         // Verify user received their original deposit
@@ -394,7 +396,6 @@ contract RocketPoolStrategyTest is Test {
         vm.startPrank(keeper);
         vault.report();
         vm.stopPrank();
-
         // Clear mock
         vm.clearMockedCalls();
 
@@ -407,6 +408,9 @@ contract RocketPoolStrategyTest is Test {
             state.donationBalanceBefore2,
             "Donation address should have received profit after second harvest"
         );
+
+        // Maintain obligations solvency by keeping current rate equal to last reported rate during redemption
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(state.newExchangeRate2));
 
         // Both users withdraw
         vm.startPrank(state.user1);
