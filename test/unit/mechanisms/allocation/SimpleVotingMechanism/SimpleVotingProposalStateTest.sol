@@ -487,7 +487,7 @@ contract SimpleVotingProposalStateTest is Test {
 
         // Start early to ensure proposals are created in PENDING state
         vm.warp(deploymentTime + 10);
-        
+
         // Create proposals that will have different outcomes
         vm.prank(alice);
         uint256 pidSuccessful = _tokenized(address(mechanism)).propose(charlie, "Charlie's Success Story");

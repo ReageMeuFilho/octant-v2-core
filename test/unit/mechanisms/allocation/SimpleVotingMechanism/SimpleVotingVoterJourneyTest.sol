@@ -69,7 +69,7 @@ contract SimpleVotingVoterJourneyTest is Test {
         uint256 deploymentTime = block.timestamp;
         uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
         uint256 votingStartTime = deploymentTime + votingDelay;
-        
+
         // Stay before voting starts for registration
         vm.warp(votingStartTime - 1);
 
@@ -115,7 +115,7 @@ contract SimpleVotingVoterJourneyTest is Test {
         uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
         uint256 votingStartTime = deploymentTime + votingDelay;
         uint256 votingEndTime = votingStartTime + votingPeriod;
-        
+
         // Stay before voting starts for registration
         vm.warp(votingStartTime - 1);
 
@@ -131,7 +131,7 @@ contract SimpleVotingVoterJourneyTest is Test {
         vm.expectRevert(abi.encodeWithSignature("RegistrationBlocked(address)", alice));
         _tokenized(address(mechanism)).signup(SMALL_DEPOSIT);
         vm.stopPrank();
-        
+
         // Verify voting power unchanged after blocked re-registration
         uint256 alicePowerAfter = _tokenized(address(mechanism)).votingPower(alice);
         assertEq(alicePowerAfter, LARGE_DEPOSIT, "Re-registration should be blocked, voting power unchanged");
@@ -160,7 +160,7 @@ contract SimpleVotingVoterJourneyTest is Test {
         uint256 deploymentTime = block.timestamp;
         uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
         uint256 votingStartTime = deploymentTime + votingDelay;
-        
+
         // Stay before voting starts for registration
         vm.warp(votingStartTime - 1);
 
@@ -228,7 +228,7 @@ contract SimpleVotingVoterJourneyTest is Test {
         uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
         uint256 votingStartTime = deploymentTime + votingDelay;
         uint256 votingEndTime = votingStartTime + votingPeriod;
-        
+
         // Stay before voting starts for registration
         vm.warp(votingStartTime - 1);
 
@@ -285,7 +285,7 @@ contract SimpleVotingVoterJourneyTest is Test {
         uint256 deploymentTime = block.timestamp;
         uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
         uint256 votingStartTime = deploymentTime + votingDelay;
-        
+
         // Stay before voting starts for registration
         vm.warp(votingStartTime - 1);
 

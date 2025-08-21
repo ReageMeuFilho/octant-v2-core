@@ -36,7 +36,6 @@ contract QuadraticVotingSimpleTimelockTest is Test {
             quorumShares: 500, // Adjusted for quadratic funding
             timelockDelay: 1000, // 1000 seconds for easier testing
             gracePeriod: 5000, // 5000 seconds
-
             owner: address(0)
         });
 

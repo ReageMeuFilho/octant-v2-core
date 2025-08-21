@@ -171,7 +171,7 @@ contract TokenizedPatternDemoTest is Test {
         vm.expectRevert(abi.encodeWithSignature("RegistrationBlocked(address)", alice));
         _tokenized(address(mechanism)).signup(50 ether);
         vm.stopPrank();
-        
+
         // Verify voting power unchanged after blocked re-registration
         uint256 alicePowerAfter = _tokenized(address(mechanism)).votingPower(alice);
         assertEq(alicePowerAfter, alicePowerBefore, "Re-registration should be blocked, voting power unchanged");

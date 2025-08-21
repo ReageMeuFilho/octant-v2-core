@@ -48,7 +48,6 @@ contract QuadraticVotingTimelockEnforcementTest is Test {
             quorumShares: QUORUM_REQUIREMENT,
             timelockDelay: TIMELOCK_DELAY,
             gracePeriod: GRACE_PERIOD,
-
             owner: address(0)
         });
 

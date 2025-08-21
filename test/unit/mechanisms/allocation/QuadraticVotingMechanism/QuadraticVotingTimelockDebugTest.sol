@@ -36,7 +36,6 @@ contract QuadraticVotingTimelockDebugTest is Test {
             quorumShares: 500,
             timelockDelay: 1 days,
             gracePeriod: 7 days,
-
             owner: address(0)
         });
 

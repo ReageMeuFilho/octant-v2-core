@@ -225,7 +225,6 @@ contract QuadraticVotingE2E is Test {
             quorumShares: QUORUM_REQUIREMENT,
             timelockDelay: TIMELOCK_DELAY,
             gracePeriod: GRACE_PERIOD,
-
             owner: address(0)
         });
 
@@ -1771,7 +1770,12 @@ contract QuadraticVotingE2E is Test {
         token.transfer(address(mechanism), matchingFunds);
 
         // Finalize and test actual share distribution
-        vm.warp(data.deploymentTime + _tokenized(address(mechanism)).votingDelay() + _tokenized(address(mechanism)).votingPeriod() + 1);
+        vm.warp(
+            data.deploymentTime +
+                _tokenized(address(mechanism)).votingDelay() +
+                _tokenized(address(mechanism)).votingPeriod() +
+                1
+        );
         _tokenized(address(mechanism)).finalizeVoteTally();
         _tokenized(address(mechanism)).queueProposal(data.pid1);
         _tokenized(address(mechanism)).queueProposal(data.pid2);
@@ -1854,7 +1858,12 @@ contract QuadraticVotingE2E is Test {
         assertEq(totalFundingAfterAlpha, expectedTotalFunding, "setAlpha should update totalFunding correctly");
 
         // Finalize to update totalFunding storage
-        vm.warp(data.deploymentTime + _tokenized(address(mechanism)).votingDelay() + _tokenized(address(mechanism)).votingPeriod() + 1);
+        vm.warp(
+            data.deploymentTime +
+                _tokenized(address(mechanism)).votingDelay() +
+                _tokenized(address(mechanism)).votingPeriod() +
+                1
+        );
         _tokenized(address(mechanism)).finalizeVoteTally();
 
         // Verify totalFunding matches expected calculation
@@ -2000,7 +2009,12 @@ contract QuadraticVotingE2E is Test {
         mechanism.setAlpha(data.finalAlphaNumerator, data.finalAlphaDenominator);
 
         // Finalize and verify total funding is updated correctly
-        vm.warp(data.deploymentTime + _tokenized(address(mechanism)).votingDelay() + _tokenized(address(mechanism)).votingPeriod() + 1);
+        vm.warp(
+            data.deploymentTime +
+                _tokenized(address(mechanism)).votingDelay() +
+                _tokenized(address(mechanism)).votingPeriod() +
+                1
+        );
         _tokenized(address(mechanism)).finalizeVoteTally();
 
         data.finalTotalFunding = mechanism.totalFunding();

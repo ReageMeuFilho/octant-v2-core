@@ -157,7 +157,7 @@ abstract contract ProperQF {
      * @dev Calculate weighted total funding using alpha parameter
      * @return The weighted total funding across all projects
      * @dev IMPORTANT: Due to integer division rounding, totalFunding >= sum of individual project funding
-     * @dev The discrepancy ε satisfies: 0 ≤ ε ≤ 2(|P| - 1) where |P| is the number of projects  
+     * @dev The discrepancy ε satisfies: 0 ≤ ε ≤ 2(|P| - 1) where |P| is the number of projects
      * @dev This discrepancy is negligible in practice and ensures no over-allocation occurs
      * @dev All available funds are still distributed - the error represents dust amounts
      */
@@ -185,13 +185,13 @@ abstract contract ProperQF {
     }
 
     /**
-     * @notice Returns the current funding metrics for a specific project  
+     * @notice Returns the current funding metrics for a specific project
      * @dev This function aggregates all the relevant funding data for a project
      * @param projectId The ID of the project to tally
      * @return sumContributions The total sum of all contributions for the project
      * @return sumSquareRoots The sum of square roots of all contributions
      * @return quadraticFunding The alpha-weighted quadratic funding: ⌊α × S_j²⌋
-     * @return linearFunding The alpha-weighted linear funding: ⌊(1-α) × Sum_j⌋  
+     * @return linearFunding The alpha-weighted linear funding: ⌊(1-α) × Sum_j⌋
      * @dev ROUNDING DISCREPANCY: Due to per-project integer division, sum of all project
      * @dev funding ≤ totalFunding(). The discrepancy ε is bounded: 0 ≤ ε ≤ 2(|P| - 1)
      * @dev where |P| is the total number of projects. This is negligible dust that ensures

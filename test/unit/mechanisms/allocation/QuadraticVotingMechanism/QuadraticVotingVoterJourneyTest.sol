@@ -112,7 +112,7 @@ contract QuadraticVotingVoterJourneyTest is Test {
         uint256 deploymentTime = block.timestamp;
         uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
         uint256 votingStartTime = deploymentTime + votingDelay;
-        
+
         // Warp to just before voting starts (signup period)
         vm.warp(votingStartTime - 1);
 
@@ -145,7 +145,7 @@ contract QuadraticVotingVoterJourneyTest is Test {
         uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
         uint256 votingStartTime = deploymentTime + votingDelay;
         uint256 votingEndTime = votingStartTime + votingPeriod;
-        
+
         // Warp to just before voting starts (signup period)
         vm.warp(votingStartTime - 1);
 
@@ -158,7 +158,7 @@ contract QuadraticVotingVoterJourneyTest is Test {
         token.approve(address(mechanism), SMALL_DEPOSIT);
         _tokenized(address(mechanism)).signup(SMALL_DEPOSIT);
         vm.stopPrank();
-        
+
         // Verify voting power accumulated
         uint256 alicePowerAfter = _tokenized(address(mechanism)).votingPower(alice);
         assertEq(alicePowerAfter, alicePowerBefore + SMALL_DEPOSIT, "Multiple signups should accumulate voting power");
@@ -184,7 +184,7 @@ contract QuadraticVotingVoterJourneyTest is Test {
         uint256 deploymentTime = block.timestamp;
         uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
         uint256 votingStartTime = deploymentTime + votingDelay;
-        
+
         // Warp to just before voting starts (signup period)
         vm.warp(votingStartTime - 1);
 
@@ -232,7 +232,7 @@ contract QuadraticVotingVoterJourneyTest is Test {
         uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
         uint256 votingStartTime = deploymentTime + votingDelay;
         uint256 votingEndTime = votingStartTime + votingPeriod;
-        
+
         // Warp to just before voting starts (signup period)
         vm.warp(votingStartTime - 1);
 
@@ -279,7 +279,7 @@ contract QuadraticVotingVoterJourneyTest is Test {
         uint256 deploymentTime = block.timestamp;
         uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
         uint256 votingStartTime = deploymentTime + votingDelay;
-        
+
         // Warp to just before voting starts (signup period)
         vm.warp(votingStartTime - 1);
 

@@ -44,8 +44,15 @@ interface IBaseAllocationStrategy {
     function getRecipientAddressHook(uint256 pid) external view returns (address recipient);
 
     /// @dev Hook to perform custom distribution of shares when a proposal is queued
-    /// @dev If this returns true, default share minting is skipped
-    function requestCustomDistributionHook(address recipient, uint256 sharesToMint) external returns (bool);
+    /// @dev If this returns (true, assetsTransferred), default share minting is skipped and totalAssets is updated
+    /// @param recipient Address of the recipient for the proposal
+    /// @param sharesToMint Number of shares to distribute/mint to the recipient
+    /// @return handled True if custom distribution was handled, false to use default minting
+    /// @return assetsTransferred Amount of assets transferred directly to recipient (to update totalAssets)
+    function requestCustomDistributionHook(
+        address recipient,
+        uint256 sharesToMint
+    ) external returns (bool handled, uint256 assetsTransferred);
 
     /// @dev Hook to get the available withdraw limit for a share owner
     function availableWithdrawLimit(address shareOwner) external view returns (uint256);
@@ -94,6 +101,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     error AlreadyQueued(uint256 pid);
     error QueueingClosedAfterRedemption();
     error NoAllocation(uint256 pid, uint256 sharesToMint);
+    error InsufficientAssets(uint256 requested, uint256 available);
     error VotingClosed(uint256 currentTime, uint256 startTime, uint256 endTime);
     error InvalidWeight(uint256 weight, uint256 votingPower);
     error WeightTooLarge(uint256 weight, uint256 maxAllowed);
@@ -152,7 +160,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         Expired
     }
 
-
     struct Proposal {
         uint256 sharesRequested;
         address proposer;
@@ -174,10 +181,10 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         uint256 timelockDelay;
         uint256 gracePeriod;
         uint256 quorumShares;
-        uint256 startTime;              // Start timestamp for the mechanism
-        uint256 votingStartTime;        // startTime + votingDelay (when voting can begin)
-        uint256 votingEndTime;          // startTime + votingDelay + votingPeriod (when voting ends)
-        uint256 tallyFinalizedTime;     // when finalizeVoteTally() was called
+        uint256 startTime; // Start timestamp for the mechanism
+        uint256 votingStartTime; // startTime + votingDelay (when voting can begin)
+        uint256 votingEndTime; // startTime + votingDelay + votingPeriod (when voting ends)
+        uint256 tallyFinalizedTime; // when finalizeVoteTally() was called
         // Access control
         address owner;
         address pendingOwner;
@@ -382,7 +389,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         s.startTime = block.timestamp;
         s.votingStartTime = s.startTime + _votingDelay;
         s.votingEndTime = s.votingStartTime + _votingPeriod;
-        
+
         // Set management roles to owner
         s.management = _owner;
         s.keeper = _owner;
@@ -485,8 +492,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
             revert RegistrationBlocked(user);
         }
 
-        if (block.timestamp > s.votingEndTime)
-            revert VotingEnded(block.timestamp, s.votingEndTime);
+        if (block.timestamp > s.votingEndTime) revert VotingEnded(block.timestamp, s.votingEndTime);
 
         if (deposit > MAX_SAFE_VALUE) revert DepositTooLarge(deposit, MAX_SAFE_VALUE);
 
@@ -501,7 +507,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         // Add to existing voting power to support multiple signups
         uint256 totalPower = s.votingPower[user] + newPower;
         if (totalPower > MAX_SAFE_VALUE) revert VotingPowerTooLarge(totalPower, MAX_SAFE_VALUE);
-        
+
         s.votingPower[user] = totalPower;
         emit UserRegistered(user, newPower);
     }
@@ -527,15 +533,15 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         // Call hook for validation
         if (!IBaseAllocationStrategy(address(this)).beforeProposeHook(proposer)) revert ProposeNotAllowed(proposer);
 
-        if (recipient == address(0)) revert InvalidRecipient(recipient);
+        if (recipient == address(0) || recipient == address(this)) revert InvalidRecipient(recipient);
 
         AllocationStorage storage s = _getStorage();
-        
+
         // Proposing only allowed before voting period ends
         if (block.timestamp > s.votingEndTime) {
             revert VotingEnded(block.timestamp, s.votingEndTime);
         }
-        
+
         if (s.recipientUsed[recipient]) revert RecipientUsed(recipient);
         if (bytes(description).length == 0) revert EmptyDescription();
         if (bytes(description).length > 1000) revert DescriptionTooLong(bytes(description).length, 1000);
@@ -606,11 +612,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
 
         // Check voting window
         if (block.timestamp < s.votingStartTime || block.timestamp > s.votingEndTime)
-            revert VotingClosed(
-                block.timestamp,
-                s.votingStartTime,
-                s.votingEndTime
-            );
+            revert VotingClosed(block.timestamp, s.votingStartTime, s.votingEndTime);
 
         uint256 oldPower = s.votingPower[voter];
         if (weight == 0) revert InvalidWeight(weight, oldPower);
@@ -637,8 +639,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     function finalizeVoteTally() external onlyOwner nonReentrant onlyInitialized {
         AllocationStorage storage s = _getStorage();
 
-        if (block.timestamp <= s.votingEndTime)
-            revert VotingNotEnded(block.timestamp, s.votingEndTime);
+        if (block.timestamp <= s.votingEndTime) revert VotingNotEnded(block.timestamp, s.votingEndTime);
 
         if (s.tallyFinalized) revert TallyAlreadyFinalized();
 
@@ -687,13 +688,15 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         address recipient = IBaseAllocationStrategy(address(this)).getRecipientAddressHook(pid);
 
         // Try custom distribution hook first
-        bool customDistributionHandled = IBaseAllocationStrategy(address(this)).requestCustomDistributionHook(
-            recipient,
-            sharesToMint
-        );
+        (bool customDistributionHandled, uint256 assetsTransferred) = IBaseAllocationStrategy(address(this))
+            .requestCustomDistributionHook(recipient, sharesToMint);
 
-        // If custom distribution wasn't handled, mint shares by default
-        if (!customDistributionHandled) {
+        // If custom distribution was handled, update totalAssets to reflect assets transferred out
+        if (customDistributionHandled) {
+            if (assetsTransferred > s.totalAssets) revert InsufficientAssets(assetsTransferred, s.totalAssets);
+            s.totalAssets -= assetsTransferred;
+        } else {
+            // If custom distribution wasn't handled, mint shares by default
             _mint(s, recipient, sharesToMint);
         }
 
@@ -737,7 +740,9 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
             return s.proposalShares[pid] == 0 ? ProposalState.Succeeded : ProposalState.Queued;
         }
         // During redemption period
-        else if (s.globalRedemptionStart != 0 && s.globalRedemptionEndTime != 0 && currentTime <= s.globalRedemptionEndTime) {
+        else if (
+            s.globalRedemptionStart != 0 && s.globalRedemptionEndTime != 0 && currentTime <= s.globalRedemptionEndTime
+        ) {
             return s.proposalShares[pid] == 0 ? ProposalState.Succeeded : ProposalState.Redeemable;
         }
         // After redemption period (grace period expired)
@@ -1365,9 +1370,11 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         require(to != address(this), "ERC20 transfer to strategy");
 
         // Only allow transfers during redemption period [globalRedemptionStart, globalRedemptionEndTime]
-        if (S.globalRedemptionStart == 0 || 
-            block.timestamp < S.globalRedemptionStart || 
-            (S.globalRedemptionEndTime != 0 && block.timestamp > S.globalRedemptionEndTime)) {
+        if (
+            S.globalRedemptionStart == 0 ||
+            block.timestamp < S.globalRedemptionStart ||
+            (S.globalRedemptionEndTime != 0 && block.timestamp > S.globalRedemptionEndTime)
+        ) {
             revert("Transfers only allowed during redemption period");
         }
 

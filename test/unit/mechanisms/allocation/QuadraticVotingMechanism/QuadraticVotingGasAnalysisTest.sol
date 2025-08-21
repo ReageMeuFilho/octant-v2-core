@@ -231,7 +231,7 @@ contract QuadraticVotingGasAnalysisTest is Test {
         vm.prank(alice);
         uint256 pid = _tokenized().propose(recipient1, "Repeated Voting Project");
 
-        // Get absolute timeline from contract  
+        // Get absolute timeline from contract
         uint256 deploymentTime3 = block.timestamp;
         uint256 votingDelay3 = _tokenized().votingDelay();
         uint256 votingStartTime3 = deploymentTime3 + votingDelay3;

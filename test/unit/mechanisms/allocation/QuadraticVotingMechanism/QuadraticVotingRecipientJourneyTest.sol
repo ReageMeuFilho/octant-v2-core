@@ -184,7 +184,6 @@ contract QuadraticVotingRecipientJourneyTest is Test {
             quorumShares: QUORUM_REQUIREMENT,
             timelockDelay: TIMELOCK_DELAY,
             gracePeriod: 7 days,
-
             owner: address(0)
         });
 
@@ -242,7 +241,7 @@ contract QuadraticVotingRecipientJourneyTest is Test {
     /// @notice Test recipient monitoring and outcome tracking
     function testRecipientMonitoring_OutcomeTracking() public {
         _clearTestContext();
-        
+
         // ✅ CORRECT: Fetch absolute timeline from contract
         uint256 deploymentTime = block.timestamp; // When mechanism was deployed
         uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
@@ -394,7 +393,7 @@ contract QuadraticVotingRecipientJourneyTest is Test {
     /// @notice Test recipient partial redemption and share management
     function testRecipientShares_PartialRedemption() public {
         _clearTestContext();
-        
+
         // ✅ CORRECT: Fetch absolute timeline from contract
         uint256 deploymentTime = block.timestamp; // When mechanism was deployed
         uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();

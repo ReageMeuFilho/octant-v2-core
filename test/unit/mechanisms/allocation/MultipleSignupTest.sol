@@ -16,20 +16,20 @@ contract MultipleSignupTest is Test {
     AllocationMechanismFactory factory;
     ERC20Mock token;
     QuadraticVotingMechanism quadraticMechanism;
-    
+
     address alice = address(0x1);
-    
+
     function _tokenized(address _mechanism) internal pure returns (TokenizedAllocationMechanism) {
         return TokenizedAllocationMechanism(_mechanism);
     }
-    
+
     function setUp() public {
         factory = new AllocationMechanismFactory();
         token = new ERC20Mock();
-        
+
         // Fund alice
         token.mint(alice, 10000 ether);
-        
+
         // Deploy QuadraticVotingMechanism
         AllocationConfig memory config = AllocationConfig({
             asset: IERC20(address(token)),
@@ -42,49 +42,49 @@ contract MultipleSignupTest is Test {
             gracePeriod: 7 days,
             owner: address(this)
         });
-        
+
         address mechanismAddr = factory.deployQuadraticVotingMechanism(config, 1, 2); // Alpha = 0.5
         quadraticMechanism = QuadraticVotingMechanism(payable(mechanismAddr));
     }
-    
+
     /// @notice Test that QuadraticVotingMechanism allows multiple signups
     function testQuadraticMechanism_AllowsMultipleSignups() public {
         console.log("=== Testing Multiple Signups in QuadraticVotingMechanism ===");
-        
+
         // Get timeline info
         uint256 deploymentTime = block.timestamp;
         uint256 votingDelay = _tokenized(address(quadraticMechanism)).votingDelay();
         uint256 votingStartTime = deploymentTime + votingDelay;
-        
+
         // Stay before voting starts for registration
         vm.warp(votingStartTime - 1);
-        
+
         // First signup - should work
         vm.startPrank(alice);
         token.approve(address(quadraticMechanism), 1000 ether);
         _tokenized(address(quadraticMechanism)).signup(1000 ether);
-        
+
         uint256 powerAfterFirst = _tokenized(address(quadraticMechanism)).votingPower(alice);
         console.log("Power after first signup:", powerAfterFirst);
         assertEq(powerAfterFirst, 1000 ether, "First signup should give voting power");
-        
+
         // Second signup - should also work and add to existing power
         token.approve(address(quadraticMechanism), 500 ether);
         _tokenized(address(quadraticMechanism)).signup(500 ether);
-        
+
         uint256 powerAfterSecond = _tokenized(address(quadraticMechanism)).votingPower(alice);
         console.log("Power after second signup:", powerAfterSecond);
         assertEq(powerAfterSecond, 1500 ether, "Second signup should add to existing power");
-        
+
         // Third signup with zero deposit - should work
         _tokenized(address(quadraticMechanism)).signup(0);
-        
+
         uint256 powerAfterThird = _tokenized(address(quadraticMechanism)).votingPower(alice);
         console.log("Power after third signup (zero deposit):", powerAfterThird);
         assertEq(powerAfterThird, 1500 ether, "Zero deposit signup should not change power");
-        
+
         vm.stopPrank();
-        
+
         console.log("SUCCESS: QuadraticVotingMechanism allows multiple signups!");
     }
 }

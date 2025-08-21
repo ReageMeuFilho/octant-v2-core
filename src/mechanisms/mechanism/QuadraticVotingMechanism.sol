@@ -168,10 +168,14 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
 
     /// @notice Handle custom share distribution - returns false to use default minting
     /// @return handled False to indicate default minting should be used
-    function _requestCustomDistributionHook(address, uint256) internal pure virtual override returns (bool) {
+    /// @return assetsTransferred 0 since no custom distribution is performed
+    function _requestCustomDistributionHook(
+        address,
+        uint256
+    ) internal pure virtual override returns (bool handled, uint256 assetsTransferred) {
         // Return false to indicate we want to use the default share minting in TokenizedAllocationMechanism
         // This allows the base implementation to handle the minting via _mint()
-        return false;
+        return (false, 0);
     }
 
     /// @dev Get available withdraw limit for share owner with global timelock and grace period enforcement
@@ -256,12 +260,18 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
     ) external view returns (uint256 optimalAlphaNumerator, uint256 optimalAlphaDenominator) {
         // Get asset decimals to normalize amounts
         uint8 assetDecimals = IERC20Metadata(address(asset)).decimals();
-        
+
         // Normalize both amounts to 18 decimals to match quadratic/linear sums
         uint256 normalizedMatchingPool = _normalizeToDecimals(matchingPoolAmount, assetDecimals);
         uint256 normalizedUserDeposits = _normalizeToDecimals(totalUserDeposits, assetDecimals);
-        
-        return _calculateOptimalAlpha(normalizedMatchingPool, totalQuadraticSum(), totalLinearSum(), normalizedUserDeposits);
+
+        return
+            _calculateOptimalAlpha(
+                normalizedMatchingPool,
+                totalQuadraticSum(),
+                totalLinearSum(),
+                normalizedUserDeposits
+            );
     }
 
     /// @notice Reject ETH deposits to prevent permanent fund loss

@@ -171,11 +171,17 @@ The system implements **permissionless proposal queuing**, enabling flexible gov
     - MUST return consistent recipient throughout proposal lifecycle
 - **`_requestCustomDistributionHook(address recipient, uint256 shares)`** - Handles custom share distribution
   - **Security Assumptions**:
-    - MUST return true ONLY if custom distribution is fully handled
-    - MUST mint/transfer exact share amount if returning true
-    - MUST NOT mint shares if returning false (default minting will occur)
-    - MAY implement vesting, splitting, or other distribution logic
+    - MUST return (true, assetsTransferred) ONLY if custom distribution is fully handled
+    - MUST transfer exact asset amount and report it for totalAssets accounting if returning true
+    - MUST return (false, 0) if using default minting (shares will be minted automatically)
+    - MAY implement vesting, splitting, threshold-based distribution, or other distribution logic
     - MUST handle reentrancy safely if making external calls
+    - MUST ensure totalAssets accounting remains accurate by reporting transferred amounts
+  - **Threshold-Based Distribution Pattern**: Common implementation strategy for conditional distribution:
+    - **Direct Transfer Mode**: Transfer assets directly based on allocation criteria to optimize gas or implement custom logic
+    - **Share Minting Mode**: Use default share minting for standard lifecycle management
+    - **Asset Conversion**: Use `convertToAssets(sharesToMint)` to determine equivalent asset amount for direct transfers
+    - **Conditional Logic**: Implement custom criteria to determine which distribution method to use
   - **Access Control Pattern**: Since `queueProposal()` is permissionless, this hook can enforce custom access control:
     - **Example**: `require(msg.sender == owner || hasRole(QUEUER_ROLE, msg.sender), "Unauthorized queuing")`
     - **Governance Models**: Can implement community-driven queuing, role-based access, or other patterns
@@ -285,13 +291,16 @@ This pattern enables complete code reuse while maintaining storage isolation and
 
 #### FR-5: Proposal Queuing & Share Allocation
 - **Requirement:** Successful proposals must be queued and vault shares minted to recipients
-- **Implementation:** `queueProposal(uint256 pid)` with `_requestDistributionHook()` and direct `_mint()` calls
+- **Implementation:** `queueProposal(uint256 pid)` with `_requestCustomDistributionHook()` and direct `_mint()` calls
 - **Access Control Design:** `queueProposal` is **permissionless** to enable flexible governance models, but access control can be enforced via `_requestCustomDistributionHook()` if needed
 - **Acceptance Criteria:**
   - Can only queue proposals after tally finalization
   - Proposals must meet quorum requirements via `_hasQuorumHook()`
   - Share amount determined by `_convertVotesToShares()` hook
-  - Shares actually minted to recipient via internal `_mint()` function
+  - Shares actually minted to recipient via internal `_mint()` function OR custom distribution via hook
+  - **Custom Distribution Accounting**: If `_requestCustomDistributionHook()` returns `(true, assetsTransferred)`, then:
+    - `totalAssets` is reduced by `assetsTransferred` to maintain accurate accounting
+    - Prevents accounting discrepancies between actual balance and `totalAssets` tracking
   - Timelock delay applied before redemption eligibility
   - **Permissionless queuing** enables community-driven execution without admin bottlenecks
   - **Custom distribution hook** can implement access control or other types of distributions altogether

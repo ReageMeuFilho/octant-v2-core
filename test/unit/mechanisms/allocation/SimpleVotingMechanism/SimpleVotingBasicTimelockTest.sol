@@ -45,13 +45,13 @@ contract SimpleVotingBasicTimelockTest is Test {
     function testBasicTimelock() public {
         // Capture deployment time (when mechanism was deployed and startTime was set)
         uint256 deploymentTime = block.timestamp;
-        
+
         // Fetch timeline configuration from the deployed mechanism using available getters
         uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
         uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
         uint256 timelockDelay = _tokenized(address(mechanism)).timelockDelay();
         uint256 gracePeriod = _tokenized(address(mechanism)).gracePeriod();
-        
+
         // Calculate absolute timestamps based on deployment time
         uint256 votingStartTime = deploymentTime + votingDelay;
         uint256 votingEndTime = votingStartTime + votingPeriod;
@@ -64,12 +64,12 @@ contract SimpleVotingBasicTimelockTest is Test {
         vm.stopPrank();
 
         // Vote - warp to voting period and cast vote
-        vm.warp(votingStartTime + 1);  // Use absolute warp to voting start + 1 second
+        vm.warp(votingStartTime + 1); // Use absolute warp to voting start + 1 second
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 500 ether);
 
         // Finalize - warp to after voting ends and finalize
-        vm.warp(votingEndTime + 1);  // Use absolute warp to voting end + 1 second
+        vm.warp(votingEndTime + 1); // Use absolute warp to voting end + 1 second
         uint256 finalizeTime = block.timestamp;
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");

@@ -41,7 +41,6 @@ contract QuadraticVotingDefeatedStateTest is Test {
             quorumShares: QUORUM_REQUIREMENT,
             timelockDelay: 1 days,
             gracePeriod: 7 days,
-
             owner: address(0)
         });
 
@@ -57,16 +56,16 @@ contract QuadraticVotingDefeatedStateTest is Test {
         uint256 deploymentTime = block.timestamp; // Time when mechanism was deployed in setUp()
         uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
         uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
-        
+
         // Calculate absolute timeline timestamps
         uint256 startTime = deploymentTime; // Contract sets this during initialization
         uint256 votingStartTime = startTime + votingDelay;
         uint256 votingEndTime = votingStartTime + votingPeriod;
-        
+
         console.log("Timeline - Start:", startTime);
         console.log("Timeline - Voting Start:", votingStartTime);
         console.log("Timeline - Voting End:", votingEndTime);
-        
+
         // Setup voter
         vm.startPrank(alice);
         token.approve(address(mechanism), LARGE_DEPOSIT);

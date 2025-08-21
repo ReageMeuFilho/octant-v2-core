@@ -18,7 +18,7 @@ contract SimpleVotingMechanism is BaseAllocationMechanism {
 
     /// @notice Mapping of proposal ID to vote tallies
     mapping(uint256 => VoteTally) public voteTallies;
-    
+
     /// @notice Mapping to track which users have already signed up to prevent multiple registrations
     mapping(address => bool) public hasSignedUp;
     constructor(
@@ -35,10 +35,10 @@ contract SimpleVotingMechanism is BaseAllocationMechanism {
         if (hasSignedUp[user]) {
             return false; // Block re-registration
         }
-        
+
         // Mark user as having signed up
         hasSignedUp[user] = true;
-        
+
         return true; // Allow registration
     }
 
@@ -141,10 +141,14 @@ contract SimpleVotingMechanism is BaseAllocationMechanism {
 
     /// @dev Handle custom share distribution - returns false to use default minting
     /// @return handled False to indicate default minting should be used
-    function _requestCustomDistributionHook(address, uint256) internal pure override returns (bool) {
+    /// @return assetsTransferred 0 since no custom distribution is performed
+    function _requestCustomDistributionHook(
+        address,
+        uint256
+    ) internal pure override returns (bool handled, uint256 assetsTransferred) {
         // Return false to indicate we want to use the default share minting in TokenizedAllocationMechanism
         // This allows the base implementation to handle the minting via _mint()
-        return false;
+        return (false, 0);
     }
 
     /// @dev Get available withdraw limit for share owner with timelock and grace period enforcement

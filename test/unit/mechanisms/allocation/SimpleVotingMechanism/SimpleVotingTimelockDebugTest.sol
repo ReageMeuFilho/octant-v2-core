@@ -50,7 +50,7 @@ contract SimpleVotingTimelockDebugTest is Test {
         uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
         uint256 votingStartTime = deploymentTime + votingDelay;
         uint256 votingEndTime = votingStartTime + votingPeriod;
-        
+
         // Stay before voting starts for registration
         vm.warp(votingStartTime - 1);
 

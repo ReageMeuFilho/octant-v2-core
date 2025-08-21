@@ -197,7 +197,6 @@ contract QuadraticVotingAccountingAuditTest is Test {
             quorumShares: QUORUM_REQUIREMENT,
             timelockDelay: TIMELOCK_DELAY,
             gracePeriod: 7 days,
-
             owner: address(0)
         });
 

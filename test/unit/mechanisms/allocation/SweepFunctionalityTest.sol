@@ -146,7 +146,7 @@ contract SweepFunctionalityTest is Test {
         uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
         uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
         uint256 votingEndTime = deploymentTime + votingDelay + votingPeriod;
-        
+
         // Setup and finalize to set globalRedemptionStart
         vm.warp(votingEndTime + 1);
         _tokenized(address(mechanism)).finalizeVoteTally();

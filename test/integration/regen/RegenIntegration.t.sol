@@ -2359,12 +2359,12 @@ contract RegenIntegrationTest is Test {
         // Notify rewards
         vm.prank(ADMIN);
         regenStaker.notifyRewardAmount(currentTestCtx.rewardAmount);
-        
+
         // Warp to voting period and ensure sufficient rewards have accrued
         // Warp to near end of voting period to accumulate maximum rewards
         uint256 timeInVotingPeriod = votingEndTime - (votingPeriod / 10); // 90% through voting period
         vm.warp(timeInVotingPeriod);
-        
+
         console.log("Voting start:", votingStartTime);
         console.log("Voting end:", votingEndTime);
         console.log("Current time:", block.timestamp);
@@ -2488,12 +2488,12 @@ contract RegenIntegrationTest is Test {
         // Notify rewards
         vm.prank(ADMIN);
         regenStaker.notifyRewardAmount(currentTestCtx.rewardAmount);
-        
+
         // Warp to voting period and ensure sufficient rewards have accrued
         // Warp to near end of voting period to accumulate maximum rewards
         uint256 timeInVotingPeriod = votingEndTime - (votingPeriod / 10); // 90% through voting period
         vm.warp(timeInVotingPeriod);
-        
+
         console.log("Voting start:", votingStartTime);
         console.log("Voting end:", votingEndTime);
         console.log("Current time:", block.timestamp);

@@ -35,7 +35,6 @@ contract QuadraticVotingBasicTimelockTest is Test {
             quorumShares: 500, // Adjusted for quadratic funding
             timelockDelay: 1000, // 1000 seconds
             gracePeriod: 5000, // 5000 seconds
-
             owner: address(0)
         });
 
@@ -48,7 +47,7 @@ contract QuadraticVotingBasicTimelockTest is Test {
         // Get the voting delay and period from the mechanism
         uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
         uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
-        
+
         // Calculate timeline based on deployment time (setUp runs at timestamp 1)
         uint256 deploymentTime = 1; // Default foundry timestamp
         uint256 votingStartTime = deploymentTime + votingDelay; // 1 + 10 = 11

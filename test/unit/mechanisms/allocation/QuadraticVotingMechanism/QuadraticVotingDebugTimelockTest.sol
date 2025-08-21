@@ -28,7 +28,7 @@ contract QuadraticVotingDebugTimelockTest is Test {
     function setUp() public {
         // Set timestamp before deploying mechanism
         vm.warp(100000);
-        
+
         factory = new AllocationMechanismFactory();
         token = new ERC20Mock();
         token.mint(alice, 2000 ether);
@@ -42,7 +42,6 @@ contract QuadraticVotingDebugTimelockTest is Test {
             quorumShares: 500,
             timelockDelay: TIMELOCK_DELAY,
             gracePeriod: 7 days,
-
             owner: address(0)
         });
 

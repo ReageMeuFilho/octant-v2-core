@@ -61,7 +61,6 @@ contract SimpleVotingRecipientJourneyTest is Test {
 
     /// @notice Test recipient proposal advocacy and creation
     function testRecipientAdvocacy_ProposalCreation() public {
-
         // Recipients need proposers with voting power
         vm.startPrank(alice);
         token.approve(address(mechanism), LARGE_DEPOSIT);
