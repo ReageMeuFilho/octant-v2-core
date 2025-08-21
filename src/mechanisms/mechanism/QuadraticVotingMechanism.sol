@@ -76,6 +76,21 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
         }
     }
 
+    /// @dev Normalize token amount to 18 decimals (matches voting power normalization)
+    function _normalizeToDecimals(uint256 amount, uint8 assetDecimals) internal pure returns (uint256) {
+        if (assetDecimals == 18) {
+            return amount;
+        } else if (assetDecimals < 18) {
+            // Scale up: multiply by 10^(18 - assetDecimals)
+            uint256 scaleFactor = 10 ** (18 - assetDecimals);
+            return amount * scaleFactor;
+        } else {
+            // Scale down: divide by 10^(assetDecimals - 18)
+            uint256 scaleFactor = 10 ** (assetDecimals - 18);
+            return amount / scaleFactor;
+        }
+    }
+
     /// @notice Process vote using quadratic funding algorithm
     /// @dev The cost of voting is quadratic: to cast `weight` votes, you pay `weight^2` voting power
     function _processVoteHook(
@@ -223,16 +238,23 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
     }
 
     /// @notice Calculate optimal alpha for 1:1 shares-to-assets ratio given fixed matching pool amount
-    /// @param matchingPoolAmount Fixed amount of matching funds available
-    /// @param totalUserDeposits Total user deposits in the mechanism
+    /// @param matchingPoolAmount Fixed amount of matching funds available (in token's native decimals)
+    /// @param totalUserDeposits Total user deposits in the mechanism (in token's native decimals)
     /// @return optimalAlphaNumerator Calculated alpha numerator
     /// @return optimalAlphaDenominator Calculated alpha denominator
-    /// @dev Uses current mechanism state for quadratic and linear sums
+    /// @dev Internally normalizes amounts to 18 decimals to match quadratic/linear sum calculations
     function calculateOptimalAlpha(
         uint256 matchingPoolAmount,
         uint256 totalUserDeposits
     ) external view returns (uint256 optimalAlphaNumerator, uint256 optimalAlphaDenominator) {
-        return _calculateOptimalAlpha(matchingPoolAmount, totalQuadraticSum(), totalLinearSum(), totalUserDeposits);
+        // Get asset decimals to normalize amounts
+        uint8 assetDecimals = IERC20Metadata(address(asset)).decimals();
+        
+        // Normalize both amounts to 18 decimals to match quadratic/linear sums
+        uint256 normalizedMatchingPool = _normalizeToDecimals(matchingPoolAmount, assetDecimals);
+        uint256 normalizedUserDeposits = _normalizeToDecimals(totalUserDeposits, assetDecimals);
+        
+        return _calculateOptimalAlpha(normalizedMatchingPool, totalQuadraticSum(), totalLinearSum(), normalizedUserDeposits);
     }
 
     /// @notice Reject ETH deposits to prevent permanent fund loss
