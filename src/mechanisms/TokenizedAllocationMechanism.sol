@@ -70,10 +70,11 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     error ZeroTimelockDelay();
     error ZeroGracePeriod();
     error ZeroStartBlock();
+    error InvalidStartTime(uint256 startTime, uint256 currentTime);
     error EmptyName();
     error EmptySymbol();
     error RegistrationBlocked(address user);
-    error VotingEnded(uint256 currentBlock, uint256 endBlock);
+    error VotingEnded(uint256 currentTime, uint256 endTime);
     error AlreadyRegistered(address user);
     error DepositTooLarge(uint256 deposit, uint256 maxAllowed);
     error VotingPowerTooLarge(uint256 votingPower, uint256 maxAllowed);
@@ -83,7 +84,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     error RecipientUsed(address recipient);
     error EmptyDescription();
     error DescriptionTooLong(uint256 length, uint256 maxLength);
-    error VotingNotEnded(uint256 currentBlock, uint256 endBlock);
+    error VotingNotEnded(uint256 currentTime, uint256 endTime);
     error TallyAlreadyFinalized();
     error FinalizationBlocked();
     error TallyNotFinalized();
@@ -93,7 +94,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     error AlreadyQueued(uint256 pid);
     error QueueingClosedAfterRedemption();
     error NoAllocation(uint256 pid, uint256 sharesToMint);
-    error VotingClosed(uint256 currentBlock, uint256 startBlock, uint256 endBlock);
+    error VotingClosed(uint256 currentTime, uint256 startTime, uint256 endTime);
     error InvalidWeight(uint256 weight, uint256 votingPower);
     error WeightTooLarge(uint256 weight, uint256 maxAllowed);
     error PowerIncreased(uint256 oldPower, uint256 newPower);
@@ -147,8 +148,10 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         Defeated,
         Succeeded,
         Queued,
+        Redeemable,
         Expired
     }
+
 
     struct Proposal {
         uint256 sharesRequested;
@@ -171,6 +174,10 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         uint256 timelockDelay;
         uint256 gracePeriod;
         uint256 quorumShares;
+        uint256 startTime;              // Start timestamp for the mechanism
+        uint256 votingStartTime;        // startTime + votingDelay (when voting can begin)
+        uint256 votingEndTime;          // startTime + votingDelay + votingPeriod (when voting ends)
+        uint256 tallyFinalizedTime;     // when finalizeVoteTally() was called
         // Access control
         address owner;
         address pendingOwner;
@@ -180,6 +187,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         bool tallyFinalized;
         uint256 proposalIdCounter;
         uint256 globalRedemptionStart; // Global timestamp when all redemptions and transfers can begin
+        uint256 globalRedemptionEndTime; // Global timestamp when redemption period ends
         // Allocation Mechanism Vault Storage (merged from DistributionMechanism)
         mapping(address => uint256) nonces; // Mapping of nonces used for permit functions
         mapping(address => uint256) balances; // Mapping to track current balances for each account that holds shares
@@ -316,8 +324,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         uint256 _votingPeriod,
         uint256 _quorumShares,
         uint256 _timelockDelay,
-        uint256 _gracePeriod,
-        uint256 _startBlock
+        uint256 _gracePeriod
     ) external {
         _initializeAllocation(
             _owner,
@@ -328,8 +335,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
             _votingPeriod,
             _quorumShares,
             _timelockDelay,
-            _gracePeriod,
-            _startBlock
+            _gracePeriod
         );
     }
 
@@ -343,8 +349,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         uint256 _votingPeriod,
         uint256 _quorumShares,
         uint256 _timelockDelay,
-        uint256 _gracePeriod,
-        uint256 _startBlock
+        uint256 _gracePeriod
     ) internal {
         AllocationStorage storage s = _getStorage();
 
@@ -356,7 +361,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         if (_quorumShares == 0) revert ZeroQuorumShares();
         if (_timelockDelay == 0) revert ZeroTimelockDelay();
         if (_gracePeriod == 0) revert ZeroGracePeriod();
-        if (_startBlock == 0) revert ZeroStartBlock();
         if (bytes(_name).length == 0) revert EmptyName();
         if (bytes(_symbol).length == 0) revert EmptySymbol();
         if (s.initialized == true) revert AlreadyInitialized();
@@ -371,9 +375,14 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         s.quorumShares = _quorumShares;
         s.timelockDelay = _timelockDelay;
         s.gracePeriod = _gracePeriod;
-        s.startBlock = _startBlock;
+        s.startBlock = block.number; // Keep for legacy getter compatibility
         s.initialized = true;
 
+        // Set timestamp-based timeline starting from deployment time
+        s.startTime = block.timestamp;
+        s.votingStartTime = s.startTime + _votingDelay;
+        s.votingEndTime = s.votingStartTime + _votingPeriod;
+        
         // Set management roles to owner
         s.management = _owner;
         s.keeper = _owner;
@@ -476,8 +485,8 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
             revert RegistrationBlocked(user);
         }
 
-        if (block.number >= s.startBlock + s.votingDelay + s.votingPeriod)
-            revert VotingEnded(block.number, s.startBlock + s.votingDelay + s.votingPeriod);
+        if (block.timestamp > s.votingEndTime)
+            revert VotingEnded(block.timestamp, s.votingEndTime);
 
         if (s.votingPower[user] != 0) revert AlreadyRegistered(user);
         if (deposit > MAX_SAFE_VALUE) revert DepositTooLarge(deposit, MAX_SAFE_VALUE);
@@ -518,6 +527,12 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         if (recipient == address(0)) revert InvalidRecipient(recipient);
 
         AllocationStorage storage s = _getStorage();
+        
+        // Proposing only allowed before voting period ends
+        if (block.timestamp > s.votingEndTime) {
+            revert VotingEnded(block.timestamp, s.votingEndTime);
+        }
+        
         if (s.recipientUsed[recipient]) revert RecipientUsed(recipient);
         if (bytes(description).length == 0) revert EmptyDescription();
         if (bytes(description).length > 1000) revert DescriptionTooLong(bytes(description).length, 1000);
@@ -587,11 +602,11 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         if (p.canceled) revert ProposalCanceledError(pid);
 
         // Check voting window
-        if (block.number < s.startBlock + s.votingDelay || block.number > s.startBlock + s.votingDelay + s.votingPeriod)
+        if (block.timestamp < s.votingStartTime || block.timestamp > s.votingEndTime)
             revert VotingClosed(
-                block.number,
-                s.startBlock + s.votingDelay,
-                s.startBlock + s.votingDelay + s.votingPeriod
+                block.timestamp,
+                s.votingStartTime,
+                s.votingEndTime
             );
 
         uint256 oldPower = s.votingPower[voter];
@@ -619,8 +634,8 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     function finalizeVoteTally() external onlyOwner nonReentrant onlyInitialized {
         AllocationStorage storage s = _getStorage();
 
-        if (block.number < s.startBlock + s.votingDelay + s.votingPeriod)
-            revert VotingNotEnded(block.number, s.startBlock + s.votingDelay + s.votingPeriod);
+        if (block.timestamp <= s.votingEndTime)
+            revert VotingNotEnded(block.timestamp, s.votingEndTime);
 
         if (s.tallyFinalized) revert TallyAlreadyFinalized();
 
@@ -632,6 +647,8 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
 
         // Set global redemption start time for all proposals
         s.globalRedemptionStart = block.timestamp + s.timelockDelay;
+        s.globalRedemptionEndTime = s.globalRedemptionStart + s.gracePeriod;
+        s.tallyFinalizedTime = block.timestamp;
 
         s.tallyFinalized = true;
         emit VoteTallyFinalized();
@@ -690,23 +707,40 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         return _state(pid);
     }
 
-    /// @dev Internal state computation for a proposal
+    /// @dev Internal state computation for a proposal with direct time range checks
     function _state(uint256 pid) internal view returns (ProposalState) {
         AllocationStorage storage s = _getStorage();
         Proposal storage p = s.proposals[pid];
 
         if (p.canceled) return ProposalState.Canceled;
-        if (block.number < s.startBlock) return ProposalState.Pending;
-        if (block.number <= s.startBlock + s.votingDelay + s.votingPeriod || !s.tallyFinalized)
+
+        // Check if proposal failed quorum (defeated proposals never change state)
+        if (s.tallyFinalized && !IBaseAllocationStrategy(address(this)).hasQuorumHook(pid)) {
+            return ProposalState.Defeated;
+        }
+
+        uint256 currentTime = block.timestamp;
+
+        // Before voting starts (Pending or Delay phases)
+        if (currentTime < s.votingStartTime) {
+            return ProposalState.Pending;
+        }
+        // During voting period or before tally finalized
+        else if (currentTime <= s.votingEndTime || !s.tallyFinalized) {
             return ProposalState.Active;
-        if (!IBaseAllocationStrategy(address(this)).hasQuorumHook(pid)) return ProposalState.Defeated;
-        // Check if proposal has been queued (has shares allocated)
-        if (s.proposalShares[pid] == 0) return ProposalState.Succeeded;
-        // Check global grace period expiration
-        if (s.globalRedemptionStart != 0 && block.timestamp > s.globalRedemptionStart + s.gracePeriod) {
+        }
+        // After tally finalized - check if queued or succeeded
+        else if (s.globalRedemptionStart != 0 && currentTime < s.globalRedemptionStart) {
+            return s.proposalShares[pid] == 0 ? ProposalState.Succeeded : ProposalState.Queued;
+        }
+        // During redemption period
+        else if (s.globalRedemptionStart != 0 && s.globalRedemptionEndTime != 0 && currentTime <= s.globalRedemptionEndTime) {
+            return s.proposalShares[pid] == 0 ? ProposalState.Succeeded : ProposalState.Redeemable;
+        }
+        // After redemption period (grace period expired)
+        else {
             return ProposalState.Expired;
         }
-        return ProposalState.Queued;
     }
 
     // ---------- Proposal Management ----------
@@ -1298,9 +1332,11 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         require(to != address(0), "ERC20: transfer to the zero address");
         require(to != address(this), "ERC20 transfer to strategy");
 
-        // Block transfers until redemption period starts
-        if (S.globalRedemptionStart == 0 || block.timestamp < S.globalRedemptionStart) {
-            revert("Transfers not allowed until redemption period");
+        // Only allow transfers during redemption period [globalRedemptionStart, globalRedemptionEndTime]
+        if (S.globalRedemptionStart == 0 || 
+            block.timestamp < S.globalRedemptionStart || 
+            (S.globalRedemptionEndTime != 0 && block.timestamp > S.globalRedemptionEndTime)) {
+            revert("Transfers only allowed during redemption period");
         }
 
         S.balances[from] -= amount;

@@ -286,7 +286,7 @@ This pattern enables complete code reuse while maintaining storage isolation and
 - **Requirement:** System must track and expose proposal states throughout lifecycle
 - **Implementation:** `state(uint256 pid)` and `_state()` functions with comprehensive state machine
 - **Acceptance Criteria:**
-  - States: Pending, Active, Canceled, Defeated, Succeeded, Queued, Expired
+  - States: Pending, Active, Canceled, Defeated, Succeeded, Queued, Redeemable, Expired
   - State transitions follow predefined rules based on timing and votes
   - Canceled proposals remain permanently canceled
   - Grace period handling for expired proposals
@@ -373,9 +373,9 @@ This pattern enables complete code reuse while maintaining storage isolation and
 ## System Invariants & Constraints
 
 ### Timing Invariants
-1. **Voting Window**: `startBlock + votingDelay ≤ voting period ≤ startBlock + votingDelay + votingPeriod`
-2. **Registration Cutoff**: Users can only register before `startBlock + votingDelay + votingPeriod`
-3. **Tally Finalization**: Can only occur after `startBlock + votingDelay + votingPeriod`
+1. **Voting Window**: `startTime + votingDelay ≤ voting period ≤ startTime + votingDelay + votingPeriod`
+2. **Registration Cutoff**: Users can only register before `startTime + votingDelay + votingPeriod`
+3. **Tally Finalization**: Can only occur after `startTime + votingDelay + votingPeriod`
 4. **Timelock Enforcement**: Shares redeemable only after `block.timestamp ≥ eta`
 5. **Grace Period**: 
    - Share redemption window: From `globalRedemptionStart` to `globalRedemptionStart + gracePeriod`

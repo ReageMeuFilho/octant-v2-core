@@ -9,13 +9,12 @@ struct AllocationConfig {
     IERC20 asset;
     string name;
     string symbol;
-    uint256 votingDelay;
-    uint256 votingPeriod;
+    uint256 votingDelay;     // Delay before voting begins (in seconds)
+    uint256 votingPeriod;    // Duration of voting period (in seconds)
     uint256 quorumShares;
-    uint256 timelockDelay;
-    uint256 gracePeriod;
-    uint256 startBlock;
-    address owner; // Owner of the mechanism (deployer)
+    uint256 timelockDelay;   // Delay before redemption begins (in seconds)
+    uint256 gracePeriod;     // Grace period for redemption (in seconds)
+    address owner;           // Owner of the mechanism (deployer)
 }
 
 /// @title Base Allocation Mechanism - Lightweight Proxy
@@ -62,8 +61,7 @@ abstract contract BaseAllocationMechanism is IBaseAllocationStrategy {
                     _config.votingPeriod,
                     _config.quorumShares,
                     _config.timelockDelay,
-                    _config.gracePeriod,
-                    _config.startBlock
+                    _config.gracePeriod
                 )
             )
         );
