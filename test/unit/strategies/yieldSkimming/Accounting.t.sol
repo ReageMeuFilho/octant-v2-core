@@ -18,7 +18,7 @@ contract AccountingTest is Setup {
         assets = bound(assets, 1, 1e6); // Max 1 million - safe for all math
         airdropAmount = uint16(bound(airdropAmount, 1, 100)); // Small airdrop
 
-        vm.assume(_address != address(0) && _address != address(strategy) && _address != address(this));
+        vm.assume(_address != address(0) && _address != address(strategy) && _address != address(this) && _address != donationAddress);
 
         // nothing has happened pps should be 1
         uint256 pricePerShare = strategy.pricePerShare();
@@ -947,5 +947,129 @@ contract AccountingTest is Setup {
 
         assertLe(withdrawnUnderlying1, initialUnderlying1 + 1, "Depositor1 withdrawn <= initial");
         assertLe(withdrawnUnderlying2, initialUnderlying2 + 1, "Depositor2 withdrawn <= initial");
+    }
+
+    /**
+     * @notice Test loss reporting behavior when currentRate > lastReportedRate but still a loss
+     * @dev This tests if the lastReportedRate check is needed - case 1
+     */
+    function test_lastReportedRate_lossWithRateIncrease() public {
+        uint256 depositAmount = 10e18; // 10 tokens
+        address depositor = makeAddr("depositor");
+        
+        // Initial deposit
+        mintAndDepositIntoStrategy(strategy, depositor, depositAmount);
+        
+        // Create a big profit first (rate increases to 1.5)
+        uint256 profitRate = 15e17; // 1.5 rate
+        MockStrategySkimming(address(strategy)).updateExchangeRate(profitRate);
+        
+        // Report the profit - this should mint shares to dragon router
+        vm.prank(keeper);
+        (uint256 profit1, uint256 loss1) = strategy.report();
+        
+        assertGt(profit1, 0, "Should report profit");
+        assertEq(loss1, 0, "Should report no loss");
+        assertGt(strategy.balanceOf(donationAddress), 0, "Dragon should receive shares from profit");
+        
+        uint256 lastRate = IYieldSkimmingStrategy(address(strategy)).getLastRateRay();
+        assertEq(lastRate, profitRate * 1e9, "Last reported rate should be updated to profit rate");
+        
+        // Now simulate first loss: rate drops to 1.2 (still higher than initial 1.0, but lower than 1.5)
+        uint256 lossRate1 = 12e17; // 1.2 rate
+        MockStrategySkimming(address(strategy)).updateExchangeRate(lossRate1);
+        
+        // This is a loss compared to totalValueDebt + dragonValueDebt, but currentRate > YS.lastReportedRate is FALSE
+        // because 1.2 < 1.5
+        vm.prank(keeper);
+        (uint256 profit2, uint256 loss2) = strategy.report();
+        
+        assertEq(profit2, 0, "Should report no profit");
+        assertGt(loss2, 0, "Should report loss");
+        
+        // Verify the rate was updated
+        uint256 newLastRate = IYieldSkimmingStrategy(address(strategy)).getLastRateRay();
+        assertEq(newLastRate, lossRate1 * 1e9, "Last reported rate should be updated after loss");
+        
+        // Now simulate second loss: rate drops further to 1.1 (still a loss but rate decreased)
+        uint256 lossRate2 = 11e17; // 1.1 rate
+        MockStrategySkimming(address(strategy)).updateExchangeRate(lossRate2);
+        
+        // This is a loss and currentRate < YS.lastReportedRate is TRUE because 1.1 < 1.2
+        vm.prank(keeper);
+        (uint256 profit3, uint256 loss3) = strategy.report();
+        
+        assertEq(profit3, 0, "Should report no profit");
+        assertGt(loss3, 0, "Should report loss");
+        
+        // Both losses should have been reported and handled
+        console2.log("Loss 2 (rate increased but still loss):", loss2);
+        console2.log("Loss 3 (rate decreased):", loss3);
+    }
+    
+    /**
+     * @notice Test loss reporting behavior when currentRate < lastReportedRate is false  
+     * @dev This tests if the lastReportedRate check is needed - case 2
+     */
+    function test_lastReportedRate_lossWithoutRateDecrease() public {
+        uint256 depositAmount = 10e18; // 10 tokens
+        address depositor = makeAddr("depositor");
+        
+        // Initial deposit
+        mintAndDepositIntoStrategy(strategy, depositor, depositAmount);
+        
+        // Create a big profit first (rate increases to 2.0)
+        uint256 profitRate = 2e18; // 2.0 rate
+        MockStrategySkimming(address(strategy)).updateExchangeRate(profitRate);
+        
+        // Report the profit - this should mint shares to dragon router
+        vm.prank(keeper);
+        (uint256 profit1, uint256 loss1) = strategy.report();
+        
+        assertGt(profit1, 0, "Should report profit");
+        assertEq(loss1, 0, "Should report no loss");
+        assertGt(strategy.balanceOf(donationAddress), 0, "Dragon should receive shares from profit");
+        
+        uint256 lastRate = IYieldSkimmingStrategy(address(strategy)).getLastRateRay();
+        assertEq(lastRate, profitRate * 1e9, "Last reported rate should be updated to profit rate");
+        
+        // Now simulate a scenario where we have a loss in total value but rate increases slightly
+        // Rate goes to 2.1 (higher than lastReportedRate of 2.0)
+        uint256 higherRate = 21e17; // 2.1 rate
+        MockStrategySkimming(address(strategy)).updateExchangeRate(higherRate);
+        
+        // But we need to create a loss in total value
+        // We'll burn some assets to simulate a loss despite rate increase
+        uint256 assetsToRemove = strategy.totalAssets() / 4; // Remove 25% of assets
+        vm.prank(address(strategy));
+        yieldSource.transfer(address(0xdead), assetsToRemove);
+        
+        // Now we have: currentRate > lastReportedRate (2.1 > 2.0) 
+        // But currentValue < totalValueDebt + dragonValueDebt due to asset removal
+        vm.prank(keeper);
+        (uint256 profit2, uint256 loss2) = strategy.report();
+        
+        // This should NOT report a loss because currentRate < YS.lastReportedRate is FALSE
+        assertEq(profit2, 0, "Should report no profit");
+        assertEq(loss2, 0, "Should report no loss when rate increased");
+        
+        // Verify rate was NOT updated (by design - only updates on profit or loss with rate decrease)
+        uint256 newLastRate = IYieldSkimmingStrategy(address(strategy)).getLastRateRay();
+        assertEq(newLastRate, profitRate * 1e9, "Last reported rate should NOT be updated when loss is not reported");
+        
+        // Now let's create another loss where rate does decrease
+        uint256 lowerRate = 19e17; // 1.9 rate (lower than 2.1)
+        MockStrategySkimming(address(strategy)).updateExchangeRate(lowerRate);
+        
+        // This time currentRate < YS.lastReportedRate is TRUE (1.9 < 2.1)
+        vm.prank(keeper);
+        (uint256 profit3, uint256 loss3) = strategy.report();
+        
+        assertEq(profit3, 0, "Should report no profit");
+        assertGt(loss3, 0, "Should report loss when rate decreased");
+        
+        console2.log("Loss not reported when rate increased:", loss2);
+        console2.log("Loss reported when rate decreased:", loss3);
+        console2.log("This demonstrates the lastReportedRate check filters out losses when rate is increasing");
     }
 }
