@@ -388,13 +388,15 @@ contract QuadraticVotingAccountingAuditTest is Test {
         _tokenized(address(mechanism)).castVote(
             currentTestCtx.pid1,
             TokenizedAllocationMechanism.VoteType.For,
-            VOTE_WEIGHT
+            VOTE_WEIGHT,
+            recipient1
         );
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(
             currentTestCtx.pid2,
             TokenizedAllocationMechanism.VoteType.For,
-            VOTE_WEIGHT
+            VOTE_WEIGHT,
+            recipient2
         );
 
         // Bob votes
@@ -402,13 +404,15 @@ contract QuadraticVotingAccountingAuditTest is Test {
         _tokenized(address(mechanism)).castVote(
             currentTestCtx.pid1,
             TokenizedAllocationMechanism.VoteType.For,
-            VOTE_WEIGHT
+            VOTE_WEIGHT,
+            recipient1
         );
         vm.prank(bob);
         _tokenized(address(mechanism)).castVote(
             currentTestCtx.pid2,
             TokenizedAllocationMechanism.VoteType.For,
-            VOTE_WEIGHT
+            VOTE_WEIGHT,
+            recipient2
         );
 
         // Charlie votes
@@ -416,13 +420,15 @@ contract QuadraticVotingAccountingAuditTest is Test {
         _tokenized(address(mechanism)).castVote(
             currentTestCtx.pid1,
             TokenizedAllocationMechanism.VoteType.For,
-            VOTE_WEIGHT
+            VOTE_WEIGHT,
+            recipient1
         );
         vm.prank(charlie);
         _tokenized(address(mechanism)).castVote(
             currentTestCtx.pid2,
             TokenizedAllocationMechanism.VoteType.For,
-            VOTE_WEIGHT
+            VOTE_WEIGHT,
+            recipient2
         );
 
         AccountingState memory postVotingState = _captureAccountingState(currentTestCtx.pid1, currentTestCtx.pid2);
@@ -730,17 +736,17 @@ contract QuadraticVotingAccountingAuditTest is Test {
         // DIFFERENT VOTE PATTERNS - Asymmetric voting
         // Project 1: Gets strong support (more votes)
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, 25); // 625 voting power
+        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, 25, recipient1); // 625 voting power
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, 20); // 400 voting power
+        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, 20, recipient1); // 400 voting power
         vm.prank(charlie);
-        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, 15); // 225 voting power
+        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, 15, recipient1); // 225 voting power
 
         // Project 2: Gets moderate support (fewer votes, but still meets quorum)
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 15); // 225 voting power
+        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 15, recipient2); // 225 voting power
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 12); // 144 voting power
+        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 12, recipient2); // 144 voting power
 
         console.log("=== VOTE PATTERNS ===");
         console.log("Project 1 votes: Alice(25), Bob(20), Charlie(15) = total weight 60");
@@ -961,16 +967,16 @@ contract QuadraticVotingAccountingAuditTest is Test {
 
         // Alice votes the same amount (20) for each project
         vm.startPrank(alice);
-        _tokenized(address(mechanism)).castVote(currentTestCtx.pid1, TokenizedAllocationMechanism.VoteType.For, 20); // Cost: 400
-        _tokenized(address(mechanism)).castVote(currentTestCtx.pid2, TokenizedAllocationMechanism.VoteType.For, 20); // Cost: 400
-        _tokenized(address(mechanism)).castVote(currentTestCtx.pid3, TokenizedAllocationMechanism.VoteType.For, 20); // Cost: 400
+        _tokenized(address(mechanism)).castVote(currentTestCtx.pid1, TokenizedAllocationMechanism.VoteType.For, 20, recipient1); // Cost: 400
+        _tokenized(address(mechanism)).castVote(currentTestCtx.pid2, TokenizedAllocationMechanism.VoteType.For, 20, recipient2); // Cost: 400
+        _tokenized(address(mechanism)).castVote(currentTestCtx.pid3, TokenizedAllocationMechanism.VoteType.For, 20, recipient3); // Cost: 400
         vm.stopPrank();
 
         // Bob votes the same amount (15) for each project
         vm.startPrank(bob);
-        _tokenized(address(mechanism)).castVote(currentTestCtx.pid1, TokenizedAllocationMechanism.VoteType.For, 15); // Cost: 225
-        _tokenized(address(mechanism)).castVote(currentTestCtx.pid2, TokenizedAllocationMechanism.VoteType.For, 15); // Cost: 225
-        _tokenized(address(mechanism)).castVote(currentTestCtx.pid3, TokenizedAllocationMechanism.VoteType.For, 15); // Cost: 225
+        _tokenized(address(mechanism)).castVote(currentTestCtx.pid1, TokenizedAllocationMechanism.VoteType.For, 15, recipient1); // Cost: 225
+        _tokenized(address(mechanism)).castVote(currentTestCtx.pid2, TokenizedAllocationMechanism.VoteType.For, 15, recipient2); // Cost: 225
+        _tokenized(address(mechanism)).castVote(currentTestCtx.pid3, TokenizedAllocationMechanism.VoteType.For, 15, recipient3); // Cost: 225
         vm.stopPrank();
 
         vm.warp(currentTestCtx.startTime + VOTING_DELAY + VOTING_PERIOD + 1);

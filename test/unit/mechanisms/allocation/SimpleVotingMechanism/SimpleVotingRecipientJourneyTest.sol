@@ -149,19 +149,19 @@ contract SimpleVotingRecipientJourneyTest is Test {
         // Create different voting outcomes
         // Charlie: Successful (meets quorum)
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pidCharlie, TokenizedAllocationMechanism.VoteType.For, 800 ether);
+        _tokenized(address(mechanism)).castVote(pidCharlie, TokenizedAllocationMechanism.VoteType.For, 800 ether, charlie);
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pidCharlie, TokenizedAllocationMechanism.VoteType.For, 200 ether);
+        _tokenized(address(mechanism)).castVote(pidCharlie, TokenizedAllocationMechanism.VoteType.For, 200 ether, charlie);
 
         // Dave: Failed (below quorum)
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pidDave, TokenizedAllocationMechanism.VoteType.For, 150 ether);
+        _tokenized(address(mechanism)).castVote(pidDave, TokenizedAllocationMechanism.VoteType.For, 150 ether, dave);
 
         // Eve: Negative outcome
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pidEve, TokenizedAllocationMechanism.VoteType.Against, 200 ether);
+        _tokenized(address(mechanism)).castVote(pidEve, TokenizedAllocationMechanism.VoteType.Against, 200 ether, eve);
         vm.prank(frank);
-        _tokenized(address(mechanism)).castVote(pidEve, TokenizedAllocationMechanism.VoteType.For, 100 ether);
+        _tokenized(address(mechanism)).castVote(pidEve, TokenizedAllocationMechanism.VoteType.For, 100 ether, eve);
 
         // Recipients can monitor progress in real-time
         (uint256 charlieFor, uint256 charlieAgainst, ) = mechanism.voteTallies(pidCharlie);
@@ -222,10 +222,10 @@ contract SimpleVotingRecipientJourneyTest is Test {
 
         // Generate successful vote outcome
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 700 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 700 ether, charlie);
 
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 300 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 300 ether, charlie);
 
         vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
@@ -309,10 +309,10 @@ contract SimpleVotingRecipientJourneyTest is Test {
 
         // Vote for both proposals
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, 600 ether);
+        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, 600 ether, charlie);
 
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 400 ether);
+        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 400 ether, dave);
 
         vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
@@ -398,7 +398,7 @@ contract SimpleVotingRecipientJourneyTest is Test {
         vm.warp(votingStartTime + 1);
 
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 500 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 500 ether, charlie);
 
         vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));

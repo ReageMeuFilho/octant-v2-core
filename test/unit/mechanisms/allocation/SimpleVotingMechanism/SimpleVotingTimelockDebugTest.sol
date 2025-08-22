@@ -64,7 +64,7 @@ contract SimpleVotingTimelockDebugTest is Test {
         // Move to voting period
         vm.warp(votingStartTime + 1);
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 500 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 500 ether, charlie);
 
         // Move to finalization period
         vm.warp(votingEndTime + 1);

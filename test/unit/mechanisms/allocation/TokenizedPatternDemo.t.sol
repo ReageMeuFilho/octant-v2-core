@@ -265,11 +265,11 @@ contract TokenizedPatternDemoTest is Test {
 
         // Vote For
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether, charlie);
 
         // Vote Against
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.Against, 50 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.Against, 50 ether, charlie);
 
         // Check vote tally
         (uint256 forVotes, uint256 againstVotes, uint256 abstainVotes) = mechanism.voteTallies(pid);
@@ -303,7 +303,7 @@ contract TokenizedPatternDemoTest is Test {
 
         // Alice votes with only part of her power
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 60 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 60 ether, charlie);
 
         // Check partial power usage
         assertEq(_tokenized(address(mechanism)).votingPower(alice), 40 ether);
@@ -333,7 +333,7 @@ contract TokenizedPatternDemoTest is Test {
         vm.warp(votingStartTime + 1);
 
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether, charlie);
 
         // Move past voting period
         vm.warp(votingEndTime + 1);
@@ -368,7 +368,7 @@ contract TokenizedPatternDemoTest is Test {
 
         // Vote with enough to meet quorum (100 ether)
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 150 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 150 ether, charlie);
 
         vm.warp(votingEndTime + 1); // End voting
         // Call through the mechanism proxy to preserve owner context
@@ -420,7 +420,7 @@ contract TokenizedPatternDemoTest is Test {
         // Vote to meet quorum (during active voting period)
         vm.warp(votingStartTime + 50); // Past voting delay, within voting period
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 150 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 150 ether, charlie);
 
         // TALLYING after voting ends but before finalized
         vm.warp(votingEndTime + 100); // Past voting period
@@ -479,7 +479,7 @@ contract TokenizedPatternDemoTest is Test {
 
         // Test _processVoteHook (simple tally update)
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether, charlie);
 
         (uint256 forVotes, , ) = mechanism.voteTallies(pid);
         assertEq(forVotes, 100 ether);
@@ -541,19 +541,19 @@ contract TokenizedPatternDemoTest is Test {
 
         // Complex voting pattern
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, 100 ether);
+        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, 100 ether, charlie);
 
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.Against, 50 ether);
+        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.Against, 50 ether, charlie);
 
         vm.prank(dave);
-        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, 75 ether);
+        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, 75 ether, charlie);
 
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 150 ether);
+        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 150 ether, eve);
 
         vm.prank(dave);
-        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.Against, 75 ether);
+        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.Against, 75 ether, eve);
 
         // Check tallies
         (uint256 p1For, uint256 p1Against, ) = mechanism.voteTallies(pid1);
@@ -673,7 +673,7 @@ contract TokenizedPatternDemoTest is Test {
 
         // Vote with enough to meet quorum (100 ether)
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 150 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 150 ether, charlie);
 
         vm.warp(votingEndTime + 1); // End voting
 
@@ -732,10 +732,10 @@ contract TokenizedPatternDemoTest is Test {
 
         // Vote on both proposals
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, 100 ether);
+        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, 100 ether, charlie);
 
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 200 ether);
+        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 200 ether, dave);
 
         vm.warp(votingEndTime + 1);
 
@@ -780,7 +780,7 @@ contract TokenizedPatternDemoTest is Test {
         vm.warp(votingStartTime + 1);
 
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 150 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 150 ether, charlie);
 
         vm.warp(votingEndTime + 1);
 

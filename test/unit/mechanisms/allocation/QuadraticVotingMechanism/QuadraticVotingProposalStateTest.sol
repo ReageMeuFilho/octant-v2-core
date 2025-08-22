@@ -136,7 +136,7 @@ contract QuadraticVotingProposalStateTest is Test {
 
         // Recipient can monitor voting progress
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 30);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 30, dave);
 
         (, , uint256 quadraticFunding, uint256 linearFunding) = mechanism.getTally(pid);
         uint256 forVotes = quadraticFunding + linearFunding;
@@ -184,7 +184,7 @@ contract QuadraticVotingProposalStateTest is Test {
         // Cannot vote on canceled proposal
         vm.expectRevert();
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 8);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 8, dave);
 
         // State remains CANCELED permanently
         vm.warp(votingEndTime + 100);
@@ -225,13 +225,13 @@ contract QuadraticVotingProposalStateTest is Test {
 
         // Proposal 1: Insufficient votes (below quorum)
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pidLowVotes, TokenizedAllocationMechanism.VoteType.For, 10);
+        _tokenized(address(mechanism)).castVote(pidLowVotes, TokenizedAllocationMechanism.VoteType.For, 10, frank);
 
         // Proposal 2: Low total votes (below quorum)
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pidNegativeVotes, TokenizedAllocationMechanism.VoteType.For, 15);
+        _tokenized(address(mechanism)).castVote(pidNegativeVotes, TokenizedAllocationMechanism.VoteType.For, 15, grace);
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pidNegativeVotes, TokenizedAllocationMechanism.VoteType.For, 10);
+        _tokenized(address(mechanism)).castVote(pidNegativeVotes, TokenizedAllocationMechanism.VoteType.For, 10, grace);
 
         // Finalize voting
         vm.warp(votingEndTime + 1);
@@ -280,7 +280,7 @@ contract QuadraticVotingProposalStateTest is Test {
 
         // Vote to meet quorum
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 30);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 30, henry);
 
         vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
@@ -327,7 +327,7 @@ contract QuadraticVotingProposalStateTest is Test {
         vm.warp(votingStartTime + 1);
 
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 30);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 30, charlie);
 
         vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
@@ -384,7 +384,7 @@ contract QuadraticVotingProposalStateTest is Test {
         vm.warp(votingStartTime + 1);
 
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 30);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 30, dave);
 
         vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
@@ -441,7 +441,7 @@ contract QuadraticVotingProposalStateTest is Test {
         vm.warp(votingStartTime + 1);
 
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 30);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 30, eve);
 
         vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
@@ -540,10 +540,10 @@ contract QuadraticVotingProposalStateTest is Test {
 
         // Vote on remaining proposals
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pidSuccessful, TokenizedAllocationMechanism.VoteType.For, 30);
+        _tokenized(address(mechanism)).castVote(pidSuccessful, TokenizedAllocationMechanism.VoteType.For, 30, charlie);
 
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pidDefeated, TokenizedAllocationMechanism.VoteType.For, 10); // Below quorum
+        _tokenized(address(mechanism)).castVote(pidDefeated, TokenizedAllocationMechanism.VoteType.For, 10, dave); // Below quorum
 
         // Finalize
         vm.warp(votingEndTime + 1);

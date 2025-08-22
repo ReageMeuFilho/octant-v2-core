@@ -84,7 +84,7 @@ contract QuadraticVotingTimelockEnforcementTest is Test {
         vm.warp(votingStartTime + 1);
 
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 30); // 30^2 = 900 > 500 quorum
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 30, charlie); // 30^2 = 900 > 500 quorum
 
         vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
@@ -149,7 +149,7 @@ contract QuadraticVotingTimelockEnforcementTest is Test {
         vm.warp(votingStartTime + 1);
 
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 30); // 30^2 = 900 > 500 quorum
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 30, charlie); // 30^2 = 900 > 500 quorum
 
         vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
@@ -219,7 +219,7 @@ contract QuadraticVotingTimelockEnforcementTest is Test {
         vm.warp(votingStartTime + 1);
 
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 30); // 30^2 = 900 > 500 quorum
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 30, charlie); // 30^2 = 900 > 500 quorum
 
         vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
@@ -293,10 +293,10 @@ contract QuadraticVotingTimelockEnforcementTest is Test {
 
         // Vote for both
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, 30); // 30^2 = 900 > 500 quorum
+        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, 30, charlie); // 30^2 = 900 > 500 quorum
 
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 30); // 30^2 = 900 > 500 quorum
+        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 30, bob); // 30^2 = 900 > 500 quorum
 
         vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));

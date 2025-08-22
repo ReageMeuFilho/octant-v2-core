@@ -69,11 +69,12 @@ contract QuadraticVotingVoterJourneyTest is Test {
     function _castVote(
         address voter,
         uint256 pid,
-        uint256 weight
+        uint256 weight,
+        address recipient
     ) internal returns (uint256 previousPower, uint256 newPower) {
         previousPower = _tokenized(address(mechanism)).votingPower(voter);
         vm.prank(voter);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, weight);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, weight, recipient);
         newPower = _tokenized(address(mechanism)).votingPower(voter);
     }
 
@@ -202,22 +203,22 @@ contract QuadraticVotingVoterJourneyTest is Test {
 
         // Quadratic voting - cost is weight^2
         // Alice votes with weight 31, cost = 31^2 = 961 voting power
-        (uint256 alicePrevPower, uint256 aliceNewPower) = _castVote(alice, pid1, 31);
+        (uint256 alicePrevPower, uint256 aliceNewPower) = _castVote(alice, pid1, 31, charlie);
 
         assertEq(alicePrevPower - aliceNewPower, 31 * 31, "Alice should have spent 961 voting power");
         assertEq(aliceNewPower, LARGE_DEPOSIT - (31 * 31));
         assertTrue(mechanism.hasVoted(pid1, alice));
 
         // Bob votes with weight 10, cost = 10^2 = 100 voting power
-        _castVote(bob, pid1, 10);
+        _castVote(bob, pid1, 10, charlie);
         assertEq(_tokenized(address(mechanism)).votingPower(bob), MEDIUM_DEPOSIT - (10 * 10));
 
         // Bob votes again with weight 15, cost = 15^2 = 225 voting power
-        _castVote(bob, pid2, 15);
+        _castVote(bob, pid2, 15, dave);
         assertEq(_tokenized(address(mechanism)).votingPower(bob), MEDIUM_DEPOSIT - 100 - 225);
 
         // Frank votes with weight 5, cost = 5^2 = 25 voting power
-        _castVote(frank, pid2, 5);
+        _castVote(frank, pid2, 5, dave);
         assertEq(_tokenized(address(mechanism)).votingPower(frank), SMALL_DEPOSIT - 25);
 
         // Note: QuadraticVoting uses ProperQF tallying, not simple vote counts
@@ -243,7 +244,7 @@ contract QuadraticVotingVoterJourneyTest is Test {
         vm.warp(votingStartTime - 50);
         vm.expectRevert();
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 8);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 8, charlie);
 
         // Warp to voting period
         vm.warp(votingStartTime + 1);
@@ -251,26 +252,26 @@ contract QuadraticVotingVoterJourneyTest is Test {
         // Cannot vote with more power than available
         vm.expectRevert();
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, LARGE_DEPOSIT + 1);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, LARGE_DEPOSIT + 1, charlie);
 
         // Cannot vote twice
-        _castVote(alice, pid, 8);
+        _castVote(alice, pid, 8, charlie);
 
         vm.expectRevert(abi.encodeWithSelector(QuadraticVotingMechanism.AlreadyVoted.selector, alice, pid));
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 10);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 10, charlie);
 
         // Cannot vote after voting period
         vm.warp(votingEndTime + 1);
         vm.expectRevert();
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 8);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 8, charlie);
 
         // Unregistered user cannot vote
         vm.warp(votingStartTime + 500);
         vm.expectRevert();
         vm.prank(henry);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 1);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 1, charlie);
     }
 
     /// @notice Test voter power conservation and management
@@ -297,14 +298,14 @@ contract QuadraticVotingVoterJourneyTest is Test {
 
         // First vote - quadratic cost: 10^2 = 100
         uint256 vote1Weight = 10;
-        (uint256 prevPower1, uint256 newPower1) = _castVote(alice, pid1, vote1Weight);
+        (uint256 prevPower1, uint256 newPower1) = _castVote(alice, pid1, vote1Weight, charlie);
 
         assertEq(prevPower1, initialPower, "Initial power should match");
         assertEq(newPower1, initialPower - (vote1Weight * vote1Weight), "Power consumed correctly");
 
         // Second vote with remaining power
         uint256 vote2Weight = 10; // Quadratic cost: 10^2 = 100
-        _castVote(alice, pid2, vote2Weight);
+        _castVote(alice, pid2, vote2Weight, dave);
 
         uint256 powerAfterVote2 = _tokenized(address(mechanism)).votingPower(alice);
         assertEq(powerAfterVote2, initialPower - (vote1Weight * vote1Weight) - (vote2Weight * vote2Weight));

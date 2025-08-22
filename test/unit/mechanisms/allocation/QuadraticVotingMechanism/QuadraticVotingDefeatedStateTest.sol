@@ -85,7 +85,7 @@ contract QuadraticVotingDefeatedStateTest is Test {
 
         // Vote with insufficient amount for quorum - QuadraticFunding calculation needed
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 10);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 10, frank);
 
         console.log("Vote weight: 10, quadratic cost: 100 voting power");
 

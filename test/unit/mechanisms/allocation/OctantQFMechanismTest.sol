@@ -270,7 +270,7 @@ contract OctantQFMechanismTest is Test {
         // This exceeds quorum of 10,000e18
         for (uint i = 0; i < users.length; i++) {
             vm.prank(users[i]);
-            tam().castVote(pid, TokenizedAllocationMechanism.VoteType.For, 60e9);
+            tam().castVote(pid, TokenizedAllocationMechanism.VoteType.For, 60e9, alice);
         }
 
         // Wait for voting period

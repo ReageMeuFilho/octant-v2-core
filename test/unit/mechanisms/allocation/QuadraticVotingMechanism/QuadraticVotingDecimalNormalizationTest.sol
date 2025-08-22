@@ -255,8 +255,8 @@ contract QuadraticVotingDecimalNormalizationTest is Test {
 
                 // Vote on proposal 1 and 2 with weight 10 each
                 // Cost: 10^2 = 100 voting power per vote, 200 total per user
-                _tokenized(address(mechanisms[m])).castVote(1, TokenizedAllocationMechanism.VoteType.For, 10);
-                _tokenized(address(mechanisms[m])).castVote(2, TokenizedAllocationMechanism.VoteType.For, 10);
+                _tokenized(address(mechanisms[m])).castVote(1, TokenizedAllocationMechanism.VoteType.For, 10, projectA);
+                _tokenized(address(mechanisms[m])).castVote(2, TokenizedAllocationMechanism.VoteType.For, 10, projectB);
 
                 vm.stopPrank();
             }
@@ -281,8 +281,8 @@ contract QuadraticVotingDecimalNormalizationTest is Test {
             vm.startPrank(users[i]);
 
             // Vote on proposal 1 and 2 with weight 10 each
-            _tokenized(address(mechanism)).castVote(1, TokenizedAllocationMechanism.VoteType.For, 10);
-            _tokenized(address(mechanism)).castVote(2, TokenizedAllocationMechanism.VoteType.For, 10);
+            _tokenized(address(mechanism)).castVote(1, TokenizedAllocationMechanism.VoteType.For, 10, projectA);
+            _tokenized(address(mechanism)).castVote(2, TokenizedAllocationMechanism.VoteType.For, 10, projectB);
 
             vm.stopPrank();
         }

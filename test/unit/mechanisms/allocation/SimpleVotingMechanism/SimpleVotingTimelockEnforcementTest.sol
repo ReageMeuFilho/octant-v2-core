@@ -78,7 +78,7 @@ contract SimpleVotingTimelockEnforcementTest is Test {
         vm.warp(votingStartTime + 1);
 
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 500 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 500 ether, charlie);
 
         // Move to finalization period
         vm.warp(votingEndTime + 1);
@@ -145,7 +145,7 @@ contract SimpleVotingTimelockEnforcementTest is Test {
         vm.warp(votingStartTime + 1);
 
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 300 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 300 ether, charlie);
 
         // Move to finalization period
         vm.warp(votingEndTime + 1);
@@ -223,7 +223,7 @@ contract SimpleVotingTimelockEnforcementTest is Test {
         vm.warp(votingStartTime + 1);
 
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 400 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 400 ether, charlie);
 
         // Move to finalization period
         vm.warp(votingEndTime + 1);
@@ -299,10 +299,10 @@ contract SimpleVotingTimelockEnforcementTest is Test {
 
         // Vote for both
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, 600 ether);
+        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, 600 ether, charlie);
 
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 400 ether);
+        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 400 ether, bob);
 
         // Move to finalization period
         vm.warp(votingEndTime + 1);

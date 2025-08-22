@@ -108,21 +108,21 @@ contract SimpleVotingCrossJourneyTest is Test {
         // Complex voting patterns
         // Alice: Strategic voter supporting energy and education
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pidCharlie, TokenizedAllocationMechanism.VoteType.For, 600 ether);
+        _tokenized(address(mechanism)).castVote(pidCharlie, TokenizedAllocationMechanism.VoteType.For, 600 ether, charlie);
 
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pidDave, TokenizedAllocationMechanism.VoteType.For, 400 ether);
+        _tokenized(address(mechanism)).castVote(pidDave, TokenizedAllocationMechanism.VoteType.For, 400 ether, dave);
 
         // Bob: Focused on education with opposition to energy
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pidDave, TokenizedAllocationMechanism.VoteType.For, 400 ether);
+        _tokenized(address(mechanism)).castVote(pidDave, TokenizedAllocationMechanism.VoteType.For, 400 ether, dave);
 
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pidCharlie, TokenizedAllocationMechanism.VoteType.Against, 100 ether);
+        _tokenized(address(mechanism)).castVote(pidCharlie, TokenizedAllocationMechanism.VoteType.Against, 100 ether, charlie);
 
         // Frank: Supporting healthcare
         vm.prank(frank);
-        _tokenized(address(mechanism)).castVote(pidEve, TokenizedAllocationMechanism.VoteType.For, 100 ether);
+        _tokenized(address(mechanism)).castVote(pidEve, TokenizedAllocationMechanism.VoteType.For, 100 ether, eve);
 
         // PHASE 4: ADMIN FINALIZATION AND EXECUTION
 
@@ -244,7 +244,7 @@ contract SimpleVotingCrossJourneyTest is Test {
         vm.warp(votingStartTime + 1);
 
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 500 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 500 ether, charlie);
 
         // Emergency pause during voting
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("pause()"));
@@ -253,7 +253,7 @@ contract SimpleVotingCrossJourneyTest is Test {
         // All operations blocked
         vm.expectRevert(TokenizedAllocationMechanism.PausedError.selector);
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether, charlie);
 
         // Resume operations
         (bool success2, ) = address(mechanism).call(abi.encodeWithSignature("unpause()"));
@@ -261,7 +261,7 @@ contract SimpleVotingCrossJourneyTest is Test {
 
         // Operations work again - use bob since alice already voted
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether, charlie);
 
         // Ownership transfer during crisis
         (bool success3, ) = address(mechanism).call(
@@ -343,18 +343,18 @@ contract SimpleVotingCrossJourneyTest is Test {
         // Exactly at voting start
         vm.warp(votingStartTime);
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 1000 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 1000 ether, charlie);
 
         // Exactly at voting end
         vm.warp(votingEndTime);
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.Against, 100 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.Against, 100 ether, charlie);
 
         // One second later should fail
         vm.warp(votingEndTime + 1);
         vm.expectRevert();
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 1 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 1 ether, charlie);
     }
 
     /// @notice Test proposal cancellation across journeys
@@ -400,7 +400,7 @@ contract SimpleVotingCrossJourneyTest is Test {
         vm.warp(votingStartTime + 1);
         vm.expectRevert();
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether, charlie);
 
         // Non-proposer cannot cancel
         vm.prank(alice);
@@ -451,21 +451,21 @@ contract SimpleVotingCrossJourneyTest is Test {
         // Strategic voting with power distribution
         // Alice: Supports infrastructure but opposes healthcare
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, 500 ether);
+        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, 500 ether, charlie);
 
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid3, TokenizedAllocationMechanism.VoteType.Against, 300 ether);
+        _tokenized(address(mechanism)).castVote(pid3, TokenizedAllocationMechanism.VoteType.Against, 300 ether, eve);
 
         // Bob: Supports education and healthcare
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 400 ether);
+        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 400 ether, dave);
 
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pid3, TokenizedAllocationMechanism.VoteType.For, 100 ether);
+        _tokenized(address(mechanism)).castVote(pid3, TokenizedAllocationMechanism.VoteType.For, 100 ether, eve);
 
         // Frank: All-in on healthcare
         vm.prank(frank);
-        _tokenized(address(mechanism)).castVote(pid3, TokenizedAllocationMechanism.VoteType.For, 100 ether);
+        _tokenized(address(mechanism)).castVote(pid3, TokenizedAllocationMechanism.VoteType.For, 100 ether, eve);
 
         // Finalize and determine outcomes
         vm.warp(votingEndTime + 1);

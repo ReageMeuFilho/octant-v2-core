@@ -89,6 +89,8 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     error ProposeNotAllowed(address proposer);
     error InvalidRecipient(address recipient);
     error RecipientUsed(address recipient);
+    error RecipientMismatch(uint256 pid, address expected, address actual);
+    error DescriptionMismatch(uint256 pid);
     error EmptyDescription();
     error DescriptionTooLong(uint256 length, uint256 maxLength);
     error VotingNotEnded(uint256 currentTime, uint256 endTime);
@@ -135,7 +137,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     /// @notice CastVote typehash for EIP712 structured data
     bytes32 private constant CAST_VOTE_TYPEHASH =
         keccak256(
-            "CastVote(address voter,uint256 proposalId,uint8 choice,uint256 weight,uint256 nonce,uint256 deadline)"
+            "CastVote(address voter,uint256 proposalId,uint8 choice,uint256 weight,address expectedRecipient,uint256 nonce,uint256 deadline)"
         );
 
     /// @notice EIP712 version for domain separator
@@ -556,12 +558,14 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     /// @param pid Proposal ID
     /// @param choice VoteType (Against, For, Abstain)
     /// @param weight Amount of voting power to apply
+    /// @param expectedRecipient Expected recipient address to prevent reorganization attacks
     function castVote(
         uint256 pid,
         VoteType choice,
-        uint256 weight
+        uint256 weight,
+        address expectedRecipient
     ) external nonReentrant whenNotPaused {
-        _executeCastVote(msg.sender, pid, choice, weight);
+        _executeCastVote(msg.sender, pid, choice, weight, expectedRecipient);
     }
 
     /// @notice Cast vote using EIP-2612 style signature
@@ -569,6 +573,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     /// @param pid Proposal ID
     /// @param choice Vote choice (Against, For, Abstain)
     /// @param weight Voting weight to use
+    /// @param expectedRecipient Expected recipient address for the proposal
     /// @param deadline Expiration timestamp for the signature
     /// @param v Signature parameter
     /// @param r Signature parameter
@@ -578,6 +583,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         uint256 pid,
         VoteType choice,
         uint256 weight,
+        address expectedRecipient,
         uint256 deadline,
         uint8 v,
         bytes32 r,
@@ -586,17 +592,17 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         uint256 nonce = _getStorage().nonces[voter]++;
         _validateSignature(
             voter,
-            keccak256(abi.encode(CAST_VOTE_TYPEHASH, voter, pid, uint8(choice), weight, nonce, deadline)),
+            keccak256(abi.encode(CAST_VOTE_TYPEHASH, voter, pid, uint8(choice), weight, expectedRecipient, nonce, deadline)),
             deadline,
             v,
             r,
             s
         );
-        _executeCastVote(voter, pid, choice, weight);
+        _executeCastVote(voter, pid, choice, weight, expectedRecipient);
     }
 
     /// @dev Internal vote execution logic
-    function _executeCastVote(address voter, uint256 pid, VoteType choice, uint256 weight) private {
+    function _executeCastVote(address voter, uint256 pid, VoteType choice, uint256 weight, address expectedRecipient) private {
         AllocationStorage storage s = _getStorage();
 
         // Validate proposal
@@ -605,6 +611,9 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         // Check if proposal is canceled
         Proposal storage p = s.proposals[pid];
         if (p.canceled) revert ProposalCanceledError(pid);
+
+        // Verify recipient matches voter's expectation to prevent reorganization attacks
+        if (p.recipient != expectedRecipient) revert RecipientMismatch(pid, expectedRecipient, p.recipient);
 
         // Check voting window
         if (block.timestamp < s.votingStartTime || block.timestamp > s.votingEndTime)
@@ -628,6 +637,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         s.votingPower[voter] = newPower;
         emit VotesCast(voter, pid, weight);
     }
+
 
     // ---------- Vote Tally Finalization ----------
 

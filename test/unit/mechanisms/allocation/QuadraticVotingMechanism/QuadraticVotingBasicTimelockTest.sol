@@ -63,7 +63,7 @@ contract QuadraticVotingBasicTimelockTest is Test {
         // Vote - advance to voting period
         vm.warp(votingStartTime);
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 31); // 31^2 = 961 > 500 quorum
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 31, charlie); // 31^2 = 961 > 500 quorum
 
         // Finalize - advance past voting period
         vm.warp(votingEndTime + 1);

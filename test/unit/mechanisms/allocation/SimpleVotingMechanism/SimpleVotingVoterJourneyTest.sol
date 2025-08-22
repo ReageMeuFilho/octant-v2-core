@@ -192,23 +192,23 @@ contract SimpleVotingVoterJourneyTest is Test {
 
         // Full power voting
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, LARGE_DEPOSIT);
+        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, LARGE_DEPOSIT, charlie);
 
         assertEq(_tokenized(address(mechanism)).votingPower(alice), 0);
         // SimpleVoting now allows multiple votes per person, so we don't check hasVoted
 
         // Partial power voting across proposals
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.Against, 200 ether);
+        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.Against, 200 ether, charlie);
         assertEq(_tokenized(address(mechanism)).votingPower(bob), 300 ether);
 
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 200 ether);
+        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 200 ether, dave);
         assertEq(_tokenized(address(mechanism)).votingPower(bob), 100 ether);
 
         // Strategic voting
         vm.prank(frank);
-        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 50 ether);
+        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 50 ether, dave);
         assertEq(_tokenized(address(mechanism)).votingPower(frank), 50 ether);
 
         // Verify vote tallies
@@ -244,7 +244,7 @@ contract SimpleVotingVoterJourneyTest is Test {
         vm.warp(votingStartTime - 50);
         vm.expectRevert();
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether, charlie);
 
         // Move to voting period
         vm.warp(votingStartTime + 1);
@@ -252,16 +252,16 @@ contract SimpleVotingVoterJourneyTest is Test {
         // Cannot vote with more power than available
         vm.expectRevert();
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, LARGE_DEPOSIT + 1);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, LARGE_DEPOSIT + 1, charlie);
 
         // SimpleVoting now allows multiple votes per person
         // Alice can vote multiple times with remaining power
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether, charlie);
 
         // Alice can vote again with her remaining power
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.Against, 100 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.Against, 100 ether, charlie);
 
         // Verify Alice has used 200 ether total voting power
         assertEq(_tokenized(address(mechanism)).votingPower(alice), LARGE_DEPOSIT - 200 ether);
@@ -270,13 +270,13 @@ contract SimpleVotingVoterJourneyTest is Test {
         vm.warp(votingEndTime + 1);
         vm.expectRevert();
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether, charlie);
 
         // Unregistered user cannot vote (back in voting period)
         vm.warp(votingStartTime + 500);
         vm.expectRevert();
         vm.prank(henry);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 1);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 1, charlie);
     }
 
     /// @notice Test voter power conservation and management
@@ -309,7 +309,7 @@ contract SimpleVotingVoterJourneyTest is Test {
         // First vote
         uint256 vote1Weight = 300 ether;
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, vote1Weight);
+        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, vote1Weight, charlie);
 
         uint256 powerAfterVote1 = _tokenized(address(mechanism)).votingPower(alice);
         assertEq(powerAfterVote1, initialPower - vote1Weight);
@@ -317,7 +317,7 @@ contract SimpleVotingVoterJourneyTest is Test {
         // Second vote with remaining power
         uint256 vote2Weight = 200 ether;
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.Against, vote2Weight);
+        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.Against, vote2Weight, dave);
 
         uint256 powerAfterVote2 = _tokenized(address(mechanism)).votingPower(alice);
         assertEq(powerAfterVote2, initialPower - vote1Weight - vote2Weight);

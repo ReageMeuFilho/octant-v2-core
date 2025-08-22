@@ -130,16 +130,16 @@ contract SimpleVotingAdminJourneyTest is Test {
         vm.warp(votingStartTime + 1);
 
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, 600 ether);
+        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, 600 ether, charlie);
 
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.Against, 100 ether);
+        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.Against, 100 ether, charlie);
 
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 400 ether);
+        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 400 ether, dave);
 
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 400 ether);
+        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 400 ether, dave);
 
         // Admin checks real-time vote tallies
         (uint256 p1For, uint256 p1Against, ) = mechanism.voteTallies(pid1);
@@ -181,7 +181,7 @@ contract SimpleVotingAdminJourneyTest is Test {
         vm.warp(votingStartTime + 1);
 
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 500 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 500 ether, charlie);
 
         // Cannot finalize before voting period ends
         vm.expectRevert();
@@ -229,14 +229,14 @@ contract SimpleVotingAdminJourneyTest is Test {
 
         // Create outcomes: one success, one failure
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pidSuccessful, TokenizedAllocationMechanism.VoteType.For, 800 ether);
+        _tokenized(address(mechanism)).castVote(pidSuccessful, TokenizedAllocationMechanism.VoteType.For, 800 ether, charlie);
 
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pidSuccessful, TokenizedAllocationMechanism.VoteType.For, 300 ether);
+        _tokenized(address(mechanism)).castVote(pidSuccessful, TokenizedAllocationMechanism.VoteType.For, 300 ether, charlie);
 
         // Failed proposal gets insufficient votes
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pidFailed, TokenizedAllocationMechanism.VoteType.For, 100 ether);
+        _tokenized(address(mechanism)).castVote(pidFailed, TokenizedAllocationMechanism.VoteType.For, 100 ether, dave);
 
         vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
@@ -342,7 +342,7 @@ contract SimpleVotingAdminJourneyTest is Test {
         vm.warp(votingStartTime + 1);
 
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 500 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 500 ether, charlie);
 
         // Emergency pause during voting
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("pause()"));
@@ -351,7 +351,7 @@ contract SimpleVotingAdminJourneyTest is Test {
         // All operations blocked
         vm.expectRevert(TokenizedAllocationMechanism.PausedError.selector);
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether, charlie);
 
         // Resume operations
         (bool success2, ) = address(mechanism).call(abi.encodeWithSignature("unpause()"));
@@ -359,7 +359,7 @@ contract SimpleVotingAdminJourneyTest is Test {
 
         // Operations work again - use bob since alice already voted
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether, charlie);
 
         // Ownership transfer during crisis
         address emergencyAdmin = newOwner;

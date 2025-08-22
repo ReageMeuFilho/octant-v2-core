@@ -62,9 +62,10 @@ contract QuadraticVotingAdminJourneyTest is Test {
     /// @param voter Address casting the vote
     /// @param pid Proposal ID to vote on
     /// @param weight Vote weight (quadratic cost = weight^2)
-    function _castVote(address voter, uint256 pid, uint256 weight) internal {
+    /// @param recipient Expected recipient address for the proposal
+    function _castVote(address voter, uint256 pid, uint256 weight, address recipient) internal {
         vm.prank(voter);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, weight);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, weight, recipient);
     }
 
     function setUp() public {
@@ -151,10 +152,10 @@ contract QuadraticVotingAdminJourneyTest is Test {
         // Admin monitors voting progress - advance to voting period
         vm.warp(block.timestamp + VOTING_DELAY + 1);
 
-        _castVote(alice, pid1, 22);
-        _castVote(bob, pid1, 8);
-        _castVote(alice, pid2, 18);
-        _castVote(bob, pid2, 18);
+        _castVote(alice, pid1, 22, charlie);
+        _castVote(bob, pid1, 8, charlie);
+        _castVote(alice, pid2, 18, dave);
+        _castVote(bob, pid2, 18, dave);
 
         // Admin checks real-time vote tallies using getTally() from ProperQF
         (, , uint256 p1QuadraticFunding, uint256 p1LinearFunding) = mechanism.getTally(pid1);
@@ -185,7 +186,7 @@ contract QuadraticVotingAdminJourneyTest is Test {
         // Advance to voting period
         vm.warp(block.timestamp + VOTING_DELAY + 1);
 
-        _castVote(alice, pid, 20);
+        _castVote(alice, pid, 20, charlie);
 
         // Cannot finalize before voting period ends
         vm.expectRevert();
@@ -216,11 +217,11 @@ contract QuadraticVotingAdminJourneyTest is Test {
         vm.warp(block.timestamp + VOTING_DELAY + 1);
 
         // Create outcomes: one success, one failure
-        _castVote(alice, pidSuccessful, 25);
-        _castVote(bob, pidSuccessful, 15);
+        _castVote(alice, pidSuccessful, 25, charlie);
+        _castVote(bob, pidSuccessful, 15, charlie);
 
         // Failed proposal gets insufficient votes
-        _castVote(bob, pidFailed, 8);
+        _castVote(bob, pidFailed, 8, dave);
 
         // Advance past voting period
         vm.warp(block.timestamp + VOTING_PERIOD + 1);
@@ -316,7 +317,7 @@ contract QuadraticVotingAdminJourneyTest is Test {
         // Advance to voting period
         vm.warp(block.timestamp + VOTING_DELAY + 1);
 
-        _castVote(alice, pid, 20);
+        _castVote(alice, pid, 20, charlie);
 
         // Emergency pause during voting
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("pause()"));
@@ -325,14 +326,14 @@ contract QuadraticVotingAdminJourneyTest is Test {
         // All operations blocked
         vm.expectRevert(TokenizedAllocationMechanism.PausedError.selector);
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 8);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 8, charlie);
 
         // Resume operations
         (bool success2, ) = address(mechanism).call(abi.encodeWithSignature("unpause()"));
         require(success2, "Unpause failed");
 
         // Operations work again - use bob since alice already voted
-        _castVote(bob, pid, 8);
+        _castVote(bob, pid, 8, charlie);
 
         // Ownership transfer during crisis
         address emergencyAdmin = newOwner;

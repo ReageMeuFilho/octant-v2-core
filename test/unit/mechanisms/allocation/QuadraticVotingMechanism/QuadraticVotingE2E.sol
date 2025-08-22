@@ -123,11 +123,12 @@ contract QuadraticVotingE2E is Test {
     function _castVote(
         address voter,
         uint256 pid,
-        uint256 weight
+        uint256 weight,
+        address recipient
     ) internal returns (uint256 previousPower, uint256 newPower) {
         previousPower = _tokenized(address(mechanism)).votingPower(voter);
         vm.prank(voter);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, weight);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, weight, recipient);
         newPower = _tokenized(address(mechanism)).votingPower(voter);
     }
 
@@ -482,7 +483,7 @@ contract QuadraticVotingE2E is Test {
         // Cannot vote before voting period starts
         vm.expectRevert();
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 10);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 10, recipient1);
 
         // Move to voting period
         vm.warp(votingStartTime + 1);
@@ -490,32 +491,32 @@ contract QuadraticVotingE2E is Test {
         // Cannot vote with insufficient voting power
         vm.expectRevert(); // Bob has 50 wei, but voting weight 100 costs 10000
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100, recipient1);
 
         // Alice votes successfully
-        _castVote(alice, pid, 10);
+        _castVote(alice, pid, 10, recipient1);
 
         // Cannot vote twice on same proposal
         vm.expectRevert();
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 5);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 5, recipient1);
 
         // Unregistered user cannot vote
         vm.expectRevert();
         vm.prank(charlie);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 1);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 1, recipient1);
 
         // Cannot vote after voting period ends
         vm.warp(votingEndTime + 1);
         vm.expectRevert();
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 5);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 5, recipient1);
 
         // Cannot vote on non-existent proposal
         vm.warp(votingStartTime + 500); // Back in voting period
         vm.expectRevert();
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(999, TokenizedAllocationMechanism.VoteType.For, 5); // Non-existent proposal ID
+        _tokenized(address(mechanism)).castVote(999, TokenizedAllocationMechanism.VoteType.For, 5, recipient1); // Non-existent proposal ID
     }
 
     /// @notice Test complex multi-user voting scenario
@@ -541,22 +542,22 @@ contract QuadraticVotingE2E is Test {
 
         // Alice votes on all three proposals
         console.log("Alice voting...");
-        _castVote(alice, pid1, 25e9); // Cost: 625 ether
-        _castVote(alice, pid2, 15e9); // Cost: 225 ether
-        _castVote(alice, pid3, 10e9); // Cost: 100 ether
+        _castVote(alice, pid1, 25e9, recipient1); // Cost: 625 ether
+        _castVote(alice, pid2, 15e9, recipient2); // Cost: 225 ether
+        _castVote(alice, pid3, 10e9, recipient3); // Cost: 100 ether
         // Alice remaining power: 1000 ether - 625 - 225 - 100 = 1000 ether - 950
         assertEq(_tokenized(address(mechanism)).votingPower(alice), 1000 ether - 950 ether, "Alice remaining power");
 
         // Bob votes on two proposals
         console.log("Bob voting...");
-        _castVote(bob, pid1, 20e9); // Cost: 400 ether
-        _castVote(bob, pid2, 10e9); // Cost: 100 ether
+        _castVote(bob, pid1, 20e9, recipient1); // Cost: 400 ether
+        _castVote(bob, pid2, 10e9, recipient2); // Cost: 100 ether
         // Bob remaining power: 500 ether - 400 - 100 = 500 ether - 500
         assertEq(_tokenized(address(mechanism)).votingPower(bob), 500 ether - 500 ether, "Bob remaining power");
 
         // Charlie votes on one proposal
         // console.log("Charlie voting...");
-        _castVote(charlie, pid3, 14e9); // Cost: 196 ether
+        _castVote(charlie, pid3, 14e9, recipient3); // Cost: 196 ether
         // Charlie remaining power: 200 ether - 196 = 200 ether - 196
         assertEq(_tokenized(address(mechanism)).votingPower(charlie), 200 ether - 196 ether, "Charlie remaining power");
 
@@ -665,10 +666,10 @@ contract QuadraticVotingE2E is Test {
         vm.warp(votingStartTime + 1);
 
         // Cast votes with specific weights to create known quadratic/linear sums
-        _castVote(alice, pid1, 20e9); // Cost: 400 ether
-        _castVote(bob, pid1, 15e9); // Cost: 225 ether
-        _castVote(alice, pid2, 10e9); // Cost: 100 ether (Alice remaining: 1000-400-100=500)
-        _castVote(charlie, pid2, 14e9); // Cost: 196 ether
+        _castVote(alice, pid1, 20e9, recipient1); // Cost: 400 ether
+        _castVote(bob, pid1, 15e9, recipient1); // Cost: 225 ether
+        _castVote(alice, pid2, 10e9, recipient2); // Cost: 100 ether (Alice remaining: 1000-400-100=500)
+        _castVote(charlie, pid2, 14e9, recipient2); // Cost: 196 ether
 
         console.log("=== MATCHING FUNDS CALCULATION TEST ===");
 
@@ -768,9 +769,9 @@ contract QuadraticVotingE2E is Test {
         vm.warp(votingStartTime + 1);
 
         // Cast votes to create known sums (closer to signup amounts)
-        _castVote(alice, pid1, 30e9); // Cost: 900 ether
-        _castVote(bob, pid1, 20e9); // Cost: 400 ether
-        _castVote(charlie, pid2, 14e9); // Cost: 196 ether
+        _castVote(alice, pid1, 30e9, recipient1); // Cost: 900 ether
+        _castVote(bob, pid1, 20e9, recipient1); // Cost: 400 ether
+        _castVote(charlie, pid2, 14e9, recipient2); // Cost: 196 ether
 
         // console.log("=== OPTIMAL ALPHA CALCULATION TEST ===");
 
@@ -896,10 +897,10 @@ contract QuadraticVotingE2E is Test {
         vm.warp(votingStartTime + 1);
 
         // Cast moderate votes to create quadratic advantage
-        _castVote(alice, pid1, 20e9); // Cost: 400 ether
-        _castVote(bob, pid1, 15e9); // Cost: 225 ether
-        _castVote(alice, pid2, 15e9); // Cost: 225 ether
-        _castVote(bob, pid2, 18e9); // Cost: 324 ether
+        _castVote(alice, pid1, 20e9, recipient1); // Cost: 400 ether
+        _castVote(bob, pid1, 15e9, recipient1); // Cost: 225 ether
+        _castVote(alice, pid2, 15e9, recipient2); // Cost: 225 ether
+        _castVote(bob, pid2, 18e9, recipient2); // Cost: 324 ether
 
         console.log("=== SMALL MATCHING POOL TEST ===");
 
@@ -977,10 +978,10 @@ contract QuadraticVotingE2E is Test {
         vm.warp(votingStartTime + 1);
 
         // Cast strategic votes
-        _castVote(alice, pid1, 25e9); // Cost: 625 ether
-        _castVote(bob, pid1, 20e9); // Cost: 400 ether
-        _castVote(alice, pid2, 20e9); // Cost: 400 ether (Alice remaining: 1200-625-400=175)
-        _castVote(bob, pid2, 15e9); // Cost: 225 ether (Bob remaining: 800-400-225=175)
+        _castVote(alice, pid1, 25e9, recipient1); // Cost: 625 ether
+        _castVote(bob, pid1, 20e9, recipient1); // Cost: 400 ether
+        _castVote(alice, pid2, 20e9, recipient2); // Cost: 400 ether (Alice remaining: 1200-625-400=175)
+        _castVote(bob, pid2, 15e9, recipient2); // Cost: 225 ether (Bob remaining: 800-400-225=175)
 
         console.log("=== MEDIUM MATCHING POOL TEST ===");
 
@@ -1060,12 +1061,12 @@ contract QuadraticVotingE2E is Test {
         vm.warp(votingStartTime + 1);
 
         // Create diverse voting patterns
-        _castVote(alice, pid1, 22e9); // Cost: 484 ether
-        _castVote(alice, pid2, 18e9); // Cost: 324 ether
-        _castVote(bob, pid1, 15e9); // Cost: 225 ether
-        _castVote(bob, pid3, 20e9); // Cost: 400 ether
-        _castVote(charlie, pid2, 12e9); // Cost: 144 ether
-        _castVote(charlie, pid3, 16e9); // Cost: 256 ether
+        _castVote(alice, pid1, 22e9, recipient1); // Cost: 484 ether
+        _castVote(alice, pid2, 18e9, recipient2); // Cost: 324 ether
+        _castVote(bob, pid1, 15e9, recipient1); // Cost: 225 ether
+        _castVote(bob, pid3, 20e9, recipient3); // Cost: 400 ether
+        _castVote(charlie, pid2, 12e9, recipient2); // Cost: 144 ether
+        _castVote(charlie, pid3, 16e9, recipient3); // Cost: 256 ether
 
         console.log("=== VARIED VOTING PATTERNS TEST ===");
 
@@ -1169,10 +1170,10 @@ contract QuadraticVotingE2E is Test {
         vm.warp(votingStartTime + 1);
 
         // Cast large votes that fit within available voting power
-        _castVote(alice, pid1, 8000e9); // Cost: 64M ether
-        _castVote(bob, pid1, 6000e9); // Cost: 36M ether
-        _castVote(alice, pid2, 6000e9); // Cost: 36M ether (Alice total: 100M ether)
-        _castVote(bob, pid2, 6500e9); // Cost: 42.25M ether (Bob total: 78.25M ether)
+        _castVote(alice, pid1, 8000e9, recipient1); // Cost: 64M ether
+        _castVote(bob, pid1, 6000e9, recipient1); // Cost: 36M ether
+        _castVote(alice, pid2, 6000e9, recipient2); // Cost: 36M ether (Alice total: 100M ether)
+        _castVote(bob, pid2, 6500e9, recipient2); // Cost: 42.25M ether (Bob total: 78.25M ether)
 
         console.log("=== LARGE SCALE PRECISION TEST ===");
 
@@ -1250,10 +1251,10 @@ contract QuadraticVotingE2E is Test {
         vm.warp(votingStartTime + 1);
 
         // Cast votes that create large quadratic advantage
-        _castVote(alice, pid1, 25e9); // Cost: 625 ether
-        _castVote(bob, pid1, 20e9); // Cost: 400 ether
-        _castVote(alice, pid2, 15e9); // Cost: 225 ether
-        _castVote(bob, pid2, 18e9); // Cost: 324 ether
+        _castVote(alice, pid1, 25e9, recipient1); // Cost: 625 ether
+        _castVote(bob, pid1, 20e9, recipient1); // Cost: 400 ether
+        _castVote(alice, pid2, 15e9, recipient2); // Cost: 225 ether
+        _castVote(bob, pid2, 18e9, recipient2); // Cost: 324 ether
 
         console.log("=== TINY MATCHING POOL PRECISION TEST ===");
 
@@ -1331,9 +1332,9 @@ contract QuadraticVotingE2E is Test {
         vm.warp(votingStartTime + 1);
 
         // Cast votes to create measurable quadratic advantage
-        _castVote(alice, pid1, 15e9); // Cost: 225 ether (Alice remaining: 275 ether)
-        _castVote(bob, pid1, 10e9); // Cost: 100 ether (Bob remaining: 400 ether)
-        _castVote(alice, pid2, 16e9); // Cost: 256 ether (Alice remaining: 19 ether)
+        _castVote(alice, pid1, 15e9, recipient1); // Cost: 225 ether (Alice remaining: 275 ether)
+        _castVote(bob, pid1, 10e9, recipient1); // Cost: 100 ether (Bob remaining: 400 ether)
+        _castVote(alice, pid2, 16e9, recipient2); // Cost: 256 ether (Alice remaining: 19 ether)
         // Project 1: (15e9 + 10e9)² = (25e9)² = 625 ether, linear = 325 ether
         // Project 2: (16e9)² = 256 ether, linear = 256 ether
         // Total: quadratic = 881 ether, linear = 581 ether
@@ -1429,10 +1430,10 @@ contract QuadraticVotingE2E is Test {
         vm.warp(votingStartTime + 1);
 
         // Cast very large votes to create huge quadratic advantage
-        _castVote(alice, pid1, 80e9); // Cost: 6400 ether
-        _castVote(bob, pid1, 60e9); // Cost: 3600 ether (total: 10000 ether for pid1)
-        _castVote(alice, pid2, 60e9); // Cost: 3600 ether (Alice total: 10000 ether)
-        _castVote(bob, pid2, 65e9); // Cost: 4225 ether (Bob remaining: 175 ether)
+        _castVote(alice, pid1, 80e9, recipient1); // Cost: 6400 ether
+        _castVote(bob, pid1, 60e9, recipient1); // Cost: 3600 ether (total: 10000 ether for pid1)
+        _castVote(alice, pid2, 60e9, recipient2); // Cost: 3600 ether (Alice total: 10000 ether)
+        _castVote(bob, pid2, 65e9, recipient2); // Cost: 4225 ether (Bob remaining: 175 ether)
 
         console.log("=== HUGE QUADRATIC ADVANTAGE PRECISION TEST ===");
 
@@ -1515,10 +1516,10 @@ contract QuadraticVotingE2E is Test {
         vm.warp(votingStartTime + 1);
 
         // Cast votes to create known quadratic advantage
-        _castVote(alice, pid1, 20e9); // Cost: 400 ether
-        _castVote(bob, pid1, 15e9); // Cost: 225 ether
-        _castVote(alice, pid2, 15e9); // Cost: 225 ether
-        _castVote(bob, pid2, 18e9); // Cost: 324 ether
+        _castVote(alice, pid1, 20e9, recipient1); // Cost: 400 ether
+        _castVote(bob, pid1, 15e9, recipient1); // Cost: 225 ether
+        _castVote(alice, pid2, 15e9, recipient2); // Cost: 225 ether
+        _castVote(bob, pid2, 18e9, recipient2); // Cost: 324 ether
 
         console.log("=== EXCESS FUNDS AND ALPHA=1 VALIDATION TEST ===");
 
@@ -1616,10 +1617,10 @@ contract QuadraticVotingE2E is Test {
         vm.warp(votingStartTime + 1);
 
         // Cast votes to create quadratic advantage (adjusted for available voting power)
-        _castVote(alice, pid1, 25e9); // Cost: 625 ether (Alice remaining: 375 ether)
-        _castVote(bob, pid1, 20e9); // Cost: 400 ether (Bob remaining: 200 ether)
-        _castVote(alice, pid2, 15e9); // Cost: 225 ether (Alice remaining: 150 ether)
-        _castVote(bob, pid2, 14e9); // Cost: 196 ether (Bob remaining: 4 ether)
+        _castVote(alice, pid1, 25e9, recipient1); // Cost: 625 ether (Alice remaining: 375 ether)
+        _castVote(bob, pid1, 20e9, recipient1); // Cost: 400 ether (Bob remaining: 200 ether)
+        _castVote(alice, pid2, 15e9, recipient2); // Cost: 225 ether (Alice remaining: 150 ether)
+        _castVote(bob, pid2, 14e9, recipient2); // Cost: 196 ether (Bob remaining: 4 ether)
 
         console.log("=== FRACTIONAL ALPHA RATIO VALIDATION TEST ===");
 
@@ -1702,13 +1703,13 @@ contract QuadraticVotingE2E is Test {
         assertEq(initialAlphaDenominator, 1, "Initial alpha denominator should be 1");
 
         // Alice votes 30 on Project 1 (costs 900 ether)
-        _castVote(alice, data.pid1, 30e9); // Cost: 900 ether
+        _castVote(alice, data.pid1, 30e9, recipient1); // Cost: 900 ether
 
         // Check Project 1 funding with alpha=1.0
         (data.p1Contributions1, data.p1SqrtSum1, data.p1Quadratic1, data.p1Linear1) = mechanism.getTally(data.pid1);
 
         // Bob votes 25 on Project 2 (costs 625 ether)
-        _castVote(bob, data.pid2, 25e9); // Cost: 625 ether
+        _castVote(bob, data.pid2, 25e9, recipient2); // Cost: 625 ether
 
         // Check Project 2 funding with alpha=1.0
         (data.p2Contributions1, data.p2SqrtSum1, data.p2Quadratic1, data.p2Linear1) = mechanism.getTally(data.pid2);
@@ -1749,7 +1750,7 @@ contract QuadraticVotingE2E is Test {
 
         // Charlie votes 20e9 on Project 1 (costs 400 ether)
         _signupUser(charlie, 500 ether); // Give Charlie some voting power
-        _castVote(charlie, data.pid1, 20e9); // Cost: 400 ether
+        _castVote(charlie, data.pid1, 20e9, recipient1); // Cost: 400 ether
 
         // Check Project 1 funding after Charlie's vote
         (data.p1Contributions3, data.p1SqrtSum3, data.p1Quadratic3, data.p1Linear3) = mechanism.getTally(data.pid1);
@@ -1813,12 +1814,12 @@ contract QuadraticVotingE2E is Test {
         vm.warp(data.deploymentTime + _tokenized(address(mechanism)).votingDelay() + 1);
 
         // Complex voting pattern across multiple projects
-        _castVote(alice, data.pid1, 25e9); // Cost: 625 ether
-        _castVote(alice, data.pid2, 15e9); // Cost: 225 ether
-        _castVote(bob, data.pid1, 20e9); // Cost: 400 ether
-        _castVote(bob, data.pid3, 18e9); // Cost: 324 ether
-        _castVote(charlie, data.pid2, 22e9); // Cost: 484 ether
-        _castVote(charlie, data.pid3, 12e9); // Cost: 144 ether
+        _castVote(alice, data.pid1, 25e9, recipient1); // Cost: 625 ether
+        _castVote(alice, data.pid2, 15e9, recipient2); // Cost: 225 ether
+        _castVote(bob, data.pid1, 20e9, recipient1); // Cost: 400 ether
+        _castVote(bob, data.pid3, 18e9, recipient3); // Cost: 324 ether
+        _castVote(charlie, data.pid2, 22e9, recipient2); // Cost: 484 ether
+        _castVote(charlie, data.pid3, 12e9, recipient3); // Cost: 144 ether
 
         // Fixed matching pool amount
         data.fixedMatchingPool = 500 ether;
@@ -1939,23 +1940,23 @@ contract QuadraticVotingE2E is Test {
         vm.warp(data.deploymentTime + _tokenized(address(mechanism)).votingDelay() + 1);
 
         // Pattern 1: Heavy concentration on one project
-        _castVote(alice, data.pid1, 35e9); // Cost: 1225 ether
-        _castVote(bob, data.pid1, 25e9); // Cost: 625 ether
+        _castVote(alice, data.pid1, 35e9, recipient1); // Cost: 1225 ether
+        _castVote(bob, data.pid1, 25e9, recipient1); // Cost: 625 ether
 
         // Pattern 2: Moderate support across multiple projects
-        _castVote(charlie, data.pid1, 10e9); // Cost: 100 ether
-        _castVote(charlie, data.pid2, 15e9); // Cost: 225 ether
-        _castVote(charlie, data.pid3, 20e9); // Cost: 400 ether
+        _castVote(charlie, data.pid1, 10e9, recipient1); // Cost: 100 ether
+        _castVote(charlie, data.pid2, 15e9, recipient2); // Cost: 225 ether
+        _castVote(charlie, data.pid3, 20e9, recipient3); // Cost: 400 ether
 
         // Pattern 3: Small votes spread widely
-        _castVote(data.dave, data.pid1, 5e9); // Cost: 25 ether
-        _castVote(data.dave, data.pid2, 8e9); // Cost: 64 ether
-        _castVote(data.dave, data.pid3, 12e9); // Cost: 144 ether
-        _castVote(data.dave, data.pid4, 18e9); // Cost: 324 ether
+        _castVote(data.dave, data.pid1, 5e9, recipient1); // Cost: 25 ether
+        _castVote(data.dave, data.pid2, 8e9, recipient2); // Cost: 64 ether
+        _castVote(data.dave, data.pid3, 12e9, recipient3); // Cost: 144 ether
+        _castVote(data.dave, data.pid4, 18e9, data.recipient4); // Cost: 324 ether
 
         // Additional votes to create interesting dynamics
-        _castVote(alice, data.pid2, 12e9); // Cost: 144 ether (remaining from 1500-1225=275)
-        _castVote(bob, data.pid3, 15e9); // Cost: 225 ether (remaining from 1000-625=375)
+        _castVote(alice, data.pid2, 12e9, recipient2); // Cost: 144 ether (remaining from 1500-1225=275)
+        _castVote(bob, data.pid3, 15e9, recipient3); // Cost: 225 ether (remaining from 1000-625=375)
 
         // Get voting results
         data.totalQuadraticSum = mechanism.totalQuadraticSum();

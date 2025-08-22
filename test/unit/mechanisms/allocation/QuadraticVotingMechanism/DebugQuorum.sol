@@ -68,7 +68,7 @@ contract DebugQuorum is Test {
         // Try different vote weights to find minimum for quorum
         vm.warp(votingStartTime + 1);
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 31); // 31^2 = 961 > 200 ether quorum
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 31, charlie); // 31^2 = 961 > 200 ether quorum
 
         console.log("=== AFTER VOTING ===");
         console.log("Vote weight used: 31");

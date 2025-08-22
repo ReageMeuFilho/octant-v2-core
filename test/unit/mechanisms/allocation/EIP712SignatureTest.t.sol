@@ -21,7 +21,7 @@ contract EIP712SignatureTest is Test {
         keccak256("Signup(address user,address payer,uint256 deposit,uint256 nonce,uint256 deadline)");
     bytes32 private constant CAST_VOTE_TYPEHASH =
         keccak256(
-            "CastVote(address voter,uint256 proposalId,uint8 choice,uint256 weight,uint256 nonce,uint256 deadline)"
+            "CastVote(address voter,uint256 proposalId,uint8 choice,uint256 weight,address expectedRecipient,uint256 nonce,uint256 deadline)"
         );
     string private constant EIP712_VERSION = "1";
 
@@ -114,10 +114,11 @@ contract EIP712SignatureTest is Test {
         uint256 pid,
         uint8 choice,
         uint256 weight,
+        address expectedRecipient,
         uint256 nonce,
         uint256 deadline
     ) internal view returns (bytes32) {
-        bytes32 structHash = keccak256(abi.encode(CAST_VOTE_TYPEHASH, voter, pid, choice, weight, nonce, deadline));
+        bytes32 structHash = keccak256(abi.encode(CAST_VOTE_TYPEHASH, voter, pid, choice, weight, expectedRecipient, nonce, deadline));
         bytes32 domainSeparator = _tokenized(address(mechanism)).DOMAIN_SEPARATOR();
         return keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
     }
@@ -314,7 +315,7 @@ contract EIP712SignatureTest is Test {
         uint8 choice = uint8(TokenizedAllocationMechanism.VoteType.For);
         uint256 weight = 100;
 
-        bytes32 digest = _getCastVoteDigest(alice, pid, choice, weight, nonce, deadline);
+        bytes32 digest = _getCastVoteDigest(alice, pid, choice, weight, address(0x123), nonce, deadline);
         (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, ALICE_PRIVATE_KEY);
 
         // Cast vote with signature
@@ -323,6 +324,7 @@ contract EIP712SignatureTest is Test {
             pid,
             TokenizedAllocationMechanism.VoteType.For,
             weight,
+            address(0x123),
             deadline,
             v,
             r,
@@ -379,7 +381,7 @@ contract EIP712SignatureTest is Test {
                 uint8 choice = uint8(voteTypes[i]);
                 uint256 weight = 50;
 
-                bytes32 digest = _getCastVoteDigest(users[i], pids[i], choice, weight, nonce, deadline);
+                bytes32 digest = _getCastVoteDigest(users[i], pids[i], choice, weight, address(uint160(0x100 + i)), nonce, deadline);
                 (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, privateKeys[i]);
 
                 _tokenized(address(mechanism)).castVoteWithSignature(
@@ -387,6 +389,7 @@ contract EIP712SignatureTest is Test {
                     pids[i],
                     voteTypes[i],
                     weight,
+                    address(uint160(0x100 + i)),
                     deadline,
                     v,
                     r,
@@ -413,7 +416,7 @@ contract EIP712SignatureTest is Test {
 
         uint256 nonce = _tokenized(address(mechanism)).nonces(alice);
         uint256 deadline = block.timestamp + 1 hours;
-        bytes32 digest = _getCastVoteDigest(alice, pid, 1, 100, nonce, deadline);
+        bytes32 digest = _getCastVoteDigest(alice, pid, 1, 100, address(0x123), nonce, deadline);
         (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, ALICE_PRIVATE_KEY);
 
         // Create an invalid signature that will recover to address(0)
@@ -427,6 +430,7 @@ contract EIP712SignatureTest is Test {
             pid,
             TokenizedAllocationMechanism.VoteType.For,
             100,
+            address(0x123),
             deadline,
             v,
             r,
@@ -449,7 +453,7 @@ contract EIP712SignatureTest is Test {
 
         uint256 nonce = _tokenized(address(mechanism)).nonces(alice);
         uint256 deadline = block.timestamp - 1; // Expired
-        bytes32 digest = _getCastVoteDigest(alice, pid, 1, 100, nonce, deadline);
+        bytes32 digest = _getCastVoteDigest(alice, pid, 1, 100, address(0x123), nonce, deadline);
         (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, ALICE_PRIVATE_KEY);
 
         vm.expectRevert(
@@ -460,6 +464,7 @@ contract EIP712SignatureTest is Test {
             pid,
             TokenizedAllocationMechanism.VoteType.For,
             100,
+            address(0x123),
             deadline,
             v,
             r,
@@ -483,7 +488,7 @@ contract EIP712SignatureTest is Test {
 
         uint256 nonce = _tokenized(address(mechanism)).nonces(alice);
         uint256 deadline = block.timestamp + 1 hours;
-        bytes32 digest = _getCastVoteDigest(alice, pid1, 1, 100, nonce, deadline);
+        bytes32 digest = _getCastVoteDigest(alice, pid1, 1, 100, address(0x123), nonce, deadline);
         (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, ALICE_PRIVATE_KEY);
 
         // First vote succeeds
@@ -492,6 +497,7 @@ contract EIP712SignatureTest is Test {
             pid1,
             TokenizedAllocationMechanism.VoteType.For,
             100,
+            address(0x123),
             deadline,
             v,
             r,
@@ -505,6 +511,7 @@ contract EIP712SignatureTest is Test {
             pid1,
             TokenizedAllocationMechanism.VoteType.For,
             100,
+            address(0x123),
             deadline,
             v,
             r,
@@ -539,7 +546,7 @@ contract EIP712SignatureTest is Test {
 
         uint256 voteNonce = _tokenized(address(mechanism)).nonces(alice);
         uint256 voteDeadline = block.timestamp + 1 hours;
-        bytes32 voteDigest = _getCastVoteDigest(alice, pid, 1, 200, voteNonce, voteDeadline);
+        bytes32 voteDigest = _getCastVoteDigest(alice, pid, 1, 200, address(0x123), voteNonce, voteDeadline);
         (uint8 vv, bytes32 vr, bytes32 vs) = _signDigest(voteDigest, ALICE_PRIVATE_KEY);
 
         vm.prank(relayer);
@@ -548,6 +555,7 @@ contract EIP712SignatureTest is Test {
             pid,
             TokenizedAllocationMechanism.VoteType.For,
             200,
+            address(0x123),
             voteDeadline,
             vv,
             vr,
@@ -589,12 +597,12 @@ contract EIP712SignatureTest is Test {
 
         // Alice votes directly
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100, address(0x123));
 
         // Bob votes with signature
         uint256 bobVoteNonce = _tokenized(address(mechanism)).nonces(bob);
         uint256 bobVoteDeadline = block.timestamp + 1 hours;
-        bytes32 bobVoteDigest = _getCastVoteDigest(bob, pid, 1, 150, bobVoteNonce, bobVoteDeadline);
+        bytes32 bobVoteDigest = _getCastVoteDigest(bob, pid, 1, 150, address(0x123), bobVoteNonce, bobVoteDeadline);
         (uint8 vv, bytes32 vr, bytes32 vs) = _signDigest(bobVoteDigest, BOB_PRIVATE_KEY);
 
         _tokenized(address(mechanism)).castVoteWithSignature(
@@ -602,6 +610,7 @@ contract EIP712SignatureTest is Test {
             pid,
             TokenizedAllocationMechanism.VoteType.For,
             150,
+            address(0x123),
             bobVoteDeadline,
             vv,
             vr,
@@ -640,7 +649,7 @@ contract EIP712SignatureTest is Test {
         assertEq(voteNonce, initialNonce + 1, "Vote should use incremented nonce");
 
         uint256 voteDeadline = block.timestamp + 1 hours;
-        bytes32 voteDigest = _getCastVoteDigest(alice, pid, 1, 50, voteNonce, voteDeadline);
+        bytes32 voteDigest = _getCastVoteDigest(alice, pid, 1, 50, address(0x123), voteNonce, voteDeadline);
         (uint8 vv, bytes32 vr, bytes32 vs) = _signDigest(voteDigest, ALICE_PRIVATE_KEY);
 
         _tokenized(address(mechanism)).castVoteWithSignature(
@@ -648,6 +657,7 @@ contract EIP712SignatureTest is Test {
             pid,
             TokenizedAllocationMechanism.VoteType.For,
             50,
+            address(0x123),
             voteDeadline,
             vv,
             vr,

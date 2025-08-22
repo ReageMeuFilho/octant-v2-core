@@ -162,9 +162,10 @@ contract QuadraticVotingRecipientJourneyTest is Test {
     /// @param voter Address casting the vote
     /// @param pid Proposal ID to vote on
     /// @param weight Vote weight (quadratic cost = weight^2)
-    function _castVote(address voter, uint256 pid, uint256 weight) internal {
+    /// @param recipient Expected recipient address for the proposal
+    function _castVote(address voter, uint256 pid, uint256 weight, address recipient) internal {
         vm.prank(voter);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, weight);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, weight, recipient);
     }
 
     function setUp() public {
@@ -264,15 +265,15 @@ contract QuadraticVotingRecipientJourneyTest is Test {
 
         // Create different voting outcomes
         // Charlie: Successful (meets quorum)
-        _castVote(alice, currentTestCtx.pidCharlie, 30);
-        _castVote(bob, currentTestCtx.pidCharlie, 15);
+        _castVote(alice, currentTestCtx.pidCharlie, 30, charlie);
+        _castVote(bob, currentTestCtx.pidCharlie, 15, charlie);
 
         // Dave: Failed (below quorum)
-        _castVote(bob, currentTestCtx.pidDave, 10);
+        _castVote(bob, currentTestCtx.pidDave, 10, dave);
 
         // Eve: Negative outcome
-        _castVote(alice, currentTestCtx.pidEve, 12);
-        _castVote(frank, currentTestCtx.pidEve, 8);
+        _castVote(alice, currentTestCtx.pidEve, 12, eve);
+        _castVote(frank, currentTestCtx.pidEve, 8, eve);
 
         // Recipients can monitor progress in real-time using getTally() from ProperQF
         (, , currentTestCtx.charlieQuadraticFunding, currentTestCtx.charlieLinearFunding) = mechanism.getTally(
@@ -335,8 +336,8 @@ contract QuadraticVotingRecipientJourneyTest is Test {
         vm.warp(votingStartTime + 1);
 
         // Generate successful vote outcome
-        _castVote(alice, pid, 30);
-        _castVote(bob, pid, 20);
+        _castVote(alice, pid, 30, charlie);
+        _castVote(bob, pid, 20, charlie);
 
         vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
@@ -419,8 +420,8 @@ contract QuadraticVotingRecipientJourneyTest is Test {
         vm.warp(votingStartTime + 1);
 
         // Vote for both proposals
-        _castVote(alice, currentTestCtx.pid1, 30);
-        _castVote(bob, currentTestCtx.pid2, 25);
+        _castVote(alice, currentTestCtx.pid1, 30, charlie);
+        _castVote(bob, currentTestCtx.pid2, 25, dave);
 
         vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
@@ -612,7 +613,7 @@ contract QuadraticVotingRecipientJourneyTest is Test {
         // Use absolute warp for voting
         vm.warp(votingStartTime + 1);
 
-        _castVote(alice, pid, 30);
+        _castVote(alice, pid, 30, charlie);
 
         vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));

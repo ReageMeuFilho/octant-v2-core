@@ -221,13 +221,13 @@ contract CustomDistributionAccountingTest is Test {
         // Vote strategically to get target amounts
         vm.warp(votingStartTime + 1);
         vm.prank(alice);
-        _tokenized().castVote(pid1, TokenizedAllocationMechanism.VoteType.For, 30 ether);
+        _tokenized().castVote(pid1, TokenizedAllocationMechanism.VoteType.For, 30 ether, project1);
         vm.prank(alice);
-        _tokenized().castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 40 ether);
+        _tokenized().castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 40 ether, project2);
         vm.prank(alice);
-        _tokenized().castVote(pid3, TokenizedAllocationMechanism.VoteType.For, 80 ether);
+        _tokenized().castVote(pid3, TokenizedAllocationMechanism.VoteType.For, 80 ether, project3);
         vm.prank(bob);
-        _tokenized().castVote(pid4, TokenizedAllocationMechanism.VoteType.For, 60 ether);
+        _tokenized().castVote(pid4, TokenizedAllocationMechanism.VoteType.For, 60 ether, project4);
 
         // Finalize tally
         vm.warp(votingEndTime + 1);

@@ -61,7 +61,7 @@ contract QuadraticVotingSimpleTimelockTest is Test {
 
         vm.warp(votingStartTime + 1);
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 25); // Cost: 25^2 = 625
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 25, charlie); // Cost: 25^2 = 625
 
         // Debug: Check what quadratic funding this generates
         (uint256 sumContributions, , uint256 quadraticFunding, uint256 linearFunding) = mechanism.getProposalFunding(

@@ -76,7 +76,7 @@ contract SweepFunctionalityTest is Test {
         // Vote and finalize
         vm.warp(votingStartTime + 1);
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 500 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 500 ether, charlie);
 
         vm.warp(votingEndTime + 1);
 

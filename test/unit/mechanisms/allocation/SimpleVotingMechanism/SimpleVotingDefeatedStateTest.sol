@@ -74,7 +74,7 @@ contract SimpleVotingDefeatedStateTest is Test {
 
         // Vote with insufficient amount (150 ether < 200 ether quorum)
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 150 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 150 ether, frank);
 
         console.log("Votes cast: 150 ether");
 

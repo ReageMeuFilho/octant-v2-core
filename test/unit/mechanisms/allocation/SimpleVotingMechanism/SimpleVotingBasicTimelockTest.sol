@@ -66,7 +66,7 @@ contract SimpleVotingBasicTimelockTest is Test {
         // Vote - warp to voting period and cast vote
         vm.warp(votingStartTime + 1); // Use absolute warp to voting start + 1 second
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 500 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 500 ether, charlie);
 
         // Finalize - warp to after voting ends and finalize
         vm.warp(votingEndTime + 1); // Use absolute warp to voting end + 1 second

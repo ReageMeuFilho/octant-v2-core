@@ -64,7 +64,7 @@ contract QuadraticVotingDebugTimelockTest is Test {
         vm.warp(100100);
 
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 31); // 31^2 = 961 > 500 quorum
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 31, charlie); // 31^2 = 961 > 500 quorum
 
         // Move past voting period: startTime + votingDelay + votingPeriod = 100000 + 100 + 1000 = 101100
         vm.warp(101101);
