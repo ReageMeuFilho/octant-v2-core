@@ -23,8 +23,6 @@ abstract contract ProperQF {
     struct Project {
         uint256 sumContributions; // Sum of contributions (Sum_j)
         uint256 sumSquareRoots; // Sum of square roots (S_j)
-        uint256 quadraticFunding; // Quadratic term (F_quad_j)
-        uint256 linearFunding; // Linear term (F_linear_j)
     }
 
     /// @notice Main storage struct containing all mutable state for ProperQF
@@ -128,15 +126,16 @@ abstract contract ProperQF {
         uint256 newSumContributions = project.sumContributions + contribution;
 
         // Calculate quadratic funding - no overflow risk with uint256
+        uint256 oldQuadraticFunding = project.sumSquareRoots * project.sumSquareRoots;
         uint256 newQuadraticFunding = newSumSquareRoots * newSumSquareRoots;
 
         // Update global sums with underflow protection (keep checked for safety)
-        if (s.totalQuadraticSum < project.quadraticFunding) revert QuadraticSumUnderflow();
-        if (s.totalLinearSum < project.linearFunding) revert LinearSumUnderflow();
+        if (s.totalQuadraticSum < oldQuadraticFunding) revert QuadraticSumUnderflow();
+        if (s.totalLinearSum < project.sumContributions) revert LinearSumUnderflow();
 
         // Update global sums
-        uint256 newTotalQuadraticSum = s.totalQuadraticSum - project.quadraticFunding + newQuadraticFunding;
-        uint256 newTotalLinearSum = s.totalLinearSum - project.linearFunding + newSumContributions;
+        uint256 newTotalQuadraticSum = s.totalQuadraticSum - oldQuadraticFunding + newQuadraticFunding;
+        uint256 newTotalLinearSum = s.totalLinearSum - project.sumContributions + newSumContributions;
 
         s.totalQuadraticSum = newTotalQuadraticSum;
         s.totalLinearSum = newTotalLinearSum;
@@ -144,8 +143,6 @@ abstract contract ProperQF {
         // Update project state - batch storage writes
         project.sumSquareRoots = newSumSquareRoots;
         project.sumContributions = newSumContributions;
-        project.quadraticFunding = newQuadraticFunding;
-        project.linearFunding = newSumContributions;
 
         s.projects[projectId] = project;
 
@@ -208,11 +205,14 @@ abstract contract ProperQF {
         ProperQFStorage storage s = _getProperQFStorage();
         Project storage project = s.projects[projectId];
 
+        // Calculate quadratic funding on-demand as square of sum of square roots
+        uint256 rawQuadraticFunding = project.sumSquareRoots * project.sumSquareRoots;
+        
         // Return all relevant metrics for the project
         return (
             project.sumContributions, // Total contributions
             project.sumSquareRoots, // Sum of square roots
-            (project.quadraticFunding * s.alphaNumerator) / s.alphaDenominator, // Alpha-weighted quadratic funding
+            (rawQuadraticFunding * s.alphaNumerator) / s.alphaDenominator, // Alpha-weighted quadratic funding
             (project.sumContributions * (s.alphaDenominator - s.alphaNumerator)) / s.alphaDenominator // Alpha-weighted linear funding (1-α) × Sum_j
         );
     }
