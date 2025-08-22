@@ -80,7 +80,7 @@ contract YieldDonatingTokenizedStrategy is TokenizedStrategy {
     function _handleDragonLossProtection(StrategyData storage S, uint256 loss) internal {
         if (S.enableBurning) {
             // Convert loss to shares that should be burned
-            uint256 sharesToBurn = super._convertToShares(S, loss, Math.Rounding.Ceil);
+            uint256 sharesToBurn = _convertToShares(S, loss, Math.Rounding.Ceil);
 
             // Can only burn up to available shares from dragon router
             uint256 sharesBurned = Math.min(sharesToBurn, S.balances[S.dragonRouter]);
