@@ -137,6 +137,11 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @notice Error thrown when attempting to disable allocation whitelist
     error DisablingAllocationMechanismWhitelistNotAllowed();
 
+    /// @notice Error thrown when reward token doesn't match allocation mechanism's expected asset
+    /// @param expected The expected token (REWARD_TOKEN)
+    /// @param actual The actual token expected by the allocation mechanism
+    error AssetMismatch(address expected, address actual);
+
     // === State Variables ===
     /// @notice Shared configuration state instance
     /// @dev Internal storage for shared configuration accessible via getters.
@@ -565,6 +570,14 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
             sharedState.allocationMechanismWhitelist.isWhitelisted(_allocationMechanismAddress),
             NotWhitelisted(sharedState.allocationMechanismWhitelist, _allocationMechanismAddress)
         );
+
+        // Validate asset compatibility to fail fast and provide clear error
+        {
+            address expectedAsset = address(TokenizedAllocationMechanism(_allocationMechanismAddress).asset());
+            if (address(REWARD_TOKEN) != expectedAsset) {
+                revert AssetMismatch(address(REWARD_TOKEN), expectedAsset);
+            }
+        }
 
         Deposit storage deposit = deposits[_depositId];
         if (deposit.claimer != msg.sender && deposit.owner != msg.sender) {
