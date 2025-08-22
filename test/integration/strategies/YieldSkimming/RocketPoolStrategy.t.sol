@@ -2,7 +2,6 @@
 pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
-import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { RocketPoolStrategy } from "src/strategies/yieldSkimming/RocketPoolStrategy.sol";
 import { RocketPoolStrategyFactory } from "src/factories/yieldSkimming/RocketPoolStrategyFactory.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -1112,5 +1111,72 @@ contract RocketPoolStrategyTest is Test {
                 10000, // should be greater or equal because of the first profit
             "User should receive some assets"
         );
+    }
+
+    /// @notice Test profit then loss scenario with proper dragon share burning
+    /// @dev Sequence: r1.0, d1, r1.5, d2, report, r1.0, w1, report, r1.5, w2
+    /// Demonstrates that losses are properly handled regardless of rate direction
+    function test_profitThenLoss_dragonSharesBurnCorrectly() public {
+        address user1 = makeAddr("user1");
+        address user2 = makeAddr("user2");
+        
+        uint256 depositAmount1 = 100e18; // 100 rETH
+        uint256 depositAmount2 = 150e18; // 150 rETH
+        
+        // Airdrop rETH to both users
+        airdrop(ERC20(R_ETH), user1, depositAmount1);
+        airdrop(ERC20(R_ETH), user2, depositAmount2);
+        
+        // Step 1-2: r1.0, d1 - User1 deposits 100 rETH at rate 1.0
+        uint256 initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
+        vm.startPrank(user1);
+        ERC20(R_ETH).approve(address(strategy), depositAmount1);
+        vault.deposit(depositAmount1, user1);
+        vm.stopPrank();
+        
+        // Step 3-4: r1.5, d2 - Rate increases to 1.5, User2 deposits 150 rETH
+        uint256 increasedRate = (initialExchangeRate * 15) / 10; // 1.5x rate
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(increasedRate));
+        vm.startPrank(user2);
+        ERC20(R_ETH).approve(address(strategy), depositAmount2);
+        vault.deposit(depositAmount2, user2);
+        vm.stopPrank();
+        
+        // Step 5: report - First report (should mint dragon shares)
+        vm.startPrank(keeper);
+        (uint256 profit1, uint256 loss1) = vault.report();
+        vm.stopPrank();
+        uint256 dragonShares = vault.balanceOf(donationAddress);
+        
+        // Step 6: r1.0 - Rate drops back to 1.0 
+        vm.clearMockedCalls();
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(initialExchangeRate));
+        
+        // Step 7-8: w1 - User1 withdraws all
+        vm.startPrank(user1);
+        vault.redeem(vault.balanceOf(user1), user1, user1);
+        vm.stopPrank();
+        
+        // Step 9: report - Second report (should burn dragon shares due to loss)
+        vm.startPrank(keeper);
+        (uint256 profit2, uint256 loss2) = vault.report();
+        vm.stopPrank();
+        uint256 dragonSharesAfterLoss = vault.balanceOf(donationAddress);
+        
+        // Step 10-11: r1.5, w2 - Rate increases back to 1.5, User2 withdraws all
+        vm.clearMockedCalls();
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(increasedRate));
+        vm.startPrank(user2);
+        vault.redeem(vault.balanceOf(user2), user2, user2);
+        vm.stopPrank();
+        vm.clearMockedCalls();
+        
+        // Verify that without the rate check, losses are properly handled
+        assertEq(profit2, 0, "Should report no profit in second report");
+        assertGt(loss2, 0, "Should report loss in second report even with rate changes");
+        assertLt(dragonSharesAfterLoss, dragonShares, "Dragon shares should be burned to handle loss");
+        assertGt(profit1, 0, "Should report profit in first report");
+        assertEq(loss1, 0, "Should report no loss in first report");
+        assertGt(dragonShares, 0, "Dragon shares should be minted in first report");
     }
 }
