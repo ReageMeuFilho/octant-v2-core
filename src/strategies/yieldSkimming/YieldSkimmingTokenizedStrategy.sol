@@ -27,9 +27,9 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
 
     /// @dev Storage for yield skimming strategy
     struct YieldSkimmingStorage {
-        uint256 totalValueDebt; // Track ETH value owed to users only
+        uint256 totalUserDebtInAssetValue; // Track ETH value owed to users only
         uint256 lastReportedRate; // Track the last reported rate
-        uint256 dragonValueDebt; // Track the ETH value owed to dragon router
+        uint256 dragonRouterDebtInAssetValue; // Track the ETH value owed to dragon router
     }
 
     // exchange rate storage slot
@@ -78,7 +78,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         require(shares != 0, "ZERO_SHARES");
 
         // Update value debt
-        YS.totalValueDebt += shares;
+        YS.totalUserDebtInAssetValue += shares;
 
         // Call internal deposit to handle transfers and minting
         _deposit(S, receiver, assets, shares);
@@ -117,7 +117,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         require(assets != 0, "ZERO_ASSETS");
 
         // Update value debt
-        YS.totalValueDebt += shares;
+        YS.totalUserDebtInAssetValue += shares;
 
         // Call internal deposit to handle transfers and minting
         _deposit(S, receiver, assets, shares);
@@ -156,13 +156,13 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
 
         // Update value debt after successful redemption (only for users)
         if (owner != S.dragonRouter) {
-            YS.totalValueDebt = YS.totalValueDebt > valueToReturn ? YS.totalValueDebt - valueToReturn : 0;
+            YS.totalUserDebtInAssetValue = YS.totalUserDebtInAssetValue > valueToReturn ? YS.totalUserDebtInAssetValue - valueToReturn : 0;
             // if actual shares is the total shares, then we can reset the total value debt to 0
             if (shares == _totalSupply(S)) {
-                YS.totalValueDebt = 0;
+                YS.totalUserDebtInAssetValue = 0;
             }
         } else {
-            YS.dragonValueDebt = YS.dragonValueDebt > valueToReturn ? YS.dragonValueDebt - valueToReturn : 0;
+            YS.dragonRouterDebtInAssetValue = YS.dragonRouterDebtInAssetValue > valueToReturn ? YS.dragonRouterDebtInAssetValue - valueToReturn : 0;
         }
 
         return assets;
@@ -201,13 +201,13 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
 
         // Update value debt after successful withdrawal (only for users)
         if (owner != S.dragonRouter) {
-            YS.totalValueDebt = YS.totalValueDebt > valueToReturn ? YS.totalValueDebt - valueToReturn : 0;
+            YS.totalUserDebtInAssetValue = YS.totalUserDebtInAssetValue > valueToReturn ? YS.totalUserDebtInAssetValue - valueToReturn : 0;
             // if actual shares is the total shares, then we can reset the total value debt to 0
             if (shares == _totalSupply(S)) {
-                YS.totalValueDebt = 0;
+                YS.totalUserDebtInAssetValue = 0;
             }
         } else {
-            YS.dragonValueDebt = YS.dragonValueDebt > valueToReturn ? YS.dragonValueDebt - valueToReturn : 0;
+            YS.dragonRouterDebtInAssetValue = YS.dragonRouterDebtInAssetValue > valueToReturn ? YS.dragonRouterDebtInAssetValue - valueToReturn : 0;
         }
 
         return shares;
@@ -227,10 +227,27 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
 
     /**
      * @notice Get the total ETH value debt owed to users
-     * @return The total value debt
+     * @return The total user debt in asset value
      */
-    function getTotalValueDebt() external view returns (uint256) {
-        return _strategyYieldSkimmingStorage().totalValueDebt;
+    function getTotalUserDebtInAssetValue() external view returns (uint256) {
+        return _strategyYieldSkimmingStorage().totalUserDebtInAssetValue;
+    }
+
+    /**
+     * @notice Get the total ETH value debt owed to dragon router
+     * @return The total dragon router debt in asset value
+     */
+    function getDragonRouterDebtInAssetValue() external view returns (uint256) {
+        return _strategyYieldSkimmingStorage().dragonRouterDebtInAssetValue;
+    }
+
+    /**
+     * @notice Get the total ETH value debt owed to both users and dragon router combined
+     * @return The total debt in asset value (users + dragon router)
+     */
+    function getTotalValueDebtInAssetValue() external view returns (uint256) {
+        YieldSkimmingStorage storage YS = _strategyYieldSkimmingStorage();
+        return YS.totalUserDebtInAssetValue + YS.dragonRouterDebtInAssetValue;
     }
 
     /**
@@ -290,7 +307,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
      * Management should ensure regular reporting or adjust profit/loss ratios based on expected frequency.
      *
      * Key behaviors:
-     * 1. **Value Debt Tracking**: Compares current total value vs user debt (totalValueDebt only)
+     * 1. **Value Debt Tracking**: Compares current total value vs user debt (totalUserDebtInAssetValue only)
      * 2. **Profit Capture**: When current value exceeds owed value, mints shares to dragonRouter
      * 3. **Loss Protection**: When current value is less than owed value, burns dragon shares
      * 4. **User Protection**: If dragon buffer insufficient, reduces user value debt proportionally
@@ -310,6 +327,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
 
         // Update total assets from harvest
         uint256 currentTotalAssets = IBaseStrategy(address(this)).harvestAndReport();
+
         uint256 totalAssetsBalance = S.asset.balanceOf(address(this));
         if (totalAssetsBalance != currentTotalAssets) {
             S.totalAssets = totalAssetsBalance;
@@ -320,10 +338,10 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         uint256 currentValue = totalAssets.mulDiv(currentRate, WadRayMath.RAY);
         // Compare current value to user debt only (dragon shares are pure profit buffer)
 
-        if (currentValue > YS.totalValueDebt + YS.dragonValueDebt) {
+        if (currentValue > YS.totalUserDebtInAssetValue + YS.dragonRouterDebtInAssetValue) {
             // Yield captured! Mint profit shares to dragon
-            uint256 profitValue = currentValue > YS.totalValueDebt + YS.dragonValueDebt
-                ? currentValue - YS.totalValueDebt - YS.dragonValueDebt
+            uint256 profitValue = currentValue > YS.totalUserDebtInAssetValue + YS.dragonRouterDebtInAssetValue
+                ? currentValue - YS.totalUserDebtInAssetValue - YS.dragonRouterDebtInAssetValue
                 : 0;
 
             uint256 profitShares = profitValue; // 1 share = 1 ETH value
@@ -334,15 +352,15 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
             _mint(S, S.dragonRouter, profitShares);
 
             // update the dragon value debt
-            YS.dragonValueDebt += profitValue;
+            YS.dragonRouterDebtInAssetValue += profitValue;
 
             // Update last reported rate after profit to track high-water mark
             YS.lastReportedRate = currentRate;
 
             emit DonationMinted(S.dragonRouter, profitShares, currentRate.rayToWad());
-        } else if (currentValue < YS.totalValueDebt + YS.dragonValueDebt) {
+        } else if (currentValue < YS.totalUserDebtInAssetValue + YS.dragonRouterDebtInAssetValue) {
             // Loss - burn dragon shares first
-            uint256 lossValue = YS.totalValueDebt + YS.dragonValueDebt - currentValue;
+            uint256 lossValue = YS.totalUserDebtInAssetValue + YS.dragonRouterDebtInAssetValue - currentValue;
             uint256 dragonBalance = _balanceOf(S, S.dragonRouter);
 
             // Report the total loss in assets (gross loss before dragon protection)
@@ -359,7 +377,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
                 _burn(S, S.dragonRouter, dragonBurn);
 
                 // update the dragon value debt
-                YS.dragonValueDebt -= dragonBurn;
+                YS.dragonRouterDebtInAssetValue -= dragonBurn;
 
                 emit DonationBurned(S.dragonRouter, dragonBurn, currentRate.rayToWad());
             }
@@ -468,7 +486,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         uint256 currentRate = _currentRateRay();
         uint256 currentVaultValue = S.totalAssets.mulDiv(currentRate, WadRayMath.RAY);
 
-        return YS.totalValueDebt > 0 && currentVaultValue < YS.totalValueDebt + YS.dragonValueDebt;
+        return YS.totalUserDebtInAssetValue > 0 && currentVaultValue < YS.totalUserDebtInAssetValue + YS.dragonRouterDebtInAssetValue;
     }
 
     /**
@@ -480,9 +498,9 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
 
         // Direct transfer: shares represent ETH value 1:1 in this system
         // Dragon loses debt obligation, users gain debt obligation
-        require(YS.dragonValueDebt >= transferAmount, "Insufficient dragon debt");
-        YS.dragonValueDebt -= transferAmount;
-        YS.totalValueDebt += transferAmount;
+        require(YS.dragonRouterDebtInAssetValue >= transferAmount, "Insufficient dragon debt");
+        YS.dragonRouterDebtInAssetValue -= transferAmount;
+        YS.totalUserDebtInAssetValue += transferAmount;
     }
 
     /**

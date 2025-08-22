@@ -633,7 +633,7 @@ contract AccountingTest is Setup {
         vm.stopPrank();
 
         // Check if debt tracking is working properly
-        uint256 totalValueDebt = IYieldSkimmingStrategy(address(strategy)).getTotalValueDebt();
+        uint256 totalValueDebt = IYieldSkimmingStrategy(address(strategy)).getTotalUserDebtInAssetValue();
 
         // For yield skimming strategies, deposits after losses are typically blocked
         // by insolvency protection when totalValueDebt > 0 and current value < debt.
@@ -1096,7 +1096,7 @@ contract AccountingTest is Setup {
         console2.log("Step 2: d1 - User1 deposits 100");
         mintAndDepositIntoStrategy(strategy, user1, 100e18);
         console2.log("User1 shares:", strategy.balanceOf(user1));
-        console2.log("Total value debt:", IYieldSkimmingStrategy(address(strategy)).getTotalValueDebt());
+        console2.log("Total value debt:", IYieldSkimmingStrategy(address(strategy)).getTotalUserDebtInAssetValue());
 
         // r1.5: Rate increases to 1.5
         console2.log("\nStep 3: r1.5 - Rate increases to 1.5");
@@ -1106,7 +1106,7 @@ contract AccountingTest is Setup {
         console2.log("Step 4: d2 - User2 deposits 150");
         mintAndDepositIntoStrategy(strategy, user2, 150e18);
         console2.log("User2 shares:", strategy.balanceOf(user2));
-        console2.log("Total value debt:", IYieldSkimmingStrategy(address(strategy)).getTotalValueDebt());
+        console2.log("Total value debt:", IYieldSkimmingStrategy(address(strategy)).getTotalUserDebtInAssetValue());
         console2.log("Total assets:", strategy.totalAssets());
 
         // report: Should create profit and mint to dragon
@@ -1127,7 +1127,7 @@ contract AccountingTest is Setup {
         console2.log("Current vault value:", (strategy.totalAssets() * 1e18) / 1e18); // Rate is 1.0
         console2.log(
             "Total debt needed:",
-            IYieldSkimmingStrategy(address(strategy)).getTotalValueDebt() + strategy.balanceOf(donationAddress)
+            IYieldSkimmingStrategy(address(strategy)).getTotalUserDebtInAssetValue() + strategy.balanceOf(donationAddress)
         );
 
         // Skip the deposit since vault is insolvent - this shows the protection working
@@ -1140,7 +1140,7 @@ contract AccountingTest is Setup {
         vm.prank(user1);
         strategy.redeem(user1Balance, user1, user1);
         console2.log("User1 withdrawn, remaining total assets:", strategy.totalAssets());
-        console2.log("Remaining total value debt:", IYieldSkimmingStrategy(address(strategy)).getTotalValueDebt());
+        console2.log("Remaining total value debt:", IYieldSkimmingStrategy(address(strategy)).getTotalUserDebtInAssetValue());
 
         // report: Should show loss and burn dragon shares
         console2.log("\nStep 9: report - Second report (should burn dragon shares due to loss)");
@@ -1170,7 +1170,7 @@ contract AccountingTest is Setup {
         console2.log("Final dragon shares:", strategy.balanceOf(donationAddress));
         console2.log("Final total assets:", strategy.totalAssets());
         console2.log("Final total supply:", strategy.totalSupply());
-        console2.log("Final total value debt:", IYieldSkimmingStrategy(address(strategy)).getTotalValueDebt());
+        console2.log("Final total value debt:", IYieldSkimmingStrategy(address(strategy)).getTotalUserDebtInAssetValue());
 
         // Verify that without the rate check, losses are properly handled
         assertEq(profit2, 0, "Should report no profit in second report");
