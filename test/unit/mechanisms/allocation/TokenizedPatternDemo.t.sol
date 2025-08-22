@@ -422,11 +422,11 @@ contract TokenizedPatternDemoTest is Test {
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 150 ether);
 
-        // Still active until finalized
+        // TALLYING after voting ends but before finalized
         vm.warp(votingEndTime + 100); // Past voting period
         assertEq(
             uint(_tokenized(address(mechanism)).state(pid)),
-            uint(TokenizedAllocationMechanism.ProposalState.Active)
+            uint(TokenizedAllocationMechanism.ProposalState.Tallying)
         );
 
         // Succeeded after finalization

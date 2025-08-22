@@ -153,6 +153,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         Pending,
         Active,
         Canceled,
+        Tallying,
         Defeated,
         Succeeded,
         Queued,
@@ -732,17 +733,19 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
             return ProposalState.Pending;
         }
         // During voting period or before tally finalized
-        else if (currentTime <= s.votingEndTime || !s.tallyFinalized) {
+        else if (currentTime <= s.votingEndTime) {
             return ProposalState.Active;
+        }
+        // After voting ends but before tally finalized
+        else if (!s.tallyFinalized) {
+            return ProposalState.Tallying;
         }
         // After tally finalized - check if queued or succeeded
         else if (s.globalRedemptionStart != 0 && currentTime < s.globalRedemptionStart) {
             return s.proposalShares[pid] == 0 ? ProposalState.Succeeded : ProposalState.Queued;
         }
         // During redemption period
-        else if (
-            s.globalRedemptionStart != 0 && s.globalRedemptionEndTime != 0 && currentTime <= s.globalRedemptionEndTime
-        ) {
+        else if (s.globalRedemptionEndTime != 0 && currentTime <= s.globalRedemptionEndTime) {
             return s.proposalShares[pid] == 0 ? ProposalState.Succeeded : ProposalState.Redeemable;
         }
         // After redemption period (grace period expired)
@@ -1371,7 +1374,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
 
         // Only allow transfers during redemption period [globalRedemptionStart, globalRedemptionEndTime]
         if (
-            S.globalRedemptionStart == 0 ||
             block.timestamp < S.globalRedemptionStart ||
             (S.globalRedemptionEndTime != 0 && block.timestamp > S.globalRedemptionEndTime)
         ) {

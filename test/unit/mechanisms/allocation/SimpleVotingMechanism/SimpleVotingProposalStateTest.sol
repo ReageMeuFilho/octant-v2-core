@@ -134,11 +134,11 @@ contract SimpleVotingProposalStateTest is Test {
         (uint256 forVotes, , ) = mechanism.voteTallies(pid);
         assertEq(forVotes, 300 ether);
 
-        // Still ACTIVE until finalized
+        // TALLYING after voting ends but before finalized
         vm.warp(votingEndTime + 10);
         assertEq(
             uint(_tokenized(address(mechanism)).state(pid)),
-            uint(TokenizedAllocationMechanism.ProposalState.Active)
+            uint(TokenizedAllocationMechanism.ProposalState.Tallying)
         );
     }
 

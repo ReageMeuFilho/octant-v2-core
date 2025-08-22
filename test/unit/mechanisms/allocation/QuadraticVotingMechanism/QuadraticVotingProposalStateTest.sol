@@ -142,11 +142,11 @@ contract QuadraticVotingProposalStateTest is Test {
         uint256 forVotes = quadraticFunding + linearFunding;
         assertEq(forVotes, 900);
 
-        // Still ACTIVE until finalized
+        // TALLYING after voting ends but before finalized
         vm.warp(votingEndTime + 10);
         assertEq(
             uint(_tokenized(address(mechanism)).state(pid)),
-            uint(TokenizedAllocationMechanism.ProposalState.Active)
+            uint(TokenizedAllocationMechanism.ProposalState.Tallying)
         );
     }
 
