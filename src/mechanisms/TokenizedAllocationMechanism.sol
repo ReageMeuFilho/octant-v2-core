@@ -109,7 +109,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     error NotProposer(address caller, address proposer);
     error AlreadyCanceled(uint256 pid);
     error Unauthorized();
-    error NotInitialized();
     error AlreadyInitialized();
     error PausedError();
     error ExpiredSignature(uint256 deadline, uint256 currentTime);
@@ -314,10 +313,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         _;
     }
 
-    modifier onlyInitialized() {
-        if (!_getStorage().initialized) revert NotInitialized();
-        _;
-    }
 
     // ---------- Initialization ----------
 
@@ -408,7 +403,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
 
     /// @notice Register to gain voting power by depositing underlying tokens
     /// @param deposit Amount of underlying to deposit (may be zero)
-    function signup(uint256 deposit) external nonReentrant whenNotPaused onlyInitialized {
+    function signup(uint256 deposit) external nonReentrant whenNotPaused {
         _executeSignup(msg.sender, deposit, msg.sender);
     }
 
@@ -427,7 +422,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) external nonReentrant whenNotPaused onlyInitialized {
+    ) external nonReentrant whenNotPaused {
         _validateSignature(
             user,
             keccak256(abi.encode(SIGNUP_TYPEHASH, user, msg.sender, deposit, _getStorage().nonces[user]++, deadline)),
@@ -454,7 +449,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) external nonReentrant whenNotPaused onlyInitialized {
+    ) external nonReentrant whenNotPaused {
         _validateSignature(
             user,
             keccak256(abi.encode(SIGNUP_TYPEHASH, user, user, deposit, _getStorage().nonces[user]++, deadline)),
@@ -528,7 +523,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     function propose(
         address recipient,
         string calldata description
-    ) external whenNotPaused nonReentrant onlyInitialized returns (uint256 pid) {
+    ) external whenNotPaused nonReentrant returns (uint256 pid) {
         address proposer = msg.sender;
 
         // Call hook for validation
@@ -565,7 +560,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         uint256 pid,
         VoteType choice,
         uint256 weight
-    ) external nonReentrant whenNotPaused onlyInitialized {
+    ) external nonReentrant whenNotPaused {
         _executeCastVote(msg.sender, pid, choice, weight);
     }
 
@@ -587,7 +582,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) external nonReentrant whenNotPaused onlyInitialized {
+    ) external nonReentrant whenNotPaused {
         uint256 nonce = _getStorage().nonces[voter]++;
         _validateSignature(
             voter,
@@ -637,7 +632,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     // ---------- Vote Tally Finalization ----------
 
     /// @notice Finalize vote tally once voting period has ended
-    function finalizeVoteTally() external onlyOwner nonReentrant onlyInitialized {
+    function finalizeVoteTally() external onlyOwner nonReentrant {
         AllocationStorage storage s = _getStorage();
 
         if (block.timestamp <= s.votingEndTime) revert VotingNotEnded(block.timestamp, s.votingEndTime);
@@ -664,7 +659,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
 
     /// @notice Queue proposal and trigger share distribution
     /// @param pid Proposal ID to queue
-    function queueProposal(uint256 pid) external nonReentrant onlyInitialized {
+    function queueProposal(uint256 pid) external nonReentrant {
         AllocationStorage storage s = _getStorage();
 
         if (!s.tallyFinalized) revert TallyNotFinalized();
@@ -709,7 +704,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     /// @notice Get the current state of a proposal
     /// @param pid Proposal ID
     /// @return Current state of the proposal
-    function state(uint256 pid) external view onlyInitialized returns (ProposalState) {
+    function state(uint256 pid) external view returns (ProposalState) {
         if (!IBaseAllocationStrategy(address(this)).validateProposalHook(pid)) revert InvalidProposal(pid);
         return _state(pid);
     }
@@ -758,7 +753,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
 
     /// @notice Cancel a proposal
     /// @param pid Proposal ID to cancel
-    function cancelProposal(uint256 pid) external nonReentrant onlyInitialized {
+    function cancelProposal(uint256 pid) external nonReentrant {
         AllocationStorage storage s = _getStorage();
 
         if (!IBaseAllocationStrategy(address(this)).validateProposalHook(pid)) revert InvalidProposal(pid);
@@ -775,78 +770,78 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     // ---------- View Functions ----------
 
     /// @notice Get remaining voting power for an address
-    function getRemainingVotingPower(address voter) external view onlyInitialized returns (uint256) {
+    function getRemainingVotingPower(address voter) external view returns (uint256) {
         return _getStorage().votingPower[voter];
     }
 
     /// @notice Get total number of proposals created
-    function getProposalCount() external view onlyInitialized returns (uint256) {
+    function getProposalCount() external view returns (uint256) {
         return _getStorage().proposalIdCounter;
     }
 
     // Public getters for storage access
-    function name() external view onlyInitialized returns (string memory) {
+    function name() external view returns (string memory) {
         return _getStorage().name;
     }
 
-    function symbol() external view onlyInitialized returns (string memory) {
+    function symbol() external view returns (string memory) {
         return _getStorage().symbol;
     }
 
-    function asset() external view onlyInitialized returns (IERC20) {
+    function asset() external view returns (IERC20) {
         return _getStorage().asset;
     }
 
-    function owner() external view onlyInitialized returns (address) {
+    function owner() external view returns (address) {
         return _getStorage().owner;
     }
 
-    function pendingOwner() external view onlyInitialized returns (address) {
+    function pendingOwner() external view returns (address) {
         return _getStorage().pendingOwner;
     }
 
-    function tallyFinalized() external view onlyInitialized returns (bool) {
+    function tallyFinalized() external view returns (bool) {
         return _getStorage().tallyFinalized;
     }
 
-    function proposals(uint256 pid) external view onlyInitialized returns (Proposal memory) {
+    function proposals(uint256 pid) external view returns (Proposal memory) {
         return _getStorage().proposals[pid];
     }
 
-    function votingPower(address user) external view onlyInitialized returns (uint256) {
+    function votingPower(address user) external view returns (uint256) {
         return _getStorage().votingPower[user];
     }
 
-    function proposalShares(uint256 pid) external view onlyInitialized returns (uint256) {
+    function proposalShares(uint256 pid) external view returns (uint256) {
         return _getStorage().proposalShares[pid];
     }
 
     // Configuration getters
-    function startBlock() external view onlyInitialized returns (uint256) {
+    function startBlock() external view returns (uint256) {
         return _getStorage().startBlock;
     }
 
-    function votingDelay() external view onlyInitialized returns (uint256) {
+    function votingDelay() external view returns (uint256) {
         return _getStorage().votingDelay;
     }
 
-    function votingPeriod() external view onlyInitialized returns (uint256) {
+    function votingPeriod() external view returns (uint256) {
         return _getStorage().votingPeriod;
     }
 
-    function quorumShares() external view onlyInitialized returns (uint256) {
+    function quorumShares() external view returns (uint256) {
         return _getStorage().quorumShares;
     }
 
-    function timelockDelay() external view onlyInitialized returns (uint256) {
+    function timelockDelay() external view returns (uint256) {
         return _getStorage().timelockDelay;
     }
 
-    function gracePeriod() external view onlyInitialized returns (uint256) {
+    function gracePeriod() external view returns (uint256) {
         return _getStorage().gracePeriod;
     }
 
-    function globalRedemptionStart() external view onlyInitialized returns (uint256) {
+    function globalRedemptionStart() external view returns (uint256) {
         return _getStorage().globalRedemptionStart;
     }
 
@@ -861,7 +856,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
 
     /// @notice Initiate ownership transfer to a new address (step 1 of 2)
     /// @param newOwner The address to transfer ownership to
-    function transferOwnership(address newOwner) external onlyOwner onlyInitialized {
+    function transferOwnership(address newOwner) external onlyOwner {
         if (newOwner == address(0)) revert Unauthorized();
         AllocationStorage storage s = _getStorage();
         s.pendingOwner = newOwner;
@@ -870,7 +865,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
 
     /// @notice Accept ownership transfer (step 2 of 2)
     /// @dev Must be called by the pending owner to complete the transfer
-    function acceptOwnership() external onlyInitialized {
+    function acceptOwnership() external {
         AllocationStorage storage s = _getStorage();
         if (msg.sender != s.pendingOwner) revert Unauthorized();
 
@@ -882,7 +877,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
 
     /// @notice Cancel pending ownership transfer
     /// @dev Can only be called by current owner
-    function cancelOwnershipTransfer() external onlyOwner onlyInitialized {
+    function cancelOwnershipTransfer() external onlyOwner {
         AllocationStorage storage s = _getStorage();
         if (s.pendingOwner == address(0)) revert Unauthorized();
 
@@ -891,7 +886,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     }
 
     /// @notice Update keeper address
-    function setKeeper(address newKeeper) external onlyOwner onlyInitialized {
+    function setKeeper(address newKeeper) external onlyOwner {
         if (newKeeper == address(0)) revert Unauthorized();
         AllocationStorage storage s = _getStorage();
         address oldKeeper = s.keeper;
@@ -900,7 +895,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     }
 
     /// @notice Update management address
-    function setManagement(address newManagement) external onlyOwner onlyInitialized {
+    function setManagement(address newManagement) external onlyOwner {
         if (newManagement == address(0)) revert Unauthorized();
         AllocationStorage storage s = _getStorage();
         address oldManagement = s.management;
@@ -909,21 +904,21 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     }
 
     /// @notice Emergency pause all operations
-    function pause() external onlyOwner onlyInitialized {
+    function pause() external onlyOwner {
         AllocationStorage storage s = _getStorage();
         s.paused = true;
         emit PausedStatusChanged(true);
     }
 
     /// @notice Resume operations after pause
-    function unpause() external onlyOwner onlyInitialized {
+    function unpause() external onlyOwner {
         AllocationStorage storage s = _getStorage();
         s.paused = false;
         emit PausedStatusChanged(false);
     }
 
     /// @notice Check if contract is paused
-    function paused() external view onlyInitialized returns (bool) {
+    function paused() external view returns (bool) {
         return _getStorage().paused;
     }
 
@@ -931,7 +926,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     /// @dev Can only be called by owner after global grace period ends
     /// @param token The token to sweep (use address(0) for ETH)
     /// @param receiver The address to receive the swept tokens
-    function sweep(address token, address receiver) external onlyOwner onlyInitialized nonReentrant {
+    function sweep(address token, address receiver) external onlyOwner nonReentrant {
         AllocationStorage storage s = _getStorage();
 
         // Ensure grace period has expired for everyone
@@ -1088,27 +1083,27 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     }
 
     // Additional getters for vault functionality
-    function management() external view onlyInitialized returns (address) {
+    function management() external view returns (address) {
         return _getStorage().management;
     }
 
-    function keeper() external view onlyInitialized returns (address) {
+    function keeper() external view returns (address) {
         return _getStorage().keeper;
     }
 
-    function emergencyAdmin() external view onlyInitialized returns (address) {
+    function emergencyAdmin() external view returns (address) {
         return _getStorage().emergencyAdmin;
     }
 
-    function decimals() external view onlyInitialized returns (uint8) {
+    function decimals() external view returns (uint8) {
         return _getStorage().decimals;
     }
 
-    function balanceOf(address account) external view onlyInitialized returns (uint256) {
+    function balanceOf(address account) external view returns (uint256) {
         return _balanceOf(_getStorage(), account);
     }
 
-    function allowance(address tokenOwner, address spender) external view onlyInitialized returns (uint256) {
+    function allowance(address tokenOwner, address spender) external view returns (uint256) {
         return _allowance(_getStorage(), tokenOwner, spender);
     }
 
@@ -1283,7 +1278,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
      * @param amount The amount of shares to be transferred from sender.
      * @return . a boolean value indicating whether the operation succeeded.
      */
-    function transfer(address to, uint256 amount) external onlyInitialized returns (bool) {
+    function transfer(address to, uint256 amount) external returns (bool) {
         _transfer(_getStorage(), msg.sender, to, amount);
         return true;
     }
@@ -1312,7 +1307,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
      * @param amount the amount of shares to allow `spender` to move.
      * @return . a boolean value indicating whether the operation succeeded.
      */
-    function approve(address spender, uint256 amount) external onlyInitialized returns (bool) {
+    function approve(address spender, uint256 amount) external returns (bool) {
         _approve(_getStorage(), msg.sender, spender, amount);
         return true;
     }
@@ -1344,7 +1339,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
      * @param amount the quantity of shares to move.
      * @return . a boolean value indicating whether the operation succeeded.
      */
-    function transferFrom(address from, address to, uint256 amount) external onlyInitialized returns (bool) {
+    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
         AllocationStorage storage S = _getStorage();
         _spendAllowance(S, from, msg.sender, amount);
         _transfer(S, from, to, amount);
