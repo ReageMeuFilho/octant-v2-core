@@ -340,7 +340,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
             YS.lastReportedRate = currentRate;
 
             emit DonationMinted(S.dragonRouter, profitShares, currentRate.rayToWad());
-        } else if (currentValue < YS.totalValueDebt + YS.dragonValueDebt && currentRate < YS.lastReportedRate) {
+        } else if (currentValue < YS.totalValueDebt + YS.dragonValueDebt) {
             // Loss - burn dragon shares first
             uint256 lossValue = YS.totalValueDebt + YS.dragonValueDebt - currentValue;
             uint256 dragonBalance = _balanceOf(S, S.dragonRouter);
@@ -363,8 +363,6 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
 
                 emit DonationBurned(S.dragonRouter, dragonBurn, currentRate.rayToWad());
             }
-
-            YS.lastReportedRate = currentRate;
         }
 
         // Update last report timestamp
