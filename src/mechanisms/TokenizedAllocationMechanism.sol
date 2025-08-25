@@ -1072,7 +1072,18 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
      * @return . The amount of `asset` that would be returned.
      */
     function previewRedeem(uint256 shares) external view returns (uint256) {
-        return _convertToAssets(_getStorage(), shares, Math.Rounding.Floor);
+        AllocationStorage storage s = _getStorage();
+        
+        // Return 0 if outside redemption period [t_r_start, t_r_end]
+        if (s.globalRedemptionStart == 0 || block.timestamp < s.globalRedemptionStart) {
+            return 0; // Before redemption period starts
+        }
+        
+        if (s.globalRedemptionEndTime != 0 && block.timestamp > s.globalRedemptionEndTime) {
+            return 0; // After redemption period ends
+        }
+        
+        return _convertToAssets(s, shares, Math.Rounding.Floor);
     }
 
     /**
