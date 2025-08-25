@@ -1339,4 +1339,282 @@ contract RocketPoolStrategyTest is Test {
         console.log("Donation address total assets:", vault.totalAssets());
         console.log("Donation address total supply:", vault.totalSupply());
     }
+
+    // Struct to avoid stack too deep for dragon withdrawal tests
+    struct DragonWithdrawalTestData {
+        address user1;
+        uint256 depositAmount;
+        uint256 initialRate;
+        uint256 increasedRate;
+        uint256 decreasedRate;
+        uint256 finalRate;
+        uint256 user1Shares;
+        uint256 dragonSharesAfterProfit;
+        uint256 dragonAssets;
+        uint256 profit1;
+        uint256 loss1;
+        uint256 profit2;
+        uint256 loss2;
+        uint256 profit3;
+        uint256 loss3;
+        uint256 assetsReceived;
+    }
+
+    /// @notice Test dragon router withdrawal followed by rate recovery - user should have no loss
+    /// @dev Sequence: d1 -> r1.5 -> report (mint DR) -> wDR -> r1.0 -> report (cant burn shares) -> r1.5 -> report -> w1 (no loss)
+    function test_dragonRouterWithdrawal_rateRecovery_userNoLoss() public {
+        DragonWithdrawalTestData memory data;
+        
+        data.user1 = makeAddr("user1");
+        data.depositAmount = 100e18; // 100 rETH
+        data.initialRate = 1e18; // 1.0
+        data.increasedRate = (1e18 * 15) / 10; // 1.5x rate
+        data.decreasedRate = 1e18; // back to 1.0
+
+        // Airdrop rETH to user
+        airdrop(ERC20(R_ETH), data.user1, data.depositAmount);
+
+        // Set loss limit to allow for rate changes
+        vm.startPrank(management);
+        strategy.setLossLimitRatio(5000); // 50% loss limit
+        vm.stopPrank();
+
+        // Step 1: d1 - User deposits at rate 1.0
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(data.initialRate));
+        
+        vm.startPrank(data.user1);
+        ERC20(R_ETH).approve(address(strategy), data.depositAmount);
+        data.user1Shares = vault.deposit(data.depositAmount, data.user1);
+        vm.stopPrank();
+
+        // Expected shares: depositAmount * rate = 100e18 * 1e18 / 1e18 = 100e18
+        assertEq(data.user1Shares, 100e18, "User1 should receive 100e18 shares at 1:1 rate");
+        
+        vm.clearMockedCalls();
+
+        // Step 2: r1.5 - Rate increases to 1.5
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(data.increasedRate));
+
+        // Step 3: report (mint DR) - First report creates dragon shares
+        vm.startPrank(keeper);
+        (data.profit1, data.loss1) = vault.report();
+        vm.stopPrank();
+
+        data.dragonSharesAfterProfit = vault.balanceOf(donationAddress);
+        
+        // Expected profit calculation:
+        // Total assets: 100e18 rETH
+        // Current rate: 1.5, last rate: 1.0
+        // Vault value: 100e18 * 1.5 = 150e18 ETH
+        // User debt: 100e18 * 1.0 = 100e18 ETH
+        // Excess value: 150e18 - 100e18 = 50e18 ETH
+        // Dragon shares minted: 50e18
+        // Profit reported: 50e18 / 1.5 = 33.333e18 rETH
+        assertEq(data.profit1, 33333333333333333333, "Should report 33.333e18 profit");
+        assertEq(data.loss1, 0, "Should report no loss");
+        assertEq(data.dragonSharesAfterProfit, 50e18, "Dragon shares should be 50e18");
+
+        // Step 4: wDR - Dragon router withdraws all shares (removes protection buffer)
+        vm.startPrank(donationAddress);
+        data.dragonAssets = vault.redeem(vault.balanceOf(donationAddress), donationAddress, donationAddress);
+        vm.stopPrank();
+
+        // Expected dragon withdrawal:
+        // Dragon shares: 50e18
+        // Total shares: 150e18 (100e18 user + 50e18 dragon)
+        // Total assets: 100e18 rETH
+        // Dragon receives: 50e18 / 150e18 * 100e18 = 33.333e18 rETH
+        assertEq(data.dragonAssets, 33333333333333333333, "Dragon should receive 33.333e18 rETH");
+        assertEq(vault.balanceOf(donationAddress), 0, "Dragon should have no shares after withdrawal");
+
+        vm.clearMockedCalls();
+
+        // Step 5: r1.0 - Rate drops back to 1.0
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(data.decreasedRate));
+
+        // Step 6: report (cant burn shares) - Report with no dragon shares to burn
+        vm.startPrank(keeper);
+        (data.profit2, data.loss2) = vault.report();
+        vm.stopPrank();
+
+        // Expected loss calculation:
+        // Remaining assets: 100e18 - 33.333e18 = 66.666e18 rETH
+        // Current rate: 1.0, last rate: 1.5
+        // Vault value: 66.666e18 * 1.0 = 66.666e18 ETH
+        // User debt: 100e18 * 1.0 = 100e18 ETH
+        // Deficit: 66.666e18 - 100e18 = -33.333e18 ETH
+        // Loss reported: 33.333e18 ETH / 1.0 = 33.333e18 rETH
+        // No dragon shares to burn, loss remains uncovered
+        assertEq(data.profit2, 0, "Should report no profit");
+        assertEq(data.loss2, 33333333333333333333, "Should report 33.333e18 loss (with rounding)");
+        assertEq(vault.balanceOf(donationAddress), 0, "Still no dragon shares to burn");
+
+        vm.clearMockedCalls();
+
+        // Step 7: r1.5 - Rate recovers to 1.5
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(data.increasedRate));
+
+        // Step 8: report - Report the recovery
+        vm.startPrank(keeper);
+        (data.profit3, data.loss3) = vault.report();
+        vm.stopPrank();
+
+        // Expected profit from recovery:
+        // Assets: 66.666e18 rETH
+        // Current rate: 1.5, last rate: 1.0
+        // Vault value: 66.666e18 * 1.5 = 100e18 ETH
+        // User debt: 100e18 ETH (unchanged)
+        // No excess value, no profit to report (exactly breaks even)
+        assertEq(data.profit3, 0, "Should report no profit (exactly breaks even)");
+        assertEq(data.loss3, 0, "Should report no loss");
+
+        // Step 9: w1 - User withdraws (should have no loss due to rate recovery)
+        vm.startPrank(data.user1);
+        data.assetsReceived = vault.redeem(vault.balanceOf(data.user1), data.user1, data.user1);
+        vm.stopPrank();
+
+        // Expected withdrawal:
+        // User shares: 100e18
+        // Total shares: 100e18 (only user shares remain)
+        // Total assets: 66.666e18 rETH
+        // At rate 1.5, user receives: 100e18 / 1.5 = 66.666e18 rETH
+        // Value check: 66.666e18 * 1.5 = 100e18 ETH (matches initial deposit value)
+        assertEq(data.assetsReceived, 66666666666666666666, "User should receive 66.666e18 rETH");
+        
+        // Verify no loss in ETH value terms
+        // Since rates are in WAD format (1e18), we need to divide by 1e18 after multiplication
+        uint256 depositValue = (data.depositAmount * data.initialRate) / 1e18; // 100e18 ETH
+        uint256 withdrawValue = (data.assetsReceived * data.increasedRate) / 1e18; // 66.666e18 * 1.5 = 100e18 ETH
+        assertApproxEqAbs(withdrawValue, depositValue, 1e15, "User should have no loss in ETH value terms (within 0.001 ETH tolerance)");
+    }
+
+    /// @notice Test dragon router withdrawal followed by rate decline - user should experience loss
+    /// @dev Sequence: d1 -> r1.5 -> report (mint DR) -> wDR -> r1.0 -> report (cant burn shares) -> r0.9 -> w1 (loss)
+    function test_dragonRouterWithdrawal_rateDecline_userLoss() public {
+        DragonWithdrawalTestData memory data;
+        
+        data.user1 = makeAddr("user1");
+        data.depositAmount = 100e18; // 100 rETH
+        data.initialRate = 1e18; // 1.0
+        data.increasedRate = (1e18 * 15) / 10; // 1.5x rate
+        data.decreasedRate = 1e18; // 1.0
+        data.finalRate = (1e18 * 9) / 10; // 0.9x rate
+
+        // Airdrop rETH to user
+        airdrop(ERC20(R_ETH), data.user1, data.depositAmount);
+
+        // Set loss limit to allow for rate changes
+        vm.startPrank(management);
+        strategy.setLossLimitRatio(5000); // 50% loss limit
+        vm.stopPrank();
+
+        // Step 1: d1 - User deposits at rate 1.0
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(data.initialRate));
+        
+        vm.startPrank(data.user1);
+        ERC20(R_ETH).approve(address(strategy), data.depositAmount);
+        data.user1Shares = vault.deposit(data.depositAmount, data.user1);
+        vm.stopPrank();
+
+        // Expected shares: depositAmount * rate = 100e18 * 1e18 / 1e18 = 100e18
+        assertEq(data.user1Shares, 100e18, "User1 should receive 100e18 shares at 1:1 rate");
+        
+        vm.clearMockedCalls();
+
+        // Step 2: r1.5 - Rate increases to 1.5
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(data.increasedRate));
+
+        // Step 3: report (mint DR) - First report creates dragon shares
+        vm.startPrank(keeper);
+        (data.profit1, data.loss1) = vault.report();
+        vm.stopPrank();
+
+        data.dragonSharesAfterProfit = vault.balanceOf(donationAddress);
+        
+        // Expected profit calculation (same as first test):
+        // Total assets: 100e18 rETH
+        // Current rate: 1.5, last rate: 1.0
+        // Vault value: 100e18 * 1.5 = 150e18 ETH
+        // User debt: 100e18 * 1.0 = 100e18 ETH
+        // Excess value: 150e18 - 100e18 = 50e18 ETH
+        // Dragon shares minted: 50e18
+        // Profit reported: 50e18 / 1.5 = 33.333e18 rETH
+        assertEq(data.profit1, 33333333333333333333, "Should report 33.333e18 profit");
+        assertEq(data.loss1, 0, "Should report no loss");
+        assertEq(data.dragonSharesAfterProfit, 50e18, "Dragon shares should be 50e18");
+
+        // Step 4: wDR - Dragon router withdraws all shares (removes protection buffer)
+        vm.startPrank(donationAddress);
+        data.dragonAssets = vault.redeem(vault.balanceOf(donationAddress), donationAddress, donationAddress);
+        vm.stopPrank();
+
+        // Expected dragon withdrawal:
+        // Dragon shares: 50e18
+        // Total shares: 150e18 (100e18 user + 50e18 dragon)
+        // Total assets: 100e18 rETH
+        // Dragon receives: 50e18 / 150e18 * 100e18 = 33.333e18 rETH
+        assertEq(data.dragonAssets, 33333333333333333333, "Dragon should receive 33.333e18 rETH");
+        assertEq(vault.balanceOf(donationAddress), 0, "Dragon should have no shares after withdrawal");
+
+        vm.clearMockedCalls();
+
+        // Step 5: r1.0 - Rate drops back to 1.0
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(data.decreasedRate));
+
+        // Step 6: report (cant burn shares) - Report with no dragon shares to burn
+        vm.startPrank(keeper);
+        (data.profit2, data.loss2) = vault.report();
+        vm.stopPrank();
+
+        // Expected loss calculation:
+        // Remaining assets: 100e18 - 33.333e18 = 66.666e18 rETH
+        // Current rate: 1.0, last rate: 1.5
+        // Vault value: 66.666e18 * 1.0 = 66.666e18 ETH
+        // User debt: 100e18 * 1.0 = 100e18 ETH
+        // Deficit: 66.666e18 - 100e18 = -33.333e18 ETH
+        // Loss reported: 33.333e18 ETH / 1.0 = 33.333e18 rETH
+        // No dragon shares to burn, loss remains uncovered
+        assertEq(data.profit2, 0, "Should report no profit");
+        assertEq(data.loss2, 33333333333333333333, "Should report 33.333e18 loss (with rounding)");
+        assertEq(vault.balanceOf(donationAddress), 0, "Still no dragon shares to burn");
+
+        vm.clearMockedCalls();
+
+        // Step 7: r0.9 - Rate declines further to 0.9 (below deposit rate)
+        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(data.finalRate));
+
+        // Step 8: w1 - User withdraws (should experience loss due to rate below deposit rate and no dragon protection)
+        vm.startPrank(data.user1);
+        data.assetsReceived = vault.redeem(vault.balanceOf(data.user1), data.user1, data.user1);
+        vm.stopPrank();
+
+        // Expected withdrawal with loss:
+        // User shares: 100e18
+        // Total shares: 100e18 (only user shares remain)
+        // Total assets: 66.666e18 rETH
+        // Since vault is insolvent (lastReportedRate=1.0, currentRate=0.9):
+        //   Vault value: 66.666e18 * 0.9 = 60e18 ETH
+        //   User debt: 100e18 ETH
+        //   Deficit: 60e18 - 100e18 = -40e18 ETH (vault is insolvent)
+        // In insolvency, user receives proportional share of assets:
+        //   User receives: 100e18 shares / 100e18 total shares * 66.666e18 assets = 66.666e18 rETH
+        assertEq(data.assetsReceived, 66666666666666666667, "User should receive 66.666e18 rETH");
+        
+        // Calculate the loss in ETH value terms
+        // Since rates are in WAD format (1e18), we need to divide by 1e18 after multiplication
+        uint256 depositValue = (data.depositAmount * data.initialRate) / 1e18; // 100e18 ETH
+        uint256 withdrawValue = (data.assetsReceived * data.finalRate) / 1e18; // 66.666e18 * 0.9 = 60e18 ETH
+        
+        // User should receive less than their deposit due to loss and no dragon protection
+        assertLt(withdrawValue, depositValue, "User should receive less ETH value than deposited");
+        
+        // Expected loss: 100e18 - 60e18 = 40e18 ETH (40% loss)
+        uint256 actualLoss = depositValue - withdrawValue;
+        assertApproxEqAbs(actualLoss, 40e18, 1e15, "User should experience ~40e18 ETH loss (40%)");
+        
+        // Verify the user experienced significant loss (40%)
+        uint256 lossPercentage = (actualLoss * 100) / depositValue;
+        assertEq(lossPercentage, 40, "User should experience exactly 40% loss");
+        
+    }
 }
