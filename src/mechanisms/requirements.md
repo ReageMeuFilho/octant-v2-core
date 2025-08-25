@@ -120,7 +120,6 @@ The system implements **permissionless proposal queuing**, enabling flexible gov
   - **Security Assumptions**:
     - MUST validate pid is within valid range (1 <= pid <= proposalCount)
     - MUST be view function for gas efficiency and security
-    - MUST NOT validate canceled proposals as valid
     - SHOULD be used consistently before any proposal state access
 - **`_beforeFinalizeVoteTallyHook()`** - Guards vote tally finalization
   - **Security Assumptions**:

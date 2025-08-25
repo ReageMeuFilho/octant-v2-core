@@ -228,6 +228,12 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
         returns (uint256 sumContributions, uint256 sumSquareRoots, uint256 quadraticFunding, uint256 linearFunding)
     {
         if (!_validateProposalHook(pid)) revert TokenizedAllocationMechanism.InvalidProposal(pid);
+        
+        // Return zero funding for cancelled proposals
+        if (_tokenizedAllocation().state(pid) == TokenizedAllocationMechanism.ProposalState.Canceled) {
+            return (0, 0, 0, 0);
+        }
+        
         return getTally(pid);
     }
 
