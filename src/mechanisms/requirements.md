@@ -157,7 +157,7 @@ The system implements **permissionless proposal queuing**, enabling flexible gov
   - **Security Assumptions**:
     - MUST implement fair and consistent vote-to-share conversion
     - MUST be view function for predictable outcomes
-    - MUST return 0 shares for proposals that don't meet quorum
+    - **Note**: Quorum enforcement is handled by `queueProposal()` which calls `hasQuorumHook()` before `convertVotesToShares()`
     - SHOULD consider total available assets to prevent over-allocation
     - MUST handle mathematical operations safely (no overflow/underflow)
     - MAY implement complex formulas (e.g., quadratic funding with alpha)
