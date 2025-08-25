@@ -379,4 +379,16 @@ contract RecipientVerificationTest is Test {
         assertEq(_tokenized(address(mechanism)).votingPower(alice), DEPOSIT_AMOUNT - 400); // 20^2
         assertEq(_tokenized(address(mechanism)).votingPower(bob), DEPOSIT_AMOUNT); // No vote went through
     }
+
+    /// @notice Test that zero address registration is blocked at core level
+    function test_ZeroAddressSignupBlocked() public {
+        // Try to signup as zero address using vm.prank - should fail with InvalidUser
+        vm.expectRevert(
+            abi.encodeWithSelector(TokenizedAllocationMechanism.InvalidUser.selector, address(0))
+        );
+        
+        // Use vm.prank to simulate the call coming from address(0)
+        vm.prank(address(0));
+        _tokenized(address(mechanism)).signup(0); // Zero deposit to avoid token transfer complications
+    }
 }

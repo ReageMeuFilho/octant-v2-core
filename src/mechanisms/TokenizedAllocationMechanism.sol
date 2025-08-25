@@ -88,6 +88,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     error InsufficientDeposit(uint256 deposit);
     error ProposeNotAllowed(address proposer);
     error InvalidRecipient(address recipient);
+    error InvalidUser(address user);
     error RecipientUsed(address recipient);
     error RecipientMismatch(uint256 pid, address expected, address actual);
     error DescriptionMismatch(uint256 pid);
@@ -484,6 +485,9 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     /// @dev Internal signup execution logic
     function _executeSignup(address user, uint256 deposit, address payer) private {
         AllocationStorage storage s = _getStorage();
+
+        // Prevent zero address registration
+        if (user == address(0)) revert InvalidUser(user);
 
         // Call hook for validation via interface (Yearn V3 pattern)
         if (!IBaseAllocationStrategy(address(this)).beforeSignupHook(user)) {
