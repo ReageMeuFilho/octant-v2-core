@@ -74,15 +74,15 @@ contract LockedVaultTest is Test {
     function testFuzz_RageQuitCooldownPeriodSetting(uint256 cooldownPeriod) public {
         // Bound to valid range: 1 day to 30 days (vault maximum)
         cooldownPeriod = bound(cooldownPeriod, 1 days, 30 days);
-        
+
         // Should be able to propose and finalize rage quit cooldown period change
         vm.startPrank(gov);
         vault.proposeRageQuitCooldownPeriodChange(cooldownPeriod);
         assertEq(vault.getPendingRageQuitCooldownPeriod(), cooldownPeriod, "Pending period should be set");
-        
+
         // Fast forward past delay period
         vm.warp(block.timestamp + vault.RAGE_QUIT_COOLDOWN_CHANGE_DELAY() + 1);
-        
+
         vault.finalizeRageQuitCooldownPeriodChange();
         assertEq(vault.rageQuitCooldownPeriod(), cooldownPeriod, "Rage quit cooldown period should be updated");
         assertEq(vault.getPendingRageQuitCooldownPeriod(), 0, "Pending period should be cleared");
@@ -92,7 +92,7 @@ contract LockedVaultTest is Test {
     function testFuzz_RageQuitCooldownPeriodSettingInvalid(uint256 invalidPeriod) public {
         // Test invalid periods (below 1 day or above 30 days)
         vm.assume(invalidPeriod < 1 days || invalidPeriod > 30 days);
-        
+
         vm.startPrank(gov);
         vm.expectRevert(IMultistrategyLockedVault.InvalidRageQuitCooldownPeriod.selector);
         vault.proposeRageQuitCooldownPeriodChange(invalidPeriod);
@@ -102,11 +102,11 @@ contract LockedVaultTest is Test {
     function testFuzz_InitiateRageQuit(uint256 depositAmount, uint256 sharesToLock) public {
         // Bound deposit amount to reasonable range
         depositAmount = bound(depositAmount, 1e18, 1_000_000e18);
-        
+
         // Mint and deposit
         asset.mint(fish, depositAmount);
         userDeposit(fish, depositAmount);
-        
+
         // Bound shares to lock to not exceed balance
         uint256 userBalance = vault.balanceOf(fish);
         sharesToLock = bound(sharesToLock, 1, userBalance);
@@ -130,7 +130,7 @@ contract LockedVaultTest is Test {
         vm.prank(fish);
         vm.expectRevert(IMultistrategyLockedVault.InvalidShareAmount.selector);
         vault.initiateRageQuit(0);
-        
+
         // Test when user has no balance but tries to lock positive amount
         invalidAmount = bound(invalidAmount, 1, type(uint256).max);
         vm.prank(fish);
@@ -142,7 +142,7 @@ contract LockedVaultTest is Test {
         // Bound deposits to reasonable ranges
         firstDeposit = bound(firstDeposit, 1e18, 500_000e18);
         secondDeposit = bound(secondDeposit, 1e18, 500_000e18);
-        
+
         // Mint and deposit first amount
         asset.mint(fish, firstDeposit);
         userDeposit(fish, firstDeposit);
@@ -156,7 +156,7 @@ contract LockedVaultTest is Test {
 
         // Withdraw all shares to clear custody
         vault.withdraw(firstDeposit, fish, fish, 0, new address[](0));
-        
+
         // Deposit again
         vm.stopPrank();
         asset.mint(fish, secondDeposit);
@@ -173,12 +173,15 @@ contract LockedVaultTest is Test {
         vm.stopPrank();
     }
 
-    function testFuzz_CannotInitiateRageQuitWhenAlreadyUnlockedAndCooldownPeriodHasNotPassed(uint256 depositAmount, uint256 timeElapsed) public {
+    function testFuzz_CannotInitiateRageQuitWhenAlreadyUnlockedAndCooldownPeriodHasNotPassed(
+        uint256 depositAmount,
+        uint256 timeElapsed
+    ) public {
         // Bound deposit amount and time elapsed
         depositAmount = bound(depositAmount, 1e18, 1_000_000e18);
         uint256 cooldownPeriod = vault.rageQuitCooldownPeriod();
         timeElapsed = bound(timeElapsed, 1, cooldownPeriod - 1);
-        
+
         // Mint and deposit
         asset.mint(fish, depositAmount);
         userDeposit(fish, depositAmount);
@@ -199,11 +202,11 @@ contract LockedVaultTest is Test {
     function testFuzz_WithdrawAndRedeemWhenLocked(uint256 depositAmount, uint256 withdrawAmount) public {
         // Bound deposit amount
         depositAmount = bound(depositAmount, 1e18, 1_000_000e18);
-        
+
         // Mint and deposit
         asset.mint(fish, depositAmount);
         userDeposit(fish, depositAmount);
-        
+
         // Bound withdraw amount to be within deposited range
         withdrawAmount = bound(withdrawAmount, 1, depositAmount);
 
@@ -224,10 +227,10 @@ contract LockedVaultTest is Test {
     function testFuzz_WithdrawAfterUnlock(uint256 depositAmount) public {
         // Bound deposit amount
         depositAmount = bound(depositAmount, 1e18, 1_000_000e18);
-        
+
         // Store initial balance
         uint256 initialBalance = asset.balanceOf(fish);
-        
+
         // Mint and deposit
         asset.mint(fish, depositAmount);
         userDeposit(fish, depositAmount);
@@ -252,10 +255,10 @@ contract LockedVaultTest is Test {
     function testFuzz_RedeemAfterUnlock(uint256 depositAmount) public {
         // Bound deposit amount
         depositAmount = bound(depositAmount, 1e18, 1_000_000e18);
-        
+
         // Store initial balance
         uint256 initialBalance = asset.balanceOf(fish);
-        
+
         // Mint and deposit
         asset.mint(fish, depositAmount);
         userDeposit(fish, depositAmount);
@@ -284,7 +287,7 @@ contract LockedVaultTest is Test {
         // Bound deposit amount
         depositAmount = bound(depositAmount, 1e18, 1_000_000e18);
         withdrawAmount = bound(withdrawAmount, 1, depositAmount);
-        
+
         // Mint and deposit
         asset.mint(fish, depositAmount);
         userDeposit(fish, depositAmount);
@@ -295,14 +298,20 @@ contract LockedVaultTest is Test {
         vault.withdraw(withdrawAmount, fish, fish, 0, new address[](0));
     }
 
-    function testFuzz_ReinitializeRageQuit(uint256 firstDeposit, uint256 partialLock, uint256 secondDeposit, uint256 newCooldown, uint256 timeElapsed) public {
+    function testFuzz_ReinitializeRageQuit(
+        uint256 firstDeposit,
+        uint256 partialLock,
+        uint256 secondDeposit,
+        uint256 newCooldown,
+        uint256 timeElapsed
+    ) public {
         // Bound inputs
         firstDeposit = bound(firstDeposit, 2e18, 500_000e18); // Need at least 2 to have partial
         partialLock = bound(partialLock, 1e18, firstDeposit / 2);
         secondDeposit = bound(secondDeposit, 1e18, 500_000e18);
         newCooldown = bound(newCooldown, 8 days, 30 days); // Different from default 7 days
         timeElapsed = bound(timeElapsed, 1 days, 6 days); // Less than original cooldown
-        
+
         // Mint and deposit first amount
         asset.mint(fish, firstDeposit);
         userDeposit(fish, firstDeposit);
@@ -335,11 +344,14 @@ contract LockedVaultTest is Test {
         assertEq(currentUnlockTime, originalUnlockTime, "Unlock time should not change on re-deposit");
     }
 
-    function testFuzz_CannotWithdrawAgainAfterFirstWithdrawalWithoutNewRageQuit(uint256 depositAmount, uint256 firstWithdrawPercent) public {
+    function testFuzz_CannotWithdrawAgainAfterFirstWithdrawalWithoutNewRageQuit(
+        uint256 depositAmount,
+        uint256 firstWithdrawPercent
+    ) public {
         // Bound inputs
         depositAmount = bound(depositAmount, 2e18, 1_000_000e18); // Need at least 2 to split
         firstWithdrawPercent = bound(firstWithdrawPercent, 10, 90); // 10-90% for first withdrawal
-        
+
         // Mint and deposit
         asset.mint(fish, depositAmount);
         userDeposit(fish, depositAmount);
@@ -371,7 +383,7 @@ contract LockedVaultTest is Test {
         // Bound inputs
         depositAmount = bound(depositAmount, 2e18, 1_000_000e18); // Need at least 2 to split
         firstLockPercent = bound(firstLockPercent, 10, 90); // 10-90% for first lock
-        
+
         // Mint and deposit
         asset.mint(fish, depositAmount);
         userDeposit(fish, depositAmount);
@@ -401,11 +413,14 @@ contract LockedVaultTest is Test {
         vm.stopPrank();
     }
 
-    function testFuzz_CannotRedeemAgainAfterFirstRedeemWithoutNewRageQuit(uint256 depositAmount, uint256 firstRedeemPercent) public {
+    function testFuzz_CannotRedeemAgainAfterFirstRedeemWithoutNewRageQuit(
+        uint256 depositAmount,
+        uint256 firstRedeemPercent
+    ) public {
         // Bound inputs
         depositAmount = bound(depositAmount, 2e18, 1_000_000e18); // Need at least 2 to split
         firstRedeemPercent = bound(firstRedeemPercent, 10, 90); // 10-90% for first redeem
-        
+
         // Mint and deposit
         asset.mint(fish, depositAmount);
         userDeposit(fish, depositAmount);
@@ -439,7 +454,7 @@ contract LockedVaultTest is Test {
         // Bound inputs
         depositAmount = bound(depositAmount, 2e18, 1_000_000e18); // Need at least 2 to split
         firstLockPercent = bound(firstLockPercent, 10, 90); // 10-90% for first lock
-        
+
         // Mint and deposit
         asset.mint(fish, depositAmount);
         userDeposit(fish, depositAmount);

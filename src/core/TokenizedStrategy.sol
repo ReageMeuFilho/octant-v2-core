@@ -356,10 +356,12 @@ abstract contract TokenizedStrategy {
     uint256 internal constant DRAGON_ROUTER_COOLDOWN = 14 days;
 
     /// @notice Permit type hash for EIP-2612 permit functionality.
-    bytes32 internal constant PERMIT_TYPEHASH = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+    bytes32 internal constant PERMIT_TYPEHASH =
+        keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
 
     /// @notice EIP712Domain type hash for EIP-712 domain separator.
-    bytes32 internal constant EIP712DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+    bytes32 internal constant EIP712DOMAIN_TYPEHASH =
+        keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
 
     /// @notice Hash of the vault name for EIP-712 domain separator.
     bytes32 internal constant NAME_HASH = keccak256("Octant Vault");
@@ -1729,15 +1731,6 @@ abstract contract TokenizedStrategy {
      * @return . The domain separator that will be used for any {permit} calls.
      */
     function DOMAIN_SEPARATOR() public view returns (bytes32) {
-        return
-            keccak256(
-                abi.encode(
-                    EIP712DOMAIN_TYPEHASH,
-                    NAME_HASH,
-                    VERSION_HASH,
-                    block.chainid,
-                    address(this)
-                )
-            );
+        return keccak256(abi.encode(EIP712DOMAIN_TYPEHASH, NAME_HASH, VERSION_HASH, block.chainid, address(this)));
     }
 }

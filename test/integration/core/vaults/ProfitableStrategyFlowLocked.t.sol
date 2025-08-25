@@ -248,7 +248,7 @@ contract ProfitableStrategyFlowLockedTest is Test {
 
         // User1 can redeem remaining custodied shares from original rage quit
         // (no need to initiate new rage quit as custody is still active)
-        
+
         // User1 redeems all remaining shares
         address[] memory withdrawalQueue = new address[](1);
         withdrawalQueue[0] = address(strategy);

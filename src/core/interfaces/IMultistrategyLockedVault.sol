@@ -46,7 +46,5 @@ interface IMultistrategyLockedVault is IMultistrategyVault {
     function getRageQuitCooldownPeriodChangeTimestamp() external view returns (uint256);
     function setRegenGovernance(address _regenGovernance) external;
     function cancelRageQuit() external;
-    function getCustodyInfo(
-        address user
-    ) external view returns (uint256 lockedShares, uint256 unlockTime);
+    function getCustodyInfo(address user) external view returns (uint256 lockedShares, uint256 unlockTime);
 }
