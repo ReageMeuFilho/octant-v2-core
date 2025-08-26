@@ -1056,11 +1056,15 @@ contract AccountingTest is Setup {
 
         // This should NOT report a loss because currentRate < YS.lastReportedRate is FALSE
         assertEq(profit2, 0, "Should report no profit");
-        assertEq(loss2, 0, "Should report no loss when rate increased");
+        assertGt(
+            loss2,
+            0,
+            "Should report absolute loss when rate increased but currentValue < totalValueDebt + dragonValueDebt"
+        );
 
         // Verify rate was NOT updated (by design - only updates on profit or loss with rate decrease)
         uint256 newLastRate = IYieldSkimmingStrategy(address(strategy)).getLastRateRay();
-        assertEq(newLastRate, profitRate * 1e9, "Last reported rate should NOT be updated when loss is not reported");
+        assertEq(newLastRate, higherRate * 1e9, "Last reported rate should be updated when loss");
 
         // Now let's create another loss where rate does decrease
         uint256 lowerRate = 19e17; // 1.9 rate (lower than 2.1)
@@ -1072,10 +1076,6 @@ contract AccountingTest is Setup {
 
         assertEq(profit3, 0, "Should report no profit");
         assertGt(loss3, 0, "Should report loss when rate decreased");
-
-        console2.log("Loss not reported when rate increased:", loss2);
-        console2.log("Loss reported when rate decreased:", loss3);
-        console2.log("This demonstrates the lastReportedRate check filters out losses when rate is increasing");
     }
 
     /**
@@ -1127,7 +1127,8 @@ contract AccountingTest is Setup {
         console2.log("Current vault value:", (strategy.totalAssets() * 1e18) / 1e18); // Rate is 1.0
         console2.log(
             "Total debt needed:",
-            IYieldSkimmingStrategy(address(strategy)).getTotalUserDebtInAssetValue() + strategy.balanceOf(donationAddress)
+            IYieldSkimmingStrategy(address(strategy)).getTotalUserDebtInAssetValue() +
+                strategy.balanceOf(donationAddress)
         );
 
         // Skip the deposit since vault is insolvent - this shows the protection working
@@ -1140,7 +1141,10 @@ contract AccountingTest is Setup {
         vm.prank(user1);
         strategy.redeem(user1Balance, user1, user1);
         console2.log("User1 withdrawn, remaining total assets:", strategy.totalAssets());
-        console2.log("Remaining total value debt:", IYieldSkimmingStrategy(address(strategy)).getTotalUserDebtInAssetValue());
+        console2.log(
+            "Remaining total value debt:",
+            IYieldSkimmingStrategy(address(strategy)).getTotalUserDebtInAssetValue()
+        );
 
         // report: Should show loss and burn dragon shares
         console2.log("\nStep 9: report - Second report (should burn dragon shares due to loss)");
@@ -1170,7 +1174,10 @@ contract AccountingTest is Setup {
         console2.log("Final dragon shares:", strategy.balanceOf(donationAddress));
         console2.log("Final total assets:", strategy.totalAssets());
         console2.log("Final total supply:", strategy.totalSupply());
-        console2.log("Final total value debt:", IYieldSkimmingStrategy(address(strategy)).getTotalUserDebtInAssetValue());
+        console2.log(
+            "Final total value debt:",
+            IYieldSkimmingStrategy(address(strategy)).getTotalUserDebtInAssetValue()
+        );
 
         // Verify that without the rate check, losses are properly handled
         assertEq(profit2, 0, "Should report no profit in second report");

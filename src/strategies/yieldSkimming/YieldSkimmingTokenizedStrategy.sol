@@ -362,9 +362,6 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
             // update the dragon value debt
             YS.dragonRouterDebtInAssetValue += profitValue;
 
-            // Update last reported rate after profit to track high-water mark
-            YS.lastReportedRate = currentRate;
-
             emit DonationMinted(S.dragonRouter, profitShares, currentRate.rayToWad());
         } else if (currentValue < YS.totalUserDebtInAssetValue + YS.dragonRouterDebtInAssetValue) {
             // Loss - burn dragon shares first
@@ -393,6 +390,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
 
         // Update last report timestamp
         S.lastReport = uint96(block.timestamp);
+        YS.lastReportedRate = currentRate;
         emit Harvest(msg.sender, currentRate.rayToWad());
         emit Reported(profit, loss);
 
