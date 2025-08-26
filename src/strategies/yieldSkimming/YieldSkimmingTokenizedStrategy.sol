@@ -159,9 +159,10 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
             YS.totalUserDebtInAssetValue = YS.totalUserDebtInAssetValue > valueToReturn
                 ? YS.totalUserDebtInAssetValue - valueToReturn
                 : 0;
-            // if actual shares is the total shares, then we can reset the total value debt to 0
-            if (shares == _totalSupply(S)) {
+            // if vault is empty, reset all debts to 0
+            if (_totalSupply(S) == 0) {
                 YS.totalUserDebtInAssetValue = 0;
+                YS.dragonRouterDebtInAssetValue = 0;
             }
         } else {
             YS.dragonRouterDebtInAssetValue = YS.dragonRouterDebtInAssetValue > valueToReturn
@@ -208,9 +209,10 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
             YS.totalUserDebtInAssetValue = YS.totalUserDebtInAssetValue > valueToReturn
                 ? YS.totalUserDebtInAssetValue - valueToReturn
                 : 0;
-            // if actual shares is the total shares, then we can reset the total value debt to 0
-            if (shares == _totalSupply(S)) {
+            // if vault is empty, reset all debts to 0
+            if (_totalSupply(S) == 0) {
                 YS.totalUserDebtInAssetValue = 0;
+                YS.dragonRouterDebtInAssetValue = 0;
             }
         } else {
             YS.dragonRouterDebtInAssetValue = YS.dragonRouterDebtInAssetValue > valueToReturn
