@@ -209,6 +209,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
             YS.totalUserDebtInAssetValue = YS.totalUserDebtInAssetValue > valueToReturn
                 ? YS.totalUserDebtInAssetValue - valueToReturn
                 : 0;
+
             // if vault is empty, reset all debts to 0
             if (_totalSupply(S) == 0) {
                 YS.totalUserDebtInAssetValue = 0;
@@ -317,13 +318,13 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
      * Management should ensure regular reporting or adjust profit/loss ratios based on expected frequency.
      *
      * Key behaviors:
-     * 1. **Value Debt Tracking**: Compares current total value vs user debt (totalUserDebtInAssetValue only)
-     * 2. **Profit Capture**: When current value exceeds owed value, mints shares to dragonRouter
-     * 3. **Loss Protection**: When current value is less than owed value, burns dragon shares
-     * 4. **User Protection**: If dragon buffer insufficient, reduces user value debt proportionally
+     * 1. **Value Debt Tracking**: Compares current total value (assets * exchange rate) vs total debt (user debt + dragon router debt combined)
+     * 2. **Profit Capture**: When current value exceeds total debt, mints shares to dragonRouter and increases dragon debt accordingly
+     * 3. **Loss Protection**: When current value is less than total debt, burns dragon shares (up to available balance) and reduces dragon debt
+     * 4. **Insolvency Handling**: If dragon buffer insufficient for losses, remaining shortfall is handled through proportional asset distribution during withdrawals, not by modifying debt balances
      *
-     * @return profit The profit in assets
-     * @return loss The loss in assets
+     * @return profit The profit in assets (converted from underlying asset value appreciation)
+     * @return loss The loss in assets (converted from underlying asset value depreciation)
      */
     function report()
         public
@@ -350,9 +351,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
 
         if (currentValue > YS.totalUserDebtInAssetValue + YS.dragonRouterDebtInAssetValue) {
             // Yield captured! Mint profit shares to dragon
-            uint256 profitValue = currentValue > YS.totalUserDebtInAssetValue + YS.dragonRouterDebtInAssetValue
-                ? currentValue - YS.totalUserDebtInAssetValue - YS.dragonRouterDebtInAssetValue
-                : 0;
+            uint256 profitValue = currentValue - YS.totalUserDebtInAssetValue - YS.dragonRouterDebtInAssetValue;
 
             uint256 profitShares = profitValue; // 1 share = 1 ETH value
 
@@ -457,7 +456,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         uint256 totalShares = _totalSupply(S);
         uint256 currentVaultValue = S.totalAssets.mulDiv(currentRate, WadRayMath.RAY);
 
-        if (totalShares > 0 && currentVaultValue < totalShares) {
+        if (currentVaultValue < totalShares) {
             // Vault insolvent - reverse the proportional calculation
             // If assets get proportionally reduced, shares needed are higher
             return assets.mulDiv(totalShares, S.totalAssets, rounding);
@@ -483,7 +482,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         uint256 totalShares = _totalSupply(S);
         uint256 currentVaultValue = S.totalAssets.mulDiv(currentRate, WadRayMath.RAY);
 
-        if (totalShares > 0 && currentVaultValue < totalShares) {
+        if (currentVaultValue < totalShares) {
             // Vault insolvent - proportional distribution
             return shares.mulDiv(S.totalAssets, totalShares, rounding);
         } else {
@@ -503,7 +502,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         uint256 currentVaultValue = S.totalAssets.mulDiv(currentRate, WadRayMath.RAY);
 
         return
-            YS.totalUserDebtInAssetValue > 0 &&
+            (YS.totalUserDebtInAssetValue > 0 || YS.dragonRouterDebtInAssetValue > 0) &&
             currentVaultValue < YS.totalUserDebtInAssetValue + YS.dragonRouterDebtInAssetValue;
     }
 
