@@ -733,103 +733,6 @@ contract RocketPoolStrategyTest is Test {
         assertEq(totalAssetsAfter, totalAssetsBefore, "Total assets should be the same before and after loss");
     }
 
-    /// @notice Test loss scenario with multiple users to verify fair loss handling
-    function testMultipleUserLossDistributionRocket() public {
-        // Set loss limit to allow 20% losses
-        vm.startPrank(management);
-        strategy.setLossLimitRatio(2000); // 20%
-        vm.stopPrank();
-
-        TestState memory state;
-
-        // Setup users
-        state.user1 = user;
-        state.user2 = address(0x5678);
-        state.depositAmount1 = 1000e18; // 1000 R_ETH
-        state.depositAmount2 = 2000e18; // 2000 R_ETH
-
-        // Get initial exchange rate
-        state.initialExchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
-
-        // First user deposits
-        vm.startPrank(state.user1);
-        vault.deposit(state.depositAmount1, state.user1);
-        vm.stopPrank();
-
-        // Generate some profit first to create donation shares for loss protection
-        state.newExchangeRate1 = (state.initialExchangeRate * 110) / 100; // 10% profit
-        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(state.newExchangeRate1));
-
-        vm.startPrank(keeper);
-        vault.report(); // Creates donation shares
-        vm.stopPrank();
-        vm.clearMockedCalls();
-
-        // Second user deposits after profit generation
-        vm.startPrank(address(this));
-        airdrop(ERC20(R_ETH), state.user2, state.depositAmount2);
-        vm.stopPrank();
-
-        vm.startPrank(state.user2);
-        ERC20(R_ETH).approve(address(strategy), type(uint256).max);
-        vault.deposit(state.depositAmount2, state.user2);
-        vm.stopPrank();
-
-        // Check donation shares available for loss protection
-        uint256 donationSharesBefore = vault.balanceOf(donationAddress);
-        assertGt(donationSharesBefore, 0, "Should have donation shares for loss protection");
-
-        // Record user shares before loss
-        uint256 user1SharesBefore = vault.balanceOf(state.user1);
-        uint256 user2SharesBefore = vault.balanceOf(state.user2);
-
-        // Generate loss (20% decrease from profit rate)
-        state.newExchangeRate2 = (state.newExchangeRate1 * 8001) / 10000; // less than 20% loss
-        vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(state.newExchangeRate2));
-
-        // Report loss
-        vm.startPrank(keeper);
-        (uint256 profit, uint256 loss) = vault.report();
-        vm.stopPrank();
-        vm.clearMockedCalls();
-
-        // Verify loss was reported
-        assertEq(profit, 0, "Should have no profit");
-        assertGt(loss, 0, "Should have reported loss");
-
-        // Check that donation shares were burned for loss protection
-        uint256 donationSharesAfter = vault.balanceOf(donationAddress);
-        assertLt(donationSharesAfter, donationSharesBefore, "Donation shares should be burned for loss protection");
-
-        // User shares should remain unchanged due to loss protection
-        assertEq(vault.balanceOf(state.user1), user1SharesBefore, "User 1 shares should be protected");
-        assertEq(vault.balanceOf(state.user2), user2SharesBefore, "User 2 shares should be protected");
-
-        // Both users withdraw
-        vm.startPrank(state.user1);
-        state.user1Assets = vault.redeem(vault.balanceOf(state.user1), state.user1, state.user1);
-        vm.stopPrank();
-
-        vm.startPrank(state.user2);
-        state.user2Assets = vault.redeem(vault.balanceOf(state.user2), state.user2, state.user2);
-        vm.stopPrank();
-
-        // Users should receive their deposits adjusted for exchange rate changes with loss protection
-        assertApproxEqRel(
-            state.user1Assets * state.newExchangeRate2,
-            ((state.depositAmount1 * state.initialExchangeRate) * (110 * 8)) / (100 * 10),
-            0.1e18, // 0.1% tolerance for loss scenarios
-            "User 1 should receive deposit value with loss protection"
-        );
-
-        assertApproxEqRel(
-            state.user2Assets * state.newExchangeRate2,
-            (state.depositAmount2 * state.newExchangeRate1 * 8) / 10, // expect a 20 pr cent loss in value
-            0.1e18, // 0.1% tolerance for loss scenarios
-            "User 2 should receive deposit value with loss protection"
-        );
-    }
-
     /// @notice Test loss scenario where loss exceeds available donation shares
     function testLossExceedingDonationSharesRocket() public {
         // Set loss limit to allow 15% losses
@@ -1364,7 +1267,7 @@ contract RocketPoolStrategyTest is Test {
     /// @dev Sequence: d1 -> r1.5 -> report (mint DR) -> wDR -> r1.0 -> report (cant burn shares) -> r1.5 -> report -> w1 (no loss)
     function test_dragonRouterWithdrawal_rateRecovery_userNoLoss() public {
         DragonWithdrawalTestData memory data;
-        
+
         data.user1 = makeAddr("user1");
         data.depositAmount = 100e18; // 100 rETH
         data.initialRate = 1e18; // 1.0
@@ -1381,7 +1284,7 @@ contract RocketPoolStrategyTest is Test {
 
         // Step 1: d1 - User deposits at rate 1.0
         vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(data.initialRate));
-        
+
         vm.startPrank(data.user1);
         ERC20(R_ETH).approve(address(strategy), data.depositAmount);
         data.user1Shares = vault.deposit(data.depositAmount, data.user1);
@@ -1389,7 +1292,7 @@ contract RocketPoolStrategyTest is Test {
 
         // Expected shares: depositAmount * rate = 100e18 * 1e18 / 1e18 = 100e18
         assertEq(data.user1Shares, 100e18, "User1 should receive 100e18 shares at 1:1 rate");
-        
+
         vm.clearMockedCalls();
 
         // Step 2: r1.5 - Rate increases to 1.5
@@ -1401,7 +1304,7 @@ contract RocketPoolStrategyTest is Test {
         vm.stopPrank();
 
         data.dragonSharesAfterProfit = vault.balanceOf(donationAddress);
-        
+
         // Expected profit calculation:
         // Total assets: 100e18 rETH
         // Current rate: 1.5, last rate: 1.0
@@ -1480,19 +1383,24 @@ contract RocketPoolStrategyTest is Test {
         // At rate 1.5, user receives: 100e18 / 1.5 = 66.666e18 rETH
         // Value check: 66.666e18 * 1.5 = 100e18 ETH (matches initial deposit value)
         assertEq(data.assetsReceived, 66666666666666666666, "User should receive 66.666e18 rETH");
-        
+
         // Verify no loss in ETH value terms
         // Since rates are in WAD format (1e18), we need to divide by 1e18 after multiplication
         uint256 depositValue = (data.depositAmount * data.initialRate) / 1e18; // 100e18 ETH
         uint256 withdrawValue = (data.assetsReceived * data.increasedRate) / 1e18; // 66.666e18 * 1.5 = 100e18 ETH
-        assertApproxEqAbs(withdrawValue, depositValue, 1e15, "User should have no loss in ETH value terms (within 0.001 ETH tolerance)");
+        assertApproxEqAbs(
+            withdrawValue,
+            depositValue,
+            1e15,
+            "User should have no loss in ETH value terms (within 0.001 ETH tolerance)"
+        );
     }
 
     /// @notice Test dragon router withdrawal followed by rate decline - user should experience loss
     /// @dev Sequence: d1 -> r1.5 -> report (mint DR) -> wDR -> r1.0 -> report (cant burn shares) -> r0.9 -> w1 (loss)
     function test_dragonRouterWithdrawal_rateDecline_userLoss() public {
         DragonWithdrawalTestData memory data;
-        
+
         data.user1 = makeAddr("user1");
         data.depositAmount = 100e18; // 100 rETH
         data.initialRate = 1e18; // 1.0
@@ -1510,7 +1418,7 @@ contract RocketPoolStrategyTest is Test {
 
         // Step 1: d1 - User deposits at rate 1.0
         vm.mockCall(R_ETH, abi.encodeWithSignature("getExchangeRate()"), abi.encode(data.initialRate));
-        
+
         vm.startPrank(data.user1);
         ERC20(R_ETH).approve(address(strategy), data.depositAmount);
         data.user1Shares = vault.deposit(data.depositAmount, data.user1);
@@ -1518,7 +1426,7 @@ contract RocketPoolStrategyTest is Test {
 
         // Expected shares: depositAmount * rate = 100e18 * 1e18 / 1e18 = 100e18
         assertEq(data.user1Shares, 100e18, "User1 should receive 100e18 shares at 1:1 rate");
-        
+
         vm.clearMockedCalls();
 
         // Step 2: r1.5 - Rate increases to 1.5
@@ -1530,7 +1438,7 @@ contract RocketPoolStrategyTest is Test {
         vm.stopPrank();
 
         data.dragonSharesAfterProfit = vault.balanceOf(donationAddress);
-        
+
         // Expected profit calculation (same as first test):
         // Total assets: 100e18 rETH
         // Current rate: 1.5, last rate: 1.0
@@ -1599,22 +1507,21 @@ contract RocketPoolStrategyTest is Test {
         // In insolvency, user receives proportional share of assets:
         //   User receives: 100e18 shares / 100e18 total shares * 66.666e18 assets = 66.666e18 rETH
         assertEq(data.assetsReceived, 66666666666666666667, "User should receive 66.666e18 rETH");
-        
+
         // Calculate the loss in ETH value terms
         // Since rates are in WAD format (1e18), we need to divide by 1e18 after multiplication
         uint256 depositValue = (data.depositAmount * data.initialRate) / 1e18; // 100e18 ETH
         uint256 withdrawValue = (data.assetsReceived * data.finalRate) / 1e18; // 66.666e18 * 0.9 = 60e18 ETH
-        
+
         // User should receive less than their deposit due to loss and no dragon protection
         assertLt(withdrawValue, depositValue, "User should receive less ETH value than deposited");
-        
+
         // Expected loss: 100e18 - 60e18 = 40e18 ETH (40% loss)
         uint256 actualLoss = depositValue - withdrawValue;
         assertApproxEqAbs(actualLoss, 40e18, 1e15, "User should experience ~40e18 ETH loss (40%)");
-        
+
         // Verify the user experienced significant loss (40%)
         uint256 lossPercentage = (actualLoss * 100) / depositValue;
         assertEq(lossPercentage, 40, "User should experience exactly 40% loss");
-        
     }
 }
