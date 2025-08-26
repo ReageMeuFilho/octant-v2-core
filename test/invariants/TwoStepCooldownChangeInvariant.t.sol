@@ -163,6 +163,7 @@ contract TwoStepCooldownChangeInvariantTest is Test {
         vault.proposeRageQuitCooldownPeriodChange(14 days);
 
         // Try to finalize immediately
+        vm.startPrank(gov);
         vm.expectRevert(IMultistrategyLockedVault.RageQuitCooldownPeriodChangeDelayNotElapsed.selector);
         vault.finalizeRageQuitCooldownPeriodChange();
 
@@ -170,9 +171,10 @@ contract TwoStepCooldownChangeInvariantTest is Test {
         vm.warp(block.timestamp + CHANGE_DELAY - 1);
         vm.expectRevert(IMultistrategyLockedVault.RageQuitCooldownPeriodChangeDelayNotElapsed.selector);
         vault.finalizeRageQuitCooldownPeriodChange();
+        vm.stopPrank();
     }
 
-    function invariant_AnyoneCanFinalize() public {
+    function invariant_OnlyGovernanceCanFinalize() public {
         uint256 newPeriod = 14 days;
 
         vm.startPrank(gov);
@@ -182,8 +184,14 @@ contract TwoStepCooldownChangeInvariantTest is Test {
         // Fast forward past delay
         vm.warp(block.timestamp + CHANGE_DELAY + 1);
 
-        // Non-governance can finalize
+        // Non-governance cannot finalize
         vm.startPrank(nonGov);
+        vm.expectRevert(IMultistrategyLockedVault.NotRegenGovernance.selector);
+        vault.finalizeRageQuitCooldownPeriodChange();
+        vm.stopPrank();
+
+        // Governance can finalize
+        vm.startPrank(gov);
         vault.finalizeRageQuitCooldownPeriodChange();
         vm.stopPrank();
 
@@ -198,7 +206,9 @@ contract TwoStepCooldownChangeInvariantTest is Test {
         vm.stopPrank();
 
         vm.warp(block.timestamp + CHANGE_DELAY + 1);
+        vm.startPrank(gov);
         vault.finalizeRageQuitCooldownPeriodChange();
+        vm.stopPrank();
 
         assertEq(vault.rageQuitCooldownPeriod(), newPeriod, "Period should be updated");
         assertEq(vault.getPendingRageQuitCooldownPeriod(), 0, "Pending period should be cleared");
@@ -206,8 +216,10 @@ contract TwoStepCooldownChangeInvariantTest is Test {
     }
 
     function invariant_CannotFinalizeNonExistentChange() public {
+        vm.startPrank(gov);
         vm.expectRevert(IMultistrategyLockedVault.NoPendingRageQuitCooldownPeriodChange.selector);
         vault.finalizeRageQuitCooldownPeriodChange();
+        vm.stopPrank();
     }
 
     function invariant_CannotFinalizeTwice() public {
@@ -216,11 +228,13 @@ contract TwoStepCooldownChangeInvariantTest is Test {
         vm.stopPrank();
 
         vm.warp(block.timestamp + CHANGE_DELAY + 1);
+        vm.startPrank(gov);
         vault.finalizeRageQuitCooldownPeriodChange();
 
         // Try to finalize again
         vm.expectRevert(IMultistrategyLockedVault.NoPendingRageQuitCooldownPeriodChange.selector);
         vault.finalizeRageQuitCooldownPeriodChange();
+        vm.stopPrank();
     }
 
     // ===== CANCELLATION INVARIANTS =====
@@ -284,7 +298,9 @@ contract TwoStepCooldownChangeInvariantTest is Test {
 
         // Finalize change
         vm.warp(block.timestamp + CHANGE_DELAY + 1);
+        vm.startPrank(gov);
         vault.finalizeRageQuitCooldownPeriodChange();
+        vm.stopPrank();
 
         // Store the time when user2 rage quits
         uint256 user2RageQuitTime = block.timestamp;
@@ -330,7 +346,9 @@ contract TwoStepCooldownChangeInvariantTest is Test {
         vm.stopPrank();
 
         vm.warp(block.timestamp + CHANGE_DELAY + 1);
+        vm.startPrank(gov);
         vault.finalizeRageQuitCooldownPeriodChange();
+        vm.stopPrank();
 
         assertEq(vault.getPendingRageQuitCooldownPeriod(), 0, "No pending period after finalize");
         assertEq(vault.getRageQuitCooldownPeriodChangeTimestamp(), 0, "No timestamp after finalize");
@@ -351,7 +369,9 @@ contract TwoStepCooldownChangeInvariantTest is Test {
 
         // Period should change on finalization
         vm.warp(block.timestamp + 2);
+        vm.startPrank(gov);
         vault.finalizeRageQuitCooldownPeriodChange();
+        vm.stopPrank();
         assertEq(vault.rageQuitCooldownPeriod(), 14 days, "Period changed on finalization");
     }
 
@@ -365,6 +385,7 @@ contract TwoStepCooldownChangeInvariantTest is Test {
         uint256 startTime = block.timestamp;
 
         // Try various ways to bypass grace period - test specific times
+        vm.startPrank(gov);
         vm.warp(startTime + 1 days);
         vm.expectRevert(IMultistrategyLockedVault.RageQuitCooldownPeriodChangeDelayNotElapsed.selector);
         vault.finalizeRageQuitCooldownPeriodChange();
@@ -376,6 +397,7 @@ contract TwoStepCooldownChangeInvariantTest is Test {
         vm.warp(startTime + CHANGE_DELAY - 1);
         vm.expectRevert(IMultistrategyLockedVault.RageQuitCooldownPeriodChangeDelayNotElapsed.selector);
         vault.finalizeRageQuitCooldownPeriodChange();
+        vm.stopPrank();
     }
 
     function invariant_CannotActivateChangesEarly() public {
@@ -390,7 +412,9 @@ contract TwoStepCooldownChangeInvariantTest is Test {
 
         assertEq(vault.rageQuitCooldownPeriod(), originalPeriod, "Period should not change early");
 
+        vm.startPrank(gov);
         vm.expectRevert(IMultistrategyLockedVault.RageQuitCooldownPeriodChangeDelayNotElapsed.selector);
         vault.finalizeRageQuitCooldownPeriodChange();
+        vm.stopPrank();
     }
 }
