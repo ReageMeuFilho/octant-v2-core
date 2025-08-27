@@ -2,6 +2,8 @@
 pragma solidity >=0.8.25;
 import { TokenizedStrategy, Math } from "src/core/TokenizedStrategy.sol";
 import { IBaseStrategy } from "src/core/interfaces/IBaseStrategy.sol";
+
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 /**
  * @title YieldDonatingTokenizedStrategy
  * @author octant.finance
@@ -13,6 +15,11 @@ import { IBaseStrategy } from "src/core/interfaces/IBaseStrategy.sol";
  *      - Protecting against losses by burning shares from dragonRouter
  */
 contract YieldDonatingTokenizedStrategy is TokenizedStrategy {
+    using Math for uint256;
+
+    /// @dev Events for donation tracking
+    event DonationMinted(address indexed dragonRouter, uint256 amount);
+    event DonationBurned(address indexed dragonRouter, uint256 amount);
     /**
      * @inheritdoc TokenizedStrategy
      * @dev This implementation overrides the base report function to mint profit-derived shares to dragonRouter.
