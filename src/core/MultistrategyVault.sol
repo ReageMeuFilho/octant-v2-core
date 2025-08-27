@@ -1247,27 +1247,7 @@ contract MultistrategyVault is IMultistrategyVault {
         uint256 assetsNeeded
     ) external view returns (uint256) {
         require(currentDebt >= assetsNeeded, NotEnoughDebt());
-
-        // The actual amount that the debt is currently worth.
-        uint256 vaultShares = IERC4626Payable(strategy).balanceOf(address(this));
-        uint256 strategyAssets = IERC4626Payable(strategy).convertToAssets(vaultShares);
-
-        // If no losses, return 0
-        if (strategyAssets >= currentDebt || currentDebt == 0) {
-            return 0;
-        }
-
-        // Users will withdraw assetsNeeded divided by loss ratio (strategyAssets / currentDebt - 1).
-        // NOTE: If there are unrealised losses, the user will take his share.
-        uint256 numerator = assetsNeeded * strategyAssets;
-        uint256 usersShareOfLoss = assetsNeeded - numerator / currentDebt;
-
-        // Always round up.
-        if (numerator % currentDebt != 0) {
-            usersShareOfLoss += 1;
-        }
-
-        return usersShareOfLoss;
+        return _assessShareOfUnrealisedLosses(strategy, currentDebt, assetsNeeded);
     }
 
     /**
@@ -1279,7 +1259,7 @@ contract MultistrategyVault is IMultistrategyVault {
             keccak256(
                 abi.encode(
                     DOMAIN_TYPE_HASH,
-                    keccak256(bytes("Yearn Vault")),
+                    keccak256(bytes("Octant Vault")),
                     keccak256(bytes(API_VERSION)),
                     block.chainid,
                     address(this)
@@ -1313,7 +1293,7 @@ contract MultistrategyVault is IMultistrategyVault {
     /**
      * @dev Transfers tokens from sender to receiver
      */
-    function _transfer(address sender_, address receiver_, uint256 amount_) internal {
+    function _transfer(address sender_, address receiver_, uint256 amount_) internal virtual {
         uint256 senderBalance = _balanceOf[sender_];
         require(senderBalance >= amount_, InsufficientFunds());
         _balanceOf[sender_] = senderBalance - amount_;
@@ -1648,12 +1628,6 @@ contract MultistrategyVault is IMultistrategyVault {
         // NOTE: If there are unrealised losses, the user will take his share.
         uint256 numerator = assetsNeeded_ * strategyAssets;
         uint256 usersShareOfLoss = assetsNeeded_ - numerator / strategyCurrentDebt_;
-
-        // Always round up.
-        // slither-disable-next-line weak-prng
-        if (numerator % strategyCurrentDebt_ != 0) {
-            usersShareOfLoss += 1;
-        }
 
         return usersShareOfLoss;
     }
