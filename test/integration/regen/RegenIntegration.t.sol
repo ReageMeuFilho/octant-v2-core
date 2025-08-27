@@ -17,7 +17,7 @@ import { MockERC20Staking } from "test/mocks/MockERC20Staking.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocationMechanism.sol";
-import { SimpleVotingMechanism } from "test/mocks/SimpleVotingMechanism.sol";
+import { SimpleVotingMechanism } from "src/mechanisms/SimpleVotingMechanism.sol";
 import { AllocationMechanismFactory } from "src/mechanisms/AllocationMechanismFactory.sol";
 import { AllocationConfig } from "src/mechanisms/BaseAllocationMechanism.sol";
 
