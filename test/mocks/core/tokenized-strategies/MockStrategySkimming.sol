@@ -7,8 +7,13 @@ import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
 import { console2 } from "forge-std/console2.sol";
 import { MockYieldSourceSkimming } from "./MockYieldSourceSkimming.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import { WadRayMath } from "src/utils/libs/Maths/WadRay.sol";
 
 contract MockStrategySkimming is BaseStrategy {
+    using Math for uint256;
+    using WadRayMath for uint256;
+
     address public yieldSource;
     bool public trigger;
     bool public managed;

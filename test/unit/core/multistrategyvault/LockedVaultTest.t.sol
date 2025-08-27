@@ -71,131 +71,206 @@ contract LockedVaultTest is Test {
         vm.stopPrank();
     }
 
-    function testRageQuitCooldownPeriodSetting() public {
-        // Should be able to set rage quit cooldown period within valid range
+    function testFuzz_RageQuitCooldownPeriodSetting(uint256 cooldownPeriod) public {
+        // Bound to valid range: 1 day to 30 days (vault maximum), excluding current default (7 days)
+        cooldownPeriod = bound(cooldownPeriod, 1 days, 30 days);
+
+        // Skip the default value (7 days) since setting it to the same value should revert
+        if (cooldownPeriod == 7 days) {
+            cooldownPeriod = 8 days; // Use 8 days instead
+        }
+
+        // Should be able to propose and finalize rage quit cooldown period change
         vm.startPrank(gov);
-        vault.setRageQuitCooldownPeriod(3 days);
-        assertEq(vault.rageQuitCooldownPeriod(), 3 days, "Rage quit cooldown period should be updated");
+        vault.proposeRageQuitCooldownPeriodChange(cooldownPeriod);
+        assertEq(vault.getPendingRageQuitCooldownPeriod(), cooldownPeriod, "Pending period should be set");
 
-        // Should revert when setting below minimum
-        vm.expectRevert(IMultistrategyLockedVault.InvalidRageQuitCooldownPeriod.selector);
-        vault.setRageQuitCooldownPeriod(12 hours);
+        // Fast forward past delay period
+        vm.warp(block.timestamp + vault.RAGE_QUIT_COOLDOWN_CHANGE_DELAY() + 1);
 
-        // Should revert when setting above maximum
-        vm.expectRevert(IMultistrategyLockedVault.InvalidRageQuitCooldownPeriod.selector);
-        vault.setRageQuitCooldownPeriod(366 days);
+        vault.finalizeRageQuitCooldownPeriodChange();
+        assertEq(vault.rageQuitCooldownPeriod(), cooldownPeriod, "Rage quit cooldown period should be updated");
+        assertEq(vault.getPendingRageQuitCooldownPeriod(), 0, "Pending period should be cleared");
         vm.stopPrank();
     }
 
-    function testInitiateRageQuit() public {
-        // Deposit first
-        userDeposit(fish, fishAmount);
+    function testFuzz_RageQuitCooldownPeriodSettingInvalid(uint256 invalidPeriod) public {
+        // Test invalid periods (below 1 day or above 30 days)
+        vm.assume(invalidPeriod < 1 days || invalidPeriod > 30 days);
+
+        vm.startPrank(gov);
+        vm.expectRevert(IMultistrategyLockedVault.InvalidRageQuitCooldownPeriod.selector);
+        vault.proposeRageQuitCooldownPeriodChange(invalidPeriod);
+        vm.stopPrank();
+    }
+
+    function testFuzz_InitiateRageQuit(uint256 depositAmount, uint256 sharesToLock) public {
+        // Bound deposit amount to reasonable range
+        depositAmount = bound(depositAmount, 1e18, 1_000_000e18);
+
+        // Mint and deposit
+        asset.mint(fish, depositAmount);
+        userDeposit(fish, depositAmount);
+
+        // Bound shares to lock to not exceed balance
+        uint256 userBalance = vault.balanceOf(fish);
+        sharesToLock = bound(sharesToLock, 1, userBalance);
 
         // Initiate rage quit
         vm.prank(fish);
-        vault.initiateRageQuit();
+        vault.initiateRageQuit(sharesToLock);
 
-        // Verify lockup info
-        (uint256 lockupTime, uint256 unlockTime) = vault.voluntaryLockups(fish);
+        // Verify custody info
+        (uint256 lockedShares, uint256 unlockTime) = vault.getCustodyInfo(fish);
         assertEq(
             unlockTime,
             block.timestamp + vault.rageQuitCooldownPeriod(),
             "Unlock time should be set to current time plus cooldown"
         );
-        assertEq(lockupTime, block.timestamp, "Lockup time should be current time");
+        assertEq(lockedShares, sharesToLock, "Locked shares should match requested amount");
     }
 
-    function testCannotInitiateRageQuitWithoutShares() public {
+    function testFuzz_CannotInitiateRageQuitWithoutShares(uint256 invalidAmount) public {
+        // Test with zero amount
         vm.prank(fish);
-        vm.expectRevert(IMultistrategyLockedVault.NoSharesToRageQuit.selector);
-        vault.initiateRageQuit();
+        vm.expectRevert(IMultistrategyLockedVault.InvalidShareAmount.selector);
+        vault.initiateRageQuit(0);
+
+        // Test when user has no balance but tries to lock positive amount
+        invalidAmount = bound(invalidAmount, 1, type(uint256).max);
+        vm.prank(fish);
+        vm.expectRevert(IMultistrategyLockedVault.InsufficientBalance.selector);
+        vault.initiateRageQuit(invalidAmount);
     }
 
-    function testCanInitiateRageQuitWhenAlreadyUnlocked() public {
-        // Deposit first
-        userDeposit(fish, fishAmount);
+    function testFuzz_CanInitiateRageQuitWhenAlreadyUnlocked(uint256 firstDeposit, uint256 secondDeposit) public {
+        // Bound deposits to reasonable ranges
+        firstDeposit = bound(firstDeposit, 1e18, 500_000e18);
+        secondDeposit = bound(secondDeposit, 1e18, 500_000e18);
+
+        // Mint and deposit first amount
+        asset.mint(fish, firstDeposit);
+        userDeposit(fish, firstDeposit);
 
         // Initiate rage quit
-        vm.prank(fish);
-        vault.initiateRageQuit();
+        vm.startPrank(fish);
+        vault.initiateRageQuit(vault.balanceOf(fish));
 
         // Fast forward past unlock time
         vm.warp(block.timestamp + vault.rageQuitCooldownPeriod() + 1);
 
-        // Should be able to initiate again
-        vm.prank(fish);
-        vault.initiateRageQuit();
+        // Withdraw all shares to clear custody
+        vault.withdraw(firstDeposit, fish, fish, 0, new address[](0));
 
-        // Verify lockup info
-        (uint256 lockupTime, uint256 unlockTime) = vault.voluntaryLockups(fish);
+        // Deposit again
+        vm.stopPrank();
+        asset.mint(fish, secondDeposit);
+        userDeposit(fish, secondDeposit);
+
+        // Should be able to initiate rage quit again after custody is cleared
+        vm.startPrank(fish);
+        vault.initiateRageQuit(vault.balanceOf(fish));
+
+        // Verify custody info
+        (uint256 lockedShares, uint256 unlockTime) = vault.getCustodyInfo(fish);
         assertEq(unlockTime, block.timestamp + vault.rageQuitCooldownPeriod(), "Unlock time should be updated");
-        assertEq(lockupTime, block.timestamp, "Lockup time should be current time");
+        assertEq(lockedShares, vault.balanceOf(fish), "Locked shares should match balance");
+        vm.stopPrank();
     }
 
-    function testCannotInitiateRageQuitWhenAlreadyUnlockedAndCooldownPeriodHasNotPassed() public {
-        // Deposit first
-        userDeposit(fish, fishAmount);
+    function testFuzz_CannotInitiateRageQuitWhenAlreadyUnlockedAndCooldownPeriodHasNotPassed(
+        uint256 depositAmount,
+        uint256 timeElapsed
+    ) public {
+        // Bound deposit amount and time elapsed
+        depositAmount = bound(depositAmount, 1e18, 1_000_000e18);
+        uint256 cooldownPeriod = vault.rageQuitCooldownPeriod();
+        timeElapsed = bound(timeElapsed, 1, cooldownPeriod - 1);
+
+        // Mint and deposit
+        asset.mint(fish, depositAmount);
+        userDeposit(fish, depositAmount);
 
         // Initiate rage quit
-        vm.prank(fish);
-        vault.initiateRageQuit();
+        vm.startPrank(fish);
+        vault.initiateRageQuit(vault.balanceOf(fish));
 
-        // Fast forward past unlock time
-        vm.warp(block.timestamp + vault.rageQuitCooldownPeriod() - 1);
+        // Fast forward but not past unlock time
+        vm.warp(block.timestamp + timeElapsed);
 
-        // Should revert when trying to initiate again
-        vm.prank(fish);
+        // Should revert when trying to initiate again while one is active
         vm.expectRevert(IMultistrategyLockedVault.RageQuitAlreadyInitiated.selector);
-        vault.initiateRageQuit();
+        vault.initiateRageQuit(depositAmount); // Try to lock same amount again
+        vm.stopPrank();
     }
 
-    function testWithdrawAndRedeemWhenLocked() public {
-        // Deposit first
-        userDeposit(fish, fishAmount);
+    function testFuzz_WithdrawAndRedeemWhenLocked(uint256 depositAmount, uint256 withdrawAmount) public {
+        // Bound deposit amount
+        depositAmount = bound(depositAmount, 1e18, 1_000_000e18);
+
+        // Mint and deposit
+        asset.mint(fish, depositAmount);
+        userDeposit(fish, depositAmount);
+
+        // Bound withdraw amount to be within deposited range
+        withdrawAmount = bound(withdrawAmount, 1, depositAmount);
 
         // Initiate rage quit
-        vm.prank(fish);
-        vault.initiateRageQuit();
+        vm.startPrank(fish);
+        vault.initiateRageQuit(vault.balanceOf(fish));
 
         // Try to withdraw during lock period (should fail)
-        vm.prank(fish);
         vm.expectRevert(IMultistrategyLockedVault.SharesStillLocked.selector);
-        vault.withdraw(fishAmount, fish, fish, 0, new address[](0));
+        vault.withdraw(withdrawAmount, fish, fish, 0, new address[](0));
 
         // Try to redeem during lock period (should fail)
-        vm.prank(fish);
         vm.expectRevert(IMultistrategyLockedVault.SharesStillLocked.selector);
-        vault.redeem(fishAmount, fish, fish, 0, new address[](0));
+        vault.redeem(withdrawAmount, fish, fish, 0, new address[](0));
+        vm.stopPrank();
     }
 
-    function testWithdrawAfterUnlock() public {
-        // Deposit first
-        userDeposit(fish, fishAmount);
+    function testFuzz_WithdrawAfterUnlock(uint256 depositAmount) public {
+        // Bound deposit amount
+        depositAmount = bound(depositAmount, 1e18, 1_000_000e18);
+
+        // Store initial balance
+        uint256 initialBalance = asset.balanceOf(fish);
+
+        // Mint and deposit
+        asset.mint(fish, depositAmount);
+        userDeposit(fish, depositAmount);
 
         // Initiate rage quit
-        vm.prank(fish);
-        vault.initiateRageQuit();
+        vm.startPrank(fish);
+        vault.initiateRageQuit(vault.balanceOf(fish));
 
         // Fast forward past unlock time
         vm.warp(block.timestamp + vault.rageQuitCooldownPeriod() + 1);
 
         // Should be able to withdraw now
-        vm.startPrank(fish);
-        uint256 withdrawnAmount = vault.withdraw(fishAmount, fish, fish, 0, new address[](0));
-        assertEq(withdrawnAmount, fishAmount, "Should withdraw correct amount");
+        uint256 withdrawnAmount = vault.withdraw(depositAmount, fish, fish, 0, new address[](0));
+        assertEq(withdrawnAmount, depositAmount, "Should withdraw correct amount");
 
         // Verify balances
         assertEq(vault.balanceOf(fish), 0, "Fish should have no remaining shares");
-        assertEq(asset.balanceOf(fish), fishAmount, "Fish should have received all assets back");
+        assertEq(asset.balanceOf(fish), initialBalance + depositAmount, "Fish should have received all assets back");
+        vm.stopPrank();
     }
 
-    function testRedeemAfterUnlock() public {
-        // Deposit first
-        userDeposit(fish, fishAmount);
+    function testFuzz_RedeemAfterUnlock(uint256 depositAmount) public {
+        // Bound deposit amount
+        depositAmount = bound(depositAmount, 1e18, 1_000_000e18);
+
+        // Store initial balance
+        uint256 initialBalance = asset.balanceOf(fish);
+
+        // Mint and deposit
+        asset.mint(fish, depositAmount);
+        userDeposit(fish, depositAmount);
 
         // Initiate rage quit
-        vm.prank(fish);
-        vault.initiateRageQuit();
+        vm.startPrank(fish);
+        vault.initiateRageQuit(vault.balanceOf(fish));
 
         // Fast forward past unlock time
         vm.warp(block.timestamp + vault.rageQuitCooldownPeriod() + 1);
@@ -203,155 +278,216 @@ contract LockedVaultTest is Test {
         // redeem
         uint256 shares = vault.balanceOf(fish);
 
-        // Should be able to withdraw now
-        vm.startPrank(fish);
+        // Should be able to redeem now
         uint256 redeemedAmount = vault.redeem(shares, fish, fish, 0, new address[](0));
-        assertEq(redeemedAmount, fishAmount, "Should redeem correct amount");
+        assertEq(redeemedAmount, depositAmount, "Should redeem correct amount");
 
         // Verify balances
         assertEq(vault.balanceOf(fish), 0, "Fish should have no remaining shares");
-        assertEq(asset.balanceOf(fish), fishAmount, "Fish should have received all assets back");
+        assertEq(asset.balanceOf(fish), initialBalance + depositAmount, "Fish should have received all assets back");
+        vm.stopPrank();
     }
 
-    function testNormalWithdrawWithoutLockupShouldRevert() public {
-        // Deposit first
-        userDeposit(fish, fishAmount);
+    function testFuzz_NormalWithdrawWithoutLockupShouldRevert(uint256 depositAmount, uint256 withdrawAmount) public {
+        // Bound deposit amount
+        depositAmount = bound(depositAmount, 1e18, 1_000_000e18);
+        withdrawAmount = bound(withdrawAmount, 1, depositAmount);
 
-        // Should be able to withdraw immediately (no lockup initiated)
-        vm.expectRevert(IMultistrategyLockedVault.SharesStillLocked.selector);
+        // Mint and deposit
+        asset.mint(fish, depositAmount);
+        userDeposit(fish, depositAmount);
+
+        // Should not be able to withdraw without rage quit
+        vm.expectRevert(IMultistrategyLockedVault.NoCustodiedShares.selector);
         vm.prank(fish);
-        vault.withdraw(fishAmount, fish, fish, 0, new address[](0));
+        vault.withdraw(withdrawAmount, fish, fish, 0, new address[](0));
     }
 
-    function testReinitializeRageQuit() public {
-        // Deposit first
-        userDeposit(fish, fishAmount);
+    function testFuzz_ReinitializeRageQuit(
+        uint256 firstDeposit,
+        uint256 partialLock,
+        uint256 secondDeposit,
+        uint256 newCooldown,
+        uint256 timeElapsed
+    ) public {
+        // Bound inputs
+        firstDeposit = bound(firstDeposit, 2e18, 500_000e18); // Need at least 2 to have partial
+        partialLock = bound(partialLock, 1e18, firstDeposit / 2);
+        secondDeposit = bound(secondDeposit, 1e18, 500_000e18);
+        newCooldown = bound(newCooldown, 8 days, 30 days); // Different from default 7 days
+        timeElapsed = bound(timeElapsed, 1 days, 6 days); // Less than original cooldown
 
-        // Initiate rage quit
-        vm.prank(fish);
-        vault.initiateRageQuit();
+        // Mint and deposit first amount
+        asset.mint(fish, firstDeposit);
+        userDeposit(fish, firstDeposit);
 
-        (, uint256 originalUnlockTime) = vault.voluntaryLockups(fish);
+        // Initiate rage quit for partial amount initially
+        vm.startPrank(fish);
+        vault.initiateRageQuit(partialLock);
 
-        // Change cooldown period
-        vm.prank(gov);
-        vault.setRageQuitCooldownPeriod(14 days);
+        (, uint256 originalUnlockTime) = vault.getCustodyInfo(fish);
 
-        // Fast forward halfway through cooldown
-        vm.warp(block.timestamp + 4 days);
+        // Change cooldown period (this doesn't affect existing rage quits)
+        vm.stopPrank();
+        vm.startPrank(gov);
+        vault.proposeRageQuitCooldownPeriodChange(newCooldown);
+        vm.warp(block.timestamp + vault.RAGE_QUIT_COOLDOWN_CHANGE_DELAY() + 1);
+        vault.finalizeRageQuitCooldownPeriodChange();
+        vm.stopPrank();
+
+        // Fast forward partway through cooldown
+        vm.warp(block.timestamp + timeElapsed);
 
         // Mint more tokens for second deposit
-        asset.mint(fish, fishAmount);
+        asset.mint(fish, secondDeposit);
 
-        // Redeposit some funds
-        userDeposit(fish, fishAmount);
+        // Redeposit some funds (this should work as fish has available shares)
+        userDeposit(fish, secondDeposit);
 
         // Original unlock time should not change despite re-deposit
-        (, uint256 currentUnlockTime) = vault.voluntaryLockups(fish);
+        (, uint256 currentUnlockTime) = vault.getCustodyInfo(fish);
         assertEq(currentUnlockTime, originalUnlockTime, "Unlock time should not change on re-deposit");
     }
 
-    function testCannotWithdrawAgainAfterFirstWithdrawalWithoutNewRageQuit() public {
-        // Deposit first
-        userDeposit(fish, fishAmount);
+    function testFuzz_CannotWithdrawAgainAfterFirstWithdrawalWithoutNewRageQuit(
+        uint256 depositAmount,
+        uint256 firstWithdrawPercent
+    ) public {
+        // Bound inputs
+        depositAmount = bound(depositAmount, 2e18, 1_000_000e18); // Need at least 2 to split
+        firstWithdrawPercent = bound(firstWithdrawPercent, 10, 90); // 10-90% for first withdrawal
 
-        // Initiate rage quit
-        vm.prank(fish);
-        vault.initiateRageQuit();
+        // Mint and deposit
+        asset.mint(fish, depositAmount);
+        userDeposit(fish, depositAmount);
+
+        // Initiate rage quit for full amount
+        vm.startPrank(fish);
+        vault.initiateRageQuit(vault.balanceOf(fish));
 
         // Fast forward past unlock time
         vm.warp(block.timestamp + vault.rageQuitCooldownPeriod() + 1);
 
-        // First withdrawal should succeed
-        vm.startPrank(fish);
-        uint256 withdrawnAmount = vault.withdraw(fishAmount / 2, fish, fish, 0, new address[](0));
-        assertEq(withdrawnAmount, fishAmount / 2, "Should withdraw correct amount");
+        // First withdrawal (partial)
+        uint256 firstWithdrawAmount = (depositAmount * firstWithdrawPercent) / 100;
+        uint256 withdrawnAmount = vault.withdraw(firstWithdrawAmount, fish, fish, 0, new address[](0));
+        assertEq(withdrawnAmount, firstWithdrawAmount, "Should withdraw correct amount");
 
-        // Try to withdraw again without initiating new rage quit (should fail)
-        vm.expectRevert(IMultistrategyLockedVault.SharesStillLocked.selector);
-        vault.withdraw(fishAmount / 2, fish, fish, 0, new address[](0));
+        // Can withdraw remaining custodied shares (no new rage quit needed)
+        uint256 remainingAmount = depositAmount - firstWithdrawAmount;
+        uint256 secondWithdrawAmount = vault.withdraw(remainingAmount, fish, fish, 0, new address[](0));
+        assertEq(secondWithdrawAmount, remainingAmount, "Should withdraw remaining custodied amount");
+
+        // Now custody should be cleared and no more withdrawals possible
+        vm.expectRevert(IMultistrategyLockedVault.NoCustodiedShares.selector);
+        vault.withdraw(1, fish, fish, 0, new address[](0));
         vm.stopPrank();
     }
 
-    function testCanWithdrawAgainAfterNewRageQuit() public {
-        // Deposit first
-        userDeposit(fish, fishAmount);
+    function testFuzz_CanWithdrawAgainAfterNewRageQuit(uint256 depositAmount, uint256 firstLockPercent) public {
+        // Bound inputs
+        depositAmount = bound(depositAmount, 2e18, 1_000_000e18); // Need at least 2 to split
+        firstLockPercent = bound(firstLockPercent, 10, 90); // 10-90% for first lock
 
-        // First rage quit
-        vm.prank(fish);
-        vault.initiateRageQuit();
+        // Mint and deposit
+        asset.mint(fish, depositAmount);
+        userDeposit(fish, depositAmount);
+
+        // First rage quit for partial amount
+        vm.startPrank(fish);
+        uint256 firstLockAmount = (depositAmount * firstLockPercent) / 100;
+        vault.initiateRageQuit(firstLockAmount);
 
         // Fast forward past unlock time
         vm.warp(block.timestamp + vault.rageQuitCooldownPeriod() + 1);
 
-        // First withdrawal
-        vm.startPrank(fish);
-        uint256 withdrawnAmount = vault.withdraw(fishAmount / 2, fish, fish, 0, new address[](0));
-        assertEq(withdrawnAmount, fishAmount / 2, "Should withdraw correct amount");
+        // First withdrawal (partial amount)
+        uint256 withdrawnAmount = vault.withdraw(firstLockAmount, fish, fish, 0, new address[](0));
+        assertEq(withdrawnAmount, firstLockAmount, "Should withdraw correct amount");
 
-        // Initiate new rage quit
-        vault.initiateRageQuit();
+        // Now custody cleared, can initiate new rage quit for remaining shares
+        vault.initiateRageQuit(vault.balanceOf(fish));
 
         // Fast forward past new unlock time
         vm.warp(block.timestamp + vault.rageQuitCooldownPeriod() + 1);
 
-        // Should be able to withdraw again after new rage quit
-        withdrawnAmount = vault.withdraw(fishAmount / 2, fish, fish, 0, new address[](0));
-        assertEq(withdrawnAmount, fishAmount / 2, "Should withdraw correct amount");
+        // Should be able to withdraw remaining shares after new rage quit
+        uint256 remainingAmount = depositAmount - firstLockAmount;
+        withdrawnAmount = vault.withdraw(remainingAmount, fish, fish, 0, new address[](0));
+        assertEq(withdrawnAmount, remainingAmount, "Should withdraw remaining amount");
         vm.stopPrank();
     }
 
-    function testCannotRedeemAgainAfterFirstRedeemWithoutNewRageQuit() public {
-        // Deposit first
-        userDeposit(fish, fishAmount);
+    function testFuzz_CannotRedeemAgainAfterFirstRedeemWithoutNewRageQuit(
+        uint256 depositAmount,
+        uint256 firstRedeemPercent
+    ) public {
+        // Bound inputs
+        depositAmount = bound(depositAmount, 2e18, 1_000_000e18); // Need at least 2 to split
+        firstRedeemPercent = bound(firstRedeemPercent, 10, 90); // 10-90% for first redeem
 
-        // Initiate rage quit
-        vm.prank(fish);
-        vault.initiateRageQuit();
+        // Mint and deposit
+        asset.mint(fish, depositAmount);
+        userDeposit(fish, depositAmount);
+
+        // Initiate rage quit for full amount
+        vm.startPrank(fish);
+        vault.initiateRageQuit(vault.balanceOf(fish));
 
         // Fast forward past unlock time
         vm.warp(block.timestamp + vault.rageQuitCooldownPeriod() + 1);
 
-        // First redeem should succeed
-        vm.startPrank(fish);
-        uint256 sharesToRedeem = vault.previewWithdraw(fishAmount / 2); // Get shares needed for half amount
+        // First redeem (partial)
+        uint256 firstRedeemAmount = (depositAmount * firstRedeemPercent) / 100;
+        uint256 sharesToRedeem = vault.previewWithdraw(firstRedeemAmount);
         uint256 withdrawnAmount = vault.redeem(sharesToRedeem, fish, fish, 0, new address[](0));
-        assertEq(withdrawnAmount, fishAmount / 2, "Should redeem correct amount");
+        assertEq(withdrawnAmount, firstRedeemAmount, "Should redeem correct amount");
 
-        // Try to redeem again without initiating new rage quit (should fail)
-        uint256 remainingShares = vault.previewWithdraw(fishAmount / 2);
-        vm.expectRevert(IMultistrategyLockedVault.SharesStillLocked.selector);
-        vault.redeem(remainingShares, fish, fish, 0, new address[](0));
+        // Can redeem remaining custodied shares (no new rage quit needed)
+        uint256 remainingShares = vault.balanceOf(fish);
+        uint256 remainingAmount = depositAmount - firstRedeemAmount;
+        uint256 secondWithdrawAmount = vault.redeem(remainingShares, fish, fish, 0, new address[](0));
+        assertEq(secondWithdrawAmount, remainingAmount, "Should redeem remaining custodied amount");
+
+        // Now custody should be cleared and no more redemptions possible
+        vm.expectRevert(IMultistrategyLockedVault.NoCustodiedShares.selector);
+        vault.redeem(1, fish, fish, 0, new address[](0));
         vm.stopPrank();
     }
 
-    function testCanRedeemAgainAfterNewRageQuit() public {
-        // Deposit first
-        userDeposit(fish, fishAmount);
+    function testFuzz_CanRedeemAgainAfterNewRageQuit(uint256 depositAmount, uint256 firstLockPercent) public {
+        // Bound inputs
+        depositAmount = bound(depositAmount, 2e18, 1_000_000e18); // Need at least 2 to split
+        firstLockPercent = bound(firstLockPercent, 10, 90); // 10-90% for first lock
 
-        // First rage quit
-        vm.prank(fish);
-        vault.initiateRageQuit();
+        // Mint and deposit
+        asset.mint(fish, depositAmount);
+        userDeposit(fish, depositAmount);
+
+        // First rage quit for partial amount
+        vm.startPrank(fish);
+        uint256 firstLockAmount = (depositAmount * firstLockPercent) / 100;
+        uint256 sharesToLock = vault.previewWithdraw(firstLockAmount);
+        vault.initiateRageQuit(sharesToLock);
 
         // Fast forward past unlock time
         vm.warp(block.timestamp + vault.rageQuitCooldownPeriod() + 1);
 
-        // First redeem
-        vm.startPrank(fish);
-        uint256 sharesToRedeem = vault.previewWithdraw(fishAmount / 2); // Get shares needed for half amount
-        uint256 withdrawnAmount = vault.redeem(sharesToRedeem, fish, fish, 0, new address[](0));
-        assertEq(withdrawnAmount, fishAmount / 2, "Should redeem correct amount");
+        // First redeem (exactly what was locked)
+        uint256 withdrawnAmount = vault.redeem(sharesToLock, fish, fish, 0, new address[](0));
+        assertEq(withdrawnAmount, firstLockAmount, "Should redeem correct amount");
 
-        // Initiate new rage quit
-        vault.initiateRageQuit();
+        // Now custody cleared, can initiate new rage quit for remaining shares
+        vault.initiateRageQuit(vault.balanceOf(fish));
 
         // Fast forward past new unlock time
         vm.warp(block.timestamp + vault.rageQuitCooldownPeriod() + 1);
 
-        // Should be able to redeem again after new rage quit
-        uint256 remainingShares = vault.previewWithdraw(fishAmount / 2);
+        // Should be able to redeem remaining shares after new rage quit
+        uint256 remainingShares = vault.balanceOf(fish);
+        uint256 remainingAmount = depositAmount - firstLockAmount;
         withdrawnAmount = vault.redeem(remainingShares, fish, fish, 0, new address[](0));
-        assertEq(withdrawnAmount, fishAmount / 2, "Should redeem correct amount");
+        assertEq(withdrawnAmount, remainingAmount, "Should redeem remaining amount");
         vm.stopPrank();
     }
 }
