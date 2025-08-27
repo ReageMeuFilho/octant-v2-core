@@ -51,6 +51,10 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
      * 5. Updates exchange rate and emits harvest event
      *
      * This approach maintains PPS ≈ 1 by diluting/concentrating shares based on yield.
+     * Health check effectiveness depends on report() frequency. Exchange rate checks
+     * become less effective over time if reports are infrequent, as profit limits may be exceeded.
+     * Management should ensure regular reporting or adjust profit/loss ratios based on expected frequency.
+     *
      */
     function report()
         public
