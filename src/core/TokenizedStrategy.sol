@@ -802,6 +802,9 @@ abstract contract TokenizedStrategy {
     }
 
     /// @dev Internal implementation of {convertToAssets}.
+    // WARNING: When deploying donated assets with YieldDonatingTokenizedStrategy,
+    // potential losses can be amplified due to the multi-hop donation flow:
+    // For example OctantVault → YearnVault → MorphoVault → Morpho
     function _convertToAssets(
         StrategyData storage S,
         uint256 shares,
