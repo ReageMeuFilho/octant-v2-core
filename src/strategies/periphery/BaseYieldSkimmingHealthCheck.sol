@@ -96,6 +96,22 @@ abstract contract BaseYieldSkimmingHealthCheck is BaseStrategy, IBaseHealthCheck
         require(_newProfitLimitRatio > 0, "!zero profit");
         require(_newProfitLimitRatio <= type(uint16).max, "!too high");
         _profitLimitRatio = uint16(_newProfitLimitRatio);
+    /**
+     * @notice Returns the current exchange rate in RAY format
+     * @return The current exchange rate in RAY format.
+     */
+    function getCurrentRateRay() public view returns (uint256) {
+        uint256 currentRate = IYieldSkimmingStrategy(address(this)).getCurrentExchangeRate();
+        uint256 decimals = IYieldSkimmingStrategy(address(this)).decimalsOfExchangeRate();
+
+        // Convert directly to RAY (27 decimals) to avoid precision loss
+        if (decimals < 27) {
+            return currentRate * 10 ** (27 - decimals);
+        } else if (decimals > 27) {
+            return currentRate / 10 ** (decimals - 27);
+        } else {
+            return currentRate;
+        }
     }
 
     /**
@@ -148,8 +164,8 @@ abstract contract BaseYieldSkimmingHealthCheck is BaseStrategy, IBaseHealthCheck
             return;
         }
 
-        uint256 currentExchangeRate = IYieldSkimmingStrategy(address(this)).getLastRateRay().rayToWad();
-        uint256 newExchangeRate = IYieldSkimmingStrategy(address(this)).getCurrentExchangeRate();
+        uint256 currentExchangeRate = IYieldSkimmingStrategy(address(this)).getLastRateRay();
+        uint256 newExchangeRate = IYieldSkimmingStrategy(address(this)).getCurrentRateRay();
 
         if (currentExchangeRate < newExchangeRate) {
             require(
