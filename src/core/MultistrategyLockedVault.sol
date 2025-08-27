@@ -6,9 +6,8 @@ import { IMultistrategyVault } from "src/core/interfaces/IMultistrategyVault.sol
 import { IMultistrategyLockedVault } from "src/core/interfaces/IMultistrategyLockedVault.sol";
 
 /**
- * @title LockedMultistrategyVault
- * @notice Vault with modified unlocking mechanism similar to DragonTokenizedStrategy
- * that consults strategies for minimum unlock times during rage quit
+ * @title MultistrategyLockedVault
+ * @notice A locked vault with custody-based rage quit mechanism and two-step cooldown period changes
  *
  * @dev Important Behavior Notes:
  *
@@ -40,6 +39,23 @@ import { IMultistrategyLockedVault } from "src/core/interfaces/IMultistrategyLoc
  *       - Can withdraw/redeem up to 150 shares after cooldown
  *       - Same one-time window rules apply to total balance
  *
+ * ## Two-Step Cooldown Period Changes:
+ * 1. **Grace Period Protection:**
+ *    - Governance proposes cooldown period changes with 14-day delay
+ *    - Users can rage quit under current terms during grace period
+ *    - Protects users from unfavorable governance decisions
+ *
+ * 2. **Change Process:**
+ *    - **Propose**: Governance proposes new period, starts grace period
+ *    - **Grace Period**: 14 days for users to exit under current terms
+ *    - **Finalize**: Anyone can finalize change after grace period
+ *    - **Cancel**: Governance can cancel during grace period
+ *
+ * 3. **User Protection:**
+ *    - Users who rage quit before finalization use old cooldown period
+ *    - Users who rage quit after finalization use new cooldown period
+ *    - No retroactive application of cooldown changes
+ *
  */
 contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVault {
     // Mapping of user address to their lockup info
@@ -51,10 +67,14 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
     // Cooldown period for rage quit
     uint256 public rageQuitCooldownPeriod;
 
+    // Two-step rage quit cooldown period change variables
+    uint256 public pendingRageQuitCooldownPeriod;
+    uint256 public rageQuitCooldownPeriodChangeTimestamp;
     // Constants
     uint256 public constant INITIAL_RAGE_QUIT_COOLDOWN_PERIOD = 7 days;
     uint256 public constant RANGE_MINIMUM_RAGE_QUIT_COOLDOWN_PERIOD = 1 days;
     uint256 public constant RANGE_MAXIMUM_RAGE_QUIT_COOLDOWN_PERIOD = 30 days;
+    uint256 public constant RAGE_QUIT_COOLDOWN_CHANGE_DELAY = 14 days;
 
     // Define onlyRegenGovernance modifier
     modifier onlyRegenGovernance() {
@@ -75,43 +95,80 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
     }
 
     /**
-     * @notice Set the lockup duration
+     * @notice Propose a new rage quit cooldown period
      * @param _rageQuitCooldownPeriod New cooldown period for rage quit
+     * @dev Starts a grace period allowing users to rage quit under current terms
      */
-    function setRageQuitCooldownPeriod(uint256 _rageQuitCooldownPeriod) external onlyRegenGovernance {
+    function proposeRageQuitCooldownPeriodChange(uint256 _rageQuitCooldownPeriod) external onlyRegenGovernance {
         if (
             _rageQuitCooldownPeriod < RANGE_MINIMUM_RAGE_QUIT_COOLDOWN_PERIOD ||
             _rageQuitCooldownPeriod > RANGE_MAXIMUM_RAGE_QUIT_COOLDOWN_PERIOD
         ) {
             revert InvalidRageQuitCooldownPeriod();
         }
-        rageQuitCooldownPeriod = _rageQuitCooldownPeriod;
-        emit RageQuitCooldownPeriodSet(_rageQuitCooldownPeriod);
+
+        if (_rageQuitCooldownPeriod == rageQuitCooldownPeriod) {
+            revert InvalidRageQuitCooldownPeriod();
+        }
+
+        pendingRageQuitCooldownPeriod = _rageQuitCooldownPeriod;
+        rageQuitCooldownPeriodChangeTimestamp = block.timestamp;
+
+        uint256 effectiveTimestamp = block.timestamp + RAGE_QUIT_COOLDOWN_CHANGE_DELAY;
+        emit PendingRageQuitCooldownPeriodChange(_rageQuitCooldownPeriod, effectiveTimestamp);
     }
 
     /**
-     * @notice Initiate rage quit process to unlock shares earlier
-     * Consults all strategies via hooks to determine the appropriate unlock time
+     * @notice Finalize the rage quit cooldown period change after the grace period
+     * @dev Can only be called after the grace period has elapsed
      */
-    function initiateRageQuit() external {
-        if (balanceOf(msg.sender) == 0) revert NoSharesToRageQuit();
+    function finalizeRageQuitCooldownPeriodChange() external onlyRegenGovernance {
+        if (pendingRageQuitCooldownPeriod == 0) {
+            revert NoPendingRageQuitCooldownPeriodChange();
+        }
 
-        LockupInfo storage lockup = voluntaryLockups[msg.sender];
-        if (block.timestamp <= lockup.unlockTime) revert RageQuitAlreadyInitiated();
+        if (block.timestamp < rageQuitCooldownPeriodChangeTimestamp + RAGE_QUIT_COOLDOWN_CHANGE_DELAY) {
+            revert RageQuitCooldownPeriodChangeDelayNotElapsed();
+        }
 
-        // Default unlock time based on vault's rage quit cooldown
-        uint256 defaultUnlockTime = block.timestamp + rageQuitCooldownPeriod;
+        uint256 oldPeriod = rageQuitCooldownPeriod;
+        rageQuitCooldownPeriod = pendingRageQuitCooldownPeriod;
+        pendingRageQuitCooldownPeriod = 0;
+        rageQuitCooldownPeriodChangeTimestamp = 0;
 
-        lockup.unlockTime = defaultUnlockTime;
-
-        lockup.lockupTime = block.timestamp; // Set starting point for gradual unlocking
-
-        emit RageQuitInitiated(msg.sender, lockup.lockupTime, defaultUnlockTime);
+        emit RageQuitCooldownPeriodChanged(oldPeriod, rageQuitCooldownPeriod);
     }
 
     /**
-     * @notice Override withdrawal functions to check if shares are unlocked
+     * @notice Cancel a pending rage quit cooldown period change
+     * @dev Can only be called by governance during the grace period
      */
+    function cancelRageQuitCooldownPeriodChange() external onlyRegenGovernance {
+        if (pendingRageQuitCooldownPeriod == 0) {
+            revert NoPendingRageQuitCooldownPeriodChange();
+        }
+
+        pendingRageQuitCooldownPeriod = 0;
+        rageQuitCooldownPeriodChangeTimestamp = 0;
+
+        emit PendingRageQuitCooldownPeriodChange(0, 0);
+    }
+
+    /**
+     * @notice Get the pending rage quit cooldown period if any
+     * @return The pending cooldown period (0 if none)
+     */
+    function getPendingRageQuitCooldownPeriod() external view returns (uint256) {
+        return pendingRageQuitCooldownPeriod;
+    }
+
+    /**
+     * @notice Get the timestamp when rage quit cooldown period change was initiated
+     * @return Timestamp of the change initiation (0 if none)
+     */
+    function getRageQuitCooldownPeriodChangeTimestamp() external view returns (uint256) {
+        return rageQuitCooldownPeriodChangeTimestamp;
+    }
     function withdraw(
         uint256 assets,
         address receiver,
