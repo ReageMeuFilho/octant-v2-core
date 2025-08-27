@@ -1154,7 +1154,7 @@ abstract contract TokenizedStrategy {
      *
      * @return . The price per share.
      */
-    function pricePerShare() external view returns (uint256) {
+    function pricePerShare() public view returns (uint256) {
         StrategyData storage S = _strategyStorage();
         return _convertToAssets(S, 10 ** S.decimals, Math.Rounding.Floor);
     }
