@@ -220,7 +220,6 @@ abstract contract TokenizedStrategy {
         uint8 entered; // To prevent reentrancy. Use uint8 for gas savings.
         bool shutdown; // Bool that can be used to stop deposits into the strategy.
         
-        
         // Burning mechanism control
         bool enableBurning; // Whether to burn shares from dragon router during loss protection
     }
@@ -331,7 +330,7 @@ abstract contract TokenizedStrategy {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice API version this TokenizedStrategy implements.
-    string internal constant API_VERSION = "3.0.4";
+    string internal constant API_VERSION = "1.0.0";
 
     /// @notice Value to set the `entered` flag to during a call.
     uint8 internal constant ENTERED = 2;
@@ -343,6 +342,20 @@ abstract contract TokenizedStrategy {
 
     /// @notice Cooldown period for dragon router changes (14 days).
     uint256 internal constant DRAGON_ROUTER_COOLDOWN = 14 days;
+
+    /// @notice Permit type hash for EIP-2612 permit functionality.
+    bytes32 internal constant PERMIT_TYPEHASH =
+        keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+
+    /// @notice EIP712Domain type hash for EIP-712 domain separator.
+    bytes32 internal constant EIP712DOMAIN_TYPEHASH =
+        keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+
+    /// @notice Hash of the vault name for EIP-712 domain separator.
+    bytes32 internal constant NAME_HASH = keccak256("Octant Vault");
+
+    /// @notice Hash of the API version for EIP-712 domain separator.
+    bytes32 internal constant VERSION_HASH = keccak256(bytes(API_VERSION));
 
     /**
      * @dev Custom storage slot that will be used to store the
@@ -359,7 +372,7 @@ abstract contract TokenizedStrategy {
      * amount of storage in their strategy without worrying
      * about collisions.
      */
-    bytes32 internal constant BASE_STRATEGY_STORAGE = bytes32(uint256(keccak256("yearn.base.strategy.storage")) - 1);
+    bytes32 internal constant BASE_STRATEGY_STORAGE = bytes32(uint256(keccak256("octant.base.strategy.storage")) - 1);
 
     /*//////////////////////////////////////////////////////////////
                             STORAGE GETTER
@@ -1138,7 +1151,7 @@ abstract contract TokenizedStrategy {
      *
      * @return . The price per share.
      */
-    function pricePerShare() external view returns (uint256) {
+    function pricePerShare() public view returns (uint256) {
         StrategyData storage S = _strategyStorage();
         return _convertToAssets(S, 10 ** S.decimals, Math.Rounding.Floor);
     }
@@ -1298,11 +1311,11 @@ abstract contract TokenizedStrategy {
 
     /**
      * @notice Returns the symbol of the strategies token.
-     * @dev Will be 'ys + asset symbol'.
+     * @dev Will be 'os + asset symbol'.
      * @return . The symbol the strategy is using for its tokens.
      */
     function symbol() external view returns (string memory) {
-        return string(abi.encodePacked("ys", _strategyStorage().asset.symbol()));
+        return string(abi.encodePacked("os", _strategyStorage().asset.symbol()));
     }
 
     /**
@@ -1598,9 +1611,7 @@ abstract contract TokenizedStrategy {
                         DOMAIN_SEPARATOR(),
                         keccak256(
                             abi.encode(
-                                keccak256(
-                                    "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
-                                ),
+                                PERMIT_TYPEHASH,
                                 owner,
                                 spender,
                                 value,
@@ -1628,15 +1639,6 @@ abstract contract TokenizedStrategy {
      * @return . The domain separator that will be used for any {permit} calls.
      */
     function DOMAIN_SEPARATOR() public view returns (bytes32) {
-        return
-            keccak256(
-                abi.encode(
-                    keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                    keccak256("Yearn Vault"),
-                    keccak256(bytes(API_VERSION)),
-                    block.chainid,
-                    address(this)
-                )
-            );
+        return keccak256(abi.encode(EIP712DOMAIN_TYPEHASH, NAME_HASH, VERSION_HASH, block.chainid, address(this)));
     }
 }
