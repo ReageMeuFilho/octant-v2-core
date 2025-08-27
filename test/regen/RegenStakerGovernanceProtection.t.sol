@@ -24,7 +24,10 @@ contract RegenStakerGovernanceProtectionTest is Test {
     RegenEarningPowerCalculator public earningPowerCalculator;
     MockERC20 public rewardToken;
     MockERC20Staking public stakeToken;
-    Whitelist public whitelist;
+    Whitelist public stakerWhitelist;
+    Whitelist public contributionWhitelist;
+    Whitelist public allocationWhitelist;
+    Whitelist public earningPowerWhitelist;
 
     address public admin = makeAddr("admin");
     address public rewardNotifier = makeAddr("rewardNotifier");
@@ -41,10 +44,13 @@ contract RegenStakerGovernanceProtectionTest is Test {
         rewardToken = new MockERC20(18);
         stakeToken = new MockERC20Staking(18);
 
-        // Deploy whitelist and calculator
+        // Deploy whitelists and calculator
         vm.startPrank(admin);
-        whitelist = new Whitelist();
-        earningPowerCalculator = new RegenEarningPowerCalculator(admin, whitelist);
+        stakerWhitelist = new Whitelist();
+        contributionWhitelist = new Whitelist();
+        allocationWhitelist = new Whitelist();
+        earningPowerWhitelist = new Whitelist();
+        earningPowerCalculator = new RegenEarningPowerCalculator(admin, earningPowerWhitelist);
 
         // Deploy RegenStaker
         regenStaker = new RegenStaker(
@@ -56,14 +62,14 @@ contract RegenStakerGovernanceProtectionTest is Test {
             uint128(REWARD_DURATION),
             0, // maxClaimFee
             INITIAL_MIN_STAKE,
-            whitelist,
-            whitelist,
-            whitelist
+            stakerWhitelist,
+            contributionWhitelist,
+            allocationWhitelist
         );
 
         // Setup permissions
         regenStaker.setRewardNotifier(rewardNotifier, true);
-        whitelist.addToWhitelist(user);
+        stakerWhitelist.addToWhitelist(user);
         vm.stopPrank();
 
         // Fund users
@@ -96,11 +102,12 @@ contract RegenStakerGovernanceProtectionTest is Test {
         regenStaker.setMaxBumpTip(type(uint256).max);
 
         // Try to DECREASE during active rewards - should succeed
+        uint256 newMaxBumpTip = INITIAL_MAX_BUMP_TIP - 1;
         vm.prank(admin);
-        regenStaker.setMaxBumpTip(INITIAL_MAX_BUMP_TIP - 1);
+        regenStaker.setMaxBumpTip(newMaxBumpTip);
 
-        // Verify maxBumpTip unchanged
-        assertEq(regenStaker.maxBumpTip(), INITIAL_MAX_BUMP_TIP, "MaxBumpTip should be unchanged");
+        // Verify maxBumpTip was decreased
+        assertEq(regenStaker.maxBumpTip(), newMaxBumpTip, "MaxBumpTip should be decreased");
     }
 
     /**

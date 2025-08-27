@@ -90,17 +90,15 @@ contract REG008CompoundWhitelistBypassDemoTest is Test {
         assertFalse(stakerWhitelist.isWhitelisted(depositor));
         assertTrue(stakerWhitelist.isWhitelisted(whitelistedClaimer));
 
-        // Step 4: VULNERABILITY - Whitelisted claimer can still compound for delisted depositor
-        uint256 balanceBefore = stakeToken.balanceOf(address(regenStaker.surrogates(makeAddr("delegatee"))));
-
+        // Step 4: FIX VERIFIED - Whitelisted claimer can no longer compound for delisted depositor
+        // This now correctly reverts with NotWhitelisted error
         vm.prank(whitelistedClaimer);
-        uint256 compoundedAmount = regenStaker.compoundRewards(depositId);
-
+        vm.expectRevert(); // Expected to revert with NotWhitelisted
+        regenStaker.compoundRewards(depositId);
+        
+        // Verify balance unchanged - compound was correctly blocked
         uint256 balanceAfter = stakeToken.balanceOf(address(regenStaker.surrogates(makeAddr("delegatee"))));
-
-        // Compound succeeded - depositor's stake increased despite being delisted
-        assertGt(compoundedAmount, 0);
-        assertGt(balanceAfter, balanceBefore);
+        assertEq(balanceAfter, STAKE_AMOUNT); // No increase from compounding
     }
 
     function testREG008_DirectDepositBlockedButCompoundAllowed() public {
@@ -131,9 +129,10 @@ contract REG008CompoundWhitelistBypassDemoTest is Test {
         regenStaker.stake(STAKE_AMOUNT, makeAddr("delegatee"), depositor);
         vm.stopPrank();
 
-        // But compound still works via claimer - this is the vulnerability
+        // FIX VERIFIED - Compound is now also blocked for delisted owner
+        // Both direct staking and compounding are now consistently protected
         vm.prank(whitelistedClaimer);
-        uint256 compounded = regenStaker.compoundRewards(depositId);
-        assertGt(compounded, 0);
+        vm.expectRevert(); // Expected to revert with NotWhitelisted
+        regenStaker.compoundRewards(depositId);
     }
 }

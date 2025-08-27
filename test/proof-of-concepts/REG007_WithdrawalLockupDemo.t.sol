@@ -60,9 +60,15 @@ contract REG007WithdrawalLockupDemoTest is Test {
         assertEq(stakeToken.balanceOf(address(regenStaker)), STAKE_AMOUNT);
         assertEq(stakeToken.balanceOf(user), 0);
 
-        // Withdrawal fails - funds permanently stuck
-        vm.expectRevert(); // ERC20InsufficientAllowance
-        regenStaker.withdraw(depositId, STAKE_AMOUNT / 2);
+        // REG-007 FIX: Withdrawal now succeeds (vulnerability fixed)
+        // Previously would fail with ERC20InsufficientAllowance
+        // Now withdrawals work correctly without self-approval issues
+        uint256 withdrawAmount = STAKE_AMOUNT / 2;
+        regenStaker.withdraw(depositId, withdrawAmount);
+        
+        // Verify withdrawal succeeded
+        assertEq(stakeToken.balanceOf(user), withdrawAmount);
+        assertEq(stakeToken.balanceOf(address(regenStaker)), STAKE_AMOUNT - withdrawAmount);
         vm.stopPrank();
     }
 
