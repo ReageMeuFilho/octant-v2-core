@@ -478,7 +478,7 @@ abstract contract TokenizedStrategy {
      * @param receiver The address to receive the `shares`.
      * @return shares The actual amount of shares issued.
      */
-    function deposit(uint256 assets, address receiver) external nonReentrant returns (uint256 shares) {
+    function deposit(uint256 assets, address receiver) external virtual nonReentrant returns (uint256 shares) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
 
@@ -502,7 +502,7 @@ abstract contract TokenizedStrategy {
      * @param receiver The address to receive the `shares`.
      * @return assets The actual amount of asset deposited.
      */
-    function mint(uint256 shares, address receiver) external nonReentrant returns (uint256 assets) {
+    function mint(uint256 shares, address receiver) external virtual nonReentrant returns (uint256 assets) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
 
@@ -523,7 +523,7 @@ abstract contract TokenizedStrategy {
      * @param owner The address whose shares are burnt.
      * @return shares The actual amount of shares burnt.
      */
-    function withdraw(uint256 assets, address receiver, address owner) external returns (uint256 shares) {
+    function withdraw(uint256 assets, address receiver, address owner) external virtual returns (uint256 shares) {
         return withdraw(assets, receiver, owner, 0);
     }
 
@@ -562,7 +562,7 @@ abstract contract TokenizedStrategy {
      * @param owner The address whose shares are burnt.
      * @return assets The actual amount of underlying withdrawn.
      */
-    function redeem(uint256 shares, address receiver, address owner) external returns (uint256) {
+    function redeem(uint256 shares, address receiver, address owner) external virtual returns (uint256) {
         // We default to not limiting a potential loss.
         return redeem(shares, receiver, owner, MAX_BPS);
     }
@@ -915,7 +915,7 @@ abstract contract TokenizedStrategy {
         uint256 assets,
         uint256 shares,
         uint256 maxLoss
-    ) internal returns (uint256) {
+    ) internal virtual returns (uint256) {
         require(receiver != address(0), "ZERO ADDRESS");
         require(maxLoss <= MAX_BPS, "exceeds MAX_BPS");
 
@@ -1154,6 +1154,7 @@ abstract contract TokenizedStrategy {
      *
      * @return . The price per share.
      */
+    function pricePerShare() external view returns (uint256) {
     function pricePerShare() public view returns (uint256) {
         StrategyData storage S = _strategyStorage();
         return _convertToAssets(S, 10 ** S.decimals, Math.Rounding.Floor);
@@ -1358,7 +1359,7 @@ abstract contract TokenizedStrategy {
      * @param amount The amount of shares to be transferred from sender.
      * @return . a boolean value indicating whether the operation succeeded.
      */
-    function transfer(address to, uint256 amount) external returns (bool) {
+    function transfer(address to, uint256 amount) external virtual returns (bool) {
         _transfer(_strategyStorage(), msg.sender, to, amount);
         return true;
     }
@@ -1438,7 +1439,7 @@ abstract contract TokenizedStrategy {
      * @param amount the quantity of shares to move.
      * @return . a boolean value indicating whether the operation succeeded.
      */
-    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
+    function transferFrom(address from, address to, uint256 amount) external virtual returns (bool) {
         StrategyData storage S = _strategyStorage();
         _spendAllowance(S, from, msg.sender, amount);
         _transfer(S, from, to, amount);
