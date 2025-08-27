@@ -71,12 +71,17 @@ contract ProfitableStrategyFlowLockedTest is Test {
     }
 
     function initiateAndCompleteRageQuit(address user) internal {
-        // Initiate rage quit for user
-        vm.prank(user);
-        vault.initiateRageQuit();
+        // Only initiate rage quit if user has balance
+        uint256 userBalance = vault.balanceOf(user);
+        if (userBalance > 0) {
+            // Initiate rage quit for user
+            vm.startPrank(user);
+            vault.initiateRageQuit(userBalance);
+            vm.stopPrank();
 
-        // Fast forward past cooldown period
-        vm.warp(block.timestamp + vault.rageQuitCooldownPeriod() + 1);
+            // Fast forward past cooldown period
+            vm.warp(block.timestamp + vault.rageQuitCooldownPeriod() + 1);
+        }
     }
 
     function testProfitableStrategyFlow() public {
@@ -241,8 +246,8 @@ contract ProfitableStrategyFlowLockedTest is Test {
 
         vm.warp(block.timestamp + vault.rageQuitCooldownPeriod() + 1);
 
-        // We need to initiate rage quit again for user1 because the previous one expired
-        initiateAndCompleteRageQuit(vars.user1);
+        // User1 can redeem remaining custodied shares from original rage quit
+        // (no need to initiate new rage quit as custody is still active)
 
         // User1 redeems all remaining shares
         address[] memory withdrawalQueue = new address[](1);

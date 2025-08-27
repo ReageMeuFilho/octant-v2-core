@@ -43,4 +43,13 @@ contract MockYieldSource {
     function simulateLoss(uint256 _amount) public {
         ERC20(asset).transfer(msg.sender, _amount);
     }
+
+    function simulateProfit(uint256 _amount) public {
+        // This would typically be called by the strategy to add profit
+        // In a real scenario, this might mint new tokens or add to balance
+        // For testing, we assume the caller provides the profit tokens
+        if (asset != ETH) {
+            ERC20(asset).transferFrom(msg.sender, address(this), _amount);
+        }
+    }
 }

@@ -20,6 +20,19 @@ import { YieldDonatingTokenizedStrategy } from "src/strategies/yieldDonating/Yie
 contract SkyCompounterHealthCheckTest is Test {
     using SafeERC20 for ERC20;
 
+    // Setup parameters struct to avoid stack too deep
+    struct SetupParams {
+        address management;
+        address keeper;
+        address emergencyAdmin;
+        address donationAddress;
+        string vaultSharesName;
+        bytes32 strategySalt;
+        address tokenizedStrategyAddress;
+        bool enableBurning;
+        bool allowDepositDuringLoss;
+    }
+
     // Strategy instance
     SkyCompounderStrategy public strategy;
     ITokenizedStrategy public vault;
@@ -84,20 +97,34 @@ contract SkyCompounterHealthCheckTest is Test {
         emergencyAdmin = address(0x3);
         donationAddress = address(0x4);
 
+        // Create setup params to avoid stack too deep
+        SetupParams memory params = SetupParams({
+            management: management,
+            keeper: keeper,
+            emergencyAdmin: emergencyAdmin,
+            donationAddress: donationAddress,
+            vaultSharesName: vaultSharesName,
+            strategySalt: strategySalt,
+            tokenizedStrategyAddress: address(tokenizedStrategy),
+            enableBurning: true,
+            allowDepositDuringLoss: true
+        });
+
         // Deploy factory
         factory = new SkyCompounderStrategyFactory();
 
         // Deploy strategy using the factory's createStrategy method
-        vm.startPrank(management);
+        vm.startPrank(params.management);
         address strategyAddress = factory.createStrategy(
-            vaultSharesName,
-            management,
-            keeper,
-            emergencyAdmin,
-            donationAddress,
-            true, // enableBurning
-            strategySalt,
-            address(tokenizedStrategy)
+            params.vaultSharesName,
+            params.management,
+            params.keeper,
+            params.emergencyAdmin,
+            params.donationAddress,
+            params.enableBurning,
+            params.strategySalt,
+            params.tokenizedStrategyAddress,
+            params.allowDepositDuringLoss
         );
         vm.stopPrank();
 

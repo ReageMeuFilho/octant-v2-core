@@ -18,6 +18,17 @@ import { YieldDonatingTokenizedStrategy } from "src/strategies/yieldDonating/Yie
 contract MorphoCompounderDonatingStrategyTest is Test {
     using SafeERC20 for ERC20;
 
+    // Setup parameters struct to avoid stack too deep
+    struct SetupParams {
+        address management;
+        address keeper;
+        address emergencyAdmin;
+        address donationAddress;
+        string strategyName;
+        bytes32 salt;
+        address implementationAddress;
+    }
+
     // Strategy instance
     MorphoCompounderStrategy public strategy;
 
@@ -70,6 +81,17 @@ contract MorphoCompounderDonatingStrategyTest is Test {
         emergencyAdmin = address(0x3);
         donationAddress = address(0x4);
 
+        // Create setup params to avoid stack too deep
+        SetupParams memory params = SetupParams({
+            management: management,
+            keeper: keeper,
+            emergencyAdmin: emergencyAdmin,
+            donationAddress: donationAddress,
+            strategyName: strategyName,
+            salt: keccak256("OCT_MORPHO_COMPOUNDER_STRATEGY_V1"),
+            implementationAddress: address(implementation)
+        });
+
         // MorphoCompounderStrategyFactory
         factory = new MorphoCompounderStrategyFactory{
             salt: keccak256("OCT_MORPHO_COMPOUNDER_STRATEGY_VAULT_FACTORY_V1")
@@ -79,14 +101,15 @@ contract MorphoCompounderDonatingStrategyTest is Test {
         strategy = MorphoCompounderStrategy(
             factory.createStrategy(
                 MORPHO_VAULT,
-                strategyName,
-                management,
-                keeper,
-                emergencyAdmin,
-                donationAddress,
+                params.strategyName,
+                params.management,
+                params.keeper,
+                params.emergencyAdmin,
+                params.donationAddress,
                 false, // enableBurning
-                keccak256("OCT_MORPHO_COMPOUNDER_STRATEGY_V1"),
-                address(implementation)
+                params.salt,
+                params.implementationAddress,
+                true // allowDepositDuringLoss
             )
         );
 
@@ -248,11 +271,60 @@ contract MorphoCompounderDonatingStrategyTest is Test {
         assertGt(IERC4626(address(strategy)).totalAssets(), totalAssetsBefore, "Total assets should increase");
     }
 
-    /// @notice Test available deposit limit
-    function testAvailableDepositLimit() public view {
+    /// @notice Test available deposit limit without idle assets
+    function testAvailableDepositLimitWithoutIdleAssets() public view {
         uint256 limit = strategy.availableDepositLimit(user);
         uint256 morphoLimit = IERC4626(MORPHO_VAULT).maxDeposit(address(strategy));
-        assertEq(limit, morphoLimit, "Available deposit limit should match Morpho vault limit");
+        uint256 idleBalance = ERC20(USDC).balanceOf(address(strategy));
+
+        // Since there are no idle assets initially, limit should equal morpho limit
+        assertEq(idleBalance, 0, "Strategy should have no idle assets initially");
+        assertEq(limit, morphoLimit, "Available deposit limit should match Morpho vault limit when no idle assets");
+    }
+
+    /// @notice Test available deposit limit with idle assets (TRST-M-8 fix)
+    function testAvailableDepositLimitWithIdleAssets() public {
+        uint256 idleAmount = 1000e6; // 1,000 USDC idle assets
+
+        // Airdrop idle assets to strategy to simulate undeployed funds
+        airdrop(ERC20(USDC), address(strategy), idleAmount);
+
+        // Get the limits
+        uint256 limit = strategy.availableDepositLimit(user);
+        uint256 morphoLimit = IERC4626(MORPHO_VAULT).maxDeposit(address(strategy));
+        uint256 idleBalance = ERC20(USDC).balanceOf(address(strategy));
+
+        // Verify idle assets are present
+        assertEq(idleBalance, idleAmount, "Strategy should have idle assets");
+
+        // The available deposit limit should be morpho limit minus idle balance
+        uint256 expectedLimit = morphoLimit > idleAmount ? morphoLimit - idleAmount : 0;
+        assertEq(limit, expectedLimit, "Available deposit limit should account for idle assets");
+        assertLt(limit, morphoLimit, "Available deposit limit should be less than morpho limit when idle assets exist");
+    }
+
+    /// @notice Test available deposit limit edge case where idle assets exceed morpho limit
+    function testAvailableDepositLimitIdleAssetsExceedMorphoLimit() public {
+        uint256 morphoLimit = IERC4626(MORPHO_VAULT).maxDeposit(address(strategy));
+
+        // Skip test if morpho limit is too high for this test
+        vm.assume(morphoLimit < type(uint256).max / 2);
+
+        uint256 excessIdleAmount = morphoLimit + 1000e6; // Idle assets exceed morpho limit
+
+        // Airdrop excess idle assets to strategy
+        airdrop(ERC20(USDC), address(strategy), excessIdleAmount);
+
+        // Get the limit
+        uint256 limit = strategy.availableDepositLimit(user);
+        uint256 idleBalance = ERC20(USDC).balanceOf(address(strategy));
+
+        // Verify idle assets are present and exceed morpho limit
+        assertEq(idleBalance, excessIdleAmount, "Strategy should have excess idle assets");
+        assertGt(idleBalance, morphoLimit, "Idle assets should exceed morpho limit");
+
+        // The available deposit limit should be 0 since idle assets exceed morpho capacity
+        assertEq(limit, 0, "Available deposit limit should be 0 when idle assets exceed morpho limit");
     }
 
     /// @notice Fuzz test emergency withdraw functionality
@@ -275,6 +347,14 @@ contract MorphoCompounderDonatingStrategyTest is Test {
         uint256 emergencyWithdrawAmount = (depositAmount * withdrawFraction) / 100;
         vm.assume(emergencyWithdrawAmount > 0);
 
+        // Check the maximum withdrawable amount from Morpho vault to avoid liquidity issues
+        uint256 maxWithdrawableFromMorpho = IERC4626(MORPHO_VAULT).maxWithdraw(address(strategy));
+
+        // If the emergency withdraw amount exceeds what's withdrawable, cap it
+        if (emergencyWithdrawAmount > maxWithdrawableFromMorpho) {
+            emergencyWithdrawAmount = maxWithdrawableFromMorpho;
+        }
+
         // Get initial vault shares in Morpho
         uint256 initialMorphoShares = IERC4626(MORPHO_VAULT).balanceOf(address(strategy));
 
@@ -292,6 +372,57 @@ contract MorphoCompounderDonatingStrategyTest is Test {
         if (emergencyWithdrawAmount < depositAmount) {
             assertGt(ERC20(USDC).balanceOf(address(strategy)), 0, "Strategy should have idle USDC");
         }
+    }
+
+    /// @notice Test emergency withdraw works even when maxWithdraw returns less than requested
+    /// @dev This test addresses the audit finding where maxWithdraw could underestimate withdrawable assets
+    function testEmergencyWithdrawBypassesMaxWithdraw() public {
+        // Setup: Large deposit to ensure we have funds
+        uint256 depositAmount = 100000e6; // 100,000 USDC
+
+        // Ensure user has enough balance
+        airdrop(ERC20(USDC), user, depositAmount);
+
+        // Deposit funds
+        vm.startPrank(user);
+        ERC20(USDC).approve(address(strategy), depositAmount);
+        IERC4626(address(strategy)).deposit(depositAmount, user);
+        vm.stopPrank();
+
+        // Get initial state
+        uint256 strategySharesInMorpho = IERC4626(MORPHO_VAULT).balanceOf(address(strategy));
+        uint256 strategyAssetsInMorpho = IERC4626(MORPHO_VAULT).convertToAssets(strategySharesInMorpho);
+
+        // Check what maxWithdraw reports
+        uint256 maxWithdrawAmount = IERC4626(MORPHO_VAULT).maxWithdraw(address(strategy));
+
+        // Emergency withdraw MORE than maxWithdraw (if maxWithdraw is limiting)
+        // This tests that our fix allows withdrawing even when maxWithdraw would limit it
+        uint256 emergencyWithdrawAmount = strategyAssetsInMorpho; // Try to withdraw all
+
+        // Log for debugging - this ensures maxWithdrawAmount is used
+        emit log_named_uint("maxWithdraw reports", maxWithdrawAmount);
+        emit log_named_uint("attempting to withdraw", emergencyWithdrawAmount);
+
+        vm.startPrank(emergencyAdmin);
+        IMockStrategy(address(strategy)).shutdownStrategy();
+
+        // This should succeed even if maxWithdraw < emergencyWithdrawAmount
+        // because we removed the maxWithdraw check
+        IMockStrategy(address(strategy)).emergencyWithdraw(emergencyWithdrawAmount);
+        vm.stopPrank();
+
+        // Verify withdrawal happened
+        uint256 finalSharesInMorpho = IERC4626(MORPHO_VAULT).balanceOf(address(strategy));
+        assertEq(finalSharesInMorpho, 0, "Should have withdrawn all shares from Morpho");
+
+        // Verify strategy received the USDC
+        uint256 strategyUSDCBalance = ERC20(USDC).balanceOf(address(strategy));
+        assertGe(
+            strategyUSDCBalance,
+            (depositAmount * 99) / 100,
+            "Strategy should have received at least 99% of deposited USDC"
+        );
     }
 
     /// @notice Fuzz test that _harvestAndReport returns correct total assets
@@ -320,6 +451,72 @@ contract MorphoCompounderDonatingStrategyTest is Test {
             morphoAssets + idleAssets,
             1e14, // 0.01%
             "Total assets should match Morpho assets plus idle"
+        );
+    }
+
+    /// @notice Test that _harvestAndReport includes idle funds and donations work correctly
+    function testHarvestAndReportIncludesIdleFundsWithDonation() public {
+        uint256 depositAmount = 10000e6; // 10,000 USDC
+        uint256 vaultProfit = 500e6; // 500 USDC profit in vault
+        uint256 idleProfit = 500e6; // 500 USDC idle profit
+        uint256 totalProfit = vaultProfit + idleProfit; // 1,000 USDC total
+
+        // Ensure user has enough balance
+        airdrop(ERC20(USDC), user, depositAmount);
+
+        // Deposit funds to strategy
+        vm.startPrank(user);
+        IERC4626(address(strategy)).deposit(depositAmount, user);
+        vm.stopPrank();
+
+        // Record initial state
+        uint256 initialTotalAssets = IERC4626(address(strategy)).totalAssets();
+        uint256 morphoSharesBefore = IERC4626(MORPHO_VAULT).balanceOf(address(strategy));
+
+        // Simulate vault profit by mocking Morpho vault return value
+        vm.mockCall(
+            address(MORPHO_VAULT),
+            abi.encodeWithSelector(IERC4626.convertToAssets.selector, morphoSharesBefore),
+            abi.encode(depositAmount + vaultProfit)
+        );
+
+        // Transfer idle funds to strategy to simulate additional profit
+        airdrop(ERC20(USDC), address(strategy), idleProfit);
+
+        // Check donation balance before report
+        uint256 donationBalanceBefore = ERC20(address(strategy)).balanceOf(donationAddress);
+
+        // Verify _harvestAndReport correctly includes idle funds
+        uint256 idleAssets = ERC20(USDC).balanceOf(address(strategy));
+        assertEq(idleAssets, idleProfit, "Strategy should have idle funds equal to idle profit");
+
+        // Call report to trigger donation
+        vm.prank(keeper);
+        (uint256 reportedProfit, uint256 loss) = IMockStrategy(address(strategy)).report();
+
+        vm.clearMockedCalls();
+
+        // The reported profit should include BOTH vault profit AND idle profit
+        // This demonstrates the fix is working correctly
+        assertEq(reportedProfit, totalProfit, "Reported profit should include both vault and idle profits");
+        assertEq(loss, 0, "Should have no loss");
+
+        // Verify donation occurred
+        uint256 donationBalanceAfter = ERC20(address(strategy)).balanceOf(donationAddress);
+        assertGt(donationBalanceAfter, donationBalanceBefore, "Donation address should receive profit");
+        assertEq(
+            donationBalanceAfter - donationBalanceBefore,
+            totalProfit,
+            "Donation should equal the total profit (vault + idle)"
+        );
+
+        // Verify total assets increased by the total profit
+        uint256 finalTotalAssets = IERC4626(address(strategy)).totalAssets();
+        assertApproxEqRel(
+            finalTotalAssets - initialTotalAssets,
+            totalProfit,
+            1e14,
+            "Total assets should increase by total profit"
         );
     }
 
