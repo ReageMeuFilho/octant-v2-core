@@ -36,6 +36,15 @@ abstract contract BaseHealthCheck is BaseStrategy, IBaseHealthCheck {
     // Defaults loss limit to 0.
     uint16 private _lossLimitRatio;
 
+    /// @notice Emitted when the health check flag is updated
+    event HealthCheckUpdated(bool doHealthCheck);
+
+    /// @notice Emitted when the profit limit ratio is updated
+    event ProfitLimitRatioUpdated(uint256 newProfitLimitRatio);
+
+    /// @notice Emitted when the loss limit ratio is updated
+    event LossLimitRatioUpdated(uint256 newLossLimitRatio);
+
     constructor(
         address _asset,
         string memory _name,
@@ -79,7 +88,7 @@ abstract contract BaseHealthCheck is BaseStrategy, IBaseHealthCheck {
     /**
      * @notice Set the `profitLimitRatio`.
      * @dev Denominated in basis points. I.E. 1_000 == 10%.
-     * @param _newProfitLimitRatio The mew profit limit ratio.
+     * @param _newProfitLimitRatio The new profit limit ratio.
      */
     function setProfitLimitRatio(uint256 _newProfitLimitRatio) external onlyManagement {
         _setProfitLimitRatio(_newProfitLimitRatio);
@@ -88,12 +97,13 @@ abstract contract BaseHealthCheck is BaseStrategy, IBaseHealthCheck {
     /**
      * @dev Internally set the profit limit ratio. Denominated
      * in basis points. I.E. 1_000 == 10%.
-     * @param _newProfitLimitRatio The mew profit limit ratio.
+     * @param _newProfitLimitRatio The new profit limit ratio.
      */
     function _setProfitLimitRatio(uint256 _newProfitLimitRatio) internal {
         require(_newProfitLimitRatio > 0, "!zero profit");
         require(_newProfitLimitRatio <= type(uint16).max, "!too high");
         _profitLimitRatio = uint16(_newProfitLimitRatio);
+        emit ProfitLimitRatioUpdated(_newProfitLimitRatio);
     }
 
     /**
@@ -113,6 +123,7 @@ abstract contract BaseHealthCheck is BaseStrategy, IBaseHealthCheck {
     function _setLossLimitRatio(uint256 _newLossLimitRatio) internal {
         require(_newLossLimitRatio < MAX_BPS, "!loss limit");
         _lossLimitRatio = uint16(_newLossLimitRatio);
+        emit LossLimitRatioUpdated(_newLossLimitRatio);
     }
 
     /**
@@ -122,6 +133,7 @@ abstract contract BaseHealthCheck is BaseStrategy, IBaseHealthCheck {
      */
     function setDoHealthCheck(bool _doHealthCheck) public onlyManagement {
         doHealthCheck = _doHealthCheck;
+        emit HealthCheckUpdated(_doHealthCheck);
     }
 
     /**
