@@ -39,7 +39,7 @@ contract RegenIntegrationTest is Test {
     Whitelist earningPowerWhitelist;
     MockERC20 rewardToken;
     MockERC20Staking stakeToken;
-    AllocationMechanismFactory allocationFactory;
+    TestAllocationMechanismFactory allocationFactory;
 
     uint256 public constant REWARD_AMOUNT_BASE = 30_000_000;
     uint256 public constant STAKE_AMOUNT_BASE = 1_000;
@@ -207,7 +207,7 @@ contract RegenIntegrationTest is Test {
 
         calculator = new RegenEarningPowerCalculator(ADMIN, earningPowerWhitelist);
 
-        allocationFactory = new AllocationMechanismFactory();
+        allocationFactory = new TestAllocationMechanismFactory();
 
         regenStaker = new RegenStaker(
             IERC20(address(rewardToken)),
