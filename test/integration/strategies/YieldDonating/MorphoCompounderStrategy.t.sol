@@ -276,7 +276,7 @@ contract MorphoCompounderDonatingStrategyTest is Test {
         uint256 limit = strategy.availableDepositLimit(user);
         uint256 morphoLimit = IERC4626(MORPHO_VAULT).maxDeposit(address(strategy));
         uint256 idleBalance = ERC20(USDC).balanceOf(address(strategy));
-        
+
         // Since there are no idle assets initially, limit should equal morpho limit
         assertEq(idleBalance, 0, "Strategy should have no idle assets initially");
         assertEq(limit, morphoLimit, "Available deposit limit should match Morpho vault limit when no idle assets");
@@ -285,18 +285,18 @@ contract MorphoCompounderDonatingStrategyTest is Test {
     /// @notice Test available deposit limit with idle assets (TRST-M-8 fix)
     function testAvailableDepositLimitWithIdleAssets() public {
         uint256 idleAmount = 1000e6; // 1,000 USDC idle assets
-        
+
         // Airdrop idle assets to strategy to simulate undeployed funds
         airdrop(ERC20(USDC), address(strategy), idleAmount);
-        
+
         // Get the limits
         uint256 limit = strategy.availableDepositLimit(user);
         uint256 morphoLimit = IERC4626(MORPHO_VAULT).maxDeposit(address(strategy));
         uint256 idleBalance = ERC20(USDC).balanceOf(address(strategy));
-        
+
         // Verify idle assets are present
         assertEq(idleBalance, idleAmount, "Strategy should have idle assets");
-        
+
         // The available deposit limit should be morpho limit minus idle balance
         uint256 expectedLimit = morphoLimit > idleAmount ? morphoLimit - idleAmount : 0;
         assertEq(limit, expectedLimit, "Available deposit limit should account for idle assets");
@@ -306,23 +306,23 @@ contract MorphoCompounderDonatingStrategyTest is Test {
     /// @notice Test available deposit limit edge case where idle assets exceed morpho limit
     function testAvailableDepositLimitIdleAssetsExceedMorphoLimit() public {
         uint256 morphoLimit = IERC4626(MORPHO_VAULT).maxDeposit(address(strategy));
-        
+
         // Skip test if morpho limit is too high for this test
         vm.assume(morphoLimit < type(uint256).max / 2);
-        
+
         uint256 excessIdleAmount = morphoLimit + 1000e6; // Idle assets exceed morpho limit
-        
+
         // Airdrop excess idle assets to strategy
         airdrop(ERC20(USDC), address(strategy), excessIdleAmount);
-        
+
         // Get the limit
         uint256 limit = strategy.availableDepositLimit(user);
         uint256 idleBalance = ERC20(USDC).balanceOf(address(strategy));
-        
+
         // Verify idle assets are present and exceed morpho limit
         assertEq(idleBalance, excessIdleAmount, "Strategy should have excess idle assets");
         assertGt(idleBalance, morphoLimit, "Idle assets should exceed morpho limit");
-        
+
         // The available deposit limit should be 0 since idle assets exceed morpho capacity
         assertEq(limit, 0, "Available deposit limit should be 0 when idle assets exceed morpho limit");
     }
@@ -371,46 +371,50 @@ contract MorphoCompounderDonatingStrategyTest is Test {
     function testEmergencyWithdrawBypassesMaxWithdraw() public {
         // Setup: Large deposit to ensure we have funds
         uint256 depositAmount = 100000e6; // 100,000 USDC
-        
+
         // Ensure user has enough balance
         airdrop(ERC20(USDC), user, depositAmount);
-        
+
         // Deposit funds
         vm.startPrank(user);
         ERC20(USDC).approve(address(strategy), depositAmount);
         IERC4626(address(strategy)).deposit(depositAmount, user);
         vm.stopPrank();
-        
+
         // Get initial state
         uint256 strategySharesInMorpho = IERC4626(MORPHO_VAULT).balanceOf(address(strategy));
         uint256 strategyAssetsInMorpho = IERC4626(MORPHO_VAULT).convertToAssets(strategySharesInMorpho);
-        
+
         // Check what maxWithdraw reports
         uint256 maxWithdrawAmount = IERC4626(MORPHO_VAULT).maxWithdraw(address(strategy));
-        
+
         // Emergency withdraw MORE than maxWithdraw (if maxWithdraw is limiting)
         // This tests that our fix allows withdrawing even when maxWithdraw would limit it
         uint256 emergencyWithdrawAmount = strategyAssetsInMorpho; // Try to withdraw all
-        
+
         // Log for debugging - this ensures maxWithdrawAmount is used
         emit log_named_uint("maxWithdraw reports", maxWithdrawAmount);
         emit log_named_uint("attempting to withdraw", emergencyWithdrawAmount);
-        
+
         vm.startPrank(emergencyAdmin);
         IMockStrategy(address(strategy)).shutdownStrategy();
-        
+
         // This should succeed even if maxWithdraw < emergencyWithdrawAmount
         // because we removed the maxWithdraw check
         IMockStrategy(address(strategy)).emergencyWithdraw(emergencyWithdrawAmount);
         vm.stopPrank();
-        
+
         // Verify withdrawal happened
         uint256 finalSharesInMorpho = IERC4626(MORPHO_VAULT).balanceOf(address(strategy));
         assertEq(finalSharesInMorpho, 0, "Should have withdrawn all shares from Morpho");
-        
+
         // Verify strategy received the USDC
         uint256 strategyUSDCBalance = ERC20(USDC).balanceOf(address(strategy));
-        assertGe(strategyUSDCBalance, depositAmount * 99 / 100, "Strategy should have received at least 99% of deposited USDC");
+        assertGe(
+            strategyUSDCBalance,
+            (depositAmount * 99) / 100,
+            "Strategy should have received at least 99% of deposited USDC"
+        );
     }
 
     /// @notice Fuzz test that _harvestAndReport returns correct total assets

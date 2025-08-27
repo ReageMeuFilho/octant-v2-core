@@ -185,7 +185,6 @@ contract YieldDonatingTokenizedStrategyTest is Test {
         assertEq(strategy2.asset(), address(1), "Asset not correctly set to address(1) in second deployment");
     }
 
-
     /**
      * @notice Helper function to compute the expected address from create2 deployment
      * @param _deployer Address of the deployer

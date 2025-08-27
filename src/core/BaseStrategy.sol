@@ -165,15 +165,7 @@ abstract contract BaseStrategy {
         _delegateCall(
             abi.encodeCall(
                 ITokenizedStrategy.initialize,
-                (
-                    _asset,
-                    _name,
-                    _management,
-                    _keeper,
-                    _emergencyAdmin,
-                    _donationAddress,
-                    _enableBurning
-                )
+                (_asset, _name, _management, _keeper, _emergencyAdmin, _donationAddress, _enableBurning)
             )
         );
 
