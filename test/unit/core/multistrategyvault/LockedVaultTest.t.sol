@@ -72,8 +72,13 @@ contract LockedVaultTest is Test {
     }
 
     function testFuzz_RageQuitCooldownPeriodSetting(uint256 cooldownPeriod) public {
-        // Bound to valid range: 1 day to 30 days (vault maximum)
+        // Bound to valid range: 1 day to 30 days (vault maximum), excluding current default (7 days)
         cooldownPeriod = bound(cooldownPeriod, 1 days, 30 days);
+
+        // Skip the default value (7 days) since setting it to the same value should revert
+        if (cooldownPeriod == 7 days) {
+            cooldownPeriod = 8 days; // Use 8 days instead
+        }
 
         // Should be able to propose and finalize rage quit cooldown period change
         vm.startPrank(gov);

@@ -5,7 +5,6 @@ import { Setup, IMockStrategy } from "./utils/Setup.sol";
 import { MockYieldSourceSkimming } from "test/mocks/core/tokenized-strategies/MockYieldSourceSkimming.sol";
 import { IYieldSkimmingStrategy } from "src/strategies/yieldSkimming/IYieldSkimmingStrategy.sol";
 import { MockStrategySkimming } from "test/mocks/core/tokenized-strategies/MockStrategySkimming.sol";
-import { WadRayMath } from "src/utils/libs/maths/WadRay.sol";
 import { console2 } from "forge-std/console2.sol";
 
 contract AccountingTest is Setup {

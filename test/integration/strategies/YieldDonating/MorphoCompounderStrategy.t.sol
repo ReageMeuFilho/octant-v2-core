@@ -347,6 +347,14 @@ contract MorphoCompounderDonatingStrategyTest is Test {
         uint256 emergencyWithdrawAmount = (depositAmount * withdrawFraction) / 100;
         vm.assume(emergencyWithdrawAmount > 0);
 
+        // Check the maximum withdrawable amount from Morpho vault to avoid liquidity issues
+        uint256 maxWithdrawableFromMorpho = IERC4626(MORPHO_VAULT).maxWithdraw(address(strategy));
+
+        // If the emergency withdraw amount exceeds what's withdrawable, cap it
+        if (emergencyWithdrawAmount > maxWithdrawableFromMorpho) {
+            emergencyWithdrawAmount = maxWithdrawableFromMorpho;
+        }
+
         // Get initial vault shares in Morpho
         uint256 initialMorphoShares = IERC4626(MORPHO_VAULT).balanceOf(address(strategy));
 
