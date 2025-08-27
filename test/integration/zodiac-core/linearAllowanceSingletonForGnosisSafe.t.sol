@@ -432,10 +432,10 @@ contract TestLinearAllowanceIntegration is Test {
         // Create and setup whitelists for both executors
         Whitelist normalWhitelist = new Whitelist();
         Whitelist emergencyWhitelist = new Whitelist();
-        
+
         normalExecutor.setModuleWhitelist(IWhitelist(address(normalWhitelist)));
         emergencyExecutor.setModuleWhitelist(IWhitelist(address(emergencyWhitelist)));
-        
+
         // Whitelist the allowance module
         normalWhitelist.addToWhitelist(address(allowanceModule));
         emergencyWhitelist.addToWhitelist(address(allowanceModule));

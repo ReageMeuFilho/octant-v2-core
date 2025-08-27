@@ -40,7 +40,6 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 ///
 /// @dev USE CASE: Choose this variant for simple ERC20 staking without governance requirements.
 contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
-
     // === Custom Errors ===
     /// @notice Error thrown when reward notification would corrupt user deposits (same-token scenario)
     /// @param currentBalance The actual token balance in the contract
@@ -140,13 +139,13 @@ contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
         if (_from == address(this) && _to == address(this)) {
             return;
         }
-        
+
         // Use safeTransfer for withdrawals (contract -> user)
         if (_from == address(this)) {
             SafeERC20.safeTransfer(STAKE_TOKEN, _to, _value);
             return;
         }
-        
+
         // Default behavior for deposits (user -> contract)
         super._stakeTokenSafeTransferFrom(_from, _to, _value);
     }

@@ -172,7 +172,7 @@ contract RegenStakerWithoutDelegateSurrogateVotesWithdrawalFixTest is Test {
         // Verify withdrawal
         assertEq(staker.totalStaked(), 0);
         assertEq(stakeToken.balanceOf(alice), INITIAL_BALANCE);
-        
+
         // Alice can still claim rewards after withdrawal
         uint256 aliceRewardBalanceBefore = rewardToken.balanceOf(alice);
         vm.prank(alice);
@@ -221,7 +221,7 @@ contract RegenStakerWithoutDelegateSurrogateVotesWithdrawalFixTest is Test {
         vm.prank(alice);
         sameTokenStaker.compoundRewards(depositId);
 
-        (uint96 newStakeAmount,,,,,,) = sameTokenStaker.deposits(depositId);
+        (uint96 newStakeAmount, , , , , , ) = sameTokenStaker.deposits(depositId);
         assertGt(newStakeAmount, STAKE_AMOUNT, "Stake should have increased");
 
         // Withdraw everything
@@ -238,7 +238,7 @@ contract RegenStakerWithoutDelegateSurrogateVotesWithdrawalFixTest is Test {
         // Alice makes multiple deposits
         vm.startPrank(alice);
         stakeToken.approve(address(staker), STAKE_AMOUNT * 3);
-        
+
         Staker.DepositIdentifier deposit1 = staker.stake(STAKE_AMOUNT, alice, alice);
         Staker.DepositIdentifier deposit2 = staker.stake(STAKE_AMOUNT, alice, alice);
         Staker.DepositIdentifier deposit3 = staker.stake(STAKE_AMOUNT, alice, alice);
@@ -278,7 +278,7 @@ contract RegenStakerWithoutDelegateSurrogateVotesWithdrawalFixTest is Test {
 
         // Log gas usage
         emit log_named_uint("Withdrawal gas used", gasUsed);
-        
+
         // Verify gas is reasonable (less than 100k)
         assertLt(gasUsed, 100_000, "Withdrawal should be gas efficient");
     }
@@ -288,7 +288,7 @@ contract RegenStakerWithoutDelegateSurrogateVotesWithdrawalFixTest is Test {
         // Bound inputs
         stakeAmount = bound(stakeAmount, MIN_STAKE, INITIAL_BALANCE);
         withdrawAmount = bound(withdrawAmount, 1, stakeAmount);
-        
+
         // Adjust withdrawal to respect minimum stake
         if (withdrawAmount < stakeAmount && stakeAmount - withdrawAmount < MIN_STAKE) {
             withdrawAmount = stakeAmount; // Full withdrawal if remainder would be below minimum

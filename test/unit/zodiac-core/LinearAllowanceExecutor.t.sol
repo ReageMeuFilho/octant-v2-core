@@ -30,7 +30,7 @@ contract LinearAllowanceExecutorTest is Test {
 
         // Set the whitelist on the executor
         executor.setModuleWhitelist(IWhitelist(address(moduleWhitelist)));
-        
+
         // Whitelist the allowance module
         moduleWhitelist.addToWhitelist(address(allowanceModule));
 
