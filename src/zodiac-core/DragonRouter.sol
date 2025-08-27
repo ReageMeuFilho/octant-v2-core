@@ -11,6 +11,7 @@ import { ITransformer } from "src/zodiac-core/interfaces/ITransformer.sol";
 import { IDragonRouter } from "src/zodiac-core/interfaces/IDragonRouter.sol";
 import { LinearAllowanceExecutor } from "src/zodiac-core/LinearAllowanceExecutor.sol";
 import { ISplitChecker } from "src/zodiac-core/interfaces/ISplitChecker.sol";
+import { IWhitelist } from "src/utils/IWhitelist.sol";
 
 /**
  * @title Dragon Router
@@ -160,6 +161,15 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
      */
     function setCooldownPeriod(uint256 _cooldownPeriod) external onlyRole(REGEN_GOVERNANCE_ROLE) {
         _setCooldownPeriod(_cooldownPeriod);
+    }
+
+    /**
+     * @notice Set the whitelist contract for allowance modules
+     * @dev Only DEFAULT_ADMIN_ROLE can manage the whitelist
+     * @param whitelist The address of the whitelist contract (can be address(0) to disable)
+     */
+    function setModuleWhitelist(IWhitelist whitelist) external override onlyRole(DEFAULT_ADMIN_ROLE) {
+        _setModuleWhitelist(whitelist);
     }
 
     /**

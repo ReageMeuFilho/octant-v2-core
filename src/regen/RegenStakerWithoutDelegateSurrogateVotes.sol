@@ -5,11 +5,10 @@
 
 pragma solidity ^0.8.0;
 
-// === Variant-Specific Imports ===
-import { DelegationSurrogate } from "staker/DelegationSurrogate.sol";
-
 // === Base Imports ===
-import { RegenStakerBase, Staker, IERC20, IERC20Permit, IWhitelist, IEarningPowerCalculator } from "src/regen/RegenStakerBase.sol";
+// Note: DelegationSurrogate is now imported via RegenStakerBase
+import { RegenStakerBase, Staker, IERC20, DelegationSurrogate, IWhitelist, IEarningPowerCalculator } from "src/regen/RegenStakerBase.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 // === Contract Header ===
 /// @title RegenStakerWithoutDelegateSurrogateVotes
@@ -41,6 +40,15 @@ import { RegenStakerBase, Staker, IERC20, IERC20Permit, IWhitelist, IEarningPowe
 ///
 /// @dev USE CASE: Choose this variant for simple ERC20 staking without governance requirements.
 contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
+    // === Custom Errors ===
+    /// @notice Error thrown when reward notification would corrupt user deposits (same-token scenario)
+    /// @param currentBalance The actual token balance in the contract
+    /// @param required The minimum balance needed (totalStaked + reward amount)
+    error InsufficientRewardBalance(uint256 currentBalance, uint256 required);
+
+    /// @notice Error thrown when attempting delegation operations that are not supported in this variant
+    error DelegationNotSupported();
+
     // === Constructor ===
     /// @notice Constructor for the RegenStakerWithoutDelegateSurrogateVotes contract.
     /// @param _rewardsToken The token that will be used to reward contributors.
@@ -86,6 +94,24 @@ contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
     {}
 
     // === Overridden Functions ===
+
+    /// @notice Protect same-token scenarios for this variant where all tokens are held in the main contract
+    /// @dev Validates sufficient balance when STAKE_TOKEN == REWARD_TOKEN to prevent reward notifications
+    ///      from corrupting user deposits. This check is critical for this variant since stakes and rewards
+    ///      share the same contract address.
+    /// @param _amount The reward amount to notify
+    function notifyRewardAmount(uint256 _amount) external override {
+        if (address(REWARD_TOKEN) == address(STAKE_TOKEN)) {
+            uint256 currentBalance = REWARD_TOKEN.balanceOf(address(this));
+            uint256 required = totalStaked + _amount;
+            if (currentBalance < required) {
+                revert InsufficientRewardBalance(currentBalance, required);
+            }
+        }
+
+        _notifyRewardAmountWithCustomDuration(_amount);
+    }
+
     /// @inheritdoc Staker
     /// @notice Returns this contract as the "surrogate" since we hold tokens directly
     /// @dev ARCHITECTURE: This variant uses address(this) as surrogate to eliminate delegation complexity
@@ -106,25 +132,28 @@ contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
     }
 
     /// @inheritdoc Staker
-    /// @notice Override to handle token transfers when contract acts as its own surrogate
-    /// @dev Since surrogates are always address(this), we skip transfers from contract to itself
+    /// @notice Override to support withdrawals when this contract acts as its own surrogate
+    /// @dev Since this contract uses address(this) as surrogate, use safeTransfer for contract-to-user paths.
     function _stakeTokenSafeTransferFrom(address _from, address _to, uint256 _value) internal override {
-        // Skip transfers from contract to itself (surrogate to surrogate when both are this contract)
+        // Skip self-transfers (optimization)
         if (_from == address(this) && _to == address(this)) {
             return;
         }
+
+        // Use safeTransfer for withdrawals (contract -> user)
+        if (_from == address(this)) {
+            SafeERC20.safeTransfer(STAKE_TOKEN, _to, _value);
+            return;
+        }
+
+        // Default behavior for deposits (user -> contract)
         super._stakeTokenSafeTransferFrom(_from, _to, _value);
     }
 
-    /// @inheritdoc RegenStakerBase
-    /// @dev Always checks deposit.owner for whitelist authorization, preventing bypass scenarios.
-    function _getStakeMoreWhitelistTarget(Deposit storage deposit) internal view override returns (address) {
-        return deposit.owner;
-    }
-
-    /// @inheritdoc RegenStakerBase
-    /// @dev No transfer needed since tokens stay in this contract (contract acts as its own surrogate)
-    function _transferForCompound(address, /* _delegatee */ uint256 /* _amount */) internal pure override {
-        // No transfer needed - tokens stay in this contract
+    /// @inheritdoc Staker
+    /// @notice Delegation changes are not supported in this variant
+    /// @dev Always reverts since this contract doesn't use delegation surrogates - always uses address(this)
+    function alterDelegatee(DepositIdentifier, address) external pure override {
+        revert DelegationNotSupported();
     }
 }

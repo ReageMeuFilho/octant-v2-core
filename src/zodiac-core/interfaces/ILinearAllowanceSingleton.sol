@@ -73,6 +73,9 @@ interface ILinearAllowanceSingleton {
     /// @param lengthTwo The length of the second array
     error ArrayLengthsMismatch(uint256 lengthOne, uint256 lengthTwo);
 
+    /// @notice Error thrown when a Safe transaction execution fails
+    error SafeTransactionFailed();
+
     /// @notice Set the allowance for a delegate. To revoke, set dripRatePerDay to 0. Revoking will not cancel any unspent allowance.
     /// @param delegate The delegate to set the allowance for
     /// @param token The token to set the allowance for. Use NATIVE_TOKEN for ETH

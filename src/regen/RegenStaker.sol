@@ -7,12 +7,11 @@ pragma solidity ^0.8.0;
 
 // === Variant-Specific Imports ===
 import { IERC20Staking } from "staker/interfaces/IERC20Staking.sol";
-import { DelegationSurrogate } from "staker/DelegationSurrogate.sol";
 import { DelegationSurrogateVotes } from "staker/DelegationSurrogateVotes.sol";
 import { IERC20Delegates } from "staker/interfaces/IERC20Delegates.sol";
 
 // === Base Imports ===
-import { RegenStakerBase, Staker, SafeERC20, IERC20, IWhitelist, IEarningPowerCalculator } from "src/regen/RegenStakerBase.sol";
+import { RegenStakerBase, Staker, SafeERC20, IERC20, DelegationSurrogate, IWhitelist, IEarningPowerCalculator } from "src/regen/RegenStakerBase.sol";
 
 // === Contract Header ===
 /// @title RegenStaker
@@ -89,11 +88,39 @@ contract RegenStaker is RegenStakerBase {
         VOTING_TOKEN = IERC20Delegates(address(_stakeToken));
     }
 
+    // === Events ===
+    /// @notice Emitted when a new delegation surrogate is deployed
+    /// @param delegatee The address that receives the voting power
+    /// @param surrogate The address of the deployed surrogate contract
+    event SurrogateDeployed(address indexed delegatee, address indexed surrogate);
+
     // === Overridden Functions ===
 
     /// @inheritdoc Staker
     function surrogates(address _delegatee) public view override returns (DelegationSurrogate) {
         return _surrogates[_delegatee];
+    }
+
+    /// @notice Predicts the address of a surrogate that would be deployed for a given delegatee
+    /// @param _delegatee The address that will receive delegated voting power
+    /// @return The predicted address of the surrogate contract
+    /// @dev EIP-1014 (CREATE2): last 20 bytes of keccak256(0xff ++ deployer ++ salt ++ keccak256(init_code))
+    function predictSurrogateAddress(address _delegatee) public view returns (address) {
+        bytes32 salt = keccak256(abi.encodePacked(_delegatee));
+        bytes32 bytecodeHash = keccak256(
+            abi.encodePacked(type(DelegationSurrogateVotes).creationCode, abi.encode(VOTING_TOKEN, _delegatee))
+        );
+
+        // EIP-1014: 0xff domain separator
+        return address(uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), address(this), salt, bytecodeHash)))));
+    }
+
+    /// @notice Gets the delegatee address for a given surrogate
+    /// @param _surrogate The surrogate contract address
+    /// @return The address that this surrogate delegates voting power to
+    /// @dev Returns zero address if the surrogate doesn't delegate (invalid surrogate)
+    function getDelegateeFromSurrogate(address _surrogate) external view returns (address) {
+        return VOTING_TOKEN.delegates(_surrogate);
     }
 
     /// @inheritdoc Staker
@@ -103,21 +130,13 @@ contract RegenStaker is RegenStakerBase {
     function _fetchOrDeploySurrogate(address _delegatee) internal override returns (DelegationSurrogate _surrogate) {
         _surrogate = _surrogates[_delegatee];
         if (address(_surrogate) == address(0)) {
-            _surrogate = new DelegationSurrogateVotes(VOTING_TOKEN, _delegatee);
+            _surrogate = new DelegationSurrogateVotes{ salt: keccak256(abi.encodePacked(_delegatee)) }(
+                VOTING_TOKEN,
+                _delegatee
+            );
+
             _surrogates[_delegatee] = _surrogate;
+            emit SurrogateDeployed(_delegatee, address(_surrogate));
         }
-    }
-
-    /// @inheritdoc RegenStakerBase
-    /// @dev Transfers tokens to the delegation surrogate for the delegatee
-    function _transferForCompound(address _delegatee, uint256 _amount) internal override {
-        DelegationSurrogate surrogate = _fetchOrDeploySurrogate(_delegatee);
-        SafeERC20.safeTransfer(STAKE_TOKEN, address(surrogate), _amount);
-    }
-
-    /// @inheritdoc RegenStakerBase
-    /// @dev Always checks deposit.owner for whitelist authorization, preventing bypass through delegation.
-    function _getStakeMoreWhitelistTarget(Deposit storage deposit) internal view override returns (address) {
-        return deposit.owner;
     }
 }
