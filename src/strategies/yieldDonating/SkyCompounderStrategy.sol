@@ -195,7 +195,7 @@ contract SkyCompounderStrategy is BaseHealthCheck, UniswapV3Swapper, ISkyCompoun
         if (TokenizedStrategy.isShutdown()) {
             _totalAssets = balance + balanceOfStake();
         } else {
-            if (balance > ASSET_DUST) {
+            if (balance > ASSET_DUST && !IStaking(staking).paused()) {
                 _deployFunds(balance);
             }
             _totalAssets = balanceOfStake();
