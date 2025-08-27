@@ -1139,8 +1139,6 @@ contract SkyCompounderTest is Test {
 
     // ===== LOSS TRACKING EDGE CASE TESTS =====
 
-
-
     /// @notice Test loss tracking with sufficient dragon router shares for full burning
     function testLossTracking_WithSufficientDragonShares() public {
         console.log("=== Loss Tracking: Sufficient Dragon Router Shares ===");
@@ -1272,12 +1270,9 @@ contract SkyCompounderTest is Test {
 
     // ===== PROFIT RECOVERY EDGE CASE TESTS =====
 
-
-
-
     // ===== ECONOMIC INVARIANT TESTS =====
 
-
+    function testEconomicInvariants() public {
         uint256 userDeposit = 1000e18;
         uint256 lossAmount = 300e18;
         uint256 recoveryProfit = 400e18; // Net profit of 100e18
@@ -1461,71 +1456,78 @@ contract SkyCompounderTest is Test {
     function testDustAssetsAreProperlyReported() public {
         uint256 depositAmount = 10000e18; // 10,000 USDS
         uint256 dustAmount = 50; // 50 wei dust (below ASSET_DUST threshold of 100)
-        
+
         // Setup user with USDS
         airdrop(ERC20(USDS), user, depositAmount);
-        
+
         // User deposits into vault
         vm.startPrank(user);
         vault.deposit(depositAmount, user);
         vm.stopPrank();
-        
+
         // Verify all assets are staked
         assertEq(strategy.balanceOfStake(), depositAmount, "All deposited assets should be staked");
         assertEq(strategy.balanceOfAsset(), 0, "No idle assets initially");
-        
+
         // Simulate dust assets remaining in strategy (e.g., from rounding errors)
         deal(USDS, address(strategy), dustAmount);
-        
+
         // Verify dust assets are present
         assertEq(strategy.balanceOfAsset(), dustAmount, "Dust assets should be present");
-        
+
         // Get total assets before report
         uint256 totalAssetsBefore = vault.totalAssets();
-        
+
         // Report to update totalAssets calculation
         vm.prank(keeper);
         vault.report();
-        
+
         // Get total assets after report
         uint256 totalAssetsAfter = vault.totalAssets();
-        
+
         // Verify that dust assets are included in totalAssets
         // Total assets should include both staked assets and dust
         uint256 expectedTotalAssets = strategy.balanceOfStake() + strategy.balanceOfAsset();
         assertEq(totalAssetsAfter, expectedTotalAssets, "Total assets should include dust assets");
-        
+
         // Specifically verify dust is not ignored
-        assertGe(totalAssetsAfter, totalAssetsBefore + dustAmount, "Total assets should increase by at least dust amount");
-        
+        assertGe(
+            totalAssetsAfter,
+            totalAssetsBefore + dustAmount,
+            "Total assets should increase by at least dust amount"
+        );
+
         // Verify the fix: dust assets are included even though below ASSET_DUST threshold
         assertTrue(strategy.balanceOfAsset() < 100, "Dust amount should be below ASSET_DUST threshold");
-        assertTrue(totalAssetsAfter > strategy.balanceOfStake(), "Total assets should be greater than just staked amount");
+        assertTrue(
+            totalAssetsAfter > strategy.balanceOfStake(),
+            "Total assets should be greater than just staked amount"
+        );
     }
 
     /// @notice Test edge case where only dust assets exist in strategy
     function testOnlyDustAssetsReported() public {
         uint256 dustAmount = 99; // Just below ASSET_DUST threshold
-        
+
         // Give strategy only dust assets, no staking
         deal(USDS, address(strategy), dustAmount);
-        
+
         // Verify only dust assets exist
         assertEq(strategy.balanceOfAsset(), dustAmount, "Only dust assets should exist");
         assertEq(strategy.balanceOfStake(), 0, "No staked assets should exist");
-        
+
         // Disable health check to allow small-scale operation
         vm.prank(management);
         strategy.setDoHealthCheck(false);
-        
+
         // Report to calculate totalAssets
         vm.prank(keeper);
         (uint256 profit, uint256 loss) = vault.report();
-        
+
         // Verify dust assets are properly reported
         uint256 totalAssets = vault.totalAssets();
         assertEq(totalAssets, dustAmount, "Total assets should equal dust amount");
-        
+
         // The profit will be equal to dust amount since this is a gain from 0 baseline
         assertEq(profit, dustAmount, "Profit should equal dust amount as it's a gain from 0");
         assertEq(loss, 0, "No loss should be reported");

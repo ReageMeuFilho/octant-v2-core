@@ -590,7 +590,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         ERC20 _asset = S.asset;
         uint256 idle = _asset.balanceOf(address(this));
 
-        uint256 loss;
+        uint256 loss = 0;
 
         // Check if we need to withdraw funds from yield source.
         if (idle < assets) {
