@@ -118,7 +118,9 @@ contract EIP712SignatureTest is Test {
         uint256 nonce,
         uint256 deadline
     ) internal view returns (bytes32) {
-        bytes32 structHash = keccak256(abi.encode(CAST_VOTE_TYPEHASH, voter, pid, choice, weight, expectedRecipient, nonce, deadline));
+        bytes32 structHash = keccak256(
+            abi.encode(CAST_VOTE_TYPEHASH, voter, pid, choice, weight, expectedRecipient, nonce, deadline)
+        );
         bytes32 domainSeparator = _tokenized(address(mechanism)).DOMAIN_SEPARATOR();
         return keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
     }
@@ -381,7 +383,15 @@ contract EIP712SignatureTest is Test {
                 uint8 choice = uint8(voteTypes[i]);
                 uint256 weight = 50;
 
-                bytes32 digest = _getCastVoteDigest(users[i], pids[i], choice, weight, address(uint160(0x100 + i)), nonce, deadline);
+                bytes32 digest = _getCastVoteDigest(
+                    users[i],
+                    pids[i],
+                    choice,
+                    weight,
+                    address(uint160(0x100 + i)),
+                    nonce,
+                    deadline
+                );
                 (uint8 v, bytes32 r, bytes32 s) = _signDigest(digest, privateKeys[i]);
 
                 _tokenized(address(mechanism)).castVoteWithSignature(

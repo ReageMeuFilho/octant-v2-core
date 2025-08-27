@@ -967,16 +967,46 @@ contract QuadraticVotingAccountingAuditTest is Test {
 
         // Alice votes the same amount (20) for each project
         vm.startPrank(alice);
-        _tokenized(address(mechanism)).castVote(currentTestCtx.pid1, TokenizedAllocationMechanism.VoteType.For, 20, recipient1); // Cost: 400
-        _tokenized(address(mechanism)).castVote(currentTestCtx.pid2, TokenizedAllocationMechanism.VoteType.For, 20, recipient2); // Cost: 400
-        _tokenized(address(mechanism)).castVote(currentTestCtx.pid3, TokenizedAllocationMechanism.VoteType.For, 20, recipient3); // Cost: 400
+        _tokenized(address(mechanism)).castVote(
+            currentTestCtx.pid1,
+            TokenizedAllocationMechanism.VoteType.For,
+            20,
+            recipient1
+        ); // Cost: 400
+        _tokenized(address(mechanism)).castVote(
+            currentTestCtx.pid2,
+            TokenizedAllocationMechanism.VoteType.For,
+            20,
+            recipient2
+        ); // Cost: 400
+        _tokenized(address(mechanism)).castVote(
+            currentTestCtx.pid3,
+            TokenizedAllocationMechanism.VoteType.For,
+            20,
+            recipient3
+        ); // Cost: 400
         vm.stopPrank();
 
         // Bob votes the same amount (15) for each project
         vm.startPrank(bob);
-        _tokenized(address(mechanism)).castVote(currentTestCtx.pid1, TokenizedAllocationMechanism.VoteType.For, 15, recipient1); // Cost: 225
-        _tokenized(address(mechanism)).castVote(currentTestCtx.pid2, TokenizedAllocationMechanism.VoteType.For, 15, recipient2); // Cost: 225
-        _tokenized(address(mechanism)).castVote(currentTestCtx.pid3, TokenizedAllocationMechanism.VoteType.For, 15, recipient3); // Cost: 225
+        _tokenized(address(mechanism)).castVote(
+            currentTestCtx.pid1,
+            TokenizedAllocationMechanism.VoteType.For,
+            15,
+            recipient1
+        ); // Cost: 225
+        _tokenized(address(mechanism)).castVote(
+            currentTestCtx.pid2,
+            TokenizedAllocationMechanism.VoteType.For,
+            15,
+            recipient2
+        ); // Cost: 225
+        _tokenized(address(mechanism)).castVote(
+            currentTestCtx.pid3,
+            TokenizedAllocationMechanism.VoteType.For,
+            15,
+            recipient3
+        ); // Cost: 225
         vm.stopPrank();
 
         vm.warp(currentTestCtx.startTime + VOTING_DELAY + VOTING_PERIOD + 1);

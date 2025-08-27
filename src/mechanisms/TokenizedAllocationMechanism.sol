@@ -316,7 +316,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         _;
     }
 
-
     // ---------- Initialization ----------
 
     /// @notice Initialize the allocation mechanism with configuration
@@ -596,7 +595,9 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         uint256 nonce = _getStorage().nonces[voter]++;
         _validateSignature(
             voter,
-            keccak256(abi.encode(CAST_VOTE_TYPEHASH, voter, pid, uint8(choice), weight, expectedRecipient, nonce, deadline)),
+            keccak256(
+                abi.encode(CAST_VOTE_TYPEHASH, voter, pid, uint8(choice), weight, expectedRecipient, nonce, deadline)
+            ),
             deadline,
             v,
             r,
@@ -606,7 +607,13 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     }
 
     /// @dev Internal vote execution logic
-    function _executeCastVote(address voter, uint256 pid, VoteType choice, uint256 weight, address expectedRecipient) private {
+    function _executeCastVote(
+        address voter,
+        uint256 pid,
+        VoteType choice,
+        uint256 weight,
+        address expectedRecipient
+    ) private {
         AllocationStorage storage s = _getStorage();
 
         // Validate proposal
@@ -641,7 +648,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         s.votingPower[voter] = newPower;
         emit VotesCast(voter, pid, weight);
     }
-
 
     // ---------- Vote Tally Finalization ----------
 
@@ -1073,16 +1079,16 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
      */
     function previewRedeem(uint256 shares) external view returns (uint256) {
         AllocationStorage storage s = _getStorage();
-        
+
         // Return 0 if outside redemption period [t_r_start, t_r_end]
         if (s.globalRedemptionStart == 0 || block.timestamp < s.globalRedemptionStart) {
             return 0; // Before redemption period starts
         }
-        
+
         if (s.globalRedemptionEndTime != 0 && block.timestamp > s.globalRedemptionEndTime) {
             return 0; // After redemption period ends
         }
-        
+
         return _convertToAssets(s, shares, Math.Rounding.Floor);
     }
 

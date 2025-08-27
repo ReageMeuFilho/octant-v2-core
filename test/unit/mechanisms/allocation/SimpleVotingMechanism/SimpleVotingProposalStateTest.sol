@@ -217,7 +217,12 @@ contract SimpleVotingProposalStateTest is Test {
 
         // Proposal 1: Insufficient votes (below quorum)
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pidLowVotes, TokenizedAllocationMechanism.VoteType.For, 150 ether, frank);
+        _tokenized(address(mechanism)).castVote(
+            pidLowVotes,
+            TokenizedAllocationMechanism.VoteType.For,
+            150 ether,
+            frank
+        );
 
         // Proposal 2: Negative net votes
         vm.prank(alice);
@@ -228,7 +233,12 @@ contract SimpleVotingProposalStateTest is Test {
             grace
         );
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pidNegativeVotes, TokenizedAllocationMechanism.VoteType.For, 200 ether, grace);
+        _tokenized(address(mechanism)).castVote(
+            pidNegativeVotes,
+            TokenizedAllocationMechanism.VoteType.For,
+            200 ether,
+            grace
+        );
 
         // Finalize voting
         vm.warp(votingEndTime + 1);
@@ -538,10 +548,20 @@ contract SimpleVotingProposalStateTest is Test {
 
         // Vote on remaining proposals
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pidSuccessful, TokenizedAllocationMechanism.VoteType.For, 600 ether, charlie);
+        _tokenized(address(mechanism)).castVote(
+            pidSuccessful,
+            TokenizedAllocationMechanism.VoteType.For,
+            600 ether,
+            charlie
+        );
 
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pidDefeated, TokenizedAllocationMechanism.VoteType.For, 150 ether, dave); // Below quorum
+        _tokenized(address(mechanism)).castVote(
+            pidDefeated,
+            TokenizedAllocationMechanism.VoteType.For,
+            150 ether,
+            dave
+        ); // Below quorum
 
         // Finalize
         vm.warp(votingEndTime + 1);

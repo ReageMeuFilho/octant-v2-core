@@ -207,7 +207,7 @@ abstract contract ProperQF {
 
         // Calculate quadratic funding on-demand as square of sum of square roots
         uint256 rawQuadraticFunding = project.sumSquareRoots * project.sumSquareRoots;
-        
+
         // Return all relevant metrics for the project
         return (
             project.sumContributions, // Total contributions

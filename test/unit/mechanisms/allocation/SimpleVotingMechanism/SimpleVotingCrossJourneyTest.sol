@@ -108,7 +108,12 @@ contract SimpleVotingCrossJourneyTest is Test {
         // Complex voting patterns
         // Alice: Strategic voter supporting energy and education
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pidCharlie, TokenizedAllocationMechanism.VoteType.For, 600 ether, charlie);
+        _tokenized(address(mechanism)).castVote(
+            pidCharlie,
+            TokenizedAllocationMechanism.VoteType.For,
+            600 ether,
+            charlie
+        );
 
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pidDave, TokenizedAllocationMechanism.VoteType.For, 400 ether, dave);
@@ -118,7 +123,12 @@ contract SimpleVotingCrossJourneyTest is Test {
         _tokenized(address(mechanism)).castVote(pidDave, TokenizedAllocationMechanism.VoteType.For, 400 ether, dave);
 
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pidCharlie, TokenizedAllocationMechanism.VoteType.Against, 100 ether, charlie);
+        _tokenized(address(mechanism)).castVote(
+            pidCharlie,
+            TokenizedAllocationMechanism.VoteType.Against,
+            100 ether,
+            charlie
+        );
 
         // Frank: Supporting healthcare
         vm.prank(frank);

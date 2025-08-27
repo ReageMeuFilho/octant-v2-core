@@ -252,7 +252,12 @@ contract QuadraticVotingVoterJourneyTest is Test {
         // Cannot vote with more power than available
         vm.expectRevert();
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, LARGE_DEPOSIT + 1, charlie);
+        _tokenized(address(mechanism)).castVote(
+            pid,
+            TokenizedAllocationMechanism.VoteType.For,
+            LARGE_DEPOSIT + 1,
+            charlie
+        );
 
         // Cannot vote twice
         _castVote(alice, pid, 8, charlie);

@@ -133,7 +133,12 @@ contract SimpleVotingAdminJourneyTest is Test {
         _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, 600 ether, charlie);
 
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.Against, 100 ether, charlie);
+        _tokenized(address(mechanism)).castVote(
+            pid1,
+            TokenizedAllocationMechanism.VoteType.Against,
+            100 ether,
+            charlie
+        );
 
         vm.prank(alice);
         _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 400 ether, dave);
@@ -229,10 +234,20 @@ contract SimpleVotingAdminJourneyTest is Test {
 
         // Create outcomes: one success, one failure
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pidSuccessful, TokenizedAllocationMechanism.VoteType.For, 800 ether, charlie);
+        _tokenized(address(mechanism)).castVote(
+            pidSuccessful,
+            TokenizedAllocationMechanism.VoteType.For,
+            800 ether,
+            charlie
+        );
 
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pidSuccessful, TokenizedAllocationMechanism.VoteType.For, 300 ether, charlie);
+        _tokenized(address(mechanism)).castVote(
+            pidSuccessful,
+            TokenizedAllocationMechanism.VoteType.For,
+            300 ether,
+            charlie
+        );
 
         // Failed proposal gets insufficient votes
         vm.prank(bob);

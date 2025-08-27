@@ -149,9 +149,19 @@ contract SimpleVotingRecipientJourneyTest is Test {
         // Create different voting outcomes
         // Charlie: Successful (meets quorum)
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pidCharlie, TokenizedAllocationMechanism.VoteType.For, 800 ether, charlie);
+        _tokenized(address(mechanism)).castVote(
+            pidCharlie,
+            TokenizedAllocationMechanism.VoteType.For,
+            800 ether,
+            charlie
+        );
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pidCharlie, TokenizedAllocationMechanism.VoteType.For, 200 ether, charlie);
+        _tokenized(address(mechanism)).castVote(
+            pidCharlie,
+            TokenizedAllocationMechanism.VoteType.For,
+            200 ether,
+            charlie
+        );
 
         // Dave: Failed (below quorum)
         vm.prank(bob);

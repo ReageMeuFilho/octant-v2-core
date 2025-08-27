@@ -139,7 +139,8 @@ contract QuadraticVotingSimpleTimelockTest is Test {
         _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 20, charlie); // Cost: 20^2 = 400
 
         // Verify proposal has non-zero funding before cancellation
-        (uint256 sumContributions, uint256 sumSquareRoots, uint256 quadraticFunding, uint256 linearFunding) = mechanism.getProposalFunding(pid);
+        (uint256 sumContributions, uint256 sumSquareRoots, uint256 quadraticFunding, uint256 linearFunding) = mechanism
+            .getProposalFunding(pid);
         assertTrue(sumContributions > 0, "Should have contributions before cancellation");
         assertTrue(sumSquareRoots > 0, "Should have square roots before cancellation");
         assertTrue(quadraticFunding > 0, "Should have quadratic funding before cancellation");
@@ -149,7 +150,10 @@ contract QuadraticVotingSimpleTimelockTest is Test {
         _tokenized(address(mechanism)).cancelProposal(pid);
 
         // Verify proposal is cancelled
-        assertEq(uint(_tokenized(address(mechanism)).state(pid)), uint(TokenizedAllocationMechanism.ProposalState.Canceled));
+        assertEq(
+            uint(_tokenized(address(mechanism)).state(pid)),
+            uint(TokenizedAllocationMechanism.ProposalState.Canceled)
+        );
 
         // Verify getProposalFunding returns all zeros for cancelled proposal
         (sumContributions, sumSquareRoots, quadraticFunding, linearFunding) = mechanism.getProposalFunding(pid);
@@ -198,7 +202,11 @@ contract QuadraticVotingSimpleTimelockTest is Test {
 
         // Phase 2: Before redemption period starts - should return 0
         vm.warp(globalRedemptionStart - 1);
-        assertEq(_tokenized(address(mechanism)).previewRedeem(testShares), 0, "Should return 0 before redemption starts");
+        assertEq(
+            _tokenized(address(mechanism)).previewRedeem(testShares),
+            0,
+            "Should return 0 before redemption starts"
+        );
 
         // Phase 3: During redemption period - should return non-zero
         vm.warp(globalRedemptionStart + 1);

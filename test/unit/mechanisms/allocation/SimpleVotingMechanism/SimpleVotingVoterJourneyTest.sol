@@ -192,14 +192,24 @@ contract SimpleVotingVoterJourneyTest is Test {
 
         // Full power voting
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, LARGE_DEPOSIT, charlie);
+        _tokenized(address(mechanism)).castVote(
+            pid1,
+            TokenizedAllocationMechanism.VoteType.For,
+            LARGE_DEPOSIT,
+            charlie
+        );
 
         assertEq(_tokenized(address(mechanism)).votingPower(alice), 0);
         // SimpleVoting now allows multiple votes per person, so we don't check hasVoted
 
         // Partial power voting across proposals
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.Against, 200 ether, charlie);
+        _tokenized(address(mechanism)).castVote(
+            pid1,
+            TokenizedAllocationMechanism.VoteType.Against,
+            200 ether,
+            charlie
+        );
         assertEq(_tokenized(address(mechanism)).votingPower(bob), 300 ether);
 
         vm.prank(bob);
@@ -252,7 +262,12 @@ contract SimpleVotingVoterJourneyTest is Test {
         // Cannot vote with more power than available
         vm.expectRevert();
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, LARGE_DEPOSIT + 1, charlie);
+        _tokenized(address(mechanism)).castVote(
+            pid,
+            TokenizedAllocationMechanism.VoteType.For,
+            LARGE_DEPOSIT + 1,
+            charlie
+        );
 
         // SimpleVoting now allows multiple votes per person
         // Alice can vote multiple times with remaining power
