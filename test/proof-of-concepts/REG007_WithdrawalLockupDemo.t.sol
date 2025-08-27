@@ -65,7 +65,7 @@ contract REG007WithdrawalLockupDemoTest is Test {
         // Now withdrawals work correctly without self-approval issues
         uint256 withdrawAmount = STAKE_AMOUNT / 2;
         regenStaker.withdraw(depositId, withdrawAmount);
-        
+
         // Verify withdrawal succeeded
         assertEq(stakeToken.balanceOf(user), withdrawAmount);
         assertEq(stakeToken.balanceOf(address(regenStaker)), STAKE_AMOUNT - withdrawAmount);

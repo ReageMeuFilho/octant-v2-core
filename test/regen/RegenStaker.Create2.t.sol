@@ -95,7 +95,7 @@ contract RegenStakerCreate2Test is Test {
     ) public {
         // Bound inputs - ensure both arrays exist and have elements
         if (delegatees.length == 0 || amounts.length == 0) return;
-        
+
         // Use the minimum of both array lengths to avoid out-of-bounds
         uint256 length = delegatees.length < amounts.length ? delegatees.length : amounts.length;
         length = bound(length, 1, 10);

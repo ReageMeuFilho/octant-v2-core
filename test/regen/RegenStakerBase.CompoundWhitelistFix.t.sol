@@ -320,7 +320,7 @@ contract RegenStakerBaseCompoundWhitelistFixTest is Test {
         // Always start with owner whitelisted to create deposit
         stakerWhitelist.addToWhitelist(depositor);
         earningPowerWhitelist.addToWhitelist(depositor);
-        
+
         if (claimerWhitelisted) {
             stakerWhitelist.addToWhitelist(whitelistedClaimer);
         }

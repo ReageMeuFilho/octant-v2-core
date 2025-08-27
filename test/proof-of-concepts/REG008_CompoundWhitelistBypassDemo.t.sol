@@ -95,7 +95,7 @@ contract REG008CompoundWhitelistBypassDemoTest is Test {
         vm.prank(whitelistedClaimer);
         vm.expectRevert(); // Expected to revert with NotWhitelisted
         regenStaker.compoundRewards(depositId);
-        
+
         // Verify balance unchanged - compound was correctly blocked
         uint256 balanceAfter = stakeToken.balanceOf(address(regenStaker.surrogates(makeAddr("delegatee"))));
         assertEq(balanceAfter, STAKE_AMOUNT); // No increase from compounding

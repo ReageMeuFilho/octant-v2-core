@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import "forge-std/console.sol";
 import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocationMechanism.sol";
 import { SimpleVotingMechanism } from "test/mocks/SimpleVotingMechanism.sol";
-import { AllocationMechanismFactory } from "src/mechanisms/AllocationMechanismFactory.sol";
+import { TestAllocationMechanismFactory } from "test/mocks/TestAllocationMechanismFactory.sol";
 import { AllocationConfig } from "src/mechanisms/BaseAllocationMechanism.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { ERC20Mock } from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
@@ -13,7 +13,7 @@ import { ERC20Mock } from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 /// @title Cross-Journey Integration Tests
 /// @notice Tests complete end-to-end workflows across voter, admin, and recipient journeys
 contract SimpleVotingCrossJourneyTest is Test {
-    AllocationMechanismFactory factory;
+    TestAllocationMechanismFactory factory;
     ERC20Mock token;
     SimpleVotingMechanism mechanism;
 
@@ -38,7 +38,7 @@ contract SimpleVotingCrossJourneyTest is Test {
     }
 
     function setUp() public {
-        factory = new AllocationMechanismFactory();
+        factory = new TestAllocationMechanismFactory();
         token = new ERC20Mock();
 
         // Mint tokens to all actors (including large amount for edge case testing)

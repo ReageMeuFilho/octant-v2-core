@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import "forge-std/console.sol";
 import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocationMechanism.sol";
 import { SimpleVotingMechanism } from "test/mocks/SimpleVotingMechanism.sol";
-import { AllocationMechanismFactory } from "src/mechanisms/AllocationMechanismFactory.sol";
+import { TestAllocationMechanismFactory } from "test/mocks/TestAllocationMechanismFactory.sol";
 import { AllocationConfig } from "src/mechanisms/BaseAllocationMechanism.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { ERC20Mock } from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
@@ -13,7 +13,7 @@ import { ERC20Mock } from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 /// @title Admin Journey Integration Tests
 /// @notice Comprehensive tests for admin user journey covering deployment, monitoring, and execution
 contract SimpleVotingAdminJourneyTest is Test {
-    AllocationMechanismFactory factory;
+    TestAllocationMechanismFactory factory;
     ERC20Mock token;
     SimpleVotingMechanism mechanism;
 
@@ -35,7 +35,7 @@ contract SimpleVotingAdminJourneyTest is Test {
     }
 
     function setUp() public {
-        factory = new AllocationMechanismFactory();
+        factory = new TestAllocationMechanismFactory();
         token = new ERC20Mock();
 
         token.mint(alice, 2000 ether);

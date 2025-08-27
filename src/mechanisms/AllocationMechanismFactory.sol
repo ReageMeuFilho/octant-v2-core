@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import { TokenizedAllocationMechanism } from "./TokenizedAllocationMechanism.sol";
-import { SimpleVotingMechanism } from "test/mocks/SimpleVotingMechanism.sol";
+// SimpleVotingMechanism import removed - moved to test helper
 import { QuadraticVotingMechanism } from "./mechanism/QuadraticVotingMechanism.sol";
 import { AllocationConfig } from "./BaseAllocationMechanism.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -40,24 +40,8 @@ contract AllocationMechanismFactory {
 
     // ---------- External Functions ----------
 
-    /// @notice Deploy a new SimpleVotingMechanism
-    /// @param _config Configuration parameters for the allocation mechanism
-    /// @return mechanism Address of the deployed mechanism
-    function deploySimpleVotingMechanism(AllocationConfig memory _config) external returns (address mechanism) {
-        // Set the deployer as the owner
-        _config.owner = msg.sender;
-
-        // Deploy new SimpleVotingMechanism using the shared implementation
-        mechanism = address(new SimpleVotingMechanism(tokenizedAllocationImplementation, _config));
-
-        // Track deployment
-        deployedMechanisms.push(mechanism);
-        isMechanism[mechanism] = true;
-
-        emit AllocationMechanismDeployed(mechanism, address(_config.asset), _config.name, _config.symbol, msg.sender);
-
-        return mechanism;
-    }
+    // deploySimpleVotingMechanism removed - SimpleVotingMechanism is test-only
+    // Use TestAllocationMechanismFactory in tests for this functionality
 
     /// @notice Deploy a new QuadraticVotingMechanism
     /// @param _config Configuration parameters for the allocation mechanism

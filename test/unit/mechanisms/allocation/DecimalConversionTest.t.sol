@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import { QuadraticVotingMechanism } from "src/mechanisms/mechanism/QuadraticVotingMechanism.sol";
 import { SimpleVotingMechanism } from "test/mocks/SimpleVotingMechanism.sol";
 import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocationMechanism.sol";
-import { AllocationMechanismFactory } from "src/mechanisms/AllocationMechanismFactory.sol";
+import { TestAllocationMechanismFactory } from "test/mocks/TestAllocationMechanismFactory.sol";
 import { AllocationConfig } from "src/mechanisms/BaseAllocationMechanism.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -29,7 +29,7 @@ contract MockTokenWithDecimals is ERC20 {
 
 /// @title Test decimal conversion in voting power calculation
 contract DecimalConversionTest is Test {
-    AllocationMechanismFactory factory;
+    TestAllocationMechanismFactory factory;
     MockTokenWithDecimals token6; // 6 decimals (USDC-like)
     MockTokenWithDecimals token8; // 8 decimals (Bitcoin-like)
     MockTokenWithDecimals token18; // 18 decimals (ETH-like)
@@ -41,7 +41,7 @@ contract DecimalConversionTest is Test {
     }
 
     function setUp() public {
-        factory = new AllocationMechanismFactory();
+        factory = new TestAllocationMechanismFactory();
 
         token6 = new MockTokenWithDecimals("USDC", "USDC", 6);
         token8 = new MockTokenWithDecimals("WBTC", "WBTC", 8);
