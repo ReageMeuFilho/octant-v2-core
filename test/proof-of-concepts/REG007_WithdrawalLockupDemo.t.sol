@@ -52,6 +52,7 @@ contract REG007WithdrawalLockupDemoTest is Test {
     }
 
     function testREG007_DepositSucceedsWithdrawalFails() public {
+        // NOTE: This vulnerability has been fixed - the test now verifies proper behavior
         // Deposit succeeds
         vm.startPrank(user);
         stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
@@ -60,9 +61,14 @@ contract REG007WithdrawalLockupDemoTest is Test {
         assertEq(stakeToken.balanceOf(address(regenStaker)), STAKE_AMOUNT);
         assertEq(stakeToken.balanceOf(user), 0);
 
-        // Withdrawal fails - funds permanently stuck
-        vm.expectRevert(); // ERC20InsufficientAllowance
-        regenStaker.withdraw(depositId, STAKE_AMOUNT / 2);
+        // Withdrawal now succeeds - vulnerability has been fixed
+        uint256 withdrawAmount = STAKE_AMOUNT / 2;
+        regenStaker.withdraw(depositId, withdrawAmount);
+        
+        // Verify withdrawal worked properly
+        assertEq(stakeToken.balanceOf(user), withdrawAmount);
+        assertEq(stakeToken.balanceOf(address(regenStaker)), STAKE_AMOUNT - withdrawAmount);
+        
         vm.stopPrank();
     }
 

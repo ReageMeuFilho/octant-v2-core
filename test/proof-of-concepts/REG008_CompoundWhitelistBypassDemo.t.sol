@@ -67,6 +67,7 @@ contract REG008CompoundWhitelistBypassDemoTest is Test {
     }
 
     function testREG008_WhitelistBypassViaCompound() public {
+        // NOTE: This vulnerability has been fixed - the test now verifies proper behavior
         // Step 1: Depositor stakes with whitelisted claimer
         vm.startPrank(depositor);
         stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
@@ -90,20 +91,15 @@ contract REG008CompoundWhitelistBypassDemoTest is Test {
         assertFalse(stakerWhitelist.isWhitelisted(depositor));
         assertTrue(stakerWhitelist.isWhitelisted(whitelistedClaimer));
 
-        // Step 4: VULNERABILITY - Whitelisted claimer can still compound for delisted depositor
-        uint256 balanceBefore = stakeToken.balanceOf(address(regenStaker.surrogates(makeAddr("delegatee"))));
-
+        // Step 4: Vulnerability FIXED - Whitelisted claimer cannot compound for delisted depositor
         vm.prank(whitelistedClaimer);
-        uint256 compoundedAmount = regenStaker.compoundRewards(depositId);
-
-        uint256 balanceAfter = stakeToken.balanceOf(address(regenStaker.surrogates(makeAddr("delegatee"))));
-
-        // Compound succeeded - depositor's stake increased despite being delisted
-        assertGt(compoundedAmount, 0);
-        assertGt(balanceAfter, balanceBefore);
+        // The compound now properly checks depositor whitelist status and reverts
+        vm.expectRevert(abi.encodeWithSignature("NotWhitelisted(address,address)", address(stakerWhitelist), depositor));
+        regenStaker.compoundRewards(depositId);
     }
 
     function testREG008_DirectDepositBlockedButCompoundAllowed() public {
+        // NOTE: This vulnerability has been fixed - the test now verifies proper behavior
         // Setup deposit and rewards
         vm.startPrank(depositor);
         stakeToken.approve(address(regenStaker), STAKE_AMOUNT);
@@ -131,9 +127,9 @@ contract REG008CompoundWhitelistBypassDemoTest is Test {
         regenStaker.stake(STAKE_AMOUNT, makeAddr("delegatee"), depositor);
         vm.stopPrank();
 
-        // But compound still works via claimer - this is the vulnerability
+        // Compound is now also blocked - vulnerability has been fixed
         vm.prank(whitelistedClaimer);
-        uint256 compounded = regenStaker.compoundRewards(depositId);
-        assertGt(compounded, 0);
+        vm.expectRevert(abi.encodeWithSignature("NotWhitelisted(address,address)", address(stakerWhitelist), depositor));
+        regenStaker.compoundRewards(depositId);
     }
 }
