@@ -69,11 +69,12 @@ contract QuadraticVotingVoterJourneyTest is Test {
     function _castVote(
         address voter,
         uint256 pid,
-        uint256 weight
+        uint256 weight,
+        address recipient
     ) internal returns (uint256 previousPower, uint256 newPower) {
         previousPower = _tokenized(address(mechanism)).votingPower(voter);
         vm.prank(voter);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, weight);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, weight, recipient);
         newPower = _tokenized(address(mechanism)).votingPower(voter);
     }
 
@@ -97,7 +98,6 @@ contract QuadraticVotingVoterJourneyTest is Test {
             quorumShares: QUORUM_REQUIREMENT,
             timelockDelay: 1 days,
             gracePeriod: 7 days,
-            startBlock: block.number + 50,
             owner: address(0)
         });
 
@@ -109,8 +109,13 @@ contract QuadraticVotingVoterJourneyTest is Test {
 
     /// @notice Test voter registration with various deposit amounts
     function testVoterRegistration_VariousDeposits() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // Use absolute timeline pattern
+        uint256 deploymentTime = block.timestamp;
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+
+        // Warp to just before voting starts (signup period)
+        vm.warp(votingStartTime - 1);
 
         // Large deposit registration
         _signupUser(alice, LARGE_DEPOSIT);
@@ -135,21 +140,32 @@ contract QuadraticVotingVoterJourneyTest is Test {
 
     /// @notice Test voter registration edge cases
     function testVoterRegistration_EdgeCases() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // Use absolute timeline pattern
+        uint256 deploymentTime = block.timestamp;
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
+
+        // Warp to just before voting starts (signup period)
+        vm.warp(votingStartTime - 1);
 
         // Register alice first
         _signupUser(alice, LARGE_DEPOSIT);
 
-        // Cannot register twice
+        // Can register multiple times in QuadraticVotingMechanism (accumulates voting power)
+        uint256 alicePowerBefore = _tokenized(address(mechanism)).votingPower(alice);
         vm.startPrank(alice);
         token.approve(address(mechanism), SMALL_DEPOSIT);
-        vm.expectRevert(abi.encodeWithSelector(TokenizedAllocationMechanism.AlreadyRegistered.selector, alice));
         _tokenized(address(mechanism)).signup(SMALL_DEPOSIT);
         vm.stopPrank();
 
+        // Verify voting power accumulated
+        uint256 alicePowerAfter = _tokenized(address(mechanism)).votingPower(alice);
+        assertEq(alicePowerAfter, alicePowerBefore + SMALL_DEPOSIT, "Multiple signups should accumulate voting power");
+
         // Cannot register after voting period ends
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
         vm.startPrank(henry);
         token.approve(address(mechanism), MEDIUM_DEPOSIT);
         vm.expectRevert();
@@ -157,7 +173,7 @@ contract QuadraticVotingVoterJourneyTest is Test {
         vm.stopPrank();
 
         // Can register at the last valid moment
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD - 1);
+        vm.warp(votingEndTime - 1);
         _signupUser(bob, MEDIUM_DEPOSIT);
 
         assertEq(_tokenized(address(mechanism)).votingPower(bob), MEDIUM_DEPOSIT);
@@ -165,8 +181,13 @@ contract QuadraticVotingVoterJourneyTest is Test {
 
     /// @notice Test comprehensive voting patterns
     function testVotingPatterns_Comprehensive() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // Use absolute timeline pattern
+        uint256 deploymentTime = block.timestamp;
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+
+        // Warp to just before voting starts (signup period)
+        vm.warp(votingStartTime - 1);
 
         // Register voters
         _signupUser(alice, LARGE_DEPOSIT);
@@ -177,26 +198,27 @@ contract QuadraticVotingVoterJourneyTest is Test {
         uint256 pid1 = _createProposal(alice, charlie, "Fund Charlie's Project");
         uint256 pid2 = _createProposal(bob, dave, "Fund Dave's Project");
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        // Warp to voting period
+        vm.warp(votingStartTime + 1);
 
         // Quadratic voting - cost is weight^2
         // Alice votes with weight 31, cost = 31^2 = 961 voting power
-        (uint256 alicePrevPower, uint256 aliceNewPower) = _castVote(alice, pid1, 31);
+        (uint256 alicePrevPower, uint256 aliceNewPower) = _castVote(alice, pid1, 31, charlie);
 
         assertEq(alicePrevPower - aliceNewPower, 31 * 31, "Alice should have spent 961 voting power");
         assertEq(aliceNewPower, LARGE_DEPOSIT - (31 * 31));
         assertTrue(mechanism.hasVoted(pid1, alice));
 
         // Bob votes with weight 10, cost = 10^2 = 100 voting power
-        _castVote(bob, pid1, 10);
+        _castVote(bob, pid1, 10, charlie);
         assertEq(_tokenized(address(mechanism)).votingPower(bob), MEDIUM_DEPOSIT - (10 * 10));
 
         // Bob votes again with weight 15, cost = 15^2 = 225 voting power
-        _castVote(bob, pid2, 15);
+        _castVote(bob, pid2, 15, dave);
         assertEq(_tokenized(address(mechanism)).votingPower(bob), MEDIUM_DEPOSIT - 100 - 225);
 
         // Frank votes with weight 5, cost = 5^2 = 25 voting power
-        _castVote(frank, pid2, 5);
+        _castVote(frank, pid2, 5, dave);
         assertEq(_tokenized(address(mechanism)).votingPower(frank), SMALL_DEPOSIT - 25);
 
         // Note: QuadraticVoting uses ProperQF tallying, not simple vote counts
@@ -205,56 +227,75 @@ contract QuadraticVotingVoterJourneyTest is Test {
 
     /// @notice Test voting error conditions
     function testVoting_ErrorConditions() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // Use absolute timeline pattern
+        uint256 deploymentTime = block.timestamp;
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
+
+        // Warp to just before voting starts (signup period)
+        vm.warp(votingStartTime - 1);
 
         _signupUser(alice, LARGE_DEPOSIT);
         uint256 pid = _createProposal(alice, charlie, "Test Proposal");
 
         // Cannot vote before voting period
-        vm.roll(startBlock + 50);
+        vm.warp(votingStartTime - 50);
         vm.expectRevert();
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 8);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 8, charlie);
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        // Warp to voting period
+        vm.warp(votingStartTime + 1);
 
         // Cannot vote with more power than available
         vm.expectRevert();
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, LARGE_DEPOSIT + 1);
+        _tokenized(address(mechanism)).castVote(
+            pid,
+            TokenizedAllocationMechanism.VoteType.For,
+            LARGE_DEPOSIT + 1,
+            charlie
+        );
 
         // Cannot vote twice
-        _castVote(alice, pid, 8);
+        _castVote(alice, pid, 8, charlie);
 
         vm.expectRevert(abi.encodeWithSelector(QuadraticVotingMechanism.AlreadyVoted.selector, alice, pid));
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 10);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 10, charlie);
 
         // Cannot vote after voting period
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
         vm.expectRevert();
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 8);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 8, charlie);
 
         // Unregistered user cannot vote
-        vm.roll(startBlock + VOTING_DELAY + 500);
+        vm.warp(votingStartTime + 500);
         vm.expectRevert();
         vm.prank(henry);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 1);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 1, charlie);
     }
 
     /// @notice Test voter power conservation and management
     function testVoterPower_ConservationAndManagement() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // Use absolute timeline pattern
+        uint256 deploymentTime = block.timestamp;
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+
+        // Warp to just before voting starts (signup period)
+        vm.warp(votingStartTime - 1);
 
         _signupUser(alice, LARGE_DEPOSIT);
 
         uint256 pid1 = _createProposal(alice, charlie, "Proposal 1");
         uint256 pid2 = _createProposal(alice, dave, "Proposal 2");
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        // Warp to voting period
+        vm.warp(votingStartTime + 1);
 
         // Track power consumption across multiple votes
         uint256 initialPower = _tokenized(address(mechanism)).votingPower(alice);
@@ -262,14 +303,14 @@ contract QuadraticVotingVoterJourneyTest is Test {
 
         // First vote - quadratic cost: 10^2 = 100
         uint256 vote1Weight = 10;
-        (uint256 prevPower1, uint256 newPower1) = _castVote(alice, pid1, vote1Weight);
+        (uint256 prevPower1, uint256 newPower1) = _castVote(alice, pid1, vote1Weight, charlie);
 
         assertEq(prevPower1, initialPower, "Initial power should match");
         assertEq(newPower1, initialPower - (vote1Weight * vote1Weight), "Power consumed correctly");
 
         // Second vote with remaining power
         uint256 vote2Weight = 10; // Quadratic cost: 10^2 = 100
-        _castVote(alice, pid2, vote2Weight);
+        _castVote(alice, pid2, vote2Weight, dave);
 
         uint256 powerAfterVote2 = _tokenized(address(mechanism)).votingPower(alice);
         assertEq(powerAfterVote2, initialPower - (vote1Weight * vote1Weight) - (vote2Weight * vote2Weight));

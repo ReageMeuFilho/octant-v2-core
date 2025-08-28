@@ -94,6 +94,19 @@ contract MorphoCompounderStrategyTest is Test {
         uint256 assetsReceived;
     }
 
+    // Setup parameters struct to avoid stack too deep
+    struct SetupParams {
+        address management;
+        address keeper;
+        address emergencyAdmin;
+        address donationAddress;
+        string vaultSharesName;
+        bytes32 strategySalt;
+        address implementationAddress;
+        bool enableBurning;
+        bool allowDepositDuringLoss;
+    }
+
     /**
      * @notice Helper function to airdrop tokens to a specified address
      * @param _asset The ERC20 token to airdrop
@@ -126,32 +139,46 @@ contract MorphoCompounderStrategyTest is Test {
         emergencyAdmin = address(0x3);
         donationAddress = address(0x4);
 
+        // Create setup params to avoid stack too deep
+        SetupParams memory params = SetupParams({
+            management: management,
+            keeper: keeper,
+            emergencyAdmin: emergencyAdmin,
+            donationAddress: donationAddress,
+            vaultSharesName: vaultSharesName,
+            strategySalt: strategySalt,
+            implementationAddress: address(implementation),
+            enableBurning: true,
+            allowDepositDuringLoss: true
+        });
+
         // Deploy factory
         factory = new MorphoCompounderStrategyFactory();
 
         // Deploy wrapper
         wrapper = new MorphoCompounderWrapper(
             YIELD_VAULT,
-            vaultSharesName,
-            management,
-            keeper,
-            emergencyAdmin,
-            donationAddress,
+            params.vaultSharesName,
+            params.management,
+            params.keeper,
+            params.emergencyAdmin,
+            params.donationAddress,
             false, // enableBurning
             address(tokenizedStrategy)
         );
 
         // Deploy strategy using the factory's createStrategy method
-        vm.startPrank(management);
+        vm.startPrank(params.management);
         address strategyAddress = factory.createStrategy(
-            vaultSharesName,
-            management,
-            keeper,
-            emergencyAdmin,
-            donationAddress,
-            true, // enableBurning
-            strategySalt,
-            address(implementation)
+            params.vaultSharesName,
+            params.management,
+            params.keeper,
+            params.emergencyAdmin,
+            params.donationAddress,
+            params.enableBurning,
+            params.strategySalt,
+            params.implementationAddress,
+            params.allowDepositDuringLoss
         );
         vm.stopPrank();
 
@@ -252,6 +279,10 @@ contract MorphoCompounderStrategyTest is Test {
         // Check total assets after harvest
         uint256 totalAssetsAfter = vault.totalAssets();
         assertEq(totalAssetsAfter, totalAssetsBefore, "Total assets should not change after harvest");
+
+        // Maintain obligations solvency by keeping current rate equal to last reported rate during redemption
+        vm.mockCall(YIELD_VAULT, abi.encodeWithSignature("pricePerShare()"), abi.encode(newExchangeRate));
+
         // Withdraw everything for user
         vm.startPrank(user);
         uint256 sharesToRedeem = vault.balanceOf(user);
@@ -338,7 +369,14 @@ contract MorphoCompounderStrategyTest is Test {
             state.donationBalanceBefore2,
             "Donation address should have received profit after second harvest"
         );
-        // Both users withdraw
+        // Maintain obligations solvency by keeping current rate equal to last reported rate during redemption
+        vm.mockCall(YIELD_VAULT, abi.encodeWithSignature("pricePerShare()"), abi.encode(state.newExchangeRate2));
+
+        // redeem the shares of the donation address first to ensure obligations solvency
+        vm.startPrank(donationAddress);
+        vault.redeem(vault.balanceOf(donationAddress), donationAddress, donationAddress);
+        vm.stopPrank();
+        // Then both users withdraw
         vm.startPrank(state.user1);
         state.user1Shares = vault.balanceOf(state.user1);
         state.user1Assets = vault.redeem(vault.balanceOf(state.user1), state.user1, state.user1);
@@ -346,10 +384,6 @@ contract MorphoCompounderStrategyTest is Test {
         vm.startPrank(state.user2);
         state.user2Shares = vault.balanceOf(state.user2);
         state.user2Assets = vault.redeem(vault.balanceOf(state.user2), state.user2, state.user2);
-        vm.stopPrank();
-        // redeem the shares of the donation address
-        vm.startPrank(donationAddress);
-        vault.redeem(vault.balanceOf(donationAddress), donationAddress, donationAddress);
         vm.stopPrank();
         // User 1 deposited before first yield accrual, so should have earned more
         assertApproxEqRel(

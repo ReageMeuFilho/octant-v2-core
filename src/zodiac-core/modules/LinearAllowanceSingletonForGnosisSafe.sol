@@ -212,27 +212,26 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
     function _executeTransfer(address safe, address delegate, address token, address to, uint256 amount) internal {
         uint256 beneficiaryPreBalance = getBalance(to, token);
 
+        bool success;
         if (token == NATIVE_TOKEN) {
-            ISafe(payable(safe)).execTransactionFromModule(to, amount, "", Enum.Operation.Call);
+            success = ISafe(payable(safe)).execTransactionFromModule(to, amount, "", Enum.Operation.Call);
         } else {
-            bytes memory data = abi.encodeWithSelector(IERC20.transfer.selector, to, amount);
-            ISafe(payable(safe)).execTransactionFromModule(token, 0, data, Enum.Operation.Call);
+            bytes memory data = abi.encodeCall(IERC20.transfer, (to, amount));
+            success = ISafe(payable(safe)).execTransactionFromModule(token, 0, data, Enum.Operation.Call);
         }
 
+        // Explicit success check for defense-in-depth
+        if (!success) revert SafeTransactionFailed();
+
+        // Maintain existing balance verification as primary security control
         uint256 beneficiaryPostBalance = getBalance(to, token);
         require(beneficiaryPostBalance - beneficiaryPreBalance >= amount, TransferFailed(safe, delegate, token));
     }
 
     function _calculateCurrentAllowance(LinearAllowance memory a) internal view returns (LinearAllowance memory) {
         uint256 newAccrued = _calculateNewAccrued(a);
-
-        if (a.lastBookedAtInSeconds == 0) {
-            a.lastBookedAtInSeconds = block.timestamp.toUint64();
-        } else if (newAccrued > 0) {
-            a.totalUnspent += newAccrued;
-            a.lastBookedAtInSeconds = block.timestamp.toUint64();
-        }
-
+        a.totalUnspent += newAccrued;
+        a.lastBookedAtInSeconds = block.timestamp.toUint64();
         return a;
     }
 
@@ -244,6 +243,6 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
         uint256 timeElapsed = block.timestamp - allowance.lastBookedAtInSeconds;
         uint256 newAccrued = (timeElapsed * allowance.dripRatePerDay) / 1 days;
 
-        return newAccrued > 0 ? newAccrued : 0;
+        return newAccrued;
     }
 }

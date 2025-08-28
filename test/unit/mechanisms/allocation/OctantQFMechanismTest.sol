@@ -61,7 +61,6 @@ contract OctantQFMechanismTest is Test {
             quorumShares: QUORUM_SHARES,
             timelockDelay: TIMELOCK_DELAY,
             gracePeriod: GRACE_PERIOD,
-            startBlock: block.number,
             owner: owner
         });
 
@@ -262,7 +261,7 @@ contract OctantQFMechanismTest is Test {
         uint256 pid = tam().propose(alice, "Test proposal");
 
         // Wait for voting delay
-        vm.roll(block.number + VOTING_DELAY + 1);
+        vm.warp(block.timestamp + VOTING_DELAY + 1);
 
         // All users vote with substantial weight
         // Each has 10,000e18 voting power, so they can vote with weight 60e9
@@ -271,11 +270,11 @@ contract OctantQFMechanismTest is Test {
         // This exceeds quorum of 10,000e18
         for (uint i = 0; i < users.length; i++) {
             vm.prank(users[i]);
-            tam().castVote(pid, TokenizedAllocationMechanism.VoteType.For, 60e9);
+            tam().castVote(pid, TokenizedAllocationMechanism.VoteType.For, 60e9, alice);
         }
 
         // Wait for voting period
-        vm.roll(block.number + VOTING_PERIOD + 1);
+        vm.warp(block.timestamp + VOTING_PERIOD + 1);
 
         // Finalize and queue
         vm.prank(owner);

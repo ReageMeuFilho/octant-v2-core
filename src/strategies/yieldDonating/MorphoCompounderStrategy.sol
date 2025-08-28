@@ -44,7 +44,9 @@ contract MorphoCompounderStrategy is BaseHealthCheck {
     }
 
     function availableDepositLimit(address /*_owner*/) public view override returns (uint256) {
-        return IERC4626(compounderVault).maxDeposit(address(this));
+        uint256 vaultLimit = IERC4626(compounderVault).maxDeposit(address(this));
+        uint256 idleBalance = IERC20(asset).balanceOf(address(this));
+        return vaultLimit > idleBalance ? vaultLimit - idleBalance : 0;
     }
 
     function availableWithdrawLimit(address /*_owner*/) public view override returns (uint256) {
@@ -60,20 +62,19 @@ contract MorphoCompounderStrategy is BaseHealthCheck {
     }
 
     function _emergencyWithdraw(uint256 _amount) internal override {
-        uint256 maxWithdrawableAssets = IERC4626(compounderVault).maxWithdraw(address(this));
-        _amount = _min(_amount, maxWithdrawableAssets);
         _freeFunds(_amount);
     }
 
     function _harvestAndReport() internal view override returns (uint256 _totalAssets) {
-        // get strategy's balance
+        // get strategy's balance in the vault
         uint256 shares = IERC4626(compounderVault).balanceOf(address(this));
-        _totalAssets = IERC4626(compounderVault).convertToAssets(shares);
+        uint256 vaultAssets = IERC4626(compounderVault).convertToAssets(shares);
+
+        // include idle funds as per BaseStrategy specification
+        uint256 idleAssets = IERC20(asset).balanceOf(address(this));
+
+        _totalAssets = vaultAssets + idleAssets;
 
         return _totalAssets;
-    }
-
-    function _min(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a < b ? a : b;
     }
 }

@@ -36,7 +36,6 @@ contract QuadraticVotingTimelockDebugTest is Test {
             quorumShares: 500,
             timelockDelay: 1 days,
             gracePeriod: 7 days,
-            startBlock: block.number + 50,
             owner: address(0)
         });
 
@@ -48,8 +47,12 @@ contract QuadraticVotingTimelockDebugTest is Test {
     }
 
     function testTimelockDebug() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // Get absolute timeline from contract
+        uint256 deploymentTime = block.timestamp;
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Setup
         vm.startPrank(alice);
@@ -58,11 +61,11 @@ contract QuadraticVotingTimelockDebugTest is Test {
         uint256 pid = _tokenized(address(mechanism)).propose(charlie, "Test");
         vm.stopPrank();
 
-        vm.roll(startBlock + 101);
+        vm.warp(votingStartTime + 1);
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 31); // 31^2 = 961 > 500 quorum
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 31, charlie); // 31^2 = 961 > 500 quorum
 
-        vm.roll(startBlock + 1101);
+        vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
 

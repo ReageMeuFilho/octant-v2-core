@@ -26,7 +26,7 @@ The system uses a hook-based architecture that allows implementers to customize 
 
 ### QuadraticVotingMechanism Implementation
 
-QuadraticVotingMechanism.sol is a concrete implementation that demonstrates the power of the Yearn V3 pattern:
+QuadraticVotingMechanism.sol is an **abstract base contract** that provides the foundation for both Quadratic Funding (QF) and Quadratic Voting (QV) implementations:
 
 **Key Features:**
 - **Quadratic Cost Voting**: To cast W votes, users pay W² voting power (prevents plutocracy)
@@ -35,6 +35,8 @@ QuadraticVotingMechanism.sol is a concrete implementation that demonstrates the 
 - **Single Vote Per Proposal**: Users can only vote once per proposal (prevents vote splitting attacks)
 - **Decimal Normalization**: Converts all voting power to 18 decimals for consistent calculations
 
+**Implementation Variants:**
+- **Quadratic Funding (QF)**: Users pay for voice credits → multiple signups appropriate for topping up
 **Hook Implementations:**
 1. **`_beforeProposeHook`**: Restricts proposal creation to keeper/management roles
 2. **`_getVotingPowerHook`**: Normalizes deposit amounts to 18 decimals regardless of asset decimals
@@ -47,6 +49,14 @@ QuadraticVotingMechanism.sol is a concrete implementation that demonstrates the 
 - Controls the balance between quadratic and linear funding: `F_j = α × (sum_sqrt)² + (1-α) × sum_contributions`
 - Can be dynamically calculated via `calculateOptimalAlpha()` to ensure 1:1 shares-to-assets ratio (ignoring decimals)
 - Adjustable by owner via `setAlpha()` for fine-tuning funding distribution
+
+**Rounding Discrepancy (Mathematical Precision):**
+- Due to integer division, total funding calculation differs from sum of individual project funding
+- **Global**: `F(c) = ⌊α × ||Φ^LR(c)||₁⌋ + ⌊(1-α) × ||Φ^CAP(c)||₁⌋` (alpha applied to aggregated sums)
+- **Individual**: `Fp(c) = ⌊α × Φ^LR(c)_p⌋ + ⌊(1-α) × Φ^CAP(c)_p⌋` (alpha applied per project)
+- **Invariant**: `∑p∈P Fp(c) ≤ F(c)` with error bound `ε ∈ {0, 1, ..., 2(|P| - 1)}`
+- **Practical Impact**: The discrepancy is negligible dust (≤ 2 wei per project) that ensures no over-allocation
+- **Fund Distribution**: All available funds are still distributed - the error bound represents minimal rounding loss
 
 **Security Features:**
 - Rejects ETH deposits via custom `receive()` function (prevents permanent fund loss)
@@ -93,9 +103,12 @@ The system implements **permissionless proposal queuing**, enabling flexible gov
 - **`_beforeSignupHook(address user)`** - Controls user registration eligibility
   - **Security Assumptions**: 
     - MUST return false for address(0) to prevent zero address registration
-    - MUST be view function to prevent state manipulation during validation
+    - CAN be stateful to implement custom registration tracking
     - SHOULD implement consistent eligibility criteria that cannot be gamed
-    - MUST NOT allow re-registration if user already has voting power
+    - MUST customize re-registration policy based on mechanism type:
+      - **QF Variants**: Allow multiple signups for voice credit top-ups
+      - **QV Variants**: Generally restrict to single signup for allocated voice credits
+      - **Custom Logic**: Implement mechanism-specific registration rules
 - **`_beforeProposeHook(address proposer)`** - Validates proposal creation rights
   - **Security Assumptions**:
     - MUST verify proposer has legitimate right to create proposals (e.g., voting power > 0, role-based access)
@@ -107,7 +120,6 @@ The system implements **permissionless proposal queuing**, enabling flexible gov
   - **Security Assumptions**:
     - MUST validate pid is within valid range (1 <= pid <= proposalCount)
     - MUST be view function for gas efficiency and security
-    - MUST NOT validate canceled proposals as valid
     - SHOULD be used consistently before any proposal state access
 - **`_beforeFinalizeVoteTallyHook()`** - Guards vote tally finalization
   - **Security Assumptions**:
@@ -145,7 +157,7 @@ The system implements **permissionless proposal queuing**, enabling flexible gov
   - **Security Assumptions**:
     - MUST implement fair and consistent vote-to-share conversion
     - MUST be view function for predictable outcomes
-    - MUST return 0 shares for proposals that don't meet quorum
+    - **Note**: Quorum enforcement is handled by `queueProposal()` which calls `hasQuorumHook()` before `convertVotesToShares()`
     - SHOULD consider total available assets to prevent over-allocation
     - MUST handle mathematical operations safely (no overflow/underflow)
     - MAY implement complex formulas (e.g., quadratic funding with alpha)
@@ -158,11 +170,17 @@ The system implements **permissionless proposal queuing**, enabling flexible gov
     - MUST return consistent recipient throughout proposal lifecycle
 - **`_requestCustomDistributionHook(address recipient, uint256 shares)`** - Handles custom share distribution
   - **Security Assumptions**:
-    - MUST return true ONLY if custom distribution is fully handled
-    - MUST mint/transfer exact share amount if returning true
-    - MUST NOT mint shares if returning false (default minting will occur)
-    - MAY implement vesting, splitting, or other distribution logic
+    - MUST return (true, assetsTransferred) ONLY if custom distribution is fully handled
+    - MUST transfer exact asset amount and report it for totalAssets accounting if returning true
+    - MUST return (false, 0) if using default minting (shares will be minted automatically)
+    - MAY implement vesting, splitting, threshold-based distribution, or other distribution logic
     - MUST handle reentrancy safely if making external calls
+    - MUST ensure totalAssets accounting remains accurate by reporting transferred amounts
+  - **Threshold-Based Distribution Pattern**: Common implementation strategy for conditional distribution:
+    - **Direct Transfer Mode**: Transfer assets directly based on allocation criteria to optimize gas or implement custom logic
+    - **Share Minting Mode**: Use default share minting for standard lifecycle management
+    - **Asset Conversion**: Use `convertToAssets(sharesToMint)` to determine equivalent asset amount for direct transfers
+    - **Conditional Logic**: Implement custom criteria to determine which distribution method to use
   - **Access Control Pattern**: Since `queueProposal()` is permissionless, this hook can enforce custom access control:
     - **Example**: `require(msg.sender == owner || hasRole(QUEUER_ROLE, msg.sender), "Unauthorized queuing")`
     - **Governance Models**: Can implement community-driven queuing, role-based access, or other patterns
@@ -180,7 +198,6 @@ The system implements **permissionless proposal queuing**, enabling flexible gov
     - MUST accurately reflect total assets available for distribution
     - MUST include any external funding sources (matching pools, grants)
     - MUST be view function when called during finalization
-    - SHOULD snapshot values if they might change after finalization
     - MUST NOT double-count assets or include unauthorized funds
 
 ### BaseAllocationMechanism Deep Dive
@@ -235,9 +252,10 @@ This pattern enables complete code reuse while maintaining storage isolation and
 - **Requirement:** Users must be able to register with optional asset deposits to gain voting power
 - **Implementation:** `signup(uint256 deposit)` function in TokenizedAllocationMechanism with `_beforeSignupHook()` and `_getVotingPowerHook()` in strategy
 - **Acceptance Criteria:**
-  - Users can only register once during voting period
+  - Registration restrictions are mechanism-specific via `_beforeSignupHook()` implementation
   - Registration requires hook validation to pass via `IBaseAllocationStrategy` interface
   - Voting power is calculated through customizable hook in strategy contract
+  - Multiple signups accumulate voting power (if allowed by mechanism - appropriate for QF, should be restricted for QV)
   - Asset deposits are transferred securely using ERC20 transferFrom
   - Operation blocked when contract is paused (`whenNotPaused` modifier)
 
@@ -271,13 +289,16 @@ This pattern enables complete code reuse while maintaining storage isolation and
 
 #### FR-5: Proposal Queuing & Share Allocation
 - **Requirement:** Successful proposals must be queued and vault shares minted to recipients
-- **Implementation:** `queueProposal(uint256 pid)` with `_requestDistributionHook()` and direct `_mint()` calls
+- **Implementation:** `queueProposal(uint256 pid)` with `_requestCustomDistributionHook()` and direct `_mint()` calls
 - **Access Control Design:** `queueProposal` is **permissionless** to enable flexible governance models, but access control can be enforced via `_requestCustomDistributionHook()` if needed
 - **Acceptance Criteria:**
   - Can only queue proposals after tally finalization
   - Proposals must meet quorum requirements via `_hasQuorumHook()`
   - Share amount determined by `_convertVotesToShares()` hook
-  - Shares actually minted to recipient via internal `_mint()` function
+  - Shares actually minted to recipient via internal `_mint()` function OR custom distribution via hook
+  - **Custom Distribution Accounting**: If `_requestCustomDistributionHook()` returns `(true, assetsTransferred)`, then:
+    - `totalAssets` is reduced by `assetsTransferred` to maintain accurate accounting
+    - Prevents accounting discrepancies between actual balance and `totalAssets` tracking
   - Timelock delay applied before redemption eligibility
   - **Permissionless queuing** enables community-driven execution without admin bottlenecks
   - **Custom distribution hook** can implement access control or other types of distributions altogether
@@ -286,7 +307,7 @@ This pattern enables complete code reuse while maintaining storage isolation and
 - **Requirement:** System must track and expose proposal states throughout lifecycle
 - **Implementation:** `state(uint256 pid)` and `_state()` functions with comprehensive state machine
 - **Acceptance Criteria:**
-  - States: Pending, Active, Canceled, Defeated, Succeeded, Queued, Expired
+  - States: Pending, Active, Canceled, Defeated, Succeeded, Queued, Redeemable, Expired
   - State transitions follow predefined rules based on timing and votes
   - Canceled proposals remain permanently canceled
   - Grace period handling for expired proposals
@@ -373,9 +394,9 @@ This pattern enables complete code reuse while maintaining storage isolation and
 ## System Invariants & Constraints
 
 ### Timing Invariants
-1. **Voting Window**: `startBlock + votingDelay ≤ voting period ≤ startBlock + votingDelay + votingPeriod`
-2. **Registration Cutoff**: Users can only register before `startBlock + votingDelay + votingPeriod`
-3. **Tally Finalization**: Can only occur after `startBlock + votingDelay + votingPeriod`
+1. **Voting Window**: `startTime + votingDelay ≤ voting period ≤ startTime + votingDelay + votingPeriod`
+2. **Registration Cutoff**: Users can only register before `startTime + votingDelay + votingPeriod`
+3. **Tally Finalization**: Can only occur after `startTime + votingDelay + votingPeriod`
 4. **Timelock Enforcement**: Shares redeemable only after `block.timestamp ≥ eta`
 5. **Grace Period**: 
    - Share redemption window: From `globalRedemptionStart` to `globalRedemptionStart + gracePeriod`
@@ -385,7 +406,11 @@ This pattern enables complete code reuse while maintaining storage isolation and
 
 ### Power Conservation Invariants
 1. **Non-Increasing Power**: `_processVoteHook()` must return `newPower ≤ oldPower`
-2. **Single Registration**: Each address can only call `signup()` once
+2. **Multiple Registration Policy**: Registration restrictions are mechanism-specific via `_beforeSignupHook()`
+   - **QuadraticVotingMechanism (Abstract)**: Allows multiple signups by default - serves as base for both QF and QV variants
+   - **Quadratic Funding (QF) Variants**: Multiple signups appropriate since users pay for additional voice credits  
+   - **Quadratic Voting (QV) Variants**: Should generally restrict to single signup since QV assumes users claim allocated voice credits once
+   - **Custom Mechanisms**: Can implement any signup policy through hook customization
 
 ### State Consistency Invariants
 1. **Unique Recipients**: Each recipient address used in at most one proposal
@@ -423,7 +448,7 @@ Voters are community members who deposit assets to gain voting power and partici
 - Voter can now participate in voting
 
 **Key Constraints:**
-- One-time registration only (cannot re-register)
+- Registration policy varies by mechanism (see Multiple Registration Policy in System Invariants)
 - Must register before voting period ends
 - **No asset recovery** - deposited tokens locked until mechanism concludes
 - Voting power calculation customizable per mechanism

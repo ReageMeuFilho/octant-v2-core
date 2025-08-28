@@ -35,7 +35,6 @@ contract QuadraticVotingBasicTimelockTest is Test {
             quorumShares: 500, // Adjusted for quadratic funding
             timelockDelay: 1000, // 1000 seconds
             gracePeriod: 5000, // 5000 seconds
-            startBlock: block.number + 5,
             owner: address(0)
         });
 
@@ -45,37 +44,44 @@ contract QuadraticVotingBasicTimelockTest is Test {
     }
 
     function testBasicTimelock() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // Get the voting delay and period from the mechanism
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
 
-        // Setup - register and create proposal
+        // Calculate timeline based on deployment time (setUp runs at timestamp 1)
+        uint256 deploymentTime = 1; // Default foundry timestamp
+        uint256 votingStartTime = deploymentTime + votingDelay; // 1 + 10 = 11
+        uint256 votingEndTime = votingStartTime + votingPeriod; // 11 + 100 = 111
+
+        // Setup - register and create proposal (before voting starts)
         vm.startPrank(alice);
         token.approve(address(mechanism), 1000 ether);
         _tokenized(address(mechanism)).signup(1000 ether);
         uint256 pid = _tokenized(address(mechanism)).propose(charlie, "Test");
         vm.stopPrank();
 
-        // Vote
-        vm.roll(startBlock + 11);
+        // Vote - advance to voting period
+        vm.warp(votingStartTime);
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 31); // 31^2 = 961 > 500 quorum
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 31, charlie); // 31^2 = 961 > 500 quorum
 
-        // Finalize - this sets the global redemption start time
-        vm.roll(startBlock + 111);
-        uint256 finalizeTime = block.timestamp; // Should be 1
+        // Finalize - advance past voting period
+        vm.warp(votingEndTime + 1);
+        uint256 finalizeTime = block.timestamp; // Should be 112
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
 
         // Check that global redemption start was set during finalization
+        uint256 timelockDelay = _tokenized(address(mechanism)).timelockDelay();
         assertEq(
             _tokenized(address(mechanism)).globalRedemptionStart(),
-            finalizeTime + 1000,
+            finalizeTime + timelockDelay,
             "Should have globalRedemptionStart set after finalize"
         );
         assertEq(_tokenized(address(mechanism)).balanceOf(charlie), 0, "Should have no shares before queue");
 
         // Queue proposal
-        assertEq(block.timestamp, 1, "Should be at timestamp 1");
+        assertEq(block.timestamp, finalizeTime, "Should be at finalize timestamp");
         (bool success2, ) = address(mechanism).call(abi.encodeWithSignature("queueProposal(uint256)", pid));
         require(success2, "Queue failed");
 
@@ -84,7 +90,7 @@ contract QuadraticVotingBasicTimelockTest is Test {
         // Global redemption start remains the same (set during finalize)
         assertEq(
             _tokenized(address(mechanism)).globalRedemptionStart(),
-            finalizeTime + 1000,
+            finalizeTime + timelockDelay,
             "globalRedemptionStart should not change after queue"
         );
 
@@ -92,19 +98,20 @@ contract QuadraticVotingBasicTimelockTest is Test {
         assertEq(_tokenized(address(mechanism)).maxRedeem(charlie), 0, "Should be blocked at queue time");
 
         // Should be blocked during timelock period (1 second before expiry)
-        vm.warp(finalizeTime + 999);
+        vm.warp(finalizeTime + timelockDelay - 1);
         assertEq(_tokenized(address(mechanism)).maxRedeem(charlie), 0, "Should be blocked 1 second before expiry");
 
         // Should be allowed at timelock expiry
-        vm.warp(finalizeTime + 1000);
+        vm.warp(finalizeTime + timelockDelay);
         assertGt(_tokenized(address(mechanism)).maxRedeem(charlie), 0, "Should be allowed at timelock expiry");
 
         // Should still be allowed after timelock expiry
-        vm.warp(finalizeTime + 1001);
+        vm.warp(finalizeTime + timelockDelay + 1);
         assertGt(_tokenized(address(mechanism)).maxRedeem(charlie), 0, "Should be allowed after timelock expiry");
 
         // Should be blocked after grace period expires
-        vm.warp(finalizeTime + 1000 + 5000 + 1);
+        uint256 gracePeriod = _tokenized(address(mechanism)).gracePeriod();
+        vm.warp(finalizeTime + timelockDelay + gracePeriod + 1);
         assertEq(_tokenized(address(mechanism)).maxRedeem(charlie), 0, "Should be blocked after grace period");
     }
 }

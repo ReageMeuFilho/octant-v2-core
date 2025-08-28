@@ -24,6 +24,9 @@ contract SkyCompounderStrategy is BaseHealthCheck, UniswapV3Swapper, ISkyCompoun
     ///@notice yearn's referral code
     uint16 public referral = 13425;
 
+    ///@notice Minimum amount out for swaps (absolute value)
+    uint256 public minAmountOut = 0; // Default 0 = no protection
+
     address public immutable staking;
     address public immutable rewardsToken;
 
@@ -61,8 +64,6 @@ contract SkyCompounderStrategy is BaseHealthCheck, UniswapV3Swapper, ISkyCompoun
         require(IStaking(_staking).paused() == false, "paused");
         require(USDS == IStaking(_staking).stakingToken(), "!stakingToken");
         rewardsToken = IStaking(_staking).rewardsToken();
-        ERC20(USDS).forceApprove(_staking, type(uint256).max);
-        ERC20(rewardsToken).forceApprove(UNIV2ROUTER, type(uint256).max);
         staking = _staking;
         base = USDS;
         minAmountToSell = 50e18; // Set the min amount for the swapper to sell
@@ -145,6 +146,17 @@ contract SkyCompounderStrategy is BaseHealthCheck, UniswapV3Swapper, ISkyCompoun
         emit ReferralUpdated(_referral);
     }
 
+    /**
+     * @notice Set the minimum amount out for swaps
+     * @param _minAmountOut minimum amount out (absolute value)
+     * @dev This protects against MEV attacks by ensuring minimum output amounts.
+     * Set to 0 to disable protection (not recommended for production).
+     */
+    function setMinAmountOut(uint256 _minAmountOut) external onlyManagement {
+        minAmountOut = _minAmountOut;
+        emit MinAmountOutUpdated(_minAmountOut);
+    }
+
     function availableDepositLimit(address /*_owner*/) public view override returns (uint256) {
         bool paused = IStaking(staking).paused();
         if (paused) return 0;
@@ -168,6 +180,7 @@ contract SkyCompounderStrategy is BaseHealthCheck, UniswapV3Swapper, ISkyCompoun
     }
 
     function _deployFunds(uint256 _amount) internal override {
+        _checkAllowance(staking, address(asset), _amount);
         IStaking(staking).stake(_amount, referral);
     }
 
@@ -176,18 +189,19 @@ contract SkyCompounderStrategy is BaseHealthCheck, UniswapV3Swapper, ISkyCompoun
     }
 
     function _harvestAndReport() internal override returns (uint256 _totalAssets) {
-        // MEV PROTECTION: The swaps below use minAmountOut=0 which creates front-running vulnerability.
-        // Strategy keepers MUST use private RPCs (Flashbots Protect) to prevent sandwich attacks
-        // until proper slippage protection is implemented. Without private mempool protection,
-        // MEV bots can extract significant value from these reward swaps.
         if (claimRewards) {
             IStaking(staking).getReward();
-            if (useUniV3) {
-                // UniV3
-                _swapFrom(rewardsToken, address(asset), balanceOfRewards(), 0); // minAmountOut = 0 since we only sell rewards
-            } else {
-                // UniV2
-                _uniV2swapFrom(rewardsToken, address(asset), balanceOfRewards(), 0); // minAmountOut = 0 since we only sell rewards
+            // MEV PROTECTION: Use setMinAmountOut() to configure slippage protection.
+            // Strategy keepers should set appropriate minAmountOut values and use private RPCS to prevent sandwich attacks.
+            uint256 rewardBalance = balanceOfRewards();
+            if (rewardBalance > 0) {
+                if (useUniV3) {
+                    // UniV3
+                    _swapFrom(rewardsToken, address(asset), rewardBalance, minAmountOut);
+                } else {
+                    // UniV2
+                    _uniV2swapFrom(rewardsToken, address(asset), rewardBalance, minAmountOut);
+                }
             }
         }
 
@@ -195,15 +209,16 @@ contract SkyCompounderStrategy is BaseHealthCheck, UniswapV3Swapper, ISkyCompoun
         if (TokenizedStrategy.isShutdown()) {
             _totalAssets = balance + balanceOfStake();
         } else {
-            if (balance > ASSET_DUST) {
+            if (balance > ASSET_DUST && !IStaking(staking).paused()) {
                 _deployFunds(balance);
             }
-            _totalAssets = balanceOfStake();
+            _totalAssets = balanceOfStake() + balanceOfAsset();
         }
     }
 
     function _uniV2swapFrom(address _from, address _to, uint256 _amountIn, uint256 _minAmountOut) internal {
-        if (_amountIn > minAmountToSell) {
+        if (_amountIn >= minAmountToSell) {
+            _checkAllowance(UNIV2ROUTER, _from, _amountIn);
             IUniswapV2Router02(UNIV2ROUTER).swapExactTokensForTokens(
                 _amountIn,
                 _minAmountOut,

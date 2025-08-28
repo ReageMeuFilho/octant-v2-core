@@ -26,6 +26,9 @@ contract QuadraticVotingDebugTimelockTest is Test {
     }
 
     function setUp() public {
+        // Set timestamp before deploying mechanism
+        vm.warp(100000);
+
         factory = new AllocationMechanismFactory();
         token = new ERC20Mock();
         token.mint(alice, 2000 ether);
@@ -39,7 +42,6 @@ contract QuadraticVotingDebugTimelockTest is Test {
             quorumShares: 500,
             timelockDelay: TIMELOCK_DELAY,
             gracePeriod: 7 days,
-            startBlock: block.number + 50,
             owner: address(0)
         });
 
@@ -49,26 +51,23 @@ contract QuadraticVotingDebugTimelockTest is Test {
     }
 
     function testDebugTimelock() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
-
-        // Start with clean timestamp
-        vm.warp(100000);
         console.log("Initial timestamp:", block.timestamp);
 
-        // Setup successful proposal
+        // Setup successful proposal during delay period (before voting starts)
         vm.startPrank(alice);
         token.approve(address(mechanism), LARGE_DEPOSIT);
         _tokenized(address(mechanism)).signup(LARGE_DEPOSIT);
         uint256 pid = _tokenized(address(mechanism)).propose(charlie, "Charlie's Project");
         vm.stopPrank();
 
-        vm.roll(startBlock + 101);
+        // Move to voting period: startTime + votingDelay = 100000 + 100 = 100100
+        vm.warp(100100);
 
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 31); // 31^2 = 961 > 500 quorum
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 31, charlie); // 31^2 = 961 > 500 quorum
 
-        vm.roll(startBlock + 1101);
+        // Move past voting period: startTime + votingDelay + votingPeriod = 100000 + 100 + 1000 = 101100
+        vm.warp(101101);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
 

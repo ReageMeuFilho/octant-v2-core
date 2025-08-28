@@ -41,7 +41,6 @@ contract SimpleVotingDefeatedStateTest is Test {
             quorumShares: QUORUM_REQUIREMENT,
             timelockDelay: 1 days,
             gracePeriod: 7 days,
-            startBlock: block.number + 50,
             owner: address(0)
         });
 
@@ -50,8 +49,12 @@ contract SimpleVotingDefeatedStateTest is Test {
     }
 
     function testDebugDefeatedState() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism was deployed
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Setup voter
         vm.startPrank(alice);
@@ -66,11 +69,12 @@ contract SimpleVotingDefeatedStateTest is Test {
         vm.prank(alice);
         uint256 pid = _tokenized(address(mechanism)).propose(frank, "Frank's Low Vote Proposal");
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        // Use absolute warps for voting
+        vm.warp(votingStartTime + 1);
 
         // Vote with insufficient amount (150 ether < 200 ether quorum)
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 150 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 150 ether, frank);
 
         console.log("Votes cast: 150 ether");
 
@@ -80,8 +84,8 @@ contract SimpleVotingDefeatedStateTest is Test {
         console.log("Against votes:", againstVotes / 1e18);
         console.log("Abstain votes:", abstainVotes / 1e18);
 
-        // Finalize voting
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        // Finalize voting - use absolute warp for finalization
+        vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
 

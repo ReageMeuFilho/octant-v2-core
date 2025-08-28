@@ -3,7 +3,14 @@ pragma solidity >=0.8.25;
 
 import { Test } from "forge-std/Test.sol";
 import { console } from "forge-std/console.sol";
+import { ERC20Mock } from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
+
 import { YieldDonatingTokenizedStrategy } from "src/strategies/yieldDonating/YieldDonatingTokenizedStrategy.sol";
+import { BaseStrategy, ERC20 } from "src/core/BaseStrategy.sol";
+import { MockYieldSource } from "test/mocks/core/tokenized-strategies/MockYieldSource.sol";
+import { MockStrategy } from "test/mocks/core/tokenized-strategies/MockStrategy.sol";
+import { IMockStrategy } from "test/mocks/zodiac-core/IMockStrategy.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import { DeployYieldDonatingStrategy } from "script/deploy/DeployYieldDonatingStrategy.s.sol";
 
 /**
@@ -80,7 +87,7 @@ contract YieldDonatingTokenizedStrategyTest is Test {
     function testInheritedFunctions() public view {
         // Test accessing the API version
         string memory apiVersion = strategy.apiVersion();
-        assertEq(apiVersion, "3.0.4", "API version should match parent contract");
+        assertEq(apiVersion, "1.0.0", "API version should match parent contract");
     }
 
     /**

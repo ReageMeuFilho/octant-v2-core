@@ -91,7 +91,8 @@ contract SkyCompounderStrategyFactoryTest is Test {
             donationAddress,
             true, // enableBurning
             strategySalt,
-            address(tokenizedStrategy)
+            address(tokenizedStrategy),
+            true // allowDepositDuringLoss
         );
         vm.stopPrank();
 
@@ -125,7 +126,8 @@ contract SkyCompounderStrategyFactoryTest is Test {
             donationAddress,
             true, // enableBurning
             firstSalt,
-            address(tokenizedStrategy)
+            address(tokenizedStrategy),
+            true // allowDepositDuringLoss
         );
 
         // Create second strategy for same user
@@ -140,7 +142,8 @@ contract SkyCompounderStrategyFactoryTest is Test {
             donationAddress,
             true, // enableBurning
             secondSalt,
-            address(tokenizedStrategy)
+            address(tokenizedStrategy),
+            true // allowDepositDuringLoss
         );
         vm.stopPrank();
 
@@ -175,7 +178,8 @@ contract SkyCompounderStrategyFactoryTest is Test {
             donationAddress,
             true, // enableBurning
             firstSalt,
-            address(tokenizedStrategy)
+            address(tokenizedStrategy),
+            true // allowDepositDuringLoss
         );
         vm.stopPrank();
 
@@ -192,7 +196,8 @@ contract SkyCompounderStrategyFactoryTest is Test {
             donationAddress,
             true, // enableBurning
             secondSalt,
-            address(tokenizedStrategy)
+            address(tokenizedStrategy),
+            true // allowDepositDuringLoss
         );
         vm.stopPrank();
 
@@ -224,7 +229,8 @@ contract SkyCompounderStrategyFactoryTest is Test {
             donationAddress,
             true, // enableBurning
             strategySalt,
-            address(tokenizedStrategy)
+            address(tokenizedStrategy),
+            true // allowDepositDuringLoss
         );
         vm.stopPrank();
 
@@ -241,7 +247,8 @@ contract SkyCompounderStrategyFactoryTest is Test {
             donationAddress,
             true, // enableBurning
             strategySalt,
-            address(tokenizedStrategy)
+            address(tokenizedStrategy),
+            true // allowDepositDuringLoss
         );
         vm.stopPrank();
 
@@ -261,7 +268,8 @@ contract SkyCompounderStrategyFactoryTest is Test {
             donationAddress,
             true, // enableBurning
             differentSalt,
-            address(tokenizedStrategy)
+            address(tokenizedStrategy),
+            true // allowDepositDuringLoss
         );
         vm.stopPrank();
 

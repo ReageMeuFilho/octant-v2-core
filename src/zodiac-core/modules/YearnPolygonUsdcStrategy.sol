@@ -2,8 +2,7 @@
 pragma solidity >=0.8.18;
 
 import { DragonBaseStrategy, ERC20 } from "src/zodiac-core/vaults/DragonBaseStrategy.sol";
-import { Math } from "@openzeppelin/contracts//utils/math/Math.sol";
-import { IBaseStrategy } from "src/zodiac-core/interfaces/IBaseStrategy.sol";
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { IStrategy } from "src/zodiac-core/interfaces/IStrategy.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC4626Payable } from "src/zodiac-core/interfaces/IERC4626Payable.sol";
@@ -61,7 +60,7 @@ contract YearnPolygonUsdcStrategy is DragonBaseStrategy {
     }
 
     function _deployFunds(uint256 _amount) internal override {
-        uint256 limit = IBaseStrategy(YIELD_SOURCE).availableDepositLimit(address(this));
+        uint256 limit = IStrategy(YIELD_SOURCE).availableDepositLimit(address(this));
         _amount = Math.min(_amount, limit);
         if (_amount > 0) {
             IERC4626Payable(YIELD_SOURCE).deposit(_amount, address(this));

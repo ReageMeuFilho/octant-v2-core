@@ -23,8 +23,6 @@ abstract contract ProperQF {
     struct Project {
         uint256 sumContributions; // Sum of contributions (Sum_j)
         uint256 sumSquareRoots; // Sum of square roots (S_j)
-        uint256 quadraticFunding; // Quadratic term (F_quad_j)
-        uint256 linearFunding; // Linear term (F_linear_j)
     }
 
     /// @notice Main storage struct containing all mutable state for ProperQF
@@ -128,15 +126,16 @@ abstract contract ProperQF {
         uint256 newSumContributions = project.sumContributions + contribution;
 
         // Calculate quadratic funding - no overflow risk with uint256
+        uint256 oldQuadraticFunding = project.sumSquareRoots * project.sumSquareRoots;
         uint256 newQuadraticFunding = newSumSquareRoots * newSumSquareRoots;
 
         // Update global sums with underflow protection (keep checked for safety)
-        if (s.totalQuadraticSum < project.quadraticFunding) revert QuadraticSumUnderflow();
-        if (s.totalLinearSum < project.linearFunding) revert LinearSumUnderflow();
+        if (s.totalQuadraticSum < oldQuadraticFunding) revert QuadraticSumUnderflow();
+        if (s.totalLinearSum < project.sumContributions) revert LinearSumUnderflow();
 
         // Update global sums
-        uint256 newTotalQuadraticSum = s.totalQuadraticSum - project.quadraticFunding + newQuadraticFunding;
-        uint256 newTotalLinearSum = s.totalLinearSum - project.linearFunding + newSumContributions;
+        uint256 newTotalQuadraticSum = s.totalQuadraticSum - oldQuadraticFunding + newQuadraticFunding;
+        uint256 newTotalLinearSum = s.totalLinearSum - project.sumContributions + newSumContributions;
 
         s.totalQuadraticSum = newTotalQuadraticSum;
         s.totalLinearSum = newTotalLinearSum;
@@ -144,8 +143,6 @@ abstract contract ProperQF {
         // Update project state - batch storage writes
         project.sumSquareRoots = newSumSquareRoots;
         project.sumContributions = newSumContributions;
-        project.quadraticFunding = newQuadraticFunding;
-        project.linearFunding = newSumContributions;
 
         s.projects[projectId] = project;
 
@@ -156,6 +153,10 @@ abstract contract ProperQF {
     /**
      * @dev Calculate weighted total funding using alpha parameter
      * @return The weighted total funding across all projects
+     * @dev IMPORTANT: Due to integer division rounding, totalFunding >= sum of individual project funding
+     * @dev The discrepancy ε satisfies: 0 ≤ ε ≤ 2(|P| - 1) where |P| is the number of projects
+     * @dev This discrepancy is negligible in practice and ensures no over-allocation occurs
+     * @dev All available funds are still distributed - the error represents dust amounts
      */
     function _calculateWeightedTotalFunding() internal view returns (uint256) {
         ProperQFStorage storage s = _getProperQFStorage();
@@ -186,8 +187,12 @@ abstract contract ProperQF {
      * @param projectId The ID of the project to tally
      * @return sumContributions The total sum of all contributions for the project
      * @return sumSquareRoots The sum of square roots of all contributions
-     * @return quadraticFunding The raw quadratic funding component (S_j^2)
-     * @return linearFunding The raw linear funding component (Sum_j)
+     * @return quadraticFunding The alpha-weighted quadratic funding: ⌊α × S_j²⌋
+     * @return linearFunding The alpha-weighted linear funding: ⌊(1-α) × Sum_j⌋
+     * @dev ROUNDING DISCREPANCY: Due to per-project integer division, sum of all project
+     * @dev funding ≤ totalFunding(). The discrepancy ε is bounded: 0 ≤ ε ≤ 2(|P| - 1)
+     * @dev where |P| is the total number of projects. This is negligible dust that ensures
+     * @dev no over-allocation while maintaining full fund distribution.
      */
     function getTally(
         uint256 projectId
@@ -200,11 +205,14 @@ abstract contract ProperQF {
         ProperQFStorage storage s = _getProperQFStorage();
         Project storage project = s.projects[projectId];
 
+        // Calculate quadratic funding on-demand as square of sum of square roots
+        uint256 rawQuadraticFunding = project.sumSquareRoots * project.sumSquareRoots;
+
         // Return all relevant metrics for the project
         return (
             project.sumContributions, // Total contributions
             project.sumSquareRoots, // Sum of square roots
-            (project.quadraticFunding * s.alphaNumerator) / s.alphaDenominator, // Alpha-weighted quadratic funding
+            (rawQuadraticFunding * s.alphaNumerator) / s.alphaDenominator, // Alpha-weighted quadratic funding
             (project.sumContributions * (s.alphaDenominator - s.alphaNumerator)) / s.alphaDenominator // Alpha-weighted linear funding (1-α) × Sum_j
         );
     }

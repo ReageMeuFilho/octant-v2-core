@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
+import "forge-std/console.sol";
 import { RegenStaker } from "src/regen/RegenStaker.sol";
 import { RegenStakerBase } from "src/regen/RegenStakerBase.sol";
 import { RegenEarningPowerCalculator } from "src/regen/RegenEarningPowerCalculator.sol";
@@ -1754,7 +1755,8 @@ contract RegenIntegrationTest is Test {
         compoundRegenStaker.setMinimumStakeAmount(uint128(0));
 
         sameToken.mint(user, stakeAmount);
-        sameToken.mint(address(compoundRegenStaker), rewardAmount);
+        // Protection requires balance >= totalStaked + rewardAmount
+        sameToken.mint(address(compoundRegenStaker), stakeAmount + rewardAmount);
 
         vm.startPrank(user);
         sameToken.approve(address(compoundRegenStaker), stakeAmount);
@@ -1825,7 +1827,8 @@ contract RegenIntegrationTest is Test {
         uint256 rewardAmount = getRewardAmount(rewardAmountBase);
 
         sameToken.mint(user, stakeAmount);
-        sameToken.mint(address(compoundRegenStaker), rewardAmount);
+        // Protection requires balance >= totalStaked + rewardAmount
+        sameToken.mint(address(compoundRegenStaker), stakeAmount + rewardAmount);
 
         vm.startPrank(user);
         sameToken.approve(address(compoundRegenStaker), stakeAmount);
@@ -1901,7 +1904,8 @@ contract RegenIntegrationTest is Test {
         }
 
         sameToken.mint(user, stakeAmount);
-        sameToken.mint(address(compoundRegenStaker), rewardAmount);
+        // Protection requires balance >= totalStaked + rewardAmount
+        sameToken.mint(address(compoundRegenStaker), stakeAmount + rewardAmount);
 
         vm.startPrank(user);
         sameToken.approve(address(compoundRegenStaker), stakeAmount);
@@ -1917,7 +1921,7 @@ contract RegenIntegrationTest is Test {
         (uint96 balanceBefore, , , , , , ) = compoundRegenStaker.deposits(depositId);
         uint256 feeCollectorBalanceBefore = sameToken.balanceOf(feeCollector);
 
-        if (unclaimedBefore < feeAmount) {
+        if (unclaimedBefore <= feeAmount) {
             vm.prank(user);
             uint256 compoundedAmount = compoundRegenStaker.compoundRewards(depositId);
             assertEq(compoundedAmount, 0);
@@ -1972,7 +1976,8 @@ contract RegenIntegrationTest is Test {
         uint256 rewardAmount = getRewardAmount(rewardAmountBase);
 
         sameToken.mint(user, stakeAmount);
-        sameToken.mint(address(compoundRegenStaker), rewardAmount * compoundTimes);
+        // Multiple compounds need extra buffer for totalStaked growth
+        sameToken.mint(address(compoundRegenStaker), stakeAmount + rewardAmount * compoundTimes * 2);
 
         vm.startPrank(user);
         sameToken.approve(address(compoundRegenStaker), stakeAmount);
@@ -2050,7 +2055,11 @@ contract RegenIntegrationTest is Test {
 
         currentTestCtx.sameToken.mint(currentTestCtx.user1, currentTestCtx.user1Stake);
         currentTestCtx.sameToken.mint(currentTestCtx.user2, currentTestCtx.user2Stake);
-        currentTestCtx.sameToken.mint(address(currentTestCtx.compoundRegenStaker), currentTestCtx.rewardAmount);
+        // Protection requires balance >= totalStaked + rewardAmount
+        currentTestCtx.sameToken.mint(
+            address(currentTestCtx.compoundRegenStaker),
+            currentTestCtx.user1Stake + currentTestCtx.user2Stake + currentTestCtx.rewardAmount
+        );
 
         vm.startPrank(currentTestCtx.user1);
         currentTestCtx.sameToken.approve(address(currentTestCtx.compoundRegenStaker), currentTestCtx.user1Stake);
@@ -2179,7 +2188,8 @@ contract RegenIntegrationTest is Test {
         uint256 rewardAmount = getRewardAmount(rewardAmountBase);
 
         sameToken.mint(user, stakeAmount);
-        sameToken.mint(address(compoundRegenStaker), rewardAmount);
+        // Protection requires balance >= totalStaked + rewardAmount
+        sameToken.mint(address(compoundRegenStaker), stakeAmount + rewardAmount);
 
         vm.startPrank(user);
         sameToken.approve(address(compoundRegenStaker), stakeAmount);
@@ -2248,7 +2258,8 @@ contract RegenIntegrationTest is Test {
         uint256 rewardAmount = rewardAmountBase * (10 ** decimals);
 
         sameToken.mint(user, stakeAmount);
-        sameToken.mint(address(compoundRegenStaker), rewardAmount);
+        // Protection requires balance >= totalStaked + rewardAmount
+        sameToken.mint(address(compoundRegenStaker), stakeAmount + rewardAmount);
 
         vm.startPrank(user);
         sameToken.approve(address(compoundRegenStaker), stakeAmount);
@@ -2311,11 +2322,10 @@ contract RegenIntegrationTest is Test {
             name: "Test Allocation",
             symbol: "TEST",
             votingDelay: 1,
-            votingPeriod: 1000,
+            votingPeriod: 8 days, // Extended to ensure voting period overlaps with reward accumulation
             quorumShares: 1e18,
             timelockDelay: 1 days,
             gracePeriod: 7 days,
-            startBlock: block.number + 1,
             owner: address(0) // Will be set by factory
         });
 
@@ -2332,9 +2342,15 @@ contract RegenIntegrationTest is Test {
         // Setup
         currentTestCtx.stakeAmount = getStakeAmount(1000);
         currentTestCtx.rewardAmount = getRewardAmount(10000);
-        currentTestCtx.contributeAmount = getRewardAmount(100); // Use a smaller, more realistic amount
+        currentTestCtx.contributeAmount = getRewardAmount(1); // Much smaller amount to match partial voting period accumulation
 
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism will be deployed
         currentTestCtx.allocationMechanism = _deployAllocationMechanism();
+        uint256 votingDelay = TokenizedAllocationMechanism(currentTestCtx.allocationMechanism).votingDelay();
+        uint256 votingPeriod = TokenizedAllocationMechanism(currentTestCtx.allocationMechanism).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Advance to allow signup (startBlock + votingDelay period)
         vm.roll(block.number + 5);
@@ -2353,7 +2369,16 @@ contract RegenIntegrationTest is Test {
         // Notify rewards
         vm.prank(ADMIN);
         regenStaker.notifyRewardAmount(currentTestCtx.rewardAmount);
-        vm.warp(block.timestamp + regenStaker.rewardDuration());
+
+        // Warp to voting period and ensure sufficient rewards have accrued
+        // Warp to near end of voting period to accumulate maximum rewards
+        uint256 timeInVotingPeriod = votingEndTime - (votingPeriod / 10); // 90% through voting period
+        vm.warp(timeInVotingPeriod);
+
+        console.log("Voting start:", votingStartTime);
+        console.log("Voting end:", votingEndTime);
+        console.log("Current time:", block.timestamp);
+        console.log("Time in voting period?", block.timestamp >= votingStartTime && block.timestamp <= votingEndTime);
 
         // Verify alice has unclaimed rewards
         currentTestCtx.unclaimedBefore = regenStaker.unclaimedReward(currentTestCtx.depositId);
@@ -2431,7 +2456,7 @@ contract RegenIntegrationTest is Test {
 
         currentTestCtx.stakeAmount = getStakeAmount(1000);
         currentTestCtx.rewardAmount = getRewardAmount(100000); // Much larger reward amount to ensure sufficient rewards
-        currentTestCtx.contributeAmount = currentTestCtx.rewardAmount / 100; // Use 1% of total rewards to ensure it's available
+        currentTestCtx.contributeAmount = getRewardAmount(10); // Small amount to match partial voting period accumulation
 
         // Setup with fees - make fee amount relative to contribution amount to avoid underflow
         currentTestCtx.feeAmount = currentTestCtx.contributeAmount / 10; // 10% of contribution as fee
@@ -2448,7 +2473,13 @@ contract RegenIntegrationTest is Test {
 
         currentTestCtx.netContribution = currentTestCtx.contributeAmount - currentTestCtx.feeAmount;
 
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism will be deployed
         currentTestCtx.allocationMechanism = _deployAllocationMechanism();
+        uint256 votingDelay = TokenizedAllocationMechanism(currentTestCtx.allocationMechanism).votingDelay();
+        uint256 votingPeriod = TokenizedAllocationMechanism(currentTestCtx.allocationMechanism).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Advance to allow signup (startBlock + votingDelay period)
         vm.roll(block.number + 5);
@@ -2467,7 +2498,24 @@ contract RegenIntegrationTest is Test {
         // Notify rewards
         vm.prank(ADMIN);
         regenStaker.notifyRewardAmount(currentTestCtx.rewardAmount);
-        vm.warp(block.timestamp + regenStaker.rewardDuration());
+
+        // Warp to voting period and ensure sufficient rewards have accrued
+        // Warp to near end of voting period to accumulate maximum rewards
+        uint256 timeInVotingPeriod = votingEndTime - (votingPeriod / 10); // 90% through voting period
+        vm.warp(timeInVotingPeriod);
+
+        console.log("Voting start:", votingStartTime);
+        console.log("Voting end:", votingEndTime);
+        console.log("Current time:", block.timestamp);
+        console.log("Time in voting period?", block.timestamp >= votingStartTime && block.timestamp <= votingEndTime);
+
+        // Verify alice has unclaimed rewards
+        currentTestCtx.unclaimedBefore = regenStaker.unclaimedReward(currentTestCtx.depositId);
+        assertGt(
+            currentTestCtx.unclaimedBefore,
+            currentTestCtx.contributeAmount,
+            "Alice should have sufficient unclaimed rewards"
+        );
 
         // Create signature for the net contribution (after fees)
         currentTestCtx.nonce = TokenizedAllocationMechanism(currentTestCtx.allocationMechanism).nonces(alice);
@@ -2755,7 +2803,6 @@ contract RegenIntegrationTest is Test {
             quorumShares: 1e18,
             timelockDelay: 1 days,
             gracePeriod: 7 days,
-            startBlock: block.number + 1,
             owner: address(0)
         });
         address allocationMechanism = allocationFactory.deploySimpleVotingMechanism(config);

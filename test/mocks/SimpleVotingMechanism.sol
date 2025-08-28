@@ -18,6 +18,9 @@ contract SimpleVotingMechanism is BaseAllocationMechanism {
 
     /// @notice Mapping of proposal ID to vote tallies
     mapping(uint256 => VoteTally) public voteTallies;
+
+    /// @notice Mapping to track which users have already signed up to prevent multiple registrations
+    mapping(address => bool) public hasSignedUp;
     constructor(
         address _implementation,
         AllocationConfig memory _config
@@ -25,9 +28,18 @@ contract SimpleVotingMechanism is BaseAllocationMechanism {
 
     // ---------- Internal Hook Implementations ----------
 
-    /// @dev Allow all users to sign up
-    function _beforeSignupHook(address) internal pure override returns (bool) {
-        return true;
+    /// @dev Allow users to sign up only if they haven't already registered
+    /// @dev Maintains explicit tracking to prevent re-registration even after voting power is spent
+    function _beforeSignupHook(address user) internal override returns (bool) {
+        // Check if user has already signed up
+        if (hasSignedUp[user]) {
+            return false; // Block re-registration
+        }
+
+        // Mark user as having signed up
+        hasSignedUp[user] = true;
+
+        return true; // Allow registration
     }
 
     /// @dev Only allow users with voting power to propose
@@ -129,10 +141,14 @@ contract SimpleVotingMechanism is BaseAllocationMechanism {
 
     /// @dev Handle custom share distribution - returns false to use default minting
     /// @return handled False to indicate default minting should be used
-    function _requestCustomDistributionHook(address, uint256) internal pure override returns (bool) {
+    /// @return assetsTransferred 0 since no custom distribution is performed
+    function _requestCustomDistributionHook(
+        address,
+        uint256
+    ) internal pure override returns (bool handled, uint256 assetsTransferred) {
         // Return false to indicate we want to use the default share minting in TokenizedAllocationMechanism
         // This allows the base implementation to handle the minting via _mint()
-        return false;
+        return (false, 0);
     }
 
     /// @dev Get available withdraw limit for share owner with timelock and grace period enforcement

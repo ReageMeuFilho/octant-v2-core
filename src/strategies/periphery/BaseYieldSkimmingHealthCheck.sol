@@ -38,6 +38,15 @@ abstract contract BaseYieldSkimmingHealthCheck is BaseStrategy, IBaseHealthCheck
     // Defaults loss limit to 0.
     uint16 private _lossLimitRatio;
 
+    /// @notice Emitted when the health check flag is updated
+    event HealthCheckUpdated(bool doHealthCheck);
+
+    /// @notice Emitted when the profit limit ratio is updated
+    event ProfitLimitRatioUpdated(uint256 newProfitLimitRatio);
+
+    /// @notice Emitted when the loss limit ratio is updated
+    event LossLimitRatioUpdated(uint256 newLossLimitRatio);
+
     constructor(
         address _asset,
         string memory _name,
@@ -81,7 +90,7 @@ abstract contract BaseYieldSkimmingHealthCheck is BaseStrategy, IBaseHealthCheck
     /**
      * @notice Set the `profitLimitRatio`.
      * @dev Denominated in basis points. I.E. 1_000 == 10%.
-     * @param _newProfitLimitRatio The mew profit limit ratio.
+     * @param _newProfitLimitRatio The new profit limit ratio.
      */
     function setProfitLimitRatio(uint256 _newProfitLimitRatio) external onlyManagement {
         _setProfitLimitRatio(_newProfitLimitRatio);
@@ -90,12 +99,31 @@ abstract contract BaseYieldSkimmingHealthCheck is BaseStrategy, IBaseHealthCheck
     /**
      * @dev Internally set the profit limit ratio. Denominated
      * in basis points. I.E. 1_000 == 10%.
-     * @param _newProfitLimitRatio The mew profit limit ratio.
+     * @param _newProfitLimitRatio The new profit limit ratio.
      */
     function _setProfitLimitRatio(uint256 _newProfitLimitRatio) internal {
         require(_newProfitLimitRatio > 0, "!zero profit");
         require(_newProfitLimitRatio <= type(uint16).max, "!too high");
         _profitLimitRatio = uint16(_newProfitLimitRatio);
+        emit ProfitLimitRatioUpdated(_newProfitLimitRatio);
+    }
+
+    /**
+     * @notice Returns the current exchange rate in RAY format
+     * @return The current exchange rate in RAY format.
+     */
+    function getCurrentRateRay() public view returns (uint256) {
+        uint256 currentRate = IYieldSkimmingStrategy(address(this)).getCurrentExchangeRate();
+        uint256 decimals = IYieldSkimmingStrategy(address(this)).decimalsOfExchangeRate();
+
+        // Convert directly to RAY (27 decimals) to avoid precision loss
+        if (decimals < 27) {
+            return currentRate * 10 ** (27 - decimals);
+        } else if (decimals > 27) {
+            return currentRate / 10 ** (decimals - 27);
+        } else {
+            return currentRate;
+        }
     }
 
     /**
@@ -115,6 +143,7 @@ abstract contract BaseYieldSkimmingHealthCheck is BaseStrategy, IBaseHealthCheck
     function _setLossLimitRatio(uint256 _newLossLimitRatio) internal {
         require(_newLossLimitRatio < MAX_BPS, "!loss limit");
         _lossLimitRatio = uint16(_newLossLimitRatio);
+        emit LossLimitRatioUpdated(_newLossLimitRatio);
     }
 
     /**
@@ -124,6 +153,7 @@ abstract contract BaseYieldSkimmingHealthCheck is BaseStrategy, IBaseHealthCheck
      */
     function setDoHealthCheck(bool _doHealthCheck) public onlyManagement {
         doHealthCheck = _doHealthCheck;
+        emit HealthCheckUpdated(_doHealthCheck);
     }
 
     /**
@@ -148,8 +178,8 @@ abstract contract BaseYieldSkimmingHealthCheck is BaseStrategy, IBaseHealthCheck
             return;
         }
 
-        uint256 currentExchangeRate = IYieldSkimmingStrategy(address(this)).getLastRateRay().rayToWad();
-        uint256 newExchangeRate = IYieldSkimmingStrategy(address(this)).getCurrentExchangeRate();
+        uint256 currentExchangeRate = IYieldSkimmingStrategy(address(this)).getLastRateRay();
+        uint256 newExchangeRate = IYieldSkimmingStrategy(address(this)).getCurrentRateRay();
 
         if (currentExchangeRate < newExchangeRate) {
             require(

@@ -12,7 +12,7 @@ import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.s
 import { IERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 
 // Staker Library Imports
-import { Staker, SafeCast, SafeERC20, IERC20 } from "staker/Staker.sol";
+import { Staker, DelegationSurrogate, SafeCast, SafeERC20, IERC20 } from "staker/Staker.sol";
 import { StakerOnBehalf } from "staker/extensions/StakerOnBehalf.sol";
 import { StakerPermitAndStake } from "staker/extensions/StakerPermitAndStake.sol";
 
@@ -34,23 +34,49 @@ import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocation
 ///         - Reward compounding (when REWARD_TOKEN == STAKE_TOKEN)
 ///         - Reward contribution to whitelisted allocation mechanisms
 ///         - Admin controls (pause/unpause, config updates)
-/// @dev PRECISION IMPLICATIONS: Variable reward durations affect calculation precision. The original Staker contract assumed a fixed
-///      30-day duration for optimal precision. This contract allows 7-3000 days, providing flexibility at the cost of potential precision loss.
-///      Shorter durations (especially < 30 days) can increase the margin of error in reward calculations by up to ~1% due to increased
-///      reward rates amplifying rounding errors in scaled arithmetic operations. This is an intentional design trade-off favoring
-///      operational flexibility over mathematical precision. For maximum precision, prefer longer reward durations (≥30 days).
+///
+/// @dev CLAIMER PERMISSION MODEL:
+///      Claimers are trusted entities designated by deposit owners with specific permissions:
+///
+///      Permission Matrix:
+///      ┌─────────────────────────┬──────────┬─────────┐
+///      │ Operation               │ Owner    │ Claimer │
+///      ├─────────────────────────┼──────────┼─────────┤
+///      │ Claim rewards           │ ✓        │ ✓       │
+///      │ Compound rewards*†      │ ✓        │ ✓       │
+///      │ Contribute to public‡   │ ✓        │ ✓       │
+///      │ Stake more              │ ✓        │ ✗       │
+///      │ Withdraw                │ ✓        │ ✗       │
+///      │ Alter delegatee         │ ✓        │ ✗       │
+///      │ Alter claimer           │ ✓        │ ✗       │
+///      └─────────────────────────┴──────────┴─────────┘
+///      * Compounding increases deposit stake (intended behavior)
+///      † Compounding requires the deposit owner to be whitelisted; caller may be owner or claimer
+///      ‡ Claimer may contribute only if on the contribution whitelist; mechanism must be whitelisted
+///      § VOTING POWER: The contributor (msg.sender) receives voting power in the allocation mechanism,
+///         NOT the deposit owner. When a claimer contributes, the claimer gets voting power.
+///
+///      When designating a claimer, owners explicitly trust them with:
+///      1. Claiming accrued rewards on their behalf
+///      2. Compounding rewards to increase stake position (when REWARD_TOKEN == STAKE_TOKEN)
+///      3. Contributing unclaimed rewards to whitelisted allocation mechanisms (subject to contribution whitelist)
+///      4. Receiving voting power in allocation mechanisms when they contribute (claimer gets voting power, not owner)
+///
+///      Security boundaries are maintained:
+///      - Claimers cannot withdraw principal or rewards to arbitrary addresses
+///      - Claimers cannot modify deposit parameters
+///      - Owners can revoke claimer designation at any time via alterClaimer()
+///
+/// @notice Token requirements: STAKE_TOKEN and REWARD_TOKEN must be standard ERC-20 tokens.
+///         Unsupported token behaviors include fee-on-transfer/deflationary mechanisms, rebasing,
+///         or non-standard return values. Accounting assumes transferred amount equals requested
+///         amount; non-standard tokens can break deposits, withdrawals, or reward accounting.
+/// @dev Integer division causes ~1 wei precision loss, negligible due to SCALE_FACTOR (1e36).
 /// @dev This base is abstract, with variants implementing token-specific behaviors (e.g., delegation surrogates).
 /// @dev Earning power updates are required after balance changes; some are automatic, others via bumpEarningPower.
 /// @dev If rewards should not be taxable, set MAX_CLAIM_FEE to 0 in deployment.
 abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, StakerPermitAndStake, StakerOnBehalf {
     using SafeCast for uint256;
-
-    // === Constants ===
-    /// @notice Minimum allowed reward duration in seconds (7 days).
-    uint256 public constant MIN_REWARD_DURATION = 7 days;
-
-    /// @notice Maximum allowed reward duration to prevent excessively long reward periods.
-    uint256 public constant MAX_REWARD_DURATION = 3000 days;
 
     // === Structs ===
     /// @notice Struct to hold shared configuration state
@@ -62,6 +88,13 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         IWhitelist contributionWhitelist;
         IWhitelist allocationMechanismWhitelist;
     }
+
+    // === Constants ===
+    /// @notice Minimum allowed reward duration in seconds (7 days).
+    uint256 public constant MIN_REWARD_DURATION = 7 days;
+
+    /// @notice Maximum allowed reward duration to prevent excessively long reward periods.
+    uint256 public constant MAX_REWARD_DURATION = 3000 days;
 
     // === Custom Errors ===
     /// @notice Error thrown when an address is not whitelisted
@@ -92,6 +125,9 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @notice Error thrown when raising minimum stake amount during active reward
     error CannotRaiseMinimumStakeAmountDuringActiveReward();
 
+    /// @notice Error thrown when attempting to increase max bump tip during active reward
+    error CannotRaiseMaxBumpTipDuringActiveReward();
+
     /// @notice Error thrown for zero amount operations
     error ZeroOperation();
 
@@ -100,6 +136,11 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
 
     /// @notice Error thrown when attempting to disable allocation whitelist
     error DisablingAllocationMechanismWhitelistNotAllowed();
+
+    /// @notice Error thrown when reward token doesn't match allocation mechanism's expected asset
+    /// @param expected The expected token (REWARD_TOKEN)
+    /// @param actual The actual token expected by the allocation mechanism
+    error AssetMismatch(address expected, address actual);
 
     // === State Variables ===
     /// @notice Shared configuration state instance
@@ -148,6 +189,10 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         uint256 newBalance,
         uint256 newEarningPower
     );
+
+    /// @notice Error thrown when a required surrogate is missing
+    /// @param delegatee The delegatee for which a surrogate was expected
+    error SurrogateNotFound(address delegatee);
 
     /// @notice Emitted when the minimum stake amount is updated
     /// @param newMinimumStakeAmount The new minimum stake amount
@@ -211,7 +256,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @param _minimumStakeAmount The min stake amount
     /// @param _stakerWhitelist Staker whitelist
     /// @param _contributionWhitelist Contribution whitelist
-    /// @param _allocationMechanismWhitelist Allocation mechanism whitelist
+    /// @param _allocationMechanismWhitelist Allocation mechanism whitelist (cannot be address(0))
     /// @param _eip712Name The EIP712 domain name
     constructor(
         IERC20 _rewardsToken,
@@ -233,6 +278,12 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     {
         MAX_CLAIM_FEE = _maxClaimFee;
         _setClaimFeeParameters(ClaimFeeParameters({ feeAmount: 0, feeCollector: address(0) }));
+
+        // Enable self-transfers for compound operations when stake and reward tokens are the same
+        // This allows compoundRewards to use _stakeTokenSafeTransferFrom with address(this) as source
+        if (address(STAKE_TOKEN) == address(REWARD_TOKEN)) {
+            SafeERC20.safeIncreaseAllowance(STAKE_TOKEN, address(this), type(uint256).max);
+        }
 
         // Initialize shared state
         _initializeSharedState(
@@ -263,19 +314,45 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
             _rewardDuration >= MIN_REWARD_DURATION && _rewardDuration <= MAX_REWARD_DURATION,
             InvalidRewardDuration(uint256(_rewardDuration))
         );
+        // Align initialization invariants with setters: allocation mechanism whitelist cannot be disabled
+        require(
+            address(_allocationMechanismWhitelist) != address(0),
+            DisablingAllocationMechanismWhitelistNotAllowed()
+        );
+        // Sanity check: Allocation mechanism whitelist must be distinct from other whitelists
+        require(
+            address(_allocationMechanismWhitelist) != address(_stakerWhitelist) &&
+                address(_allocationMechanismWhitelist) != address(_contributionWhitelist),
+            Staker__InvalidAddress()
+        );
 
+        // Emit events first to match setter ordering
+        emit RewardDurationSet(_rewardDuration);
+        emit MinimumStakeAmountSet(_minimumStakeAmount);
+
+        if (address(_stakerWhitelist) == address(0)) {
+            emit StakerWhitelistDisabled();
+        } else {
+            emit StakerWhitelistSet(_stakerWhitelist);
+        }
+
+        if (address(_contributionWhitelist) == address(0)) {
+            emit ContributionWhitelistDisabled();
+        } else {
+            emit ContributionWhitelistSet(_contributionWhitelist);
+        }
+
+        emit AllocationMechanismWhitelistSet(_allocationMechanismWhitelist);
+
+        // Assign to storage after emits for consistency with setters
         sharedState.rewardDuration = _rewardDuration;
         sharedState.minimumStakeAmount = _minimumStakeAmount;
         sharedState.stakerWhitelist = _stakerWhitelist;
         sharedState.contributionWhitelist = _contributionWhitelist;
         sharedState.allocationMechanismWhitelist = _allocationMechanismWhitelist;
-
-        emit RewardDurationSet(_rewardDuration);
-        emit MinimumStakeAmountSet(_minimumStakeAmount);
     }
 
     /// @notice Sets the reward duration for future reward notifications
-    /// @dev PRECISION WARNING: Shorter durations (< 30 days) may introduce calculation errors up to ~1%.
     /// @dev GAS IMPLICATIONS: Shorter reward durations may result in higher gas costs for certain
     ///      operations due to more frequent reward rate calculations. Consider gas costs when
     ///      selecting reward durations.
@@ -302,16 +379,13 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
 
         rewardPerTokenAccumulatedCheckpoint = rewardPerTokenAccumulated();
 
-        uint256 totalRewards;
         if (block.timestamp >= rewardEndTime) {
             // Scale to maintain precision across variable durations
             scaledRewardRate = (_amount * SCALE_FACTOR) / sharedState.rewardDuration;
-            totalRewards = _amount * SCALE_FACTOR;
         } else {
             uint256 _remainingReward = scaledRewardRate * (rewardEndTime - block.timestamp);
             // Scale to maintain precision across variable durations
             scaledRewardRate = (_remainingReward + _amount * SCALE_FACTOR) / sharedState.rewardDuration;
-            totalRewards = _remainingReward + _amount * SCALE_FACTOR;
         }
 
         rewardEndTime = block.timestamp + sharedState.rewardDuration;
@@ -319,8 +393,13 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
 
         if (scaledRewardRate < SCALE_FACTOR) revert Staker__InvalidRewardRate();
 
-        // Avoid "divide before multiply" by restructuring the balance check
-        if (totalRewards > (REWARD_TOKEN.balanceOf(address(this)) * SCALE_FACTOR)) {
+        // @dev KNOWN ISSUE: Unclaimed rewards not included in balance check
+        // This check cannot _guarantee_ sufficient rewards have been transferred to the contract,
+        // because it cannot isolate the unclaimed rewards owed to stakers left in the balance. While
+        // this check is useful for preventing degenerate cases, it is not sufficient. Therefore, it is
+        // critical that only safe reward notifier contracts are approved to call this method by the
+        // admin.
+        if ((scaledRewardRate * sharedState.rewardDuration) > (REWARD_TOKEN.balanceOf(address(this)) * SCALE_FACTOR)) {
             revert Staker__InsufficientRewardBalance();
         }
 
@@ -335,11 +414,17 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @param _stakerWhitelist New staker whitelist contract (address(0) = no restrictions)
     function setStakerWhitelist(IWhitelist _stakerWhitelist) external {
         require(sharedState.stakerWhitelist != _stakerWhitelist, NoOperation());
+        // Sanity check: staker whitelist must be distinct from allocation mechanism whitelist
+        require(
+            address(_stakerWhitelist) != address(sharedState.allocationMechanismWhitelist),
+            Staker__InvalidAddress()
+        );
         _revertIfNotAdmin();
         if (address(_stakerWhitelist) == address(0)) {
             emit StakerWhitelistDisabled();
+        } else {
+            emit StakerWhitelistSet(_stakerWhitelist);
         }
-        emit StakerWhitelistSet(_stakerWhitelist);
         sharedState.stakerWhitelist = _stakerWhitelist;
     }
 
@@ -351,11 +436,17 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @param _contributionWhitelist New contribution whitelist contract (address(0) = no restrictions)
     function setContributionWhitelist(IWhitelist _contributionWhitelist) external {
         require(sharedState.contributionWhitelist != _contributionWhitelist, NoOperation());
+        // Prevent footgun: ensure distinct from allocation mechanism whitelist
+        require(
+            address(_contributionWhitelist) != address(sharedState.allocationMechanismWhitelist),
+            Staker__InvalidAddress()
+        );
         _revertIfNotAdmin();
         if (address(_contributionWhitelist) == address(0)) {
             emit ContributionWhitelistDisabled();
+        } else {
+            emit ContributionWhitelistSet(_contributionWhitelist);
         }
-        emit ContributionWhitelistSet(_contributionWhitelist);
         sharedState.contributionWhitelist = _contributionWhitelist;
     }
 
@@ -376,6 +467,12 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
             address(_allocationMechanismWhitelist) != address(0),
             DisablingAllocationMechanismWhitelistNotAllowed()
         );
+        // Prevent footgun: allocation mechanism whitelist must be distinct from other whitelists
+        require(
+            address(_allocationMechanismWhitelist) != address(sharedState.stakerWhitelist) &&
+                address(_allocationMechanismWhitelist) != address(sharedState.contributionWhitelist),
+            Staker__InvalidAddress()
+        );
         _revertIfNotAdmin();
         emit AllocationMechanismWhitelistSet(_allocationMechanismWhitelist);
         sharedState.allocationMechanismWhitelist = _allocationMechanismWhitelist;
@@ -391,11 +488,27 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     function setMinimumStakeAmount(uint128 _minimumStakeAmount) external {
         _revertIfNotAdmin();
         require(
-            _minimumStakeAmount <= sharedState.minimumStakeAmount || block.timestamp >= rewardEndTime,
+            _minimumStakeAmount <= sharedState.minimumStakeAmount || block.timestamp > rewardEndTime,
             CannotRaiseMinimumStakeAmountDuringActiveReward()
         );
         emit MinimumStakeAmountSet(_minimumStakeAmount);
         sharedState.minimumStakeAmount = _minimumStakeAmount;
+    }
+
+    /// @notice Sets the maximum bump tip with governance protection
+    /// @dev TIMING RESTRICTION: During active reward period only decreases are allowed; increases must wait until after rewardEndTime.
+    /// @dev SECURITY: Prevents malicious admin from extracting unclaimed rewards via tip manipulation.
+    /// @dev GOVERNANCE PROTECTION: Aligns with setMinimumStakeAmount protection for consistency.
+    /// @dev Can only be called by admin and not during active reward period
+    /// @param _newMaxBumpTip New maximum bump tip value in wei
+    function setMaxBumpTip(uint256 _newMaxBumpTip) external virtual override {
+        _revertIfNotAdmin();
+        // Allow decreases anytime; increases only after reward period ends
+        require(
+            _newMaxBumpTip <= maxBumpTip || block.timestamp > rewardEndTime,
+            CannotRaiseMaxBumpTipDuringActiveReward()
+        );
+        _setMaxBumpTip(_newMaxBumpTip);
     }
 
     /// @notice Pauses the contract, disabling all user operations except view functions
@@ -423,9 +536,15 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @dev TRUST MODEL: Allocation mechanisms must be whitelisted by protocol governance.
     ///      Only contribute to mechanisms you trust, as the protocol cannot recover funds
     ///      sent to malicious or buggy allocation mechanisms.
+    /// @dev VOTING POWER ASSIGNMENT: The contributor (msg.sender) receives voting power in the
+    ///      allocation mechanism, NOT necessarily the deposit owner. When a claimer contributes
+    ///      owner's rewards, the CLAIMER receives the voting power. This is intended behavior
+    ///      as part of the claimer trust model.
     /// @dev SECURITY: This function first withdraws rewards to the contributor, then the contributor
     ///      must have pre-approved the allocation mechanism to pull the tokens.
     /// @dev SECURITY AUDIT: Ensure allocation mechanisms are immutable post-whitelisting.
+    /// @dev AUTHZ: Authorized caller is the deposit owner or the designated claimer; the claimer acts
+    ///      as the owner's agent for rewards and may contribute if on the contribution whitelist.
     /// @dev Requires contract not paused and uses reentrancy guard
     /// @param _depositId The deposit identifier to contribute from
     /// @param _allocationMechanismAddress Whitelisted allocation mechanism to receive contribution
@@ -452,6 +571,14 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
             NotWhitelisted(sharedState.allocationMechanismWhitelist, _allocationMechanismAddress)
         );
 
+        // Validate asset compatibility to fail fast and provide clear error
+        {
+            address expectedAsset = address(TokenizedAllocationMechanism(_allocationMechanismAddress).asset());
+            if (address(REWARD_TOKEN) != expectedAsset) {
+                revert AssetMismatch(address(REWARD_TOKEN), expectedAsset);
+            }
+        }
+
         Deposit storage deposit = deposits[_depositId];
         if (deposit.claimer != msg.sender && deposit.owner != msg.sender) {
             revert Staker__Unauthorized("not claimer or owner", msg.sender);
@@ -464,6 +591,13 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         require(_amount <= unclaimedAmount, CantAfford(_amount, unclaimedAmount));
 
         uint256 fee = claimFeeParameters.feeAmount;
+
+        // Early return if user benefit would be zero or negative
+        // Ensures users always receive some value after fees
+        if (_amount <= fee) {
+            return 0;
+        }
+
         amountContributedToAllocationMechanism = _calculateNetContribution(_amount, fee);
 
         // Prevent zero-amount contributions after fee deduction
@@ -472,7 +606,24 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         uint256 scaledAmountConsumed = _amount * SCALE_FACTOR;
         deposit.scaledUnclaimedRewardCheckpoint = deposit.scaledUnclaimedRewardCheckpoint - scaledAmountConsumed;
 
-        emit RewardClaimed(_depositId, msg.sender, amountContributedToAllocationMechanism, deposit.earningPower);
+        // Defensive earning power update - maintaining consistency with base Staker pattern
+        uint256 _oldEarningPower = deposit.earningPower;
+        uint256 _newEarningPower = earningPowerCalculator.getEarningPower(
+            deposit.balance,
+            deposit.owner,
+            deposit.delegatee
+        );
+
+        // Update earning power totals before modifying deposit state
+        totalEarningPower = _calculateTotalEarningPower(_oldEarningPower, _newEarningPower, totalEarningPower);
+        depositorTotalEarningPower[deposit.owner] = _calculateTotalEarningPower(
+            _oldEarningPower,
+            _newEarningPower,
+            depositorTotalEarningPower[deposit.owner]
+        );
+        deposit.earningPower = _newEarningPower.toUint96();
+
+        emit RewardClaimed(_depositId, msg.sender, amountContributedToAllocationMechanism, _newEarningPower);
 
         // approve the allocation mechanism to spend the rewards
         SafeERC20.safeIncreaseAllowance(
@@ -512,13 +663,16 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @dev FEE HANDLING: Claim fees are deducted before compounding. Zero fee results in zero compound.
     /// @dev EARNING POWER: Compounding updates earning power based on new total balance.
     /// @dev GAS OPTIMIZATION: More efficient than separate claim + stake operations.
+    /// @dev CLAIMER PERMISSIONS: This function grants claimers the ability to increase deposit stakes
+    ///      through compounding. This is INTENDED BEHAVIOR - when an owner designates a claimer, they
+    ///      explicitly trust them with both reward claiming AND limited staking operations (compounding).
+    ///      Claimers cannot withdraw funds or alter deposit parameters, maintaining security boundaries.
     /// @dev Requires contract not paused and uses reentrancy guard
     /// @param _depositId The deposit to compound rewards for
     /// @return compoundedAmount Amount of rewards compounded (after fees)
     function compoundRewards(
         DepositIdentifier _depositId
     ) external virtual whenNotPaused nonReentrant returns (uint256 compoundedAmount) {
-        _checkWhitelisted(sharedState.stakerWhitelist, msg.sender);
         if (address(REWARD_TOKEN) != address(STAKE_TOKEN)) {
             revert CompoundingNotSupported();
         }
@@ -530,26 +684,34 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
             revert Staker__Unauthorized("not claimer or owner", msg.sender);
         }
 
+        // Enforce owner whitelist for stake-increasing operation
+        _checkWhitelisted(sharedState.stakerWhitelist, depositOwner);
+
         _checkpointGlobalReward();
         _checkpointReward(deposit);
 
         uint256 unclaimedAmount = deposit.scaledUnclaimedRewardCheckpoint / SCALE_FACTOR;
-        require(unclaimedAmount > 0, ZeroOperation());
+        if (unclaimedAmount == 0) {
+            return 0;
+        }
 
         ClaimFeeParameters memory feeParams = claimFeeParameters;
         uint256 fee = feeParams.feeAmount;
 
-        if (unclaimedAmount < fee) {
+        // Early return if user benefit would be zero or negative
+        // Ensures users always receive some value after fees
+        if (unclaimedAmount <= fee) {
             return 0;
         }
 
         compoundedAmount = unclaimedAmount - fee;
         uint256 newBalance = deposit.balance + compoundedAmount;
+        uint256 oldEarningPower = deposit.earningPower; // Save old earning power for event
         uint256 newEarningPower = earningPowerCalculator.getEarningPower(newBalance, deposit.owner, deposit.delegatee);
 
-        totalEarningPower = _calculateTotalEarningPower(deposit.earningPower, newEarningPower, totalEarningPower);
+        totalEarningPower = _calculateTotalEarningPower(oldEarningPower, newEarningPower, totalEarningPower);
         depositorTotalEarningPower[deposit.owner] = _calculateTotalEarningPower(
-            deposit.earningPower,
+            oldEarningPower,
             newEarningPower,
             depositorTotalEarningPower[deposit.owner]
         );
@@ -557,17 +719,30 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         totalStaked += compoundedAmount;
         depositorTotalStaked[depositOwner] += compoundedAmount;
 
+        // Preserve sub-wei dust like claimReward by subtracting the scaled amount claimed
+        // This is done BEFORE updating balance/earning power to match base _claimReward pattern
+        deposit.scaledUnclaimedRewardCheckpoint =
+            deposit.scaledUnclaimedRewardCheckpoint -
+            (unclaimedAmount * SCALE_FACTOR);
+
         deposit.balance = newBalance.toUint96();
         deposit.earningPower = newEarningPower.toUint96();
-        deposit.scaledUnclaimedRewardCheckpoint = 0;
 
         if (fee > 0) {
             SafeERC20.safeTransfer(REWARD_TOKEN, feeParams.feeCollector, fee);
         }
 
-        _transferForCompound(deposit.delegatee, compoundedAmount);
+        // Transfer compounded rewards using the same pattern as _stakeMore for consistency
+        // The surrogate must already exist since the deposit exists (created during initial stake)
+        // This ensures child contracts can customize behavior through _stakeTokenSafeTransferFrom
+        DelegationSurrogate _surrogate = surrogates(deposit.delegatee);
+        if (address(_surrogate) == address(0)) {
+            revert SurrogateNotFound(deposit.delegatee);
+        }
+        _stakeTokenSafeTransferFrom(address(this), address(_surrogate), compoundedAmount);
 
-        emit RewardCompounded(_depositId, msg.sender, compoundedAmount, newBalance, newEarningPower);
+        emit RewardClaimed(_depositId, msg.sender, compoundedAmount, oldEarningPower);
+        emit StakeDeposited(depositOwner, _depositId, compoundedAmount, newBalance, newEarningPower);
 
         _revertIfMinimumStakeAmountNotMet(_depositId);
 
@@ -609,6 +784,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     }
 
     // === Overridden Functions ===
+
     /// @inheritdoc Staker
     /// @notice Overrides to prevent staking 0 tokens.
     /// @notice Overrides to prevent staking below the minimum stake amount.
@@ -680,7 +856,9 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
 
     /// @inheritdoc Staker
     /// @notice Overrides to prevent claiming when the contract is paused.
+    /// @notice Override to prevent fee collection when user receives no benefit after fees
     /// @dev Uses reentrancy guard
+    /// @dev Returns 0 without any state changes or transfers if reward <= fee
     /// @param _depositId The deposit identifier
     /// @param deposit The deposit storage
     /// @param _claimer The claimer address
@@ -690,22 +868,33 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         Deposit storage deposit,
         address _claimer
     ) internal virtual override whenNotPaused nonReentrant returns (uint256) {
+        _checkpointGlobalReward();
+        _checkpointReward(deposit);
+
+        uint256 _reward = deposit.scaledUnclaimedRewardCheckpoint / SCALE_FACTOR;
+
+        // Early return if user benefit would be zero or negative
+        // Ensures users always receive some value after fees
+        if (_reward <= claimFeeParameters.feeAmount) {
+            return 0;
+        }
+
         return super._claimReward(_depositId, deposit, _claimer);
     }
 
     /// @notice Override notifyRewardAmount to use custom reward duration
-    /// @dev Virtual for child overrides
+    /// @dev nonReentrant as a belts-and-braces guard against exotic ERC20 callback reentry
     /// @param _amount The reward amount
-    function notifyRewardAmount(uint256 _amount) external virtual override {
+    function notifyRewardAmount(uint256 _amount) external virtual override nonReentrant {
         _notifyRewardAmountWithCustomDuration(_amount);
     }
 
     /// @inheritdoc Staker
     /// @notice Overrides to prevent staking 0 tokens.
-    /// @notice Overrides to prevent pushing the amount below the minimum stake amount.
+    /// @notice Overrides to ensure the final stake amount meets the minimum requirement.
     /// @notice Overrides to prevent staking more when the contract is paused.
-    /// @notice Overrides to prevent staking more if the staker is not whitelisted.
-    /// @dev Uses reentrancy guard
+    /// @notice Overrides to prevent staking more if the deposit owner is not whitelisted.
+    /// @dev Uses reentrancy guard; validates deposit.owner against staker whitelist before proceeding
     /// @param deposit The deposit storage
     /// @param _depositId The deposit identifier
     /// @param _amount The additional amount to stake
@@ -715,23 +904,76 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         uint256 _amount
     ) internal virtual override whenNotPaused nonReentrant {
         require(_amount > 0, ZeroOperation());
-        _checkWhitelisted(sharedState.stakerWhitelist, _getStakeMoreWhitelistTarget(deposit));
+        _checkWhitelisted(sharedState.stakerWhitelist, deposit.owner);
         super._stakeMore(deposit, _depositId, _amount);
         _revertIfMinimumStakeAmountNotMet(_depositId);
     }
 
-    /// @notice Virtual function to get the address to check for stakeMore whitelist
-    /// @dev Override in derived contracts to return deposit.owner for owner-centric authorization.
-    /// @dev OWNER-CENTRIC MODEL: All variants should return deposit.owner to ensure consistent
-    ///      security across the system and prevent whitelist circumvention.
-    /// @dev SECURITY: Only whitelisted users can own deposits and benefit from staking rewards.
-    /// @param deposit The deposit storage reference
-    /// @return The address to check against the whitelist (should be deposit.owner)
-    function _getStakeMoreWhitelistTarget(Deposit storage deposit) internal view virtual returns (address);
+    /// @inheritdoc Staker
+    /// @notice Override to add nonReentrant modifier and fix checks-effects-interactions pattern
+    /// @dev Adds reentrancy protection and corrects state update ordering
+    /// @dev Updates state BEFORE external transfer to prevent reentrancy vulnerabilities
+    /// @param _depositId The deposit identifier to bump earning power for
+    /// @param _tipReceiver The receiver of the reward for updating a deposit's earning power
+    /// @param _requestedTip The amount of tip requested by the third-party
+    function bumpEarningPower(
+        DepositIdentifier _depositId,
+        address _tipReceiver,
+        uint256 _requestedTip
+    ) external virtual override nonReentrant {
+        if (_requestedTip > maxBumpTip) revert Staker__InvalidTip();
 
-    /// @notice Abstract function for transferring tokens during compound rewards
-    /// @dev Implementing contracts must define how to handle token transfers for compounding
-    /// @param _delegatee The delegatee address (may be used for surrogate transfers)
-    /// @param _amount The amount to transfer
-    function _transferForCompound(address _delegatee, uint256 _amount) internal virtual;
+        Deposit storage deposit = deposits[_depositId];
+
+        _checkpointGlobalReward();
+        _checkpointReward(deposit);
+
+        uint256 _unclaimedRewards = deposit.scaledUnclaimedRewardCheckpoint / SCALE_FACTOR;
+
+        (uint256 _newEarningPower, bool _isQualifiedForBump) = earningPowerCalculator.getNewEarningPower(
+            deposit.balance,
+            deposit.owner,
+            deposit.delegatee,
+            deposit.earningPower
+        );
+        if (!_isQualifiedForBump || _newEarningPower == deposit.earningPower) {
+            revert Staker__Unqualified(_newEarningPower);
+        }
+
+        if (_newEarningPower > deposit.earningPower && _unclaimedRewards < _requestedTip) {
+            revert Staker__InsufficientUnclaimedRewards();
+        }
+
+        // Note: underflow causes a revert if the requested tip is more than unclaimed rewards
+        if (_newEarningPower < deposit.earningPower && (_unclaimedRewards - _requestedTip) < maxBumpTip) {
+            revert Staker__InsufficientUnclaimedRewards();
+        }
+
+        emit EarningPowerBumped(
+            _depositId,
+            deposit.earningPower,
+            _newEarningPower,
+            msg.sender,
+            _tipReceiver,
+            _requestedTip
+        );
+
+        // Update global earning power & deposit earning power based on this bump
+        totalEarningPower = _calculateTotalEarningPower(deposit.earningPower, _newEarningPower, totalEarningPower);
+        depositorTotalEarningPower[deposit.owner] = _calculateTotalEarningPower(
+            deposit.earningPower,
+            _newEarningPower,
+            depositorTotalEarningPower[deposit.owner]
+        );
+        deposit.earningPower = _newEarningPower.toUint96();
+
+        // CRITICAL: Update state BEFORE external call (checks-effects-interactions pattern)
+        // This prevents reentrancy attacks via malicious reward tokens with callbacks
+        deposit.scaledUnclaimedRewardCheckpoint =
+            deposit.scaledUnclaimedRewardCheckpoint -
+            (_requestedTip * SCALE_FACTOR);
+
+        // External call AFTER all state updates
+        SafeERC20.safeTransfer(REWARD_TOKEN, _tipReceiver, _requestedTip);
+    }
 }

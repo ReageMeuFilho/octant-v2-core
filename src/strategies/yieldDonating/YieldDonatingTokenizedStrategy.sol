@@ -2,6 +2,8 @@
 pragma solidity >=0.8.25;
 import { TokenizedStrategy, Math } from "src/core/TokenizedStrategy.sol";
 import { IBaseStrategy } from "src/core/interfaces/IBaseStrategy.sol";
+
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 /**
  * @title YieldDonatingTokenizedStrategy
  * @author octant.finance
@@ -13,6 +15,11 @@ import { IBaseStrategy } from "src/core/interfaces/IBaseStrategy.sol";
  *      - Protecting against losses by burning shares from dragonRouter
  */
 contract YieldDonatingTokenizedStrategy is TokenizedStrategy {
+    using Math for uint256;
+
+    /// @dev Events for donation tracking
+    event DonationMinted(address indexed dragonRouter, uint256 amount);
+    event DonationBurned(address indexed dragonRouter, uint256 amount);
     /**
      * @inheritdoc TokenizedStrategy
      * @dev This implementation overrides the base report function to mint profit-derived shares to dragonRouter.
@@ -26,10 +33,7 @@ contract YieldDonatingTokenizedStrategy is TokenizedStrategy {
         override(TokenizedStrategy)
         nonReentrant
         onlyKeepers
-        returns (
-            uint256 profit,
-            uint256 loss // TODO: check if this is of in the multistrategy vaults or if we need to pass it the fee amounts as zero anyway
-        )
+        returns (uint256 profit, uint256 loss)
     {
         // Cache storage pointer since its used repeatedly.
         StrategyData storage S = super._strategyStorage();
@@ -38,22 +42,15 @@ contract YieldDonatingTokenizedStrategy is TokenizedStrategy {
         uint256 oldTotalAssets = _totalAssets(S);
         address _dragonRouter = S.dragonRouter;
 
-        uint256 lossAmount = S.lossAmount;
-
         if (newTotalAssets > oldTotalAssets) {
             unchecked {
                 profit = newTotalAssets - oldTotalAssets;
             }
-            if (profit > lossAmount) {
-                uint256 sharesToMint = _convertToSharesWithLoss(S, profit - lossAmount, Math.Rounding.Floor);
+            uint256 sharesToMint = _convertToShares(S, profit, Math.Rounding.Floor);
 
-                // update the loss amount
-                S.lossAmount = 0;
-                // mint the shares to the dragon router
-                _mint(S, _dragonRouter, sharesToMint);
-            } else {
-                S.lossAmount -= profit;
-            }
+            // mint the shares to the dragon router
+            _mint(S, _dragonRouter, sharesToMint);
+            emit DonationMinted(_dragonRouter, profit);
         } else {
             unchecked {
                 loss = oldTotalAssets - newTotalAssets;
@@ -78,35 +75,24 @@ contract YieldDonatingTokenizedStrategy is TokenizedStrategy {
      * @param loss The amount of loss in terms of asset to protect against
      *
      * If burning is enabled, this function will try to burn shares from the dragon router
-     * equivalent to the loss amount, and add any remaining unburnted amount to the loss tracker.
-     * If burning is disabled, it adds the full loss amount to the loss tracker.
+     * equivalent to the loss amount.
      */
     function _handleDragonLossProtection(StrategyData storage S, uint256 loss) internal {
         if (S.enableBurning) {
             // Convert loss to shares that should be burned
-            uint256 sharesToBurn = _convertToSharesWithLoss(S, loss, Math.Rounding.Ceil);
+            uint256 sharesToBurn = _convertToShares(S, loss, Math.Rounding.Ceil);
 
             // Can only burn up to available shares from dragon router
             uint256 sharesBurned = Math.min(sharesToBurn, S.balances[S.dragonRouter]);
 
             if (sharesBurned > 0) {
-                // Burn shares from dragon router
-                _burn(S, S.dragonRouter, sharesBurned);
-
-                // Convert burned shares back to assets to calculate remaining loss
+                // Convert shares to assets BEFORE burning to get correct value
                 uint256 assetValueBurned = _convertToAssets(S, sharesBurned, Math.Rounding.Floor);
 
-                // Add any remaining loss that couldn't be covered by burning
-                if (loss > assetValueBurned) {
-                    S.lossAmount += (loss - assetValueBurned);
-                }
-            } else {
-                // No shares available to burn, add full loss
-                S.lossAmount += loss;
+                // Burn shares from dragon router
+                _burn(S, S.dragonRouter, sharesBurned);
+                emit DonationBurned(S.dragonRouter, assetValueBurned);
             }
-        } else {
-            // Burning disabled, add full loss to tracker
-            S.lossAmount += loss;
         }
     }
 }

@@ -9,12 +9,11 @@ struct AllocationConfig {
     IERC20 asset;
     string name;
     string symbol;
-    uint256 votingDelay;
-    uint256 votingPeriod;
+    uint256 votingDelay; // Delay before voting begins (in seconds)
+    uint256 votingPeriod; // Duration of voting period (in seconds)
     uint256 quorumShares;
-    uint256 timelockDelay;
-    uint256 gracePeriod;
-    uint256 startBlock;
+    uint256 timelockDelay; // Delay before redemption begins (in seconds)
+    uint256 gracePeriod; // Grace period for redemption (in seconds)
     address owner; // Owner of the mechanism (deployer)
 }
 
@@ -62,8 +61,7 @@ abstract contract BaseAllocationMechanism is IBaseAllocationStrategy {
                     _config.votingPeriod,
                     _config.quorumShares,
                     _config.timelockDelay,
-                    _config.gracePeriod,
-                    _config.startBlock
+                    _config.gracePeriod
                 )
             )
         );
@@ -77,7 +75,7 @@ abstract contract BaseAllocationMechanism is IBaseAllocationStrategy {
     /// @dev Hook to allow or block registration
     /// @param user Address attempting to register
     /// @return allow True if registration should proceed
-    function _beforeSignupHook(address user) internal view virtual returns (bool);
+    function _beforeSignupHook(address user) internal virtual returns (bool);
 
     /// @dev Hook to allow or block proposal creation
     /// @param proposer Address proposing
@@ -130,11 +128,15 @@ abstract contract BaseAllocationMechanism is IBaseAllocationStrategy {
     function _getRecipientAddressHook(uint256 pid) internal view virtual returns (address recipient);
 
     /// @dev Hook to perform custom distribution of shares when a proposal is queued
-    /// @dev If this returns true, default share minting is skipped
+    /// @dev If this returns (true, assetsTransferred), default share minting is skipped and totalAssets is updated
     /// @param recipient Address of the recipient for the proposal
     /// @param sharesToMint Number of shares to distribute/mint to the recipient
     /// @return handled True if custom distribution was handled, false to use default minting
-    function _requestCustomDistributionHook(address recipient, uint256 sharesToMint) internal virtual returns (bool);
+    /// @return assetsTransferred Amount of assets transferred directly to recipient (to update totalAssets)
+    function _requestCustomDistributionHook(
+        address recipient,
+        uint256 sharesToMint
+    ) internal virtual returns (bool handled, uint256 assetsTransferred);
 
     /// @dev Hook to get the available withdraw limit for a share owner
     /// @param shareOwner Address of the share owner
@@ -156,7 +158,7 @@ abstract contract BaseAllocationMechanism is IBaseAllocationStrategy {
         _;
     }
 
-    function beforeSignupHook(address user) external view onlySelf returns (bool) {
+    function beforeSignupHook(address user) external onlySelf returns (bool) {
         return _beforeSignupHook(user);
     }
 
@@ -198,7 +200,10 @@ abstract contract BaseAllocationMechanism is IBaseAllocationStrategy {
         return _getRecipientAddressHook(pid);
     }
 
-    function requestCustomDistributionHook(address recipient, uint256 sharesToMint) external onlySelf returns (bool) {
+    function requestCustomDistributionHook(
+        address recipient,
+        uint256 sharesToMint
+    ) external onlySelf returns (bool handled, uint256 assetsTransferred) {
         return _requestCustomDistributionHook(recipient, sharesToMint);
     }
 

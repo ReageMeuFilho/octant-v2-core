@@ -55,7 +55,6 @@ contract SimpleVotingCrossJourneyTest is Test {
             quorumShares: QUORUM_REQUIREMENT,
             timelockDelay: TIMELOCK_DELAY,
             gracePeriod: 7 days,
-            startBlock: block.number + 50,
             owner: address(0)
         });
 
@@ -65,8 +64,12 @@ contract SimpleVotingCrossJourneyTest is Test {
 
     /// @notice Test complete end-to-end integration across all user journeys
     function testCompleteEndToEnd_Integration() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism was deployed
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // PHASE 1: ADMIN SETUP AND COMMUNITY ONBOARDING
 
@@ -100,30 +103,40 @@ contract SimpleVotingCrossJourneyTest is Test {
 
         // PHASE 3: DEMOCRATIC VOTING PROCESS
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.warp(votingStartTime + 1);
 
         // Complex voting patterns
         // Alice: Strategic voter supporting energy and education
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pidCharlie, TokenizedAllocationMechanism.VoteType.For, 600 ether);
+        _tokenized(address(mechanism)).castVote(
+            pidCharlie,
+            TokenizedAllocationMechanism.VoteType.For,
+            600 ether,
+            charlie
+        );
 
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pidDave, TokenizedAllocationMechanism.VoteType.For, 400 ether);
+        _tokenized(address(mechanism)).castVote(pidDave, TokenizedAllocationMechanism.VoteType.For, 400 ether, dave);
 
         // Bob: Focused on education with opposition to energy
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pidDave, TokenizedAllocationMechanism.VoteType.For, 400 ether);
+        _tokenized(address(mechanism)).castVote(pidDave, TokenizedAllocationMechanism.VoteType.For, 400 ether, dave);
 
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pidCharlie, TokenizedAllocationMechanism.VoteType.Against, 100 ether);
+        _tokenized(address(mechanism)).castVote(
+            pidCharlie,
+            TokenizedAllocationMechanism.VoteType.Against,
+            100 ether,
+            charlie
+        );
 
         // Frank: Supporting healthcare
         vm.prank(frank);
-        _tokenized(address(mechanism)).castVote(pidEve, TokenizedAllocationMechanism.VoteType.For, 100 ether);
+        _tokenized(address(mechanism)).castVote(pidEve, TokenizedAllocationMechanism.VoteType.For, 100 ether, eve);
 
         // PHASE 4: ADMIN FINALIZATION AND EXECUTION
 
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
 
         // Admin finalizes voting
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
@@ -217,8 +230,12 @@ contract SimpleVotingCrossJourneyTest is Test {
 
     /// @notice Test crisis recovery and system resilience
     function testCrisisRecovery_SystemResilience() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism was deployed
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Setup scenario with potential failures
         vm.startPrank(alice);
@@ -234,10 +251,10 @@ contract SimpleVotingCrossJourneyTest is Test {
         vm.prank(alice);
         uint256 pid = _tokenized(address(mechanism)).propose(charlie, "Test proposal");
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.warp(votingStartTime + 1);
 
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 500 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 500 ether, charlie);
 
         // Emergency pause during voting
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("pause()"));
@@ -246,7 +263,7 @@ contract SimpleVotingCrossJourneyTest is Test {
         // All operations blocked
         vm.expectRevert(TokenizedAllocationMechanism.PausedError.selector);
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether, charlie);
 
         // Resume operations
         (bool success2, ) = address(mechanism).call(abi.encodeWithSignature("unpause()"));
@@ -254,7 +271,7 @@ contract SimpleVotingCrossJourneyTest is Test {
 
         // Operations work again - use bob since alice already voted
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether, charlie);
 
         // Ownership transfer during crisis
         (bool success3, ) = address(mechanism).call(
@@ -280,7 +297,7 @@ contract SimpleVotingCrossJourneyTest is Test {
         vm.stopPrank();
 
         // Complete voting cycle
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
 
         vm.startPrank(emergencyAdmin);
         (bool success6, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
@@ -300,8 +317,12 @@ contract SimpleVotingCrossJourneyTest is Test {
 
     /// @notice Test edge cases and boundary conditions across journeys
     function testEdgeCases_BoundaryConditions() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism was deployed
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Maximum safe values
         vm.startPrank(alice);
@@ -330,26 +351,28 @@ contract SimpleVotingCrossJourneyTest is Test {
         uint256 pid = _tokenized(address(mechanism)).propose(charlie, "Boundary test");
 
         // Exactly at voting start
-        vm.roll(startBlock + VOTING_DELAY);
+        vm.warp(votingStartTime);
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 1000 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 1000 ether, charlie);
 
         // Exactly at voting end
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD);
+        vm.warp(votingEndTime);
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.Against, 100 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.Against, 100 ether, charlie);
 
-        // One block later should fail
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        // One second later should fail
+        vm.warp(votingEndTime + 1);
         vm.expectRevert();
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 1 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 1 ether, charlie);
     }
 
     /// @notice Test proposal cancellation across journeys
     function testProposalCancellation_CrossJourney() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism was deployed
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingStartTime = deploymentTime + votingDelay;
 
         vm.startPrank(alice);
         token.approve(address(mechanism), LARGE_DEPOSIT);
@@ -360,15 +383,15 @@ contract SimpleVotingCrossJourneyTest is Test {
         vm.prank(alice);
         uint256 pid = _tokenized(address(mechanism)).propose(charlie, "Cancellable proposal");
 
-        // Should be in Pending state
-        vm.roll(startBlock - 1);
+        // Should be in Pending state (before voting starts)
+        // No need to warp - we're already before votingStartTime
         assertEq(
             uint(_tokenized(address(mechanism)).state(pid)),
             uint(TokenizedAllocationMechanism.ProposalState.Pending)
         );
 
-        // During voting delay
-        vm.roll(startBlock + 50);
+        // During voting period - warp to active state
+        vm.warp(votingStartTime + 1);
         assertEq(
             uint(_tokenized(address(mechanism)).state(pid)),
             uint(TokenizedAllocationMechanism.ProposalState.Active)
@@ -384,10 +407,10 @@ contract SimpleVotingCrossJourneyTest is Test {
         );
 
         // Cannot vote on canceled proposal
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.warp(votingStartTime + 1);
         vm.expectRevert();
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100 ether, charlie);
 
         // Non-proposer cannot cancel
         vm.prank(alice);
@@ -400,8 +423,12 @@ contract SimpleVotingCrossJourneyTest is Test {
 
     /// @notice Test multi-proposal complex scenarios
     function testMultiProposal_ComplexScenarios() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp; // When mechanism was deployed
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Setup diverse voter base
         vm.startPrank(alice);
@@ -429,29 +456,29 @@ contract SimpleVotingCrossJourneyTest is Test {
         vm.prank(frank);
         uint256 pid3 = _tokenized(address(mechanism)).propose(eve, "Healthcare Access");
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.warp(votingStartTime + 1);
 
         // Strategic voting with power distribution
         // Alice: Supports infrastructure but opposes healthcare
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, 500 ether);
+        _tokenized(address(mechanism)).castVote(pid1, TokenizedAllocationMechanism.VoteType.For, 500 ether, charlie);
 
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid3, TokenizedAllocationMechanism.VoteType.Against, 300 ether);
+        _tokenized(address(mechanism)).castVote(pid3, TokenizedAllocationMechanism.VoteType.Against, 300 ether, eve);
 
         // Bob: Supports education and healthcare
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 400 ether);
+        _tokenized(address(mechanism)).castVote(pid2, TokenizedAllocationMechanism.VoteType.For, 400 ether, dave);
 
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pid3, TokenizedAllocationMechanism.VoteType.For, 100 ether);
+        _tokenized(address(mechanism)).castVote(pid3, TokenizedAllocationMechanism.VoteType.For, 100 ether, eve);
 
         // Frank: All-in on healthcare
         vm.prank(frank);
-        _tokenized(address(mechanism)).castVote(pid3, TokenizedAllocationMechanism.VoteType.For, 100 ether);
+        _tokenized(address(mechanism)).castVote(pid3, TokenizedAllocationMechanism.VoteType.For, 100 ether, eve);
 
         // Finalize and determine outcomes
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
 

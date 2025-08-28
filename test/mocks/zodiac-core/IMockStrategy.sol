@@ -16,6 +16,8 @@ interface IMockStrategy is IDragonTokenizedStrategy, IBaseStrategy {
 
     function onlyLetEmergencyAdminsIn() external;
 
+    function safeDeposit(uint256 assets, address receiver, uint256 minSharesOut) external;
+
     function yieldSource() external view returns (address);
 
     function managed() external view returns (bool);
@@ -41,4 +43,10 @@ interface IMockStrategy is IDragonTokenizedStrategy, IBaseStrategy {
     function dragonRouterChangeTimestamp() external view returns (uint256);
 
     function cancelDragonRouterChange() external;
+
+    function lossAmount() external view returns (uint256);
+
+    function enableBurning() external view returns (bool);
+
+    function setEnableBurning(bool _enableBurning) external;
 }

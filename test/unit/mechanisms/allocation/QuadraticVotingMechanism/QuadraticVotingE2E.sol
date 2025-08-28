@@ -17,7 +17,7 @@ contract QuadraticVotingE2E is Test {
     // General purpose struct to avoid stack too deep errors
     struct TestData {
         // Common data
-        uint256 startBlock;
+        uint256 deploymentTime;
         uint256 pid1;
         uint256 pid2;
         uint256 pid3;
@@ -123,11 +123,12 @@ contract QuadraticVotingE2E is Test {
     function _castVote(
         address voter,
         uint256 pid,
-        uint256 weight
+        uint256 weight,
+        address recipient
     ) internal returns (uint256 previousPower, uint256 newPower) {
         previousPower = _tokenized(address(mechanism)).votingPower(voter);
         vm.prank(voter);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, weight);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, weight, recipient);
         newPower = _tokenized(address(mechanism)).votingPower(voter);
     }
 
@@ -225,7 +226,6 @@ contract QuadraticVotingE2E is Test {
             quorumShares: QUORUM_REQUIREMENT,
             timelockDelay: TIMELOCK_DELAY,
             gracePeriod: GRACE_PERIOD,
-            startBlock: block.number + 50,
             owner: address(0)
         });
 
@@ -264,7 +264,14 @@ contract QuadraticVotingE2E is Test {
         assertEq(_tokenized(address(mechanism)).quorumShares(), QUORUM_REQUIREMENT, "Quorum should match");
         assertEq(_tokenized(address(mechanism)).timelockDelay(), TIMELOCK_DELAY, "Timelock delay should match");
         assertEq(_tokenized(address(mechanism)).gracePeriod(), GRACE_PERIOD, "Grace period should match");
-        assertEq(_tokenized(address(mechanism)).startBlock(), block.number + 50, "Start block should match");
+        // Verify timing setup - mechanism uses timestamp-based timeline
+        uint256 deploymentTime = block.timestamp;
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
+        assertGt(votingStartTime, deploymentTime, "Voting should start after deployment");
+        assertGt(votingEndTime, votingStartTime, "Voting should end after it starts");
 
         // Verify quadratic voting mechanism specific configuration
         (uint256 alphaNumerator, uint256 alphaDenominator) = mechanism.getAlpha();
@@ -295,8 +302,7 @@ contract QuadraticVotingE2E is Test {
 
     /// @notice Test user signup functionality with helper function
     function testUserSignup() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // No need to warp time for signup - it's allowed during initial period
 
         // Initial state verification
         assertEq(_tokenized(address(mechanism)).votingPower(alice), 0, "Alice should have no voting power initially");
@@ -349,8 +355,7 @@ contract QuadraticVotingE2E is Test {
 
     /// @notice Test proposal creation functionality with helper function
     function testProposalCreation() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // No timing manipulation needed for proposal creation
 
         // Sign up users first (only registered users can propose)
         _signupUser(alice, DEPOSIT_AMOUNT);
@@ -400,8 +405,7 @@ contract QuadraticVotingE2E is Test {
 
     /// @notice Test combined signup and proposal workflow
     function testSignupAndProposalWorkflow() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // No timing manipulation needed for this workflow test
 
         // Phase 1: User signup
         console.log("=== Phase 1: User Signup ===");
@@ -464,8 +468,12 @@ contract QuadraticVotingE2E is Test {
     }
     /// @notice Test voting edge cases and error conditions
     function testVotingErrorConditions() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp;
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Setup
         _signupUser(alice, DEPOSIT_AMOUNT);
@@ -475,46 +483,48 @@ contract QuadraticVotingE2E is Test {
         // Cannot vote before voting period starts
         vm.expectRevert();
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 10);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 10, recipient1);
 
         // Move to voting period
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.warp(votingStartTime + 1);
 
         // Cannot vote with insufficient voting power
         vm.expectRevert(); // Bob has 50 wei, but voting weight 100 costs 10000
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 100, recipient1);
 
         // Alice votes successfully
-        _castVote(alice, pid, 10);
+        _castVote(alice, pid, 10, recipient1);
 
         // Cannot vote twice on same proposal
         vm.expectRevert();
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 5);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 5, recipient1);
 
         // Unregistered user cannot vote
         vm.expectRevert();
         vm.prank(charlie);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 1);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 1, recipient1);
 
         // Cannot vote after voting period ends
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
         vm.expectRevert();
         vm.prank(bob);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 5);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 5, recipient1);
 
         // Cannot vote on non-existent proposal
-        vm.roll(startBlock + VOTING_DELAY + 500); // Back in voting period
+        vm.warp(votingStartTime + 500); // Back in voting period
         vm.expectRevert();
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(999, TokenizedAllocationMechanism.VoteType.For, 5); // Non-existent proposal ID
+        _tokenized(address(mechanism)).castVote(999, TokenizedAllocationMechanism.VoteType.For, 5, recipient1); // Non-existent proposal ID
     }
 
     /// @notice Test complex multi-user voting scenario
     function testMultiUserVotingScenario() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp;
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingStartTime = deploymentTime + votingDelay;
 
         // Setup: 3 users with different voting power, 3 proposals
         _signupUser(alice, 1000 ether); // 1000 voting power
@@ -525,28 +535,29 @@ contract QuadraticVotingE2E is Test {
         uint256 pid2 = _createProposal(bob, recipient2, "Healthcare");
         uint256 pid3 = _createProposal(alice, recipient3, "Environment"); // alice creates for charlie's project
 
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        // Move to voting period
+        vm.warp(votingStartTime + 1);
 
         console.log("=== Multi-User Voting Scenario ===");
 
         // Alice votes on all three proposals
         console.log("Alice voting...");
-        _castVote(alice, pid1, 25e9); // Cost: 625 ether
-        _castVote(alice, pid2, 15e9); // Cost: 225 ether
-        _castVote(alice, pid3, 10e9); // Cost: 100 ether
+        _castVote(alice, pid1, 25e9, recipient1); // Cost: 625 ether
+        _castVote(alice, pid2, 15e9, recipient2); // Cost: 225 ether
+        _castVote(alice, pid3, 10e9, recipient3); // Cost: 100 ether
         // Alice remaining power: 1000 ether - 625 - 225 - 100 = 1000 ether - 950
         assertEq(_tokenized(address(mechanism)).votingPower(alice), 1000 ether - 950 ether, "Alice remaining power");
 
         // Bob votes on two proposals
         console.log("Bob voting...");
-        _castVote(bob, pid1, 20e9); // Cost: 400 ether
-        _castVote(bob, pid2, 10e9); // Cost: 100 ether
+        _castVote(bob, pid1, 20e9, recipient1); // Cost: 400 ether
+        _castVote(bob, pid2, 10e9, recipient2); // Cost: 100 ether
         // Bob remaining power: 500 ether - 400 - 100 = 500 ether - 500
         assertEq(_tokenized(address(mechanism)).votingPower(bob), 500 ether - 500 ether, "Bob remaining power");
 
         // Charlie votes on one proposal
         // console.log("Charlie voting...");
-        _castVote(charlie, pid3, 14e9); // Cost: 196 ether
+        _castVote(charlie, pid3, 14e9, recipient3); // Cost: 196 ether
         // Charlie remaining power: 200 ether - 196 = 200 ether - 196
         assertEq(_tokenized(address(mechanism)).votingPower(charlie), 200 ether - 196 ether, "Charlie remaining power");
 
@@ -634,8 +645,12 @@ contract QuadraticVotingE2E is Test {
 
     /// @notice Test matching fund calculation and 1:1 shares-to-assets ratio verification
     function testMatchingFundsCalculationAnd1to1Ratio() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp;
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Setup: 3 users with different voting power
         uint256 totalUserDeposits = 1000 ether + 500 ether + 200 ether; // User signup deposits
@@ -648,13 +663,13 @@ contract QuadraticVotingE2E is Test {
         uint256 pid2 = _createProposal(bob, recipient2, "Project Beta");
 
         // Move to voting period
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.warp(votingStartTime + 1);
 
         // Cast votes with specific weights to create known quadratic/linear sums
-        _castVote(alice, pid1, 20e9); // Cost: 400 ether
-        _castVote(bob, pid1, 15e9); // Cost: 225 ether
-        _castVote(alice, pid2, 10e9); // Cost: 100 ether (Alice remaining: 1000-400-100=500)
-        _castVote(charlie, pid2, 14e9); // Cost: 196 ether
+        _castVote(alice, pid1, 20e9, recipient1); // Cost: 400 ether
+        _castVote(bob, pid1, 15e9, recipient1); // Cost: 225 ether
+        _castVote(alice, pid2, 10e9, recipient2); // Cost: 100 ether (Alice remaining: 1000-400-100=500)
+        _castVote(charlie, pid2, 14e9, recipient2); // Cost: 196 ether
 
         console.log("=== MATCHING FUNDS CALCULATION TEST ===");
 
@@ -701,7 +716,7 @@ contract QuadraticVotingE2E is Test {
         );
 
         // Move past voting period and finalize
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
         _tokenized(address(mechanism)).finalizeVoteTally();
 
         // Queue proposals to actually mint shares and verify ratio is maintained
@@ -733,8 +748,12 @@ contract QuadraticVotingE2E is Test {
 
     /// @notice Test optimal alpha calculation for 1:1 shares-to-assets ratio with fixed matching pool
     function testOptimalAlphaCalculationWith1to1Ratio() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp;
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Setup: 3 users with different voting power
         uint256 totalUserDeposits = 1000 ether + 500 ether + 200 ether;
@@ -747,12 +766,12 @@ contract QuadraticVotingE2E is Test {
         uint256 pid2 = _createProposal(bob, recipient2, "Project B");
 
         // Move to voting period
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.warp(votingStartTime + 1);
 
         // Cast votes to create known sums (closer to signup amounts)
-        _castVote(alice, pid1, 30e9); // Cost: 900 ether
-        _castVote(bob, pid1, 20e9); // Cost: 400 ether
-        _castVote(charlie, pid2, 14e9); // Cost: 196 ether
+        _castVote(alice, pid1, 30e9, recipient1); // Cost: 900 ether
+        _castVote(bob, pid1, 20e9, recipient1); // Cost: 400 ether
+        _castVote(charlie, pid2, 14e9, recipient2); // Cost: 196 ether
 
         // console.log("=== OPTIMAL ALPHA CALCULATION TEST ===");
 
@@ -830,7 +849,7 @@ contract QuadraticVotingE2E is Test {
 
         // Move past voting period and finalize using scoping for intermediate variables
         {
-            vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+            vm.warp(votingEndTime + 1);
             _tokenized(address(mechanism)).finalizeVoteTally();
 
             // Queue proposals to mint shares
@@ -858,8 +877,12 @@ contract QuadraticVotingE2E is Test {
 
     /// @notice Test optimal alpha with small matching pool - alpha should be low fractional value
     function testOptimalAlphaSmallMatchingPool() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp;
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Setup: 2 users, modest deposits
         uint256 totalUserDeposits = 800 ether + 600 ether;
@@ -871,13 +894,13 @@ contract QuadraticVotingE2E is Test {
         uint256 pid2 = _createProposal(bob, recipient2, "Healthcare Project");
 
         // Move to voting period
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.warp(votingStartTime + 1);
 
         // Cast moderate votes to create quadratic advantage
-        _castVote(alice, pid1, 20e9); // Cost: 400 ether
-        _castVote(bob, pid1, 15e9); // Cost: 225 ether
-        _castVote(alice, pid2, 15e9); // Cost: 225 ether
-        _castVote(bob, pid2, 18e9); // Cost: 324 ether
+        _castVote(alice, pid1, 20e9, recipient1); // Cost: 400 ether
+        _castVote(bob, pid1, 15e9, recipient1); // Cost: 225 ether
+        _castVote(alice, pid2, 15e9, recipient2); // Cost: 225 ether
+        _castVote(bob, pid2, 18e9, recipient2); // Cost: 324 ether
 
         console.log("=== SMALL MATCHING POOL TEST ===");
 
@@ -915,7 +938,7 @@ contract QuadraticVotingE2E is Test {
         mechanism.setAlpha(optimalAlphaNumerator, optimalAlphaDenominator);
 
         // Finalize and queue
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
         _tokenized(address(mechanism)).finalizeVoteTally();
         _tokenized(address(mechanism)).queueProposal(pid1);
         _tokenized(address(mechanism)).queueProposal(pid2);
@@ -935,8 +958,12 @@ contract QuadraticVotingE2E is Test {
 
     /// @notice Test optimal alpha with medium matching pool - alpha should be moderate fractional value
     function testOptimalAlphaMediumMatchingPool() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp;
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Setup: 2 users with different deposit amounts
         uint256 totalUserDeposits = 1200 ether + 800 ether;
@@ -948,13 +975,13 @@ contract QuadraticVotingE2E is Test {
         uint256 pid2 = _createProposal(bob, recipient2, "Research Project");
 
         // Move to voting period
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.warp(votingStartTime + 1);
 
         // Cast strategic votes
-        _castVote(alice, pid1, 25e9); // Cost: 625 ether
-        _castVote(bob, pid1, 20e9); // Cost: 400 ether
-        _castVote(alice, pid2, 20e9); // Cost: 400 ether (Alice remaining: 1200-625-400=175)
-        _castVote(bob, pid2, 15e9); // Cost: 225 ether (Bob remaining: 800-400-225=175)
+        _castVote(alice, pid1, 25e9, recipient1); // Cost: 625 ether
+        _castVote(bob, pid1, 20e9, recipient1); // Cost: 400 ether
+        _castVote(alice, pid2, 20e9, recipient2); // Cost: 400 ether (Alice remaining: 1200-625-400=175)
+        _castVote(bob, pid2, 15e9, recipient2); // Cost: 225 ether (Bob remaining: 800-400-225=175)
 
         console.log("=== MEDIUM MATCHING POOL TEST ===");
 
@@ -992,7 +1019,7 @@ contract QuadraticVotingE2E is Test {
         mechanism.setAlpha(optimalAlphaNumerator, optimalAlphaDenominator);
 
         // Finalize and queue
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
         _tokenized(address(mechanism)).finalizeVoteTally();
         _tokenized(address(mechanism)).queueProposal(pid1);
         _tokenized(address(mechanism)).queueProposal(pid2);
@@ -1012,8 +1039,12 @@ contract QuadraticVotingE2E is Test {
 
     /// @notice Test optimal alpha with varied voting patterns - multiple voters, diverse vote distribution
     function testOptimalAlphaVariedVotingPatterns() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp;
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Setup: 3 users with different deposit amounts
         uint256 totalUserDeposits = 900 ether + 700 ether + 400 ether;
@@ -1027,15 +1058,15 @@ contract QuadraticVotingE2E is Test {
         uint256 pid3 = _createProposal(alice, recipient3, "Community Project"); // alice creates for charlie's project
 
         // Move to voting period
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.warp(votingStartTime + 1);
 
         // Create diverse voting patterns
-        _castVote(alice, pid1, 22e9); // Cost: 484 ether
-        _castVote(alice, pid2, 18e9); // Cost: 324 ether
-        _castVote(bob, pid1, 15e9); // Cost: 225 ether
-        _castVote(bob, pid3, 20e9); // Cost: 400 ether
-        _castVote(charlie, pid2, 12e9); // Cost: 144 ether
-        _castVote(charlie, pid3, 16e9); // Cost: 256 ether
+        _castVote(alice, pid1, 22e9, recipient1); // Cost: 484 ether
+        _castVote(alice, pid2, 18e9, recipient2); // Cost: 324 ether
+        _castVote(bob, pid1, 15e9, recipient1); // Cost: 225 ether
+        _castVote(bob, pid3, 20e9, recipient3); // Cost: 400 ether
+        _castVote(charlie, pid2, 12e9, recipient2); // Cost: 144 ether
+        _castVote(charlie, pid3, 16e9, recipient3); // Cost: 256 ether
 
         console.log("=== VARIED VOTING PATTERNS TEST ===");
 
@@ -1074,7 +1105,7 @@ contract QuadraticVotingE2E is Test {
         mechanism.setAlpha(optimalAlphaNumerator, optimalAlphaDenominator);
 
         // Finalize and queue all proposals
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
         _tokenized(address(mechanism)).finalizeVoteTally();
         _tokenized(address(mechanism)).queueProposal(pid1);
         _tokenized(address(mechanism)).queueProposal(pid2);
@@ -1112,8 +1143,12 @@ contract QuadraticVotingE2E is Test {
 
     /// @notice Test precision with very large scale deposits and votes
     function testOptimalAlphaPrecisionLargeScale() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp;
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Use very large deposits to test precision boundaries
         uint256 largeDeposit1 = 100_000_000 ether; // 100M tokens
@@ -1132,13 +1167,13 @@ contract QuadraticVotingE2E is Test {
         uint256 pid2 = _createProposal(bob, recipient2, "Large Scale Project 2");
 
         // Move to voting period
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.warp(votingStartTime + 1);
 
         // Cast large votes that fit within available voting power
-        _castVote(alice, pid1, 8000e9); // Cost: 64M ether
-        _castVote(bob, pid1, 6000e9); // Cost: 36M ether
-        _castVote(alice, pid2, 6000e9); // Cost: 36M ether (Alice total: 100M ether)
-        _castVote(bob, pid2, 6500e9); // Cost: 42.25M ether (Bob total: 78.25M ether)
+        _castVote(alice, pid1, 8000e9, recipient1); // Cost: 64M ether
+        _castVote(bob, pid1, 6000e9, recipient1); // Cost: 36M ether
+        _castVote(alice, pid2, 6000e9, recipient2); // Cost: 36M ether (Alice total: 100M ether)
+        _castVote(bob, pid2, 6500e9, recipient2); // Cost: 42.25M ether (Bob total: 78.25M ether)
 
         console.log("=== LARGE SCALE PRECISION TEST ===");
 
@@ -1171,7 +1206,7 @@ contract QuadraticVotingE2E is Test {
         mechanism.setAlpha(optimalAlphaNumerator, optimalAlphaDenominator);
 
         // Finalize and queue
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
         _tokenized(address(mechanism)).finalizeVoteTally();
         _tokenized(address(mechanism)).queueProposal(pid1);
         _tokenized(address(mechanism)).queueProposal(pid2);
@@ -1196,8 +1231,12 @@ contract QuadraticVotingE2E is Test {
 
     /// @notice Test precision with extremely small matching pool (near-zero alpha)
     function testOptimalAlphaPrecisionTinyMatchingPool() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp;
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Setup with moderate deposits
         uint256 totalUserDeposits = 1000 ether + 800 ether;
@@ -1209,13 +1248,13 @@ contract QuadraticVotingE2E is Test {
         uint256 pid2 = _createProposal(bob, recipient2, "Project With Tiny Pool 2");
 
         // Move to voting period
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.warp(votingStartTime + 1);
 
         // Cast votes that create large quadratic advantage
-        _castVote(alice, pid1, 25e9); // Cost: 625 ether
-        _castVote(bob, pid1, 20e9); // Cost: 400 ether
-        _castVote(alice, pid2, 15e9); // Cost: 225 ether
-        _castVote(bob, pid2, 18e9); // Cost: 324 ether
+        _castVote(alice, pid1, 25e9, recipient1); // Cost: 625 ether
+        _castVote(bob, pid1, 20e9, recipient1); // Cost: 400 ether
+        _castVote(alice, pid2, 15e9, recipient2); // Cost: 225 ether
+        _castVote(bob, pid2, 18e9, recipient2); // Cost: 324 ether
 
         console.log("=== TINY MATCHING POOL PRECISION TEST ===");
 
@@ -1248,7 +1287,7 @@ contract QuadraticVotingE2E is Test {
         mechanism.setAlpha(optimalAlphaNumerator, optimalAlphaDenominator);
 
         // Finalize and queue
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
         _tokenized(address(mechanism)).finalizeVoteTally();
         _tokenized(address(mechanism)).queueProposal(pid1);
         _tokenized(address(mechanism)).queueProposal(pid2);
@@ -1273,8 +1312,12 @@ contract QuadraticVotingE2E is Test {
 
     /// @notice Test precision with extreme alpha fraction (very close to 1)
     function testOptimalAlphaPrecisionNearFullQuadratic() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp;
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Setup with specific deposits
         uint256 totalUserDeposits = 500 ether + 500 ether;
@@ -1286,12 +1329,12 @@ contract QuadraticVotingE2E is Test {
         uint256 pid2 = _createProposal(bob, recipient2, "Near Full Quadratic 2");
 
         // Move to voting period
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.warp(votingStartTime + 1);
 
         // Cast votes to create measurable quadratic advantage
-        _castVote(alice, pid1, 15e9); // Cost: 225 ether (Alice remaining: 275 ether)
-        _castVote(bob, pid1, 10e9); // Cost: 100 ether (Bob remaining: 400 ether)
-        _castVote(alice, pid2, 16e9); // Cost: 256 ether (Alice remaining: 19 ether)
+        _castVote(alice, pid1, 15e9, recipient1); // Cost: 225 ether (Alice remaining: 275 ether)
+        _castVote(bob, pid1, 10e9, recipient1); // Cost: 100 ether (Bob remaining: 400 ether)
+        _castVote(alice, pid2, 16e9, recipient2); // Cost: 256 ether (Alice remaining: 19 ether)
         // Project 1: (15e9 + 10e9)² = (25e9)² = 625 ether, linear = 325 ether
         // Project 2: (16e9)² = 256 ether, linear = 256 ether
         // Total: quadratic = 881 ether, linear = 581 ether
@@ -1332,7 +1375,7 @@ contract QuadraticVotingE2E is Test {
         mechanism.setAlpha(optimalAlphaNumerator, optimalAlphaDenominator);
 
         // Finalize and queue
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
         _tokenized(address(mechanism)).finalizeVoteTally();
         _tokenized(address(mechanism)).queueProposal(pid1);
         _tokenized(address(mechanism)).queueProposal(pid2);
@@ -1360,8 +1403,12 @@ contract QuadraticVotingE2E is Test {
 
     /// @notice Test precision with huge quadratic advantage (large denominator)
     function testOptimalAlphaPrecisionHugeQuadraticAdvantage() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp;
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Setup with large deposits for big votes
         uint256 largeDeposit1 = 10000 ether;
@@ -1380,13 +1427,13 @@ contract QuadraticVotingE2E is Test {
         uint256 pid2 = _createProposal(bob, recipient2, "Huge Advantage Project 2");
 
         // Move to voting period
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.warp(votingStartTime + 1);
 
         // Cast very large votes to create huge quadratic advantage
-        _castVote(alice, pid1, 80e9); // Cost: 6400 ether
-        _castVote(bob, pid1, 60e9); // Cost: 3600 ether (total: 10000 ether for pid1)
-        _castVote(alice, pid2, 60e9); // Cost: 3600 ether (Alice total: 10000 ether)
-        _castVote(bob, pid2, 65e9); // Cost: 4225 ether (Bob remaining: 175 ether)
+        _castVote(alice, pid1, 80e9, recipient1); // Cost: 6400 ether
+        _castVote(bob, pid1, 60e9, recipient1); // Cost: 3600 ether (total: 10000 ether for pid1)
+        _castVote(alice, pid2, 60e9, recipient2); // Cost: 3600 ether (Alice total: 10000 ether)
+        _castVote(bob, pid2, 65e9, recipient2); // Cost: 4225 ether (Bob remaining: 175 ether)
 
         console.log("=== HUGE QUADRATIC ADVANTAGE PRECISION TEST ===");
 
@@ -1424,7 +1471,7 @@ contract QuadraticVotingE2E is Test {
         mechanism.setAlpha(optimalAlphaNumerator, optimalAlphaDenominator);
 
         // Finalize and queue
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
         _tokenized(address(mechanism)).finalizeVoteTally();
         _tokenized(address(mechanism)).queueProposal(pid1);
         _tokenized(address(mechanism)).queueProposal(pid2);
@@ -1449,8 +1496,12 @@ contract QuadraticVotingE2E is Test {
 
     /// @notice Test that ratios >1:1 only occur when alpha=1 and there are excess matching funds
     function testRatioGreaterThan1OnlyWithAlpha1AndExcessFunds() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp;
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Setup with moderate deposits
         uint256 totalUserDeposits = 1000 ether + 800 ether;
@@ -1462,13 +1513,13 @@ contract QuadraticVotingE2E is Test {
         uint256 pid2 = _createProposal(bob, recipient2, "Test Project 2");
 
         // Move to voting period
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.warp(votingStartTime + 1);
 
         // Cast votes to create known quadratic advantage
-        _castVote(alice, pid1, 20e9); // Cost: 400 ether
-        _castVote(bob, pid1, 15e9); // Cost: 225 ether
-        _castVote(alice, pid2, 15e9); // Cost: 225 ether
-        _castVote(bob, pid2, 18e9); // Cost: 324 ether
+        _castVote(alice, pid1, 20e9, recipient1); // Cost: 400 ether
+        _castVote(bob, pid1, 15e9, recipient1); // Cost: 225 ether
+        _castVote(alice, pid2, 15e9, recipient2); // Cost: 225 ether
+        _castVote(bob, pid2, 18e9, recipient2); // Cost: 324 ether
 
         console.log("=== EXCESS FUNDS AND ALPHA=1 VALIDATION TEST ===");
 
@@ -1506,7 +1557,7 @@ contract QuadraticVotingE2E is Test {
         mechanism.setAlpha(optimalAlphaNumerator, optimalAlphaDenominator);
 
         // Finalize and queue
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
         _tokenized(address(mechanism)).finalizeVoteTally();
         _tokenized(address(mechanism)).queueProposal(pid1);
         _tokenized(address(mechanism)).queueProposal(pid2);
@@ -1546,8 +1597,12 @@ contract QuadraticVotingE2E is Test {
 
     /// @notice Test that ratios should never exceed 1:1 when alpha < 1 (fractional alpha)
     function testRatioNeverExceeds1With1WhenAlphaLessThan1() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // ✅ CORRECT: Fetch absolute timeline from contract
+        uint256 deploymentTime = block.timestamp;
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
 
         // Setup
         uint256 totalUserDeposits = 1000 ether + 600 ether;
@@ -1559,13 +1614,13 @@ contract QuadraticVotingE2E is Test {
         uint256 pid2 = _createProposal(bob, recipient2, "Fractional Alpha Project 2");
 
         // Move to voting period
-        vm.roll(startBlock + VOTING_DELAY + 1);
+        vm.warp(votingStartTime + 1);
 
         // Cast votes to create quadratic advantage (adjusted for available voting power)
-        _castVote(alice, pid1, 25e9); // Cost: 625 ether (Alice remaining: 375 ether)
-        _castVote(bob, pid1, 20e9); // Cost: 400 ether (Bob remaining: 200 ether)
-        _castVote(alice, pid2, 15e9); // Cost: 225 ether (Alice remaining: 150 ether)
-        _castVote(bob, pid2, 14e9); // Cost: 196 ether (Bob remaining: 4 ether)
+        _castVote(alice, pid1, 25e9, recipient1); // Cost: 625 ether (Alice remaining: 375 ether)
+        _castVote(bob, pid1, 20e9, recipient1); // Cost: 400 ether (Bob remaining: 200 ether)
+        _castVote(alice, pid2, 15e9, recipient2); // Cost: 225 ether (Alice remaining: 150 ether)
+        _castVote(bob, pid2, 14e9, recipient2); // Cost: 196 ether (Bob remaining: 4 ether)
 
         console.log("=== FRACTIONAL ALPHA RATIO VALIDATION TEST ===");
 
@@ -1593,7 +1648,7 @@ contract QuadraticVotingE2E is Test {
         mechanism.setAlpha(optimalAlphaNumerator, optimalAlphaDenominator);
 
         // Finalize and queue
-        vm.roll(startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(votingEndTime + 1);
         _tokenized(address(mechanism)).finalizeVoteTally();
         _tokenized(address(mechanism)).queueProposal(pid1);
         _tokenized(address(mechanism)).queueProposal(pid2);
@@ -1628,8 +1683,8 @@ contract QuadraticVotingE2E is Test {
     function testChangingAlphaAfterVotingBehavior() public {
         // Initialize struct to hold all test data
         TestData memory data;
-        data.startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(data.startBlock - 1);
+        data.deploymentTime = block.timestamp;
+        // Timeline already set up in data.deploymentTime
 
         // Setup users and projects
         _signupUser(alice, 1000 ether);
@@ -1639,7 +1694,7 @@ contract QuadraticVotingE2E is Test {
         data.pid2 = _createProposal(bob, recipient2, "Alpha Change Test Project 2");
 
         // Move to voting period
-        vm.roll(data.startBlock + VOTING_DELAY + 1);
+        vm.warp(data.deploymentTime + _tokenized(address(mechanism)).votingDelay() + 1);
 
         // Cast votes with initial alpha = 1.0 (100% quadratic funding)
         // Verify initial alpha is 1.0
@@ -1648,13 +1703,13 @@ contract QuadraticVotingE2E is Test {
         assertEq(initialAlphaDenominator, 1, "Initial alpha denominator should be 1");
 
         // Alice votes 30 on Project 1 (costs 900 ether)
-        _castVote(alice, data.pid1, 30e9); // Cost: 900 ether
+        _castVote(alice, data.pid1, 30e9, recipient1); // Cost: 900 ether
 
         // Check Project 1 funding with alpha=1.0
         (data.p1Contributions1, data.p1SqrtSum1, data.p1Quadratic1, data.p1Linear1) = mechanism.getTally(data.pid1);
 
         // Bob votes 25 on Project 2 (costs 625 ether)
-        _castVote(bob, data.pid2, 25e9); // Cost: 625 ether
+        _castVote(bob, data.pid2, 25e9, recipient2); // Cost: 625 ether
 
         // Check Project 2 funding with alpha=1.0
         (data.p2Contributions1, data.p2SqrtSum1, data.p2Quadratic1, data.p2Linear1) = mechanism.getTally(data.pid2);
@@ -1695,7 +1750,7 @@ contract QuadraticVotingE2E is Test {
 
         // Charlie votes 20e9 on Project 1 (costs 400 ether)
         _signupUser(charlie, 500 ether); // Give Charlie some voting power
-        _castVote(charlie, data.pid1, 20e9); // Cost: 400 ether
+        _castVote(charlie, data.pid1, 20e9, recipient1); // Cost: 400 ether
 
         // Check Project 1 funding after Charlie's vote
         (data.p1Contributions3, data.p1SqrtSum3, data.p1Quadratic3, data.p1Linear3) = mechanism.getTally(data.pid1);
@@ -1716,7 +1771,12 @@ contract QuadraticVotingE2E is Test {
         token.transfer(address(mechanism), matchingFunds);
 
         // Finalize and test actual share distribution
-        vm.roll(data.startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(
+            data.deploymentTime +
+                _tokenized(address(mechanism)).votingDelay() +
+                _tokenized(address(mechanism)).votingPeriod() +
+                1
+        );
         _tokenized(address(mechanism)).finalizeVoteTally();
         _tokenized(address(mechanism)).queueProposal(data.pid1);
         _tokenized(address(mechanism)).queueProposal(data.pid2);
@@ -1736,8 +1796,8 @@ contract QuadraticVotingE2E is Test {
     function testTotalFundingMatchesAssetsWithOptimalAlpha() public {
         // Initialize struct to hold all test data
         TestData memory data;
-        data.startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(data.startBlock - 1);
+        data.deploymentTime = block.timestamp;
+        // Timeline already set up in data.deploymentTime
 
         // Setup users with varying deposits
         _signupUser(alice, 1200 ether);
@@ -1751,15 +1811,15 @@ contract QuadraticVotingE2E is Test {
         data.pid3 = _createProposal(alice, recipient3, "Environmental Project"); // alice creates for charlie's project
 
         // Move to voting period
-        vm.roll(data.startBlock + VOTING_DELAY + 1);
+        vm.warp(data.deploymentTime + _tokenized(address(mechanism)).votingDelay() + 1);
 
         // Complex voting pattern across multiple projects
-        _castVote(alice, data.pid1, 25e9); // Cost: 625 ether
-        _castVote(alice, data.pid2, 15e9); // Cost: 225 ether
-        _castVote(bob, data.pid1, 20e9); // Cost: 400 ether
-        _castVote(bob, data.pid3, 18e9); // Cost: 324 ether
-        _castVote(charlie, data.pid2, 22e9); // Cost: 484 ether
-        _castVote(charlie, data.pid3, 12e9); // Cost: 144 ether
+        _castVote(alice, data.pid1, 25e9, recipient1); // Cost: 625 ether
+        _castVote(alice, data.pid2, 15e9, recipient2); // Cost: 225 ether
+        _castVote(bob, data.pid1, 20e9, recipient1); // Cost: 400 ether
+        _castVote(bob, data.pid3, 18e9, recipient3); // Cost: 324 ether
+        _castVote(charlie, data.pid2, 22e9, recipient2); // Cost: 484 ether
+        _castVote(charlie, data.pid3, 12e9, recipient3); // Cost: 144 ether
 
         // Fixed matching pool amount
         data.fixedMatchingPool = 500 ether;
@@ -1799,7 +1859,12 @@ contract QuadraticVotingE2E is Test {
         assertEq(totalFundingAfterAlpha, expectedTotalFunding, "setAlpha should update totalFunding correctly");
 
         // Finalize to update totalFunding storage
-        vm.roll(data.startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(
+            data.deploymentTime +
+                _tokenized(address(mechanism)).votingDelay() +
+                _tokenized(address(mechanism)).votingPeriod() +
+                1
+        );
         _tokenized(address(mechanism)).finalizeVoteTally();
 
         // Verify totalFunding matches expected calculation
@@ -1852,8 +1917,8 @@ contract QuadraticVotingE2E is Test {
     function testDiverseVotingPatternsWithFixedMatchingPool() public {
         // Initialize struct to hold all test data
         TestData memory data;
-        data.startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(data.startBlock - 1);
+        data.deploymentTime = block.timestamp;
+        // Timeline already set up in data.deploymentTime
 
         // Setup 4 users with different deposit amounts
         _signupUser(alice, 1500 ether);
@@ -1872,26 +1937,26 @@ contract QuadraticVotingE2E is Test {
         data.pid4 = _createProposal(bob, data.recipient4, "Education Access"); // bob creates for dave's project
 
         // Move to voting period
-        vm.roll(data.startBlock + VOTING_DELAY + 1);
+        vm.warp(data.deploymentTime + _tokenized(address(mechanism)).votingDelay() + 1);
 
         // Pattern 1: Heavy concentration on one project
-        _castVote(alice, data.pid1, 35e9); // Cost: 1225 ether
-        _castVote(bob, data.pid1, 25e9); // Cost: 625 ether
+        _castVote(alice, data.pid1, 35e9, recipient1); // Cost: 1225 ether
+        _castVote(bob, data.pid1, 25e9, recipient1); // Cost: 625 ether
 
         // Pattern 2: Moderate support across multiple projects
-        _castVote(charlie, data.pid1, 10e9); // Cost: 100 ether
-        _castVote(charlie, data.pid2, 15e9); // Cost: 225 ether
-        _castVote(charlie, data.pid3, 20e9); // Cost: 400 ether
+        _castVote(charlie, data.pid1, 10e9, recipient1); // Cost: 100 ether
+        _castVote(charlie, data.pid2, 15e9, recipient2); // Cost: 225 ether
+        _castVote(charlie, data.pid3, 20e9, recipient3); // Cost: 400 ether
 
         // Pattern 3: Small votes spread widely
-        _castVote(data.dave, data.pid1, 5e9); // Cost: 25 ether
-        _castVote(data.dave, data.pid2, 8e9); // Cost: 64 ether
-        _castVote(data.dave, data.pid3, 12e9); // Cost: 144 ether
-        _castVote(data.dave, data.pid4, 18e9); // Cost: 324 ether
+        _castVote(data.dave, data.pid1, 5e9, recipient1); // Cost: 25 ether
+        _castVote(data.dave, data.pid2, 8e9, recipient2); // Cost: 64 ether
+        _castVote(data.dave, data.pid3, 12e9, recipient3); // Cost: 144 ether
+        _castVote(data.dave, data.pid4, 18e9, data.recipient4); // Cost: 324 ether
 
         // Additional votes to create interesting dynamics
-        _castVote(alice, data.pid2, 12e9); // Cost: 144 ether (remaining from 1500-1225=275)
-        _castVote(bob, data.pid3, 15e9); // Cost: 225 ether (remaining from 1000-625=375)
+        _castVote(alice, data.pid2, 12e9, recipient2); // Cost: 144 ether (remaining from 1500-1225=275)
+        _castVote(bob, data.pid3, 15e9, recipient3); // Cost: 225 ether (remaining from 1000-625=375)
 
         // Get voting results
         data.totalQuadraticSum = mechanism.totalQuadraticSum();
@@ -1945,7 +2010,12 @@ contract QuadraticVotingE2E is Test {
         mechanism.setAlpha(data.finalAlphaNumerator, data.finalAlphaDenominator);
 
         // Finalize and verify total funding is updated correctly
-        vm.roll(data.startBlock + VOTING_DELAY + VOTING_PERIOD + 1);
+        vm.warp(
+            data.deploymentTime +
+                _tokenized(address(mechanism)).votingDelay() +
+                _tokenized(address(mechanism)).votingPeriod() +
+                1
+        );
         _tokenized(address(mechanism)).finalizeVoteTally();
 
         data.finalTotalFunding = mechanism.totalFunding();

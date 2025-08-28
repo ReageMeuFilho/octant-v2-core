@@ -63,7 +63,6 @@ contract DecimalConversionTest is Test {
             quorumShares: 500,
             timelockDelay: 1 days,
             gracePeriod: 7 days,
-            startBlock: block.number + 50,
             owner: address(0)
         });
 
@@ -81,7 +80,6 @@ contract DecimalConversionTest is Test {
             quorumShares: 500,
             timelockDelay: 1 days,
             gracePeriod: 7 days,
-            startBlock: block.number + 50,
             owner: address(0)
         });
 
@@ -96,7 +94,8 @@ contract DecimalConversionTest is Test {
         uint256 deposit = 100 * 10 ** 6; // 100 USDC (6 decimals)
 
         // Test through actual signup to verify conversion works
-        vm.roll(_tokenized(address(mechanism)).startBlock() - 1);
+        // Warp to ensure we're in the signup window (mechanism allows signup until votingEndTime)
+        vm.warp(block.timestamp + 1);
         vm.startPrank(alice);
         token6.approve(address(mechanism), deposit);
         _tokenized(address(mechanism)).signup(deposit);
@@ -114,7 +113,8 @@ contract DecimalConversionTest is Test {
 
         uint256 deposit = 1 * 10 ** 8; // 1 WBTC (8 decimals)
 
-        vm.roll(_tokenized(address(mechanism)).startBlock() - 1);
+        // Warp to ensure we're in the signup window (mechanism allows signup until votingEndTime)
+        vm.warp(block.timestamp + 1);
         vm.startPrank(alice);
         token8.approve(address(mechanism), deposit);
         _tokenized(address(mechanism)).signup(deposit);
@@ -132,7 +132,8 @@ contract DecimalConversionTest is Test {
 
         uint256 deposit = 100 * 10 ** 18; // 100 WETH (18 decimals)
 
-        vm.roll(_tokenized(address(mechanism)).startBlock() - 1);
+        // Warp to ensure we're in the signup window (mechanism allows signup until votingEndTime)
+        vm.warp(block.timestamp + 1);
         vm.startPrank(alice);
         token18.approve(address(mechanism), deposit);
         _tokenized(address(mechanism)).signup(deposit);
@@ -149,7 +150,8 @@ contract DecimalConversionTest is Test {
 
         uint256 deposit = 100 * 10 ** 6; // 100 USDC (6 decimals)
 
-        vm.roll(_tokenized(address(mechanism)).startBlock() - 1);
+        // Warp to ensure we're in the signup window (mechanism allows signup until votingEndTime)
+        vm.warp(block.timestamp + 1);
         vm.startPrank(alice);
         token6.approve(address(mechanism), deposit);
         _tokenized(address(mechanism)).signup(deposit);

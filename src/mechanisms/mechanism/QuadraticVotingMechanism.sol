@@ -52,8 +52,15 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
         return _proposalExists(pid);
     }
 
-    /// @notice Allow all users to register (can be restricted in derived contracts)
-    function _beforeSignupHook(address) internal view virtual override returns (bool) {
+    /// @notice Allow all users to register, including multiple signups (can be restricted in derived contracts)
+    /// @dev Returns true for all users, allowing unlimited signups to accumulate voting power
+    /// @dev IMPORTANT: While technically possible, pure quadratic voting mechanisms should restrict users
+    /// @dev to single signups to prevent double-spending of vote credits. In QV, users receive a fixed
+    /// @dev allocation of vote credits and should only be able to claim them once. Multiple signups may
+    /// @dev be appropriate for quadratic funding (QF) variants where users contribute their own funds
+    /// @dev to increase voting power, but quadratic voting (QV) variants should override this hook to
+    /// @dev prevent re-registration and double-spending of allocated vote credits.
+    function _beforeSignupHook(address) internal virtual override returns (bool) {
         return true;
     }
 
@@ -73,6 +80,21 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
             // Scale down: divide by 10^(assetDecimals - 18)
             uint256 scaleFactor = 10 ** (assetDecimals - 18);
             return deposit / scaleFactor;
+        }
+    }
+
+    /// @dev Normalize token amount to 18 decimals (matches voting power normalization)
+    function _normalizeToDecimals(uint256 amount, uint8 assetDecimals) internal pure returns (uint256) {
+        if (assetDecimals == 18) {
+            return amount;
+        } else if (assetDecimals < 18) {
+            // Scale up: multiply by 10^(18 - assetDecimals)
+            uint256 scaleFactor = 10 ** (18 - assetDecimals);
+            return amount * scaleFactor;
+        } else {
+            // Scale down: divide by 10^(assetDecimals - 18)
+            uint256 scaleFactor = 10 ** (assetDecimals - 18);
+            return amount / scaleFactor;
         }
     }
 
@@ -146,10 +168,14 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
 
     /// @notice Handle custom share distribution - returns false to use default minting
     /// @return handled False to indicate default minting should be used
-    function _requestCustomDistributionHook(address, uint256) internal pure virtual override returns (bool) {
+    /// @return assetsTransferred 0 since no custom distribution is performed
+    function _requestCustomDistributionHook(
+        address,
+        uint256
+    ) internal pure virtual override returns (bool handled, uint256 assetsTransferred) {
         // Return false to indicate we want to use the default share minting in TokenizedAllocationMechanism
         // This allows the base implementation to handle the minting via _mint()
-        return false;
+        return (false, 0);
     }
 
     /// @dev Get available withdraw limit for share owner with global timelock and grace period enforcement
@@ -202,6 +228,12 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
         returns (uint256 sumContributions, uint256 sumSquareRoots, uint256 quadraticFunding, uint256 linearFunding)
     {
         if (!_validateProposalHook(pid)) revert TokenizedAllocationMechanism.InvalidProposal(pid);
+
+        // Return zero funding for cancelled proposals
+        if (_tokenizedAllocation().state(pid) == TokenizedAllocationMechanism.ProposalState.Canceled) {
+            return (0, 0, 0, 0);
+        }
+
         return getTally(pid);
     }
 
@@ -223,16 +255,29 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
     }
 
     /// @notice Calculate optimal alpha for 1:1 shares-to-assets ratio given fixed matching pool amount
-    /// @param matchingPoolAmount Fixed amount of matching funds available
-    /// @param totalUserDeposits Total user deposits in the mechanism
+    /// @param matchingPoolAmount Fixed amount of matching funds available (in token's native decimals)
+    /// @param totalUserDeposits Total user deposits in the mechanism (in token's native decimals)
     /// @return optimalAlphaNumerator Calculated alpha numerator
     /// @return optimalAlphaDenominator Calculated alpha denominator
-    /// @dev Uses current mechanism state for quadratic and linear sums
+    /// @dev Internally normalizes amounts to 18 decimals to match quadratic/linear sum calculations
     function calculateOptimalAlpha(
         uint256 matchingPoolAmount,
         uint256 totalUserDeposits
     ) external view returns (uint256 optimalAlphaNumerator, uint256 optimalAlphaDenominator) {
-        return _calculateOptimalAlpha(matchingPoolAmount, totalQuadraticSum(), totalLinearSum(), totalUserDeposits);
+        // Get asset decimals to normalize amounts
+        uint8 assetDecimals = IERC20Metadata(address(asset)).decimals();
+
+        // Normalize both amounts to 18 decimals to match quadratic/linear sums
+        uint256 normalizedMatchingPool = _normalizeToDecimals(matchingPoolAmount, assetDecimals);
+        uint256 normalizedUserDeposits = _normalizeToDecimals(totalUserDeposits, assetDecimals);
+
+        return
+            _calculateOptimalAlpha(
+                normalizedMatchingPool,
+                totalQuadraticSum(),
+                totalLinearSum(),
+                normalizedUserDeposits
+            );
     }
 
     /// @notice Reject ETH deposits to prevent permanent fund loss

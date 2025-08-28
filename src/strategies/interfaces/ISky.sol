@@ -22,6 +22,7 @@ interface ISkyCompounder {
     event MinAmountToSellUpdated(uint256 minAmountToSell);
     event BaseTokenUpdated(address base, bool useUniV3, uint24 rewardToBase, uint24 baseToAsset);
     event ReferralUpdated(uint16 referral);
+    event MinAmountOutUpdated(uint256 minAmountOut);
 
     // Management functions
     function setClaimRewards(bool _claimRewards) external;
@@ -29,4 +30,5 @@ interface ISkyCompounder {
     function setMinAmountToSell(uint256 _minAmountToSell) external;
     function setBase(address _base, bool _useUniV3, uint24 _rewardToBase, uint24 _baseToAsset) external;
     function setReferral(uint16 _referral) external;
+    function setMinAmountOut(uint256 _minAmountOut) external;
 }

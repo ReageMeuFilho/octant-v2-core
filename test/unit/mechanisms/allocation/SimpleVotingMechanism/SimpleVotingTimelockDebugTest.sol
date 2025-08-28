@@ -36,7 +36,6 @@ contract SimpleVotingTimelockDebugTest is Test {
             quorumShares: 200 ether,
             timelockDelay: 1 days,
             gracePeriod: 7 days,
-            startBlock: block.number + 50,
             owner: address(0)
         });
 
@@ -45,8 +44,15 @@ contract SimpleVotingTimelockDebugTest is Test {
     }
 
     function testTimelockDebug() public {
-        uint256 startBlock = _tokenized(address(mechanism)).startBlock();
-        vm.roll(startBlock - 1);
+        // Get absolute timeline from contract
+        uint256 deploymentTime = block.timestamp;
+        uint256 votingDelay = _tokenized(address(mechanism)).votingDelay();
+        uint256 votingPeriod = _tokenized(address(mechanism)).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
+
+        // Stay before voting starts for registration
+        vm.warp(votingStartTime - 1);
 
         // Setup
         vm.startPrank(alice);
@@ -55,11 +61,13 @@ contract SimpleVotingTimelockDebugTest is Test {
         uint256 pid = _tokenized(address(mechanism)).propose(charlie, "Test");
         vm.stopPrank();
 
-        vm.roll(startBlock + 101);
+        // Move to voting period
+        vm.warp(votingStartTime + 1);
         vm.prank(alice);
-        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 500 ether);
+        _tokenized(address(mechanism)).castVote(pid, TokenizedAllocationMechanism.VoteType.For, 500 ether, charlie);
 
-        vm.roll(startBlock + 1101);
+        // Move to finalization period
+        vm.warp(votingEndTime + 1);
         (bool success, ) = address(mechanism).call(abi.encodeWithSignature("finalizeVoteTally()"));
         require(success, "Finalization failed");
 

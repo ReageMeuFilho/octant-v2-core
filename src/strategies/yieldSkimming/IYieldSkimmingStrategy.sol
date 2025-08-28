@@ -7,4 +7,14 @@ interface IYieldSkimmingStrategy {
     function getLastRateRay() external view returns (uint256);
 
     function decimalsOfExchangeRate() external view returns (uint256);
+
+    function getCurrentRateRay() external view returns (uint256);
+
+    function getTotalUserDebtInAssetValue() external view returns (uint256);
+
+    function getDragonRouterDebtInAssetValue() external view returns (uint256);
+
+    function getTotalValueDebtInAssetValue() external view returns (uint256);
+
+    function isVaultInsolvent() external view returns (bool);
 }

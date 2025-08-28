@@ -220,9 +220,6 @@ abstract contract TokenizedStrategy {
         uint8 entered; // To prevent reentrancy. Use uint8 for gas savings.
         bool shutdown; // Bool that can be used to stop deposits into the strategy.
         
-        // Loss tracking for yield strategies
-        uint256 lossAmount; // Accumulated losses to offset against future profits
-        
         // Burning mechanism control
         bool enableBurning; // Whether to burn shares from dragon router during loss protection
     }
@@ -333,7 +330,7 @@ abstract contract TokenizedStrategy {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice API version this TokenizedStrategy implements.
-    string internal constant API_VERSION = "3.0.4";
+    string internal constant API_VERSION = "1.0.0";
 
     /// @notice Value to set the `entered` flag to during a call.
     uint8 internal constant ENTERED = 2;
@@ -345,6 +342,20 @@ abstract contract TokenizedStrategy {
 
     /// @notice Cooldown period for dragon router changes (14 days).
     uint256 internal constant DRAGON_ROUTER_COOLDOWN = 14 days;
+
+    /// @notice Permit type hash for EIP-2612 permit functionality.
+    bytes32 internal constant PERMIT_TYPEHASH =
+        keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+
+    /// @notice EIP712Domain type hash for EIP-712 domain separator.
+    bytes32 internal constant EIP712DOMAIN_TYPEHASH =
+        keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+
+    /// @notice Hash of the vault name for EIP-712 domain separator.
+    bytes32 internal constant NAME_HASH = keccak256("Octant Vault");
+
+    /// @notice Hash of the API version for EIP-712 domain separator.
+    bytes32 internal constant VERSION_HASH = keccak256(bytes(API_VERSION));
 
     /**
      * @dev Custom storage slot that will be used to store the
@@ -361,7 +372,7 @@ abstract contract TokenizedStrategy {
      * amount of storage in their strategy without worrying
      * about collisions.
      */
-    bytes32 internal constant BASE_STRATEGY_STORAGE = bytes32(uint256(keccak256("yearn.base.strategy.storage")) - 1);
+    bytes32 internal constant BASE_STRATEGY_STORAGE = bytes32(uint256(keccak256("octant.base.strategy.storage")) - 1);
 
     /*//////////////////////////////////////////////////////////////
                             STORAGE GETTER
@@ -467,7 +478,7 @@ abstract contract TokenizedStrategy {
      * @param receiver The address to receive the `shares`.
      * @return shares The actual amount of shares issued.
      */
-    function deposit(uint256 assets, address receiver) external nonReentrant returns (uint256 shares) {
+    function deposit(uint256 assets, address receiver) external virtual nonReentrant returns (uint256 shares) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
 
@@ -491,7 +502,7 @@ abstract contract TokenizedStrategy {
      * @param receiver The address to receive the `shares`.
      * @return assets The actual amount of asset deposited.
      */
-    function mint(uint256 shares, address receiver) external nonReentrant returns (uint256 assets) {
+    function mint(uint256 shares, address receiver) external virtual nonReentrant returns (uint256 assets) {
         // Get the storage slot for all following calls.
         StrategyData storage S = _strategyStorage();
 
@@ -512,7 +523,7 @@ abstract contract TokenizedStrategy {
      * @param owner The address whose shares are burnt.
      * @return shares The actual amount of shares burnt.
      */
-    function withdraw(uint256 assets, address receiver, address owner) external returns (uint256 shares) {
+    function withdraw(uint256 assets, address receiver, address owner) external virtual returns (uint256 shares) {
         return withdraw(assets, receiver, owner, 0);
     }
 
@@ -551,7 +562,7 @@ abstract contract TokenizedStrategy {
      * @param owner The address whose shares are burnt.
      * @return assets The actual amount of underlying withdrawn.
      */
-    function redeem(uint256 shares, address receiver, address owner) external returns (uint256) {
+    function redeem(uint256 shares, address receiver, address owner) external virtual returns (uint256) {
         // We default to not limiting a potential loss.
         return redeem(shares, receiver, owner, MAX_BPS);
     }
@@ -790,24 +801,10 @@ abstract contract TokenizedStrategy {
         return assets.mulDiv(totalSupply_, totalAssets_, _rounding);
     }
 
-    function _convertToSharesWithLoss(
-        StrategyData storage S,
-        uint256 assets,
-        Math.Rounding _rounding
-    ) internal view returns (uint256) {
-        // Saves an extra SLOAD if values are non-zero.
-        uint256 totalSupply_ = _totalSupply(S);
-        // If supply is 0, PPS = 1.
-        if (totalSupply_ == 0) return assets;
-
-        uint256 totalAssets_ = _totalAssets(S);
-        // If assets are 0 but supply is not PPS = 0.
-        if (totalAssets_ == 0) return 0;
-
-        return assets.mulDiv(totalSupply_, totalAssets_ + S.lossAmount, _rounding);
-    }
-
     /// @dev Internal implementation of {convertToAssets}.
+    // WARNING: When deploying donated assets with YieldDonatingTokenizedStrategy,
+    // potential losses can be amplified due to the multi-hop donation flow:
+    // For example OctantVault → YearnVault → MorphoVault → Morpho
     function _convertToAssets(
         StrategyData storage S,
         uint256 shares,
@@ -918,7 +915,7 @@ abstract contract TokenizedStrategy {
         uint256 assets,
         uint256 shares,
         uint256 maxLoss
-    ) internal returns (uint256) {
+    ) internal virtual returns (uint256) {
         require(receiver != address(0), "ZERO ADDRESS");
         require(maxLoss <= MAX_BPS, "exceeds MAX_BPS");
 
@@ -1157,7 +1154,7 @@ abstract contract TokenizedStrategy {
      *
      * @return . The price per share.
      */
-    function pricePerShare() external view returns (uint256) {
+    function pricePerShare() public view returns (uint256) {
         StrategyData storage S = _strategyStorage();
         return _convertToAssets(S, 10 ** S.decimals, Math.Rounding.Floor);
     }
@@ -1317,11 +1314,11 @@ abstract contract TokenizedStrategy {
 
     /**
      * @notice Returns the symbol of the strategies token.
-     * @dev Will be 'ys + asset symbol'.
+     * @dev Will be 'os + asset symbol'.
      * @return . The symbol the strategy is using for its tokens.
      */
     function symbol() external view returns (string memory) {
-        return string(abi.encodePacked("ys", _strategyStorage().asset.symbol()));
+        return string(abi.encodePacked("os", _strategyStorage().asset.symbol()));
     }
 
     /**
@@ -1361,7 +1358,7 @@ abstract contract TokenizedStrategy {
      * @param amount The amount of shares to be transferred from sender.
      * @return . a boolean value indicating whether the operation succeeded.
      */
-    function transfer(address to, uint256 amount) external returns (bool) {
+    function transfer(address to, uint256 amount) external virtual returns (bool) {
         _transfer(_strategyStorage(), msg.sender, to, amount);
         return true;
     }
@@ -1441,7 +1438,7 @@ abstract contract TokenizedStrategy {
      * @param amount the quantity of shares to move.
      * @return . a boolean value indicating whether the operation succeeded.
      */
-    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
+    function transferFrom(address from, address to, uint256 amount) external virtual returns (bool) {
         StrategyData storage S = _strategyStorage();
         _spendAllowance(S, from, msg.sender, amount);
         _transfer(S, from, to, amount);
@@ -1617,9 +1614,7 @@ abstract contract TokenizedStrategy {
                         DOMAIN_SEPARATOR(),
                         keccak256(
                             abi.encode(
-                                keccak256(
-                                    "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
-                                ),
+                                PERMIT_TYPEHASH,
                                 owner,
                                 spender,
                                 value,
@@ -1647,15 +1642,6 @@ abstract contract TokenizedStrategy {
      * @return . The domain separator that will be used for any {permit} calls.
      */
     function DOMAIN_SEPARATOR() public view returns (bytes32) {
-        return
-            keccak256(
-                abi.encode(
-                    keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                    keccak256("Yearn Vault"),
-                    keccak256(bytes(API_VERSION)),
-                    block.chainid,
-                    address(this)
-                )
-            );
+        return keccak256(abi.encode(EIP712DOMAIN_TYPEHASH, NAME_HASH, VERSION_HASH, block.chainid, address(this)));
     }
 }
