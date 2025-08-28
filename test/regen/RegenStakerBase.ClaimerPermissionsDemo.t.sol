@@ -55,7 +55,6 @@ contract RegenStakerBaseClaimerPermissionsDemoTest is Test {
             quorumShares: 1,
             timelockDelay: 1,
             gracePeriod: 100,
-            startBlock: block.number,
             owner: admin
         });
         allocationMechanism = new OctantQFMechanism(address(impl), cfg, 1, 1, address(0));
