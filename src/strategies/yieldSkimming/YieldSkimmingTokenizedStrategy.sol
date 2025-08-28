@@ -124,18 +124,32 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     }
 
     /**
-     * @notice Redeem shares from the strategy with value debt tracking
-     * @dev Shares represent ETH value (1 share = 1 ETH value)
+     * @notice Redeem shares from the strategy with default maxLoss
+     * @dev Wrapper that calls the full redeem function with MAX_BPS maxLoss
      * @param shares The amount of shares to redeem
      * @param receiver The address to receive the assets
      * @param owner The address whose shares are being redeemed
      * @return assets The amount of assets returned
      */
+    function redeem(uint256 shares, address receiver, address owner) external override returns (uint256 assets) {
+        return redeem(shares, receiver, owner, MAX_BPS);
+    }
+
+    /**
+     * @notice Redeem shares from the strategy with value debt tracking
+     * @dev Shares represent ETH value (1 share = 1 ETH value)
+     * @param shares The amount of shares to redeem
+     * @param receiver The address to receive the assets
+     * @param owner The address whose shares are being redeemed
+     * @param maxLoss The maximum acceptable loss in basis points
+     * @return assets The amount of assets returned
+     */
     function redeem(
         uint256 shares,
         address receiver,
-        address owner
-    ) external override nonReentrant returns (uint256 assets) {
+        address owner,
+        uint256 maxLoss
+    ) public override nonReentrant returns (uint256 assets) {
         StrategyData storage S = _strategyStorage();
         YieldSkimmingStorage storage YS = _strategyYieldSkimmingStorage();
 
@@ -148,7 +162,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         // Validate inputs and check limits (replaces super.redeem validation)
         require(shares <= _maxRedeem(S, owner), "ERC4626: redeem more than max");
         require((assets = _convertToAssets(S, shares, Math.Rounding.Floor)) != 0, "ZERO_ASSETS");
-        assets = _performWithdrawal(S, receiver, owner, assets, shares, MAX_BPS);
+        assets = _performWithdrawal(S, receiver, owner, assets, shares, maxLoss);
 
         // Update value debt after successful redemption (only for users)
         if (owner != S.dragonRouter) {
