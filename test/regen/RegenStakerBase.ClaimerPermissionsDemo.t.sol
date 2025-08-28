@@ -51,11 +51,10 @@ contract RegenStakerBaseClaimerPermissionsDemoTest is Test {
             name: "TestAlloc",
             symbol: "TA",
             votingDelay: 1,
-            votingPeriod: 10,
+            votingPeriod: 30 days,
             quorumShares: 1,
             timelockDelay: 1,
             gracePeriod: 100,
-            startBlock: block.number,
             owner: admin
         });
         allocationMechanism = new OctantQFMechanism(address(impl), cfg, 1, 1, address(0));
@@ -154,9 +153,7 @@ contract RegenStakerBaseClaimerPermissionsDemoTest is Test {
         bytes32 typeHash = keccak256(
             bytes("Signup(address user,address payer,uint256 deposit,uint256 nonce,uint256 deadline)")
         );
-        bytes32 structHash = keccak256(
-            abi.encode(typeHash, claimer, address(regenStaker), amount, nonce, deadline)
-        );
+        bytes32 structHash = keccak256(abi.encode(typeHash, claimer, address(regenStaker), amount, nonce, deadline));
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(claimerPk, digest);
 

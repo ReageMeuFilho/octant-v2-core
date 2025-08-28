@@ -25,6 +25,7 @@ contract RegenStakerGovernanceProtectionTest is Test {
     MockERC20 public rewardToken;
     MockERC20Staking public stakeToken;
     Whitelist public whitelist;
+    Whitelist public allocationWhitelist;
 
     address public admin = makeAddr("admin");
     address public rewardNotifier = makeAddr("rewardNotifier");
@@ -44,6 +45,7 @@ contract RegenStakerGovernanceProtectionTest is Test {
         // Deploy whitelist and calculator
         vm.startPrank(admin);
         whitelist = new Whitelist();
+        allocationWhitelist = new Whitelist();
         earningPowerCalculator = new RegenEarningPowerCalculator(admin, whitelist);
 
         // Deploy RegenStaker
@@ -58,7 +60,7 @@ contract RegenStakerGovernanceProtectionTest is Test {
             INITIAL_MIN_STAKE,
             whitelist,
             whitelist,
-            whitelist
+            allocationWhitelist
         );
 
         // Setup permissions
@@ -99,8 +101,8 @@ contract RegenStakerGovernanceProtectionTest is Test {
         vm.prank(admin);
         regenStaker.setMaxBumpTip(INITIAL_MAX_BUMP_TIP - 1);
 
-        // Verify maxBumpTip unchanged
-        assertEq(regenStaker.maxBumpTip(), INITIAL_MAX_BUMP_TIP, "MaxBumpTip should be unchanged");
+        // Verify maxBumpTip was decreased (decreases are allowed during active rewards)
+        assertEq(regenStaker.maxBumpTip(), INITIAL_MAX_BUMP_TIP - 1, "MaxBumpTip should be decreased");
     }
 
     /**

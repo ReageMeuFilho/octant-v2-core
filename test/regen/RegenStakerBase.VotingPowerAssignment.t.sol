@@ -59,11 +59,10 @@ contract RegenStakerBaseVotingPowerAssignmentTest is Test {
             name: "TestAlloc",
             symbol: "TA",
             votingDelay: 1,
-            votingPeriod: 10,
+            votingPeriod: 30 days,
             quorumShares: 1,
             timelockDelay: 1,
             gracePeriod: 100,
-            startBlock: block.number,
             owner: admin
         });
         allocationMechanism = new OctantQFMechanism(address(impl), cfg, 1, 1, address(0));
@@ -86,7 +85,7 @@ contract RegenStakerBaseVotingPowerAssignmentTest is Test {
         vm.prank(admin);
         regenStaker = new RegenStaker(
             IERC20(address(token)), // rewardsToken
-            token, // stakeToken  
+            token, // stakeToken
             earningPowerCalculator,
             0, // maxBumpTip
             admin,
@@ -124,7 +123,7 @@ contract RegenStakerBaseVotingPowerAssignmentTest is Test {
         bytes32 domainSeparator = TokenizedAllocationMechanism(address(allocationMechanism)).DOMAIN_SEPARATOR();
         uint256 nonce = TokenizedAllocationMechanism(address(allocationMechanism)).nonces(owner);
         uint256 deadline = block.timestamp + 1 days;
-        
+
         bytes32 typeHash = keccak256(
             bytes("Signup(address user,address payer,uint256 deposit,uint256 nonce,uint256 deadline)")
         );
@@ -150,13 +149,15 @@ contract RegenStakerBaseVotingPowerAssignmentTest is Test {
         assertEq(contributed, CONTRIBUTION_AMOUNT, "Contribution amount mismatch");
 
         // CRITICAL ASSERTION: Owner gets the voting power
-        uint256 ownerVotingPower = TokenizedAllocationMechanism(address(allocationMechanism))
-            .getRemainingVotingPower(owner);
+        uint256 ownerVotingPower = TokenizedAllocationMechanism(address(allocationMechanism)).getRemainingVotingPower(
+            owner
+        );
         assertEq(ownerVotingPower, CONTRIBUTION_AMOUNT, "Owner should have voting power equal to contribution");
 
         // CRITICAL ASSERTION: Claimer has NO voting power
-        uint256 claimerVotingPower = TokenizedAllocationMechanism(address(allocationMechanism))
-            .getRemainingVotingPower(claimer);
+        uint256 claimerVotingPower = TokenizedAllocationMechanism(address(allocationMechanism)).getRemainingVotingPower(
+            claimer
+        );
         assertEq(claimerVotingPower, 0, "Claimer should have no voting power when owner contributes");
     }
 
@@ -167,7 +168,7 @@ contract RegenStakerBaseVotingPowerAssignmentTest is Test {
         bytes32 domainSeparator = TokenizedAllocationMechanism(address(allocationMechanism)).DOMAIN_SEPARATOR();
         uint256 nonce = TokenizedAllocationMechanism(address(allocationMechanism)).nonces(claimer);
         uint256 deadline = block.timestamp + 1 days;
-        
+
         bytes32 typeHash = keccak256(
             bytes("Signup(address user,address payer,uint256 deposit,uint256 nonce,uint256 deadline)")
         );
@@ -193,13 +194,15 @@ contract RegenStakerBaseVotingPowerAssignmentTest is Test {
         assertEq(contributed, CONTRIBUTION_AMOUNT, "Contribution amount mismatch");
 
         // CRITICAL ASSERTION: Claimer gets the voting power
-        uint256 claimerVotingPower = TokenizedAllocationMechanism(address(allocationMechanism))
-            .getRemainingVotingPower(claimer);
+        uint256 claimerVotingPower = TokenizedAllocationMechanism(address(allocationMechanism)).getRemainingVotingPower(
+            claimer
+        );
         assertEq(claimerVotingPower, CONTRIBUTION_AMOUNT, "Claimer should have voting power equal to contribution");
 
         // CRITICAL ASSERTION: Owner has NO voting power (despite rewards coming from their deposit!)
-        uint256 ownerVotingPower = TokenizedAllocationMechanism(address(allocationMechanism))
-            .getRemainingVotingPower(owner);
+        uint256 ownerVotingPower = TokenizedAllocationMechanism(address(allocationMechanism)).getRemainingVotingPower(
+            owner
+        );
         assertEq(ownerVotingPower, 0, "Owner should have no voting power when claimer contributes");
     }
 
@@ -211,22 +214,24 @@ contract RegenStakerBaseVotingPowerAssignmentTest is Test {
         // First: Owner contributes half
         _contributeAsOwner(halfContribution);
 
-        // Second: Claimer contributes the other half  
+        // Second: Claimer contributes the other half
         _contributeAsClaimer(halfContribution);
 
         // CRITICAL ASSERTIONS: Each has voting power matching their own contribution
-        uint256 ownerVotingPower = TokenizedAllocationMechanism(address(allocationMechanism))
-            .getRemainingVotingPower(owner);
-        uint256 claimerVotingPower = TokenizedAllocationMechanism(address(allocationMechanism))
-            .getRemainingVotingPower(claimer);
+        uint256 ownerVotingPower = TokenizedAllocationMechanism(address(allocationMechanism)).getRemainingVotingPower(
+            owner
+        );
+        uint256 claimerVotingPower = TokenizedAllocationMechanism(address(allocationMechanism)).getRemainingVotingPower(
+            claimer
+        );
 
         assertEq(ownerVotingPower, halfContribution, "Owner voting power should match their contribution");
         assertEq(claimerVotingPower, halfContribution, "Claimer voting power should match their contribution");
-        
+
         // Both used the same deposit's rewards, but each got their own voting power
         assertEq(
-            ownerVotingPower + claimerVotingPower, 
-            CONTRIBUTION_AMOUNT, 
+            ownerVotingPower + claimerVotingPower,
+            CONTRIBUTION_AMOUNT,
             "Total voting power should equal total contributions"
         );
     }
@@ -236,13 +241,11 @@ contract RegenStakerBaseVotingPowerAssignmentTest is Test {
         bytes32 domainSeparator = TokenizedAllocationMechanism(address(allocationMechanism)).DOMAIN_SEPARATOR();
         uint256 nonce = TokenizedAllocationMechanism(address(allocationMechanism)).nonces(owner);
         uint256 deadline = block.timestamp + 1 days;
-        
+
         bytes32 typeHash = keccak256(
             bytes("Signup(address user,address payer,uint256 deposit,uint256 nonce,uint256 deadline)")
         );
-        bytes32 structHash = keccak256(
-            abi.encode(typeHash, owner, address(regenStaker), amount, nonce, deadline)
-        );
+        bytes32 structHash = keccak256(abi.encode(typeHash, owner, address(regenStaker), amount, nonce, deadline));
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerPk, digest);
 
@@ -264,13 +267,11 @@ contract RegenStakerBaseVotingPowerAssignmentTest is Test {
         bytes32 domainSeparator = TokenizedAllocationMechanism(address(allocationMechanism)).DOMAIN_SEPARATOR();
         uint256 nonce = TokenizedAllocationMechanism(address(allocationMechanism)).nonces(claimer);
         uint256 deadline = block.timestamp + 1 days;
-        
+
         bytes32 typeHash = keccak256(
             bytes("Signup(address user,address payer,uint256 deposit,uint256 nonce,uint256 deadline)")
         );
-        bytes32 structHash = keccak256(
-            abi.encode(typeHash, claimer, address(regenStaker), amount, nonce, deadline)
-        );
+        bytes32 structHash = keccak256(abi.encode(typeHash, claimer, address(regenStaker), amount, nonce, deadline));
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(claimerPk, digest);
 
@@ -294,7 +295,7 @@ contract RegenStakerBaseVotingPowerAssignmentTest is Test {
         bytes32 domainSeparator = TokenizedAllocationMechanism(address(allocationMechanism)).DOMAIN_SEPARATOR();
         uint256 nonce = TokenizedAllocationMechanism(address(allocationMechanism)).nonces(owner);
         uint256 deadline = block.timestamp + 1 days;
-        
+
         bytes32 typeHash = keccak256(
             bytes("Signup(address user,address payer,uint256 deposit,uint256 nonce,uint256 deadline)")
         );
@@ -308,19 +309,12 @@ contract RegenStakerBaseVotingPowerAssignmentTest is Test {
         // Claimer tries to contribute but passes owner's signature - should fail
         vm.prank(claimer);
         vm.expectRevert(); // Will revert due to signature mismatch
-        regenStaker.contribute(
-            depositId,
-            address(allocationMechanism),
-            CONTRIBUTION_AMOUNT,
-            deadline,
-            v,
-            r,
-            s
-        );
+        regenStaker.contribute(depositId, address(allocationMechanism), CONTRIBUTION_AMOUNT, deadline, v, r, s);
 
         // Verify no voting power was assigned
-        uint256 claimerVotingPower = TokenizedAllocationMechanism(address(allocationMechanism))
-            .getRemainingVotingPower(claimer);
+        uint256 claimerVotingPower = TokenizedAllocationMechanism(address(allocationMechanism)).getRemainingVotingPower(
+            claimer
+        );
         assertEq(claimerVotingPower, 0, "Claimer should have no voting power after failed contribution");
     }
 }
