@@ -8,16 +8,23 @@ import { SkyCompounderStrategy } from "src/strategies/yieldDonating/SkyCompounde
  * @title SkyCompounderStrategyFactory
  * @author Octant
  * @notice Factory for deploying Sky Compounder yield donating strategies
- * @dev Inherits secure deterministic deployment from BaseStrategyFactory
+ * @dev Inherits deterministic deployment from BaseStrategyFactory
  */
 contract SkyCompounderStrategyFactory is BaseStrategyFactory {
     /// @notice USDS reward address on mainnet
     address constant USDS_REWARD_ADDRESS = 0x0650CAF159C5A49f711e8169D4336ECB9b950275;
 
+    // Child-specific StrategyDeploy event for compatibility with existing tests
+    event StrategyDeploy(
+        address indexed deployer,
+        address indexed donationAddress,
+        address indexed strategyAddress,
+        string vaultTokenName
+    );
+
     /**
      * @notice Deploys a new SkyCompounder strategy for the Yield Donating Vault.
-     * @dev Uses secure deterministic deployment with deployer-specific counters
-     *      to prevent front-running attacks. Each deployer gets unique addresses.
+     * @dev Uses deterministic deployment with user-provided salt combined with deployer address.
      * @param _name The name of the vault token associated with the strategy.
      * @param _management The address of the management entity responsible for the strategy.
      * @param _keeper The address of the keeper responsible for maintaining the strategy.
@@ -35,6 +42,7 @@ contract SkyCompounderStrategyFactory is BaseStrategyFactory {
         address _emergencyAdmin,
         address _donationAddress,
         bool _enableBurning,
+        bytes32 _salt,
         address _tokenizedStrategyAddress,
         bool _allowDepositDuringLoss
     ) external returns (address strategyAddress) {
@@ -53,9 +61,11 @@ contract SkyCompounderStrategyFactory is BaseStrategyFactory {
             )
         );
 
-        // Deploy using secure deterministic method from base
-        strategyAddress = _deployStrategy(bytecode);
-        
+        // Deploy using deterministic deployment with user-provided salt
+        strategyAddress = _deployStrategy(bytecode, _salt);
+
+        emit StrategyDeploy(_management, _donationAddress, strategyAddress, _name);
+
         // Record the deployment
         _recordStrategy(_name, _donationAddress, strategyAddress);
     }

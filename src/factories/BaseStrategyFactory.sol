@@ -6,14 +6,13 @@ import { CREATE3 } from "solady/utils/CREATE3.sol";
 /**
  * @title BaseStrategyFactory
  * @author Octant
- * @notice Base contract for strategy factories with secure deterministic deployment
- * @dev Uses CREATE3 with deployer-specific counters to prevent front-running attacks
- * 
+ * @notice Base contract for strategy factories with deterministic deployment
+ * @dev Uses CREATE3 with user-provided salts for backward compatibility
+ *
  * Security Considerations:
- * - Each deployer has a unique counter that increments with each deployment
- * - Salt is derived from msg.sender and their deployment count
- * - This prevents front-running as an attacker cannot predict or manipulate the counter
- * - Addresses are deterministic and predictable for legitimate users
+ * - Callers are responsible for managing salt uniqueness to prevent collisions
+ * - Salt is combined with msg.sender to ensure deployer-specific addresses
+ * - Addresses are deterministic and predictable based on salt and deployer
  */
 abstract contract BaseStrategyFactory {
     /**
@@ -32,91 +31,51 @@ abstract contract BaseStrategyFactory {
 
     /**
      * @dev Mapping from deployer address to their deployed strategies
-     * Used for tracking and generating unique salts
+     * Used for tracking deployed strategies
      */
     mapping(address => StrategyInfo[]) public strategies;
 
-    /**
-     * @dev Counter for each deployer to ensure unique deployments
-     * Critical for preventing front-running attacks
-     */
-    mapping(address => uint256) public deploymentCounter;
-
-    event StrategyDeploy(
-        address indexed deployer,
-        address indexed donationAddress,
-        address indexed strategyAddress,
-        string vaultTokenName
-    );
+    // Note: Child factories should declare and emit their own `StrategyDeploy` event for compatibility.
 
     /**
-     * @notice Predict deterministic deployment address for the next strategy
-     * @dev Uses the current deployment counter for the deployer
-     * @param deployer Address that will deploy
+     * @notice Predict deployment address using user-provided salt and deployer
+     * @dev Combines salt with deployer address for deterministic deployment
+     * @param _salt User-provided salt for uniqueness
+     * @param deployer Deployer address
      * @return Predicted contract address
      */
-    function predictNextStrategyAddress(address deployer) external view returns (address) {
-        bytes32 salt = _generateSalt(deployer, deploymentCounter[deployer]);
-        return CREATE3.predictDeterministicAddress(salt);
-    }
-
-    /**
-     * @notice Predict deterministic deployment address for a specific deployment index
-     * @param deployer Address that will deploy
-     * @param index Deployment index to predict
-     * @return Predicted contract address
-     */
-    function predictStrategyAddressAtIndex(address deployer, uint256 index) external view returns (address) {
-        bytes32 salt = _generateSalt(deployer, index);
-        return CREATE3.predictDeterministicAddress(salt);
-    }
-
-    /**
-     * @dev Generate secure salt combining deployer and their counter
-     * @param deployer Address of the deployer
-     * @param counter Deployment counter for the deployer
-     * @return salt Secure salt for deterministic deployment
-     */
-    function _generateSalt(address deployer, uint256 counter) internal pure returns (bytes32) {
-        return keccak256(abi.encode(deployer, counter));
+    function predictStrategyAddress(bytes32 _salt, address deployer) external view returns (address) {
+        bytes32 finalSalt = keccak256(abi.encodePacked(_salt, deployer));
+        return CREATE3.predictDeterministicAddress(finalSalt);
     }
 
     /**
      * @dev Internal function to deploy strategy using CREATE3
      * @param bytecode The deployment bytecode
+     * @param _salt User-provided salt for deterministic deployment
      * @return strategyAddress The deployed strategy address
      */
-    function _deployStrategy(bytes memory bytecode) internal returns (address strategyAddress) {
-        // Generate secure salt using deployer and their counter
-        bytes32 salt = _generateSalt(msg.sender, deploymentCounter[msg.sender]);
-        
-        // Increment counter for next deployment
-        deploymentCounter[msg.sender]++;
-        
-        // Deploy using CREATE3
-        strategyAddress = CREATE3.deployDeterministic(bytecode, salt);
+    function _deployStrategy(bytes memory bytecode, bytes32 _salt) internal returns (address strategyAddress) {
+        bytes32 finalSalt = keccak256(abi.encodePacked(_salt, msg.sender));
+        strategyAddress = CREATE3.deployDeterministic(bytecode, finalSalt);
     }
 
     /**
      * @dev Internal function to record strategy deployment
      * @param _name Strategy name
      * @param _donationAddress Donation address
-     * @param strategyAddress Deployed strategy address
+     * @param _strategyAddress Deployed strategy address
      */
-    function _recordStrategy(
-        string memory _name,
-        address _donationAddress,
-        address strategyAddress
-    ) internal {
-        emit StrategyDeploy(msg.sender, _donationAddress, strategyAddress, _name);
-        
+    function _recordStrategy(string memory _name, address _donationAddress, address _strategyAddress) internal {
+        // Silence unused parameter warning
+        _strategyAddress;
         StrategyInfo memory strategyInfo = StrategyInfo({
             deployerAddress: msg.sender,
             timestamp: block.timestamp,
             vaultTokenName: _name,
             donationAddress: _donationAddress
         });
-        
+
         strategies[msg.sender].push(strategyInfo);
     }
 
@@ -127,14 +86,5 @@ abstract contract BaseStrategyFactory {
      */
     function getStrategiesByDeployer(address deployer) external view returns (StrategyInfo[] memory) {
         return strategies[deployer];
-    }
-
-    /**
-     * @dev Get the number of strategies deployed by an address
-     * @param deployer Address of the deployer
-     * @return Number of strategies deployed
-     */
-    function getDeploymentCount(address deployer) external view returns (uint256) {
-        return deploymentCounter[deployer];
     }
 }

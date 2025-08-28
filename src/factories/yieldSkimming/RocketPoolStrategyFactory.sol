@@ -8,16 +8,23 @@ import { RocketPoolStrategy } from "src/strategies/yieldSkimming/RocketPoolStrat
  * @title RocketPoolStrategyFactory
  * @author Octant
  * @notice Factory for deploying RocketPool yield skimming strategies
- * @dev Inherits secure deterministic deployment from BaseStrategyFactory
+ * @dev Inherits deterministic deployment from BaseStrategyFactory
  */
 contract RocketPoolStrategyFactory is BaseStrategyFactory {
     /// @notice rETH token address on mainnet
     address public constant R_ETH = 0xae78736Cd615f374D3085123A210448E74Fc6393;
 
+    // Child-specific StrategyDeploy event for compatibility with existing tests
+    event StrategyDeploy(
+        address indexed deployer,
+        address indexed donationAddress,
+        address indexed strategyAddress,
+        string vaultTokenName
+    );
+
     /**
      * @notice Deploys a new RocketPool strategy for the Yield Skimming Vault.
-     * @dev Uses secure deterministic deployment with deployer-specific counters
-     *      to prevent front-running attacks. Each deployer gets unique addresses.
+     * @dev Uses deterministic deployment with user-provided salt combined with deployer address.
      * @param _name The name of the vault token associated with the strategy.
      * @param _management The address of the management entity responsible for the strategy.
      * @param _keeper The address of the keeper responsible for maintaining the strategy.
@@ -35,6 +42,7 @@ contract RocketPoolStrategyFactory is BaseStrategyFactory {
         address _emergencyAdmin,
         address _donationAddress,
         bool _enableBurning,
+        bytes32 _salt,
         address _tokenizedStrategyAddress,
         bool _allowDepositDuringLoss
     ) external returns (address strategyAddress) {
@@ -53,9 +61,11 @@ contract RocketPoolStrategyFactory is BaseStrategyFactory {
             )
         );
 
-        // Deploy using secure deterministic method from base
-        strategyAddress = _deployStrategy(bytecode);
-        
+        // Deploy using deterministic deployment with user-provided salt
+        strategyAddress = _deployStrategy(bytecode, _salt);
+
+        emit StrategyDeploy(_management, _donationAddress, strategyAddress, _name);
+
         // Record the deployment
         _recordStrategy(_name, _donationAddress, strategyAddress);
     }

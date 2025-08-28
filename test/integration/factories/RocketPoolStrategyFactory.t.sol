@@ -77,22 +77,7 @@ contract RocketPoolStrategyFactoryTest is Test {
         vm.assume(bytes(vaultSharesName).length >= MIN_NAME_LENGTH && bytes(vaultSharesName).length <= MAX_NAME_LENGTH);
         bytes32 strategySalt = keccak256(abi.encodePacked("FUZZ_SALT", saltSeed));
 
-        // Calculate expected address using Create2
-        bytes memory bytecode = abi.encodePacked(
-            type(RocketPoolStrategy).creationCode,
-            abi.encode(
-                R_ETH,
-                vaultSharesName,
-                management,
-                keeper,
-                emergencyAdmin,
-                donationAddress,
-                false, // enableBurning
-                address(implementation),
-                true // allowDepositDuringLoss
-            )
-        );
-        address expectedStrategyAddress = Create2.computeAddress(strategySalt, keccak256(bytecode), address(factory));
+        address expectedStrategyAddress = factory.predictStrategyAddress(strategySalt, management);
 
         // Create a strategy and check events
         vm.startPrank(management);
