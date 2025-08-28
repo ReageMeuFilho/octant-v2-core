@@ -23,7 +23,6 @@ forge soldeer install
 ```
 
 We're using `soldeer` as dependency manager for Solidity contracts, which allows us to manage Solidity versions and dependencies in a consistent manner.
-We have added Soldeer execution as a postinstall script in `package.json`, so it will run automatically after installing Node.js dependencies. Unfortunately it will not run if node dependencies are already installed.
 
 3. Configure environment:
 

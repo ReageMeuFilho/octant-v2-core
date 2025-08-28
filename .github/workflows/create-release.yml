@@ -54,7 +54,9 @@ jobs:
           git config --local user.signingkey "${{ secrets.HOUSEKEEPER_GITHUB_SIGNING_KEY_ID }}"
 
       - name: Init env
-        run: yarn install
+        run: |
+          yarn install
+          forge soldeer install
 
       - name: Publish preRelease
         env:
@@ -94,7 +96,9 @@ jobs:
           git config --local user.signingkey "${{ secrets.HOUSEKEEPER_GITHUB_SIGNING_KEY_ID }}"
 
       - name: Init env
-        run: yarn install
+        run: |
+          yarn install
+          forge soldeer install
 
       - name: Publish release
         env:

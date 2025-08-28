@@ -75,11 +75,13 @@ jobs:
           MAX_OPEX_SPLIT: "5"
           MIN_METAPOOL_SPLIT: "0"
           CONTRACT_ADDRESSES: "/app/ci/contract_addresses.txt"
+          VERSION_TAG: "${{ github.ref_name }}"
         run: |
           cd /app
           mkdir -p ci
           touch .env
           yarn deploy:tenderly && (
+            echo "VERSION_TAG=${VERSION_TAG}" >> $CONTRACT_ADDRESSES
             cp $CONTRACT_ADDRESSES $GITHUB_OUTPUT
             echo "# Smart contract addresses\n\n| Contract name | Address |\n|---|---|" > $GITHUB_STEP_SUMMARY
             grep ADDRESS $CONTRACT_ADDRESSES | awk -F '=' '{gsub("_ADDRESS", "", $1); print "| `" $1 "` | `" $2 "` |"}' >> $GITHUB_STEP_SUMMARY
@@ -93,11 +95,38 @@ jobs:
           name: contract_addresses
           path: /app/ci/contract_addresses.txt
 
+  update-contract-secret:
+    name: Update secret
+    runs-on:
+      - general
+    needs:
+      - deploy-contract
+    container:
+      image: gcr.io/google.com/cloudsdktool/cloud-sdk:stable
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          apt-get update && apt-get install -y --no-install-recommends jq
+
+      - name: Download artifact with contract addresses
+        uses: actions/download-artifact@v4
+        with:
+          name: contract_addresses
+
+      - name: Add new secret version
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_B64: ${{ secrets.GCP_SECRET_VERSION_ADDER_SERVICE_ACCOUNT }}
+          GCP_PROJECT: ${{ vars.GCP_PROJECT }}
+        run: ci/update_gcp_secret.sh develop
+
   restart-services:
     name: Restart develop services
     runs-on: general
     needs:
-      - deploy-contract
+      - update-contract-secret
 
     steps:
       - name: Update frontend contracts
