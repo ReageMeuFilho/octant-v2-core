@@ -80,8 +80,13 @@ contract SkyCompounderStrategyFactoryTest is Test {
 
         // Create a strategy and check events
         vm.startPrank(management);
-        vm.expectEmit(true, true, true, false); // Check first 3 indexed params, ignore the non-indexed timestamp
-        emit StrategyDeploy(management, donationAddress, 0x68c8c8FdBc4A50a07cb407aa430d31566E1D2F31); // We can't predict the exact address
+        vm.expectEmit(true, true, true, false); // Check first 3 indexed params, ignore the non-indexed data
+        emit SkyCompounderStrategyFactory.StrategyDeploy(
+            management,
+            donationAddress,
+            factory.predictStrategyAddress(strategySalt, management),
+            vaultSharesName
+        );
 
         address strategyAddress = factory.createStrategy(
             vaultSharesName,
