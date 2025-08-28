@@ -1638,7 +1638,7 @@ contract MultistrategyVault is IMultistrategyVault {
      */
     function _addStrategy(address newStrategy_, bool addToQueue_) internal {
         // Validate the strategy
-        require(newStrategy_ != address(0), StrategyCannotBeZeroAddress());
+        require(newStrategy_ != address(0) && newStrategy_ != address(this), StrategyCannotBeZeroAddress());
 
         // Verify the strategy asset matches the vault's asset
         require(IERC4626Payable(newStrategy_).asset() == asset, InvalidAsset());
