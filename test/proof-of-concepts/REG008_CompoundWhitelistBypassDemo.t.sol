@@ -94,7 +94,9 @@ contract REG008CompoundWhitelistBypassDemoTest is Test {
         // Step 4: Vulnerability FIXED - Whitelisted claimer cannot compound for delisted depositor
         vm.prank(whitelistedClaimer);
         // The compound now properly checks depositor whitelist status and reverts
-        vm.expectRevert(abi.encodeWithSignature("NotWhitelisted(address,address)", address(stakerWhitelist), depositor));
+        vm.expectRevert(
+            abi.encodeWithSignature("NotWhitelisted(address,address)", address(stakerWhitelist), depositor)
+        );
         regenStaker.compoundRewards(depositId);
     }
 
@@ -129,7 +131,9 @@ contract REG008CompoundWhitelistBypassDemoTest is Test {
 
         // Compound is now also blocked - vulnerability has been fixed
         vm.prank(whitelistedClaimer);
-        vm.expectRevert(abi.encodeWithSignature("NotWhitelisted(address,address)", address(stakerWhitelist), depositor));
+        vm.expectRevert(
+            abi.encodeWithSignature("NotWhitelisted(address,address)", address(stakerWhitelist), depositor)
+        );
         regenStaker.compoundRewards(depositId);
     }
 }

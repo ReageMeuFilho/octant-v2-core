@@ -350,7 +350,7 @@ contract RegenStakerBaseCompoundWhitelistFixTest is Test {
 
         // Determine who is calling and expected result
         address caller = callerIsOwner ? depositor : whitelistedClaimer;
-        
+
         // The implementation only checks that the deposit owner is whitelisted
         // It doesn't matter if the claimer is whitelisted or not
         bool shouldSucceed = ownerWhitelisted;
@@ -362,7 +362,9 @@ contract RegenStakerBaseCompoundWhitelistFixTest is Test {
             assertGt(compounded, 0, "Should compound successfully");
         } else {
             vm.prank(caller);
-            vm.expectRevert(abi.encodeWithSelector(RegenStakerBase.NotWhitelisted.selector, stakerWhitelist, depositor));
+            vm.expectRevert(
+                abi.encodeWithSelector(RegenStakerBase.NotWhitelisted.selector, stakerWhitelist, depositor)
+            );
             staker.compoundRewards(depositId);
         }
     }

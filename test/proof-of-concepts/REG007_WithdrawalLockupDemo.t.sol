@@ -64,11 +64,11 @@ contract REG007WithdrawalLockupDemoTest is Test {
         // Withdrawal now succeeds - vulnerability has been fixed
         uint256 withdrawAmount = STAKE_AMOUNT / 2;
         regenStaker.withdraw(depositId, withdrawAmount);
-        
+
         // Verify withdrawal worked properly
         assertEq(stakeToken.balanceOf(user), withdrawAmount);
         assertEq(stakeToken.balanceOf(address(regenStaker)), STAKE_AMOUNT - withdrawAmount);
-        
+
         vm.stopPrank();
     }
 
