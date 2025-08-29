@@ -17,7 +17,7 @@ import { MockERC20Staking } from "test/mocks/MockERC20Staking.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocationMechanism.sol";
-import { SimpleVotingMechanism } from "test/mocks/SimpleVotingMechanism.sol";
+// import { SimpleVotingMechanism } from "test/mocks/SimpleVotingMechanism.sol"; // SimpleVotingMechanism removed
 import { AllocationMechanismFactory } from "src/mechanisms/AllocationMechanismFactory.sol";
 import { AllocationConfig } from "src/mechanisms/BaseAllocationMechanism.sol";
 
@@ -2317,6 +2317,8 @@ contract RegenIntegrationTest is Test {
     }
 
     function _deployAllocationMechanism() internal returns (address) {
+        // SimpleVotingMechanism removed - config no longer needed
+        /*
         AllocationConfig memory config = AllocationConfig({
             asset: IERC20(address(rewardToken)),
             name: "Test Allocation",
@@ -2330,6 +2332,8 @@ contract RegenIntegrationTest is Test {
         });
 
         address allocationMechanism = allocationFactory.deploySimpleVotingMechanism(config);
+        */
+        address allocationMechanism = address(0); // SimpleVotingMechanism removed - using null address
         whitelistAllocationMechanism(allocationMechanism);
         return allocationMechanism;
     }
@@ -2794,6 +2798,8 @@ contract RegenIntegrationTest is Test {
         uint256 contributeAmount = getRewardAmount(100);
 
         // Deploy allocation mechanism but don't whitelist it
+        // SimpleVotingMechanism removed - config no longer needed
+        /*
         AllocationConfig memory config = AllocationConfig({
             asset: IERC20(address(rewardToken)),
             name: "Test Allocation",
@@ -2806,6 +2812,8 @@ contract RegenIntegrationTest is Test {
             owner: address(0)
         });
         address allocationMechanism = allocationFactory.deploySimpleVotingMechanism(config);
+        */
+        address allocationMechanism = address(0); // SimpleVotingMechanism removed - using null address
 
         // Advance to allow signup (startBlock + votingDelay period)
         vm.roll(block.number + 5);
