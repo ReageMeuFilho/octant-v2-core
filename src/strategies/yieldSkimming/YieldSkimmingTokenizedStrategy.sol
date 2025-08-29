@@ -459,15 +459,13 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         uint256 assets,
         Math.Rounding rounding
     ) internal view virtual override returns (uint256) {
-        uint256 currentRate = _currentRateRay();
-        uint256 totalShares = _totalSupply(S);
-        uint256 currentVaultValue = S.totalAssets.mulDiv(currentRate, WadRayMath.RAY);
-
-        if (currentVaultValue < totalShares) {
+        if (_isVaultInsolvent()) {
             // Vault insolvent - reverse the proportional calculation
+            uint256 totalShares = _totalSupply(S);
             return assets.mulDiv(totalShares, S.totalAssets, rounding);
         } else {
             // Vault solvent - normal rate-based conversion
+            uint256 currentRate = _currentRateRay();
             return assets.mulDiv(currentRate, WadRayMath.RAY, rounding);
         }
     }
@@ -484,15 +482,13 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         uint256 shares,
         Math.Rounding rounding
     ) internal view virtual override returns (uint256) {
-        uint256 currentRate = _currentRateRay();
-        uint256 totalShares = _totalSupply(S);
-        uint256 currentVaultValue = S.totalAssets.mulDiv(currentRate, WadRayMath.RAY);
-
-        if (currentVaultValue < totalShares) {
+        if (_isVaultInsolvent()) {
             // Vault insolvent - proportional distribution
+            uint256 totalShares = _totalSupply(S);
             return shares.mulDiv(S.totalAssets, totalShares, rounding);
         } else {
             // Vault solvent - normal rate-based conversion
+            uint256 currentRate = _currentRateRay();
             return shares.mulDiv(WadRayMath.RAY, currentRate, rounding);
         }
     }
