@@ -375,26 +375,9 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         } else if (currentValue < YS.totalUserDebtInAssetValue + YS.dragonRouterDebtInAssetValue) {
             // Loss - burn dragon shares first
             uint256 lossValue = YS.totalUserDebtInAssetValue + YS.dragonRouterDebtInAssetValue - currentValue;
-            uint256 dragonBalance = _balanceOf(S, S.dragonRouter);
 
-            // Report the total loss in assets (gross loss before dragon protection)
-            // Handle division by zero case when currentRate is 0
-            if (currentRate > 0) {
-                loss = lossValue.mulDiv(WadRayMath.RAY, currentRate);
-            } else {
-                // If rate is 0, total loss is all assets
-                loss = S.totalAssets;
-            }
-
-            if (dragonBalance > 0) {
-                uint256 dragonBurn = Math.min(lossValue, dragonBalance);
-                _burn(S, S.dragonRouter, dragonBurn);
-
-                // update the dragon value debt
-                YS.dragonRouterDebtInAssetValue -= dragonBurn;
-
-                emit DonationBurned(S.dragonRouter, dragonBurn, currentRate.rayToWad());
-            }
+            // Handle loss protection through dragon burning
+            loss = _handleDragonLossProtection(S, YS, lossValue, currentRate);
         }
 
         // Update last report timestamp
@@ -632,6 +615,42 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
 
         // Return the actual amount of assets withdrawn.
         return assets;
+    }
+
+    /**
+     * @dev Internal function to handle loss protection by burning dragon shares
+     * @param S Strategy storage pointer
+     * @param YS Yield skimming storage pointer
+     * @param lossValue The loss amount in ETH value terms
+     * @param currentRate The current exchange rate in RAY format
+     * @return loss The loss amount in asset terms for reporting
+     */
+    function _handleDragonLossProtection(
+        StrategyData storage S,
+        YieldSkimmingStorage storage YS,
+        uint256 lossValue,
+        uint256 currentRate
+    ) internal returns (uint256 loss) {
+        uint256 dragonBalance = _balanceOf(S, S.dragonRouter);
+
+        // Report the total loss in assets (gross loss before dragon protection)
+        // Handle division by zero case when currentRate is 0
+        if (currentRate > 0) {
+            loss = lossValue.mulDiv(WadRayMath.RAY, currentRate);
+        } else {
+            // If rate is 0, total loss is all assets
+            loss = S.totalAssets;
+        }
+
+        if (dragonBalance > 0) {
+            uint256 dragonBurn = Math.min(lossValue, dragonBalance);
+            _burn(S, S.dragonRouter, dragonBurn);
+
+            // update the dragon value debt
+            YS.dragonRouterDebtInAssetValue -= dragonBurn;
+
+            emit DonationBurned(S.dragonRouter, dragonBurn, currentRate.rayToWad());
+        }
     }
 
     function _strategyYieldSkimmingStorage() internal pure returns (YieldSkimmingStorage storage S) {
