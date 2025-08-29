@@ -233,16 +233,6 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         return sharedState.minimumStakeAmount;
     }
 
-    // === Modifiers ===
-    /// @notice Modifier to check whitelist if set
-    /// @dev Reverts if whitelist is set and user is not whitelisted
-    /// @param _whitelist The whitelist to check
-    /// @param _user The user to check
-    modifier onlyWhitelistedIfWhitelistIsSet(IWhitelist _whitelist, address _user) {
-        _checkWhitelisted(_whitelist, _user);
-        _;
-    }
-
     // === Constructor ===
     /// @notice Constructor for RegenStakerBase
     /// @dev Initializes Staker, extensions, and shared state
