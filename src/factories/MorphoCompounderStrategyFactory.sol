@@ -138,7 +138,7 @@ contract MorphoCompounderStrategyFactory {
             })
         );
 
-        emit StrategyDeploy(msg.sender, _donationAddress, strategyAddress, _name);
+        emit StrategyDeploy(_management, _donationAddress, strategyAddress, _name);
         return strategyAddress;
     }
 }
