@@ -5,6 +5,7 @@ import { TokenizedAllocationMechanism } from "./TokenizedAllocationMechanism.sol
 import { QuadraticVotingMechanism } from "./mechanism/QuadraticVotingMechanism.sol";
 import { AllocationConfig } from "./BaseAllocationMechanism.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { CREATE3 } from "solady/utils/CREATE3.sol";
 
 /// @title Allocation Mechanism Factory
 /// @notice Factory for deploying allocation mechanisms using the Yearn V3 pattern
@@ -30,6 +31,11 @@ contract AllocationMechanismFactory {
         address indexed deployer
     );
 
+    // ---------- Errors ----------
+
+    /// @notice Thrown when trying to deploy a mechanism with same parameters
+    error MechanismAlreadyExists(address existingMechanism);
+
     // ---------- Constructor ----------
 
     constructor() {
@@ -38,6 +44,39 @@ contract AllocationMechanismFactory {
     }
 
     // ---------- External Functions ----------
+
+    /// @notice Predict the address of a QuadraticVotingMechanism before deployment
+    /// @param _config Configuration parameters for the allocation mechanism
+    /// @param _alphaNumerator Alpha numerator for quadratic funding
+    /// @param _alphaDenominator Alpha denominator for quadratic funding
+    /// @param deployer Address that will deploy the mechanism
+    /// @return predicted The predicted address of the mechanism
+    function predictMechanismAddress(
+        AllocationConfig memory _config,
+        uint256 _alphaNumerator,
+        uint256 _alphaDenominator,
+        address deployer
+    ) public view returns (address predicted) {
+        // Generate deterministic salt from parameters
+        bytes32 salt = keccak256(
+            abi.encode(
+                tokenizedAllocationImplementation,
+                _config.asset,
+                _config.name,
+                _config.symbol,
+                _config.votingDelay,
+                _config.votingPeriod,
+                _config.quorumShares,
+                _config.timelockDelay,
+                _config.gracePeriod,
+                _alphaNumerator,
+                _alphaDenominator,
+                deployer
+            )
+        );
+
+        return CREATE3.predictDeterministicAddress(salt);
+    }
 
     /// @notice Deploy a new QuadraticVotingMechanism
     /// @param _config Configuration parameters for the allocation mechanism
@@ -52,10 +91,38 @@ contract AllocationMechanismFactory {
         // Set the deployer as the owner
         _config.owner = msg.sender;
 
-        // Deploy new QuadraticVotingMechanism using the shared implementation
-        mechanism = address(
-            new QuadraticVotingMechanism(tokenizedAllocationImplementation, _config, _alphaNumerator, _alphaDenominator)
+        // Generate deterministic salt from parameters
+        bytes32 salt = keccak256(
+            abi.encode(
+                tokenizedAllocationImplementation,
+                _config.asset,
+                _config.name,
+                _config.symbol,
+                _config.votingDelay,
+                _config.votingPeriod,
+                _config.quorumShares,
+                _config.timelockDelay,
+                _config.gracePeriod,
+                _alphaNumerator,
+                _alphaDenominator,
+                msg.sender
+            )
         );
+
+        // Check if mechanism already exists
+        address predictedAddress = CREATE3.predictDeterministicAddress(salt);
+        if (predictedAddress.code.length > 0) {
+            revert MechanismAlreadyExists(predictedAddress);
+        }
+
+        // Prepare creation bytecode
+        bytes memory bytecode = abi.encodePacked(
+            type(QuadraticVotingMechanism).creationCode,
+            abi.encode(tokenizedAllocationImplementation, _config, _alphaNumerator, _alphaDenominator)
+        );
+
+        // Deploy new QuadraticVotingMechanism using CREATE3
+        mechanism = CREATE3.deployDeterministic(bytecode, salt);
 
         // Track deployment
         deployedMechanisms.push(mechanism);
