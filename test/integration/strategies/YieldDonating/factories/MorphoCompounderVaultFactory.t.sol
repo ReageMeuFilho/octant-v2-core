@@ -74,9 +74,23 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
     /// @notice Test creating a strategy through the factory
     function testCreateStrategy() public {
         string memory vaultSharesName = "MorphoCompounder Donating Vault Shares";
-        bytes32 strategySalt = keccak256("TEST_STRATEGY_SALT");
 
-        address expectedStrategyAddress = factory.predictStrategyAddress(strategySalt, management);
+        // Generate parameter hash for prediction
+        bytes32 parameterHash = keccak256(
+            abi.encode(
+                MORPHO_VAULT,
+                0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48, // USDC
+                vaultSharesName,
+                management,
+                keeper,
+                emergencyAdmin,
+                donationAddress,
+                false, // enableBurning
+                address(implementation),
+                true // allowDepositDuringLoss
+            )
+        );
+        address expectedStrategyAddress = factory.predictStrategyAddress(parameterHash, management);
 
         // Create a strategy and check events
         vm.startPrank(management);
@@ -96,7 +110,6 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            strategySalt,
             address(implementation),
             true // allowDepositDuringLoss
         );
@@ -120,7 +133,6 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
     function testMultipleStrategiesPerUser() public {
         // Create first strategy
         string memory firstVaultName = "First MorphoCompounder Donating Vault";
-        bytes32 firstSalt = keccak256("FIRST_TEST_STRATEGY_SALT");
 
         vm.startPrank(management);
         address firstStrategyAddress = factory.createStrategy(
@@ -131,14 +143,12 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            firstSalt,
             address(implementation),
             true // allowDepositDuringLoss
         );
 
         // Create second strategy for same user
         string memory secondVaultName = "Second MorphoCompounder Donating Vault";
-        bytes32 secondSalt = keccak256("SECOND_TEST_STRATEGY_SALT");
 
         address secondStrategyAddress = factory.createStrategy(
             MORPHO_VAULT,
@@ -148,7 +158,6 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            secondSalt,
             address(implementation),
             true // allowDepositDuringLoss
         );
@@ -170,7 +179,6 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
     /// @notice Test creating strategies for different users
     function testMultipleUsers() public {
         string memory firstVaultName = "First User's Donating Vault";
-        bytes32 firstSalt = keccak256("FIRST_USER_SALT");
 
         address firstUser = address(0x5678);
         address secondUser = address(0x9876);
@@ -185,7 +193,6 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            firstSalt,
             address(implementation),
             true // allowDepositDuringLoss
         );
@@ -193,7 +200,6 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
 
         // Create strategy for second user
         string memory secondVaultName = "Second User's Donating Vault";
-        bytes32 secondSalt = keccak256("SECOND_USER_SALT");
 
         vm.startPrank(secondUser);
         address secondStrategyAddress = factory.createStrategy(
@@ -204,7 +210,6 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            secondSalt,
             address(implementation),
             true // allowDepositDuringLoss
         );
@@ -223,10 +228,9 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
         assertTrue(firstStrategyAddress != secondStrategyAddress, "Strategies should have different addresses");
     }
 
-    /// @notice Test creating a strategy with deterministic addressing via salt
+    /// @notice Test for deterministic addressing and duplicate prevention
     function testDeterministicAddressing() public {
         string memory vaultSharesName = "Deterministic Donating Vault";
-        bytes32 strategySalt = keccak256("DETERMINISTIC_SALT");
 
         // Create a strategy
         vm.startPrank(management);
@@ -238,18 +242,17 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            strategySalt,
             address(implementation),
             true // allowDepositDuringLoss
         );
         vm.stopPrank();
 
-        // Create a new factory
-        MorphoCompounderStrategyFactory newFactory = new MorphoCompounderStrategyFactory();
-
-        // Create a strategy with the same salt but from a different factory
+        // Try to deploy the exact same strategy again - should revert
         vm.startPrank(management);
-        address secondAddress = newFactory.createStrategy(
+        vm.expectRevert(
+            abi.encodeWithSelector(MorphoCompounderStrategyFactory.StrategyAlreadyExists.selector, firstAddress)
+        );
+        factory.createStrategy(
             MORPHO_VAULT,
             vaultSharesName,
             management,
@@ -257,43 +260,35 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            strategySalt,
             address(implementation),
             true // allowDepositDuringLoss
         );
         vm.stopPrank();
 
-        // Addresses should be different because factory addresses are different
-        // but they should be deterministic based on the salt and other parameters
-        assertTrue(firstAddress != secondAddress, "Addresses should be different with different factories");
-
-        // Re-create with a different salt but same factory and parameters
-        bytes32 differentSalt = keccak256("DIFFERENT_SALT");
-
+        // Create a strategy with different parameters - should succeed
+        string memory differentName = "Different Donating Vault";
         vm.startPrank(management);
-        address thirdAddress = factory.createStrategy(
+        address secondAddress = factory.createStrategy(
             MORPHO_VAULT,
-            vaultSharesName,
+            differentName,
             management,
             keeper,
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            differentSalt,
             address(implementation),
             true // allowDepositDuringLoss
         );
         vm.stopPrank();
 
-        assertTrue(firstAddress != thirdAddress, "Addresses should be different with different salts");
+        // Different parameters should result in different address
+        assertTrue(firstAddress != secondAddress, "Different params should create different address");
     }
 
     /// @notice Test creating strategies with different Morpho vaults
     function testDifferentMorphoVaults() public {
         string memory firstVaultName = "First Morpho Vault Strategy";
         string memory secondVaultName = "Second Morpho Vault Strategy";
-        bytes32 firstSalt = keccak256("FIRST_MORPHO_VAULT_SALT");
-        bytes32 secondSalt = keccak256("SECOND_MORPHO_VAULT_SALT");
 
         // Use a different Morpho vault address for the second strategy
         address secondMorphoVault = 0xBe53A109B494E5c9f97b9Cd39Fe969BE68BF6204; // another usdc vault
@@ -307,7 +302,6 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            firstSalt,
             address(implementation),
             true // allowDepositDuringLoss
         );
@@ -320,7 +314,6 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            secondSalt,
             address(implementation),
             true // allowDepositDuringLoss
         );

@@ -24,7 +24,7 @@ contract RocketPoolStrategyFactory is BaseStrategyFactory {
 
     /**
      * @notice Deploys a new RocketPool strategy for the Yield Skimming Vault.
-     * @dev Uses deterministic deployment with user-provided salt combined with deployer address.
+     * @dev Uses deterministic deployment based on strategy parameters to prevent duplicates.
      * @param _name The name of the vault token associated with the strategy.
      * @param _management The address of the management entity responsible for the strategy.
      * @param _keeper The address of the keeper responsible for maintaining the strategy.
@@ -42,10 +42,24 @@ contract RocketPoolStrategyFactory is BaseStrategyFactory {
         address _emergencyAdmin,
         address _donationAddress,
         bool _enableBurning,
-        bytes32 _salt,
         address _tokenizedStrategyAddress,
         bool _allowDepositDuringLoss
     ) external returns (address strategyAddress) {
+        // Generate deterministic hash from all strategy parameters
+        bytes32 parameterHash = keccak256(
+            abi.encode(
+                R_ETH,
+                _name,
+                _management,
+                _keeper,
+                _emergencyAdmin,
+                _donationAddress,
+                _enableBurning,
+                _tokenizedStrategyAddress,
+                _allowDepositDuringLoss
+            )
+        );
+
         bytes memory bytecode = abi.encodePacked(
             type(RocketPoolStrategy).creationCode,
             abi.encode(
@@ -61,8 +75,8 @@ contract RocketPoolStrategyFactory is BaseStrategyFactory {
             )
         );
 
-        // Deploy using deterministic deployment with user-provided salt
-        strategyAddress = _deployStrategy(bytecode, _salt);
+        // Deploy using parameter hash to prevent duplicates
+        strategyAddress = _deployStrategy(bytecode, parameterHash);
 
         emit StrategyDeploy(_management, _donationAddress, strategyAddress, _name);
 

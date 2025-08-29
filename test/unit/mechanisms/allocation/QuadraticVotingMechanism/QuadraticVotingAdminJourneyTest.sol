@@ -96,7 +96,7 @@ contract QuadraticVotingAdminJourneyTest is Test {
     }
 
     /// @notice Test admin deployment and configuration verification
-    function testAdminDeployment_ConfigurationVerification() public view {
+    function testAdminDeployment_ConfigurationVerification() public {
         // Verify factory deployment state
         assertEq(factory.getDeployedCount(), 1);
         assertTrue(factory.isMechanism(address(mechanism)));
@@ -115,8 +115,6 @@ contract QuadraticVotingAdminJourneyTest is Test {
         assertEq(_tokenized(address(mechanism)).owner(), address(this));
 
         // Deploy second mechanism to test isolation
-        // SimpleVotingMechanism removed - config2 no longer needed
-        /*
         AllocationConfig memory config2 = AllocationConfig({
             asset: IERC20(address(token)),
             name: "Second Mechanism",
@@ -129,9 +127,7 @@ contract QuadraticVotingAdminJourneyTest is Test {
             owner: address(0)
         });
 
-        address mechanism2Addr = factory.deploySimpleVotingMechanism(config2);
-        */
-        address mechanism2Addr = address(0); // SimpleVotingMechanism removed
+        address mechanism2Addr = factory.deployQuadraticVotingMechanism(config2, 50, 100);
 
         // Verify isolation between mechanisms
         assertEq(factory.getDeployedCount(), 2);
@@ -172,12 +168,12 @@ contract QuadraticVotingAdminJourneyTest is Test {
 
         // Admin monitors proposal states during voting
         assertEq(
-            uint(_tokenized(address(mechanism)).state(pid1)),
-            uint(TokenizedAllocationMechanism.ProposalState.Active)
+            uint256(_tokenized(address(mechanism)).state(pid1)),
+            uint256(TokenizedAllocationMechanism.ProposalState.Active)
         );
         assertEq(
-            uint(_tokenized(address(mechanism)).state(pid2)),
-            uint(TokenizedAllocationMechanism.ProposalState.Active)
+            uint256(_tokenized(address(mechanism)).state(pid2)),
+            uint256(TokenizedAllocationMechanism.ProposalState.Active)
         );
     }
 
@@ -234,8 +230,8 @@ contract QuadraticVotingAdminJourneyTest is Test {
 
         // Queue successful proposal
         assertEq(
-            uint(_tokenized(address(mechanism)).state(pidSuccessful)),
-            uint(TokenizedAllocationMechanism.ProposalState.Succeeded)
+            uint256(_tokenized(address(mechanism)).state(pidSuccessful)),
+            uint256(TokenizedAllocationMechanism.ProposalState.Succeeded)
         );
 
         uint256 timestampBefore = block.timestamp;
@@ -244,8 +240,8 @@ contract QuadraticVotingAdminJourneyTest is Test {
 
         // Verify queuing effects
         assertEq(
-            uint(_tokenized(address(mechanism)).state(pidSuccessful)),
-            uint(TokenizedAllocationMechanism.ProposalState.Queued)
+            uint256(_tokenized(address(mechanism)).state(pidSuccessful)),
+            uint256(TokenizedAllocationMechanism.ProposalState.Queued)
         );
         // QuadraticFunding calculation: pidSuccessful gets proportional shares based on weighted funding
         // Alice(25) + Bob(15) = (40)² × 0.5 + contributions × 0.5 = approx 1225 weighted funding
@@ -257,8 +253,8 @@ contract QuadraticVotingAdminJourneyTest is Test {
 
         // Cannot queue failed proposal
         assertEq(
-            uint(_tokenized(address(mechanism)).state(pidFailed)),
-            uint(TokenizedAllocationMechanism.ProposalState.Defeated)
+            uint256(_tokenized(address(mechanism)).state(pidFailed)),
+            uint256(TokenizedAllocationMechanism.ProposalState.Defeated)
         );
 
         vm.expectRevert(); // Should revert with NoQuorum or similar for defeated proposal
@@ -379,8 +375,8 @@ contract QuadraticVotingAdminJourneyTest is Test {
         uint256 actualShares = _tokenized(address(mechanism)).balanceOf(charlie);
         assertTrue(actualShares > 0, "Successful proposal should receive shares after crisis recovery");
         assertEq(
-            uint(_tokenized(address(mechanism)).state(pid)),
-            uint(TokenizedAllocationMechanism.ProposalState.Queued)
+            uint256(_tokenized(address(mechanism)).state(pid)),
+            uint256(TokenizedAllocationMechanism.ProposalState.Queued)
         );
     }
 }

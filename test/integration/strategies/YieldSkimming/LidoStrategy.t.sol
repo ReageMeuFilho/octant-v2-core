@@ -160,7 +160,6 @@ contract LidoStrategyTest is Test {
             params.emergencyAdmin,
             params.donationAddress,
             params.enableBurning,
-            params.strategySalt,
             params.implementationAddress,
             params.allowDepositDuringLoss
         );

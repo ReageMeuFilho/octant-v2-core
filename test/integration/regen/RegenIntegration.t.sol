@@ -2317,8 +2317,6 @@ contract RegenIntegrationTest is Test {
     }
 
     function _deployAllocationMechanism() internal returns (address) {
-        // SimpleVotingMechanism removed - config no longer needed
-        /*
         AllocationConfig memory config = AllocationConfig({
             asset: IERC20(address(rewardToken)),
             name: "Test Allocation",
@@ -2331,9 +2329,8 @@ contract RegenIntegrationTest is Test {
             owner: address(0) // Will be set by factory
         });
 
-        address allocationMechanism = allocationFactory.deploySimpleVotingMechanism(config);
-        */
-        address allocationMechanism = address(0); // SimpleVotingMechanism removed - using null address
+        // Deploy QuadraticVotingMechanism instead of SimpleVotingMechanism
+        address allocationMechanism = allocationFactory.deployQuadraticVotingMechanism(config, 50, 100);
         whitelistAllocationMechanism(allocationMechanism);
         return allocationMechanism;
     }
@@ -2798,8 +2795,6 @@ contract RegenIntegrationTest is Test {
         uint256 contributeAmount = getRewardAmount(100);
 
         // Deploy allocation mechanism but don't whitelist it
-        // SimpleVotingMechanism removed - config no longer needed
-        /*
         AllocationConfig memory config = AllocationConfig({
             asset: IERC20(address(rewardToken)),
             name: "Test Allocation",
@@ -2811,9 +2806,8 @@ contract RegenIntegrationTest is Test {
             gracePeriod: 7 days,
             owner: address(0)
         });
-        address allocationMechanism = allocationFactory.deploySimpleVotingMechanism(config);
-        */
-        address allocationMechanism = address(0); // SimpleVotingMechanism removed - using null address
+        // Deploy QuadraticVotingMechanism instead of SimpleVotingMechanism
+        address allocationMechanism = allocationFactory.deployQuadraticVotingMechanism(config, 50, 100);
 
         // Advance to allow signup (startBlock + votingDelay period)
         vm.roll(block.number + 5);
