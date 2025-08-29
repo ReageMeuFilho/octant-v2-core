@@ -122,7 +122,6 @@ contract SkyCompounterHealthCheckTest is Test {
             params.emergencyAdmin,
             params.donationAddress,
             params.enableBurning,
-            params.strategySalt,
             params.tokenizedStrategyAddress,
             params.allowDepositDuringLoss
         );

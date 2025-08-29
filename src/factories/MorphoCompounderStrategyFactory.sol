@@ -42,14 +42,17 @@ contract MorphoCompounderStrategyFactory {
         string vaultTokenName
     );
 
+    error StrategyAlreadyExists(address existingStrategy);
+
     /**
      * @notice Predict deterministic deployment address
-     * @param _salt Deployment salt
+     * @param _parameterHash Hash of all strategy parameters
      * @param deployer Address that will deploy
      * @return Predicted contract address
      */
-    function predictStrategyAddress(bytes32 _salt, address deployer) external view returns (address) {
-        return CREATE3.predictDeterministicAddress(keccak256(abi.encodePacked(_salt, deployer)));
+    function predictStrategyAddress(bytes32 _parameterHash, address deployer) external view returns (address) {
+        bytes32 finalSalt = keccak256(abi.encodePacked(_parameterHash, deployer));
+        return CREATE3.predictDeterministicAddress(finalSalt);
     }
 
     /**
@@ -63,7 +66,6 @@ contract MorphoCompounderStrategyFactory {
      * @param _emergencyAdmin The address of the emergency admin for the strategy.
      * @param _donationAddress The address where donations from the strategy will be sent.
      * @param _enableBurning Whether to enable burning shares from dragon router during loss protection.
-     * @param _salt A unique salt used for deterministic deployment of the strategy.
      * @return strategyAddress The address of the newly deployed strategy contract.
      */
     function createStrategy(
@@ -73,33 +75,70 @@ contract MorphoCompounderStrategyFactory {
         address _emergencyAdmin,
         address _donationAddress,
         bool _enableBurning,
-        bytes32 _salt,
         address _tokenizedStrategyAddress,
         bool _allowDepositDuringLoss
-    ) external returns (address strategyAddress) {
-        bytes memory bytecode = abi.encodePacked(
-            type(MorphoCompounderStrategy).creationCode,
-            abi.encode(
-                YS_USDC,
-                _name,
-                _management,
-                _keeper,
-                _emergencyAdmin,
-                _donationAddress,
-                _enableBurning,
-                _tokenizedStrategyAddress,
-                _allowDepositDuringLoss
-            )
+    ) external returns (address) {
+        bytes32 parameterHash;
+        bytes32 finalSalt;
+        address strategyAddress;
+
+        {
+            // Generate parameter hash from all inputs (in a closure to reduce stack usage)
+            parameterHash = keccak256(
+                abi.encode(
+                    YS_USDC,
+                    _name,
+                    _management,
+                    _keeper,
+                    _emergencyAdmin,
+                    _donationAddress,
+                    _enableBurning,
+                    _tokenizedStrategyAddress,
+                    _allowDepositDuringLoss
+                )
+            );
+
+            // Generate final salt using parameter hash and sender
+            finalSalt = keccak256(abi.encodePacked(parameterHash, msg.sender));
+
+            // Check if strategy already exists
+            address predictedAddress = CREATE3.predictDeterministicAddress(finalSalt);
+            if (predictedAddress.code.length > 0) {
+                revert StrategyAlreadyExists(predictedAddress);
+            }
+        }
+
+        {
+            // Deploy strategy in another closure
+            bytes memory bytecode = abi.encodePacked(
+                type(MorphoCompounderStrategy).creationCode,
+                abi.encode(
+                    YS_USDC,
+                    _name,
+                    _management,
+                    _keeper,
+                    _emergencyAdmin,
+                    _donationAddress,
+                    _enableBurning,
+                    _tokenizedStrategyAddress,
+                    _allowDepositDuringLoss
+                )
+            );
+
+            strategyAddress = CREATE3.deployDeterministic(bytecode, finalSalt);
+        }
+
+        // Store strategy info
+        strategies[msg.sender].push(
+            StrategyInfo({
+                deployerAddress: msg.sender,
+                timestamp: block.timestamp,
+                vaultTokenName: _name,
+                donationAddress: _donationAddress
+            })
         );
 
-        strategyAddress = CREATE3.deployDeterministic(bytecode, keccak256(abi.encodePacked(_salt, msg.sender)));
         emit StrategyDeploy(msg.sender, _donationAddress, strategyAddress, _name);
-        StrategyInfo memory strategyInfo = StrategyInfo({
-            deployerAddress: msg.sender,
-            timestamp: block.timestamp,
-            vaultTokenName: _name,
-            donationAddress: _donationAddress
-        });
-        strategies[msg.sender].push(strategyInfo);
+        return strategyAddress;
     }
 }

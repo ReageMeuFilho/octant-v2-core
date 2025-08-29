@@ -72,19 +72,11 @@ contract MorphoCompounderStrategyFactoryTest is Test {
     /// @notice Test creating a strategy through the factory
     function testCreateStrategy() public {
         string memory vaultSharesName = "MorphoCompounder Vault Shares";
-        bytes32 strategySalt = keccak256("TEST_STRATEGY_SALT");
-
-        address expectedStrategyAddress = factory.predictStrategyAddress(strategySalt, management);
 
         // Create a strategy and check events
         vm.startPrank(management);
         vm.expectEmit(true, true, true, false); // Check first 3 indexed params, ignore the non-indexed timestamp
-        emit MorphoCompounderStrategyFactory.StrategyDeploy(
-            management,
-            donationAddress,
-            expectedStrategyAddress,
-            vaultSharesName
-        ); // We can't predict the exact address
+        emit MorphoCompounderStrategyFactory.StrategyDeploy(management, donationAddress, address(0), vaultSharesName); // We can't predict the exact address
 
         address strategyAddress = factory.createStrategy(
             vaultSharesName,
@@ -93,7 +85,6 @@ contract MorphoCompounderStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            strategySalt,
             address(implementation),
             true // allowDepositDuringLoss
         );
@@ -117,7 +108,6 @@ contract MorphoCompounderStrategyFactoryTest is Test {
     function testMultipleStrategiesPerUser() public {
         // Create first strategy
         string memory firstVaultName = "First MorphoCompounder Vault";
-        bytes32 firstSalt = keccak256("FIRST_TEST_STRATEGY_SALT");
 
         vm.startPrank(management);
         address firstStrategyAddress = factory.createStrategy(
@@ -127,14 +117,12 @@ contract MorphoCompounderStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            firstSalt,
             address(implementation),
             true // allowDepositDuringLoss
         );
 
         // Create second strategy for same user
         string memory secondVaultName = "Second MorphoCompounder Vault";
-        bytes32 secondSalt = keccak256("SECOND_TEST_STRATEGY_SALT");
 
         address secondStrategyAddress = factory.createStrategy(
             secondVaultName,
@@ -143,7 +131,6 @@ contract MorphoCompounderStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            secondSalt,
             address(implementation),
             true // allowDepositDuringLoss
         );
@@ -165,7 +152,6 @@ contract MorphoCompounderStrategyFactoryTest is Test {
     /// @notice Test creating strategies for different users
     function testMultipleUsers() public {
         string memory firstVaultName = "First User's Vault";
-        bytes32 firstSalt = keccak256("FIRST_USER_SALT");
 
         address firstUser = address(0x5678);
         address secondUser = address(0x9876);
@@ -179,7 +165,6 @@ contract MorphoCompounderStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            firstSalt,
             address(implementation),
             true // allowDepositDuringLoss
         );
@@ -187,7 +172,6 @@ contract MorphoCompounderStrategyFactoryTest is Test {
 
         // Create strategy for second user
         string memory secondVaultName = "Second User's Vault";
-        bytes32 secondSalt = keccak256("SECOND_USER_SALT");
 
         vm.startPrank(secondUser);
         address secondStrategyAddress = factory.createStrategy(
@@ -197,7 +181,6 @@ contract MorphoCompounderStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            secondSalt,
             address(implementation),
             true // allowDepositDuringLoss
         );
@@ -219,7 +202,6 @@ contract MorphoCompounderStrategyFactoryTest is Test {
     /// @notice Test creating a strategy with deterministic addressing via salt
     function testDeterministicAddressing() public {
         string memory vaultSharesName = "Deterministic Vault";
-        bytes32 strategySalt = keccak256("DETERMINISTIC_SALT");
 
         // Create a strategy
         vm.startPrank(management);
@@ -230,7 +212,6 @@ contract MorphoCompounderStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            strategySalt,
             address(implementation),
             true // allowDepositDuringLoss
         );
@@ -248,7 +229,6 @@ contract MorphoCompounderStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            strategySalt,
             address(implementation),
             true // allowDepositDuringLoss
         );
@@ -259,7 +239,6 @@ contract MorphoCompounderStrategyFactoryTest is Test {
         assertTrue(firstAddress != secondAddress, "Addresses should be different with different factories");
 
         // Re-create with a different salt but same factory and parameters
-        bytes32 differentSalt = keccak256("DIFFERENT_SALT");
 
         vm.startPrank(management);
         address thirdAddress = factory.createStrategy(
@@ -269,7 +248,6 @@ contract MorphoCompounderStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            differentSalt,
             address(implementation),
             true // allowDepositDuringLoss
         );

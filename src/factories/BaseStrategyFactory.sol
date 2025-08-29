@@ -7,12 +7,13 @@ import { CREATE3 } from "solady/utils/CREATE3.sol";
  * @title BaseStrategyFactory
  * @author Octant
  * @notice Base contract for strategy factories with deterministic deployment
- * @dev Uses CREATE3 with user-provided salts for backward compatibility
+ * @dev Uses CREATE3 with parameter-based hashing to prevent duplicate deployments
  *
  * Security Considerations:
- * - Callers are responsible for managing salt uniqueness to prevent collisions
- * - Salt is combined with msg.sender to ensure deployer-specific addresses
- * - Addresses are deterministic and predictable based on salt and deployer
+ * - Strategy parameters are hashed to create a unique salt
+ * - Same parameters always result in the same deployment address
+ * - Duplicate strategy deployments are automatically prevented
+ * - Addresses are deterministic and predictable based on parameters
  */
 abstract contract BaseStrategyFactory {
     /**
@@ -35,28 +36,38 @@ abstract contract BaseStrategyFactory {
      */
     mapping(address => StrategyInfo[]) public strategies;
 
+    // Custom errors
+    error StrategyAlreadyExists(address existingStrategy);
+
     // Note: Child factories should declare and emit their own `StrategyDeploy` event for compatibility.
 
     /**
-     * @notice Predict deployment address using user-provided salt and deployer
-     * @dev Combines salt with deployer address for deterministic deployment
-     * @param _salt User-provided salt for uniqueness
+     * @notice Predict deployment address using strategy parameter hash
+     * @dev Combines parameter hash with deployer address for deterministic deployment
+     * @param _parameterHash Hash of all strategy parameters
      * @param deployer Deployer address
      * @return Predicted contract address
      */
-    function predictStrategyAddress(bytes32 _salt, address deployer) external view returns (address) {
-        bytes32 finalSalt = keccak256(abi.encodePacked(_salt, deployer));
+    function predictStrategyAddress(bytes32 _parameterHash, address deployer) external view returns (address) {
+        bytes32 finalSalt = keccak256(abi.encodePacked(_parameterHash, deployer));
         return CREATE3.predictDeterministicAddress(finalSalt);
     }
 
     /**
      * @dev Internal function to deploy strategy using CREATE3
      * @param bytecode The deployment bytecode
-     * @param _salt User-provided salt for deterministic deployment
+     * @param _parameterHash Hash of all strategy parameters for deterministic deployment
      * @return strategyAddress The deployed strategy address
      */
-    function _deployStrategy(bytes memory bytecode, bytes32 _salt) internal returns (address strategyAddress) {
-        bytes32 finalSalt = keccak256(abi.encodePacked(_salt, msg.sender));
+    function _deployStrategy(bytes memory bytecode, bytes32 _parameterHash) internal returns (address strategyAddress) {
+        bytes32 finalSalt = keccak256(abi.encodePacked(_parameterHash, msg.sender));
+
+        // Check if strategy would be deployed to an existing address
+        address predictedAddress = CREATE3.predictDeterministicAddress(finalSalt);
+        if (predictedAddress.code.length > 0) {
+            revert StrategyAlreadyExists(predictedAddress);
+        }
+
         strategyAddress = CREATE3.deployDeterministic(bytecode, finalSalt);
     }
 
