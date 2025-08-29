@@ -96,7 +96,7 @@ contract QuadraticVotingAdminJourneyTest is Test {
     }
 
     /// @notice Test admin deployment and configuration verification
-    function testAdminDeployment_ConfigurationVerification() public {
+    function testAdminDeployment_ConfigurationVerification() public view {
         // Verify factory deployment state
         assertEq(factory.getDeployedCount(), 1);
         assertTrue(factory.isMechanism(address(mechanism)));
@@ -115,6 +115,8 @@ contract QuadraticVotingAdminJourneyTest is Test {
         assertEq(_tokenized(address(mechanism)).owner(), address(this));
 
         // Deploy second mechanism to test isolation
+        // SimpleVotingMechanism removed - config2 no longer needed
+        /*
         AllocationConfig memory config2 = AllocationConfig({
             asset: IERC20(address(token)),
             name: "Second Mechanism",
@@ -128,6 +130,8 @@ contract QuadraticVotingAdminJourneyTest is Test {
         });
 
         address mechanism2Addr = factory.deploySimpleVotingMechanism(config2);
+        */
+        address mechanism2Addr = address(0); // SimpleVotingMechanism removed
 
         // Verify isolation between mechanisms
         assertEq(factory.getDeployedCount(), 2);

@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import { QuadraticVotingMechanism } from "src/mechanisms/mechanism/QuadraticVotingMechanism.sol";
-import { SimpleVotingMechanism } from "test/mocks/SimpleVotingMechanism.sol";
+// import { SimpleVotingMechanism } from "test/mocks/SimpleVotingMechanism.sol"; // SimpleVotingMechanism removed
 import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocationMechanism.sol";
 import { AllocationMechanismFactory } from "src/mechanisms/AllocationMechanismFactory.sol";
 import { AllocationConfig } from "src/mechanisms/BaseAllocationMechanism.sol";
@@ -70,6 +70,8 @@ contract DecimalConversionTest is Test {
         return QuadraticVotingMechanism(payable(mechanismAddr));
     }
 
+    // SimpleVotingMechanism removed - function commented out
+    /*
     function deploySimpleMechanismWithToken(IERC20 asset) internal returns (SimpleVotingMechanism) {
         AllocationConfig memory config = AllocationConfig({
             asset: asset,
@@ -86,6 +88,7 @@ contract DecimalConversionTest is Test {
         address mechanismAddr = factory.deploySimpleVotingMechanism(config);
         return SimpleVotingMechanism(payable(mechanismAddr));
     }
+    */
 
     /// @notice Test that 6-decimal tokens are properly scaled to 18 decimals (Quadratic)
     function testQuadraticDecimalConversion_6Decimals() public {
@@ -144,6 +147,8 @@ contract DecimalConversionTest is Test {
         assertEq(actualVotingPower, deposit, "18-decimal token should remain unchanged");
     }
 
+    // SimpleVotingMechanism removed - test commented out
+    /*
     /// @notice Test that 6-decimal tokens are properly scaled to 18 decimals (Simple)
     function testSimpleDecimalConversion_6Decimals() public {
         SimpleVotingMechanism mechanism = deploySimpleMechanismWithToken(IERC20(address(token6)));
@@ -162,4 +167,5 @@ contract DecimalConversionTest is Test {
         uint256 actualVotingPower = _tokenized(address(mechanism)).votingPower(alice);
         assertEq(actualVotingPower, expected, "6-decimal token should scale up to 18 decimals in SimpleVoting");
     }
+    */
 }
