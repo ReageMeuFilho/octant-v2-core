@@ -88,8 +88,22 @@ contract SkyCompounderStrategyFactoryTest is Test {
                 emergencyAdmin,
                 donationAddress,
                 true, // enableBurning
-                address(tokenizedStrategy),
-                true // allowDepositDuringLoss
+                address(tokenizedStrategy)
+            )
+        );
+
+        // Build the bytecode for address prediction
+        bytes memory bytecode = abi.encodePacked(
+            type(SkyCompounderStrategy).creationCode,
+            abi.encode(
+                0x0650CAF159C5A49f711e8169D4336ECB9b950275, // USDS_REWARD_ADDRESS
+                vaultSharesName,
+                management,
+                keeper,
+                emergencyAdmin,
+                donationAddress,
+                true, // enableBurning
+                address(tokenizedStrategy)
             )
         );
 
@@ -99,7 +113,7 @@ contract SkyCompounderStrategyFactoryTest is Test {
         emit SkyCompounderStrategyFactory.StrategyDeploy(
             management,
             donationAddress,
-            factory.predictStrategyAddress(parameterHash, management),
+            factory.predictStrategyAddress(parameterHash, management, bytecode),
             vaultSharesName
         );
 
@@ -110,8 +124,7 @@ contract SkyCompounderStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             true, // enableBurning
-            address(tokenizedStrategy),
-            true // allowDepositDuringLoss
+            address(tokenizedStrategy)
         );
         vm.stopPrank();
 
@@ -143,8 +156,7 @@ contract SkyCompounderStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             true, // enableBurning
-            address(tokenizedStrategy),
-            true // allowDepositDuringLoss
+            address(tokenizedStrategy)
         );
 
         // Create second strategy for same user with different parameters
@@ -157,8 +169,7 @@ contract SkyCompounderStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             true, // enableBurning
-            address(tokenizedStrategy),
-            true // allowDepositDuringLoss
+            address(tokenizedStrategy)
         );
         vm.stopPrank();
 
@@ -191,8 +202,7 @@ contract SkyCompounderStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             true, // enableBurning
-            address(tokenizedStrategy),
-            true // allowDepositDuringLoss
+            address(tokenizedStrategy)
         );
         vm.stopPrank();
 
@@ -207,8 +217,7 @@ contract SkyCompounderStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             true, // enableBurning
-            address(tokenizedStrategy),
-            true // allowDepositDuringLoss
+            address(tokenizedStrategy)
         );
         vm.stopPrank();
 
@@ -238,8 +247,7 @@ contract SkyCompounderStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             true, // enableBurning
-            address(tokenizedStrategy),
-            true // allowDepositDuringLoss
+            address(tokenizedStrategy)
         );
 
         // Try to create the exact same strategy again - should revert
@@ -251,8 +259,7 @@ contract SkyCompounderStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             true, // enableBurning
-            address(tokenizedStrategy),
-            true // allowDepositDuringLoss
+            address(tokenizedStrategy)
         );
 
         // Create strategy with different name - should succeed
@@ -264,8 +271,7 @@ contract SkyCompounderStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             true, // enableBurning
-            address(tokenizedStrategy),
-            true // allowDepositDuringLoss
+            address(tokenizedStrategy)
         );
         vm.stopPrank();
 

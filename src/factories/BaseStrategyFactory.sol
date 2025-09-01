@@ -49,7 +49,11 @@ abstract contract BaseStrategyFactory {
      * @param bytecode The deployment bytecode (including constructor args)
      * @return Predicted contract address
      */
-    function predictStrategyAddress(bytes32 _parameterHash, address deployer, bytes memory bytecode) external view returns (address) {
+    function predictStrategyAddress(
+        bytes32 _parameterHash,
+        address deployer,
+        bytes memory bytecode
+    ) external view returns (address) {
         bytes32 finalSalt = keccak256(abi.encodePacked(_parameterHash, deployer));
         return Create2.computeAddress(finalSalt, keccak256(bytecode));
     }
@@ -65,7 +69,7 @@ abstract contract BaseStrategyFactory {
 
         // Check if strategy would be deployed to an existing address
         address predictedAddress = Create2.computeAddress(finalSalt, keccak256(bytecode));
-        
+
         if (predictedAddress.code.length > 0) {
             revert StrategyAlreadyExists(predictedAddress);
         }

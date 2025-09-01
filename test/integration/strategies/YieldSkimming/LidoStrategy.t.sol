@@ -100,7 +100,6 @@ contract LidoStrategyTest is Test {
         bytes32 strategySalt;
         address implementationAddress;
         bool enableBurning;
-        bool allowDepositDuringLoss;
     }
 
     /**
@@ -144,8 +143,7 @@ contract LidoStrategyTest is Test {
             vaultSharesName: vaultSharesName,
             strategySalt: strategySalt,
             implementationAddress: address(implementation),
-            enableBurning: true,
-            allowDepositDuringLoss: true
+            enableBurning: true
         });
 
         // Deploy factory
@@ -160,8 +158,7 @@ contract LidoStrategyTest is Test {
             params.emergencyAdmin,
             params.donationAddress,
             params.enableBurning,
-            params.implementationAddress,
-            params.allowDepositDuringLoss
+            params.implementationAddress
         );
         vm.stopPrank();
 

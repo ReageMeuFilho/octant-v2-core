@@ -104,7 +104,11 @@ contract RegenStakerFactory {
     /// @param deployer Address that will deploy
     /// @param bytecode The deployment bytecode (including constructor args)
     /// @return Predicted contract address
-    function predictStakerAddress(bytes32 salt, address deployer, bytes memory bytecode) external view returns (address) {
+    function predictStakerAddress(
+        bytes32 salt,
+        address deployer,
+        bytes memory bytecode
+    ) external view returns (address) {
         bytes32 finalSalt = keccak256(abi.encode(salt, deployer));
         return Create2.computeAddress(finalSalt, keccak256(bytecode));
     }
@@ -133,7 +137,7 @@ contract RegenStakerFactory {
 
         bytes memory fullBytecode = bytes.concat(code, constructorParams);
         bytes32 finalSalt = keccak256(abi.encode(salt, msg.sender));
-        
+
         stakerAddress = Create2.deploy(0, finalSalt, fullBytecode);
 
         emit StakerDeploy(msg.sender, params.admin, stakerAddress, salt, variant);

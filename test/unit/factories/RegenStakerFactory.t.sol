@@ -75,8 +75,24 @@ contract RegenStakerFactoryTest is Test {
     function testCreateStaker() public {
         bytes32 salt = keccak256("TEST_STAKER_SALT");
 
+        // Build constructor params and bytecode for prediction
+        bytes memory constructorParams = abi.encode(
+            rewardsToken,
+            stakeToken,
+            earningPowerCalculator,
+            MAX_BUMP_TIP,
+            admin,
+            REWARD_DURATION,
+            MAX_CLAIM_FEE,
+            MINIMUM_STAKE_AMOUNT,
+            stakerWhitelist,
+            contributionWhitelist,
+            allocationMechanismWhitelist
+        );
+        bytes memory bytecode = bytes.concat(getRegenStakerBytecode(), constructorParams);
+
         vm.startPrank(deployer1);
-        address predictedAddress = factory.predictStakerAddress(salt, deployer1);
+        address predictedAddress = factory.predictStakerAddress(salt, deployer1, bytecode);
 
         vm.expectEmit(true, true, true, true);
         emit StakerDeploy(
@@ -207,8 +223,24 @@ contract RegenStakerFactoryTest is Test {
     function testDeterministicAddressing() public {
         bytes32 salt = keccak256("DETERMINISTIC_SALT");
 
+        // Build constructor params and bytecode for prediction
+        bytes memory constructorParams = abi.encode(
+            rewardsToken,
+            stakeToken,
+            earningPowerCalculator,
+            MAX_BUMP_TIP,
+            admin,
+            REWARD_DURATION,
+            MAX_CLAIM_FEE,
+            MINIMUM_STAKE_AMOUNT,
+            stakerWhitelist,
+            contributionWhitelist,
+            allocationMechanismWhitelist
+        );
+        bytes memory bytecode = bytes.concat(getRegenStakerBytecode(), constructorParams);
+
         vm.prank(deployer1);
-        address predictedAddress = factory.predictStakerAddress(salt, deployer1);
+        address predictedAddress = factory.predictStakerAddress(salt, deployer1, bytecode);
 
         vm.prank(deployer1);
         address actualAddress = factory.createStakerWithDelegation(

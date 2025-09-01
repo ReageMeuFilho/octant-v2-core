@@ -57,6 +57,9 @@ contract AllocationMechanismFactory {
         uint256 _alphaDenominator,
         address deployer
     ) public view returns (address predicted) {
+        // Set the deployer as the owner to match deployment logic
+        _config.owner = deployer;
+
         // Generate deterministic salt from parameters
         bytes32 salt = keccak256(
             abi.encode(
@@ -80,7 +83,7 @@ contract AllocationMechanismFactory {
             type(QuadraticVotingMechanism).creationCode,
             abi.encode(tokenizedAllocationImplementation, _config, _alphaNumerator, _alphaDenominator)
         );
-        
+
         return Create2.computeAddress(salt, keccak256(bytecode));
     }
 
@@ -123,7 +126,7 @@ contract AllocationMechanismFactory {
 
         // Check if mechanism already exists
         address predictedAddress = Create2.computeAddress(salt, keccak256(bytecode));
-        
+
         if (predictedAddress.code.length > 0) {
             revert MechanismAlreadyExists(predictedAddress);
         }

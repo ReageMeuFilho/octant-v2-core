@@ -107,8 +107,7 @@ contract MorphoCompounderDonatingStrategyTest is Test {
                 params.emergencyAdmin,
                 params.donationAddress,
                 false, // enableBurning
-                params.implementationAddress,
-                true // allowDepositDuringLoss
+                params.implementationAddress
             )
         );
 

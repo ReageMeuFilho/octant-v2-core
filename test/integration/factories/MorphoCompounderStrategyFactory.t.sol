@@ -85,8 +85,7 @@ contract MorphoCompounderStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -117,8 +116,7 @@ contract MorphoCompounderStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
 
         // Create second strategy for same user
@@ -131,8 +129,7 @@ contract MorphoCompounderStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -165,8 +162,7 @@ contract MorphoCompounderStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -181,8 +177,7 @@ contract MorphoCompounderStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -212,8 +207,7 @@ contract MorphoCompounderStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -229,8 +223,7 @@ contract MorphoCompounderStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -244,8 +237,7 @@ contract MorphoCompounderStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
         vm.stopPrank();
 

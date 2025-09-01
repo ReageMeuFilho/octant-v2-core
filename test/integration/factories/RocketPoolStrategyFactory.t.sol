@@ -89,8 +89,7 @@ contract RocketPoolStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -122,8 +121,7 @@ contract RocketPoolStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
 
         // Create second strategy for same user
@@ -134,8 +132,7 @@ contract RocketPoolStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -173,8 +170,7 @@ contract RocketPoolStrategyFactoryTest is Test {
                 emergencyAdmin,
                 donationAddress,
                 false, // enableBurning
-                address(implementation),
-                true // allowDepositDuringLoss
+                address(implementation)
             );
             vm.stopPrank();
         }
@@ -203,8 +199,7 @@ contract RocketPoolStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
 
         // Try to deploy the exact same strategy again - should revert
@@ -216,8 +211,7 @@ contract RocketPoolStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
 
         // Deploy strategy with different name - should succeed
@@ -229,8 +223,7 @@ contract RocketPoolStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -267,8 +260,7 @@ contract RocketPoolStrategyFactoryTest is Test {
             fuzzEmergencyAdmin,
             fuzzDonationAddress,
             false, // enableBurning
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -301,8 +293,7 @@ contract RocketPoolStrategyFactoryTest is Test {
                 emergencyAdmin,
                 donationAddress,
                 false, // enableBurning
-                address(implementation),
-                true // allowDepositDuringLoss
+                address(implementation)
             );
             vm.stopPrank();
         }

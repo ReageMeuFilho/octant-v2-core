@@ -86,11 +86,27 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
                 emergencyAdmin,
                 donationAddress,
                 false, // enableBurning
-                address(implementation),
-                true // allowDepositDuringLoss
+                address(implementation)
             )
         );
-        address expectedStrategyAddress = factory.predictStrategyAddress(parameterHash, management);
+
+        // Build the bytecode for address prediction
+        bytes memory bytecode = abi.encodePacked(
+            type(MorphoCompounderStrategy).creationCode,
+            abi.encode(
+                MORPHO_VAULT,
+                0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48, // USDC
+                vaultSharesName,
+                management,
+                keeper,
+                emergencyAdmin,
+                donationAddress,
+                false, // enableBurning
+                address(implementation)
+            )
+        );
+
+        address expectedStrategyAddress = factory.predictStrategyAddress(parameterHash, management, bytecode);
 
         // Create a strategy and check events
         vm.startPrank(management);
@@ -110,8 +126,7 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -143,8 +158,7 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
 
         // Create second strategy for same user
@@ -158,8 +172,7 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -193,8 +206,7 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -210,8 +222,7 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -242,8 +253,7 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -260,8 +270,7 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -276,8 +285,7 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -302,8 +310,7 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
 
         address secondStrategyAddress = factory.createStrategy(
@@ -314,8 +321,7 @@ contract MorphoCompounderDonatingVaultFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
         vm.stopPrank();
 
