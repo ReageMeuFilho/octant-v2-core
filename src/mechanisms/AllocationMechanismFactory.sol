@@ -5,7 +5,7 @@ import { TokenizedAllocationMechanism } from "./TokenizedAllocationMechanism.sol
 import { QuadraticVotingMechanism } from "./mechanism/QuadraticVotingMechanism.sol";
 import { AllocationConfig } from "./BaseAllocationMechanism.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { CREATE3 } from "solady/utils/CREATE3.sol";
+import { Create2 } from "@openzeppelin/contracts/utils/Create2.sol";
 
 /// @title Allocation Mechanism Factory
 /// @notice Factory for deploying allocation mechanisms using the Yearn V3 pattern
@@ -75,7 +75,13 @@ contract AllocationMechanismFactory {
             )
         );
 
-        return CREATE3.predictDeterministicAddress(salt);
+        // Need to build the same bytecode that will be used in deployment
+        bytes memory bytecode = abi.encodePacked(
+            type(QuadraticVotingMechanism).creationCode,
+            abi.encode(tokenizedAllocationImplementation, _config, _alphaNumerator, _alphaDenominator)
+        );
+        
+        return Create2.computeAddress(salt, keccak256(bytecode));
     }
 
     /// @notice Deploy a new QuadraticVotingMechanism
@@ -109,20 +115,21 @@ contract AllocationMechanismFactory {
             )
         );
 
-        // Check if mechanism already exists
-        address predictedAddress = CREATE3.predictDeterministicAddress(salt);
-        if (predictedAddress.code.length > 0) {
-            revert MechanismAlreadyExists(predictedAddress);
-        }
-
         // Prepare creation bytecode
         bytes memory bytecode = abi.encodePacked(
             type(QuadraticVotingMechanism).creationCode,
             abi.encode(tokenizedAllocationImplementation, _config, _alphaNumerator, _alphaDenominator)
         );
 
-        // Deploy new QuadraticVotingMechanism using CREATE3
-        mechanism = CREATE3.deployDeterministic(bytecode, salt);
+        // Check if mechanism already exists
+        address predictedAddress = Create2.computeAddress(salt, keccak256(bytecode));
+        
+        if (predictedAddress.code.length > 0) {
+            revert MechanismAlreadyExists(predictedAddress);
+        }
+
+        // Deploy new QuadraticVotingMechanism using CREATE2
+        mechanism = Create2.deploy(0, salt, bytecode);
 
         // Track deployment
         deployedMechanisms.push(mechanism);

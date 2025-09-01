@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.25;
 
-import { CREATE3 } from "solady/utils/CREATE3.sol";
+import { Create2 } from "@openzeppelin/contracts/utils/Create2.sol";
 import { MorphoCompounderStrategy } from "src/strategies/yieldDonating/MorphoCompounderStrategy.sol";
 
 contract MorphoCompounderStrategyFactory {
@@ -48,16 +48,21 @@ contract MorphoCompounderStrategyFactory {
      * @notice Predict deterministic deployment address
      * @param _parameterHash Hash of all strategy parameters
      * @param deployer Address that will deploy
+     * @param bytecode The deployment bytecode (including constructor args)
      * @return Predicted contract address
      */
-    function predictStrategyAddress(bytes32 _parameterHash, address deployer) external view returns (address) {
+    function predictStrategyAddress(
+        bytes32 _parameterHash,
+        address deployer,
+        bytes memory bytecode
+    ) external view returns (address) {
         bytes32 finalSalt = keccak256(abi.encodePacked(_parameterHash, deployer));
-        return CREATE3.predictDeterministicAddress(finalSalt);
+        return Create2.computeAddress(finalSalt, keccak256(bytecode));
     }
 
     /**
      * @notice Deploys a new MorphoCompounder strategy for the Yield Donating Vault.
-     * @dev This function uses CREATE3 to deploy a new strategy contract deterministically.
+     * @dev This function uses CREATE2 to deploy a new strategy contract deterministically.
      *      The strategy is initialized with the provided parameters, and its address is
      *      returned upon successful deployment. The function emits a `MorphoStrategyDeploy` event.
      * @param _name The name of the vault token associated with the strategy.
@@ -76,8 +81,7 @@ contract MorphoCompounderStrategyFactory {
         address _emergencyAdmin,
         address _donationAddress,
         bool _enableBurning,
-        address _tokenizedStrategyAddress,
-        bool _allowDepositDuringLoss
+        address _tokenizedStrategyAddress
     ) external returns (address) {
         bytes32 finalSalt;
         address strategyAddress;
@@ -94,19 +98,12 @@ contract MorphoCompounderStrategyFactory {
                     _emergencyAdmin,
                     _donationAddress,
                     _enableBurning,
-                    _tokenizedStrategyAddress,
-                    _allowDepositDuringLoss
+                    _tokenizedStrategyAddress
                 )
             );
 
             // Generate final salt using parameter hash and sender
             finalSalt = keccak256(abi.encodePacked(parameterHash, msg.sender));
-
-            // Check if strategy already exists
-            address predictedAddress = CREATE3.predictDeterministicAddress(finalSalt);
-            if (predictedAddress.code.length > 0) {
-                revert StrategyAlreadyExists(predictedAddress);
-            }
         }
 
         {
@@ -122,12 +119,18 @@ contract MorphoCompounderStrategyFactory {
                     _emergencyAdmin,
                     _donationAddress,
                     _enableBurning,
-                    _tokenizedStrategyAddress,
-                    _allowDepositDuringLoss
+                    _tokenizedStrategyAddress
                 )
             );
 
-            strategyAddress = CREATE3.deployDeterministic(bytecode, finalSalt);
+            // Check if strategy already exists
+            address predictedAddress = Create2.computeAddress(finalSalt, keccak256(bytecode));
+
+            if (predictedAddress.code.length > 0) {
+                revert StrategyAlreadyExists(predictedAddress);
+            }
+
+            strategyAddress = Create2.deploy(0, finalSalt, bytecode);
         }
 
         // Store strategy info

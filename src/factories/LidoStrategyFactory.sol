@@ -32,7 +32,6 @@ contract LidoStrategyFactory is BaseStrategyFactory {
      * @param _donationAddress The address where donations from the strategy will be sent.
      * @param _enableBurning Whether to enable burning shares from dragon router during loss protection.
      * @param _tokenizedStrategyAddress Address of the tokenized strategy implementation
-     * @param _allowDepositDuringLoss Whether to allow deposits during loss periods
      * @return strategyAddress The address of the newly deployed strategy contract.
      */
     function createStrategy(
@@ -42,8 +41,7 @@ contract LidoStrategyFactory is BaseStrategyFactory {
         address _emergencyAdmin,
         address _donationAddress,
         bool _enableBurning,
-        address _tokenizedStrategyAddress,
-        bool _allowDepositDuringLoss
+        address _tokenizedStrategyAddress
     ) external returns (address strategyAddress) {
         // Generate deterministic hash from all strategy parameters
         bytes32 parameterHash = keccak256(
@@ -55,8 +53,7 @@ contract LidoStrategyFactory is BaseStrategyFactory {
                 _emergencyAdmin,
                 _donationAddress,
                 _enableBurning,
-                _tokenizedStrategyAddress,
-                _allowDepositDuringLoss
+                _tokenizedStrategyAddress
             )
         );
 
@@ -70,8 +67,7 @@ contract LidoStrategyFactory is BaseStrategyFactory {
                 _emergencyAdmin,
                 _donationAddress,
                 _enableBurning,
-                _tokenizedStrategyAddress,
-                _allowDepositDuringLoss
+                _tokenizedStrategyAddress
             )
         );
 

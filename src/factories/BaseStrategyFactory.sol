@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.25;
 
-import { CREATE3 } from "solady/utils/CREATE3.sol";
+import { Create2 } from "@openzeppelin/contracts/utils/Create2.sol";
 
 /**
  * @title BaseStrategyFactory
  * @author Octant
  * @notice Base contract for strategy factories with deterministic deployment
- * @dev Uses CREATE3 with parameter-based hashing to prevent duplicate deployments
+ * @dev Uses CREATE2 with parameter-based hashing to prevent duplicate deployments
  *
  * Security Considerations:
  * - Strategy parameters are hashed to create a unique salt
@@ -46,15 +46,16 @@ abstract contract BaseStrategyFactory {
      * @dev Combines parameter hash with deployer address for deterministic deployment
      * @param _parameterHash Hash of all strategy parameters
      * @param deployer Deployer address
+     * @param bytecode The deployment bytecode (including constructor args)
      * @return Predicted contract address
      */
-    function predictStrategyAddress(bytes32 _parameterHash, address deployer) external view returns (address) {
+    function predictStrategyAddress(bytes32 _parameterHash, address deployer, bytes memory bytecode) external view returns (address) {
         bytes32 finalSalt = keccak256(abi.encodePacked(_parameterHash, deployer));
-        return CREATE3.predictDeterministicAddress(finalSalt);
+        return Create2.computeAddress(finalSalt, keccak256(bytecode));
     }
 
     /**
-     * @dev Internal function to deploy strategy using CREATE3
+     * @dev Internal function to deploy strategy using CREATE2
      * @param bytecode The deployment bytecode
      * @param _parameterHash Hash of all strategy parameters for deterministic deployment
      * @return strategyAddress The deployed strategy address
@@ -63,12 +64,13 @@ abstract contract BaseStrategyFactory {
         bytes32 finalSalt = keccak256(abi.encodePacked(_parameterHash, msg.sender));
 
         // Check if strategy would be deployed to an existing address
-        address predictedAddress = CREATE3.predictDeterministicAddress(finalSalt);
+        address predictedAddress = Create2.computeAddress(finalSalt, keccak256(bytecode));
+        
         if (predictedAddress.code.length > 0) {
             revert StrategyAlreadyExists(predictedAddress);
         }
 
-        strategyAddress = CREATE3.deployDeterministic(bytecode, finalSalt);
+        strategyAddress = Create2.deploy(0, finalSalt, bytecode);
     }
 
     /**
