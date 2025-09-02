@@ -45,10 +45,10 @@ The system provides two specialized implementations optimized for different yiel
 
 #### YieldSkimmingTokenizedStrategy  
 - **Use Case:** Appreciating assets like liquid staking tokens (mETH, stETH) where value grows continuously
-- **Mechanism:** Skims appreciation through share dilution while using vault shares to snapshot underlying principal on user deposit.
-- **Implementation:** Tracks exchange rates in RAY precision (1e27), calculates total underlying value vs share supply to determine profit/loss
-- **Loss Protection:** Burns shares from dragon router if flag is enabled, tracks recovery implicitly through exchange rate changes
-- **Optimal For:** Assets that appreciate in value over time or would have otherwise required a two step withdraw
+- **Mechanism:** Tracks value debt obligations to users and dragon router, skimming appreciation when total vault value exceeds total debt obligations
+- **Implementation:** Uses value debt tracking system (`totalUserDebtInAssetValue`, `dragonRouterDebtInAssetValue`) with 1 share = 1 ETH value principle, tracks exchange rates in RAY precision (1e27)
+- **Loss Protection:** Burns dragon router shares and reduces dragon debt during losses, includes comprehensive insolvency protection mechanisms
+- **Optimal For:** Assets that appreciate in value over time with robust debt tracking and solvency protection
 
 #### Implementation Differences
 
@@ -58,7 +58,7 @@ The system provides two specialized implementations optimized for different yiel
 
 **Share Conversion:**
 - YieldDonating: Standard ERC4626 conversion using total assets
-- YieldSkimming: Exchange rate-based conversion using `_currentRateRay()` to convert assets to underlying-value-denominated shares 
+- YieldSkimming: Dual-mode conversion - rate-based when solvent (`_currentRateRay()`), proportional distribution when insolvent, with 1 share = 1 ETH value principle 
 
 **Exchange Rate Precision:**
 - YieldDonating: No exchange rate tracking required
@@ -66,11 +66,11 @@ The system provides two specialized implementations optimized for different yiel
 
 **State Management:**
 - YieldDonating: Standard ERC4626 state tracking + loss tracking via `S.lossAmount`
-- YieldSkimming: Custom storage slot for exchange rate data, underlying value calculations vs share supply
+- YieldSkimming: Value debt tracking system (`totalUserDebtInAssetValue`, `dragonRouterDebtInAssetValue`) with insolvency protection and 1 share = 1 ETH value accounting
 
 **Loss Protection:**
-- YieldDonating: Burns dragon router shares when `enableBurning = true`, explicitly tracks uncovered losses in `S.lossAmount` for future offset
-- YieldSkimming: Burns dragon router shares when `enableBurning = true`, implicitly tracks recovery through exchange rate vs share supply comparison
+- YieldDonating: Burns dragon router shares when `enableBurning == true`, explicitly tracks uncovered losses in `S.lossAmount` for future offset
+- YieldSkimming: Burns dragon router shares and reduces `dragonRouterDebtInAssetValue` during losses (if `enableBurning == true`), includes insolvency protection that blocks dragon operations and switches to proportional asset distribution
 
 **Update Timing:**
 - YieldDonating: Manual keeper-triggered reports at optimal intervals generate and harvest profit.
@@ -86,11 +86,12 @@ The system provides two specialized implementations optimized for different yiel
 5. **Multiple Cycles:** Accumulates losses, offsets with profits over time
 
 **YieldSkimming Strategies:**
-1. **Exchange Rate Decline:** Burns available dragon router shares up to loss amount
-2. **No Dragon Router Shares:** Loss is socialized across all shareholders
-3. **Insufficient Shares:** Burns all available, remaining loss affects PPS temporarily
-4. **Automatic Recovery:** When exchange rate recovers, profit (totalValue - supply) is automatically minted to dragon router
-5. **Implicit Tracking:** Recovery tracked through natural exchange rate appreciation vs share supply
+1. **Value Debt Tracking:** Maintains separate debt obligations for users (`totalUserDebtInAssetValue`) and dragon router (`dragonRouterDebtInAssetValue`)
+2. **Insolvency Protection:** Blocks deposits/mints when vault cannot cover total debt obligations, prevents dragon operations during insolvency
+3. **Loss Handling:** Burns dragon router shares and reduces `dragonRouterDebtInAssetValue`, remaining losses trigger insolvency mode with proportional asset distribution
+4. **Share Value System:** 1 share = 1 ETH value (or underlying asset) principle ensures consistent debt tracking regardless of exchange rate fluctuations
+5. **Transfer Controls:** Dragon router cannot transfer to itself, debt rebalancing occurs on dragon transfers, insolvency blocks dragon transfers
+6. **Dual Conversion Modes:** Rate-based conversion when solvent, proportional distribution when insolvent
 
 ## Trust Minimization
 
@@ -157,9 +158,9 @@ The security model makes the following key assumptions:
 
 3. **Exchange Rate Requirements (YieldSkimming)**:
    - The asset token must provide a reliable exchange rate to its underlying value
-   - Strategy shares automatically inherit the same decimals as the asset token
-   - The recovery mechanism relies on comparing total underlying value vs share supply
-   - Exchange rate data is assumed to be generally reliable, with healthcheck validation as defense-in-depth
+   - Value debt tracking system requires accurate exchange rate data for debt vs vault value comparisons
+   - 1 share = 1 ETH value principle requires consistent exchange rate conversion to RAY precision (1e27)
+   - Exchange rate data is assumed to be generally reliable, with healthcheck validation as defense-in-depth and insolvency protection as backup
 
 4. **Dragon Router Beneficiary**: The dragon router address is assumed to be a legitimate beneficiary for donated yield.
 
@@ -167,8 +168,9 @@ The security model makes the following key assumptions:
    - Dragon router shares represent risk capital that absorbs losses first
    - YieldDonating: Price-per-share calculations remain consistent through `_convertToSharesWithLoss`
    - YieldDonating: Users can recover original deposits underlying value after full recovery
-   - YieldSkimming: Losses beyond dragon router shares are socialized across all shareholders
-   - YieldSkimming: The recovery mechanism relies on this decimal alignment to properly calculate profit/loss as `totalValue - supply`
+   - YieldSkimming: Value debt tracking ensures accurate debt obligations, insolvency protection triggers proportional distribution when dragon buffer insufficient
+   - YieldSkimming: Debt reduction mechanism explicitly tracks loss recovery through `dragonRouterDebtInAssetValue` adjustments
+   - YieldSkimming: 1 share = 1 ETH value system ensures consistent debt accounting independent of exchange rate fluctuations
    - If share burning is enabled (`enableBurning = true`), it is the strategist's responsibility to ensure the dragon router can support having its shares burned
 
 ### Economic Invariants
@@ -182,13 +184,14 @@ The loss tracking mechanism maintains critical economic invariants:
 4. **Fair Share Pricing**: Share conversions account for tracked losses to prevent dilution
 
 **YieldSkimming Strategies:**
-Exchange rate-based recovery mechanism:
+Value debt tracking and insolvency protection mechanism:
 
-1. **Exchange Rate Based**: Total underlying value calculated from assets × current exchange rate
-2. **Automatic Recovery Tracking**: When exchange rates recover, profit automatically calculated as `totalValue - supply`
-3. **Natural Recovery**: Losses implicitly recovered when underlying value appreciation causes totalValue to exceed share supply
-4. **Direct Socialization**: Losses beyond dragon router shares immediately affect all shareholders, but are automatically recovered when rates improve
-5. **Decimal Alignment**: Strategy shares inherit asset token decimals, ensuring proper value comparison
+1. **Value Debt Tracking**: Total debt obligations tracked separately for users (`totalUserDebtInAssetValue`) and dragon router (`dragonRouterDebtInAssetValue`)
+2. **Share Value Principle**: 1 share = 1 ETH value ensures consistent debt accounting independent of exchange rate fluctuations
+3. **Solvency-Based Operations**: Vault solvency determined by comparing total vault value (assets × exchange rate) against total debt obligations
+4. **Dual Conversion Modes**: Rate-based conversion when solvent, proportional distribution when insolvent
+5. **Explicit Loss Recovery**: Dragon debt reduction during losses provides explicit recovery tracking vs implicit rate-based recovery
+6. **Transfer Controls**: Dragon router transfers include debt rebalancing and insolvency protection to maintain debt accuracy
 
 ### Threat Model Boundaries
 
@@ -218,7 +221,7 @@ The system includes several utility contracts that extend strategy functionality
 - **Behavior:** Transaction reverts if profit/loss exceeds configured limits, requiring manual intervention
 - **Variants:** 
   - Standard version for BaseStrategy with totalAssets comparison
-  - Specialized version for BaseYieldSkimmingStrategy with exchange rate-adjusted validation using `totalSupply()` vs exchange-rate-calculated total ETH value
+  - Specialized version for BaseYieldSkimmingStrategy with value debt tracking validation using total debt obligations vs current vault value (assets × exchange rate)
 
 #### UniswapV3Swapper
 - **Purpose:** Standardized Uniswap V3 integration for token swapping within strategies
@@ -233,6 +236,15 @@ The system includes several utility contracts that extend strategy functionality
   - `router`: Uniswap V3 router address (customizable per chain)
   - `base`: Base token for routing (default WETH mainnet)
 - **Usage:** Strategies inherit this contract and call `_setUniFees()` during initialization to configure trading pairs
+
+#### IYieldSkimmingStrategy Interface
+- **Purpose:** Standardized interface for yield skimming strategies with value debt tracking and insolvency monitoring
+- **Features:**
+  - Exchange rate querying (`getCurrentExchangeRate`, `getLastRateRay`, `getCurrentRateRay`, `decimalsOfExchangeRate`)
+  - Value debt inspection (`getTotalUserDebtInAssetValue`, `getDragonRouterDebtInAssetValue`, `getTotalValueDebtInAssetValue`)
+  - Insolvency monitoring (`isVaultInsolvent`)
+- **Implementation:** YieldSkimmingTokenizedStrategy implements this interface to provide transparency into debt obligations and vault health
+- **Usage:** External integrations can query debt status and vault solvency for risk assessment and monitoring
 
 ## Functional Requirements
 WLOG, I refer to yield donating and yield skimming strategies as 'donation strategies' as requirements generally apply to both with the exception of FR-2 for which the first two acceptance criteria do not apply to yield skimming variants.
@@ -301,7 +313,19 @@ WLOG, I refer to yield donating and yield skimming strategies as 'donation strat
   - Recovery follows priority: offset tracked losses first, then mint shares for net profit to dragon router
   - If `enableBurning = false`, all losses are tracked without share burning
   - Strategist must ensure dragon router implementation supports share burning when enabling this feature
-- **Note:** YieldSkimming strategies use exchange rate-based recovery - they burn available dragon router shares, socialize remaining loss, and automatically recover when exchange rates improve
+- **Note:** YieldSkimming strategies use value debt tracking with insolvency protection - they burn available dragon router shares and reduce dragon debt, trigger insolvency mode for proportional distribution when dragon buffer insufficient, and recover through explicit debt tracking vs rate appreciation
+
+#### FR-8: Value Debt Tracking & Insolvency Protection (YieldSkimming Strategies)
+- **Requirement:** YieldSkimming strategies must maintain accurate debt obligations to users and dragon router, provide insolvency protection during losses, and ensure fair value distribution through dual conversion modes.
+- **Implementation:** `totalUserDebtInAssetValue`, `dragonRouterDebtInAssetValue` storage, `_isVaultInsolvent()`, `_requireVaultSolvency()`, `_requireDragonSolvency()`, debt rebalancing on transfers
+- **Acceptance Criteria:**
+  - Value debt tracking maintains separate obligations for users and dragon router using 1 share = 1 ETH value principle
+  - Insolvency protection blocks deposits/mints when total vault value cannot cover total debt obligations
+  - Dragon router operations blocked during insolvency to protect user principal
+  - Share conversions switch to proportional distribution mode during insolvency
+  - Dragon router transfers include debt rebalancing to maintain accurate debt tracking
+  - Loss protection burns dragon shares and reduces `dragonRouterDebtInAssetValue` providing explicit recovery tracking
+  - Transfer controls prevent dragon router self-transfers and ensure solvency-aware operations
 
 ## User Lifecycle Documentation
 
@@ -324,12 +348,14 @@ WLOG, I refer to yield donating and yield skimming strategies as 'donation strat
 **Flow:**
 1. User approves asset spending for strategy contract
 2. User calls `deposit(assets, receiver)` or `mint(shares, receiver)` function
-3. System validates deposit limits and strategy operational status
-4. System transfers assets, deploys to yield source via `deployFunds` callback
+3. System validates deposit limits, strategy operational status, and vault solvency (YieldSkimming only)
+4. System transfers assets, deploys to yield source via `deployFunds` callback, updates value debt tracking (YieldSkimming only)
 5. System mints proportional shares and emits `Deposit` event
 
 **NOTE:**
 - Deposit limits may reject transactions due to underlying yield source state
+- YieldSkimming strategies block deposits during vault insolvency to protect user principal
+- Dragon router cannot deposit into YieldSkimming strategies
 
 #### Phase 3: Donation Generation & Impact Monitoring
 **User Story:** "As a funding pool participant, I want to monitor my principal preservation and the donation impact being generated so that I can make informed decisions about continued participation."
@@ -351,9 +377,11 @@ WLOG, I refer to yield donating and yield skimming strategies as 'donation strat
 **Flow:**
 1. User determines withdrawal amount and acceptable loss tolerance
 2. User calls `withdraw(assets, receiver, owner, maxLoss)` or `redeem` variant
-3. System checks withdrawal limits and validates maxLoss parameters
-4. System frees assets from yield source via `freeFunds` callback
+3. System checks withdrawal limits, validates maxLoss parameters, and ensures dragon solvency (YieldSkimming only)
+4. System frees assets from yield source via `freeFunds` callback, updates value debt tracking (YieldSkimming only)
 5. System transfers freed assets to receiver and burns corresponding shares
 
 **NOTE:**
 - Withdrawal timing depends on yield source liquidity and may incur losses without slippage checks
+- YieldSkimming strategies prevent dragon router withdrawals during vault insolvency
+- YieldSkimming strategies use proportional distribution during insolvency rather than full principal recovery
