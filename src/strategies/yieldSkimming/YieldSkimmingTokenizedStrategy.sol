@@ -279,6 +279,11 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     function transfer(address to, uint256 amount) external override returns (bool success) {
         StrategyData storage S = _strategyStorage();
 
+        // Prevent dragon router from transferring to itself
+        if (msg.sender == S.dragonRouter && to == S.dragonRouter) {
+            revert("Dragon cannot transfer to itself");
+        }
+
         // Dragon can only transfer when vault is solvent
         _requireDragonSolvency(msg.sender);
 
@@ -302,6 +307,11 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
      */
     function transferFrom(address from, address to, uint256 amount) external override returns (bool success) {
         StrategyData storage S = _strategyStorage();
+
+        // Prevent dragon router from transferring to itself
+        if (from == S.dragonRouter && to == S.dragonRouter) {
+            revert("Dragon cannot transfer to itself");
+        }
 
         // Dragon can only transfer when vault is solvent
         _requireDragonSolvency(from);

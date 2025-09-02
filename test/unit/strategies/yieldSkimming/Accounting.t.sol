@@ -1188,6 +1188,75 @@ contract AccountingTest is Setup {
     }
 
     /**
+     * @notice Test dragon router cannot transfer to itself
+     * @dev Verifies that self-transfers are blocked to prevent accounting issues
+     */
+    function test_dragonSelfTransfer_blocked() public {
+        address user1 = makeAddr("user1");
+        
+        // Setup: User deposits, profit is generated, dragon gets shares
+        mintAndDepositIntoStrategy(strategy, user1, 1000e18);
+        
+        // Create profit to give dragon some shares
+        uint256 currentRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
+        MockStrategySkimming(address(strategy)).updateExchangeRate((currentRate * 12) / 10); // 20% profit
+        vm.startPrank(keeper);
+        strategy.report();
+        vm.stopPrank();
+        
+        uint256 dragonShares = strategy.balanceOf(strategy.dragonRouter());
+        require(dragonShares > 0, "Dragon should have shares");
+        
+        // Try dragon router transferring to itself - should revert
+        vm.startPrank(strategy.dragonRouter());
+        
+        bool success = false;
+        try strategy.transfer(strategy.dragonRouter(), 100e18) {
+            success = true;
+        } catch {
+            success = false;
+        }
+        
+        vm.stopPrank();
+        
+        assertFalse(success, "Dragon self-transfer should fail");
+    }
+
+    /**
+     * @notice Test dragon router cannot transferFrom to itself
+     * @dev Verifies that self-transfers via transferFrom are blocked
+     */
+    function test_dragonSelfTransferFrom_blocked() public {
+        address user1 = makeAddr("user1");
+        address user2 = makeAddr("user2");
+        
+        // Setup: User deposits, profit is generated, dragon gets shares
+        mintAndDepositIntoStrategy(strategy, user1, 1000e18);
+        
+        // Create profit to give dragon some shares
+        uint256 currentRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
+        MockStrategySkimming(address(strategy)).updateExchangeRate((currentRate * 12) / 10); // 20% profit
+        vm.startPrank(keeper);
+        strategy.report();
+        vm.stopPrank();
+        
+        uint256 dragonShares = strategy.balanceOf(strategy.dragonRouter());
+        require(dragonShares > 0, "Dragon should have shares");
+        
+        // Dragon approves user2 to transfer its shares
+        vm.startPrank(strategy.dragonRouter());
+        strategy.approve(user2, dragonShares);
+        vm.stopPrank();
+        
+        // Try user2 transferring from dragon to dragon - should revert
+        address dragonRouter = strategy.dragonRouter();
+        vm.startPrank(user2);
+        vm.expectRevert(bytes("Dragon cannot transfer to itself"));
+        strategy.transferFrom(dragonRouter, dragonRouter, 100e18);
+        vm.stopPrank();
+    }
+
+    /**
      * @notice Test debt tracking during insolvency
      * @dev Verifies transfers are blocked appropriately during insolvency
      */
