@@ -282,9 +282,9 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         // Dragon can only transfer when vault is solvent
         _requireDragonSolvency(msg.sender);
 
-        // Handle debt rebalancing if dragon is transferring
-        if (msg.sender == S.dragonRouter) {
-            _rebalanceDebtOnDragonTransfer(amount);
+        // Handle debt rebalancing when dragon is involved
+        if (msg.sender == S.dragonRouter || to == S.dragonRouter) {
+            _rebalanceDebtOnDragonTransfer(msg.sender, to, amount);
         }
 
         // Use base contract logic for actual transfer
@@ -306,9 +306,9 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         // Dragon can only transfer when vault is solvent
         _requireDragonSolvency(from);
 
-        // Handle debt rebalancing if dragon is transferring
-        if (from == S.dragonRouter) {
-            _rebalanceDebtOnDragonTransfer(amount);
+        // Handle debt rebalancing when dragon is involved
+        if (from == S.dragonRouter || to == S.dragonRouter) {
+            _rebalanceDebtOnDragonTransfer(from, to, amount);
         }
 
         // Use base contract logic for actual transfer
@@ -492,17 +492,24 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     }
 
     /**
-     * @dev Rebalances debt tracking when dragon transfers shares
-     * @param transferAmount The amount of shares being transferred
+     * @dev Rebalances debt tracking when dragon transfers shares in or out
      */
-    function _rebalanceDebtOnDragonTransfer(uint256 transferAmount) internal {
+    function _rebalanceDebtOnDragonTransfer(address from, address to, uint256 transferAmount) internal {
         YieldSkimmingStorage storage YS = _strategyYieldSkimmingStorage();
+        StrategyData storage S = _strategyStorage();
 
         // Direct transfer: shares represent ETH value 1:1 in this system
-        // Dragon loses debt obligation, users gain debt obligation
-        require(YS.dragonRouterDebtInAssetValue >= transferAmount, "Insufficient dragon debt");
-        YS.dragonRouterDebtInAssetValue -= transferAmount;
-        YS.totalUserDebtInAssetValue += transferAmount;
+        if (from == S.dragonRouter) {
+            // Dragon sends shares: dragon loses debt obligation, users gain debt obligation
+            require(YS.dragonRouterDebtInAssetValue >= transferAmount, "Insufficient dragon debt");
+            YS.dragonRouterDebtInAssetValue -= transferAmount;
+            YS.totalUserDebtInAssetValue += transferAmount;
+        } else if (to == S.dragonRouter) {
+            // User sends shares to dragon: users lose debt obligation, dragon gains debt obligation
+            require(YS.totalUserDebtInAssetValue >= transferAmount, "Insufficient user debt");
+            YS.totalUserDebtInAssetValue -= transferAmount;
+            YS.dragonRouterDebtInAssetValue += transferAmount;
+        }
     }
 
     /**
@@ -642,7 +649,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
             loss = S.totalAssets;
         }
 
-        if (dragonBalance > 0) {
+        if (dragonBalance > 0 && S.enableBurning) {
             uint256 dragonBurn = Math.min(lossValue, dragonBalance);
             _burn(S, S.dragonRouter, dragonBurn);
 
