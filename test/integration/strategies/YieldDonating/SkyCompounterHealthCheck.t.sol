@@ -30,7 +30,6 @@ contract SkyCompounterHealthCheckTest is Test {
         bytes32 strategySalt;
         address tokenizedStrategyAddress;
         bool enableBurning;
-        bool allowDepositDuringLoss;
     }
 
     // Strategy instance
@@ -106,8 +105,7 @@ contract SkyCompounterHealthCheckTest is Test {
             vaultSharesName: vaultSharesName,
             strategySalt: strategySalt,
             tokenizedStrategyAddress: address(tokenizedStrategy),
-            enableBurning: true,
-            allowDepositDuringLoss: true
+            enableBurning: true
         });
 
         // Deploy factory
@@ -122,9 +120,7 @@ contract SkyCompounterHealthCheckTest is Test {
             params.emergencyAdmin,
             params.donationAddress,
             params.enableBurning,
-            params.strategySalt,
-            params.tokenizedStrategyAddress,
-            params.allowDepositDuringLoss
+            params.tokenizedStrategyAddress
         );
         vm.stopPrank();
 

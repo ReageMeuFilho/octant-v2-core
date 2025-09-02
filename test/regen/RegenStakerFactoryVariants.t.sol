@@ -239,7 +239,25 @@ contract RegenStakerFactoryVariantsTest is Test {
         bytes32 salt = bytes32(uint256(100));
         address deployer = address(0x123);
 
-        address predicted = factory.predictStakerAddress(salt, deployer);
+        // Create constructor params to build bytecode
+        bytes memory constructorParams = abi.encode(
+            basicToken,
+            basicToken,
+            calculator,
+            MAX_BUMP_TIP,
+            ADMIN,
+            MIN_REWARD_DURATION,
+            MAX_CLAIM_FEE,
+            0, // minimumStakeAmount
+            stakerWhitelist,
+            contributionWhitelist,
+            allocationMechanismWhitelist
+        );
+
+        // Build bytecode with constructor params (using WITH_DELEGATION variant)
+        bytes memory bytecode = bytes.concat(type(RegenStaker).creationCode, constructorParams);
+
+        address predicted = factory.predictStakerAddress(salt, deployer, bytecode);
         assertTrue(predicted != address(0));
     }
 }

@@ -6,6 +6,7 @@ import { console } from "forge-std/console.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { LidoStrategy } from "src/strategies/yieldSkimming/LidoStrategy.sol";
 import { LidoStrategyFactory } from "src/factories/LidoStrategyFactory.sol";
+import { BaseStrategyFactory } from "src/factories/BaseStrategyFactory.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { YieldSkimmingTokenizedStrategy } from "src/strategies/yieldSkimming/YieldSkimmingTokenizedStrategy.sol";
@@ -72,14 +73,11 @@ contract LidoStrategyFactoryTest is Test {
     /// @notice Test creating a strategy through the factory
     function testCreateStrategy() public {
         string memory vaultSharesName = "Lido Vault Shares";
-        bytes32 strategySalt = keccak256("TEST_STRATEGY_SALT");
-
-        address expectedStrategyAddress = factory.predictStrategyAddress(strategySalt, management);
 
         // Create a strategy and check events
         vm.startPrank(management);
-        vm.expectEmit(true, true, true, false); // Check first 3 indexed params, ignore the non-indexed timestamp
-        emit LidoStrategyFactory.StrategyDeploy(management, donationAddress, expectedStrategyAddress, vaultSharesName); // We can't predict the exact address
+        vm.expectEmit(true, true, false, true); // Check deployer, donationAddress, and vaultTokenName; ignore strategy address
+        emit LidoStrategyFactory.StrategyDeploy(management, donationAddress, address(0), vaultSharesName); // We can't predict the exact address
 
         address strategyAddress = factory.createStrategy(
             vaultSharesName,
@@ -88,9 +86,7 @@ contract LidoStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            strategySalt,
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -112,7 +108,6 @@ contract LidoStrategyFactoryTest is Test {
     function testMultipleStrategiesPerUser() public {
         // Create first strategy
         string memory firstVaultName = "First Lido Vault";
-        bytes32 firstSalt = keccak256("FIRST_TEST_STRATEGY_SALT");
 
         vm.startPrank(management);
         address firstStrategyAddress = factory.createStrategy(
@@ -122,14 +117,11 @@ contract LidoStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            firstSalt,
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
 
         // Create second strategy for same user
         string memory secondVaultName = "Second Lido Vault";
-        bytes32 secondSalt = keccak256("SECOND_TEST_STRATEGY_SALT");
 
         address secondStrategyAddress = factory.createStrategy(
             secondVaultName,
@@ -138,9 +130,7 @@ contract LidoStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            secondSalt,
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -160,7 +150,6 @@ contract LidoStrategyFactoryTest is Test {
     /// @notice Test creating strategies for different users
     function testMultipleUsers() public {
         string memory firstVaultName = "First User's Vault";
-        bytes32 firstSalt = keccak256("FIRST_USER_SALT");
 
         address firstUser = address(0x5678);
         address secondUser = address(0x9876);
@@ -174,15 +163,12 @@ contract LidoStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            firstSalt,
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
         vm.stopPrank();
 
         // Create strategy for second user
         string memory secondVaultName = "Second User's Vault";
-        bytes32 secondSalt = keccak256("SECOND_USER_SALT");
 
         vm.startPrank(secondUser);
         address secondStrategyAddress = factory.createStrategy(
@@ -192,9 +178,7 @@ contract LidoStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            secondSalt,
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -211,10 +195,9 @@ contract LidoStrategyFactoryTest is Test {
         assertTrue(firstStrategyAddress != secondStrategyAddress, "Strategies should have different addresses");
     }
 
-    /// @notice Test creating a strategy with deterministic addressing via salt
+    /// @notice Test for deterministic addressing and duplicate prevention
     function testDeterministicAddressing() public {
         string memory vaultSharesName = "Deterministic Vault";
-        bytes32 strategySalt = keccak256("DETERMINISTIC_SALT");
 
         // Create a strategy
         vm.startPrank(management);
@@ -225,51 +208,39 @@ contract LidoStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            strategySalt,
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
         vm.stopPrank();
 
-        // Create a new factory
-        LidoStrategyFactory newFactory = new LidoStrategyFactory();
-
-        // Create a strategy with the same salt but from a different factory
+        // Try to deploy the exact same strategy again - should revert
         vm.startPrank(management);
-        address secondAddress = newFactory.createStrategy(
+        vm.expectRevert(abi.encodeWithSelector(BaseStrategyFactory.StrategyAlreadyExists.selector, firstAddress));
+        factory.createStrategy(
             vaultSharesName,
             management,
             keeper,
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            strategySalt,
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
         vm.stopPrank();
 
-        // Addresses should be different because factory addresses are different
-        // but they should be deterministic based on the salt and other parameters
-        assertTrue(firstAddress != secondAddress, "Addresses should be different with different factories");
-
-        // Re-create with a different salt but same factory and parameters
-        bytes32 differentSalt = keccak256("DIFFERENT_SALT");
-
+        // Create a strategy with different parameters - should succeed
+        string memory differentName = "Different Vault";
         vm.startPrank(management);
-        address thirdAddress = factory.createStrategy(
-            vaultSharesName,
+        address secondAddress = factory.createStrategy(
+            differentName,
             management,
             keeper,
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            differentSalt,
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
         vm.stopPrank();
 
-        assertTrue(firstAddress != thirdAddress, "Addresses should be different with different salts");
+        // Different parameters should result in different address
+        assertTrue(firstAddress != secondAddress, "Different params should create different address");
     }
 }
