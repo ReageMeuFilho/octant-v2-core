@@ -1251,9 +1251,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
      *
      * This will handle all logic, transfers and accounting
      * in order to service the withdraw request.
-     *
-     * If we are not able to withdraw the full amount needed, it will
-     * be counted as a loss and passed on to the user.
      */
     function _withdraw(
         AllocationStorage storage S,
