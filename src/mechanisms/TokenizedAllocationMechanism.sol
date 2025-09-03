@@ -535,7 +535,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     ) external whenNotPaused nonReentrant returns (uint256 pid) {
         address proposer = msg.sender;
 
-        // Call hook for validation
+        // Call hook for validation - Potential DoS risk - malicious keeper/management contracts could revert these calls
         if (!IBaseAllocationStrategy(address(this)).beforeProposeHook(proposer)) revert ProposeNotAllowed(proposer);
 
         if (recipient == address(0) || recipient == address(this)) revert InvalidRecipient(recipient);
