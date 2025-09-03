@@ -111,7 +111,6 @@ The system implements **permissionless proposal queuing**, enabling flexible gov
     - MUST verify proposer has legitimate right to create proposals (e.g., voting power > 0, role-based access)
     - MUST be view function to prevent state changes during validation
     - SHOULD prevent spam by implementing appropriate restrictions
-    - MUST return false for address(0) proposers
     - MAY restrict to specific roles (e.g., QuadraticVotingMechanism restricts to keeper/management only)
 - **`_validateProposalHook(uint256 pid)`** - Ensures proposal ID validity
   - **Security Assumptions**:
