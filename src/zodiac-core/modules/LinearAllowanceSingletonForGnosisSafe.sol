@@ -142,7 +142,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
         LinearAllowance memory a = allowances[safe][delegate][token];
 
         a = _calculateCurrentAllowance(a);
-        a.dripRatePerDay = dripRatePerDay;
+        a = _updateDripRatePerDay(a, dripRatePerDay);
 
         allowances[safe][delegate][token] = a;
 
@@ -161,7 +161,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
 
         emit AllowanceRevoked(safe, delegate, token, allowance.totalUnspent);
 
-        allowance.dripRatePerDay = 0;
+        allowance = _updateDripRatePerDay(allowance, 0);
         allowance.totalUnspent = 0;
 
         allowances[safe][delegate][token] = allowance;
@@ -231,10 +231,23 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
         require(beneficiaryPostBalance - beneficiaryPreBalance >= amount, TransferFailed(safe, delegate, token));
     }
 
+    function _updateDripRatePerDay(
+        LinearAllowance memory a,
+        uint192 dripRatePerDay
+    ) internal view returns (LinearAllowance memory) {
+        a.dripRatePerDay = dripRatePerDay;
+        a.lastBookedAtInSeconds = block.timestamp.toUint64();
+        return a;
+    }
+
     function _calculateCurrentAllowance(LinearAllowance memory a) internal view returns (LinearAllowance memory) {
         uint256 newAccrued = _calculateNewAccrued(a);
-        a.totalUnspent += newAccrued;
-        a.lastBookedAtInSeconds = block.timestamp.toUint64();
+
+        if (newAccrued > 0) {
+            a.totalUnspent += newAccrued;
+            a.lastBookedAtInSeconds = block.timestamp.toUint64();
+        }
+
         return a;
     }
 
