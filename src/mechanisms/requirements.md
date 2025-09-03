@@ -136,12 +136,12 @@ The system implements **permissionless proposal queuing**, enabling flexible gov
     - Overflow check: `if (newPower > MAX_SAFE_VALUE) revert VotingPowerTooLarge(newPower, MAX_SAFE_VALUE);`
 - **`_processVoteHook(pid, voter, choice, weight, oldPower)`** - Processes vote and updates tallies
   - **Security Assumptions**:
-    - MUST return newPower <= oldPower (power conservation invariant)
     - MUST accurately update vote tallies based on weight and choice
     - MUST prevent double voting by checking hasVoted mapping
-    - MUST validate weight does not exceed voter's available power
+    - MUST validate quadratic cost (weight²) does not exceed voter's available power
     - SHOULD implement vote cost calculation (e.g., quadratic cost in QF)
     - MUST handle all VoteType choices appropriately (Against/For/Abstain)
+  - **Note**: Power conservation invariant (newPower <= oldPower) and voting period validation are performed upstream in `TokenizedAllocationMechanism`, not in this hook
 - **`_hasQuorumHook(uint256 pid)`** - Determines if proposal meets quorum requirements
   - **Security Assumptions**:
     - MUST implement consistent quorum calculation logic
@@ -272,9 +272,8 @@ This pattern enables complete code reuse while maintaining storage isolation and
 - **Implementation:** `castVote(uint256 pid, VoteType choice, uint256 weight)` in TokenizedAllocationMechanism with `_processVoteHook()` in strategy
 - **Acceptance Criteria:**
   - Users can only vote once per proposal
-  - Vote weight cannot exceed user's current voting power
-  - Votes can only be cast during active voting period
-  - Vote processing reduces user's available voting power
+  - Quadratic cost (weight²) cannot exceed user's current voting power
+  - Votes can only be cast during active voting period (validated upstream)
 
 #### FR-4: Vote Tally Finalization
 - **Requirement:** System must provide mechanism to finalize vote tallies after voting period ends
@@ -463,14 +462,14 @@ Voters are community members who deposit assets to gain voting power and partici
 
 **System Response:**
 - Vote tallies updated through `_processVoteHook()`
-- Voter's remaining power reduced by vote weight
+- Voter's remaining power reduced by quadratic cost (weight²)
 - VotesCast event emitted
 - Vote recorded (cannot be changed)
 
 **Key Constraints:**
 - Can only vote during active voting window
 - One vote per proposal per voter (immutable)
-- Vote weight cannot exceed remaining voting power
+- Quadratic cost (weight²) cannot exceed remaining voting power
 - Must manage power across multiple proposals strategically
 - QuadraticVotingMechanism: To cast W votes costs W² voting power (quadratic cost)
 - QuadraticVotingMechanism: Only "For" votes supported (no Against/Abstain)
