@@ -42,7 +42,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
         uint256 length = delegates.length;
         require(
             length == tokens.length && length == dripRatesPerDay.length,
-            ArrayLengthsMismatch(length, tokens.length)
+            ArrayLengthsMismatch(length, tokens.length, dripRatesPerDay.length)
         );
 
         for (uint256 i = 0; i < length; i++) {
@@ -58,7 +58,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
     /// @inheritdoc ILinearAllowanceSingleton
     function revokeAllowances(address[] calldata delegates, address[] calldata tokens) external nonReentrant {
         uint256 length = delegates.length;
-        require(length == tokens.length, ArrayLengthsMismatch(delegates.length, tokens.length));
+        require(length == tokens.length, ArrayLengthsMismatch(delegates.length, tokens.length, 0));
 
         for (uint256 i = 0; i < length; i++) {
             _revokeAllowance(msg.sender, delegates[i], tokens[i]);
@@ -86,7 +86,10 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
         address[] calldata tos
     ) external nonReentrant returns (uint256[] memory transferAmounts) {
         uint256 length = safes.length;
-        require(length == tokens.length && length == tos.length, ArrayLengthsMismatch(length, tokens.length));
+        require(
+            length == tokens.length && length == tos.length,
+            ArrayLengthsMismatch(length, tokens.length, tos.length)
+        );
 
         transferAmounts = new uint256[](length);
 
