@@ -280,12 +280,16 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     }
 
     /// @notice Returns the domain separator, updating it if chain ID changed (fork protection)
-    function DOMAIN_SEPARATOR() public view returns (bytes32) {
+    function DOMAIN_SEPARATOR() public returns (bytes32) {
         AllocationStorage storage s = _getStorage();
         if (block.chainid == s.initialChainId) {
             return s.domainSeparator;
         } else {
-            return _computeDomainSeparator(s);
+            s.initialChainId = block.chainid;
+
+            bytes32 domainSeparator = _computeDomainSeparator(s);
+            s.domainSeparator = domainSeparator;
+            return domainSeparator;
         }
     }
 
@@ -471,7 +475,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) private view {
+    ) private {
         // Check deadline
         if (block.timestamp > deadline) revert ExpiredSignature(deadline, block.timestamp);
 
@@ -514,7 +518,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     }
 
     /// @dev Recovers signer address from signature
-    function _recover(bytes32 structHash, uint8 v, bytes32 r, bytes32 s) private view returns (address) {
+    function _recover(bytes32 structHash, uint8 v, bytes32 r, bytes32 s) private returns (address) {
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR(), structHash));
         return ecrecover(digest, v, r, s);
     }

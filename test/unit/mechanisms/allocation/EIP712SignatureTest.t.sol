@@ -103,7 +103,7 @@ contract EIP712SignatureTest is Test {
         uint256 deposit,
         uint256 nonce,
         uint256 deadline
-    ) internal view returns (bytes32) {
+    ) internal returns (bytes32) {
         bytes32 structHash = keccak256(abi.encode(SIGNUP_TYPEHASH, user, user, deposit, nonce, deadline));
         bytes32 domainSeparator = _tokenized(address(mechanism)).DOMAIN_SEPARATOR();
         return keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
@@ -117,7 +117,7 @@ contract EIP712SignatureTest is Test {
         address expectedRecipient,
         uint256 nonce,
         uint256 deadline
-    ) internal view returns (bytes32) {
+    ) internal returns (bytes32) {
         bytes32 structHash = keccak256(
             abi.encode(CAST_VOTE_TYPEHASH, voter, pid, choice, weight, expectedRecipient, nonce, deadline)
         );
@@ -131,7 +131,7 @@ contract EIP712SignatureTest is Test {
 
     // ============ Domain Separator Tests ============
 
-    function test_DomainSeparator_Computed() public view {
+    function test_DomainSeparator_Computed() public {
         bytes32 expectedDomainSeparator = _computeDomainSeparator("Test Voting", address(mechanism));
         bytes32 actualDomainSeparator = _tokenized(address(mechanism)).DOMAIN_SEPARATOR();
 
@@ -696,7 +696,7 @@ contract EIP712SignatureTest is Test {
         assertEq(_tokenized(address(mechanism)).nonces(bob), 0, "Bob's nonce should still be 0");
     }
 
-    function test_DomainSeparator_View() public view {
+    function test_DomainSeparator_View() public {
         bytes32 domainSeparator = _tokenized(address(mechanism)).DOMAIN_SEPARATOR();
         assertTrue(domainSeparator != bytes32(0), "Domain separator should not be zero");
 
