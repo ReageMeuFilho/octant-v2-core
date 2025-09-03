@@ -130,9 +130,10 @@ The system implements **permissionless proposal queuing**, enabling flexible gov
   - **Security Assumptions**:
     - MUST return deterministic voting power based on deposit amount
     - MUST be view function to ensure consistency
-    - MUST NOT exceed MAX_SAFE_VALUE (type(uint128).max) to prevent overflow
     - SHOULD implement fair and transparent power calculation
     - MAY normalize decimals for consistent voting power across different assets
+  - **Note**: Overflow protection is performed in `_executeSignup`, not in this hook:
+    - Overflow check: `if (newPower > MAX_SAFE_VALUE) revert VotingPowerTooLarge(newPower, MAX_SAFE_VALUE);`
 - **`_processVoteHook(pid, voter, choice, weight, oldPower)`** - Processes vote and updates tallies
   - **Security Assumptions**:
     - MUST return newPower <= oldPower (power conservation invariant)
