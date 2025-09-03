@@ -1193,32 +1193,32 @@ contract AccountingTest is Setup {
      */
     function test_dragonSelfTransfer_blocked() public {
         address user1 = makeAddr("user1");
-        
+
         // Setup: User deposits, profit is generated, dragon gets shares
         mintAndDepositIntoStrategy(strategy, user1, 1000e18);
-        
+
         // Create profit to give dragon some shares
         uint256 currentRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         MockStrategySkimming(address(strategy)).updateExchangeRate((currentRate * 12) / 10); // 20% profit
         vm.startPrank(keeper);
         strategy.report();
         vm.stopPrank();
-        
+
         uint256 dragonShares = strategy.balanceOf(strategy.dragonRouter());
         require(dragonShares > 0, "Dragon should have shares");
-        
+
         // Try dragon router transferring to itself - should revert
         vm.startPrank(strategy.dragonRouter());
-        
+
         bool success = false;
         try strategy.transfer(strategy.dragonRouter(), 100e18) {
             success = true;
         } catch {
             success = false;
         }
-        
+
         vm.stopPrank();
-        
+
         assertFalse(success, "Dragon self-transfer should fail");
     }
 
@@ -1229,25 +1229,25 @@ contract AccountingTest is Setup {
     function test_dragonSelfTransferFrom_blocked() public {
         address user1 = makeAddr("user1");
         address user2 = makeAddr("user2");
-        
+
         // Setup: User deposits, profit is generated, dragon gets shares
         mintAndDepositIntoStrategy(strategy, user1, 1000e18);
-        
+
         // Create profit to give dragon some shares
         uint256 currentRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
         MockStrategySkimming(address(strategy)).updateExchangeRate((currentRate * 12) / 10); // 20% profit
         vm.startPrank(keeper);
         strategy.report();
         vm.stopPrank();
-        
+
         uint256 dragonShares = strategy.balanceOf(strategy.dragonRouter());
         require(dragonShares > 0, "Dragon should have shares");
-        
+
         // Dragon approves user2 to transfer its shares
         vm.startPrank(strategy.dragonRouter());
         strategy.approve(user2, dragonShares);
         vm.stopPrank();
-        
+
         // Try user2 transferring from dragon to dragon - should revert
         address dragonRouter = strategy.dragonRouter();
         vm.startPrank(user2);
@@ -1538,5 +1538,124 @@ contract AccountingTest is Setup {
         assertEq(profit2, 0, "Should report no profit in second report");
         assertGt(loss2, 0, "Should report loss in second report even with rate changes");
         assertLt(dragonSharesAfterLoss, dragonShares, "Dragon shares should be burned to handle loss");
+    }
+
+    struct DragonRouterChangeVars {
+        address oldDragonRouter;
+        address newDragonRouter;
+        uint256 oldDragonBalance;
+        uint256 newDragonBalance;
+        uint256 userDebtBefore;
+        uint256 dragonDebtBefore;
+        uint256 totalDebtBefore;
+        uint256 userDebtAfter;
+        uint256 dragonDebtAfter;
+        uint256 totalDebtAfter;
+    }
+
+    /**
+     * @notice Fuzz test for dragon router change with debt accounting migration
+     * @dev Verifies that debt accounting is properly migrated when changing dragon router
+     */
+    function test_fuzz_dragonRouterChange_migratesDebtAccounting(
+        uint256 initialDeposit,
+        uint256 profitFactor,
+        uint256 newDragonInitialShares
+    ) public {
+        initialDeposit = bound(initialDeposit, minFuzzAmount, maxFuzzAmount);
+        profitFactor = bound(profitFactor, 100, 1000); // 1-10% profit
+        newDragonInitialShares = bound(newDragonInitialShares, 0, maxFuzzAmount / 10);
+
+        // Skip if initial deposit is too small to create meaningful profit
+        vm.assume(initialDeposit > 1000);
+        vm.assume(newDragonInitialShares < initialDeposit / 2); // Prevent new dragon from having more shares than reasonable
+
+        DragonRouterChangeVars memory vars;
+        vars.oldDragonRouter = strategy.dragonRouter();
+        vars.newDragonRouter = makeAddr("newDragonRouter");
+
+        // Setup: User deposits and we create profit to give old dragon some shares
+        mintAndDepositIntoStrategy(strategy, makeAddr("user1"), initialDeposit);
+
+        // Create profit to give old dragon router shares
+        uint256 currentRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
+        uint256 profitRate = currentRate + (currentRate * profitFactor) / MAX_BPS;
+        MockStrategySkimming(address(strategy)).updateExchangeRate(profitRate);
+
+        vm.prank(keeper);
+        strategy.report();
+
+        vars.oldDragonBalance = strategy.balanceOf(vars.oldDragonRouter);
+
+        // Skip test if no meaningful profit was generated
+        if (vars.oldDragonBalance == 0) {
+            return;
+        }
+
+        // Give new dragon router some initial shares if specified
+        if (newDragonInitialShares > 0) {
+            mintAndDepositIntoStrategy(strategy, vars.newDragonRouter, newDragonInitialShares);
+        }
+
+        vars.newDragonBalance = strategy.balanceOf(vars.newDragonRouter);
+
+        // Record debt state before change
+        vars.userDebtBefore = IYieldSkimmingStrategy(address(strategy)).getTotalUserDebtInAssetValue();
+        vars.dragonDebtBefore = IYieldSkimmingStrategy(address(strategy)).getDragonRouterDebtInAssetValue();
+        vars.totalDebtBefore = vars.userDebtBefore + vars.dragonDebtBefore;
+
+        // Initiate dragon router change
+        vm.prank(management);
+        strategy.setDragonRouter(vars.newDragonRouter);
+
+        // Skip cooldown period
+        skip(15 days);
+
+        // Finalize the change
+        strategy.finalizeDragonRouterChange();
+
+        // Verify new dragon router is set
+        assertEq(strategy.dragonRouter(), vars.newDragonRouter, "New dragon router should be set");
+
+        // Record debt state after change
+        vars.userDebtAfter = IYieldSkimmingStrategy(address(strategy)).getTotalUserDebtInAssetValue();
+        vars.dragonDebtAfter = IYieldSkimmingStrategy(address(strategy)).getDragonRouterDebtInAssetValue();
+        vars.totalDebtAfter = vars.userDebtAfter + vars.dragonDebtAfter;
+
+        // Most importantly: total debt should be conserved
+        assertEq(
+            vars.totalDebtAfter,
+            vars.totalDebtBefore,
+            "Total debt should be conserved during dragon router change"
+        );
+
+        // Verify the migration worked correctly
+        if (vars.oldDragonBalance > 0 && vars.newDragonBalance == 0) {
+            // Case 1: Only old dragon had balance, should increase user debt
+            assertEq(
+                vars.userDebtAfter,
+                vars.userDebtBefore + vars.oldDragonBalance,
+                "User debt should increase by old dragon balance"
+            );
+        } else if (vars.oldDragonBalance == 0 && vars.newDragonBalance > 0) {
+            // Case 2: Only new dragon has balance, should increase dragon debt
+            assertEq(
+                vars.dragonDebtAfter,
+                vars.dragonDebtBefore + vars.newDragonBalance,
+                "Dragon debt should increase by new dragon balance"
+            );
+        }
+
+        // Verify share balances are preserved
+        assertEq(
+            strategy.balanceOf(vars.newDragonRouter),
+            vars.newDragonBalance,
+            "New dragon router should keep its shares"
+        );
+        assertEq(
+            strategy.balanceOf(vars.oldDragonRouter),
+            vars.oldDragonBalance,
+            "Old dragon router should keep its shares"
+        );
     }
 }

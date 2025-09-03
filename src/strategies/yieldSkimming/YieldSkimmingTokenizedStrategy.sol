@@ -670,6 +670,52 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         }
     }
 
+    /**
+     * @notice Finalizes the dragon router change with proper debt accounting migration
+     * @dev Migrates debt tracking when dragon router changes to maintain correct accounting
+     */
+    function finalizeDragonRouterChange() external override {
+        StrategyData storage S = _strategyStorage();
+        YieldSkimmingStorage storage YS = _strategyYieldSkimmingStorage();
+
+        require(S.pendingDragonRouter != address(0), "no pending change");
+        require(block.timestamp >= S.dragonRouterChangeTimestamp + DRAGON_ROUTER_COOLDOWN, "cooldown not elapsed");
+
+        address oldDragonRouter = S.dragonRouter;
+        address newDragonRouter = S.pendingDragonRouter;
+
+        // Get balances before changing the router
+        uint256 oldDragonBalance = _balanceOf(S, oldDragonRouter);
+        uint256 newDragonBalance = _balanceOf(S, newDragonRouter);
+
+        // Migrate debt accounting:
+        // 1. Old dragon router's balance becomes user debt
+        if (oldDragonBalance > 0) {
+            YS.totalUserDebtInAssetValue += oldDragonBalance;
+            if (YS.dragonRouterDebtInAssetValue >= oldDragonBalance) {
+                YS.dragonRouterDebtInAssetValue -= oldDragonBalance;
+            } else {
+                YS.dragonRouterDebtInAssetValue = 0;
+            }
+        }
+
+        // 2. New dragon router's balance (if any) becomes dragon debt
+        if (newDragonBalance > 0) {
+            YS.dragonRouterDebtInAssetValue += newDragonBalance;
+            if (YS.totalUserDebtInAssetValue >= newDragonBalance) {
+                YS.totalUserDebtInAssetValue -= newDragonBalance;
+            } else {
+                YS.totalUserDebtInAssetValue = 0;
+            }
+        }
+
+        // Now call the parent implementation to actually change the router
+        S.dragonRouter = S.pendingDragonRouter;
+        S.pendingDragonRouter = address(0);
+        S.dragonRouterChangeTimestamp = 0;
+        emit UpdateDragonRouter(S.dragonRouter);
+    }
+
     function _strategyYieldSkimmingStorage() internal pure returns (YieldSkimmingStorage storage S) {
         // Since STORAGE_SLOT is a constant, we have to put a variable
         // on the stack to access it from an inline assembly block.

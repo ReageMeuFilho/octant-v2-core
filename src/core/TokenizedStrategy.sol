@@ -1256,7 +1256,7 @@ abstract contract TokenizedStrategy {
      * @notice Finalizes the dragon router change after the cooldown period.
      * @dev Can only be called after the cooldown period has elapsed.
      */
-    function finalizeDragonRouterChange() external {
+    function finalizeDragonRouterChange() external virtual {
         StrategyData storage S = _strategyStorage();
         require(S.pendingDragonRouter != address(0), "no pending change");
         require(block.timestamp >= S.dragonRouterChangeTimestamp + DRAGON_ROUTER_COOLDOWN, "cooldown not elapsed");

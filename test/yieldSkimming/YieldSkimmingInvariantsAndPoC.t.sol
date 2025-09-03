@@ -233,7 +233,7 @@ contract YieldSkimmingInvariantSuite is StdInvariant, Setup {
 contract YieldSkimmingExploitPoC is Setup {
     function setUp() public override {
         super.setUp();
-        
+
         // Enable burning for this test suite so dragon shares can be burned during losses
         vm.prank(management);
         strategy.setEnableBurning(true);
