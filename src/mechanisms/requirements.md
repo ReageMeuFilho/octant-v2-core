@@ -196,7 +196,6 @@ The system implements **permissionless proposal queuing**, enabling flexible gov
     - MUST accurately reflect total assets available for distribution
     - MUST include any external funding sources (matching pools, grants)
     - MUST be view function when called during finalization
-    - MUST NOT double-count assets or include unauthorized funds
 
 ### BaseAllocationMechanism Deep Dive
 
