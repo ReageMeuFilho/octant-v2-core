@@ -100,7 +100,7 @@ contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
     ///      from corrupting user deposits. This check is critical for this variant since stakes and rewards
     ///      share the same contract address.
     /// @param _amount The reward amount to notify
-    function notifyRewardAmount(uint256 _amount) external override {
+    function notifyRewardAmount(uint256 _amount) external override nonReentrant {
         if (address(REWARD_TOKEN) == address(STAKE_TOKEN)) {
             uint256 currentBalance = REWARD_TOKEN.balanceOf(address(this));
             uint256 required = totalStaked + _amount;
