@@ -235,12 +235,16 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     event ProposalCanceled(uint256 indexed pid, address indexed proposer);
     /// @notice Emitted when ownership transfer is initiated
     event OwnershipTransferInitiated(address indexed currentOwner, address indexed pendingOwner);
+    /// @notice Emitted when ownership transfer is canceled
+    event OwnershipTransferCanceled(address indexed currentOwner, address indexed canceledPendingOwner);
     /// @notice Emitted when ownership is transferred
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
     /// @notice Emitted when keeper is updated
     event KeeperUpdated(address indexed previousKeeper, address indexed newKeeper);
     /// @notice Emitted when management is updated
     event ManagementUpdated(address indexed previousManagement, address indexed newManagement);
+    /// @notice Emitted when emergency admin is updated
+    event EmergencyAdminUpdated(address indexed previousEmergencyAdmin, address indexed newEmergencyAdmin);
     /// @notice Emitted when contract is paused/unpaused
     event PausedStatusChanged(bool paused);
     /// @notice Emitted when global redemption period is set
@@ -905,8 +909,9 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         AllocationStorage storage s = _getStorage();
         if (s.pendingOwner == address(0)) revert Unauthorized();
 
+        address canceledPendingOwner = s.pendingOwner;
         s.pendingOwner = address(0);
-        emit OwnershipTransferInitiated(s.owner, address(0));
+        emit OwnershipTransferCanceled(s.owner, canceledPendingOwner);
     }
 
     /// @notice Update keeper address
@@ -925,6 +930,15 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         address oldManagement = s.management;
         s.management = newManagement;
         emit ManagementUpdated(oldManagement, newManagement);
+    }
+
+    /// @notice Update emergency admin address
+    function setEmergencyAdmin(address newEmergencyAdmin) external onlyOwner {
+        if (newEmergencyAdmin == address(0)) revert Unauthorized();
+        AllocationStorage storage s = _getStorage();
+        address oldEmergencyAdmin = s.emergencyAdmin;
+        s.emergencyAdmin = newEmergencyAdmin;
+        emit EmergencyAdminUpdated(oldEmergencyAdmin, newEmergencyAdmin);
     }
 
     /// @notice Emergency pause all operations

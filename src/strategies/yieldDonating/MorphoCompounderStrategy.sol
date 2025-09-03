@@ -39,6 +39,7 @@ contract MorphoCompounderStrategy is BaseHealthCheck {
         )
     {
         // make sure asset is Morpho's asset
+        require(IERC4626(_compounderVault).asset() == _asset, "Asset mismatch with compounder vault");
         IERC20(_asset).forceApprove(_compounderVault, type(uint256).max);
         compounderVault = _compounderVault;
     }
