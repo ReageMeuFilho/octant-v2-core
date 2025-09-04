@@ -41,10 +41,6 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 /// @dev USE CASE: Choose this variant for simple ERC20 staking without governance requirements.
 contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
     // === Custom Errors ===
-    /// @notice Error thrown when reward notification would corrupt user deposits (same-token scenario)
-    /// @param currentBalance The actual token balance in the contract
-    /// @param required The minimum balance needed (totalStaked + reward amount)
-    error InsufficientRewardBalance(uint256 currentBalance, uint256 required);
 
     /// @notice Error thrown when attempting delegation operations that are not supported in this variant
     error DelegationNotSupported();
@@ -95,21 +91,23 @@ contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
 
     // === Overridden Functions ===
 
-    /// @notice Protect same-token scenarios for this variant where all tokens are held in the main contract
-    /// @dev Validates sufficient balance when STAKE_TOKEN == REWARD_TOKEN to prevent reward notifications
-    ///      from corrupting user deposits. This check is critical for this variant since stakes and rewards
-    ///      share the same contract address.
-    /// @param _amount The reward amount to notify
-    function notifyRewardAmount(uint256 _amount) external override nonReentrant {
+    /// @notice Validates sufficient balance for same-token scenarios in this variant
+    /// @dev Overrides base to include totalStaked since stakes are held in main contract
+    /// @param _amount The reward amount being added
+    /// @return required The required balance including stakes and rewards
+    function _validateSameTokenBalance(uint256 _amount) internal view override returns (uint256 required) {
         if (address(REWARD_TOKEN) == address(STAKE_TOKEN)) {
             uint256 currentBalance = REWARD_TOKEN.balanceOf(address(this));
-            uint256 required = totalStaked + _amount;
+
+            // For this variant: stakes ARE in main contract, so include totalStaked
+            // Accounting: totalStaked + totalRewards - totalClaimedRewards + newAmount
+            required = totalStaked + totalRewards - totalClaimedRewards + _amount;
+
             if (currentBalance < required) {
                 revert InsufficientRewardBalance(currentBalance, required);
             }
         }
-
-        _notifyRewardAmountWithCustomDuration(_amount);
+        return required;
     }
 
     /// @inheritdoc Staker

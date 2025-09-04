@@ -4,7 +4,7 @@ pragma solidity ^0.8.23;
 import { Test } from "forge-std/Test.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { RegenStaker } from "src/regen/RegenStaker.sol";
-import { Staker } from "staker/Staker.sol";
+import { RegenStakerBase } from "src/regen/RegenStakerBase.sol";
 import { RegenEarningPowerCalculator } from "src/regen/RegenEarningPowerCalculator.sol";
 import { MockERC20Staking } from "test/mocks/MockERC20Staking.sol";
 import { IWhitelist } from "src/utils/IWhitelist.sol";
@@ -80,13 +80,25 @@ contract RegenStakerSameTokenProtectionTest is Test {
         // Base Staker requires reward balance >= notified amount
         vm.startPrank(notifier);
 
-        // Should revert - base Staker check: no rewards transferred yet
-        vm.expectRevert(Staker.Staker__InsufficientRewardBalance.selector);
+        // Should revert - new balance validation: no rewards transferred yet
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RegenStakerBase.InsufficientRewardBalance.selector,
+                0, // currentBalance = 0 (no tokens transferred yet)
+                REWARD_AMOUNT // required = totalRewards - totalClaimedRewards + amount = 0 - 0 + 500e18
+            )
+        );
         staker.notifyRewardAmount(REWARD_AMOUNT);
 
-        // Transfer LESS than reward amount - should still fail base check
+        // Transfer LESS than reward amount - should still fail balance check
         token.transfer(address(staker), REWARD_AMOUNT - 1);
-        vm.expectRevert(Staker.Staker__InsufficientRewardBalance.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RegenStakerBase.InsufficientRewardBalance.selector,
+                REWARD_AMOUNT - 1, // currentBalance = 499e18 (transferred amount)
+                REWARD_AMOUNT // required = 0 - 0 + 500e18 = 500e18
+            )
+        );
         staker.notifyRewardAmount(REWARD_AMOUNT);
 
         // Transfer exactly reward amount - should succeed

@@ -102,6 +102,11 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @param user The user address
     error NotWhitelisted(IWhitelist whitelist, address user);
 
+    /// @notice Error thrown when reward notification would corrupt user deposits (same-token scenario)
+    /// @param currentBalance The actual token balance in the contract
+    /// @param required The minimum balance needed (totalStaked + reward amount)
+    error InsufficientRewardBalance(uint256 currentBalance, uint256 required);
+
     /// @notice Error thrown when requested amount exceeds available
     /// @param requested The requested amount
     /// @param available The available amount
@@ -146,6 +151,14 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @notice Shared configuration state instance
     /// @dev Internal storage for shared configuration accessible via getters.
     SharedState internal sharedState;
+
+    /// @notice Tracks the total amount of rewards that have been added via notifyRewardAmount
+    /// @dev This accumulates all reward amounts ever added to the contract
+    uint256 public totalRewards;
+
+    /// @notice Tracks the total amount of rewards that have been consumed by users
+    /// @dev This includes claims, compounding, contributions, and tips
+    uint256 public totalClaimedRewards;
 
     // === Events ===
     /// @notice Emitted when the staker whitelist is updated
@@ -393,15 +406,8 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
 
         if (scaledRewardRate < SCALE_FACTOR) revert Staker__InvalidRewardRate();
 
-        // @dev KNOWN ISSUE: Unclaimed rewards not included in balance check
-        // This check cannot _guarantee_ sufficient rewards have been transferred to the contract,
-        // because it cannot isolate the unclaimed rewards owed to stakers left in the balance. While
-        // this check is useful for preventing degenerate cases, it is not sufficient. Therefore, it is
-        // critical that only safe reward notifier contracts are approved to call this method by the
-        // admin.
-        if ((scaledRewardRate * sharedState.rewardDuration) > (REWARD_TOKEN.balanceOf(address(this)) * SCALE_FACTOR)) {
-            revert Staker__InsufficientRewardBalance();
-        }
+        // Track total rewards added
+        totalRewards += _amount;
 
         emit RewardNotified(_amount, msg.sender);
     }
@@ -606,6 +612,9 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         uint256 scaledAmountConsumed = _amount * SCALE_FACTOR;
         deposit.scaledUnclaimedRewardCheckpoint = deposit.scaledUnclaimedRewardCheckpoint - scaledAmountConsumed;
 
+        // Track reward consumption
+        _trackRewardConsumption(_amount);
+
         // Defensive earning power update - maintaining consistency with base Staker pattern
         uint256 _oldEarningPower = deposit.earningPower;
         uint256 _newEarningPower = earningPowerCalculator.getEarningPower(
@@ -732,6 +741,9 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
             deposit.scaledUnclaimedRewardCheckpoint -
             (unclaimedAmount * SCALE_FACTOR);
 
+        // Track reward consumption
+        _trackRewardConsumption(unclaimedAmount);
+
         deposit.balance = newBalance.toUint96();
         deposit.earningPower = newEarningPower.toUint96();
 
@@ -787,6 +799,14 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         } else {
             require(amount >= feeAmount, CantAfford(feeAmount, amount));
             netAmount = amount - feeAmount;
+        }
+    }
+
+    /// @notice Internal helper to track when rewards are consumed
+    /// @param _amount The amount of rewards consumed
+    function _trackRewardConsumption(uint256 _amount) internal {
+        if (_amount > 0) {
+            totalClaimedRewards += _amount;
         }
     }
 
@@ -886,14 +906,37 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
             return 0;
         }
 
-        return super._claimReward(_depositId, deposit, _claimer);
+        uint256 claimedAmount = super._claimReward(_depositId, deposit, _claimer);
+
+        _trackRewardConsumption(_reward);
+
+        return claimedAmount;
     }
 
     /// @notice Override notifyRewardAmount to use custom reward duration
     /// @dev nonReentrant as a belts-and-braces guard against exotic ERC20 callback reentry
     /// @param _amount The reward amount
     function notifyRewardAmount(uint256 _amount) external virtual override nonReentrant {
+        _validateSameTokenBalance(_amount);
         _notifyRewardAmountWithCustomDuration(_amount);
+    }
+
+    /// @notice Validates sufficient balance for same-token scenarios in this variant
+    /// @dev Overrides base to include totalStaked since stakes are held in main contract
+    /// @param _amount The reward amount being added
+    /// @return required The required balance including stakes and rewards
+    function _validateSameTokenBalance(uint256 _amount) internal view virtual returns (uint256 required) {
+        if (address(REWARD_TOKEN) == address(STAKE_TOKEN)) {
+            uint256 currentBalance = REWARD_TOKEN.balanceOf(address(this));
+
+            // Accounting: totalRewards - totalClaimedRewards + newAmount
+            required = totalRewards - totalClaimedRewards + _amount;
+
+            if (currentBalance < required) {
+                revert InsufficientRewardBalance(currentBalance, required);
+            }
+        }
+        return required;
     }
 
     /// @inheritdoc Staker
@@ -927,7 +970,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         DepositIdentifier _depositId,
         address _tipReceiver,
         uint256 _requestedTip
-    ) external virtual override nonReentrant {
+    ) public virtual override nonReentrant {
         if (_requestedTip > maxBumpTip) revert Staker__InvalidTip();
 
         Deposit storage deposit = deposits[_depositId];
@@ -979,6 +1022,9 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         deposit.scaledUnclaimedRewardCheckpoint =
             deposit.scaledUnclaimedRewardCheckpoint -
             (_requestedTip * SCALE_FACTOR);
+
+        // Track reward consumption
+        _trackRewardConsumption(_requestedTip);
 
         // External call AFTER all state updates
         SafeERC20.safeTransfer(REWARD_TOKEN, _tipReceiver, _requestedTip);
