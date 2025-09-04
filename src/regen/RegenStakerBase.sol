@@ -695,6 +695,13 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         }
 
         compoundedAmount = unclaimedAmount - fee;
+
+        uint256 tempEarningPower = earningPowerCalculator.getEarningPower(
+            deposit.balance,
+            deposit.owner,
+            deposit.delegatee
+        );
+
         uint256 newBalance = deposit.balance + compoundedAmount;
         uint256 oldEarningPower = deposit.earningPower; // Save old earning power for event
         uint256 newEarningPower = earningPowerCalculator.getEarningPower(newBalance, deposit.owner, deposit.delegatee);
@@ -731,7 +738,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         }
         _stakeTokenSafeTransferFrom(address(this), address(_surrogate), compoundedAmount);
 
-        emit RewardClaimed(_depositId, msg.sender, compoundedAmount, oldEarningPower);
+        emit RewardClaimed(_depositId, msg.sender, compoundedAmount, tempEarningPower);
         emit StakeDeposited(depositOwner, _depositId, compoundedAmount, newBalance, newEarningPower);
 
         _revertIfMinimumStakeAmountNotMet(_depositId);
