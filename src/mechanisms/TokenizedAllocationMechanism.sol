@@ -121,9 +121,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     /// @notice Maximum safe value for mathematical operations
     uint256 public constant MAX_SAFE_VALUE = type(uint128).max;
 
-    /// @notice Used for calculations.
-    uint256 internal constant MAX_BPS = 10_000;
-
     /// @notice Storage slot for allocation mechanism data (EIP-1967 pattern)
     bytes32 private constant ALLOCATION_STORAGE_SLOT = bytes32(uint256(keccak256("tokenized.allocation.storage")) - 1);
 
@@ -996,33 +993,12 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     /**
      * @notice Redeems exactly `shares` from `shareOwner` and
      * sends `assets` of underlying tokens to `receiver`.
-     * @dev This will default to allowing any loss passed to be realized.
      * @param shares The amount of shares burnt.
      * @param receiver The address to receive `assets`.
      * @param shareOwner The address whose shares are burnt.
-     * @return assets The actual amount of underlying withdrawn.
-     */
-    function redeem(uint256 shares, address receiver, address shareOwner) external returns (uint256) {
-        // We default to not limiting a potential loss.
-        return redeem(shares, receiver, shareOwner, MAX_BPS);
-    }
-
-    /**
-     * @notice Redeems exactly `shares` from `shareOwner` and
-     * sends `assets` of underlying tokens to `receiver`.
-     * @dev This includes an added parameter to allow for losses.
-     * @param shares The amount of shares burnt.
-     * @param receiver The address to receive `assets`.
-     * @param shareOwner The address whose shares are burnt.
-     * @param maxLoss The amount of acceptable loss in Basis points.
      * @return . The actual amount of underlying withdrawn.
      */
-    function redeem(
-        uint256 shares,
-        address receiver,
-        address shareOwner,
-        uint256 maxLoss
-    ) public nonReentrant returns (uint256) {
+    function redeem(uint256 shares, address receiver, address shareOwner) external nonReentrant returns (uint256) {
         // Get the storage slot for all following calls.
         AllocationStorage storage S = _getStorage();
         require(shares <= _maxRedeem(S, shareOwner), "Allocation: redeem more than max");
@@ -1031,8 +1007,8 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         // Check for rounding error or 0 value.
         require((assets = _convertToAssets(S, shares, Math.Rounding.Floor)) != 0, "ZERO_ASSETS");
 
-        // We need to return the actual amount withdrawn in case of a loss.
-        return _withdraw(S, receiver, shareOwner, assets, shares, maxLoss);
+        // We need to return the actual amount withdrawn.
+        return _withdraw(S, receiver, shareOwner, assets, shares);
     }
 
     /**
@@ -1119,15 +1095,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
      * @return _maxRedeem Max amount of shares that can be redeemed.
      */
     function maxRedeem(address shareOwner) external view returns (uint256) {
-        return _maxRedeem(_getStorage(), shareOwner);
-    }
-
-    /**
-     * @notice Variable `maxLoss` is ignored.
-     * @dev Accepts a `maxLoss` variable in order to match the multi
-     * strategy vaults ABI.
-     */
-    function maxRedeem(address shareOwner, uint256 /*maxLoss*/) external view returns (uint256) {
         return _maxRedeem(_getStorage(), shareOwner);
     }
 
@@ -1275,11 +1242,9 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         address receiver,
         address shareOwner,
         uint256 assets,
-        uint256 shares,
-        uint256 maxLoss
+        uint256 shares
     ) internal returns (uint256) {
         require(receiver != address(0), "ZERO ADDRESS");
-        require(maxLoss <= MAX_BPS, "exceeds MAX_BPS");
 
         // Spend allowance if applicable.
         if (msg.sender != shareOwner) {
