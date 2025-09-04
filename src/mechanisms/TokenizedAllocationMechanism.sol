@@ -1111,8 +1111,8 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         return _getStorage().emergencyAdmin;
     }
 
-    function decimals() external view returns (uint8) {
-        return _getStorage().decimals;
+    function decimals() external pure returns (uint8) {
+        return 18;
     }
 
     function balanceOf(address account) external view returns (uint256) {
