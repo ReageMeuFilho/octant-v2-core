@@ -4,6 +4,7 @@ pragma solidity ^0.8.23;
 import { Test } from "forge-std/Test.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { RegenStakerWithoutDelegateSurrogateVotes } from "src/regen/RegenStakerWithoutDelegateSurrogateVotes.sol";
+import { RegenStakerBase } from "src/regen/RegenStakerBase.sol";
 import { RegenEarningPowerCalculator } from "src/regen/RegenEarningPowerCalculator.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { IWhitelist } from "src/utils/IWhitelist.sol";
@@ -142,7 +143,7 @@ contract RegenStakerWithoutDelegateSurrogateVotesSameTokenProtectionTest is Test
         // Should revert - would need to eat into user deposits
         vm.expectRevert(
             abi.encodeWithSelector(
-                RegenStakerWithoutDelegateSurrogateVotes.InsufficientRewardBalance.selector,
+                RegenStakerBase.InsufficientRewardBalance.selector,
                 STAKE_AMOUNT + 100e18, // currentBalance
                 STAKE_AMOUNT + REWARD_AMOUNT // required
             )
@@ -178,23 +179,34 @@ contract RegenStakerWithoutDelegateSurrogateVotesSameTokenProtectionTest is Test
         uint256 newTotalStaked = staker.totalStaked();
         assertGt(newTotalStaked, STAKE_AMOUNT);
 
-        // Try to notify MORE than available balance - should fail
-        // Balance is ~1500 (1000 original + 250 compounded + 250 unclaimed)
-        // totalStaked is ~1250, so trying to notify 300 would need 1550
+        // Try to notify MORE than available balance - should fail with new simple accounting
+        // New accounting: required = totalStaked + totalRewards - totalClaimedRewards + newAmount
         vm.startPrank(notifier);
         uint256 actualBalance = token.balanceOf(address(staker));
+
+        // Get current state for simple accounting
+        uint256 currentTotalRewards = staker.totalRewards();
+        uint256 currentTotalClaimed = staker.totalClaimedRewards();
+        uint256 newAmount = 300e18;
+
         vm.expectRevert(
             abi.encodeWithSelector(
-                RegenStakerWithoutDelegateSurrogateVotes.InsufficientRewardBalance.selector,
+                RegenStakerBase.InsufficientRewardBalance.selector,
                 actualBalance, // currentBalance
-                newTotalStaked + 300e18 // required
+                newTotalStaked + currentTotalRewards - currentTotalClaimed + newAmount
             )
         );
-        staker.notifyRewardAmount(300e18); // Would need balance >= 1250 + 300 = 1550
+        staker.notifyRewardAmount(newAmount);
 
-        // Add enough tokens and notify a valid amount
-        token.transfer(address(staker), 300e18);
-        staker.notifyRewardAmount(300e18); // Now balance is ~1800, totalStaked ~1250, so this works
+        // Add enough tokens to satisfy the simple accounting requirements
+        // Need: totalStaked + totalRewards - totalClaimedRewards + newAmount - currentBalance
+        uint256 additionalNeeded = newTotalStaked +
+            currentTotalRewards -
+            currentTotalClaimed +
+            newAmount -
+            actualBalance;
+        token.transfer(address(staker), additionalNeeded);
+        staker.notifyRewardAmount(300e18);
         vm.stopPrank();
     }
 
@@ -234,7 +246,7 @@ contract RegenStakerWithoutDelegateSurrogateVotesSameTokenProtectionTest is Test
         // The typo notification should fail, protecting user deposits
         vm.expectRevert(
             abi.encodeWithSelector(
-                RegenStakerWithoutDelegateSurrogateVotes.InsufficientRewardBalance.selector,
+                RegenStakerBase.InsufficientRewardBalance.selector,
                 20_000e18 + 1_000e18, // currentBalance (stakes + transferred rewards)
                 20_000e18 + 10_000e18 // required (stakes + typo amount)
             )
@@ -273,7 +285,7 @@ contract RegenStakerWithoutDelegateSurrogateVotesSameTokenProtectionTest is Test
             // Should revert - insufficient balance
             vm.expectRevert(
                 abi.encodeWithSelector(
-                    RegenStakerWithoutDelegateSurrogateVotes.InsufficientRewardBalance.selector,
+                    RegenStakerBase.InsufficientRewardBalance.selector,
                     stakeAmt + actualTransfer, // currentBalance
                     stakeAmt + rewardAmt // required
                 )
