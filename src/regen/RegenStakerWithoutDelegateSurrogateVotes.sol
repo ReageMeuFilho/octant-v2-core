@@ -135,11 +135,6 @@ contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
     /// @notice Override to support withdrawals when this contract acts as its own surrogate
     /// @dev Since this contract uses address(this) as surrogate, use safeTransfer for contract-to-user paths.
     function _stakeTokenSafeTransferFrom(address _from, address _to, uint256 _value) internal override {
-        // Skip self-transfers (optimization)
-        if (_from == address(this) && _to == address(this)) {
-            return;
-        }
-
         // Use safeTransfer for withdrawals (contract -> user)
         if (_from == address(this)) {
             SafeERC20.safeTransfer(STAKE_TOKEN, _to, _value);
