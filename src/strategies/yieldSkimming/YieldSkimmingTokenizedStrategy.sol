@@ -169,15 +169,16 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
             YS.totalUserDebtInAssetValue = YS.totalUserDebtInAssetValue > valueToReturn
                 ? YS.totalUserDebtInAssetValue - valueToReturn
                 : 0;
-            // if vault is empty, reset all debts to 0
-            if (_totalSupply(S) == 0) {
-                YS.totalUserDebtInAssetValue = 0;
-                YS.dragonRouterDebtInAssetValue = 0;
-            }
         } else {
             YS.dragonRouterDebtInAssetValue = YS.dragonRouterDebtInAssetValue > valueToReturn
                 ? YS.dragonRouterDebtInAssetValue - valueToReturn
                 : 0;
+        }
+        
+        // if vault is empty, reset all debts to 0
+        if (_totalSupply(S) == 0) {
+            YS.totalUserDebtInAssetValue = 0;
+            YS.dragonRouterDebtInAssetValue = 0;
         }
 
         return assets;
@@ -217,16 +218,16 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
             YS.totalUserDebtInAssetValue = YS.totalUserDebtInAssetValue > valueToReturn
                 ? YS.totalUserDebtInAssetValue - valueToReturn
                 : 0;
-
-            // if vault is empty, reset all debts to 0
-            if (_totalSupply(S) == 0) {
-                YS.totalUserDebtInAssetValue = 0;
-                YS.dragonRouterDebtInAssetValue = 0;
-            }
         } else {
             YS.dragonRouterDebtInAssetValue = YS.dragonRouterDebtInAssetValue > valueToReturn
                 ? YS.dragonRouterDebtInAssetValue - valueToReturn
                 : 0;
+        }
+
+        // if vault is empty, reset all debts to 0
+        if (_totalSupply(S) == 0) {
+            YS.totalUserDebtInAssetValue = 0;
+            YS.dragonRouterDebtInAssetValue = 0;
         }
 
         return shares;
