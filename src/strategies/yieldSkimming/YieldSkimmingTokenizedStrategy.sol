@@ -162,7 +162,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         // Validate inputs and check limits (replaces super.redeem validation)
         require(shares <= _maxRedeem(S, owner), "ERC4626: redeem more than max");
         require((assets = _convertToAssets(S, shares, Math.Rounding.Floor)) != 0, "ZERO_ASSETS");
-        assets = _performWithdrawal(S, receiver, owner, assets, shares, maxLoss);
+        assets = _withdraw(S, receiver, owner, assets, shares, maxLoss);
 
         // Update value debt after successful redemption (only for users)
         if (owner != S.dragonRouter) {
@@ -210,7 +210,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
 
         // Calculate actual value returned for debt tracking (before withdrawal)
         uint256 valueToReturn = shares; // 1 share = 1 ETH value
-        _performWithdrawal(S, receiver, owner, assets, shares, maxLoss);
+        _withdraw(S, receiver, owner, assets, shares, maxLoss);
 
         // Update value debt after successful withdrawal (only for users)
         if (owner != S.dragonRouter) {
@@ -560,78 +560,6 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         } else {
             return exchangeRate / 10 ** (exchangeRateDecimals - 27);
         }
-    }
-
-    /**
-     * @dev Internal function that replicates TokenizedStrategy._withdraw logic without nonReentrant conflict
-     * @param S Strategy storage
-     * @param receiver Address to receive the assets
-     * @param owner Address whose shares are being burned
-     * @param assets Amount of assets to withdraw
-     * @param shares Amount of shares to burn
-     * @param maxLoss Maximum acceptable loss in basis points (ignored for yield skimming)
-     * @return actualAssets The actual amount of assets withdrawn
-     */
-    function _performWithdrawal(
-        StrategyData storage S,
-        address receiver,
-        address owner,
-        uint256 assets,
-        uint256 shares,
-        uint256 maxLoss
-    ) internal returns (uint256 actualAssets) {
-        require(receiver != address(0), "ZERO ADDRESS");
-        require(maxLoss <= MAX_BPS, "exceeds MAX_BPS");
-
-        // Spend allowance if applicable.
-        if (msg.sender != owner) {
-            _spendAllowance(S, owner, msg.sender, shares);
-        }
-
-        // Cache `asset` since it is used multiple times..
-        ERC20 _asset = S.asset;
-        uint256 idle = _asset.balanceOf(address(this));
-
-        uint256 loss = 0;
-
-        // Check if we need to withdraw funds from yield source.
-        if (idle < assets) {
-            // Tell Strategy to free what we need from yield source.
-            unchecked {
-                IBaseStrategy(address(this)).freeFunds(assets - idle);
-            }
-
-            // Update idle balance after freeing funds
-            idle = _asset.balanceOf(address(this));
-
-            // If we still don't have enough, we have a loss (yield source lost value)
-            if (idle < assets) {
-                unchecked {
-                    loss = assets - idle;
-                }
-
-                // If a non-default max loss parameter was set, check it
-                if (maxLoss < MAX_BPS) {
-                    require(loss <= (assets * maxLoss) / MAX_BPS, "too much loss");
-                }
-
-                // Lower the amount to be withdrawn to what's actually available
-                assets = idle;
-            }
-        }
-
-        // Update totalAssets based on both withdrawn assets and any loss
-        S.totalAssets -= (assets + loss);
-
-        _burn(S, owner, shares);
-
-        // Transfer the amount of underlying to the receiver.
-        _asset.safeTransfer(receiver, assets);
-
-        emit Withdraw(msg.sender, receiver, owner, assets, shares);
-
-        // Return the actual amount of assets withdrawn.
-        return assets;
     }
 
     /**
