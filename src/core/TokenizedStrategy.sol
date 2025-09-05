@@ -712,7 +712,7 @@ abstract contract TokenizedStrategy {
      * @param receiver The address receiving the shares.
      * @return . The max that `receiver` can deposit in `asset`.
      */
-    function maxDeposit(address receiver) external view returns (uint256) {
+    function maxDeposit(address receiver) public view virtual returns (uint256) {
         return _maxDeposit(_strategyStorage(), receiver);
     }
 
@@ -723,7 +723,7 @@ abstract contract TokenizedStrategy {
      * @param receiver The address receiving the shares.
      * @return _maxMint The max that `receiver` can mint in shares.
      */
-    function maxMint(address receiver) external view returns (uint256) {
+    function maxMint(address receiver) public view virtual returns (uint256) {
         return _maxMint(_strategyStorage(), receiver);
     }
 
@@ -735,7 +735,7 @@ abstract contract TokenizedStrategy {
      * @param owner The owner of the shares.
      * @return _maxWithdraw Max amount of `asset` that can be withdrawn.
      */
-    function maxWithdraw(address owner) external view returns (uint256) {
+    function maxWithdraw(address owner) public view virtual returns (uint256) {
         return _maxWithdraw(_strategyStorage(), owner);
     }
 
@@ -756,7 +756,7 @@ abstract contract TokenizedStrategy {
      * @param owner The owner of the shares.
      * @return _maxRedeem Max amount of shares that can be redeemed.
      */
-    function maxRedeem(address owner) external view returns (uint256) {
+    function maxRedeem(address owner) public view virtual returns (uint256) {
         return _maxRedeem(_strategyStorage(), owner);
     }
 

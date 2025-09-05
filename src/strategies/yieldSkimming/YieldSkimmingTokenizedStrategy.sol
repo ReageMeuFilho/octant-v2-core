@@ -510,13 +510,17 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         Math.Rounding rounding
     ) internal view virtual override returns (uint256) {
         if (_isVaultInsolvent()) {
-            // Vault insolvent - reverse the proportional calculation
-            uint256 totalShares = _totalSupply(S);
-            return assets.mulDiv(totalShares, S.totalAssets, rounding);
+            // Vault insolvent - use parent TokenizedStrategy logic
+            return super._convertToShares(S, assets, rounding);
         } else {
             // Vault solvent - normal rate-based conversion
             uint256 currentRate = _currentRateRay();
-            return assets.mulDiv(currentRate, WadRayMath.RAY, rounding);
+            if (currentRate > 0) {
+                return assets.mulDiv(currentRate, WadRayMath.RAY, rounding);
+            } else {
+                // Rate is 0 - asset has no value, use parent logic as fallback
+                return super._convertToShares(S, assets, rounding);
+            }
         }
     }
 
@@ -533,13 +537,17 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         Math.Rounding rounding
     ) internal view virtual override returns (uint256) {
         if (_isVaultInsolvent()) {
-            // Vault insolvent - proportional distribution
-            uint256 totalShares = _totalSupply(S);
-            return shares.mulDiv(S.totalAssets, totalShares, rounding);
+            // Vault insolvent - use parent TokenizedStrategy logic
+            return super._convertToAssets(S, shares, rounding);
         } else {
             // Vault solvent - normal rate-based conversion
             uint256 currentRate = _currentRateRay();
-            return shares.mulDiv(WadRayMath.RAY, currentRate, rounding);
+            if (currentRate > 0) {
+                return shares.mulDiv(WadRayMath.RAY, currentRate, rounding);
+            } else {
+                // Rate is 0 - asset has no value, use parent logic as fallback
+                return super._convertToAssets(S, shares, rounding);
+            }
         }
     }
 
