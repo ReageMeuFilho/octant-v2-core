@@ -174,7 +174,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
                 ? YS.dragonRouterDebtInAssetValue - valueToReturn
                 : 0;
         }
-        
+
         // if vault is empty, reset all debts to 0
         if (_totalSupply(S) == 0) {
             YS.totalUserDebtInAssetValue = 0;
@@ -364,7 +364,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         }
 
         uint256 currentRate = _currentRateRay();
-        uint256 totalAssets = S.totalAssets;
+        uint256 totalAssets = totalAssetsBalance;
         uint256 currentValue = totalAssets.mulDiv(currentRate, WadRayMath.RAY);
         // Compare current value to user debt only (dragon shares are pure profit buffer)
 
@@ -639,10 +639,10 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         }
 
         // Now call the parent implementation to actually change the router
-        S.dragonRouter = S.pendingDragonRouter;
+        S.dragonRouter = newDragonRouter;
         S.pendingDragonRouter = address(0);
         S.dragonRouterChangeTimestamp = 0;
-        emit UpdateDragonRouter(S.dragonRouter);
+        emit UpdateDragonRouter(newDragonRouter);
     }
 
     function _strategyYieldSkimmingStorage() internal pure returns (YieldSkimmingStorage storage S) {
