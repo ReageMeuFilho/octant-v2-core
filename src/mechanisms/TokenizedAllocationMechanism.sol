@@ -615,6 +615,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         address expectedRecipient
     ) private {
         AllocationStorage storage s = _getStorage();
+        uint256 currentTime = block.timestamp;
 
         // Validate proposal
         if (!IBaseAllocationStrategy(address(this)).validateProposalHook(pid)) revert InvalidProposal(pid);
@@ -627,8 +628,8 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         if (p.recipient != expectedRecipient) revert RecipientMismatch(pid, expectedRecipient, p.recipient);
 
         // Check voting window
-        if (block.timestamp < s.votingStartTime || block.timestamp > s.votingEndTime)
-            revert VotingClosed(block.timestamp, s.votingStartTime, s.votingEndTime);
+        if (currentTime < s.votingStartTime || currentTime > s.votingEndTime)
+            revert VotingClosed(currentTime, s.votingStartTime, s.votingEndTime);
 
         uint256 oldPower = s.votingPower[voter];
         if (weight == 0) revert InvalidWeight(weight, oldPower);
@@ -655,7 +656,10 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     function finalizeVoteTally() external onlyOwner nonReentrant {
         AllocationStorage storage s = _getStorage();
 
-        if (block.timestamp <= s.votingEndTime) revert VotingNotEnded(block.timestamp, s.votingEndTime);
+        // Cache timestamp to avoid multiple reads
+        uint256 currentTime = block.timestamp;
+
+        if (currentTime <= s.votingEndTime) revert VotingNotEnded(currentTime, s.votingEndTime);
 
         if (s.tallyFinalized) revert TallyAlreadyFinalized();
 
@@ -666,9 +670,9 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         s.totalAssets = IBaseAllocationStrategy(address(this)).calculateTotalAssetsHook();
 
         // Set global redemption start time for all proposals
-        s.globalRedemptionStart = block.timestamp + s.timelockDelay;
+        s.globalRedemptionStart = currentTime + s.timelockDelay;
         s.globalRedemptionEndTime = s.globalRedemptionStart + s.gracePeriod;
-        s.tallyFinalizedTime = block.timestamp;
+        s.tallyFinalizedTime = currentTime;
 
         s.tallyFinalized = true;
         emit VoteTallyFinalized();
@@ -772,16 +776,20 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     // ---------- Proposal Management ----------
 
     /// @notice Cancel a proposal
+    /// @dev Can only be called before vote tally is finalized. After finalization, all proposals are immutable.
+    /// @dev This prevents race conditions and ensures coordinators can verify all proposals before committing.
     /// @param pid Proposal ID to cancel
     function cancelProposal(uint256 pid) external nonReentrant {
         AllocationStorage storage s = _getStorage();
+
+        // Prevent cancellation after finalization - proposals become immutable
+        if (s.tallyFinalized) revert TallyAlreadyFinalized();
 
         if (!IBaseAllocationStrategy(address(this)).validateProposalHook(pid)) revert InvalidProposal(pid);
 
         Proposal storage p = s.proposals[pid];
         if (msg.sender != p.proposer) revert NotProposer(msg.sender, p.proposer);
         if (p.canceled) revert AlreadyCanceled(pid);
-        if (s.proposalShares[pid] != 0) revert AlreadyQueued(pid);
 
         p.canceled = true;
         emit ProposalCanceled(pid, p.proposer);
@@ -1080,12 +1088,15 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     function previewRedeem(uint256 shares) external view returns (uint256) {
         AllocationStorage storage s = _getStorage();
 
+        // Cache timestamp to avoid multiple reads
+        uint256 currentTime = block.timestamp;
+
         // Return 0 if outside redemption period [t_r_start, t_r_end]
-        if (s.globalRedemptionStart == 0 || block.timestamp < s.globalRedemptionStart) {
+        if (s.globalRedemptionStart == 0 || currentTime < s.globalRedemptionStart) {
             return 0; // Before redemption period starts
         }
 
-        if (s.globalRedemptionEndTime != 0 && block.timestamp > s.globalRedemptionEndTime) {
+        if (s.globalRedemptionEndTime != 0 && currentTime > s.globalRedemptionEndTime) {
             return 0; // After redemption period ends
         }
 
@@ -1399,10 +1410,9 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         require(to != address(this), "ERC20 transfer to strategy");
 
         // Only allow transfers during redemption period [globalRedemptionStart, globalRedemptionEndTime]
-        if (
-            block.timestamp < S.globalRedemptionStart ||
-            (S.globalRedemptionEndTime != 0 && block.timestamp > S.globalRedemptionEndTime)
-        ) {
+        // Before finalization: globalRedemptionEndTime is 0, so block.timestamp > 0 blocks transfers
+        // After finalization: both timestamps are set, creating the valid redemption window
+        if (block.timestamp < S.globalRedemptionStart || block.timestamp > S.globalRedemptionEndTime) {
             revert("Transfers only allowed during redemption period");
         }
 

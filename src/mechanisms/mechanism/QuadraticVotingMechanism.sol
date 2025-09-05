@@ -178,30 +178,8 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
         return (false, 0);
     }
 
-    /// @dev Get available withdraw limit for share owner with global timelock and grace period enforcement
-    /// @return availableLimit Amount of assets that can be withdrawn (0 if timelock active or expired)
-    function _availableWithdrawLimit(address /* shareOwner */) internal view virtual override returns (uint256) {
-        // Get the global redemption start time
-        uint256 globalRedemptionStart = _getGlobalRedemptionStart();
-
-        // If no global redemption time set, no withdrawals allowed
-        if (globalRedemptionStart == 0) {
-            return 0;
-        }
-
-        // Check if still in timelock period
-        if (block.timestamp < globalRedemptionStart) {
-            return 0; // Cannot withdraw during timelock
-        }
-
-        // Check if global grace period has expired
-        uint256 gracePeriod = _getGracePeriod();
-        if (block.timestamp > globalRedemptionStart + gracePeriod) {
-            return 0; // Cannot withdraw after grace period expires
-        }
-
-        return type(uint256).max;
-    }
+    // Note: _availableWithdrawLimit is now inherited from BaseAllocationMechanism
+    // The default implementation enforces timelock and grace period boundaries
 
     /// @notice Calculate total assets including matching pool + user deposits for finalization
     /// @dev This snapshots the total asset balance in the contract during finalize
