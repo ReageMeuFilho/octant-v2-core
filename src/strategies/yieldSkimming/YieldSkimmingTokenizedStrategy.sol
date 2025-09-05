@@ -246,6 +246,62 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     }
 
     /**
+     * @notice Get the maximum amount of assets that can be deposited by a user
+     * @dev Returns 0 for dragon router as they cannot deposit
+     * @param receiver The address that would receive the shares
+     * @return The maximum deposit amount
+     */
+    function maxDeposit(address receiver) public view override returns (uint256) {
+        StrategyData storage S = _strategyStorage();
+        if (receiver == S.dragonRouter) {
+            return 0;
+        }
+        return super.maxDeposit(receiver);
+    }
+
+    /**
+     * @notice Get the maximum amount of shares that can be minted by a user
+     * @dev Returns 0 for dragon router as they cannot mint
+     * @param receiver The address that would receive the shares
+     * @return The maximum mint amount
+     */
+    function maxMint(address receiver) public view override returns (uint256) {
+        StrategyData storage S = _strategyStorage();
+        if (receiver == S.dragonRouter) {
+            return 0;
+        }
+        return super.maxMint(receiver);
+    }
+
+    /**
+     * @notice Get the maximum amount of assets that can be withdrawn by a user
+     * @dev Returns 0 for dragon router during insolvency
+     * @param owner The address whose shares would be burned
+     * @return The maximum withdraw amount
+     */
+    function maxWithdraw(address owner) public view override returns (uint256) {
+        StrategyData storage S = _strategyStorage();
+        if (owner == S.dragonRouter && _isVaultInsolvent()) {
+            return 0;
+        }
+        return super.maxWithdraw(owner);
+    }
+
+    /**
+     * @notice Get the maximum amount of shares that can be redeemed by a user
+     * @dev Returns 0 for dragon router during insolvency
+     * @param owner The address whose shares would be burned
+     * @return The maximum redeem amount
+     */
+    function maxRedeem(address owner) public view override returns (uint256) {
+        StrategyData storage S = _strategyStorage();
+        if (owner == S.dragonRouter && _isVaultInsolvent()) {
+            return 0;
+        }
+        return super.maxRedeem(owner);
+    }
+
+    /**
      * @notice Get the total ETH value debt owed to users
      * @return The total user debt in asset value
      */
