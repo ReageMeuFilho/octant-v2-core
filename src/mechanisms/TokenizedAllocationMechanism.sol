@@ -629,7 +629,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         // Cache storage timestamps to avoid multiple reads in error message
         uint256 votingStart = s.votingStartTime;
         uint256 votingEnd = s.votingEndTime;
-        
+
         // Check voting window
         if (block.timestamp < votingStart || block.timestamp > votingEnd)
             revert VotingClosed(block.timestamp, votingStart, votingEnd);
@@ -757,9 +757,9 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         else if (!s.tallyFinalized) {
             return ProposalState.Tallying;
         }
-        
+
         uint256 shares = s.proposalShares[pid];
-        
+
         // After tally finalized - check if queued or succeeded
         if (s.globalRedemptionStart != 0 && block.timestamp < s.globalRedemptionStart) {
             return shares == 0 ? ProposalState.Succeeded : ProposalState.Queued;
