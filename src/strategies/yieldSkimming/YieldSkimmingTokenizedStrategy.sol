@@ -181,6 +181,9 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
             YS.dragonRouterDebtInAssetValue = 0;
         }
 
+        // Check solvency after withdrawal and debt update to prevent dragon from making vault insolvent
+        _requireDragonSolvency(owner);
+
         return assets;
     }
 
@@ -229,6 +232,9 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
             YS.totalUserDebtInAssetValue = 0;
             YS.dragonRouterDebtInAssetValue = 0;
         }
+
+        // Check solvency after withdrawal and debt update to prevent dragon from making vault insolvent
+        _requireDragonSolvency(owner);
 
         return shares;
     }
