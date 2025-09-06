@@ -615,7 +615,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         address expectedRecipient
     ) private {
         AllocationStorage storage s = _getStorage();
-        uint256 currentTime = block.timestamp;
 
         // Validate proposal
         if (!IBaseAllocationStrategy(address(this)).validateProposalHook(pid)) revert InvalidProposal(pid);
@@ -627,9 +626,13 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         // Verify recipient matches voter's expectation to prevent reorganization attacks
         if (p.recipient != expectedRecipient) revert RecipientMismatch(pid, expectedRecipient, p.recipient);
 
+        // Cache storage timestamps to avoid multiple reads in error message
+        uint256 votingStart = s.votingStartTime;
+        uint256 votingEnd = s.votingEndTime;
+        
         // Check voting window
-        if (currentTime < s.votingStartTime || currentTime > s.votingEndTime)
-            revert VotingClosed(currentTime, s.votingStartTime, s.votingEndTime);
+        if (block.timestamp < votingStart || block.timestamp > votingEnd)
+            revert VotingClosed(block.timestamp, votingStart, votingEnd);
 
         uint256 oldPower = s.votingPower[voter];
         if (weight == 0) revert InvalidWeight(weight, oldPower);
@@ -656,10 +659,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     function finalizeVoteTally() external onlyOwner nonReentrant {
         AllocationStorage storage s = _getStorage();
 
-        // Cache timestamp to avoid multiple reads
-        uint256 currentTime = block.timestamp;
-
-        if (currentTime <= s.votingEndTime) revert VotingNotEnded(currentTime, s.votingEndTime);
+        if (block.timestamp <= s.votingEndTime) revert VotingNotEnded(block.timestamp, s.votingEndTime);
 
         if (s.tallyFinalized) revert TallyAlreadyFinalized();
 
@@ -670,9 +670,9 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         s.totalAssets = IBaseAllocationStrategy(address(this)).calculateTotalAssetsHook();
 
         // Set global redemption start time for all proposals
-        s.globalRedemptionStart = currentTime + s.timelockDelay;
+        s.globalRedemptionStart = block.timestamp + s.timelockDelay;
         s.globalRedemptionEndTime = s.globalRedemptionStart + s.gracePeriod;
-        s.tallyFinalizedTime = currentTime;
+        s.tallyFinalizedTime = block.timestamp;
 
         s.tallyFinalized = true;
         emit VoteTallyFinalized();
@@ -745,14 +745,12 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
             return ProposalState.Defeated;
         }
 
-        uint256 currentTime = block.timestamp;
-
         // Before voting starts (Pending or Delay phases)
-        if (currentTime < s.votingStartTime) {
+        if (block.timestamp < s.votingStartTime) {
             return ProposalState.Pending;
         }
         // During voting period or before tally finalized
-        else if (currentTime <= s.votingEndTime) {
+        else if (block.timestamp <= s.votingEndTime) {
             return ProposalState.Active;
         }
         // After voting ends but before tally finalized
@@ -761,12 +759,13 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         }
         
         uint256 shares = s.proposalShares[pid];
+        
         // After tally finalized - check if queued or succeeded
-        if (s.globalRedemptionStart != 0 && currentTime < s.globalRedemptionStart) {
+        if (s.globalRedemptionStart != 0 && block.timestamp < s.globalRedemptionStart) {
             return shares == 0 ? ProposalState.Succeeded : ProposalState.Queued;
         }
         // During redemption period
-        else if (s.globalRedemptionEndTime != 0 && currentTime <= s.globalRedemptionEndTime) {
+        else if (s.globalRedemptionEndTime != 0 && block.timestamp <= s.globalRedemptionEndTime) {
             return shares == 0 ? ProposalState.Succeeded : ProposalState.Redeemable;
         }
         // After redemption period (grace period expired)
@@ -962,7 +961,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
 
         // Ensure grace period has expired for everyone
         require(s.globalRedemptionStart != 0, "Redemption period not started");
-        require(block.timestamp > s.globalRedemptionStart + s.gracePeriod, "Grace period not expired");
+        require(block.timestamp > s.globalRedemptionEndTime, "Grace period not expired");
         require(receiver != address(0), "Invalid receiver");
 
         if (token == address(0)) {
@@ -1091,15 +1090,12 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     function previewRedeem(uint256 shares) external view returns (uint256) {
         AllocationStorage storage s = _getStorage();
 
-        // Cache timestamp to avoid multiple reads
-        uint256 currentTime = block.timestamp;
-
         // Return 0 if outside redemption period [t_r_start, t_r_end]
-        if (s.globalRedemptionStart == 0 || currentTime < s.globalRedemptionStart) {
+        if (s.globalRedemptionStart == 0 || block.timestamp < s.globalRedemptionStart) {
             return 0; // Before redemption period starts
         }
 
-        if (s.globalRedemptionEndTime != 0 && currentTime > s.globalRedemptionEndTime) {
+        if (s.globalRedemptionEndTime != 0 && block.timestamp > s.globalRedemptionEndTime) {
             return 0; // After redemption period ends
         }
 
@@ -1412,12 +1408,10 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         require(to != address(0), "ERC20: transfer to the zero address");
         require(to != address(this), "ERC20 transfer to strategy");
 
-        uint256 currentTime = block.timestamp;
-        
         // Only allow transfers during redemption period [globalRedemptionStart, globalRedemptionEndTime]
-        // Before finalization: globalRedemptionEndTime is 0, so currentTime > 0 blocks transfers
+        // Before finalization: globalRedemptionEndTime is 0, so block.timestamp > 0 blocks transfers
         // After finalization: both timestamps are set, creating the valid redemption window
-        if (currentTime < S.globalRedemptionStart || currentTime > S.globalRedemptionEndTime) {
+        if (block.timestamp < S.globalRedemptionStart || block.timestamp > S.globalRedemptionEndTime) {
             revert("Transfers only allowed during redemption period");
         }
 
