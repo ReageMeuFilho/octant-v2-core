@@ -676,7 +676,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
 
         s.tallyFinalized = true;
         emit VoteTallyFinalized();
-        emit GlobalRedemptionPeriodSet(s.globalRedemptionStart, s.globalRedemptionStart + s.gracePeriod);
+        emit GlobalRedemptionPeriodSet(s.globalRedemptionStart, s.globalRedemptionEndTime);
     }
 
     // ---------- Queue Proposal ----------
@@ -759,13 +759,15 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         else if (!s.tallyFinalized) {
             return ProposalState.Tallying;
         }
+        
+        uint256 shares = s.proposalShares[pid];
         // After tally finalized - check if queued or succeeded
-        else if (s.globalRedemptionStart != 0 && currentTime < s.globalRedemptionStart) {
-            return s.proposalShares[pid] == 0 ? ProposalState.Succeeded : ProposalState.Queued;
+        if (s.globalRedemptionStart != 0 && currentTime < s.globalRedemptionStart) {
+            return shares == 0 ? ProposalState.Succeeded : ProposalState.Queued;
         }
         // During redemption period
         else if (s.globalRedemptionEndTime != 0 && currentTime <= s.globalRedemptionEndTime) {
-            return s.proposalShares[pid] == 0 ? ProposalState.Succeeded : ProposalState.Redeemable;
+            return shares == 0 ? ProposalState.Succeeded : ProposalState.Redeemable;
         }
         // After redemption period (grace period expired)
         else {
@@ -895,12 +897,13 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     /// @dev Must be called by the pending owner to complete the transfer
     function acceptOwnership() external {
         AllocationStorage storage s = _getStorage();
-        if (msg.sender != s.pendingOwner) revert Unauthorized();
+        address pending = s.pendingOwner;
+        if (msg.sender != pending) revert Unauthorized();
 
         address oldOwner = s.owner;
-        s.owner = s.pendingOwner;
+        s.owner = pending;
         s.pendingOwner = address(0);
-        emit OwnershipTransferred(oldOwner, s.owner);
+        emit OwnershipTransferred(oldOwner, pending);
     }
 
     /// @notice Cancel pending ownership transfer
@@ -1409,10 +1412,12 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         require(to != address(0), "ERC20: transfer to the zero address");
         require(to != address(this), "ERC20 transfer to strategy");
 
+        uint256 currentTime = block.timestamp;
+        
         // Only allow transfers during redemption period [globalRedemptionStart, globalRedemptionEndTime]
-        // Before finalization: globalRedemptionEndTime is 0, so block.timestamp > 0 blocks transfers
+        // Before finalization: globalRedemptionEndTime is 0, so currentTime > 0 blocks transfers
         // After finalization: both timestamps are set, creating the valid redemption window
-        if (block.timestamp < S.globalRedemptionStart || block.timestamp > S.globalRedemptionEndTime) {
+        if (currentTime < S.globalRedemptionStart || currentTime > S.globalRedemptionEndTime) {
             revert("Transfers only allowed during redemption period");
         }
 
