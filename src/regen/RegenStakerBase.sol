@@ -917,25 +917,26 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @dev nonReentrant as a belts-and-braces guard against exotic ERC20 callback reentry
     /// @param _amount The reward amount
     function notifyRewardAmount(uint256 _amount) external virtual override nonReentrant {
-        _validateSameTokenBalance(_amount);
+        _validateRewardBalance(_amount);
         _notifyRewardAmountWithCustomDuration(_amount);
     }
 
-    /// @notice Validates sufficient balance for same-token scenarios in this variant
-    /// @dev Overrides base to include totalStaked since stakes are held in main contract
+    /// @notice Validates sufficient reward token balance for all token scenarios
+    /// @dev Virtual function allowing variants to implement appropriate balance checks
     /// @param _amount The reward amount being added
-    /// @return required The required balance including stakes and rewards
-    function _validateSameTokenBalance(uint256 _amount) internal view virtual returns (uint256 required) {
-        if (address(REWARD_TOKEN) == address(STAKE_TOKEN)) {
-            uint256 currentBalance = REWARD_TOKEN.balanceOf(address(this));
+    /// @return required The required balance for this variant
+    function _validateRewardBalance(uint256 _amount) internal view virtual returns (uint256 required) {
+        uint256 currentBalance = REWARD_TOKEN.balanceOf(address(this));
 
-            // Accounting: totalRewards - totalClaimedRewards + newAmount
-            required = totalRewards - totalClaimedRewards + _amount;
+        // For variants with surrogates: stakes are NOT in main contract
+        // Only track rewards obligations: totalRewards - totalClaimedRewards + newAmount
+        // This works for both same-token and different-token scenarios
+        required = totalRewards - totalClaimedRewards + _amount;
 
-            if (currentBalance < required) {
-                revert InsufficientRewardBalance(currentBalance, required);
-            }
+        if (currentBalance < required) {
+            revert InsufficientRewardBalance(currentBalance, required);
         }
+
         return required;
     }
 
