@@ -210,17 +210,26 @@ contract RegenStakerWithoutDelegateSurrogateVotesSameTokenProtectionTest is Test
         vm.stopPrank();
     }
 
-    /// @notice Test different tokens scenario has no protection check
-    function test_notifyReward_differentTokens_noCheck() public {
-        // User stakes tokens
+    /// @notice Test different tokens scenario now has appropriate balance validation
+    function test_notifyReward_differentTokens_hasValidation() public {
+        // User stakes tokens (these go to stake token, separate from reward token)
         vm.startPrank(user1);
         token.approve(address(differentTokenStaker), STAKE_AMOUNT);
         differentTokenStaker.stake(STAKE_AMOUNT, user1);
         vm.stopPrank();
 
-        // For different tokens, we still need to transfer rewards first (base contract requirement)
-        // But the same-token protection check is skipped
         vm.startPrank(notifier);
+        // Should fail without transferring reward tokens first
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RegenStakerBase.InsufficientRewardBalance.selector,
+                0, // currentBalance = 0 (no reward tokens transferred)
+                REWARD_AMOUNT // required = totalRewards - totalClaimedRewards + amount = 0 - 0 + 500e18
+            )
+        );
+        differentTokenStaker.notifyRewardAmount(REWARD_AMOUNT);
+
+        // Transfer reward tokens and should succeed
         differentRewardToken.transfer(address(differentTokenStaker), REWARD_AMOUNT);
         differentTokenStaker.notifyRewardAmount(REWARD_AMOUNT);
         vm.stopPrank();
