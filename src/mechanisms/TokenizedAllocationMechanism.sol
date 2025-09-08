@@ -121,9 +121,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     /// @notice Maximum safe value for mathematical operations
     uint256 public constant MAX_SAFE_VALUE = type(uint128).max;
 
-    /// @notice Used for calculations.
-    uint256 internal constant MAX_BPS = 10_000;
-
     /// @notice Storage slot for allocation mechanism data (EIP-1967 pattern)
     bytes32 private constant ALLOCATION_STORAGE_SLOT = bytes32(uint256(keccak256("tokenized.allocation.storage")) - 1);
 
@@ -235,12 +232,16 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     event ProposalCanceled(uint256 indexed pid, address indexed proposer);
     /// @notice Emitted when ownership transfer is initiated
     event OwnershipTransferInitiated(address indexed currentOwner, address indexed pendingOwner);
+    /// @notice Emitted when ownership transfer is canceled
+    event OwnershipTransferCanceled(address indexed currentOwner, address indexed canceledPendingOwner);
     /// @notice Emitted when ownership is transferred
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
     /// @notice Emitted when keeper is updated
     event KeeperUpdated(address indexed previousKeeper, address indexed newKeeper);
     /// @notice Emitted when management is updated
     event ManagementUpdated(address indexed previousManagement, address indexed newManagement);
+    /// @notice Emitted when emergency admin is updated
+    event EmergencyAdminUpdated(address indexed previousEmergencyAdmin, address indexed newEmergencyAdmin);
     /// @notice Emitted when contract is paused/unpaused
     event PausedStatusChanged(bool paused);
     /// @notice Emitted when global redemption period is set
@@ -280,12 +281,16 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     }
 
     /// @notice Returns the domain separator, updating it if chain ID changed (fork protection)
-    function DOMAIN_SEPARATOR() public view returns (bytes32) {
+    function DOMAIN_SEPARATOR() public returns (bytes32) {
         AllocationStorage storage s = _getStorage();
         if (block.chainid == s.initialChainId) {
             return s.domainSeparator;
         } else {
-            return _computeDomainSeparator(s);
+            s.initialChainId = block.chainid;
+
+            bytes32 domainSeparator = _computeDomainSeparator(s);
+            s.domainSeparator = domainSeparator;
+            return domainSeparator;
         }
     }
 
@@ -471,7 +476,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) private view {
+    ) private {
         // Check deadline
         if (block.timestamp > deadline) revert ExpiredSignature(deadline, block.timestamp);
 
@@ -514,7 +519,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     }
 
     /// @dev Recovers signer address from signature
-    function _recover(bytes32 structHash, uint8 v, bytes32 r, bytes32 s) private view returns (address) {
+    function _recover(bytes32 structHash, uint8 v, bytes32 r, bytes32 s) private returns (address) {
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR(), structHash));
         return ecrecover(digest, v, r, s);
     }
@@ -531,7 +536,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     ) external whenNotPaused nonReentrant returns (uint256 pid) {
         address proposer = msg.sender;
 
-        // Call hook for validation
+        // Call hook for validation - Potential DoS risk - malicious keeper/management contracts could revert these calls
         if (!IBaseAllocationStrategy(address(this)).beforeProposeHook(proposer)) revert ProposeNotAllowed(proposer);
 
         if (recipient == address(0) || recipient == address(this)) revert InvalidRecipient(recipient);
@@ -626,9 +631,13 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         // Verify recipient matches voter's expectation to prevent reorganization attacks
         if (p.recipient != expectedRecipient) revert RecipientMismatch(pid, expectedRecipient, p.recipient);
 
+        // Cache storage timestamps to avoid multiple reads in error message
+        uint256 votingStart = s.votingStartTime;
+        uint256 votingEnd = s.votingEndTime;
+
         // Check voting window
-        if (block.timestamp < s.votingStartTime || block.timestamp > s.votingEndTime)
-            revert VotingClosed(block.timestamp, s.votingStartTime, s.votingEndTime);
+        if (block.timestamp < votingStart || block.timestamp > votingEnd)
+            revert VotingClosed(block.timestamp, votingStart, votingEnd);
 
         uint256 oldPower = s.votingPower[voter];
         if (weight == 0) revert InvalidWeight(weight, oldPower);
@@ -672,7 +681,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
 
         s.tallyFinalized = true;
         emit VoteTallyFinalized();
-        emit GlobalRedemptionPeriodSet(s.globalRedemptionStart, s.globalRedemptionStart + s.gracePeriod);
+        emit GlobalRedemptionPeriodSet(s.globalRedemptionStart, s.globalRedemptionEndTime);
     }
 
     // ---------- Queue Proposal ----------
@@ -741,27 +750,28 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
             return ProposalState.Defeated;
         }
 
-        uint256 currentTime = block.timestamp;
-
         // Before voting starts (Pending or Delay phases)
-        if (currentTime < s.votingStartTime) {
+        if (block.timestamp < s.votingStartTime) {
             return ProposalState.Pending;
         }
         // During voting period or before tally finalized
-        else if (currentTime <= s.votingEndTime) {
+        else if (block.timestamp <= s.votingEndTime) {
             return ProposalState.Active;
         }
         // After voting ends but before tally finalized
         else if (!s.tallyFinalized) {
             return ProposalState.Tallying;
         }
+
+        uint256 shares = s.proposalShares[pid];
+
         // After tally finalized - check if queued or succeeded
-        else if (s.globalRedemptionStart != 0 && currentTime < s.globalRedemptionStart) {
-            return s.proposalShares[pid] == 0 ? ProposalState.Succeeded : ProposalState.Queued;
+        if (s.globalRedemptionStart != 0 && block.timestamp < s.globalRedemptionStart) {
+            return shares == 0 ? ProposalState.Succeeded : ProposalState.Queued;
         }
         // During redemption period
-        else if (s.globalRedemptionEndTime != 0 && currentTime <= s.globalRedemptionEndTime) {
-            return s.proposalShares[pid] == 0 ? ProposalState.Succeeded : ProposalState.Redeemable;
+        else if (s.globalRedemptionEndTime != 0 && block.timestamp <= s.globalRedemptionEndTime) {
+            return shares == 0 ? ProposalState.Succeeded : ProposalState.Redeemable;
         }
         // After redemption period (grace period expired)
         else {
@@ -772,16 +782,20 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     // ---------- Proposal Management ----------
 
     /// @notice Cancel a proposal
+    /// @dev Can only be called before vote tally is finalized. After finalization, all proposals are immutable.
+    /// @dev This prevents race conditions and ensures coordinators can verify all proposals before committing.
     /// @param pid Proposal ID to cancel
     function cancelProposal(uint256 pid) external nonReentrant {
         AllocationStorage storage s = _getStorage();
+
+        // Prevent cancellation after finalization - proposals become immutable
+        if (s.tallyFinalized) revert TallyAlreadyFinalized();
 
         if (!IBaseAllocationStrategy(address(this)).validateProposalHook(pid)) revert InvalidProposal(pid);
 
         Proposal storage p = s.proposals[pid];
         if (msg.sender != p.proposer) revert NotProposer(msg.sender, p.proposer);
         if (p.canceled) revert AlreadyCanceled(pid);
-        if (s.proposalShares[pid] != 0) revert AlreadyQueued(pid);
 
         p.canceled = true;
         emit ProposalCanceled(pid, p.proposer);
@@ -887,12 +901,13 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     /// @dev Must be called by the pending owner to complete the transfer
     function acceptOwnership() external {
         AllocationStorage storage s = _getStorage();
-        if (msg.sender != s.pendingOwner) revert Unauthorized();
+        address pending = s.pendingOwner;
+        if (msg.sender != pending) revert Unauthorized();
 
         address oldOwner = s.owner;
-        s.owner = s.pendingOwner;
+        s.owner = pending;
         s.pendingOwner = address(0);
-        emit OwnershipTransferred(oldOwner, s.owner);
+        emit OwnershipTransferred(oldOwner, pending);
     }
 
     /// @notice Cancel pending ownership transfer
@@ -901,8 +916,9 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         AllocationStorage storage s = _getStorage();
         if (s.pendingOwner == address(0)) revert Unauthorized();
 
+        address canceledPendingOwner = s.pendingOwner;
         s.pendingOwner = address(0);
-        emit OwnershipTransferInitiated(s.owner, address(0));
+        emit OwnershipTransferCanceled(s.owner, canceledPendingOwner);
     }
 
     /// @notice Update keeper address
@@ -921,6 +937,15 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         address oldManagement = s.management;
         s.management = newManagement;
         emit ManagementUpdated(oldManagement, newManagement);
+    }
+
+    /// @notice Update emergency admin address
+    function setEmergencyAdmin(address newEmergencyAdmin) external onlyOwner {
+        if (newEmergencyAdmin == address(0)) revert Unauthorized();
+        AllocationStorage storage s = _getStorage();
+        address oldEmergencyAdmin = s.emergencyAdmin;
+        s.emergencyAdmin = newEmergencyAdmin;
+        emit EmergencyAdminUpdated(oldEmergencyAdmin, newEmergencyAdmin);
     }
 
     /// @notice Emergency pause all operations
@@ -951,7 +976,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
 
         // Ensure grace period has expired for everyone
         require(s.globalRedemptionStart != 0, "Redemption period not started");
-        require(block.timestamp > s.globalRedemptionStart + s.gracePeriod, "Grace period not expired");
+        require(block.timestamp > s.globalRedemptionEndTime, "Grace period not expired");
         require(receiver != address(0), "Invalid receiver");
 
         if (token == address(0)) {
@@ -978,33 +1003,12 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     /**
      * @notice Redeems exactly `shares` from `shareOwner` and
      * sends `assets` of underlying tokens to `receiver`.
-     * @dev This will default to allowing any loss passed to be realized.
      * @param shares The amount of shares burnt.
      * @param receiver The address to receive `assets`.
      * @param shareOwner The address whose shares are burnt.
-     * @return assets The actual amount of underlying withdrawn.
-     */
-    function redeem(uint256 shares, address receiver, address shareOwner) external returns (uint256) {
-        // We default to not limiting a potential loss.
-        return redeem(shares, receiver, shareOwner, MAX_BPS);
-    }
-
-    /**
-     * @notice Redeems exactly `shares` from `shareOwner` and
-     * sends `assets` of underlying tokens to `receiver`.
-     * @dev This includes an added parameter to allow for losses.
-     * @param shares The amount of shares burnt.
-     * @param receiver The address to receive `assets`.
-     * @param shareOwner The address whose shares are burnt.
-     * @param maxLoss The amount of acceptable loss in Basis points.
      * @return . The actual amount of underlying withdrawn.
      */
-    function redeem(
-        uint256 shares,
-        address receiver,
-        address shareOwner,
-        uint256 maxLoss
-    ) public nonReentrant returns (uint256) {
+    function redeem(uint256 shares, address receiver, address shareOwner) external nonReentrant returns (uint256) {
         // Get the storage slot for all following calls.
         AllocationStorage storage S = _getStorage();
         require(shares <= _maxRedeem(S, shareOwner), "Allocation: redeem more than max");
@@ -1013,8 +1017,8 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         // Check for rounding error or 0 value.
         require((assets = _convertToAssets(S, shares, Math.Rounding.Floor)) != 0, "ZERO_ASSETS");
 
-        // We need to return the actual amount withdrawn in case of a loss.
-        return _withdraw(S, receiver, shareOwner, assets, shares, maxLoss);
+        // We need to return the actual amount withdrawn.
+        return _withdraw(S, receiver, shareOwner, assets, shares);
     }
 
     /**
@@ -1104,15 +1108,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         return _maxRedeem(_getStorage(), shareOwner);
     }
 
-    /**
-     * @notice Variable `maxLoss` is ignored.
-     * @dev Accepts a `maxLoss` variable in order to match the multi
-     * strategy vaults ABI.
-     */
-    function maxRedeem(address shareOwner, uint256 /*maxLoss*/) external view returns (uint256) {
-        return _maxRedeem(_getStorage(), shareOwner);
-    }
-
     // Additional getters for vault functionality
     function management() external view returns (address) {
         return _getStorage().management;
@@ -1126,8 +1121,8 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         return _getStorage().emergencyAdmin;
     }
 
-    function decimals() external view returns (uint8) {
-        return _getStorage().decimals;
+    function decimals() external pure returns (uint8) {
+        return 18;
     }
 
     function balanceOf(address account) external view returns (uint256) {
@@ -1251,20 +1246,15 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
      *
      * This will handle all logic, transfers and accounting
      * in order to service the withdraw request.
-     *
-     * If we are not able to withdraw the full amount needed, it will
-     * be counted as a loss and passed on to the user.
      */
     function _withdraw(
         AllocationStorage storage S,
         address receiver,
         address shareOwner,
         uint256 assets,
-        uint256 shares,
-        uint256 maxLoss
+        uint256 shares
     ) internal returns (uint256) {
         require(receiver != address(0), "ZERO ADDRESS");
-        require(maxLoss <= MAX_BPS, "exceeds MAX_BPS");
 
         // Spend allowance if applicable.
         if (msg.sender != shareOwner) {
@@ -1399,10 +1389,9 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         require(to != address(this), "ERC20 transfer to strategy");
 
         // Only allow transfers during redemption period [globalRedemptionStart, globalRedemptionEndTime]
-        if (
-            block.timestamp < S.globalRedemptionStart ||
-            (S.globalRedemptionEndTime != 0 && block.timestamp > S.globalRedemptionEndTime)
-        ) {
+        // Before finalization: globalRedemptionEndTime is 0, so block.timestamp > 0 blocks transfers
+        // After finalization: both timestamps are set, creating the valid redemption window
+        if (block.timestamp < S.globalRedemptionStart || block.timestamp > S.globalRedemptionEndTime) {
             revert("Transfers only allowed during redemption period");
         }
 

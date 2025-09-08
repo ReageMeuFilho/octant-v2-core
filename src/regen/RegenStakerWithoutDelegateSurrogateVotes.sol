@@ -41,10 +41,6 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 /// @dev USE CASE: Choose this variant for simple ERC20 staking without governance requirements.
 contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
     // === Custom Errors ===
-    /// @notice Error thrown when reward notification would corrupt user deposits (same-token scenario)
-    /// @param currentBalance The actual token balance in the contract
-    /// @param required The minimum balance needed (totalStaked + reward amount)
-    error InsufficientRewardBalance(uint256 currentBalance, uint256 required);
 
     /// @notice Error thrown when attempting delegation operations that are not supported in this variant
     error DelegationNotSupported();
@@ -95,21 +91,28 @@ contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
 
     // === Overridden Functions ===
 
-    /// @notice Protect same-token scenarios for this variant where all tokens are held in the main contract
-    /// @dev Validates sufficient balance when STAKE_TOKEN == REWARD_TOKEN to prevent reward notifications
-    ///      from corrupting user deposits. This check is critical for this variant since stakes and rewards
-    ///      share the same contract address.
-    /// @param _amount The reward amount to notify
-    function notifyRewardAmount(uint256 _amount) external override {
+    /// @notice Validates sufficient reward token balance for all token scenarios in this variant
+    /// @dev Overrides base to include totalStaked for same-token scenarios since stakes are held in main contract
+    /// @param _amount The reward amount being added
+    /// @return required The required balance including appropriate obligations
+    function _validateRewardBalance(uint256 _amount) internal view override returns (uint256 required) {
+        uint256 currentBalance = REWARD_TOKEN.balanceOf(address(this));
+
         if (address(REWARD_TOKEN) == address(STAKE_TOKEN)) {
-            uint256 currentBalance = REWARD_TOKEN.balanceOf(address(this));
-            uint256 required = totalStaked + _amount;
-            if (currentBalance < required) {
-                revert InsufficientRewardBalance(currentBalance, required);
-            }
+            // Same-token scenario: stakes ARE in main contract, so include totalStaked
+            // Accounting: totalStaked + totalRewards - totalClaimedRewards + newAmount
+            required = totalStaked + totalRewards - totalClaimedRewards + _amount;
+        } else {
+            // Different-token scenario: stakes are separate, only track reward obligations
+            // Accounting: totalRewards - totalClaimedRewards + newAmount
+            required = totalRewards - totalClaimedRewards + _amount;
         }
 
-        _notifyRewardAmountWithCustomDuration(_amount);
+        if (currentBalance < required) {
+            revert InsufficientRewardBalance(currentBalance, required);
+        }
+
+        return required;
     }
 
     /// @inheritdoc Staker
@@ -135,11 +138,6 @@ contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
     /// @notice Override to support withdrawals when this contract acts as its own surrogate
     /// @dev Since this contract uses address(this) as surrogate, use safeTransfer for contract-to-user paths.
     function _stakeTokenSafeTransferFrom(address _from, address _to, uint256 _value) internal override {
-        // Skip self-transfers (optimization)
-        if (_from == address(this) && _to == address(this)) {
-            return;
-        }
-
         // Use safeTransfer for withdrawals (contract -> user)
         if (_from == address(this)) {
             SafeERC20.safeTransfer(STAKE_TOKEN, _to, _value);

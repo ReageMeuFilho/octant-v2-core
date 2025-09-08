@@ -166,7 +166,7 @@ contract UniswapV3Swapper {
                 );
             }
 
-            ERC20(_from).approve(router, 0);
+            ERC20(_from).forceApprove(router, 0);
         }
     }
 
