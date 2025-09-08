@@ -571,7 +571,11 @@ contract EIP712SignatureTest is Test {
         );
 
         // Verify final state
-        assertEq(_tokenized(address(mechanism)).votingPower(alice), DEPOSIT_AMOUNT - 200 * 200, "Voting power incorrect");
+        assertEq(
+            _tokenized(address(mechanism)).votingPower(alice),
+            DEPOSIT_AMOUNT - 200 * 200,
+            "Voting power incorrect"
+        );
         assertEq(_tokenized(address(mechanism)).nonces(alice), signupNonce + 2, "Nonce should increment twice");
     }
 
@@ -625,13 +629,13 @@ contract EIP712SignatureTest is Test {
 
         // Verify both votes recorded - Alice voted 100 (cost 100^2=10000), Bob voted 150 (cost 150^2=22500)
         assertEq(
-            _tokenized(address(mechanism)).votingPower(alice), 
-            DEPOSIT_AMOUNT - 100 * 100, 
+            _tokenized(address(mechanism)).votingPower(alice),
+            DEPOSIT_AMOUNT - 100 * 100,
             "Alice voting power not reduced correctly"
         );
         assertEq(
-            _tokenized(address(mechanism)).votingPower(bob), 
-            DEPOSIT_AMOUNT - 150 * 150, 
+            _tokenized(address(mechanism)).votingPower(bob),
+            DEPOSIT_AMOUNT - 150 * 150,
             "Bob voting power not reduced correctly"
         );
     }
