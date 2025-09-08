@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { CREATE3 } from "solady/utils/CREATE3.sol";
+import { Create2 } from "@openzeppelin/contracts/utils/Create2.sol";
 import { IERC20, IWhitelist, IEarningPowerCalculator } from "src/regen/RegenStaker.sol";
 
 /// @title RegenStaker Factory
@@ -102,9 +102,15 @@ contract RegenStakerFactory {
     /// @notice Predict deterministic deployment address
     /// @param salt Deployment salt
     /// @param deployer Address that will deploy
+    /// @param bytecode The deployment bytecode (including constructor args)
     /// @return Predicted contract address
-    function predictStakerAddress(bytes32 salt, address deployer) external view returns (address) {
-        return CREATE3.predictDeterministicAddress(keccak256(abi.encode(salt, deployer)));
+    function predictStakerAddress(
+        bytes32 salt,
+        address deployer,
+        bytes memory bytecode
+    ) external view returns (address) {
+        bytes32 finalSalt = keccak256(abi.encode(salt, deployer));
+        return Create2.computeAddress(finalSalt, keccak256(bytecode));
     }
 
     /// @notice SECURITY: Validate bytecode against canonical version
@@ -129,10 +135,10 @@ contract RegenStakerFactory {
     ) internal returns (address stakerAddress) {
         bytes memory constructorParams = _encodeConstructorParams(params);
 
-        stakerAddress = CREATE3.deployDeterministic(
-            bytes.concat(code, constructorParams),
-            keccak256(abi.encode(salt, msg.sender))
-        );
+        bytes memory fullBytecode = bytes.concat(code, constructorParams);
+        bytes32 finalSalt = keccak256(abi.encode(salt, msg.sender));
+
+        stakerAddress = Create2.deploy(0, finalSalt, fullBytecode);
 
         emit StakerDeploy(msg.sender, params.admin, stakerAddress, salt, variant);
     }

@@ -12,15 +12,18 @@ import { Clones } from "@openzeppelin/contracts/proxy/Clones.sol";
  * payees and shares. It uses the Clones library to deploy minimal proxies.
  */
 contract PaymentSplitterFactory {
-    // Address of the implementation contract
-    address public immutable implementation;
-
     // Struct to store payment splitter information
     struct SplitterInfo {
         address splitterAddress;
         address[] payees;
         string[] payeeNames; // Names of each payee (e.g., "GrantRoundOperator", "ESF", "OpEx")
     }
+
+    // Address of the implementation contract
+    address public immutable implementation;
+
+    // Owner allowed to sweep any accidentally sent ETH
+    address public immutable owner;
 
     // Mapping from deployer address to their deployed splitters
     mapping(address => SplitterInfo[]) public deployerToSplitters;
@@ -40,6 +43,12 @@ contract PaymentSplitterFactory {
     constructor() {
         // Deploy the implementation contract
         implementation = address(new PaymentSplitter());
+        owner = msg.sender;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "PaymentSplitterFactory: not owner");
+        _;
     }
 
     /**
@@ -59,12 +68,14 @@ contract PaymentSplitterFactory {
             "PaymentSplitterFactory: length mismatch"
         );
 
-        // Create a minimal proxy
-        address paymentSplitter = Clones.clone(implementation);
+        // Generate deterministic salt combining user input with sender and deployment count
+        bytes32 finalSalt = keccak256(abi.encode(msg.sender, deployerToSplitters[msg.sender].length));
 
-        // Initialize the proxy
+        // Create a deterministic minimal proxy
+        address paymentSplitter = Clones.cloneDeterministic(implementation, finalSalt);
+
+        // Initialize the proxy; revert with a factory-specific error if initialization fails
         bytes memory initData = abi.encodeWithSelector(PaymentSplitter.initialize.selector, payees, shares);
-
         (bool success, ) = paymentSplitter.call(initData);
         require(success, "PaymentSplitterFactory: initialization failed");
 
@@ -89,15 +100,20 @@ contract PaymentSplitterFactory {
         string[] memory payeeNames,
         uint256[] memory shares
     ) external payable returns (address) {
-        require(payees.length == payeeNames.length, "PaymentSplitterFactory: length mismatch");
+        require(
+            payees.length == payeeNames.length && payees.length == shares.length,
+            "PaymentSplitterFactory: length mismatch"
+        );
 
-        // Create a minimal proxy
-        address paymentSplitter = Clones.clone(implementation);
+        // Generate deterministic salt combining user input with sender and deployment count
+        bytes32 finalSalt = keccak256(abi.encode(msg.sender, deployerToSplitters[msg.sender].length));
 
-        // Initialize the proxy with value
+        // Create a deterministic minimal proxy with value
+        address paymentSplitter = Clones.cloneDeterministic(implementation, finalSalt, msg.value);
+
+        // Initialize the proxy; revert with a factory-specific error if initialization fails
         bytes memory initData = abi.encodeWithSelector(PaymentSplitter.initialize.selector, payees, shares);
-
-        (bool success, ) = paymentSplitter.call{ value: msg.value }(initData);
+        (bool success, ) = paymentSplitter.call(initData);
         require(success, "PaymentSplitterFactory: initialization failed");
 
         // Store the deployed splitter info
@@ -110,11 +126,32 @@ contract PaymentSplitterFactory {
     }
 
     /**
+     * @dev Sweep any ETH accidentally left on this factory to the provided recipient.
+     * This should normally be zero since ETH is forwarded to clones at creation.
+     */
+    function sweep(address payable recipient) external onlyOwner {
+        uint256 balance = address(this).balance;
+        require(balance > 0, "PaymentSplitterFactory: no ETH to sweep");
+        (bool success, ) = recipient.call{ value: balance }("");
+        require(success, "PaymentSplitterFactory: sweep failed");
+    }
+
+    /**
      * @dev Returns all payment splitters created by a specific deployer
      * @param deployer The address of the deployer
      * @return An array of SplitterInfo structs
      */
     function getSplittersByDeployer(address deployer) external view returns (SplitterInfo[] memory) {
         return deployerToSplitters[deployer];
+    }
+
+    /**
+     * @dev Predicts the address of a deterministic clone that would be created with the given salt
+     * @param deployer The address of the deployer
+     * @return The predicted address of the clone
+     */
+    function predictDeterministicAddress(address deployer) external view returns (address) {
+        bytes32 finalSalt = keccak256(abi.encode(deployer, deployerToSplitters[deployer].length));
+        return Clones.predictDeterministicAddress(implementation, finalSalt);
     }
 }

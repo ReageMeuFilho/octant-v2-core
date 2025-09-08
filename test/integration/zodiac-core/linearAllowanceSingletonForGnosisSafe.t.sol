@@ -1068,7 +1068,7 @@ contract TestLinearAllowanceIntegration is Test {
         currentTestCtx.wrongLengthTokens[1] = NATIVE_TOKEN;
 
         vm.prank(currentTestCtx.safeAddress);
-        vm.expectRevert(abi.encodeWithSelector(ILinearAllowanceSingleton.ArrayLengthsMismatch.selector, 3, 2));
+        vm.expectRevert(abi.encodeWithSelector(ILinearAllowanceSingleton.ArrayLengthsMismatch.selector, 3, 2, 0));
         allowanceModule.revokeAllowances(currentTestCtx.delegates, currentTestCtx.wrongLengthTokens);
 
         // Test zero address validation

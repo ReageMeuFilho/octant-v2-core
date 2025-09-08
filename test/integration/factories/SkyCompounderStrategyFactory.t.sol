@@ -7,6 +7,7 @@ import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { SkyCompounderStrategy } from "src/strategies/yieldDonating/SkyCompounderStrategy.sol";
 import { IStaking } from "src/strategies/interfaces/ISky.sol";
 import { SkyCompounderStrategyFactory } from "src/factories/SkyCompounderStrategyFactory.sol";
+import { BaseStrategyFactory } from "src/factories/BaseStrategyFactory.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { YieldDonatingTokenizedStrategy } from "src/strategies/yieldDonating/YieldDonatingTokenizedStrategy.sol";
@@ -76,12 +77,45 @@ contract SkyCompounderStrategyFactoryTest is Test {
     /// @notice Test creating a strategy through the factory
     function testCreateStrategy() public {
         string memory vaultSharesName = "SkyCompounder Vault Shares";
-        bytes32 strategySalt = keccak256("TEST_STRATEGY_SALT");
+
+        // Calculate expected address based on parameters
+        bytes32 parameterHash = keccak256(
+            abi.encode(
+                0x0650CAF159C5A49f711e8169D4336ECB9b950275, // USDS_REWARD_ADDRESS
+                vaultSharesName,
+                management,
+                keeper,
+                emergencyAdmin,
+                donationAddress,
+                true, // enableBurning
+                address(tokenizedStrategy)
+            )
+        );
+
+        // Build the bytecode for address prediction
+        bytes memory bytecode = abi.encodePacked(
+            type(SkyCompounderStrategy).creationCode,
+            abi.encode(
+                0x0650CAF159C5A49f711e8169D4336ECB9b950275, // USDS_REWARD_ADDRESS
+                vaultSharesName,
+                management,
+                keeper,
+                emergencyAdmin,
+                donationAddress,
+                true, // enableBurning
+                address(tokenizedStrategy)
+            )
+        );
 
         // Create a strategy and check events
         vm.startPrank(management);
-        vm.expectEmit(true, true, true, false); // Check first 3 indexed params, ignore the non-indexed timestamp
-        emit StrategyDeploy(management, donationAddress, 0x68c8c8FdBc4A50a07cb407aa430d31566E1D2F31); // We can't predict the exact address
+        vm.expectEmit(true, true, true, true); // Check all parameters including predicted address
+        emit SkyCompounderStrategyFactory.StrategyDeploy(
+            management,
+            donationAddress,
+            factory.predictStrategyAddress(parameterHash, management, bytecode),
+            vaultSharesName
+        );
 
         address strategyAddress = factory.createStrategy(
             vaultSharesName,
@@ -90,9 +124,7 @@ contract SkyCompounderStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             true, // enableBurning
-            strategySalt,
-            address(tokenizedStrategy),
-            true // allowDepositDuringLoss
+            address(tokenizedStrategy)
         );
         vm.stopPrank();
 
@@ -115,7 +147,6 @@ contract SkyCompounderStrategyFactoryTest is Test {
     function testMultipleStrategiesPerUser() public {
         // Create first strategy
         string memory firstVaultName = "First SkyCompounder Vault";
-        bytes32 firstSalt = keccak256("FIRST_TEST_STRATEGY_SALT");
 
         vm.startPrank(management);
         address firstStrategyAddress = factory.createStrategy(
@@ -125,14 +156,11 @@ contract SkyCompounderStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             true, // enableBurning
-            firstSalt,
-            address(tokenizedStrategy),
-            true // allowDepositDuringLoss
+            address(tokenizedStrategy)
         );
 
-        // Create second strategy for same user
+        // Create second strategy for same user with different parameters
         string memory secondVaultName = "Second SkyCompounder Vault";
-        bytes32 secondSalt = keccak256("SECOND_TEST_STRATEGY_SALT");
 
         address secondStrategyAddress = factory.createStrategy(
             secondVaultName,
@@ -141,9 +169,7 @@ contract SkyCompounderStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             true, // enableBurning
-            secondSalt,
-            address(tokenizedStrategy),
-            true // allowDepositDuringLoss
+            address(tokenizedStrategy)
         );
         vm.stopPrank();
 
@@ -163,7 +189,6 @@ contract SkyCompounderStrategyFactoryTest is Test {
     /// @notice Test creating strategies for different users
     function testMultipleUsers() public {
         string memory firstVaultName = "First User's Vault";
-        bytes32 firstSalt = keccak256("FIRST_USER_SALT");
 
         address firstUser = address(0x5678);
         address secondUser = address(0x9876);
@@ -177,15 +202,12 @@ contract SkyCompounderStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             true, // enableBurning
-            firstSalt,
-            address(tokenizedStrategy),
-            true // allowDepositDuringLoss
+            address(tokenizedStrategy)
         );
         vm.stopPrank();
 
         // Create strategy for second user
         string memory secondVaultName = "Second User's Vault";
-        bytes32 secondSalt = keccak256("SECOND_USER_SALT");
 
         vm.startPrank(secondUser);
         address secondStrategyAddress = factory.createStrategy(
@@ -195,9 +217,7 @@ contract SkyCompounderStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             true, // enableBurning
-            secondSalt,
-            address(tokenizedStrategy),
-            true // allowDepositDuringLoss
+            address(tokenizedStrategy)
         );
         vm.stopPrank();
 
@@ -214,10 +234,9 @@ contract SkyCompounderStrategyFactoryTest is Test {
         assertTrue(firstStrategyAddress != secondStrategyAddress, "Strategies should have different addresses");
     }
 
-    /// @notice Test creating a strategy with deterministic addressing via salt
+    /// @notice Test deterministic addressing and duplicate prevention
     function testDeterministicAddressing() public {
         string memory vaultSharesName = "Deterministic Vault";
-        bytes32 strategySalt = keccak256("DETERMINISTIC_SALT");
 
         // Create a strategy
         vm.startPrank(management);
@@ -228,52 +247,36 @@ contract SkyCompounderStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             true, // enableBurning
-            strategySalt,
-            address(tokenizedStrategy),
-            true // allowDepositDuringLoss
+            address(tokenizedStrategy)
         );
-        vm.stopPrank();
 
-        // Create a new factory
-        SkyCompounderStrategyFactory newFactory = new SkyCompounderStrategyFactory();
-
-        // Create a strategy with the same salt but from a different factory
-        vm.startPrank(management);
-        address secondAddress = newFactory.createStrategy(
+        // Try to create the exact same strategy again - should revert
+        vm.expectRevert(abi.encodeWithSelector(BaseStrategyFactory.StrategyAlreadyExists.selector, firstAddress));
+        factory.createStrategy(
             vaultSharesName,
             management,
             keeper,
             emergencyAdmin,
             donationAddress,
             true, // enableBurning
-            strategySalt,
-            address(tokenizedStrategy),
-            true // allowDepositDuringLoss
+            address(tokenizedStrategy)
         );
-        vm.stopPrank();
 
-        // Addresses should be different because factory addresses are different
-        // but they should be deterministic based on the salt and other parameters
-        assertTrue(firstAddress != secondAddress, "Addresses should be different with different factories");
-
-        // Re-create with a different salt but same factory and parameters
-        bytes32 differentSalt = keccak256("DIFFERENT_SALT");
-
-        vm.startPrank(management);
-        address thirdAddress = factory.createStrategy(
-            vaultSharesName,
+        // Create strategy with different name - should succeed
+        string memory differentName = "Different Vault";
+        address secondAddress = factory.createStrategy(
+            differentName,
             management,
             keeper,
             emergencyAdmin,
             donationAddress,
             true, // enableBurning
-            differentSalt,
-            address(tokenizedStrategy),
-            true // allowDepositDuringLoss
+            address(tokenizedStrategy)
         );
         vm.stopPrank();
 
-        assertTrue(firstAddress != thirdAddress, "Addresses should be different with different salts");
+        // Different parameters should result in different address
+        assertTrue(firstAddress != secondAddress, "Different params should create different address");
     }
 }
 

@@ -31,7 +31,6 @@ contract SkyCompounderTest is Test {
         bytes32 strategySalt;
         address implementationAddress;
         bool enableBurning;
-        bool allowDepositDuringLoss;
     }
 
     // Strategy instance
@@ -103,8 +102,7 @@ contract SkyCompounderTest is Test {
             vaultSharesName: vaultSharesName,
             strategySalt: strategySalt,
             implementationAddress: address(implementation),
-            enableBurning: true,
-            allowDepositDuringLoss: true
+            enableBurning: true
         });
 
         // Deploy factory
@@ -120,9 +118,7 @@ contract SkyCompounderTest is Test {
             params.emergencyAdmin,
             params.donationAddress,
             params.enableBurning,
-            params.strategySalt,
-            params.implementationAddress,
-            params.allowDepositDuringLoss
+            params.implementationAddress
         );
         vm.stopPrank();
 

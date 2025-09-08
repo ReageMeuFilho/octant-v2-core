@@ -17,7 +17,7 @@ import { MockERC20Staking } from "test/mocks/MockERC20Staking.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocationMechanism.sol";
-import { SimpleVotingMechanism } from "test/mocks/SimpleVotingMechanism.sol";
+// import { SimpleVotingMechanism } from "test/mocks/SimpleVotingMechanism.sol"; // SimpleVotingMechanism removed
 import { AllocationMechanismFactory } from "src/mechanisms/AllocationMechanismFactory.sol";
 import { AllocationConfig } from "src/mechanisms/BaseAllocationMechanism.sol";
 
@@ -2306,7 +2306,7 @@ contract RegenIntegrationTest is Test {
         uint256 deposit,
         uint256 nonce,
         uint256 deadline
-    ) internal view returns (bytes32) {
+    ) internal returns (bytes32) {
         bytes32 structHash = keccak256(abi.encode(SIGNUP_TYPEHASH, user, payer, deposit, nonce, deadline));
         bytes32 domainSeparator = TokenizedAllocationMechanism(allocationMechanism).DOMAIN_SEPARATOR();
         return keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
@@ -2329,7 +2329,8 @@ contract RegenIntegrationTest is Test {
             owner: address(0) // Will be set by factory
         });
 
-        address allocationMechanism = allocationFactory.deploySimpleVotingMechanism(config);
+        // Deploy QuadraticVotingMechanism instead of SimpleVotingMechanism
+        address allocationMechanism = allocationFactory.deployQuadraticVotingMechanism(config, 50, 100);
         whitelistAllocationMechanism(allocationMechanism);
         return allocationMechanism;
     }
@@ -2805,7 +2806,8 @@ contract RegenIntegrationTest is Test {
             gracePeriod: 7 days,
             owner: address(0)
         });
-        address allocationMechanism = allocationFactory.deploySimpleVotingMechanism(config);
+        // Deploy QuadraticVotingMechanism instead of SimpleVotingMechanism
+        address allocationMechanism = allocationFactory.deployQuadraticVotingMechanism(config, 50, 100);
 
         // Advance to allow signup (startBlock + votingDelay period)
         vm.roll(block.number + 5);

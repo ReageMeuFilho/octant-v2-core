@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.25;
 
-import { CREATE3 } from "solady/utils/CREATE3.sol";
+import { Create2 } from "@openzeppelin/contracts/utils/Create2.sol";
 import { MorphoCompounderStrategy } from "src/strategies/yieldDonating/MorphoCompounderStrategy.sol";
 
 contract MorphoCompounderStrategyFactory {
@@ -42,19 +42,27 @@ contract MorphoCompounderStrategyFactory {
         string vaultTokenName
     );
 
+    error StrategyAlreadyExists(address existingStrategy);
+
     /**
      * @notice Predict deterministic deployment address
-     * @param _salt Deployment salt
+     * @param _parameterHash Hash of all strategy parameters
      * @param deployer Address that will deploy
+     * @param bytecode The deployment bytecode (including constructor args)
      * @return Predicted contract address
      */
-    function predictStrategyAddress(bytes32 _salt, address deployer) external view returns (address) {
-        return CREATE3.predictDeterministicAddress(keccak256(abi.encodePacked(_salt, deployer)));
+    function predictStrategyAddress(
+        bytes32 _parameterHash,
+        address deployer,
+        bytes memory bytecode
+    ) external view returns (address) {
+        bytes32 finalSalt = keccak256(abi.encodePacked(_parameterHash, deployer));
+        return Create2.computeAddress(finalSalt, keccak256(bytecode));
     }
 
     /**
      * @notice Deploys a new MorphoCompounder strategy for the Yield Donating Vault.
-     * @dev This function uses CREATE3 to deploy a new strategy contract deterministically.
+     * @dev This function uses CREATE2 to deploy a new strategy contract deterministically.
      *      The strategy is initialized with the provided parameters, and its address is
      *      returned upon successful deployment. The function emits a `MorphoStrategyDeploy` event.
      * @param _name The name of the vault token associated with the strategy.
@@ -63,7 +71,6 @@ contract MorphoCompounderStrategyFactory {
      * @param _emergencyAdmin The address of the emergency admin for the strategy.
      * @param _donationAddress The address where donations from the strategy will be sent.
      * @param _enableBurning Whether to enable burning shares from dragon router during loss protection.
-     * @param _salt A unique salt used for deterministic deployment of the strategy.
      * @return strategyAddress The address of the newly deployed strategy contract.
      */
     function createStrategy(
@@ -74,34 +81,69 @@ contract MorphoCompounderStrategyFactory {
         address _emergencyAdmin,
         address _donationAddress,
         bool _enableBurning,
-        bytes32 _salt,
-        address _tokenizedStrategyAddress,
-        bool _allowDepositDuringLoss
-    ) external returns (address strategyAddress) {
-        bytes memory bytecode = abi.encodePacked(
-            type(MorphoCompounderStrategy).creationCode,
-            abi.encode(
-                _compounderVault,
-                USDC,
-                _name,
-                _management,
-                _keeper,
-                _emergencyAdmin,
-                _donationAddress,
-                _enableBurning,
-                _tokenizedStrategyAddress,
-                _allowDepositDuringLoss
-            )
+        address _tokenizedStrategyAddress
+    ) external returns (address) {
+        bytes32 finalSalt;
+        address strategyAddress;
+
+        {
+            // Generate parameter hash from all inputs (in a closure to reduce stack usage)
+            bytes32 parameterHash = keccak256(
+                abi.encode(
+                    _compounderVault,
+                    USDC,
+                    _name,
+                    _management,
+                    _keeper,
+                    _emergencyAdmin,
+                    _donationAddress,
+                    _enableBurning,
+                    _tokenizedStrategyAddress
+                )
+            );
+
+            // Generate final salt using parameter hash and sender
+            finalSalt = keccak256(abi.encodePacked(parameterHash, msg.sender));
+        }
+
+        {
+            // Deploy strategy in another closure
+            bytes memory bytecode = abi.encodePacked(
+                type(MorphoCompounderStrategy).creationCode,
+                abi.encode(
+                    _compounderVault,
+                    USDC,
+                    _name,
+                    _management,
+                    _keeper,
+                    _emergencyAdmin,
+                    _donationAddress,
+                    _enableBurning,
+                    _tokenizedStrategyAddress
+                )
+            );
+
+            // Check if strategy already exists
+            address predictedAddress = Create2.computeAddress(finalSalt, keccak256(bytecode));
+
+            if (predictedAddress.code.length > 0) {
+                revert StrategyAlreadyExists(predictedAddress);
+            }
+
+            strategyAddress = Create2.deploy(0, finalSalt, bytecode);
+        }
+
+        // Store strategy info
+        strategies[msg.sender].push(
+            StrategyInfo({
+                deployerAddress: msg.sender,
+                timestamp: block.timestamp,
+                vaultTokenName: _name,
+                donationAddress: _donationAddress
+            })
         );
 
-        strategyAddress = CREATE3.deployDeterministic(bytecode, keccak256(abi.encodePacked(_salt, msg.sender)));
-        emit StrategyDeploy(msg.sender, _donationAddress, strategyAddress, _name);
-        StrategyInfo memory strategyInfo = StrategyInfo({
-            deployerAddress: msg.sender,
-            timestamp: block.timestamp,
-            vaultTokenName: _name,
-            donationAddress: _donationAddress
-        });
-        strategies[msg.sender].push(strategyInfo);
+        emit StrategyDeploy(_management, _donationAddress, strategyAddress, _name);
+        return strategyAddress;
     }
 }

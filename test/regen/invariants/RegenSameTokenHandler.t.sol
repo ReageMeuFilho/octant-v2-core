@@ -4,6 +4,7 @@ pragma solidity ^0.8.23;
 import { Test } from "forge-std/Test.sol";
 import { RegenStakerWithoutDelegateSurrogateVotes } from "src/regen/RegenStakerWithoutDelegateSurrogateVotes.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
+import { RegenStakerBase } from "src/regen/RegenStakerBase.sol";
 import { Staker } from "staker/Staker.sol";
 
 contract RegenSameTokenHandler is Test {
@@ -51,7 +52,7 @@ contract RegenSameTokenHandler is Test {
         if (transferAmt >= rewardAmt) {
             staker.notifyRewardAmount(rewardAmt);
         } else {
-            vm.expectRevert(RegenStakerWithoutDelegateSurrogateVotes.InsufficientRewardBalance.selector);
+            vm.expectRevert(RegenStakerBase.InsufficientRewardBalance.selector);
             staker.notifyRewardAmount(rewardAmt);
         }
         vm.stopPrank();

@@ -130,12 +130,11 @@ contract YieldDonatingTokenizedStrategyTest is Test {
         vm.stopPrank();
 
         // Check what happens with a different salt
-        bytes32 differentSalt = keccak256("DIFFERENT_SALT");
 
         // Pre-compute the new expected address
         address newExpectedAddress = _computeCreate2Address(
             deployerAddress,
-            differentSalt,
+            keccak256("DIFFERENT_SALT"),
             type(YieldDonatingTokenizedStrategy).creationCode
         );
 
@@ -143,7 +142,9 @@ contract YieldDonatingTokenizedStrategyTest is Test {
 
         // Deploy with different salt
         vm.startPrank(deployerAddress);
-        YieldDonatingTokenizedStrategy newStrategy = new YieldDonatingTokenizedStrategy{ salt: differentSalt }();
+        YieldDonatingTokenizedStrategy newStrategy = new YieldDonatingTokenizedStrategy{
+            salt: keccak256("DIFFERENT_SALT")
+        }();
         address newActualAddress = address(newStrategy);
         vm.stopPrank();
 

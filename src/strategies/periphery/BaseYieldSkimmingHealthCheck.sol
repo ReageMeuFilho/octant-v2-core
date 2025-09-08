@@ -179,7 +179,7 @@ abstract contract BaseYieldSkimmingHealthCheck is BaseStrategy, IBaseHealthCheck
         }
 
         uint256 currentExchangeRate = IYieldSkimmingStrategy(address(this)).getLastRateRay();
-        uint256 newExchangeRate = IYieldSkimmingStrategy(address(this)).getCurrentRateRay();
+        uint256 newExchangeRate = getCurrentRateRay();
 
         if (currentExchangeRate < newExchangeRate) {
             require(

@@ -6,6 +6,7 @@ import { console } from "forge-std/console.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { RocketPoolStrategy } from "src/strategies/yieldSkimming/RocketPoolStrategy.sol";
 import { RocketPoolStrategyFactory } from "src/factories/yieldSkimming/RocketPoolStrategyFactory.sol";
+import { BaseStrategyFactory } from "src/factories/BaseStrategyFactory.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { YieldSkimmingTokenizedStrategy } from "src/strategies/yieldSkimming/YieldSkimmingTokenizedStrategy.sol";
@@ -72,37 +73,14 @@ contract RocketPoolStrategyFactoryTest is Test {
     }
 
     /// @notice Fuzz test for creating a strategy through the factory
-    function testFuzzCreateStrategy(string memory vaultSharesName, uint256 saltSeed) public {
+    function testFuzzCreateStrategy(string memory vaultSharesName) public {
         // Bound the inputs
         vm.assume(bytes(vaultSharesName).length >= MIN_NAME_LENGTH && bytes(vaultSharesName).length <= MAX_NAME_LENGTH);
-        bytes32 strategySalt = keccak256(abi.encodePacked("FUZZ_SALT", saltSeed));
-
-        // Calculate expected address using Create2
-        bytes memory bytecode = abi.encodePacked(
-            type(RocketPoolStrategy).creationCode,
-            abi.encode(
-                R_ETH,
-                vaultSharesName,
-                management,
-                keeper,
-                emergencyAdmin,
-                donationAddress,
-                false, // enableBurning
-                address(implementation),
-                true // allowDepositDuringLoss
-            )
-        );
-        address expectedStrategyAddress = Create2.computeAddress(strategySalt, keccak256(bytecode), address(factory));
 
         // Create a strategy and check events
         vm.startPrank(management);
-        vm.expectEmit(true, true, true, false); // Check first 3 indexed params, ignore the non-indexed timestamp
-        emit RocketPoolStrategyFactory.StrategyDeploy(
-            management,
-            donationAddress,
-            expectedStrategyAddress,
-            vaultSharesName
-        );
+        vm.expectEmit(true, true, false, true); // Check deployer, donationAddress, and vaultTokenName; ignore strategy address
+        emit RocketPoolStrategyFactory.StrategyDeploy(management, donationAddress, address(0), vaultSharesName);
 
         address strategyAddress = factory.createStrategy(
             vaultSharesName,
@@ -111,9 +89,7 @@ contract RocketPoolStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            strategySalt,
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -132,19 +108,10 @@ contract RocketPoolStrategyFactoryTest is Test {
     }
 
     /// @notice Fuzz test for creating multiple strategies for the same user
-    function testFuzzMultipleStrategiesPerUser(
-        string memory firstVaultName,
-        string memory secondVaultName,
-        uint256 saltSeed1,
-        uint256 saltSeed2
-    ) public {
+    function testFuzzMultipleStrategiesPerUser(string memory firstVaultName, string memory secondVaultName) public {
         // Bound the inputs
         vm.assume(bytes(firstVaultName).length >= MIN_NAME_LENGTH && bytes(firstVaultName).length <= MAX_NAME_LENGTH);
         vm.assume(bytes(secondVaultName).length >= MIN_NAME_LENGTH && bytes(secondVaultName).length <= MAX_NAME_LENGTH);
-        vm.assume(saltSeed1 != saltSeed2); // Ensure different salts
-
-        bytes32 firstSalt = keccak256(abi.encodePacked("FIRST_FUZZ_SALT", saltSeed1));
-        bytes32 secondSalt = keccak256(abi.encodePacked("SECOND_FUZZ_SALT", saltSeed2));
 
         vm.startPrank(management);
         address firstStrategyAddress = factory.createStrategy(
@@ -154,9 +121,7 @@ contract RocketPoolStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            firstSalt,
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
 
         // Create second strategy for same user
@@ -167,9 +132,7 @@ contract RocketPoolStrategyFactoryTest is Test {
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            secondSalt,
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -187,25 +150,18 @@ contract RocketPoolStrategyFactoryTest is Test {
     }
 
     /// @notice Fuzz test for creating strategies for different users
-    function testFuzzMultipleUsers(
-        address[2] memory users,
-        string[2] memory vaultNames,
-        uint256[2] memory saltSeeds
-    ) public {
+    function testFuzzMultipleUsers(address[2] memory users, string[2] memory vaultNames) public {
         // Bound the inputs and validate
-        for (uint i = 0; i < 2; i++) {
+        for (uint256 i = 0; i < 2; i++) {
             vm.assume(users[i] != address(0));
             vm.assume(bytes(vaultNames[i]).length >= MIN_NAME_LENGTH && bytes(vaultNames[i]).length <= MAX_NAME_LENGTH);
         }
         vm.assume(users[0] != users[1]); // Different users
-        vm.assume(saltSeeds[0] != saltSeeds[1]); // Different salts
 
         address[] memory strategyAddresses = new address[](2);
 
         // Create strategies for each user
-        for (uint i = 0; i < 2; i++) {
-            bytes32 salt = keccak256(abi.encodePacked("USER_SALT", i, saltSeeds[i]));
-
+        for (uint256 i = 0; i < 2; i++) {
             vm.startPrank(users[i]);
             strategyAddresses[i] = factory.createStrategy(
                 vaultNames[i],
@@ -214,15 +170,13 @@ contract RocketPoolStrategyFactoryTest is Test {
                 emergencyAdmin,
                 donationAddress,
                 false, // enableBurning
-                salt,
-                address(implementation),
-                true // allowDepositDuringLoss
+                address(implementation)
             );
             vm.stopPrank();
         }
 
         // Verify strategies are properly tracked for each user
-        for (uint i = 0; i < 2; i++) {
+        for (uint256 i = 0; i < 2; i++) {
             (address deployerAddress, , string memory name, ) = factory.strategies(users[i], 0);
             assertEq(deployerAddress, users[i], string(abi.encodePacked("User ", i, "'s deployer address incorrect")));
             assertEq(name, vaultNames[i], string(abi.encodePacked("User ", i, "'s vault name incorrect")));
@@ -232,67 +186,49 @@ contract RocketPoolStrategyFactoryTest is Test {
         assertTrue(strategyAddresses[0] != strategyAddresses[1], "Strategies should have different addresses");
     }
 
-    /// @notice Fuzz test for deterministic addressing via salt
-    function testFuzzDeterministicAddressing(
-        string memory vaultSharesName,
-        bytes32 strategySalt,
-        uint8 factoryIndex
-    ) public {
-        // Bound the inputs
-        vm.assume(bytes(vaultSharesName).length >= MIN_NAME_LENGTH && bytes(vaultSharesName).length <= MAX_NAME_LENGTH);
-        vm.assume(factoryIndex < 3); // Test with up to 3 different factories
+    /// @notice Test for deterministic addressing and duplicate prevention
+    function testDeterministicAddressing() public {
+        string memory vaultSharesName = "Test Vault";
 
-        address[] memory factories = new address[](3);
-        address[] memory strategyAddresses = new address[](3);
-
-        // Deploy multiple factories
-        for (uint i = 0; i < 3; i++) {
-            factories[i] = address(new RocketPoolStrategyFactory());
-        }
-
-        // Create strategies with same salt from different factories
-        for (uint i = 0; i <= factoryIndex; i++) {
-            vm.startPrank(management);
-            strategyAddresses[i] = RocketPoolStrategyFactory(factories[i]).createStrategy(
-                vaultSharesName,
-                management,
-                keeper,
-                emergencyAdmin,
-                donationAddress,
-                false, // enableBurning
-                strategySalt,
-                address(implementation),
-                true // allowDepositDuringLoss
-            );
-            vm.stopPrank();
-        }
-
-        // Verify addresses are different when deployed from different factories
-        for (uint i = 0; i < factoryIndex; i++) {
-            assertTrue(
-                strategyAddresses[i] != strategyAddresses[i + 1],
-                "Addresses should be different with different factories"
-            );
-        }
-
-        // Now test with different salt on the first factory
-        bytes32 differentSalt = keccak256(abi.encodePacked(strategySalt, "DIFFERENT"));
-
+        // Deploy strategy with specific parameters
         vm.startPrank(management);
-        address differentSaltAddress = RocketPoolStrategyFactory(factories[0]).createStrategy(
+        address firstAddress = factory.createStrategy(
             vaultSharesName,
             management,
             keeper,
             emergencyAdmin,
             donationAddress,
             false, // enableBurning
-            differentSalt,
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
+        );
+
+        // Try to deploy the exact same strategy again - should revert
+        vm.expectRevert(abi.encodeWithSelector(BaseStrategyFactory.StrategyAlreadyExists.selector, firstAddress));
+        factory.createStrategy(
+            vaultSharesName,
+            management,
+            keeper,
+            emergencyAdmin,
+            donationAddress,
+            false, // enableBurning
+            address(implementation)
+        );
+
+        // Deploy strategy with different name - should succeed
+        string memory differentName = "Different Vault";
+        address secondAddress = factory.createStrategy(
+            differentName,
+            management,
+            keeper,
+            emergencyAdmin,
+            donationAddress,
+            false, // enableBurning
+            address(implementation)
         );
         vm.stopPrank();
 
-        assertTrue(strategyAddresses[0] != differentSaltAddress, "Addresses should be different with different salts");
+        // Different parameters should result in different address
+        assertTrue(firstAddress != secondAddress, "Different params should create different address");
     }
 
     /// @notice Fuzz test for strategy deployment with various parameter combinations
@@ -315,8 +251,6 @@ contract RocketPoolStrategyFactoryTest is Test {
         vm.assume(fuzzManagement != fuzzEmergencyAdmin);
         vm.assume(fuzzManagement != fuzzDonationAddress);
 
-        bytes32 salt = keccak256(abi.encodePacked("PARAM_TEST", fuzzManagement, block.timestamp));
-
         // Deploy strategy with fuzzed parameters
         vm.startPrank(fuzzManagement);
         factory.createStrategy(
@@ -326,9 +260,7 @@ contract RocketPoolStrategyFactoryTest is Test {
             fuzzEmergencyAdmin,
             fuzzDonationAddress,
             false, // enableBurning
-            salt,
-            address(implementation),
-            true // allowDepositDuringLoss
+            address(implementation)
         );
         vm.stopPrank();
 
@@ -350,9 +282,8 @@ contract RocketPoolStrategyFactoryTest is Test {
         address testUser = address(0x1234);
 
         // Create multiple strategies
-        for (uint i = 0; i < numStrategies; i++) {
+        for (uint256 i = 0; i < numStrategies; i++) {
             string memory vaultName = string(abi.encodePacked("Vault_", i));
-            bytes32 salt = keccak256(abi.encodePacked("MANY_STRATEGIES", i, block.timestamp));
 
             vm.startPrank(testUser);
             factory.createStrategy(
@@ -362,15 +293,13 @@ contract RocketPoolStrategyFactoryTest is Test {
                 emergencyAdmin,
                 donationAddress,
                 false, // enableBurning
-                salt,
-                address(implementation),
-                true // allowDepositDuringLoss
+                address(implementation)
             );
             vm.stopPrank();
         }
 
         // Verify all strategies are tracked correctly
-        for (uint i = 0; i < numStrategies; i++) {
+        for (uint256 i = 0; i < numStrategies; i++) {
             (address deployerAddress, , string memory name, ) = factory.strategies(testUser, i);
             assertEq(deployerAddress, testUser, "Deployer address incorrect");
             assertEq(name, string(abi.encodePacked("Vault_", i)), "Vault name incorrect");

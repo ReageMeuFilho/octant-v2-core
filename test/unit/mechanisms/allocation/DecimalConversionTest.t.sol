@@ -3,7 +3,6 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import { QuadraticVotingMechanism } from "src/mechanisms/mechanism/QuadraticVotingMechanism.sol";
-import { SimpleVotingMechanism } from "test/mocks/SimpleVotingMechanism.sol";
 import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocationMechanism.sol";
 import { AllocationMechanismFactory } from "src/mechanisms/AllocationMechanismFactory.sol";
 import { AllocationConfig } from "src/mechanisms/BaseAllocationMechanism.sol";
@@ -70,23 +69,6 @@ contract DecimalConversionTest is Test {
         return QuadraticVotingMechanism(payable(mechanismAddr));
     }
 
-    function deploySimpleMechanismWithToken(IERC20 asset) internal returns (SimpleVotingMechanism) {
-        AllocationConfig memory config = AllocationConfig({
-            asset: asset,
-            name: "Test Simple Mechanism",
-            symbol: "TESTS",
-            votingDelay: 100,
-            votingPeriod: 1000,
-            quorumShares: 500,
-            timelockDelay: 1 days,
-            gracePeriod: 7 days,
-            owner: address(0)
-        });
-
-        address mechanismAddr = factory.deploySimpleVotingMechanism(config);
-        return SimpleVotingMechanism(payable(mechanismAddr));
-    }
-
     /// @notice Test that 6-decimal tokens are properly scaled to 18 decimals (Quadratic)
     function testQuadraticDecimalConversion_6Decimals() public {
         QuadraticVotingMechanism mechanism = deployQuadraticMechanismWithToken(IERC20(address(token6)));
@@ -142,24 +124,5 @@ contract DecimalConversionTest is Test {
         // Should remain the same
         uint256 actualVotingPower = _tokenized(address(mechanism)).votingPower(alice);
         assertEq(actualVotingPower, deposit, "18-decimal token should remain unchanged");
-    }
-
-    /// @notice Test that 6-decimal tokens are properly scaled to 18 decimals (Simple)
-    function testSimpleDecimalConversion_6Decimals() public {
-        SimpleVotingMechanism mechanism = deploySimpleMechanismWithToken(IERC20(address(token6)));
-
-        uint256 deposit = 100 * 10 ** 6; // 100 USDC (6 decimals)
-
-        // Warp to ensure we're in the signup window (mechanism allows signup until votingEndTime)
-        vm.warp(block.timestamp + 1);
-        vm.startPrank(alice);
-        token6.approve(address(mechanism), deposit);
-        _tokenized(address(mechanism)).signup(deposit);
-        vm.stopPrank();
-
-        // Should convert to 18 decimals: 100 * 10^18
-        uint256 expected = 100 * 10 ** 18;
-        uint256 actualVotingPower = _tokenized(address(mechanism)).votingPower(alice);
-        assertEq(actualVotingPower, expected, "6-decimal token should scale up to 18 decimals in SimpleVoting");
     }
 }
