@@ -42,7 +42,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
         uint256 length = delegates.length;
         require(
             length == tokens.length && length == dripRatesPerDay.length,
-            ArrayLengthsMismatch(length, tokens.length)
+            ArrayLengthsMismatch(length, tokens.length, dripRatesPerDay.length)
         );
 
         for (uint256 i = 0; i < length; i++) {
@@ -58,7 +58,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
     /// @inheritdoc ILinearAllowanceSingleton
     function revokeAllowances(address[] calldata delegates, address[] calldata tokens) external nonReentrant {
         uint256 length = delegates.length;
-        require(length == tokens.length, ArrayLengthsMismatch(delegates.length, tokens.length));
+        require(length == tokens.length, ArrayLengthsMismatch(delegates.length, tokens.length, 0));
 
         for (uint256 i = 0; i < length; i++) {
             _revokeAllowance(msg.sender, delegates[i], tokens[i]);
@@ -86,7 +86,10 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
         address[] calldata tos
     ) external nonReentrant returns (uint256[] memory transferAmounts) {
         uint256 length = safes.length;
-        require(length == tokens.length && length == tos.length, ArrayLengthsMismatch(length, tokens.length));
+        require(
+            length == tokens.length && length == tos.length,
+            ArrayLengthsMismatch(length, tokens.length, tos.length)
+        );
 
         transferAmounts = new uint256[](length);
 
@@ -139,7 +142,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
         LinearAllowance memory a = allowances[safe][delegate][token];
 
         a = _calculateCurrentAllowance(a);
-        a.dripRatePerDay = dripRatePerDay;
+        a = _updateDripRatePerDay(a, dripRatePerDay);
 
         allowances[safe][delegate][token] = a;
 
@@ -158,7 +161,7 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
 
         emit AllowanceRevoked(safe, delegate, token, allowance.totalUnspent);
 
-        allowance.dripRatePerDay = 0;
+        allowance = _updateDripRatePerDay(allowance, 0);
         allowance.totalUnspent = 0;
 
         allowances[safe][delegate][token] = allowance;
@@ -228,10 +231,23 @@ contract LinearAllowanceSingletonForGnosisSafe is ILinearAllowanceSingleton, Ree
         require(beneficiaryPostBalance - beneficiaryPreBalance >= amount, TransferFailed(safe, delegate, token));
     }
 
+    function _updateDripRatePerDay(
+        LinearAllowance memory a,
+        uint192 dripRatePerDay
+    ) internal view returns (LinearAllowance memory) {
+        a.dripRatePerDay = dripRatePerDay;
+        a.lastBookedAtInSeconds = block.timestamp.toUint64();
+        return a;
+    }
+
     function _calculateCurrentAllowance(LinearAllowance memory a) internal view returns (LinearAllowance memory) {
         uint256 newAccrued = _calculateNewAccrued(a);
-        a.totalUnspent += newAccrued;
-        a.lastBookedAtInSeconds = block.timestamp.toUint64();
+
+        if (newAccrued > 0) {
+            a.totalUnspent += newAccrued;
+            a.lastBookedAtInSeconds = block.timestamp.toUint64();
+        }
+
         return a;
     }
 

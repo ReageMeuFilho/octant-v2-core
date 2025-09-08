@@ -139,9 +139,32 @@ abstract contract BaseAllocationMechanism is IBaseAllocationStrategy {
     ) internal virtual returns (bool handled, uint256 assetsTransferred);
 
     /// @dev Hook to get the available withdraw limit for a share owner
-    /// @param shareOwner Address of the share owner
-    /// @return limit Available withdraw limit (type(uint256).max for unlimited)
-    function _availableWithdrawLimit(address shareOwner) internal view virtual returns (uint256);
+    /// @dev Default implementation enforces timelock and grace period boundaries
+    /// @dev Can be overridden for custom withdrawal limit logic
+    /// @return limit Available withdraw limit (type(uint256).max for unlimited, 0 for blocked)
+    function _availableWithdrawLimit(address /* shareOwner */) internal view virtual returns (uint256) {
+        // Get the global redemption start time
+        uint256 globalRedemptionStart = _getGlobalRedemptionStart();
+
+        // If no global redemption time set (not finalized), no withdrawals allowed
+        if (globalRedemptionStart == 0) {
+            return 0;
+        }
+
+        // Check if still in timelock period
+        if (block.timestamp < globalRedemptionStart) {
+            return 0; // Cannot withdraw during timelock
+        }
+
+        // Check if grace period has expired
+        uint256 gracePeriod = _getGracePeriod();
+        if (block.timestamp > globalRedemptionStart + gracePeriod) {
+            return 0; // Cannot withdraw after grace period expires
+        }
+
+        // Within valid redemption window - no limit
+        return type(uint256).max;
+    }
 
     /// @dev Hook to calculate total assets including any matching pools or custom logic
     /// @return totalAssets Total assets for this allocation mechanism

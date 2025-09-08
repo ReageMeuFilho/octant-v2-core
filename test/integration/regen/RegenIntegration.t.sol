@@ -2306,7 +2306,7 @@ contract RegenIntegrationTest is Test {
         uint256 deposit,
         uint256 nonce,
         uint256 deadline
-    ) internal view returns (bytes32) {
+    ) internal returns (bytes32) {
         bytes32 structHash = keccak256(abi.encode(SIGNUP_TYPEHASH, user, payer, deposit, nonce, deadline));
         bytes32 domainSeparator = TokenizedAllocationMechanism(allocationMechanism).DOMAIN_SEPARATOR();
         return keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));

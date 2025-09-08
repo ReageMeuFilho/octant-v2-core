@@ -71,7 +71,8 @@ interface ILinearAllowanceSingleton {
     /// @notice Error thrown when array lengths do not match
     /// @param lengthOne The length of the first array
     /// @param lengthTwo The length of the second array
-    error ArrayLengthsMismatch(uint256 lengthOne, uint256 lengthTwo);
+    /// @param lengthThree The length of the third array
+    error ArrayLengthsMismatch(uint256 lengthOne, uint256 lengthTwo, uint256 lengthThree);
 
     /// @notice Error thrown when a Safe transaction execution fails
     error SafeTransactionFailed();
