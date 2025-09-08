@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
 import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocationMechanism.sol";
-import { SimpleVotingMechanism } from "test/mocks/SimpleVotingMechanism.sol";
+import { QuadraticVotingMechanism } from "src/mechanisms/mechanism/QuadraticVotingMechanism.sol";
 import { AllocationMechanismFactory } from "src/mechanisms/AllocationMechanismFactory.sol";
 import { AllocationConfig } from "src/mechanisms/BaseAllocationMechanism.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -28,7 +28,7 @@ contract EIP712SignatureTest is Test {
     // Test contracts
     AllocationMechanismFactory factory;
     ERC20Mock token;
-    SimpleVotingMechanism mechanism;
+    QuadraticVotingMechanism mechanism;
 
     // Test actors with known private keys
     uint256 constant ALICE_PRIVATE_KEY = 0x1;
@@ -75,8 +75,8 @@ contract EIP712SignatureTest is Test {
             owner: address(this)
         });
 
-        address mechanismAddr = factory.deploySimpleVotingMechanism(config);
-        mechanism = SimpleVotingMechanism(payable(mechanismAddr));
+        address mechanismAddr = factory.deployQuadraticVotingMechanism(config, 1, 1);
+        mechanism = QuadraticVotingMechanism(payable(mechanismAddr));
     }
 
     function _tokenized(address _mechanism) internal pure returns (TokenizedAllocationMechanism) {
@@ -305,7 +305,6 @@ contract EIP712SignatureTest is Test {
         vm.stopPrank();
 
         // Create a proposal
-        vm.prank(alice);
         uint256 pid = _tokenized(address(mechanism)).propose(address(0x123), "Test proposal");
 
         // Move to voting phase
@@ -334,10 +333,9 @@ contract EIP712SignatureTest is Test {
         );
 
         // Verify vote was recorded
-        // SimpleVoting now allows multiple votes, so we don't check hasVoted
         assertEq(
             _tokenized(address(mechanism)).votingPower(alice),
-            DEPOSIT_AMOUNT - weight,
+            DEPOSIT_AMOUNT - weight * weight,
             "Voting power not reduced"
         );
         assertEq(_tokenized(address(mechanism)).nonces(alice), nonce + 1, "Nonce not incremented");
@@ -361,18 +359,17 @@ contract EIP712SignatureTest is Test {
         // Create proposals
         uint256[3] memory pids;
         for (uint i = 0; i < 3; i++) {
-            vm.prank(alice);
             pids[i] = _tokenized(address(mechanism)).propose(address(uint160(0x100 + i)), "Proposal");
         }
 
         // Move to voting phase
         vm.warp(block.timestamp + VOTING_DELAY);
 
-        // Test each vote type
+        // Test For vote type (QuadraticVotingMechanism only supports For votes)
         TokenizedAllocationMechanism.VoteType[3] memory voteTypes = [
-            TokenizedAllocationMechanism.VoteType.Against,
             TokenizedAllocationMechanism.VoteType.For,
-            TokenizedAllocationMechanism.VoteType.Abstain
+            TokenizedAllocationMechanism.VoteType.For,
+            TokenizedAllocationMechanism.VoteType.For
         ];
 
         for (uint i = 0; i < 3; i++) {
@@ -407,7 +404,12 @@ contract EIP712SignatureTest is Test {
                 );
             }
 
-            // SimpleVoting now allows multiple votes, so we don't check hasVoted
+            // Verify votes were recorded - each user voted with weight 50, so cost is 50*50 = 2500
+            assertEq(
+                _tokenized(address(mechanism)).votingPower(users[i]),
+                DEPOSIT_AMOUNT - 50 * 50,
+                "Voting power not reduced correctly for quadratic voting"
+            );
         }
     }
 
@@ -419,7 +421,6 @@ contract EIP712SignatureTest is Test {
         _tokenized(address(mechanism)).signup(DEPOSIT_AMOUNT);
         vm.stopPrank();
 
-        vm.prank(alice);
         uint256 pid = _tokenized(address(mechanism)).propose(address(0x123), "Test");
 
         vm.warp(block.timestamp + VOTING_DELAY);
@@ -456,7 +457,6 @@ contract EIP712SignatureTest is Test {
         _tokenized(address(mechanism)).signup(DEPOSIT_AMOUNT);
         vm.stopPrank();
 
-        vm.prank(alice);
         uint256 pid = _tokenized(address(mechanism)).propose(address(0x123), "Test");
 
         vm.warp(block.timestamp + VOTING_DELAY);
@@ -490,7 +490,6 @@ contract EIP712SignatureTest is Test {
         _tokenized(address(mechanism)).signup(DEPOSIT_AMOUNT);
         vm.stopPrank();
 
-        vm.prank(alice);
         uint256 pid1 = _tokenized(address(mechanism)).propose(address(0x123), "Test 1");
         // Create second proposal but we don't use pid2 in this test
 
@@ -548,7 +547,6 @@ contract EIP712SignatureTest is Test {
         _tokenized(address(mechanism)).signupWithSignature(alice, DEPOSIT_AMOUNT, signupDeadline, sv, sr, ss);
 
         // Create proposal (still needs direct call)
-        vm.prank(alice);
         uint256 pid = _tokenized(address(mechanism)).propose(address(0x123), "E2E Test");
 
         // Vote with signature
@@ -573,8 +571,7 @@ contract EIP712SignatureTest is Test {
         );
 
         // Verify final state
-        // SimpleVoting now allows multiple votes, so we don't check hasVoted
-        assertEq(_tokenized(address(mechanism)).votingPower(alice), DEPOSIT_AMOUNT - 200, "Voting power incorrect");
+        assertEq(_tokenized(address(mechanism)).votingPower(alice), DEPOSIT_AMOUNT - 200 * 200, "Voting power incorrect");
         assertEq(_tokenized(address(mechanism)).nonces(alice), signupNonce + 2, "Nonce should increment twice");
     }
 
@@ -599,7 +596,6 @@ contract EIP712SignatureTest is Test {
         _tokenized(address(mechanism)).signupWithSignature(bob, DEPOSIT_AMOUNT, bobDeadline, bv, br, bs);
 
         // Create proposal
-        vm.prank(alice);
         uint256 pid = _tokenized(address(mechanism)).propose(address(0x123), "Mixed test");
 
         // Voting phase
@@ -627,8 +623,17 @@ contract EIP712SignatureTest is Test {
             vs
         );
 
-        // Verify both votes recorded
-        // SimpleVoting now allows multiple votes, so we don't check hasVoted
+        // Verify both votes recorded - Alice voted 100 (cost 100^2=10000), Bob voted 150 (cost 150^2=22500)
+        assertEq(
+            _tokenized(address(mechanism)).votingPower(alice), 
+            DEPOSIT_AMOUNT - 100 * 100, 
+            "Alice voting power not reduced correctly"
+        );
+        assertEq(
+            _tokenized(address(mechanism)).votingPower(bob), 
+            DEPOSIT_AMOUNT - 150 * 150, 
+            "Bob voting power not reduced correctly"
+        );
     }
 
     function test_NonceSharing() public {
@@ -649,7 +654,6 @@ contract EIP712SignatureTest is Test {
         assertEq(_tokenized(address(mechanism)).nonces(alice), initialNonce + 1, "Nonce should increment after signup");
 
         // Create proposal for voting
-        vm.prank(alice);
         uint256 pid = _tokenized(address(mechanism)).propose(address(0x123), "Test");
 
         // Vote uses next nonce
