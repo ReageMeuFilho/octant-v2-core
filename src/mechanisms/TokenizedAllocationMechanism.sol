@@ -121,9 +121,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     /// @notice Maximum safe value for mathematical operations
     uint256 public constant MAX_SAFE_VALUE = type(uint128).max;
 
-    /// @notice Used for calculations.
-    uint256 internal constant MAX_BPS = 10_000;
-
     /// @notice Storage slot for allocation mechanism data (EIP-1967 pattern)
     bytes32 private constant ALLOCATION_STORAGE_SLOT = bytes32(uint256(keccak256("tokenized.allocation.storage")) - 1);
 
@@ -235,12 +232,16 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     event ProposalCanceled(uint256 indexed pid, address indexed proposer);
     /// @notice Emitted when ownership transfer is initiated
     event OwnershipTransferInitiated(address indexed currentOwner, address indexed pendingOwner);
+    /// @notice Emitted when ownership transfer is canceled
+    event OwnershipTransferCanceled(address indexed currentOwner, address indexed canceledPendingOwner);
     /// @notice Emitted when ownership is transferred
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
     /// @notice Emitted when keeper is updated
     event KeeperUpdated(address indexed previousKeeper, address indexed newKeeper);
     /// @notice Emitted when management is updated
     event ManagementUpdated(address indexed previousManagement, address indexed newManagement);
+    /// @notice Emitted when emergency admin is updated
+    event EmergencyAdminUpdated(address indexed previousEmergencyAdmin, address indexed newEmergencyAdmin);
     /// @notice Emitted when contract is paused/unpaused
     event PausedStatusChanged(bool paused);
     /// @notice Emitted when global redemption period is set
@@ -280,12 +281,16 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     }
 
     /// @notice Returns the domain separator, updating it if chain ID changed (fork protection)
-    function DOMAIN_SEPARATOR() public view returns (bytes32) {
+    function DOMAIN_SEPARATOR() public returns (bytes32) {
         AllocationStorage storage s = _getStorage();
         if (block.chainid == s.initialChainId) {
             return s.domainSeparator;
         } else {
-            return _computeDomainSeparator(s);
+            s.initialChainId = block.chainid;
+
+            bytes32 domainSeparator = _computeDomainSeparator(s);
+            s.domainSeparator = domainSeparator;
+            return domainSeparator;
         }
     }
 
@@ -471,7 +476,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) private view {
+    ) private {
         // Check deadline
         if (block.timestamp > deadline) revert ExpiredSignature(deadline, block.timestamp);
 
@@ -514,7 +519,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     }
 
     /// @dev Recovers signer address from signature
-    function _recover(bytes32 structHash, uint8 v, bytes32 r, bytes32 s) private view returns (address) {
+    function _recover(bytes32 structHash, uint8 v, bytes32 r, bytes32 s) private returns (address) {
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR(), structHash));
         return ecrecover(digest, v, r, s);
     }
@@ -531,7 +536,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     ) external whenNotPaused nonReentrant returns (uint256 pid) {
         address proposer = msg.sender;
 
-        // Call hook for validation
+        // Call hook for validation - Potential DoS risk - malicious keeper/management contracts could revert these calls
         if (!IBaseAllocationStrategy(address(this)).beforeProposeHook(proposer)) revert ProposeNotAllowed(proposer);
 
         if (recipient == address(0) || recipient == address(this)) revert InvalidRecipient(recipient);
@@ -911,8 +916,9 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         AllocationStorage storage s = _getStorage();
         if (s.pendingOwner == address(0)) revert Unauthorized();
 
+        address canceledPendingOwner = s.pendingOwner;
         s.pendingOwner = address(0);
-        emit OwnershipTransferInitiated(s.owner, address(0));
+        emit OwnershipTransferCanceled(s.owner, canceledPendingOwner);
     }
 
     /// @notice Update keeper address
@@ -931,6 +937,15 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         address oldManagement = s.management;
         s.management = newManagement;
         emit ManagementUpdated(oldManagement, newManagement);
+    }
+
+    /// @notice Update emergency admin address
+    function setEmergencyAdmin(address newEmergencyAdmin) external onlyOwner {
+        if (newEmergencyAdmin == address(0)) revert Unauthorized();
+        AllocationStorage storage s = _getStorage();
+        address oldEmergencyAdmin = s.emergencyAdmin;
+        s.emergencyAdmin = newEmergencyAdmin;
+        emit EmergencyAdminUpdated(oldEmergencyAdmin, newEmergencyAdmin);
     }
 
     /// @notice Emergency pause all operations
@@ -988,33 +1003,12 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     /**
      * @notice Redeems exactly `shares` from `shareOwner` and
      * sends `assets` of underlying tokens to `receiver`.
-     * @dev This will default to allowing any loss passed to be realized.
      * @param shares The amount of shares burnt.
      * @param receiver The address to receive `assets`.
      * @param shareOwner The address whose shares are burnt.
-     * @return assets The actual amount of underlying withdrawn.
-     */
-    function redeem(uint256 shares, address receiver, address shareOwner) external returns (uint256) {
-        // We default to not limiting a potential loss.
-        return redeem(shares, receiver, shareOwner, MAX_BPS);
-    }
-
-    /**
-     * @notice Redeems exactly `shares` from `shareOwner` and
-     * sends `assets` of underlying tokens to `receiver`.
-     * @dev This includes an added parameter to allow for losses.
-     * @param shares The amount of shares burnt.
-     * @param receiver The address to receive `assets`.
-     * @param shareOwner The address whose shares are burnt.
-     * @param maxLoss The amount of acceptable loss in Basis points.
      * @return . The actual amount of underlying withdrawn.
      */
-    function redeem(
-        uint256 shares,
-        address receiver,
-        address shareOwner,
-        uint256 maxLoss
-    ) public nonReentrant returns (uint256) {
+    function redeem(uint256 shares, address receiver, address shareOwner) external nonReentrant returns (uint256) {
         // Get the storage slot for all following calls.
         AllocationStorage storage S = _getStorage();
         require(shares <= _maxRedeem(S, shareOwner), "Allocation: redeem more than max");
@@ -1023,8 +1017,8 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         // Check for rounding error or 0 value.
         require((assets = _convertToAssets(S, shares, Math.Rounding.Floor)) != 0, "ZERO_ASSETS");
 
-        // We need to return the actual amount withdrawn in case of a loss.
-        return _withdraw(S, receiver, shareOwner, assets, shares, maxLoss);
+        // We need to return the actual amount withdrawn.
+        return _withdraw(S, receiver, shareOwner, assets, shares);
     }
 
     /**
@@ -1114,15 +1108,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         return _maxRedeem(_getStorage(), shareOwner);
     }
 
-    /**
-     * @notice Variable `maxLoss` is ignored.
-     * @dev Accepts a `maxLoss` variable in order to match the multi
-     * strategy vaults ABI.
-     */
-    function maxRedeem(address shareOwner, uint256 /*maxLoss*/) external view returns (uint256) {
-        return _maxRedeem(_getStorage(), shareOwner);
-    }
-
     // Additional getters for vault functionality
     function management() external view returns (address) {
         return _getStorage().management;
@@ -1136,8 +1121,8 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         return _getStorage().emergencyAdmin;
     }
 
-    function decimals() external view returns (uint8) {
-        return _getStorage().decimals;
+    function decimals() external pure returns (uint8) {
+        return 18;
     }
 
     function balanceOf(address account) external view returns (uint256) {
@@ -1261,20 +1246,15 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
      *
      * This will handle all logic, transfers and accounting
      * in order to service the withdraw request.
-     *
-     * If we are not able to withdraw the full amount needed, it will
-     * be counted as a loss and passed on to the user.
      */
     function _withdraw(
         AllocationStorage storage S,
         address receiver,
         address shareOwner,
         uint256 assets,
-        uint256 shares,
-        uint256 maxLoss
+        uint256 shares
     ) internal returns (uint256) {
         require(receiver != address(0), "ZERO ADDRESS");
-        require(maxLoss <= MAX_BPS, "exceeds MAX_BPS");
 
         // Spend allowance if applicable.
         if (msg.sender != shareOwner) {

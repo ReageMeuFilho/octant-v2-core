@@ -102,19 +102,15 @@ The system implements **permissionless proposal queuing**, enabling flexible gov
 #### Core Validation Hooks
 - **`_beforeSignupHook(address user)`** - Controls user registration eligibility
   - **Security Assumptions**: 
-    - MUST return false for address(0) to prevent zero address registration
     - CAN be stateful to implement custom registration tracking
     - SHOULD implement consistent eligibility criteria that cannot be gamed
-    - MUST customize re-registration policy based on mechanism type:
-      - **QF Variants**: Allow multiple signups for voice credit top-ups
-      - **QV Variants**: Generally restrict to single signup for allocated voice credits
-      - **Custom Logic**: Implement mechanism-specific registration rules
+    - CAN implement mechanism-specific access control (e.g., whitelist validation)
+  - **Note**: Zero address validation and re-registration handling are performed in `_executeSignup`, not in this hook.
 - **`_beforeProposeHook(address proposer)`** - Validates proposal creation rights
   - **Security Assumptions**:
     - MUST verify proposer has legitimate right to create proposals (e.g., voting power > 0, role-based access)
     - MUST be view function to prevent state changes during validation
     - SHOULD prevent spam by implementing appropriate restrictions
-    - MUST return false for address(0) proposers
     - MAY restrict to specific roles (e.g., QuadraticVotingMechanism restricts to keeper/management only)
 - **`_validateProposalHook(uint256 pid)`** - Ensures proposal ID validity
   - **Security Assumptions**:
@@ -133,17 +129,18 @@ The system implements **permissionless proposal queuing**, enabling flexible gov
   - **Security Assumptions**:
     - MUST return deterministic voting power based on deposit amount
     - MUST be view function to ensure consistency
-    - MUST NOT exceed MAX_SAFE_VALUE (type(uint128).max) to prevent overflow
     - SHOULD implement fair and transparent power calculation
     - MAY normalize decimals for consistent voting power across different assets
+  - **Note**: Overflow protection is performed in `_executeSignup`, not in this hook:
+    - Overflow check: `if (newPower > MAX_SAFE_VALUE) revert VotingPowerTooLarge(newPower, MAX_SAFE_VALUE);`
 - **`_processVoteHook(pid, voter, choice, weight, oldPower)`** - Processes vote and updates tallies
   - **Security Assumptions**:
-    - MUST return newPower <= oldPower (power conservation invariant)
     - MUST accurately update vote tallies based on weight and choice
     - MUST prevent double voting by checking hasVoted mapping
-    - MUST validate weight does not exceed voter's available power
+    - MUST validate quadratic cost (weight²) does not exceed voter's available power
     - SHOULD implement vote cost calculation (e.g., quadratic cost in QF)
     - MUST handle all VoteType choices appropriately (Against/For/Abstain)
+  - **Note**: Power conservation invariant (newPower <= oldPower) and voting period validation are performed upstream in `TokenizedAllocationMechanism`, not in this hook
 - **`_hasQuorumHook(uint256 pid)`** - Determines if proposal meets quorum requirements
   - **Security Assumptions**:
     - MUST implement consistent quorum calculation logic
@@ -198,7 +195,6 @@ The system implements **permissionless proposal queuing**, enabling flexible gov
     - MUST accurately reflect total assets available for distribution
     - MUST include any external funding sources (matching pools, grants)
     - MUST be view function when called during finalization
-    - MUST NOT double-count assets or include unauthorized funds
 
 ### BaseAllocationMechanism Deep Dive
 
@@ -255,7 +251,7 @@ This pattern enables complete code reuse while maintaining storage isolation and
   - Registration restrictions are mechanism-specific via `_beforeSignupHook()` implementation
   - Registration requires hook validation to pass via `IBaseAllocationStrategy` interface
   - Voting power is calculated through customizable hook in strategy contract
-  - Multiple signups accumulate voting power (if allowed by mechanism - appropriate for QF, should be restricted for QV)
+  - Multiple signups accumulate voting power (implemented in `_executeSignup` - appropriate for QF)
   - Asset deposits are transferred securely using ERC20 transferFrom
   - Operation blocked when contract is paused (`whenNotPaused` modifier)
 
@@ -274,9 +270,8 @@ This pattern enables complete code reuse while maintaining storage isolation and
 - **Implementation:** `castVote(uint256 pid, VoteType choice, uint256 weight)` in TokenizedAllocationMechanism with `_processVoteHook()` in strategy
 - **Acceptance Criteria:**
   - Users can only vote once per proposal
-  - Vote weight cannot exceed user's current voting power
-  - Votes can only be cast during active voting period
-  - Vote processing reduces user's available voting power
+  - Quadratic cost (weight²) cannot exceed user's current voting power
+  - Votes can only be cast during active voting period (validated upstream)
 
 #### FR-4: Vote Tally Finalization
 - **Requirement:** System must provide mechanism to finalize vote tallies after voting period ends
@@ -406,11 +401,12 @@ This pattern enables complete code reuse while maintaining storage isolation and
 
 ### Power Conservation Invariants
 1. **Non-Increasing Power**: `_processVoteHook()` must return `newPower ≤ oldPower`
-2. **Multiple Registration Policy**: Registration restrictions are mechanism-specific via `_beforeSignupHook()`
+2. **Multiple Registration Policy**: Multiple signups are allowed in `_executeSignup` with voting power accumulation
+   - **Implementation**: `uint256 totalPower = s.votingPower[user] + newPower;` in `_executeSignup`
    - **QuadraticVotingMechanism (Abstract)**: Allows multiple signups by default - serves as base for both QF and QV variants
    - **Quadratic Funding (QF) Variants**: Multiple signups appropriate since users pay for additional voice credits  
-   - **Quadratic Voting (QV) Variants**: Should generally restrict to single signup since QV assumes users claim allocated voice credits once
-   - **Custom Mechanisms**: Can implement any signup policy through hook customization
+   - **Quadratic Voting (QV) Variants**: Multiple signups allowed but may not align with QV assumptions
+   - **Custom Mechanisms**: Can implement access control via `_beforeSignupHook()` but cannot prevent re-registration
 
 ### State Consistency Invariants
 1. **Unique Recipients**: Each recipient address used in at most one proposal
@@ -464,14 +460,14 @@ Voters are community members who deposit assets to gain voting power and partici
 
 **System Response:**
 - Vote tallies updated through `_processVoteHook()`
-- Voter's remaining power reduced by vote weight
+- Voter's remaining power reduced by quadratic cost (weight²)
 - VotesCast event emitted
 - Vote recorded (cannot be changed)
 
 **Key Constraints:**
 - Can only vote during active voting window
 - One vote per proposal per voter (immutable)
-- Vote weight cannot exceed remaining voting power
+- Quadratic cost (weight²) cannot exceed remaining voting power
 - Must manage power across multiple proposals strategically
 - QuadraticVotingMechanism: To cast W votes costs W² voting power (quadratic cost)
 - QuadraticVotingMechanism: Only "For" votes supported (no Against/Abstain)

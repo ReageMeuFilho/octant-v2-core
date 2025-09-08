@@ -11,8 +11,6 @@ import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/I
 /// @dev Follows the Yearn V3 pattern with minimal implementation surface
 contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
     // Custom Errors
-    error AlphaMustBeLEQOne();
-    error AlphaDenominatorMustBePositive();
     error ZeroAddressCannotPropose();
     error OnlyForVotesSupported();
     error InsufficientVotingPowerForQuadraticCost();
@@ -29,9 +27,6 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
         uint256 _alphaNumerator,
         uint256 _alphaDenominator
     ) BaseAllocationMechanism(_implementation, _config) {
-        if (_alphaNumerator > _alphaDenominator) revert AlphaMustBeLEQOne();
-        if (_alphaDenominator == 0) revert AlphaDenominatorMustBePositive();
-
         _setAlpha(_alphaNumerator, _alphaDenominator);
     }
 
@@ -224,11 +219,7 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
         // Access control: only owner can modify alpha
         require(_tokenizedAllocation().owner() == msg.sender, "Only owner can set alpha");
 
-        // Validate alpha constraints
-        if (newNumerator > newDenominator) revert AlphaMustBeLEQOne();
-        if (newDenominator == 0) revert AlphaDenominatorMustBePositive();
-
-        // Update alpha using ProperQF's internal function
+        // Update alpha using ProperQF's internal function (validates constraints internally)
         _setAlpha(newNumerator, newDenominator);
     }
 
