@@ -599,11 +599,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         // Prevent zero-amount contributions after fee deduction
         require(amountContributedToAllocationMechanism > 0, ZeroOperation());
 
-        uint256 scaledAmountConsumed = _amount * SCALE_FACTOR;
-        deposit.scaledUnclaimedRewardCheckpoint = deposit.scaledUnclaimedRewardCheckpoint - scaledAmountConsumed;
-
-        // Track reward consumption
-        _trackRewardConsumption(_amount);
+        _consumeRewards(deposit, _amount);
 
         // Defensive earning power update - maintaining consistency with base Staker pattern
         uint256 _oldEarningPower = deposit.earningPower;
@@ -725,14 +721,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         totalStaked += compoundedAmount;
         depositorTotalStaked[depositOwner] += compoundedAmount;
 
-        // Preserve sub-wei dust like claimReward by subtracting the scaled amount claimed
-        // This is done BEFORE updating balance/earning power to match base _claimReward pattern
-        deposit.scaledUnclaimedRewardCheckpoint =
-            deposit.scaledUnclaimedRewardCheckpoint -
-            (unclaimedAmount * SCALE_FACTOR);
-
-        // Track reward consumption
-        _trackRewardConsumption(unclaimedAmount);
+        _consumeRewards(deposit, unclaimedAmount);
 
         deposit.balance = newBalance.toUint96();
         deposit.earningPower = newEarningPower.toUint96();
@@ -792,11 +781,15 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         }
     }
 
-    /// @notice Internal helper to track when rewards are consumed
-    /// @param _amount The amount of rewards consumed
-    function _trackRewardConsumption(uint256 _amount) internal {
+    /// @notice Atomically updates deposit checkpoint and totalClaimedRewards
+    /// @dev Ensures consistent state updates when rewards are consumed
+    /// @param _deposit The deposit to update
+    /// @param _amount The amount of rewards being claimed
+    function _consumeRewards(Deposit storage _deposit, uint256 _amount) internal {
         if (_amount > 0) {
-            totalClaimedRewards += _amount;
+            uint256 scaledAmount = _amount * SCALE_FACTOR;
+            _deposit.scaledUnclaimedRewardCheckpoint = _deposit.scaledUnclaimedRewardCheckpoint - scaledAmount;
+            totalClaimedRewards = totalClaimedRewards + _amount;
         }
     }
 
@@ -896,11 +889,9 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
             return 0;
         }
 
-        uint256 claimedAmount = super._claimReward(_depositId, deposit, _claimer);
+        totalClaimedRewards += _reward;
 
-        _trackRewardConsumption(_reward);
-
-        return claimedAmount;
+        return super._claimReward(_depositId, deposit, _claimer);
     }
 
     /// @notice Override notifyRewardAmount to use custom reward duration
@@ -1010,12 +1001,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
 
         // CRITICAL: Update state BEFORE external call (checks-effects-interactions pattern)
         // This prevents reentrancy attacks via malicious reward tokens with callbacks
-        deposit.scaledUnclaimedRewardCheckpoint =
-            deposit.scaledUnclaimedRewardCheckpoint -
-            (_requestedTip * SCALE_FACTOR);
-
-        // Track reward consumption
-        _trackRewardConsumption(_requestedTip);
+        _consumeRewards(deposit, _requestedTip);
 
         // External call AFTER all state updates
         SafeERC20.safeTransfer(REWARD_TOKEN, _tipReceiver, _requestedTip);
