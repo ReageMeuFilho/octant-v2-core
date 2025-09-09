@@ -1,5 +1,83 @@
 
 
+## [0.7.0-develop.0](https://github.com/golemfoundation/octant-v2-core/compare/v0.6.0-develop.0...v0.7.0-develop.0) (2025-09-09)
+
+
+### Features
+
+* add event emissions for health check state changes ([60873e5](https://github.com/golemfoundation/octant-v2-core/commit/60873e5310749293cd6e5bbed41426a01000d1c6))
+* add Tallying proposal state for post-voting period ([2a7fac9](https://github.com/golemfoundation/octant-v2-core/commit/2a7fac9a7a90ad1773bab1a27dd59343392985a4))
+* **allocation:** enhance custom distribution with asset tracking ([28809f6](https://github.com/golemfoundation/octant-v2-core/commit/28809f68bdeabec0f68d99d44df64217edf72e0e))
+* combine QuadraticVotingMechanism and TokenizedAllocationMechanism abis ([61904a5](https://github.com/golemfoundation/octant-v2-core/commit/61904a547b90de258e3fb864f29b5d3ea865e9de))
+* combine strategy proxy abis ([84f5759](https://github.com/golemfoundation/octant-v2-core/commit/84f5759f2a06775a802678ac35f4189645c6035f))
+* **factories:** add deposit during loss parameter to strategy factories ([97cf37f](https://github.com/golemfoundation/octant-v2-core/commit/97cf37ffc91b62dbe3aeafc9a98a155b9120bd25))
+* **factories:** implement secure deterministic deployment to prevent front-running ([2295b18](https://github.com/golemfoundation/octant-v2-core/commit/2295b18670c1f950bfd27c3cf8081950cf3f7871))
+* **factories:** implement secure deterministic deployment to prevent front-running ([16f0aa3](https://github.com/golemfoundation/octant-v2-core/commit/16f0aa3b38b07b7ee2482f0610f9b0fac23d49a0))
+* **healthcheck:** add events for health check state changes ([021060c](https://github.com/golemfoundation/octant-v2-core/commit/021060cfadeed9ac76cd4345de973da7b22dc417))
+* make pricePerShare public and add robust claiming logic ([6c6ea9c](https://github.com/golemfoundation/octant-v2-core/commit/6c6ea9cba32f9db5e1381783115b32ab28d1372d))
+* **mechanisms:** enable multiple signups for quadratic funding ([82e2dd8](https://github.com/golemfoundation/octant-v2-core/commit/82e2dd848bde91b2972606d84dcef62c1eb6f6bd))
+* REG-022 add reverse surrogate lookup capability ([#49](https://github.com/golemfoundation/octant-v2-core/issues/49)) ([72a8f76](https://github.com/golemfoundation/octant-v2-core/commit/72a8f769ce90c681786f6055e4bcc0ab10a5c607))
+* **security:** add recipient verification to prevent reorganization attacks ([d0cf578](https://github.com/golemfoundation/octant-v2-core/commit/d0cf57812feb40ddac884da9e77d1129284d034d))
+* **strategy:** add configurable MEV protection to swaps ([efac32b](https://github.com/golemfoundation/octant-v2-core/commit/efac32bbb0695f25e9f3a15453d9366efaacff2d))
+* **strategy:** add donation tracking events and OpenZeppelin Math ([02c88fa](https://github.com/golemfoundation/octant-v2-core/commit/02c88fa98de72710d7da7b5a08f307d541d9ad76))
+* **strategy:** add getCurrentRateRay method for standardized exchange rate conversion ([778ceee](https://github.com/golemfoundation/octant-v2-core/commit/778ceee1e780e231d0d76a2e706648bd3ec0bfc4))
+* **strategy:** add granular maxLoss control to redeem function ([c4a18c7](https://github.com/golemfoundation/octant-v2-core/commit/c4a18c778e514f8227cb38294533e159e450e728))
+* **strategy:** introduce value debt tracking and insolvency protection ([301ecfa](https://github.com/golemfoundation/octant-v2-core/commit/301ecfa9403d4ce7ca59a4077e7edf9b37d3203d))
+* **vault:** enhance rage quit functionality with granular controls ([806fbd0](https://github.com/golemfoundation/octant-v2-core/commit/806fbd09982b2f866c97d2159a690b463e3d938e))
+* **vault:** implement two-step cooldown period change mechanism ([3291d9f](https://github.com/golemfoundation/octant-v2-core/commit/3291d9f6f9c36103fac501451f6f417c1aa3a944))
+
+
+### Bug Fixes
+
+* add driprates to ArrayLengthsMismatch ([f6f3dde](https://github.com/golemfoundation/octant-v2-core/commit/f6f3ddebdb9dc0ee69c54b4c9f1813a61cbb6e83))
+* add missing nonReentrant to notifyRewardAmount ([84ea3a9](https://github.com/golemfoundation/octant-v2-core/commit/84ea3a9ead237a88615ebe2b002e3fe617423573))
+* add to ci release ([8046c10](https://github.com/golemfoundation/octant-v2-core/commit/8046c10c4ffa802145b9db373d50eab7b2b73912))
+* adjust available deposit limit calculation to account for idle balance ([bd83b98](https://github.com/golemfoundation/octant-v2-core/commit/bd83b9813f38a15a483746ef663b4c9a834dc044))
+* **allocation:** handle token decimal conversions for asset-share scaling ([b1bb718](https://github.com/golemfoundation/octant-v2-core/commit/b1bb718127f69bda05e69df2321240354e87ab3d))
+* **allowance:** atomically update dripRatePerDay and lastBookedAtInSeconds to prevent timing issues ([a72fa9e](https://github.com/golemfoundation/octant-v2-core/commit/a72fa9ef231db5ba0da85ab9cccb524ee24ca999))
+* **factories:** post-implementation improvements and fixes ([7147164](https://github.com/golemfoundation/octant-v2-core/commit/71471646cd812cb5f3672d043bdd6d119822a25b))
+* install forge deps in docker container ([eb1e750](https://github.com/golemfoundation/octant-v2-core/commit/eb1e7501c41aa4196af494bb2077296df3585615))
+* install soldeer deps in release ([b0f3a5e](https://github.com/golemfoundation/octant-v2-core/commit/b0f3a5ea6e2f2568e2369839f0ece1bc581b12bb))
+* LIN-002: Remove redundant conditional return statement ([e2ea11f](https://github.com/golemfoundation/octant-v2-core/commit/e2ea11fda73e240722da43a75d136a75300b08ee))
+* LIN-003: Use abi.encodeCall for better type safety ([34b3fbc](https://github.com/golemfoundation/octant-v2-core/commit/34b3fbcbd428fe71723de81b1aa193c50bdcf280))
+* prevent dragon router transfers to self ([dba8398](https://github.com/golemfoundation/octant-v2-core/commit/dba83982d3cf6edbcef4fe828cb05bf8bf2b5376))
+* prevent registration of zero address in allocation mechanism ([7e9f658](https://github.com/golemfoundation/octant-v2-core/commit/7e9f6582971e3fe26288a1c64171b8f0c760a1de))
+* **qv:** normalize token decimals in alpha calculation ([7d405ea](https://github.com/golemfoundation/octant-v2-core/commit/7d405ea3a713f15956fd0b20e9cd776602b0d862))
+* **qv:** return zero funding for cancelled proposals ([874c506](https://github.com/golemfoundation/octant-v2-core/commit/874c50628c65fcb011c81bc35f18417e9cddfb34))
+* rebalance debt on dragon transfers inwards ([d9c6573](https://github.com/golemfoundation/octant-v2-core/commit/d9c65733897e5c72aaa30d8ff8260b4aa088f2c9))
+* **regen:** enforce owner whitelist in compoundRewards and add tests ([#51](https://github.com/golemfoundation/octant-v2-core/issues/51)) ([44637ca](https://github.com/golemfoundation/octant-v2-core/commit/44637ca835d0a00ab9e4ddaf2cf2285b400e88db))
+* **regen:** REG-006 (OSU-920) add governance protection to setMaxBumpTip ([#30](https://github.com/golemfoundation/octant-v2-core/issues/30)) ([99b1ff9](https://github.com/golemfoundation/octant-v2-core/commit/99b1ff9ea3c35bdc127a292d77469aeeccd222c7))
+* **regen:** REG-013 (OSU-946) unify reward period boundary checks for consistency ([fb3686c](https://github.com/golemfoundation/octant-v2-core/commit/fb3686c221358b0be0668abe8efe60aa366c0cb5))
+* **regen:** REG-014 (OSU-947) align balance check with original Staker ([dc2aad3](https://github.com/golemfoundation/octant-v2-core/commit/dc2aad3590ce26dd074aa4241f7373f6684c059c))
+* **regen:** REG-015 (OSU-948) zero amount handling consistency ([2c2bcc6](https://github.com/golemfoundation/octant-v2-core/commit/2c2bcc68232a68ebb2c0c6d01d1f7b66a92f92ba))
+* **regen:** REG-016 (OSU-949) prevent fee collection on zero benefit scenarios ([#31](https://github.com/golemfoundation/octant-v2-core/issues/31)) ([0051429](https://github.com/golemfoundation/octant-v2-core/commit/005142950e270572ac21f18fbc9562fdcca48026))
+* **regen:** REG-017 (OSU-950) standardize compound event emission patterns ([af38193](https://github.com/golemfoundation/octant-v2-core/commit/af381939cad136d1af44e409c61db0c396774327))
+* **regen:** REG-018 align surrogate transfer patterns via unified hook ([#12](https://github.com/golemfoundation/octant-v2-core/issues/12)) ([081fadc](https://github.com/golemfoundation/octant-v2-core/commit/081fadcffe72c7a5e57975e2321b61dbe6dd4b3d))
+* **regen:** REG-020 (OSU-953) remove transfer skip logic for ERC20 consistency ([232d60e](https://github.com/golemfoundation/octant-v2-core/commit/232d60e98fcb865fbbaa4353f509769422cda5ba))
+* **regen:** REG-023 (OSU-956) Same-token protection with security improvements ([d68a69c](https://github.com/golemfoundation/octant-v2-core/commit/d68a69ccc3d0a6336cba8c09e86cb84c028e7e17))
+* **regen:** REG-024 add missing event emissions and prevent whitelist conflicts ([#28](https://github.com/golemfoundation/octant-v2-core/issues/28)) ([3269764](https://github.com/golemfoundation/octant-v2-core/commit/3269764d257a4c78b141607b6d1d0a5a4774eab1))
+* **regen:** REG-029 (OSU-983) add reentrancy protection to bumpEarningPower ([#33](https://github.com/golemfoundation/octant-v2-core/issues/33)) ([1a096a0](https://github.com/golemfoundation/octant-v2-core/commit/1a096a0250a3ab7fa35bf42167560dc2838ab71e))
+* **regen:** REG-036 account for _remainingReward and totalUnspentRewards in balance validation ([5cfbcf0](https://github.com/golemfoundation/octant-v2-core/commit/5cfbcf09d02c84b3b55f7f3ae3fd4c3853b168e4))
+* **regen:** REG-036 add asset validation in contribute to prevent token mismatch ([#62](https://github.com/golemfoundation/octant-v2-core/issues/62)) ([ba3c5e5](https://github.com/golemfoundation/octant-v2-core/commit/ba3c5e5b826d1d35ec77a8d95b8f53e66868f352)), closes [#39](https://github.com/golemfoundation/octant-v2-core/issues/39)
+* remove foreign command from postinstall script ([0724b47](https://github.com/golemfoundation/octant-v2-core/commit/0724b47b1c1c92ef709c37eb8f646e23c1d63181))
+* remove unecessary allowance ([a66c09d](https://github.com/golemfoundation/octant-v2-core/commit/a66c09dbe2adf9274c931a6fe63848285f02019f))
+* return zero for preview redeem outside redemption period ([dc8a2f1](https://github.com/golemfoundation/octant-v2-core/commit/dc8a2f1124b42095d6a2fc239e4ca802c7cfa42b))
+* **security:** add reinitialization protection ([f370c1f](https://github.com/golemfoundation/octant-v2-core/commit/f370c1fc3c027910eac64def375b611a11d5ef14))
+* **security:** clear unused approvals in UniswapV3Swapperrefactor ([0745cf7](https://github.com/golemfoundation/octant-v2-core/commit/0745cf7e1a2343c486e61313ea2b3c98a85066f3))
+* **security:** OSU-1030 TRST-R-25 add whitelist validation to prevent arbitrary external calls ([#66](https://github.com/golemfoundation/octant-v2-core/issues/66)) ([8b03adc](https://github.com/golemfoundation/octant-v2-core/commit/8b03adcd9099f1db30654723d7d72d66e49065a5))
+* **strategy:** include asset balance in total assets calculation ([68fff58](https://github.com/golemfoundation/octant-v2-core/commit/68fff5879fe624a99197164e6d9511b164c9f7fd))
+* **strategy:** include idle assets in total asset calculation ([774a354](https://github.com/golemfoundation/octant-v2-core/commit/774a354d5b01912b9eae5ce63ea6b081b7ab4724))
+* **strategy:** prevent deployment of funds when staking is paused ([37112f9](https://github.com/golemfoundation/octant-v2-core/commit/37112f9815cd46cb21eeedd85038e97980a6101d))
+* unify StrategyDeploy event emission to use _management across all factories ([0e612cb](https://github.com/golemfoundation/octant-v2-core/commit/0e612cb47043ad229ad79d84ff51f87c1aa1d2ba))
+* **vault:** add reentrancy guard to processReport ([666654e](https://github.com/golemfoundation/octant-v2-core/commit/666654e84e7778e344b2a5526337d2c627e616d9))
+* **vault:** prevent vault from adding itself as strategy ([5c2406e](https://github.com/golemfoundation/octant-v2-core/commit/5c2406ea1a436d37fb0c7f805640494eccfc6ef9))
+* **yield-skimming:** migrate debt accounting on dragon router change ([a5401a0](https://github.com/golemfoundation/octant-v2-core/commit/a5401a0d814d09ed71f9c931d1f5c435e9786bd2))
+
+
+### Reverts
+
+* Revert "fix(security): prevent whitelist circumvention via delegation" ([b56e7e6](https://github.com/golemfoundation/octant-v2-core/commit/b56e7e6078f7954ecf4de7ac3310cf9d0d27e614))
+
 ## [0.6.0-develop.0](https://github.com/golemfoundation/octant-v2-core/compare/v0.5.11-develop.0...v0.6.0-develop.0) (2025-07-16)
 
 
