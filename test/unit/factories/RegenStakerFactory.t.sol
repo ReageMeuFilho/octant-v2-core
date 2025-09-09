@@ -55,10 +55,10 @@ contract RegenStakerFactoryTest is Test {
         contributionWhitelist = new Whitelist();
         allocationMechanismWhitelist = new Whitelist();
 
-        // Deploy the factory with both variants' bytecode (this test contract is the deployer)
-        bytes memory regenStakerBytecode = type(RegenStaker).creationCode;
-        bytes memory noDelegationBytecode = type(RegenStakerWithoutDelegateSurrogateVotes).creationCode;
-        factory = new RegenStakerFactory(regenStakerBytecode, noDelegationBytecode);
+        // Deploy the factory with both variants' bytecode hashes (this test contract is the deployer)
+        bytes32 regenStakerBytecodeHash = keccak256(type(RegenStaker).creationCode);
+        bytes32 noDelegationBytecodeHash = keccak256(type(RegenStakerWithoutDelegateSurrogateVotes).creationCode);
+        factory = new RegenStakerFactory(regenStakerBytecodeHash, noDelegationBytecodeHash);
 
         vm.label(address(factory), "RegenStakerFactory");
         vm.label(address(rewardsToken), "RewardsToken");

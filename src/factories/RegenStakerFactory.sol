@@ -7,8 +7,8 @@ import { IERC20, IWhitelist, IEarningPowerCalculator } from "src/regen/RegenStak
 /// @title RegenStaker Factory
 /// @notice Deploys RegenStaker contracts with explicit variant selection
 /// @author [Golem Foundation](https://golem.foundation)
-/// @dev SECURITY: Tracks canonical bytecode per variant from first deployment by factory deployer
-/// @dev SECURITY ASSUMPTION: Factory deployer is trusted to provide correct canonical bytecode.
+/// @dev SECURITY: Validates deployment bytecode against pre-configured canonical hashes
+/// @dev SECURITY ASSUMPTION: Factory deployer is trusted to provide correct canonical bytecode hashes.
 ///      If deployer is compromised, all future deployments could use unauthorized code.
 ///      This is an acceptable risk given the controlled deployment environment.
 contract RegenStakerFactory {
@@ -42,30 +42,16 @@ contract RegenStakerFactory {
         RegenStakerVariant variant
     );
 
-    event CanonicalBytecodeSet(RegenStakerVariant indexed variant, bytes32 indexed bytecodeHash);
-
     // Errors
     error InvalidBytecode();
     error UnauthorizedBytecode(RegenStakerVariant variant, bytes32 providedHash, bytes32 expectedHash);
 
-    constructor(bytes memory regenStakerBytecode, bytes memory noDelegationBytecode) {
-        _canonicalizeBytecode(regenStakerBytecode, RegenStakerVariant.WITH_DELEGATION);
-        _canonicalizeBytecode(noDelegationBytecode, RegenStakerVariant.WITHOUT_DELEGATION);
+    constructor(bytes32 regenStakerBytecodeHash, bytes32 noDelegationBytecodeHash) {
+        canonicalBytecodeHash[RegenStakerVariant.WITH_DELEGATION] = regenStakerBytecodeHash;
+        canonicalBytecodeHash[RegenStakerVariant.WITHOUT_DELEGATION] = noDelegationBytecodeHash;
     }
 
-    /// @notice SECURITY: Internal function to canonicalize bytecode without full deployment
-    /// @param bytecode The bytecode to canonicalize
-    /// @param variant The variant this bytecode represents
-    function _canonicalizeBytecode(bytes memory bytecode, RegenStakerVariant variant) private {
-        if (bytecode.length == 0) revert InvalidBytecode();
-
-        bytes32 bytecodeHash = keccak256(bytecode);
-        canonicalBytecodeHash[variant] = bytecodeHash;
-
-        emit CanonicalBytecodeSet(variant, bytecodeHash);
-    }
-
-    /// @notice SECURITY: Modifier to validate bytecode against canonical version
+    /// @notice Modifier to validate bytecode against canonical hash
     modifier validatedBytecode(bytes calldata code, RegenStakerVariant variant) {
         _validateBytecode(code, variant);
         _;
@@ -113,7 +99,7 @@ contract RegenStakerFactory {
         return Create2.computeAddress(finalSalt, keccak256(bytecode));
     }
 
-    /// @notice SECURITY: Validate bytecode against canonical version
+    /// @notice Validate bytecode against canonical hash
     /// @param code Bytecode to validate
     /// @param variant The RegenStaker variant this bytecode represents
     function _validateBytecode(bytes calldata code, RegenStakerVariant variant) internal view {
