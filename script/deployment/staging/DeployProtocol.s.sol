@@ -13,6 +13,8 @@ import { DeployModuleProxyFactory } from "script/deploy/DeployModuleProxyFactory
 import { DeployPaymentSplitterFactory } from "script/deploy/DeployPaymentSplitterFactory.sol";
 import { DeploySkyCompounderStrategyFactory } from "script/deploy/DeploySkyCompounderStrategyFactory.sol";
 import { DeployMorphoCompounderStrategyFactory } from "script/deploy/DeployMorphoCompounderStrategyFactory.sol";
+import { DeployRocketPoolStrategyFactory } from "script/deploy/DeployRocketPoolStrategyFactory.sol";
+import { DeployLidoStrategyFactory } from "script/deploy/DeployLidoStrategyFactory.sol";
 import { DeployRegenStakerFactory } from "script/deploy/DeployRegenStakerFactory.sol";
 import { DeployAllocationMechanismFactory } from "script/deploy/DeployAllocationMechanismFactory.sol";
 
@@ -32,6 +34,8 @@ contract DeployProtocol is Script {
     DeployPaymentSplitterFactory public deployPaymentSplitterFactory;
     DeploySkyCompounderStrategyFactory public deploySkyCompounderStrategyFactory;
     DeployMorphoCompounderStrategyFactory public deployMorphoCompounderStrategyFactory;
+    DeployRocketPoolStrategyFactory public deployRocketPoolStrategyFactory;
+    DeployLidoStrategyFactory public deployLidoStrategyFactory;
     DeployRegenStakerFactory public deployRegenStakerFactory;
     DeployAllocationMechanismFactory public deployAllocationMechanismFactory;
 
@@ -48,6 +52,8 @@ contract DeployProtocol is Script {
     address public paymentSplitterFactoryAddress;
     address public skyCompounderStrategyFactoryAddress;
     address public morphoCompounderStrategyFactoryAddress;
+    address public rocketPoolStrategyFactoryAddress;
+    address public lidoStrategyFactoryAddress;
     address public regenStakerFactoryAddress;
     address public allocationMechanismFactoryAddress;
 
@@ -64,6 +70,8 @@ contract DeployProtocol is Script {
         deployPaymentSplitterFactory = new DeployPaymentSplitterFactory();
         deploySkyCompounderStrategyFactory = new DeploySkyCompounderStrategyFactory();
         deployMorphoCompounderStrategyFactory = new DeployMorphoCompounderStrategyFactory();
+        deployRocketPoolStrategyFactory = new DeployRocketPoolStrategyFactory();
+        deployLidoStrategyFactory = new DeployLidoStrategyFactory();
         deployRegenStakerFactory = new DeployRegenStakerFactory();
         deployAllocationMechanismFactory = new DeployAllocationMechanismFactory();
     }
@@ -120,6 +128,10 @@ contract DeployProtocol is Script {
         morphoCompounderStrategyFactoryAddress = address(
             deployMorphoCompounderStrategyFactory.morphoCompounderStrategyFactory()
         );
+        deployRocketPoolStrategyFactory.deploy();
+        rocketPoolStrategyFactoryAddress = address(deployRocketPoolStrategyFactory.rocketPoolStrategyFactory());
+        deployLidoStrategyFactory.deploy();
+        lidoStrategyFactoryAddress = address(deployLidoStrategyFactory.lidoStrategyFactory());
 
         // Deploy Regen Staker Factory
         deployRegenStakerFactory.deploy();
@@ -146,6 +158,8 @@ contract DeployProtocol is Script {
         console2.log("Payment Splitter Factory:                 ", paymentSplitterFactoryAddress);
         console2.log("Sky Compounder Strategy Factory:          ", skyCompounderStrategyFactoryAddress);
         console2.log("Morpho Compounder Strategy Vault Factory: ", morphoCompounderStrategyFactoryAddress);
+        console2.log("RocketPool Strategy Factory:              ", rocketPoolStrategyFactoryAddress);
+        console2.log("Lido Strategy Factory:                    ", lidoStrategyFactoryAddress);
         console2.log("Regen Staker Factory:                     ", regenStakerFactoryAddress);
         console2.log("Allocation Mechanism Factory:             ", allocationMechanismFactoryAddress);
         console2.log("------------------");
@@ -206,6 +220,14 @@ contract DeployProtocol is Script {
                 "MORPHO_COMPOUNDER_STRATEGY_FACTORY_ADDRESS=",
                 vm.toString(morphoCompounderStrategyFactoryAddress)
             )
+        );
+        vm.writeLine(
+            contractAddressFilename,
+            string.concat("ROCKETPOOL_STRATEGY_FACTORY_ADDRESS=", vm.toString(rocketPoolStrategyFactoryAddress))
+        );
+        vm.writeLine(
+            contractAddressFilename,
+            string.concat("LIDO_STRATEGY_FACTORY_ADDRESS=", vm.toString(lidoStrategyFactoryAddress))
         );
         vm.writeLine(
             contractAddressFilename,
