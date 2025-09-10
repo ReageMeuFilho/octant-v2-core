@@ -7,7 +7,7 @@ import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 /**
  * @title YieldDonatingTokenizedStrategy
  * @author octant.finance
- * @notice A specialized version of DragonTokenizedStrategy designed for productive assets to generate and donate profits to the dragon router
+ * @notice A specialized version of TokenizedStrategy designed for productive assets to generate and donate profits to the dragon router
  * @dev This strategy implements a yield donation mechanism by:
  *      - Calling harvestAndReport to collect all profits from the underlying strategy
  *      - Converting profits into shares using the standard conversion

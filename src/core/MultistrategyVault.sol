@@ -496,6 +496,14 @@ contract MultistrategyVault is IMultistrategyVault {
 
     /// REPORTING MANAGEMENT ///
 
+    /**
+     * @notice Process a report from a strategy or the vault itself.
+     * @dev Can only be called by the REPORTING_MANAGER role.
+     * Handles profit/loss accounting, fee assessment, and share locking.
+     * @param strategy_ The strategy to process the report for (or address(this) for vault idle).
+     * @return gain The amount of profit reported.
+     * @return loss The amount of loss reported.
+     */
     function processReport(address strategy_) external nonReentrant returns (uint256, uint256) {
         _enforceRole(msg.sender, Roles.REPORTING_MANAGER);
 
@@ -867,7 +875,6 @@ contract MultistrategyVault is IMultistrategyVault {
 
         // Add debt manager role to the sender
         roles[msg.sender] = roles[msg.sender] | (1 << uint256(Roles.DEBT_MANAGER));
-        // todo might need to emit the combined roles
         emit RoleSet(msg.sender, roles[msg.sender]);
 
         emit Shutdown();
@@ -1241,6 +1248,13 @@ contract MultistrategyVault is IMultistrategyVault {
         return _lastProfitUpdate;
     }
 
+    /**
+     * @notice Assess the share of unrealised losses that a strategy has.
+     * @param strategy The address of the strategy.
+     * @param currentDebt The current debt of the strategy.
+     * @param assetsNeeded The amount of assets needed to be withdrawn.
+     * @return The share of unrealised losses that the strategy has.
+     */
     function assessShareOfUnrealisedLosses(
         address strategy,
         uint256 currentDebt,

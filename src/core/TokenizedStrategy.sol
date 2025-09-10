@@ -614,12 +614,6 @@ abstract contract TokenizedStrategy {
     /**
      * @notice Get the current supply of the strategies shares.
      *
-     * Locked shares issued to the strategy from profits are not
-     * counted towards the full supply until they are unlocked.
-     *
-     * As more shares slowly unlock the totalSupply will decrease
-     * causing the PPS of the strategy to increase.
-     *
      * @return . Total amount of shares outstanding.
      */
     function totalSupply() external view returns (uint256) {
@@ -1237,7 +1231,7 @@ abstract contract TokenizedStrategy {
 
     /**
      * @notice Initiates a change to a new dragon router address with a cooldown period.
-     * @dev Users have 7 days to withdraw if they disagree with the new donation address.
+     * @dev Users have 14 days to withdraw if they disagree with the new donation address.
      * @param _dragonRouter New address to set as pending `dragonRouter`.
      */
     function setDragonRouter(address _dragonRouter) external onlyManagement {
@@ -1331,10 +1325,8 @@ abstract contract TokenizedStrategy {
 
     /**
      * @notice Returns the current balance for a given '_account'.
-     * @dev If the '_account` is the strategy then this will subtract
-     * the amount of shares that have been unlocked since the last profit first.
      * @param account the address to return the balance for.
-     * @return . The current balance in y shares of the '_account'.
+     * @return . The current balance in shares of the '_account'.
      */
     function balanceOf(address account) external view returns (uint256) {
         return _balanceOf(_strategyStorage(), account);

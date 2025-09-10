@@ -7,8 +7,8 @@ import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
 
 /**
- * @title YearnV3 Base Strategy
- * @author yearn.finance
+ * @title Octant Base Strategy
+ * @author octant.finance
  * @notice
  *  BaseStrategy implements all of the required functionality to
  *  seamlessly integrate with the `TokenizedStrategy` implementation contract
@@ -332,7 +332,7 @@ abstract contract BaseStrategy {
      * or sandwichable strategies. It should never be lower than `totalIdle`.
      *
      *   EX:
-     *       return TokenIzedStrategy.totalIdle();
+     *       return TokenizedStrategy.totalIdle();
      *
      * This does not need to take into account the `_owner`'s share balance
      * or conversion rates from shares to assets.
