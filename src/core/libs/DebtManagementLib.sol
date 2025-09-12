@@ -7,7 +7,26 @@ import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { IMultistrategyVault } from "src/core/interfaces/IMultistrategyVault.sol";
 import { ERC20SafeApproveLib } from "src/core/libs/ERC20SafeApproveLib.sol";
 
-/// @notice Library with all actions that can be performed on strategies
+/**
+ * @title DebtManagementLib
+ * @notice Library for managing debt allocation and rebalancing between a multistrategy vault and its strategies
+ * @dev This library handles the complex logic of moving assets between the vault's idle reserves and
+ *      individual strategies to maintain target debt levels. It ensures proper accounting, respects
+ *      minimum idle requirements, and handles loss scenarios during withdrawals.
+ *
+ * Key Features:
+ * - Debt rebalancing: Moves assets to/from strategies to match target debt allocations
+ * - Loss protection: Enforces maximum acceptable loss thresholds during withdrawals
+ * - Idle management: Maintains minimum idle reserves in the vault for liquidity
+ * - Strategy constraints: Respects individual strategy deposit/withdrawal limits
+ * - Shutdown handling: Ensures controlled wind-down when vault is in shutdown mode
+ *
+ * The library follows the ERC4626 standard for strategy interactions and implements
+ * robust error handling for edge cases like insufficient liquidity or unrealized losses.
+ *
+ * @author Golem Foundation
+ * @custom:security-contact security@golem.foundation
+ */
 library DebtManagementLib {
     // Constants
     uint256 public constant MAX_BPS = 10_000;
