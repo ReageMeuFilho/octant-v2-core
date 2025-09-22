@@ -7,7 +7,7 @@ import { FailSafe } from "test/mocks/MockFailSafe.sol";
 
 contract OctantRewardsSafeModule is BaseTest {
     address keeper = makeAddr("keeper");
-    address treasury = makeAddr("treasury");
+    address treasury = makeAddr("treasuryWallet");
     address dragonRouter = makeAddr("dragonRouter");
     uint256 totalValidators = 2;
     uint256 maxYield = 31 ether;
