@@ -6,7 +6,8 @@ import { RocketPoolStrategy } from "src/strategies/yieldSkimming/RocketPoolStrat
 
 /**
  * @title RocketPoolStrategyFactory
- * @author Octant
+ * @author [Golem Foundation](https://golem.foundation)
+ * @custom:security-contact security@golem.foundation
  * @notice Factory for deploying RocketPool yield skimming strategies
  * @dev Inherits deterministic deployment from BaseStrategyFactory
  */

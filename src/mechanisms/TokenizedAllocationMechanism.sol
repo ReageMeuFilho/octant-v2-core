@@ -1006,7 +1006,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
      * @param shares The amount of shares burnt.
      * @param receiver The address to receive `assets`.
      * @param shareOwner The address whose shares are burnt.
-     * @return . The actual amount of underlying withdrawn.
+     * @return assetsWithdrawn The actual amount of underlying withdrawn.
      */
     function redeem(uint256 shares, address receiver, address shareOwner) external nonReentrant returns (uint256) {
         // Get the storage slot for all following calls.
@@ -1027,7 +1027,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
      *
      * We manually track `totalAssets` to avoid any PPS manipulation.
      *
-     * @return . Total assets the strategy holds.
+     * @return totalAssets_ Total assets the strategy holds.
      */
     function totalAssets() external view returns (uint256) {
         return _totalAssets(_getStorage());
@@ -1042,7 +1042,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
      * As more shares slowly unlock the totalSupply will decrease
      * causing the PPS of the strategy to increase.
      *
-     * @return . Total amount of shares outstanding.
+     * @return totalSupply_ Total amount of shares outstanding.
      */
     function totalSupply() external view returns (uint256) {
         return _totalSupply(_getStorage());
@@ -1054,7 +1054,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
      * ideal scenario where all the conditions are met.
      *
      * @param assets The amount of underlying.
-     * @return . Expected shares that `assets` represents.
+     * @return shares_ Expected shares that `assets` represents.
      */
     function convertToShares(uint256 assets) external view returns (uint256) {
         return _convertToShares(_getStorage(), assets, Math.Rounding.Floor);
@@ -1066,7 +1066,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
      * ideal scenario where all the conditions are met.
      *
      * @param shares The amount of the strategies shares.
-     * @return . Expected amount of `asset` the shares represents.
+     * @return assets_ Expected amount of `asset` the shares represents.
      */
     function convertToAssets(uint256 shares) external view returns (uint256) {
         return _convertToAssets(_getStorage(), shares, Math.Rounding.Floor);
@@ -1079,7 +1079,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
      * @dev This will round down.
      *
      * @param shares The amount of shares that would be redeemed.
-     * @return . The amount of `asset` that would be returned.
+     * @return assets_ The amount of `asset` that would be returned.
      */
     function previewRedeem(uint256 shares) external view returns (uint256) {
         AllocationStorage storage s = _getStorage();
@@ -1297,7 +1297,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
      *
      * @param to The address shares will be transferred to.
      * @param amount The amount of shares to be transferred from sender.
-     * @return . a boolean value indicating whether the operation succeeded.
+     * @return success True if the operation succeeded.
      */
     function transfer(address to, uint256 amount) external returns (bool) {
         _transfer(_getStorage(), msg.sender, to, amount);
@@ -1326,7 +1326,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
      *
      * @param spender the address to allow the shares to be moved by.
      * @param amount the amount of shares to allow `spender` to move.
-     * @return . a boolean value indicating whether the operation succeeded.
+     * @return success True if the operation succeeded.
      */
     function approve(address spender, uint256 amount) external returns (bool) {
         _approve(_getStorage(), msg.sender, spender, amount);
@@ -1358,7 +1358,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
      * @param from the address to be moving shares from.
      * @param to the address to be moving shares to.
      * @param amount the quantity of shares to move.
-     * @return . a boolean value indicating whether the operation succeeded.
+     * @return success True if the operation succeeded.
      */
     function transferFrom(address from, address to, uint256 amount) external returns (bool) {
         AllocationStorage storage S = _getStorage();

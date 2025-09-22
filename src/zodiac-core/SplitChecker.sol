@@ -6,6 +6,8 @@ import { ISplitChecker } from "src/zodiac-core/interfaces/ISplitChecker.sol";
 
 import { AlreadyInitialized } from "src/errors.sol";
 /// @title SplitChecker
+/// @author [Golem Foundation](https://golem.foundation)
+/// @custom:security-contact security@golem.foundation
 /// @notice Validates split configurations for revenue distribution
 /// @dev Ensures splits meet requirements for opex and metapool allocations
 

@@ -15,6 +15,9 @@ import { IMultistrategyVaultFactory } from "src/factories/interfaces/IMultistrat
 import { DebtManagementLib } from "src/core/libs/DebtManagementLib.sol";
 
 /**
+ * @title MultistrategyVault
+ * @author yearn.finance; port maintained by [Golem Foundation](https://golem.foundation)
+ * @custom:security-contact security@golem.foundation
  * @notice
  *   This MultistrategyVault is based on the original VaultV3.vy Vyper implementation
  *   that has been ported to Solidity. It is designed as a non-opinionated system
@@ -42,6 +45,13 @@ import { DebtManagementLib } from "src/core/libs/DebtManagementLib.sol";
  *   The vault is built to be customized by the management to be able to fit their
  *   specific desired needs. Including the customization of strategies, accountants,
  *   ownership etc.
+ *
+ * @dev Security considerations (summary):
+ *  - Roles: privileged functions gated via `Roles`; improper assignment can lead to fund mismanagement.
+ *  - Reentrancy: mutating flows guarded by `nonReentrant`.
+ *  - Precision/rounding: use preview/convert helpers; PPS exposed has limited precision.
+ *  - Withdrawal queue: incorrect ordering/duplicates can distort maxWithdraw/maxRedeem views.
+ *  - Strategy trust: vault does not attest to strategy safety; management must curate strategies.
  */
 contract MultistrategyVault is IMultistrategyVault {
     // CONSTANTS

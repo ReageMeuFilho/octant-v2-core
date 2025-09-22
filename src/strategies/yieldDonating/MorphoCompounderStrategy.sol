@@ -8,7 +8,8 @@ import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @title MorphoCompounderStrategy
-/// @author Octant
+/// @author [Golem Foundation](https://golem.foundation)
+/// @custom:security-contact security@golem.foundation
 /// @notice Yearn v3 Strategy that donates rewards.
 contract MorphoCompounderStrategy is BaseHealthCheck {
     using SafeERC20 for IERC20;
@@ -16,6 +17,17 @@ contract MorphoCompounderStrategy is BaseHealthCheck {
     // morpho vault
     address public immutable compounderVault;
 
+    /**
+     * @param _compounderVault Address of the Morpho vault this strategy compounds into
+     * @param _asset Address of the underlying asset of the Morpho vault
+     * @param _name Strategy name
+     * @param _management Address with management role
+     * @param _keeper Address with keeper role
+     * @param _emergencyAdmin Address with emergency admin role
+     * @param _donationAddress Address that receives donated/minted yield
+     * @param _enableBurning Whether loss-protection burning from donation address is enabled
+     * @param _tokenizedStrategyAddress Address of TokenizedStrategy implementation
+     */
     constructor(
         address _compounderVault,
         address _asset,

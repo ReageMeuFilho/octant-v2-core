@@ -251,7 +251,18 @@ interface IMultistrategyVault {
     //////////////////////////////////////////////////////////////*/
 
     // ERC4626 EVENTS
+    /// @notice Emitted when assets are deposited and shares minted
+    /// @param sender The caller that initiated the deposit
+    /// @param owner The address receiving the minted shares
+    /// @param assets The amount of assets deposited
+    /// @param shares The amount of shares minted
     event Deposit(address indexed sender, address indexed owner, uint256 assets, uint256 shares);
+    /// @notice Emitted when shares are redeemed and assets withdrawn
+    /// @param sender The caller that initiated the withdrawal
+    /// @param receiver The address receiving the withdrawn assets
+    /// @param owner The owner whose shares were burned
+    /// @param assets The amount of assets withdrawn
+    /// @param shares The amount of shares burned
     event Withdraw(
         address indexed sender,
         address indexed receiver,
@@ -265,7 +276,18 @@ interface IMultistrategyVault {
     event Approval(address indexed owner, address indexed spender, uint256 value);
 
     // STRATEGY EVENTS
+    /// @notice Emitted when a strategy is added to or revoked from the vault
+    /// @param strategy The strategy address
+    /// @param change_type The type of change (ADDED or REVOKED)
     event StrategyChanged(address indexed strategy, StrategyChangeType indexed change_type);
+    /// @notice Emitted when a strategy report is processed
+    /// @param strategy The strategy address that reported
+    /// @param gain Reported profit amount
+    /// @param loss Reported loss amount
+    /// @param currentDebt Strategy debt after accounting
+    /// @param protocolFees Protocol fees (if any)
+    /// @param totalFees Total fees paid (including protocol fees)
+    /// @param totalRefunds Refunds credited back to the vault
     event StrategyReported(
         address indexed strategy,
         uint256 gain,
@@ -277,6 +299,10 @@ interface IMultistrategyVault {
     );
 
     // DEBT MANAGEMENT EVENTS
+    /// @notice Emitted when a strategy's debt is updated
+    /// @param strategy The strategy address
+    /// @param currentDebt The previous debt value
+    /// @param newDebt The new debt value
     event DebtUpdated(address indexed strategy, uint256 currentDebt, uint256 newDebt);
 
     // ROLE UPDATES
@@ -304,7 +330,8 @@ interface IMultistrategyVault {
 
     function asset() external view returns (address);
     function decimals() external view returns (uint8);
-    // todo fix the following functions that are there as public variables
+    // NOTE: The following functions are declared for interface completeness where
+    // some implementations may expose equivalent public state variables.
     function strategies(address strategy) external view returns (StrategyParams memory);
     function defaultQueue() external view returns (address[] memory);
     function useDefaultQueue() external view returns (bool);

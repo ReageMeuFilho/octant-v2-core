@@ -13,6 +13,16 @@ interface IWstETH {
  * @dev This strategy tracks the value of deposits and captures yield as the price per share increases
  */
 contract LidoStrategy is BaseYieldSkimmingStrategy {
+    /**
+     * @param _asset Address of the underlying asset (wstETH)
+     * @param _name Strategy name
+     * @param _management Address with management role
+     * @param _keeper Address with keeper role
+     * @param _emergencyAdmin Address with emergency admin role
+     * @param _donationAddress Address that receives donated/minted yield
+     * @param _enableBurning Whether loss-protection burning from donation address is enabled
+     * @param _tokenizedStrategyAddress Address of TokenizedStrategy implementation
+     */
     constructor(
         address _asset,
         string memory _name,

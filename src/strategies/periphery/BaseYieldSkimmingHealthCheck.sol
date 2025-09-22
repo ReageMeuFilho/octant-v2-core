@@ -8,7 +8,8 @@ import { WadRayMath } from "src/utils/libs/Maths/WadRay.sol";
 
 /**
  *   @title Base Yield Skimming Health Check
- *   @author Octant
+ *   @author [Golem Foundation](https://golem.foundation)
+ *   @custom:security-contact security@golem.foundation
  *   @notice This contract can be inherited by any Yield Skimming strategy wishing to implement a health check during
  *   the `harvestAndReport` function in order to prevent any unexpected behavior from being permanently recorded as well
  *   as the `checkHealth` modifier.
@@ -72,7 +73,7 @@ abstract contract BaseYieldSkimmingHealthCheck is BaseStrategy, IBaseHealthCheck
     /**
      * @notice Returns the current profit limit ratio.
      * @dev Use a getter function to keep the variable private.
-     * @return . The current profit limit ratio.
+     * @return profitLimitRatio The current profit limit ratio.
      */
     function profitLimitRatio() public view returns (uint256) {
         return _profitLimitRatio;
@@ -81,7 +82,7 @@ abstract contract BaseYieldSkimmingHealthCheck is BaseStrategy, IBaseHealthCheck
     /**
      * @notice Returns the current loss limit ratio.
      * @dev Use a getter function to keep the variable private.
-     * @return . The current loss limit ratio.
+     * @return lossLimitRatio The current loss limit ratio.
      */
     function lossLimitRatio() public view returns (uint256) {
         return _lossLimitRatio;

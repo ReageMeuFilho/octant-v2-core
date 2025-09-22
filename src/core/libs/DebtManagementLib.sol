@@ -24,7 +24,7 @@ import { ERC20SafeApproveLib } from "src/core/libs/ERC20SafeApproveLib.sol";
  * The library follows the ERC4626 standard for strategy interactions and implements
  * robust error handling for edge cases like insufficient liquidity or unrealized losses.
  *
- * @author Golem Foundation
+ * @author [Golem Foundation](https://golem.foundation)
  * @custom:security-contact security@golem.foundation
  */
 library DebtManagementLib {

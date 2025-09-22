@@ -53,6 +53,11 @@ contract MultistrategyVaultFactory is IMultistrategyVaultFactory {
     uint256 private defaultProtocolFeeData;
     mapping(address => uint256) private customProtocolFeeData;
 
+    /**
+     * @param _name Human-readable name for this factory instance
+     * @param _vaultOriginal Address of the canonical vault implementation to clone
+     * @param _governance Address with permission to update factory settings
+     */
     constructor(string memory _name, address _vaultOriginal, address _governance) {
         name = _name;
         VAULT_ORIGINAL = _vaultOriginal;

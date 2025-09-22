@@ -6,6 +6,7 @@ import { IWhitelist } from "src/utils/IWhitelist.sol";
 
 /// @title LinearAllowanceExecutor
 /// @author [Golem Foundation](https://golem.foundation)
+/// @custom:security-contact security@golem.foundation
 /// @notice Abstract base contract for executing linear allowance transfers from Gnosis Safe modules
 /// @dev This contract provides the core functionality for interacting with LinearAllowanceSingletonForGnosisSafe
 /// while leaving withdrawal mechanisms to be implemented by derived contracts. The contract can receive

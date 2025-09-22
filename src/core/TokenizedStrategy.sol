@@ -1,40 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity >=0.8.18;
 
-/**$$$$$$$$$$$$$$$$$$$$$$$$$$$&Mr/|1+~>>iiiiiiiiiii>~+{|tuMW$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-$$$$$$$$$$$$$$$$$$$$$$$$$B#j]->iiiiiiiiiiiiiiiiiiiiiiiiiiii>-?f*B$$$$$$$$$$$$$$$$$$$$$$$$$
-$$$$$$$$$$$$$$$$$$$$$@zj}~iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii~}fv@$$$$$$$$$$$$$$$$$$$$$
-$$$$$$$$$$$$$$$$$$@z(+iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii+)zB$$$$$$$$$$$$$$$$$$
-$$$$$$$$$$$$$$$$Mf~iiiiiiiiiiiiiiiiiii   iiiiiiiiiiiiiiiiiiiiiiiiiiiiii~t#@$$$$$$$$$$$$$$$
-$$$$$$$$$$$$$@u[iiiiiiiiiiiiiiiiiii           ii   iiiiiiiiiiiiiiiiiiiiiii?n@$$$$$$$$$$$$$
-$$$$$$$$$$$@z]iiiiiiiiiiiiiiiiii                     iiiiiiiiiiiiiiiiiiiiiii?u@$$$$$$$$$$$
-$$$$$$$$$$v]iiiiiiiiiiiiiiiii        .-'   `'.      iiiiiiiiiiiiiiiiiiiiiiiiii?u$$$$$$$$
-$$$$$$$$%)>iiiiiiiiiiiiiiiiii       /         \       iiiiiiiiiiiiiiiiiiiiiiiiii1%$$$$$$$$
-$$$$$$$c~iiiiiiiiiiiiiiiiiiiiii     |         ;       iiiiiiiiiiiiiiiiiiiiiiiii>)%$$$$$$$$
-$$$$$B/>iiiiiiiiiiiiiiiiiii         |         |           ___.--,  iiiiiiiiiiiiiii~c$$$$$$
-$$$$@)iiiiiiiiiiiiiii      _.._     |0) ~ (0) |    _.---'`__.-( (_. iiiiiiiiiiiiiii/>B$$$$
-$$$B|iiiiiiiiiiiii  __.--'`_.. '.__.\    '--. \_.-' ,.--'`     `""` iiiiiiiiiiiiiiii(@$$$$
-$$@)iiiiiiiiiii    ( ,.--'`   ',__ /` ;   `, '.__.'`    __        iiiiiiiiiiiiiiiiiii($$$$
-$$$)iiiiiiiiiiii   _`) )  .---.__.' / ;   |\   \__..--""  """--.,_   iiiiiiiiiiiiiiiii@$$$
-$$%iiiiiiiiii    `---'  ' ''-._.-'` ./  /\ '.  \ _.-~~~````~~~-._`-.__.'iiiiiiiiiiiii\$$$$
-$$@iiiiiiiiiiiiiiiiii   | |  .' _.-' |  |   \  \  '.               `~---`iiiiiiiiiiiiii$$$
-$${[iiiiiiiiiiiiiii      \ \/ .'     \  \    '. '-._)               iiiiiiiiiiiiiiiiii~$$$
-$$uiiiiiiiiiiiiiiiiiii    \/ /        \  \     `=.__`~-       iiiiiiiiiiiiiiiiiiiiiii$$$$$
-$$@iiiiiiiiiiiiiiiiii      / /\         `) )     / / `"".`\     iiiiiiiiiiiiiiiiiiiii|B$$$
-$$@\iiiiiiiiiiiiiiiii ,_.-'.'\ \        / /     ( (     / /     iiiiiiiiiiiiiiiiiiii(@$$$$
-$$$$$iiiiiiiiiiiiiii `--~`   ) )    .-'.'       '.'.  | (      iiiiiiiiiiiiiiiiiiii/>B$$$$
-$$$$@iiiiiiiiiiiiiiii       (/`    ( (`      i    ) )  '-;        iiiiiiiiiiiiiiii~c$$$$$$
-$$$$$B]iiiiiiiiiiiiiiii      `   i  '-;      ii   (-'          iiiiiiiiiiiiiiiiii>)%$$$$$$
-4$$$$$$$B)iiiiiiiiiiiii  iiii!i             iii           liiiiiiiiiiiiiiiiiiiii1%$$$$$$$$
-$$$$$$$$$$@u]iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii-x@$$$$$$$
-$$$$$$$$$$$@v?iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii-x$$$$$$$$$$$
-$$$$$$$$$$$$$$@n?iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii-rB$$$$$$$$$$$$
-$$$$$$$$$$$$$$$$$/~iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii<\*@$$$$$$$$$$$$$$$
-$$$$$$$$$$$$$$$$$$$Bc1~iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii~{v%$$$$$$$$$$$$$$$$$
-$$$$$$$$$$$$$$$$$$$$$$Bvf]<iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii<]tuB$$$$$$$$$$$$$$$$$$$$
-4$$$$$$$$$$$$$$$$$$$$$$$$$%zt-+>iiiiiiiiiiiiiiiiiiiiiiiiiiiii+_tc%$$$$$$$$$$$$$$$$$$$$$$$$
-$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$W#u/|{+~>iiiiiiiiiiii><+{|/n#W$$$$$$$$$$$$$$$$$$$$$$$$$$$$*/
-
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -43,7 +9,8 @@ import { IBaseStrategy } from "src/core/interfaces/IBaseStrategy.sol";
 
 /**
  * @title Tokenized Strategy (Octant V2 Fork)
- * @author yearn.finance; forked and modified by octant.finance
+ * @author yearn.finance; forked and modified by [Golem Foundation](https://golem.foundation)
+ * @custom:security-contact security@golem.foundation
  * @notice
  *  This TokenizedStrategy is a fork of Yearn's TokenizedStrategy that has been
  *  modified by Octant to support donation functionality and other security enhancements.
@@ -75,6 +42,29 @@ import { IBaseStrategy } from "src/core/interfaces/IBaseStrategy.sol";
  *  - YieldDonatingTokenizedStrategy: Mints profits as new shares and sends them to a specified dragon router
  *  - YieldSkimmingTokenizedStrategy: Skims the appreciation of asset and dilutes the original shares by minting new ones to the dragon router
  *
+ *  Trust Minimization (design goals):
+ *  - No protocol performance/management fees at the strategy level; yield flows directly to the configured donation destination
+ *  - Dragon router changes are subject to a mandatory cooldown (see setDragonRouter/finalizeDragonRouterChange)
+ *  - Clear role separation: management, keeper, emergencyAdmin; keepers focus on report/tend cadence
+ *
+ *  Security Model (trusted roles and expectations):
+ *  - Management: updates roles, initiates dragon router changes, may shutdown in emergencies
+ *  - Keeper: calls report/tend at appropriate intervals; use MEV-protected mempools when possible
+ *  - Emergency Admin: can shutdown and perform emergency withdrawals
+ *
+ *  Threat Model Boundaries (non-exhaustive):
+ *  - In scope: precision/rounding issues, price-per-share manipulation via airdrops (mitigated by tracked totalAssets),
+ *    reentrancy (guarded), misuse of roles
+ *  - Out of scope: malicious management/keeper/emergency admin; complete compromise of external yield sources
+ *
+ *  Functional Requirements mapping (high-level):
+ *  - FR-1 Initialization: initialize() parameters include asset, name and roles, plus donation routing settings
+ *  - FR-2 Asset management: BaseStrategy overrides (_deployFunds/_freeFunds/_harvestAndReport) power the yield logic
+ *  - FR-3 Roles: requireManagement/requireKeeperOrManagement/requireEmergencyAuthorized helpers enforce permissions
+ *  - FR-4 Donation management: dragon router cooldown and two-step change via setDragonRouter/finalize/cancel
+ *  - FR-5 Emergency: shutdownStrategy/emergencyWithdraw hooks in specialized implementations
+ *  - FR-6 ERC-4626: full ERC-4626 surface for deposits/withdrawals and previews is implemented
+ *
  *  WARNING: When creating custom strategies, DO NOT declare state variables outside
  *  the StrategyData struct. Doing so risks storage collisions if the implementation
  *  contract changes. Either extend the StrategyData struct or use a custom storage slot.
@@ -99,26 +89,32 @@ abstract contract TokenizedStrategy {
 
     /**
      * @notice Emitted when the strategy reports `profit` or `loss`.
+     * @param profit Profit amount in asset units
+     * @param loss Loss amount in asset units
      */
     event Reported(uint256 profit, uint256 loss);
 
     /**
      * @notice Emitted when the 'keeper' address is updated to 'newKeeper'.
+     * @param newKeeper The new keeper address
      */
     event UpdateKeeper(address indexed newKeeper);
 
     /**
      * @notice Emitted when the 'management' address is updated to 'newManagement'.
+     * @param newManagement The new management address
      */
     event UpdateManagement(address indexed newManagement);
 
     /**
      * @notice Emitted when the 'emergencyAdmin' address is updated to 'newEmergencyAdmin'.
+     * @param newEmergencyAdmin The new emergency admin address
      */
     event UpdateEmergencyAdmin(address indexed newEmergencyAdmin);
 
     /**
-     * @notice Emitted when the `pendingManagement` address is updated to `newPendingManagement`.
+     * @notice Emitted when the `pendingManagement` address is updated.
+     * @param newPendingManagement The new pending management address
      */
     event UpdatePendingManagement(address indexed newPendingManagement);
 
@@ -156,11 +152,14 @@ abstract contract TokenizedStrategy {
 
     /**
      * @notice Emitted when the dragon router address is updated.
+     * @param newDragonRouter The new router address
      */
     event UpdateDragonRouter(address indexed newDragonRouter);
 
     /**
      * @notice Emitted when a pending dragon router change is initiated.
+     * @param newDragonRouter The pending new router
+     * @param effectiveTimestamp Timestamp when change can be finalized
      */
     event PendingDragonRouterChange(address indexed newDragonRouter, uint256 effectiveTimestamp);
 
@@ -340,7 +339,7 @@ abstract contract TokenizedStrategy {
     /// @notice Used for calculations.
     uint256 internal constant MAX_BPS = 10_000;
 
-    /// @notice Cooldown period for dragon router changes (14 days).
+    /// @notice Cooldown period for dragon router changes.
     uint256 internal constant DRAGON_ROUTER_COOLDOWN = 14 days;
 
     /// @notice Permit type hash for EIP-2612 permit functionality.
@@ -600,99 +599,77 @@ abstract contract TokenizedStrategy {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Get the total amount of assets this strategy holds
-     * as of the last report.
-     *
-     * We manually track `totalAssets` to avoid any PPS manipulation.
-     *
-     * @return . Total assets the strategy holds.
+     * @notice Get the total amount of assets this strategy holds as of the last report.
+     * @dev We manually track `totalAssets` to avoid PPS manipulation via airdrops.
+     * @return totalAssets_ Total assets the strategy holds.
      */
     function totalAssets() external view returns (uint256) {
         return _totalAssets(_strategyStorage());
     }
 
     /**
-     * @notice Get the current supply of the strategies shares.
-     *
-     * @return . Total amount of shares outstanding.
+     * @notice Get the current supply of the strategy shares.
+     * @return totalSupply_ Total amount of shares outstanding.
      */
     function totalSupply() external view returns (uint256) {
         return _totalSupply(_strategyStorage());
     }
 
     /**
-     * @notice The amount of shares that the strategy would
-     *  exchange for the amount of assets provided, in an
-     * ideal scenario where all the conditions are met.
-     *
+     * @notice Convert an asset amount to shares under current conditions.
+     * @dev Rounds down for safety.
      * @param assets The amount of underlying.
-     * @return . Expected shares that `assets` represents.
+     * @return shares_ Expected shares that `assets` represents.
      */
     function convertToShares(uint256 assets) external view returns (uint256) {
         return _convertToShares(_strategyStorage(), assets, Math.Rounding.Floor);
     }
 
     /**
-     * @notice The amount of assets that the strategy would
-     * exchange for the amount of shares provided, in an
-     * ideal scenario where all the conditions are met.
-     *
-     * @param shares The amount of the strategies shares.
-     * @return . Expected amount of `asset` the shares represents.
+     * @notice Convert shares to the corresponding asset amount.
+     * @dev Rounds down for safety.
+     * @param shares The amount of the strategy shares.
+     * @return assets_ Expected amount of `asset` the shares represent.
      */
     function convertToAssets(uint256 shares) external view returns (uint256) {
         return _convertToAssets(_strategyStorage(), shares, Math.Rounding.Floor);
     }
 
     /**
-     * @notice Allows an on-chain or off-chain user to simulate
-     * the effects of their deposit at the current block, given
-     * current on-chain conditions.
-     * @dev This will round down.
-     *
-     * @param assets The amount of `asset` to deposits.
-     * @return . Expected shares that would be issued.
+     * @notice Preview shares that would be minted for a deposit.
+     * @dev Rounds down (Floor).
+     * @param assets The amount of `asset` to deposit.
+     * @return shares_ Expected shares that would be issued.
      */
     function previewDeposit(uint256 assets) external view returns (uint256) {
         return _convertToShares(_strategyStorage(), assets, Math.Rounding.Floor);
     }
 
     /**
-     * @notice Allows an on-chain or off-chain user to simulate
-     * the effects of their mint at the current block, given
-     * current on-chain conditions.
-     * @dev This is used instead of convertToAssets so that it can
-     * round up for safer mints.
-     *
+     * @notice Preview assets required to mint a given amount of shares.
+     * @dev Rounds up (Ceil) for safety.
      * @param shares The amount of shares to mint.
-     * @return . The needed amount of `asset` for the mint.
+     * @return assets_ The needed amount of `asset` for the mint.
      */
     function previewMint(uint256 shares) external view returns (uint256) {
         return _convertToAssets(_strategyStorage(), shares, Math.Rounding.Ceil);
     }
 
     /**
-     * @notice Allows an on-chain or off-chain user to simulate
-     * the effects of their withdrawal at the current block,
-     * given current on-chain conditions.
-     * @dev This is used instead of convertToShares so that it can
-     * round up for safer withdraws.
-     *
+     * @notice Preview shares that would be burned to withdraw an asset amount.
+     * @dev Rounds up (Ceil) for safety.
      * @param assets The amount of `asset` that would be withdrawn.
-     * @return . The amount of shares that would be burnt.
+     * @return shares_ The amount of shares that would be burned.
      */
     function previewWithdraw(uint256 assets) external view returns (uint256) {
         return _convertToShares(_strategyStorage(), assets, Math.Rounding.Ceil);
     }
 
     /**
-     * @notice Allows an on-chain or off-chain user to simulate
-     * the effects of their redemption at the current block,
-     * given current on-chain conditions.
-     * @dev This will round down.
-     *
+     * @notice Preview assets that would be returned for redeeming shares.
+     * @dev Rounds down (Floor).
      * @param shares The amount of shares that would be redeemed.
-     * @return . The amount of `asset` that would be returned.
+     * @return assets_ The amount of `asset` that would be returned.
      */
     function previewRedeem(uint256 shares) external view returns (uint256) {
         return _convertToAssets(_strategyStorage(), shares, Math.Rounding.Floor);
@@ -722,10 +699,7 @@ abstract contract TokenizedStrategy {
     }
 
     /**
-     * @notice Total number of underlying assets that can be
-     * withdrawn from the strategy by `owner`, where `owner`
-     * corresponds to the msg.sender of a {redeem} call.
-     *
+     * @notice Maximum underlying assets that can be withdrawn by `owner`.
      * @param owner The owner of the shares.
      * @return _maxWithdraw Max amount of `asset` that can be withdrawn.
      */
@@ -743,10 +717,7 @@ abstract contract TokenizedStrategy {
     }
 
     /**
-     * @notice Total number of strategy shares that can be
-     * redeemed from the strategy by `owner`, where `owner`
-     * corresponds to the msg.sender of a {redeem} call.
-     *
+     * @notice Maximum number of shares that can be redeemed by `owner`.
      * @param owner The owner of the shares.
      * @return _maxRedeem Max amount of shares that can be redeemed.
      */
@@ -1063,7 +1034,7 @@ abstract contract TokenizedStrategy {
 
     /**
      * @notice Get the underlying asset for the strategy.
-     * @return . The underlying asset.
+     * @return asset_ The underlying asset address.
      */
     function asset() external view returns (address) {
         return address(_strategyStorage().asset);
@@ -1071,7 +1042,7 @@ abstract contract TokenizedStrategy {
 
     /**
      * @notice Get the API version for this TokenizedStrategy.
-     * @return . The API version for this TokenizedStrategy
+     * @return version The API version string.
      */
     function apiVersion() external pure returns (string memory) {
         return API_VERSION;
@@ -1079,7 +1050,7 @@ abstract contract TokenizedStrategy {
 
     /**
      * @notice Get the current address that controls the strategy.
-     * @return . Address of management
+     * @return management_ Address of management.
      */
     function management() external view returns (address) {
         return _strategyStorage().management;
@@ -1087,7 +1058,7 @@ abstract contract TokenizedStrategy {
 
     /**
      * @notice Get the current pending management address if any.
-     * @return . Address of pendingManagement
+     * @return pendingManagement_ Address of pending management.
      */
     function pendingManagement() external view returns (address) {
         return _strategyStorage().pendingManagement;
@@ -1095,7 +1066,7 @@ abstract contract TokenizedStrategy {
 
     /**
      * @notice Get the current address that can call tend and report.
-     * @return . Address of the keeper
+     * @return keeper_ Address of the keeper.
      */
     function keeper() external view returns (address) {
         return _strategyStorage().keeper;
@@ -1103,7 +1074,7 @@ abstract contract TokenizedStrategy {
 
     /**
      * @notice Get the current address that can shutdown and emergency withdraw.
-     * @return . Address of the emergencyAdmin
+     * @return emergencyAdmin_ Address of the emergency admin.
      */
     function emergencyAdmin() external view returns (address) {
         return _strategyStorage().emergencyAdmin;
@@ -1111,7 +1082,7 @@ abstract contract TokenizedStrategy {
 
     /**
      * @notice Get the current dragon router address that will receive minted shares.
-     * @return Address of the dragon router
+     * @return dragonRouter_ Address of the dragon router.
      */
     function dragonRouter() external view returns (address) {
         return _strategyStorage().dragonRouter;
@@ -1119,7 +1090,7 @@ abstract contract TokenizedStrategy {
 
     /**
      * @notice Get the pending dragon router address if any.
-     * @return Address of the pending dragon router
+     * @return pendingDragonRouter_ Address of the pending dragon router.
      */
     function pendingDragonRouter() external view returns (address) {
         return _strategyStorage().pendingDragonRouter;
@@ -1127,15 +1098,15 @@ abstract contract TokenizedStrategy {
 
     /**
      * @notice Get the timestamp when dragon router change was initiated.
-     * @return Timestamp of the dragon router change initiation
+     * @return changeTimestamp Timestamp of the dragon router change initiation.
      */
     function dragonRouterChangeTimestamp() external view returns (uint256) {
         return uint256(_strategyStorage().dragonRouterChangeTimestamp);
     }
 
     /**
-     * @notice The timestamp of the last time Yield was reported.
-     * @return . The last report.
+     * @notice The timestamp of the last time yield was reported.
+     * @return lastReport_ The last report timestamp.
      */
     function lastReport() external view returns (uint256) {
         return uint256(_strategyStorage().lastReport);
@@ -1143,10 +1114,8 @@ abstract contract TokenizedStrategy {
 
     /**
      * @notice Get the price per share.
-     * @dev This value offers limited precision. Integrations that require
-     * exact precision should use convertToAssets or convertToShares instead.
-     *
-     * @return . The price per share.
+     * @dev Limited precision; use convertToAssets/convertToShares for exactness.
+     * @return pps The price per share.
      */
     function pricePerShare() public view returns (uint256) {
         StrategyData storage S = _strategyStorage();
@@ -1154,8 +1123,8 @@ abstract contract TokenizedStrategy {
     }
 
     /**
-     * @notice To check if the strategy has been shutdown.
-     * @return . Whether or not the strategy is shutdown.
+     * @notice Check if the strategy has been shutdown.
+     * @return isShutdown_ True if the strategy is shutdown.
      */
     function isShutdown() external view returns (bool) {
         return _strategyStorage().shutdown;
@@ -1231,7 +1200,10 @@ abstract contract TokenizedStrategy {
 
     /**
      * @notice Initiates a change to a new dragon router address with a cooldown period.
-     * @dev Users have 14 days to withdraw if they disagree with the new donation address.
+     * @dev Starts a two-step process to change the donation destination:
+     *      1) Emits PendingDragonRouterChange(new, effectiveTimestamp)
+     *      2) Enforces a cooldown of DRAGON_ROUTER_COOLDOWN (14 days) before finalization
+     *      During the cooldown, users are notified and can exit if they disagree with the change.
      * @param _dragonRouter New address to set as pending `dragonRouter`.
      */
     function setDragonRouter(address _dragonRouter) external onlyManagement {
@@ -1248,7 +1220,8 @@ abstract contract TokenizedStrategy {
 
     /**
      * @notice Finalizes the dragon router change after the cooldown period.
-     * @dev Can only be called after the cooldown period has elapsed.
+     * @dev Requires a pending router and that the cooldown has elapsed.
+     *      Emits UpdateDragonRouter(newDragonRouter) and clears the pending state.
      */
     function finalizeDragonRouterChange() external virtual {
         StrategyData storage S = _strategyStorage();
@@ -1264,7 +1237,7 @@ abstract contract TokenizedStrategy {
 
     /**
      * @notice Cancels a pending dragon router change.
-     * @dev Can only be called by management during the cooldown period.
+     * @dev Resets pending router and timestamp. Emits PendingDragonRouterChange(address(0), 0).
      */
     function cancelDragonRouterChange() external onlyManagement {
         StrategyData storage S = _strategyStorage();
@@ -1300,33 +1273,33 @@ abstract contract TokenizedStrategy {
 
     /**
      * @notice Returns the name of the token.
-     * @return . The name the strategy is using for its token.
+     * @return name_ The token name.
      */
     function name() external view returns (string memory) {
         return _strategyStorage().name;
     }
 
     /**
-     * @notice Returns the symbol of the strategies token.
-     * @dev Will be 'os + asset symbol'.
-     * @return . The symbol the strategy is using for its tokens.
+     * @notice Returns the symbol of the strategy token.
+     * @dev Will be 'os' + asset symbol.
+     * @return symbol_ The token symbol.
      */
     function symbol() external view returns (string memory) {
         return string(abi.encodePacked("os", _strategyStorage().asset.symbol()));
     }
 
     /**
-     * @notice Returns the number of decimals used to get its user representation.
-     * @return . The decimals used for the strategy and `asset`.
+     * @notice Returns the number of decimals used for user representation.
+     * @return decimals_ The decimals used by the strategy and `asset`.
      */
     function decimals() external view returns (uint8) {
         return _strategyStorage().decimals;
     }
 
     /**
-     * @notice Returns the current balance for a given '_account'.
-     * @param account the address to return the balance for.
-     * @return . The current balance in shares of the '_account'.
+     * @notice Returns the current balance for a given account.
+     * @param account The address to return the balance for.
+     * @return balance_ The current balance in shares of `account`.
      */
     function balanceOf(address account) external view returns (uint256) {
         return _balanceOf(_strategyStorage(), account);
@@ -1338,7 +1311,7 @@ abstract contract TokenizedStrategy {
     }
 
     /**
-     * @notice Transfer '_amount` of shares from `msg.sender` to `to`.
+     * @notice Transfer `amount` of shares from `msg.sender` to `to`.
      * @dev
      * Requirements:
      *
@@ -1348,7 +1321,7 @@ abstract contract TokenizedStrategy {
      *
      * @param to The address shares will be transferred to.
      * @param amount The amount of shares to be transferred from sender.
-     * @return . a boolean value indicating whether the operation succeeded.
+     * @return success True if the operation succeeded.
      */
     function transfer(address to, uint256 amount) external virtual returns (bool) {
         _transfer(_strategyStorage(), msg.sender, to, amount);
@@ -1363,7 +1336,7 @@ abstract contract TokenizedStrategy {
      * This value changes when {approve} or {transferFrom} are called.
      * @param owner The address who owns the shares.
      * @param spender The address who would be moving the owners shares.
-     * @return . The remaining amount of shares of `owner` that could be moved by `spender`.
+     * @return remaining The remaining amount of shares of `owner` that could be moved by `spender`.
      */
     function allowance(address owner, address spender) external view returns (uint256) {
         return _allowance(_strategyStorage(), owner, spender);
@@ -1396,7 +1369,7 @@ abstract contract TokenizedStrategy {
      *
      * @param spender the address to allow the shares to be moved by.
      * @param amount the amount of shares to allow `spender` to move.
-     * @return . a boolean value indicating whether the operation succeeded.
+     * @return success True if the operation succeeded.
      */
     function approve(address spender, uint256 amount) external returns (bool) {
         _approve(_strategyStorage(), msg.sender, spender, amount);
@@ -1404,7 +1377,7 @@ abstract contract TokenizedStrategy {
     }
 
     /**
-     * @notice `amount` tokens from `from` to `to` using the
+     * @notice Transfer `amount` of shares from `from` to `to` using the
      * allowance mechanism. `amount` is then deducted from the caller's
      * allowance.
      *
@@ -1428,7 +1401,7 @@ abstract contract TokenizedStrategy {
      * @param from the address to be moving shares from.
      * @param to the address to be moving shares to.
      * @param amount the quantity of shares to move.
-     * @return . a boolean value indicating whether the operation succeeded.
+     * @return success True if the operation succeeded.
      */
     function transferFrom(address from, address to, uint256 amount) external virtual returns (bool) {
         StrategyData storage S = _strategyStorage();
@@ -1557,8 +1530,8 @@ abstract contract TokenizedStrategy {
      * @dev Every successful call to {permit} increases ``owner``'s nonce by one. This
      * prevents a signature from being used multiple times.
      *
-     * @param _owner the address of the account to return the nonce for.
-     * @return . the current nonce for the account.
+     * @param _owner The address of the account to return the nonce for.
+     * @return nonce_ The current nonce for the account.
      */
     function nonces(address _owner) external view returns (uint256) {
         return _strategyStorage().nonces[_owner];
@@ -1628,10 +1601,8 @@ abstract contract TokenizedStrategy {
     }
 
     /**
-     * @notice Returns the domain separator used in the encoding of the signature
-     * for {permit}, as defined by {EIP712}.
-     *
-     * @return . The domain separator that will be used for any {permit} calls.
+     * @notice Returns the EIP-712 domain separator used by {permit}.
+     * @return domainSeparator The domain separator for any {permit} calls.
      */
     function DOMAIN_SEPARATOR() public view returns (bytes32) {
         return keccak256(abi.encode(EIP712DOMAIN_TYPEHASH, NAME_HASH, VERSION_HASH, block.chainid, address(this)));

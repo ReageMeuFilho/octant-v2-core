@@ -159,12 +159,13 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
     function tend() external;
 
     /**
-     * @notice Function for keepers to call to harvest and record all
-     * profits accrued.
-     * @return _profit The notional amount of gain if any since the last
-     * report in terms of `asset`.
-     * @return _loss The notional amount of loss if any since the last
-     * report in terms of `asset`.
+     * @notice Function for keepers to harvest and record all profits/losses since last report.
+     * @dev Keepers should consider MEV-protected submission. Specialized implementations may
+     *      mint shares to the donation destination (dragon router) on profit, and apply
+     *      loss-protection via dragon burning (if enabled). The return values are denominated
+     *      in the underlying `asset`.
+     * @return _profit Gain since last report, in `asset` units.
+     * @return _loss Loss since last report, in `asset` units.
      */
     function report() external returns (uint256 _profit, uint256 _loss);
 
@@ -266,18 +267,22 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
     function setEmergencyAdmin(address _emergencyAdmin) external;
 
     /**
-     * @notice Initiates a change to a new dragon router address with a cooldown period.
+     * @notice Initiates a change to a new donation destination (dragon router) with cooldown.
+     * @dev Emits PendingDragonRouterChange(new, effectiveTimestamp) and starts a mandatory
+     *      cooldown before finalization. Users can exit during the cooldown if they disagree.
      * @param _dragonRouter New address to set as pending `dragonRouter`.
      */
     function setDragonRouter(address _dragonRouter) external;
 
     /**
      * @notice Finalizes the dragon router change after the cooldown period.
+     * @dev Requires cooldown to have elapsed and pending router to be set.
      */
     function finalizeDragonRouterChange() external;
 
     /**
      * @notice Cancels a pending dragon router change.
+     * @dev Resets pending router and timestamp, emitting PendingDragonRouterChange(address(0), 0).
      */
     function cancelDragonRouterChange() external;
 

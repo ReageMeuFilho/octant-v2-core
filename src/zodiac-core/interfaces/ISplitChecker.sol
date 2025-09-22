@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity >=0.8.18;
 
+/**
+ * @title Split Checker Interface
+ * @author Golem Foundation
+ * @notice Validates that a configured split over recipients adheres to required constraints
+ *         (e.g., allocation precision, totals, inclusion of OPEX/metapool recipients).
+ */
 interface ISplitChecker {
     struct Split {
         address[] recipients; // [r1, r2, ..., opexVault, metapool]

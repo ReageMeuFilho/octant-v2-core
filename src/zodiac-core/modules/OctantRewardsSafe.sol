@@ -11,6 +11,9 @@ error OctantRewardsSafe__InvalidNumberOfValidators(uint256 amount);
 error OctantRewardsSafe__InvalidAddress(address a);
 error OctantRewardsSafe__InvalidMaxYield(uint256 maxYield);
 
+/// @title OctantRewardsSafe
+/// @author [Golem Foundation](https://golem.foundation)
+/// @custom:security-contact security@golem.foundation
 contract OctantRewardsSafe is Module {
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
     /*                          STORAGE                           */
