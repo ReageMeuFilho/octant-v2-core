@@ -11,14 +11,18 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 
 /**
  * @title YieldSkimmingTokenizedStrategy
- * @author octant.finance
- * @notice A specialized version of TokenizedStrategy designed for yield-bearing tokens
- * like mETH whose value appreciates over time.
- * @dev This strategy implements a yield skimming mechanism by:
- *      - Recognizing appreciation of the underlying asset during report()
- *      - Diluting existing shares by minting new ones to dragonRouter
- *      - Using a modified asset-to-shares conversion that accounts for dilution
- *      - Calling report() during deposits to ensure up-to-date exchange rates
+ * @author [Golem Foundation](https://golem.foundation)
+ * @custom:security-contact security@golem.foundation
+ * @notice Specialized TokenizedStrategy for yield-bearing assets (appreciating exchange rate).
+ * @dev Mechanism:
+ *      - Tracks value debt separately for users and dragon router (units: value-shares; 1 share = 1 asset value)
+ *      - On report(), compares total vault value (assets * rate in RAY) vs total value debt (users + dragon)
+ *        • Profit: mints value-shares to dragon and increases dragon value debt
+ *        • Loss: burns dragon shares (if enabled and available) and reduces dragon value debt
+ *      - Dual conversion modes:
+ *        • Solvent: rate-based conversions using current exchange rate (RAY precision)
+ *        • Insolvent: proportional distribution using base TokenizedStrategy logic; dragon operations blocked
+ *      - Dragon transfers trigger value-debt rebalancing; self-transfers by dragon are disallowed
  */
 contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     using Math for uint256;
@@ -39,10 +43,15 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     event Harvest(address indexed caller, uint256 currentRate);
 
     /// @dev Events for donation tracking
+    /// @param dragonRouter Address receiving or burning donation shares
+    /// @param amount Amount of value-shares minted or burned (1 share = 1 value unit)
+    /// @param exchangeRate Current exchange rate (scaled to wad) at the time of the event
     event DonationMinted(address indexed dragonRouter, uint256 amount, uint256 exchangeRate);
+    /// @dev Emitted when dragon shares are burned to cover value losses
     event DonationBurned(address indexed dragonRouter, uint256 amount, uint256 exchangeRate);
 
     /**
+     * @inheritdoc TokenizedStrategy
      * @notice Deposit assets into the strategy with value debt tracking
      * @dev Implements deposit protection and tracks ETH value debt
      * @param assets The amount of assets to deposit
@@ -86,6 +95,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     }
 
     /**
+     * @inheritdoc TokenizedStrategy
      * @notice Mint exact shares from the strategy with value debt tracking
      * @dev Implements insolvency protection and tracks ETH value debt
      * @param shares The amount of shares to mint
@@ -124,6 +134,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     }
 
     /**
+     * @inheritdoc TokenizedStrategy
      * @notice Redeem shares from the strategy with default maxLoss
      * @dev Wrapper that calls the full redeem function with MAX_BPS maxLoss
      * @param shares The amount of shares to redeem
@@ -136,6 +147,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     }
 
     /**
+     * @inheritdoc TokenizedStrategy
      * @notice Redeem shares from the strategy with value debt tracking
      * @dev Shares represent ETH value (1 share = 1 ETH value)
      * @param shares The amount of shares to redeem
@@ -188,6 +200,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     }
 
     /**
+     * @inheritdoc TokenizedStrategy
      * @notice Withdraw assets from the strategy with value debt tracking
      * @dev Calculates shares needed for the asset amount requested
      * @param assets The amount of assets to withdraw
@@ -240,6 +253,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     }
 
     /**
+     * @inheritdoc TokenizedStrategy
      * @notice Withdraw assets from the strategy with default maxLoss
      * @dev Wrapper that calls the full withdraw function with 0 maxLoss
      * @param assets The amount of assets to withdraw
@@ -252,6 +266,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     }
 
     /**
+     * @inheritdoc TokenizedStrategy
      * @notice Get the maximum amount of assets that can be deposited by a user
      * @dev Returns 0 for dragon router as they cannot deposit
      * @param receiver The address that would receive the shares
@@ -266,6 +281,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     }
 
     /**
+     * @inheritdoc TokenizedStrategy
      * @notice Get the maximum amount of shares that can be minted by a user
      * @dev Returns 0 for dragon router as they cannot mint
      * @param receiver The address that would receive the shares
@@ -280,6 +296,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     }
 
     /**
+     * @inheritdoc TokenizedStrategy
      * @notice Get the maximum amount of assets that can be withdrawn by a user
      * @dev Returns 0 for dragon router during insolvency
      * @param owner The address whose shares would be burned
@@ -294,6 +311,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     }
 
     /**
+     * @inheritdoc TokenizedStrategy
      * @notice Get the maximum amount of shares that can be redeemed by a user
      * @dev Returns 0 for dragon router during insolvency
      * @param owner The address whose shares would be burned
@@ -333,6 +351,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     }
 
     /**
+     * @inheritdoc TokenizedStrategy
      * @notice Transfer shares with dragon solvency protection
      * @dev Allows dragon transfers when solvent, blocks during insolvency
      * @param to The address to transfer shares to
@@ -361,6 +380,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     }
 
     /**
+     * @inheritdoc TokenizedStrategy
      * @notice Transfer shares from one address to another with dragon solvency protection
      * @dev Allows dragon transfers when solvent, blocks during insolvency
      * @param from The address to transfer shares from
@@ -463,7 +483,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     }
 
     /**
-     * @notice Get the last reported rate
+     * @notice Get the last reported exchange rate (RAY precision)
      * @return The last reported rate
      */
     function getLastRateRay() external view returns (uint256) {
@@ -670,6 +690,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     }
 
     /**
+     * @inheritdoc TokenizedStrategy
      * @notice Finalizes the dragon router change with proper debt accounting migration
      * @dev Migrates debt tracking when dragon router changes to maintain correct accounting
      */

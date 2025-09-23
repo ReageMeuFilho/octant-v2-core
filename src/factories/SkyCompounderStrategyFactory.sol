@@ -6,7 +6,8 @@ import { SkyCompounderStrategy } from "src/strategies/yieldDonating/SkyCompounde
 
 /**
  * @title SkyCompounderStrategyFactory
- * @author Octant
+ * @author [Golem Foundation](https://golem.foundation)
+ * @custom:security-contact security@golem.foundation
  * @notice Factory for deploying Sky Compounder yield donating strategies
  * @dev Inherits deterministic deployment from BaseStrategyFactory
  */

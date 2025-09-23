@@ -12,6 +12,8 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 
 /**
  * @title MethYieldStrategy
+ * @author [Golem Foundation](https://golem.foundation)
+ * @custom:security-contact security@golem.foundation
  * @notice A strategy that manages mETH (Mantle liquid staked ETH) and captures yield from its appreciation
  * @dev This strategy tracks the ETH value of mETH deposits and captures yield as mETH appreciates in value.
  *      The strategy works with YieldBearingDragonTokenizedStrategy to properly handle the yield accounting.

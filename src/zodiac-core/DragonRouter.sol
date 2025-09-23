@@ -15,6 +15,8 @@ import { IWhitelist } from "src/utils/IWhitelist.sol";
 
 /**
  * @title Dragon Router
+ * @author [Golem Foundation](https://golem.foundation)
+ * @custom:security-contact security@golem.foundation
  * @dev This contract manages the distribution of ERC20 tokens among shareholders,
  * with the ability to transform the split token into another token upon withdrawal,
  * and allows authorized pushers to directly distribute splits.

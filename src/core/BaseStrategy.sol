@@ -7,8 +7,9 @@ import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
 
 /**
- * @title YearnV3 Base Strategy
- * @author yearn.finance
+ * @title Octant Base Strategy
+ * @author [Golem Foundation](https://golem.foundation)
+ * @custom:security-contact security@golem.foundation
  * @notice
  *  BaseStrategy implements all of the required functionality to
  *  seamlessly integrate with the `TokenizedStrategy` implementation contract
@@ -36,6 +37,13 @@ import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
  *  `TokenizedStrategy` variable. IE: TokenizedStrategy.globalVariable();.
  */
 abstract contract BaseStrategy {
+    /*//////////////////////////////////////////////////////////////
+                            ERRORS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Thrown when a non-self address tries to call a self-only function
+    error NotSelf();
+
     /*//////////////////////////////////////////////////////////////
                             MODIFIERS
     //////////////////////////////////////////////////////////////*/
@@ -82,13 +90,6 @@ abstract contract BaseStrategy {
             revert NotSelf();
         }
     }
-
-    /*//////////////////////////////////////////////////////////////
-                            ERRORS
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Thrown when a non-self address tries to call a self-only function
-    error NotSelf();
 
     /*//////////////////////////////////////////////////////////////
                             IMMUTABLES
@@ -217,7 +218,7 @@ abstract contract BaseStrategy {
      * care should be taken in times of illiquidity. It may be better to revert
      * if withdraws are simply illiquid so not to realize incorrect losses.
      *
-     * @param _amount, The amount of 'asset' to be freed.
+     * @param _amount The amount of 'asset' to be freed.
      */
     function _freeFunds(uint256 _amount) internal virtual;
 
@@ -276,7 +277,7 @@ abstract contract BaseStrategy {
      * @dev Optional trigger to override if tend() will be used by the strategy.
      * This must be implemented if the strategy hopes to invoke _tend().
      *
-     * @return . Should return true if tend() should be called by keeper or false if not.
+     * @return shouldTend True if tend() should be called by a keeper; false otherwise.
      */
     function _tendTrigger() internal view virtual returns (bool) {
         return false;
@@ -285,8 +286,8 @@ abstract contract BaseStrategy {
     /**
      * @notice Returns if tend() should be called by a keeper.
      *
-     * @return . Should return true if tend() should be called by keeper or false if not.
-     * @return . Calldata for the tend call.
+     * @return shouldTend True if tend() should be called by a keeper.
+     * @return tendCalldata Calldata for the tend call.
      */
     function tendTrigger() external view virtual returns (bool, bytes memory) {
         return (
@@ -315,10 +316,10 @@ abstract contract BaseStrategy {
      * custom amounts low enough as not to cause overflow when multiplied
      * by `totalSupply`.
      *
-     * @param . The address that is depositing into the strategy.
-     * @return . The available amount the `_owner` can deposit in terms of `asset`
+     * The address that is depositing into the strategy can be used by overrides to enforce custom limits.
+     * @return The available amount the `_owner` can deposit in terms of `asset`
      */
-    function availableDepositLimit(address /*_owner*/) public view virtual returns (uint256) {
+    function availableDepositLimit(address /* _owner */) public view virtual returns (uint256) {
         return type(uint256).max;
     }
 
@@ -332,15 +333,15 @@ abstract contract BaseStrategy {
      * or sandwichable strategies. It should never be lower than `totalIdle`.
      *
      *   EX:
-     *       return TokenIzedStrategy.totalIdle();
+     *       return TokenizedStrategy.totalIdle();
      *
      * This does not need to take into account the `_owner`'s share balance
      * or conversion rates from shares to assets.
      *
-     * @param . The address that is withdrawing from the strategy.
-     * @return . The available amount that can be withdrawn in terms of `asset`
+     * The address that is withdrawing from the strategy can be used by overrides to enforce custom limits.
+     * @return The available amount that can be withdrawn in terms of `asset`
      */
-    function availableWithdrawLimit(address /*_owner*/) public view virtual returns (uint256) {
+    function availableWithdrawLimit(address /* _owner */) public view virtual returns (uint256) {
         return type(uint256).max;
     }
 
@@ -412,7 +413,7 @@ abstract contract BaseStrategy {
      * This can only be called after a report() delegateCall to the
      * TokenizedStrategy so msg.sender == address(this).
      *
-     * @return . A trusted and accurate account for the total amount
+     * @return A trusted and accurate account for the total amount
      * of 'asset' the strategy currently holds including idle funds.
      */
     function harvestAndReport() external virtual onlySelf returns (uint256) {
@@ -461,9 +462,9 @@ abstract contract BaseStrategy {
      * TokenizedStrategy implementation.
      *
      * @param _calldata The abi encoded calldata to use in delegatecall.
-     * @return . The return value if the call was successful in bytes.
+     * @return returndata The return value if the call was successful in bytes.
      */
-    function _delegateCall(bytes memory _calldata) internal returns (bytes memory) {
+    function _delegateCall(bytes memory _calldata) internal returns (bytes memory returndata) {
         // Delegate call the tokenized strategy with provided calldata.
         (bool success, bytes memory result) = TOKENIZED_STRATEGY_ADDRESS.delegatecall(_calldata);
 

@@ -5,7 +5,8 @@ import { Create2 } from "@openzeppelin/contracts/utils/Create2.sol";
 
 /**
  * @title BaseStrategyFactory
- * @author Octant
+ * @author [Golem Foundation](https://golem.foundation)
+ * @custom:security-contact security@golem.foundation
  * @notice Base contract for strategy factories with deterministic deployment
  * @dev Uses CREATE2 with parameter-based hashing to prevent duplicate deployments
  *

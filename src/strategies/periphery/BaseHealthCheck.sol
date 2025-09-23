@@ -70,7 +70,7 @@ abstract contract BaseHealthCheck is BaseStrategy, IBaseHealthCheck {
     /**
      * @notice Returns the current profit limit ratio.
      * @dev Use a getter function to keep the variable private.
-     * @return . The current profit limit ratio.
+     * @return profitLimitRatio The current profit limit ratio.
      */
     function profitLimitRatio() public view returns (uint256) {
         return _profitLimitRatio;
@@ -79,7 +79,7 @@ abstract contract BaseHealthCheck is BaseStrategy, IBaseHealthCheck {
     /**
      * @notice Returns the current loss limit ratio.
      * @dev Use a getter function to keep the variable private.
-     * @return . The current loss limit ratio.
+     * @return lossLimitRatio The current loss limit ratio.
      */
     function lossLimitRatio() public view returns (uint256) {
         return _lossLimitRatio;

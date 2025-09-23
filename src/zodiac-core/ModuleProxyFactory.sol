@@ -4,6 +4,9 @@ pragma solidity >=0.8.0;
 import { ISafe } from "./interfaces/Safe.sol";
 import { IModuleProxyFactory } from "./interfaces/IModuleProxyFactory.sol";
 
+/// @title ModuleProxyFactory
+/// @author [Golem Foundation](https://golem.foundation)
+/// @custom:security-contact security@golem.foundation
 contract ModuleProxyFactory is IModuleProxyFactory {
     /*
         @dev

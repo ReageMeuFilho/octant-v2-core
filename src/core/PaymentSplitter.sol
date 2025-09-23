@@ -1,6 +1,5 @@
 /* solhint-disable gas-custom-errors*/
 // SPDX-License-Identifier: MIT
-// OpenZeppelin Contracts (last updated v4.8.0) (finance/PaymentSplitter.sol)
 
 pragma solidity ^0.8.25;
 
@@ -11,7 +10,9 @@ import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable
 
 /**
  * @title PaymentSplitter
- * @dev This contract allows to split Ether payments among a group of accounts. The sender does not need to be aware
+ * @dev This contract is taken from OpenZeppelin and was modified to be initializable instead of using a constructor.
+ *
+ * This contract allows to split Ether payments among a group of accounts. The sender does not need to be aware
  * that the Ether will be split in this way, since it is handled transparently by the contract.
  *
  * The split can be in equal parts or in any other arbitrary proportion. The way this is specified is by assigning each
