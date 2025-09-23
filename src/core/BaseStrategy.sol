@@ -317,9 +317,9 @@ abstract contract BaseStrategy {
      * by `totalSupply`.
      *
      * The address that is depositing into the strategy can be used by overrides to enforce custom limits.
-     * @return available The available amount the `_owner` can deposit in terms of `asset`
+     * @return The available amount the `_owner` can deposit in terms of `asset`
      */
-    function availableDepositLimit(address /* _owner */) public view virtual returns (uint256 available) {
+    function availableDepositLimit(address /* _owner */) public view virtual returns (uint256) {
         return type(uint256).max;
     }
 
@@ -339,9 +339,9 @@ abstract contract BaseStrategy {
      * or conversion rates from shares to assets.
      *
      * The address that is withdrawing from the strategy can be used by overrides to enforce custom limits.
-     * @return available The available amount that can be withdrawn in terms of `asset`
+     * @return The available amount that can be withdrawn in terms of `asset`
      */
-    function availableWithdrawLimit(address /* _owner */) public view virtual returns (uint256 available) {
+    function availableWithdrawLimit(address /* _owner */) public view virtual returns (uint256) {
         return type(uint256).max;
     }
 
@@ -413,10 +413,10 @@ abstract contract BaseStrategy {
      * This can only be called after a report() delegateCall to the
      * TokenizedStrategy so msg.sender == address(this).
      *
-     * @return totalAssets A trusted and accurate account for the total amount
+     * @return A trusted and accurate account for the total amount
      * of 'asset' the strategy currently holds including idle funds.
      */
-    function harvestAndReport() external virtual onlySelf returns (uint256 totalAssets) {
+    function harvestAndReport() external virtual onlySelf returns (uint256) {
         return _harvestAndReport();
     }
 
