@@ -1,5 +1,12 @@
 
 
+## [0.7.1-develop.0](https://github.com/golemfoundation/octant-v2-core/compare/v0.7.0-develop.0...v0.7.1-develop.0) (2025-09-24)
+
+
+### Bug Fixes
+
+* **natspec:** revert to unnamed returns in BaseStrategy and adjust [@return](https://github.com/return) tags accordingly ([40b2c0b](https://github.com/golemfoundation/octant-v2-core/commit/40b2c0ba785c1e648193342a0458e631b07dc20a))
+
 ## [0.7.0-develop.0](https://github.com/golemfoundation/octant-v2-core/compare/v0.6.0-develop.0...v0.7.0-develop.0) (2025-09-09)
 
 
