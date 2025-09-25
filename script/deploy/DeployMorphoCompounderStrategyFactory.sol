@@ -2,7 +2,7 @@
 pragma solidity ^0.8.25;
 
 import { Script } from "forge-std/Script.sol";
-import { MorphoCompounderStrategyFactory } from "src/factories/MorphoCompounderStrategyFactory.sol";
+import { MorphoCompounderStrategyFactory } from "src/factories/yieldDonating/MorphoCompounderStrategyFactory.sol";
 
 contract DeployMorphoCompounderStrategyFactory is Script {
     MorphoCompounderStrategyFactory public morphoCompounderStrategyFactory;
