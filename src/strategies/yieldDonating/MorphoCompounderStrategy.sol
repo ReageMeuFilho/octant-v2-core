@@ -5,6 +5,7 @@ import { BaseHealthCheck } from "src/strategies/periphery/BaseHealthCheck.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
+import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @title MorphoCompounderStrategy
@@ -71,7 +72,8 @@ contract MorphoCompounderStrategy is BaseHealthCheck {
     }
 
     function _freeFunds(uint256 _amount) internal override {
-        IERC4626(compounderVault).withdraw(_amount, address(this), address(this));
+        // set max loss to 10 000 to avoid too much loss error
+        ITokenizedStrategy(compounderVault).withdraw(_amount, address(this), address(this), 10_000);
     }
 
     function _emergencyWithdraw(uint256 _amount) internal override {
