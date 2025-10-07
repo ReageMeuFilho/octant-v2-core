@@ -22,8 +22,6 @@ jobs:
 
   build:
     name: Build
-    needs:
-      - lint-and-format
     runs-on: general
     container:
       image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:f4f41461
@@ -44,7 +42,6 @@ jobs:
 
   test:
     name: Test suite
-    needs: build
     runs-on: general
     container:
       image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:f4f41461
@@ -92,8 +89,6 @@ jobs:
 
   coverage:
     name: Code Coverage
-    needs:
-      - build
     runs-on: general
     container:
       image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:f4f41461
