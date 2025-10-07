@@ -208,7 +208,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         uint8 decimals; // The amount of decimals that `asset` and strategy use
         // Mappings
         mapping(uint256 => Proposal) proposals;
-        mapping(address => bool) recipientUsed;
+        mapping(address => uint256) activeProposalByRecipient;
         mapping(address => uint256) votingPower;
         mapping(uint256 => uint256) proposalShares;
         // EIP712 storage
@@ -548,14 +548,25 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
             revert VotingEnded(block.timestamp, s.votingEndTime);
         }
 
-        if (s.recipientUsed[recipient]) revert RecipientUsed(recipient);
+        uint256 existingPid = s.activeProposalByRecipient[recipient];
+        if (existingPid != 0) {
+            ProposalState existingState = _state(existingPid);
+            if (
+                existingState == ProposalState.Pending ||
+                existingState == ProposalState.Active ||
+                existingState == ProposalState.Tallying
+            ) {
+                revert RecipientUsed(recipient);
+            }
+            delete s.activeProposalByRecipient[recipient];
+        }
         if (bytes(description).length == 0) revert EmptyDescription();
         if (bytes(description).length > 1000) revert DescriptionTooLong(bytes(description).length, 1000);
 
         pid = ++s.proposalIdCounter;
 
         s.proposals[pid] = Proposal(0, proposer, recipient, description, false);
-        s.recipientUsed[recipient] = true;
+        s.activeProposalByRecipient[recipient] = pid;
 
         emit ProposalCreated(pid, proposer, recipient, description);
     }
@@ -636,8 +647,9 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         uint256 votingEnd = s.votingEndTime;
 
         // Check voting window
-        if (block.timestamp < votingStart || block.timestamp > votingEnd)
+        if (block.timestamp < votingStart || block.timestamp > votingEnd) {
             revert VotingClosed(block.timestamp, votingStart, votingEnd);
+        }
 
         uint256 oldPower = s.votingPower[voter];
         if (weight == 0) revert InvalidWeight(weight, oldPower);
@@ -726,6 +738,11 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         }
 
         emit ProposalQueued(pid, s.globalRedemptionStart, sharesToMint);
+
+        uint256 trackedPid = s.activeProposalByRecipient[recipient];
+        if (trackedPid == pid) {
+            delete s.activeProposalByRecipient[recipient];
+        }
     }
 
     // ---------- State Machine ----------
@@ -798,6 +815,10 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         if (p.canceled) revert AlreadyCanceled(pid);
 
         p.canceled = true;
+        uint256 trackedPid = s.activeProposalByRecipient[p.recipient];
+        if (trackedPid == pid) {
+            delete s.activeProposalByRecipient[p.recipient];
+        }
         emit ProposalCanceled(pid, p.proposer);
     }
 
