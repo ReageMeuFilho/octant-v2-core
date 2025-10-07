@@ -976,19 +976,12 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
             revert Staker__InsufficientUnclaimedRewards();
         }
 
-        // Note: underflow causes a revert if the requested tip is more than unclaimed rewards
-        if (_newEarningPower < deposit.earningPower && (_unclaimedRewards - _requestedTip) < maxBumpTip) {
-            revert Staker__InsufficientUnclaimedRewards();
+        uint256 tipToPay = _requestedTip;
+        if (_newEarningPower < deposit.earningPower && _requestedTip > _unclaimedRewards) {
+            tipToPay = _unclaimedRewards;
         }
 
-        emit EarningPowerBumped(
-            _depositId,
-            deposit.earningPower,
-            _newEarningPower,
-            msg.sender,
-            _tipReceiver,
-            _requestedTip
-        );
+        emit EarningPowerBumped(_depositId, deposit.earningPower, _newEarningPower, msg.sender, _tipReceiver, tipToPay);
 
         // Update global earning power & deposit earning power based on this bump
         totalEarningPower = _calculateTotalEarningPower(deposit.earningPower, _newEarningPower, totalEarningPower);
@@ -1001,9 +994,12 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
 
         // CRITICAL: Update state BEFORE external call (checks-effects-interactions pattern)
         // This prevents reentrancy attacks via malicious reward tokens with callbacks
-        _consumeRewards(deposit, _requestedTip);
+        _consumeRewards(deposit, tipToPay);
 
-        // External call AFTER all state updates
-        SafeERC20.safeTransfer(REWARD_TOKEN, _tipReceiver, _requestedTip);
+        // External call AFTER all state updates. Some ERC20 tokens revert on zero-value transfers,
+        // so skip the call entirely when no tip is due. This also prevents unnecessary gas consumption for zero-value transfers.
+        if (tipToPay > 0) {
+            SafeERC20.safeTransfer(REWARD_TOKEN, _tipReceiver, tipToPay);
+        }
     }
 }
