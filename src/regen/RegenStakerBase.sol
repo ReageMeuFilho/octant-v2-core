@@ -846,7 +846,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         Deposit storage deposit,
         DepositIdentifier _depositId,
         address _newDelegatee
-    ) internal virtual override nonReentrant {
+    ) internal virtual override whenNotPaused nonReentrant {
         super._alterDelegatee(deposit, _depositId, _newDelegatee);
     }
 
@@ -860,7 +860,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         Deposit storage deposit,
         DepositIdentifier _depositId,
         address _newClaimer
-    ) internal virtual override nonReentrant {
+    ) internal virtual override whenNotPaused nonReentrant {
         super._alterClaimer(deposit, _depositId, _newClaimer);
     }
 
@@ -952,7 +952,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         DepositIdentifier _depositId,
         address _tipReceiver,
         uint256 _requestedTip
-    ) public virtual override nonReentrant {
+    ) public virtual override whenNotPaused nonReentrant {
         if (_requestedTip > maxBumpTip) revert Staker__InvalidTip();
 
         Deposit storage deposit = deposits[_depositId];
