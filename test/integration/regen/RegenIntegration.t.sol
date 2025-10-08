@@ -703,10 +703,7 @@ contract RegenIntegrationTest is Test {
         uint256 claimedAmount = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        uint256 timeStakedPercent = 100 - joinTimePercent;
-        uint256 expectedReward = (totalRewardAmount * timeStakedPercent) / 100;
-
-        assertApproxEqRel(claimedAmount, expectedReward, ONE_MICRO);
+        assertApproxEqAbs(claimedAmount, totalRewardAmount, 1);
     }
 
     function testFuzz_ContinuousReward_TwoStakers_DifferentAmounts_ProRataShare(
@@ -2449,6 +2446,49 @@ contract RegenIntegrationTest is Test {
             TokenizedAllocationMechanism(currentTestCtx.allocationMechanism).votingPower(alice),
             expectedVotingPower,
             "Alice should have voting power"
+        );
+    }
+
+    function test_RewardsResumeAfterZeroEarningPowerGap() public {
+        _clearTestContext();
+
+        uint256 duration = regenStaker.rewardDuration();
+        uint256 rewardAmount = (duration + 1) * (10 ** uint256(rewardTokenDecimals));
+
+        rewardToken.mint(address(regenStaker), rewardAmount);
+        vm.prank(ADMIN);
+        regenStaker.notifyRewardAmount(rewardAmount);
+
+        vm.warp(block.timestamp + duration / 2);
+
+        address staker = makeAddr("zeroPowerStaker");
+        whitelistUser(staker, true, false, true);
+
+        uint256 stakeAmount = getStakeAmount(500);
+        stakeToken.mint(staker, stakeAmount);
+        vm.startPrank(staker);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = regenStaker.stake(stakeAmount, staker);
+        vm.stopPrank();
+
+        assertApproxEqRel(
+            regenStaker.unclaimedReward(depositId),
+            rewardAmount / 2,
+            ONE_MICRO,
+            "Unclaimed reward should reflect paused accrual window"
+        );
+
+        vm.warp(block.timestamp + duration);
+
+        vm.startPrank(staker);
+        uint256 claimed = regenStaker.claimReward(depositId);
+        vm.stopPrank();
+
+        assertApproxEqRel(
+            claimed,
+            rewardAmount,
+            ONE_MICRO,
+            "Claim should include rewards emitted during zero-power window"
         );
     }
 

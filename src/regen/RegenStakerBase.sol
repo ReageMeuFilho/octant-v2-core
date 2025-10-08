@@ -152,6 +152,10 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @dev Internal storage for shared configuration accessible via getters.
     SharedState internal sharedState;
 
+    /// @notice Scaled reward emissions accrued while total earning power was zero.
+    /// @dev Stored in SCALE_FACTOR units to preserve precision until they can be distributed.
+    uint256 internal pendingEmissionScaled;
+
     /// @notice Tracks the total amount of rewards that have been added via notifyRewardAmount
     /// @dev This accumulates all reward amounts ever added to the contract
     uint256 public totalRewards;
@@ -791,6 +795,53 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
             _deposit.scaledUnclaimedRewardCheckpoint = _deposit.scaledUnclaimedRewardCheckpoint - scaledAmount;
             totalClaimedRewards = totalClaimedRewards + _amount;
         }
+    }
+
+    /// @inheritdoc Staker
+    /// @dev Extends base implementation by releasing any pending zero-power emissions.
+    function rewardPerTokenAccumulated() public view virtual override returns (uint256) {
+        uint256 accumulator = rewardPerTokenAccumulatedCheckpoint;
+        uint256 power = totalEarningPower;
+        if (power == 0) {
+            return accumulator;
+        }
+
+        uint256 elapsed = lastTimeRewardDistributed() - lastCheckpointTime;
+        if (elapsed != 0 && scaledRewardRate != 0) {
+            accumulator += (scaledRewardRate * elapsed) / power;
+        }
+
+        if (pendingEmissionScaled != 0) {
+            accumulator += pendingEmissionScaled / power;
+        }
+
+        return accumulator;
+    }
+
+    /// @inheritdoc Staker
+    function _checkpointGlobalReward() internal virtual override {
+        uint256 lastDistributed = lastTimeRewardDistributed();
+        uint256 elapsed = lastDistributed - lastCheckpointTime;
+        uint256 emissionScaled = elapsed != 0 && scaledRewardRate != 0 ? scaledRewardRate * elapsed : 0;
+        uint256 power = totalEarningPower;
+
+        if (emissionScaled != 0) {
+            if (power == 0) {
+                pendingEmissionScaled += emissionScaled;
+            } else {
+                uint256 emittedPerPower = emissionScaled / power;
+                rewardPerTokenAccumulatedCheckpoint += emittedPerPower;
+                pendingEmissionScaled += emissionScaled - (emittedPerPower * power);
+            }
+        }
+
+        if (power != 0 && pendingEmissionScaled != 0) {
+            uint256 carriedPerPower = pendingEmissionScaled / power;
+            rewardPerTokenAccumulatedCheckpoint += carriedPerPower;
+            pendingEmissionScaled -= carriedPerPower * power;
+        }
+
+        lastCheckpointTime = lastDistributed;
     }
 
     // === Overridden Functions ===
