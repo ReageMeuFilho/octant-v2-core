@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.25;
+
 import { TokenizedStrategy, Math } from "src/core/TokenizedStrategy.sol";
 import { IBaseStrategy } from "src/core/interfaces/IBaseStrategy.sol";
 
@@ -20,6 +21,7 @@ import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
  *      - Losses first attempt dragon share burning when enabled; residual losses decrease PPS
  *      - Dragon router change follows TokenizedStrategy cooldown and two-step finalization
  */
+
 contract YieldDonatingTokenizedStrategy is TokenizedStrategy {
     using Math for uint256;
 
@@ -34,6 +36,7 @@ contract YieldDonatingTokenizedStrategy is TokenizedStrategy {
      * @dev Mints profit-derived shares to dragon router when newTotalAssets > oldTotalAssets; on loss, attempts
      *      dragon share burning if enabled. Residual loss reduces PPS (no tracked-loss bucket).
      */
+
     function report()
         public
         virtual
@@ -57,7 +60,7 @@ contract YieldDonatingTokenizedStrategy is TokenizedStrategy {
 
             // mint the shares to the dragon router
             _mint(S, _dragonRouter, sharesToMint);
-            emit DonationMinted(_dragonRouter, profit);
+            emit DonationMinted(_dragonRouter, sharesToMint);
         } else {
             unchecked {
                 loss = oldTotalAssets - newTotalAssets;
@@ -93,12 +96,9 @@ contract YieldDonatingTokenizedStrategy is TokenizedStrategy {
             uint256 sharesBurned = Math.min(sharesToBurn, S.balances[S.dragonRouter]);
 
             if (sharesBurned > 0) {
-                // Convert shares to assets BEFORE burning to get correct value
-                uint256 assetValueBurned = _convertToAssets(S, sharesBurned, Math.Rounding.Floor);
-
                 // Burn shares from dragon router
                 _burn(S, S.dragonRouter, sharesBurned);
-                emit DonationBurned(S.dragonRouter, assetValueBurned);
+                emit DonationBurned(S.dragonRouter, sharesBurned);
             }
         }
     }
