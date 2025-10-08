@@ -5,7 +5,6 @@ import { BaseHealthCheck } from "src/strategies/periphery/BaseHealthCheck.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
-import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @title MorphoCompounderStrategy
 /// @author [Golem Foundation](https://golem.foundation)
@@ -14,8 +13,13 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 contract MorphoCompounderStrategy is BaseHealthCheck {
     using SafeERC20 for IERC20;
 
+    /// @dev Thrown when the configured compounder vault asset differs from the strategy asset.
+    error InvalidCompounderAsset(address expected, address actual);
+
     // morpho vault
     address public immutable compounderVault;
+    /// @dev Tracks excess reported capacity that failed during deposit attempts.
+    uint256 internal maxDepositBuffer;
 
     /**
      * @param _compounderVault Address of the Morpho vault this strategy compounds into
@@ -51,7 +55,10 @@ contract MorphoCompounderStrategy is BaseHealthCheck {
         )
     {
         // make sure asset is Morpho's asset
-        require(IERC4626(_compounderVault).asset() == _asset, "Asset mismatch with compounder vault");
+        address expectedAsset = IERC4626(_compounderVault).asset();
+        if (expectedAsset != _asset) {
+            revert InvalidCompounderAsset(expectedAsset, _asset);
+        }
         IERC20(_asset).forceApprove(_compounderVault, type(uint256).max);
         compounderVault = _compounderVault;
     }
@@ -59,7 +66,9 @@ contract MorphoCompounderStrategy is BaseHealthCheck {
     function availableDepositLimit(address /*_owner*/) public view override returns (uint256) {
         uint256 vaultLimit = IERC4626(compounderVault).maxDeposit(address(this));
         uint256 idleBalance = IERC20(asset).balanceOf(address(this));
-        return vaultLimit > idleBalance ? vaultLimit - idleBalance : 0;
+        uint256 limit = vaultLimit > idleBalance ? vaultLimit - idleBalance : 0;
+        uint256 buffer = maxDepositBuffer;
+        return buffer >= limit ? 0 : limit - buffer;
     }
 
     function availableWithdrawLimit(address /*_owner*/) public view override returns (uint256) {
@@ -67,7 +76,50 @@ contract MorphoCompounderStrategy is BaseHealthCheck {
     }
 
     function _deployFunds(uint256 _amount) internal override {
-        IERC4626(compounderVault).deposit(_amount, address(this));
+        if (_amount == 0) return;
+
+        uint256 remaining = _amount;
+        while (remaining > 0) {
+            uint256 reportedLimit = IERC4626(compounderVault).maxDeposit(address(this));
+            if (reportedLimit == 0 || reportedLimit <= maxDepositBuffer) {
+                // Reported capacity is exhausted or previously proven inaccurate.
+                break;
+            }
+
+            uint256 effectiveLimit = reportedLimit - maxDepositBuffer;
+            uint256 toDeposit = remaining < effectiveLimit ? remaining : effectiveLimit;
+            if (toDeposit == 0) break;
+
+            uint256 attempt = toDeposit;
+            bool deposited;
+            while (attempt > 0) {
+                try IERC4626(compounderVault).deposit(attempt, address(this)) returns (uint256) {
+                    remaining -= attempt;
+                    maxDepositBuffer = 0;
+                    deposited = true;
+                    break;
+                } catch {
+                    // Reduce the attempt by 10%. Ensure we always make progress by clamping the reduction.
+                    uint256 reduction = attempt / 10;
+                    if (reduction == 0) reduction = 1;
+                    if (attempt <= reduction) {
+                        attempt = 0;
+                    } else {
+                        attempt -= reduction;
+                    }
+                }
+            }
+
+            if (!deposited) {
+                // Even the smallest practical attempt failed; block further deposits until the limit changes.
+                maxDepositBuffer = reportedLimit;
+                break;
+            }
+
+            if (remaining == 0) {
+                break;
+            }
+        }
     }
 
     function _freeFunds(uint256 _amount) internal override {
