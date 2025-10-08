@@ -2,9 +2,9 @@
 pragma solidity >=0.8.25;
 
 import { Create2 } from "@openzeppelin/contracts/utils/Create2.sol";
-import { YearnV3CompounderStrategy } from "src/strategies/yieldDonating/YearnV3CompounderStrategy.sol";
+import { YearnV3Strategy } from "src/strategies/yieldDonating/YearnV3Strategy.sol";
 
-contract YearnV3CompounderStrategyFactory {
+contract YearnV3StrategyFactory {
     /**
      * @dev Struct to store information about a strategy.
      * @param deployerAddress The address of the deployer who created the strategy.
@@ -112,7 +112,7 @@ contract YearnV3CompounderStrategyFactory {
         {
             // Deploy strategy in another closure
             bytes memory bytecode = abi.encodePacked(
-                type(YearnV3CompounderStrategy).creationCode,
+                type(YearnV3Strategy).creationCode,
                 abi.encode(
                     _yearnVault,
                     _asset,

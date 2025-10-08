@@ -6,11 +6,11 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
 
-/// @title YearnV3CompounderStrategy
+/// @title YearnV3Strategy
 /// @author [Golem Foundation](https://golem.foundation)
 /// @custom:security-contact security@golem.foundation
 /// @notice Strategy that donates rewards from a Yearn v3 vault.
-contract YearnV3CompounderStrategy is BaseHealthCheck {
+contract YearnV3Strategy is BaseHealthCheck {
     using SafeERC20 for IERC20;
 
     // Yearn v3 vault

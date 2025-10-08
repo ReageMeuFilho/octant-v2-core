@@ -3,15 +3,15 @@ pragma solidity >=0.8.25;
 
 import { Script } from "forge-std/Script.sol";
 import { console } from "forge-std/console.sol";
-import { YearnV3CompounderStrategyFactory } from "src/factories/yieldDonating/YearnV3CompounderStrategyFactory.sol";
+import { YearnV3StrategyFactory } from "src/factories/yieldDonating/YearnV3StrategyFactory.sol";
 
 /**
- * @title DeployYearnV3CompounderStrategyFactory
+ * @title DeployYearnV3StrategyFactory
  * @author [Golem Foundation](https://golem.foundation)
- * @notice Deployment script for YearnV3CompounderStrategyFactory
- * @dev This deploys the factory that can create YearnV3CompounderStrategy instances
+ * @notice Deployment script for YearnV3StrategyFactory
+ * @dev This deploys the factory that can create YearnV3Strategy instances
  */
-contract DeployYearnV3CompounderStrategyFactory is Script {
+contract DeployYearnV3StrategyFactory is Script {
     // Salt for deterministic deployment
     bytes32 public constant DEPLOYMENT_SALT = keccak256("OCT_YEARN_V3_COMPOUNDER_STRATEGY_FACTORY_V1");
 
@@ -25,11 +25,11 @@ contract DeployYearnV3CompounderStrategyFactory is Script {
         console.log("Deployer address:", vm.addr(deployerPrivateKey));
 
         // Deploy the factory deterministically using create2
-        YearnV3CompounderStrategyFactory factory = new YearnV3CompounderStrategyFactory{ salt: DEPLOYMENT_SALT }();
+        YearnV3StrategyFactory factory = new YearnV3StrategyFactory{ salt: DEPLOYMENT_SALT }();
         address factoryAddress = address(factory);
 
         // Log deployment information
-        console.log("YearnV3CompounderStrategyFactory deployed at:", factoryAddress);
+        console.log("YearnV3StrategyFactory deployed at:", factoryAddress);
 
         vm.stopBroadcast();
 

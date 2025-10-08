@@ -3,14 +3,14 @@ pragma solidity ^0.8.25;
 
 import { Test } from "forge-std/Test.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
-import { YearnV3CompounderStrategy } from "src/strategies/yieldDonating/YearnV3CompounderStrategy.sol";
+import { YearnV3Strategy } from "src/strategies/yieldDonating/YearnV3Strategy.sol";
 import { BaseHealthCheck } from "src/strategies/periphery/BaseHealthCheck.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
 import { IMockStrategy } from "test/mocks/zodiac-core/IMockStrategy.sol";
-import { YearnV3CompounderStrategyFactory } from "src/factories/yieldDonating/YearnV3CompounderStrategyFactory.sol";
+import { YearnV3StrategyFactory } from "src/factories/yieldDonating/YearnV3StrategyFactory.sol";
 import { YieldDonatingTokenizedStrategy } from "src/strategies/yieldDonating/YieldDonatingTokenizedStrategy.sol";
 
 /// @title YearnV3Compounder Yield Donating Test
@@ -31,14 +31,14 @@ contract YearnV3CompounderDonatingStrategyTest is Test {
     }
 
     // Strategy instance
-    YearnV3CompounderStrategy public strategy;
+    YearnV3Strategy public strategy;
 
     // Strategy parameters
     address public management;
     address public keeper;
     address public emergencyAdmin;
     address public donationAddress;
-    YearnV3CompounderStrategyFactory public factory;
+    YearnV3StrategyFactory public factory;
     string public strategyName = "YearnV3Compounder Donating Strategy";
 
     // Test user
@@ -93,13 +93,11 @@ contract YearnV3CompounderDonatingStrategyTest is Test {
             implementationAddress: address(implementation)
         });
 
-        // YearnV3CompounderStrategyFactory
-        factory = new YearnV3CompounderStrategyFactory{
-            salt: keccak256("OCT_YEARN_V3_COMPOUNDER_STRATEGY_VAULT_FACTORY_V1")
-        }();
+        // YearnV3StrategyFactory
+        factory = new YearnV3StrategyFactory{ salt: keccak256("OCT_YEARN_V3_COMPOUNDER_STRATEGY_VAULT_FACTORY_V1") }();
 
         // Deploy strategy
-        strategy = YearnV3CompounderStrategy(
+        strategy = YearnV3Strategy(
             factory.createStrategy(
                 YEARN_V3_USDC_VAULT,
                 USDC,
@@ -513,7 +511,7 @@ contract YearnV3CompounderDonatingStrategyTest is Test {
     function testConstructorAssetValidation() public {
         // Try to deploy with wrong asset - should revert
         vm.expectRevert();
-        new YearnV3CompounderStrategy(
+        new YearnV3Strategy(
             YEARN_V3_USDC_VAULT,
             address(0x123), // Wrong asset
             strategyName,
