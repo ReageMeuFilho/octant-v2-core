@@ -396,8 +396,8 @@ contract MultistrategyVault is IMultistrategyVault {
      * @dev Enforces that the sender has the required role
      */
     function _enforceRole(address account_, Roles role_) internal view {
-        // Check bit at role position
-        require(roles[account_] & (1 << uint256(role_)) != 0, NotAllowed());
+        uint256 mask = 1 << uint256(role_);
+        if ((roles[account_] & mask) != mask) revert NotAllowed();
     }
 
     /**
