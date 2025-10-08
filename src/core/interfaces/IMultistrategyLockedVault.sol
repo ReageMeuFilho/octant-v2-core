@@ -33,6 +33,7 @@ interface IMultistrategyLockedVault is IMultistrategyVault {
     event RageQuitInitiated(address indexed user, uint256 shares, uint256 unlockTime);
     event RageQuitCooldownPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
     event PendingRageQuitCooldownPeriodChange(uint256 newPeriod, uint256 effectiveTimestamp);
+    event RageQuitCooldownPeriodChangeCancelled(uint256 pendingPeriod, uint256 proposedAt, uint256 cancelledAt);
     event RageQuitCancelled(address indexed user, uint256 freedShares);
     event RegenGovernanceTransferUpdate(
         address indexed previousGovernance,
@@ -56,6 +57,7 @@ interface IMultistrategyLockedVault is IMultistrategyVault {
     error NoPendingRageQuitCooldownPeriodChange();
     error RageQuitCooldownPeriodChangeDelayNotElapsed();
     error NoPendingRegenGovernance();
+    error RageQuitCooldownPeriodChangeDelayElapsed();
 
     /**
      * @notice Initiates a rage quit by locking `shares` until the unlock time is reached.
