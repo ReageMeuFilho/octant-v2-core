@@ -178,6 +178,38 @@ contract LockedVaultTest is Test {
         vm.stopPrank();
     }
 
+    function test_RegenGovernanceTransferRequiresAcceptance() public {
+        address newGovernance = address(0xABCD);
+
+        vm.startPrank(gov);
+        vm.expectEmit(true, true, false, true);
+        emit IMultistrategyLockedVault.RegenGovernanceTransferUpdate(gov, newGovernance, 0);
+        vault.setRegenGovernance(newGovernance);
+        vm.stopPrank();
+
+        assertEq(vault.regenGovernance(), gov, "governance should not update yet");
+        assertEq(vault.pendingRegenGovernance(), newGovernance, "pending governance mismatch");
+
+        vm.expectRevert(IMultistrategyLockedVault.NotRegenGovernance.selector);
+        vm.prank(address(0xBEEF));
+        vault.acceptRegenGovernance();
+
+        vm.prank(newGovernance);
+        vm.expectEmit(true, true, false, true);
+        emit IMultistrategyLockedVault.RegenGovernanceTransferUpdate(gov, newGovernance, 1);
+        vault.acceptRegenGovernance();
+
+        assertEq(vault.regenGovernance(), newGovernance, "governance not updated");
+        assertEq(vault.pendingRegenGovernance(), address(0), "pending should clear");
+    }
+
+    function test_RegenGovernanceRejectsInvalidAddresses() public {
+        vm.startPrank(gov);
+        vault.setRegenGovernance(address(0));
+        vault.setRegenGovernance(gov);
+        vm.stopPrank();
+    }
+
     function testFuzz_CannotInitiateRageQuitWhenAlreadyUnlockedAndCooldownPeriodHasNotPassed(
         uint256 depositAmount,
         uint256 timeElapsed

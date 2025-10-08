@@ -34,6 +34,11 @@ interface IMultistrategyLockedVault is IMultistrategyVault {
     event RageQuitCooldownPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
     event PendingRageQuitCooldownPeriodChange(uint256 newPeriod, uint256 effectiveTimestamp);
     event RageQuitCancelled(address indexed user, uint256 freedShares);
+    event RegenGovernanceTransferUpdate(
+        address indexed previousGovernance,
+        address indexed newGovernance,
+        uint8 status
+    );
 
     // Add necessary error definitions
     error InvalidRageQuitCooldownPeriod();
@@ -50,6 +55,7 @@ interface IMultistrategyLockedVault is IMultistrategyVault {
     error TransferExceedsAvailableShares();
     error NoPendingRageQuitCooldownPeriodChange();
     error RageQuitCooldownPeriodChangeDelayNotElapsed();
+    error NoPendingRegenGovernance();
 
     /**
      * @notice Initiates a rage quit by locking `shares` until the unlock time is reached.
@@ -81,6 +87,11 @@ interface IMultistrategyLockedVault is IMultistrategyVault {
     function setRegenGovernance(address _regenGovernance) external;
 
     /**
+     * @notice Accepts a pending regen governance transfer.
+     */
+    function acceptRegenGovernance() external;
+
+    /**
      * @notice Cancels an active rage quit for the caller and frees any locked shares.
      */
     function cancelRageQuit() external;
@@ -104,4 +115,9 @@ interface IMultistrategyLockedVault is IMultistrategyVault {
      * @return unlockTime The timestamp when the shares become withdrawable.
      */
     function getCustodyInfo(address user) external view returns (uint256 lockedShares, uint256 unlockTime);
+
+    /**
+     * @notice Returns the pending regen governance address, if any.
+     */
+    function pendingRegenGovernance() external view returns (address);
 }

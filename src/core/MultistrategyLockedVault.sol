@@ -78,6 +78,8 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
 
     // Regen governance address
     address public regenGovernance;
+    // Pending regen governance awaiting acceptance
+    address public pendingRegenGovernance;
 
     // Cooldown period for rage quit
     uint256 public rageQuitCooldownPeriod;
@@ -276,8 +278,24 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
      *      - Transferring governance to another address
      * @custom:governance Only current regen governance can call this function
      */
-    function setRegenGovernance(address _regenGovernance) external onlyRegenGovernance {
-        regenGovernance = _regenGovernance;
+    function setRegenGovernance(address _regenGovernance) external override onlyRegenGovernance {
+        if (_regenGovernance == address(0)) return;
+
+        pendingRegenGovernance = _regenGovernance;
+        emit RegenGovernanceTransferUpdate(regenGovernance, _regenGovernance, 0);
+    }
+
+    /**
+     * @notice Accept the regen governance transfer
+     */
+    function acceptRegenGovernance() external override {
+        address pending = pendingRegenGovernance;
+        if (pending == address(0)) revert NoPendingRegenGovernance();
+        if (msg.sender != pending) revert NotRegenGovernance();
+
+        emit RegenGovernanceTransferUpdate(regenGovernance, pending, 1);
+        regenGovernance = pending;
+        pendingRegenGovernance = address(0);
     }
 
     /**
