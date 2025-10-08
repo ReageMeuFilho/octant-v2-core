@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.25;
 
+import { Clones } from "@openzeppelin/contracts/proxy/Clones.sol";
 import { IMultistrategyVaultFactory } from "src/factories/interfaces/IMultistrategyVaultFactory.sol";
 import { IMultistrategyVault } from "src/core/interfaces/IMultistrategyVault.sol";
 /**
@@ -191,16 +192,8 @@ contract MultistrategyVaultFactory is IMultistrategyVaultFactory {
     }
 
     // Helper function to create a minimal proxy clone
-    function _createClone(address target, bytes32 salt) internal returns (address result) {
-        bytes20 targetBytes = bytes20(target);
-        assembly {
-            let clone := mload(0x40)
-            mstore(clone, 0x3d602d80600a3d3981f3363d3d373d3d3d363d73000000000000000000000000)
-            mstore(add(clone, 0x14), targetBytes)
-            mstore(add(clone, 0x28), 0x5af43d82803e903d91602b57fd5bf30000000000000000000000000000000000)
-            result := create2(0, clone, 0x37, salt)
-        }
-        return result;
+    function _createClone(address target, bytes32 salt) internal returns (address) {
+        return Clones.cloneDeterministic(target, salt);
     }
 
     function _unpackProtocolFee(uint256 configData) internal pure returns (uint16) {
