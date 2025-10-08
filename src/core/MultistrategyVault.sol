@@ -5,6 +5,7 @@ pragma solidity ^0.8.25;
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import { IMultistrategyVault } from "src/core/interfaces/IMultistrategyVault.sol";
 import { IDepositLimitModule } from "src/core/interfaces/IDepositLimitModule.sol";
@@ -69,7 +70,6 @@ contract MultistrategyVault is IMultistrategyVault {
         keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
     bytes32 private constant PERMIT_TYPE_HASH =
         keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
-
     // STORAGE
     // Underlying token used by the vault.
     address public override asset;
@@ -1356,8 +1356,10 @@ contract MultistrategyVault is IMultistrategyVault {
                 keccak256(abi.encode(PERMIT_TYPE_HASH, owner_, spender_, amount_, nonce, deadline_))
             )
         );
-        address recoveredAddress = ecrecover(digest, v_, r_, s_);
-        require(recoveredAddress != address(0) && recoveredAddress == owner_, InvalidSignature());
+        (address recoveredAddress, ECDSA.RecoverError error, ) = ECDSA.tryRecover(digest, v_, r_, s_);
+        if (error != ECDSA.RecoverError.NoError || recoveredAddress != owner_) {
+            revert InvalidSignature();
+        }
 
         allowance[owner_][spender_] = amount_;
         nonces[owner_] = nonce + 1;
