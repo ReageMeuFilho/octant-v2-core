@@ -24,7 +24,7 @@ contract AntiLoopholeGuard is FactoryFriendly, BaseGuard {
     function setUp(bytes memory initializeParams) public override initializer {
         address _owner = abi.decode(initializeParams, (address));
         lockEndTime = block.timestamp + LOCK_DURATION;
-        transferOwnership(_owner);
+        __Ownable_init(_owner);
     }
 
     // solhint-disable
