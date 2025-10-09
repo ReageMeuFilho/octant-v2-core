@@ -977,7 +977,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         }
 
         uint256 tipToPay = _requestedTip;
-        if (_newEarningPower < deposit.earningPower && _requestedTip > _unclaimedRewards) {
+        if (_requestedTip > _unclaimedRewards) {
             tipToPay = _unclaimedRewards;
         }
 
