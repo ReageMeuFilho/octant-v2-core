@@ -1356,10 +1356,8 @@ contract MultistrategyVault is IMultistrategyVault {
                 keccak256(abi.encode(PERMIT_TYPE_HASH, owner_, spender_, amount_, nonce, deadline_))
             )
         );
-  (address recoveredAddress, , ) = ECDSA.tryRecover(digest, v_, r_, s_);
-  if (recoveredAddress != owner_) {
-      revert InvalidSignature();
-  }
+        (address recoveredAddress, , ) = ECDSA.tryRecover(digest, v_, r_, s_);
+        require(recoveredAddress == owner_, "InvalidSignature");
 
         allowance[owner_][spender_] = amount_;
         nonces[owner_] = nonce + 1;

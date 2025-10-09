@@ -522,8 +522,8 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     /// @dev Recovers signer address from signature
     function _recover(bytes32 structHash, uint8 v, bytes32 r, bytes32 s) private returns (address) {
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR(), structHash));
-        (address recovered, ECDSA.RecoverError error, ) = ECDSA.tryRecover(digest, v, r, s);
-        if (error != ECDSA.RecoverError.NoError || recovered == address(0)) revert InvalidSignature();
+        (address recovered, , ) = ECDSA.tryRecover(digest, v, r, s);
+        require(recovered != address(0), "InvalidSignature");
         return recovered;
     }
 

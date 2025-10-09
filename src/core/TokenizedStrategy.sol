@@ -1582,11 +1582,8 @@ abstract contract TokenizedStrategy {
                 )
             );
 
-(address recoveredAddress, , ) = ECDSA.tryRecover(digest, v, r, s);
-  if (recoveredAddress != owner) {
-      revert("ERC20: INVALID_SIGNER");
-  }
-
+            (address recoveredAddress, , ) = ECDSA.tryRecover(digest, v, r, s);
+            require(recoveredAddress == owner, "ERC20: INVALID_SIGNER");
 
             _approve(_strategyStorage(), recoveredAddress, spender, value);
         }

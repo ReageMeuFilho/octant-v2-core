@@ -1407,8 +1407,8 @@ contract MockTokenizedStrategy {
                 )
             );
 
-            (address recoveredAddress, ECDSA.RecoverError error, ) = ECDSA.tryRecover(digest, v, r, s);
-            if (error != ECDSA.RecoverError.NoError || recoveredAddress != _owner) revert("ERC20: INVALID_SIGNER");
+            (address recoveredAddress, , ) = ECDSA.tryRecover(digest, v, r, s);
+            require(recoveredAddress == _owner, "ERC20: INVALID_SIGNER");
 
             _approve(_strategyStorage(), recoveredAddress, spender, value);
         }
