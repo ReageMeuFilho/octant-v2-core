@@ -2452,6 +2452,89 @@ contract RegenIntegrationTest is Test {
         );
     }
 
+    function test_Contribute_WithZeroAmount_AllowsSignup() public {
+        _clearTestContext();
+
+        currentTestCtx.stakeAmount = getStakeAmount(1000);
+        currentTestCtx.rewardAmount = getRewardAmount(10000);
+        currentTestCtx.contributeAmount = 0;
+
+        uint256 deploymentTime = block.timestamp;
+        currentTestCtx.allocationMechanism = _deployAllocationMechanism();
+        uint256 votingDelay = TokenizedAllocationMechanism(currentTestCtx.allocationMechanism).votingDelay();
+        uint256 votingPeriod = TokenizedAllocationMechanism(currentTestCtx.allocationMechanism).votingPeriod();
+        uint256 votingStartTime = deploymentTime + votingDelay;
+        uint256 votingEndTime = votingStartTime + votingPeriod;
+
+        vm.roll(block.number + 5);
+
+        whitelistUser(alice, true, true, true);
+
+        stakeToken.mint(alice, currentTestCtx.stakeAmount);
+        rewardToken.mint(address(regenStaker), currentTestCtx.rewardAmount);
+
+        vm.startPrank(alice);
+        stakeToken.approve(address(regenStaker), currentTestCtx.stakeAmount);
+        currentTestCtx.depositId = regenStaker.stake(currentTestCtx.stakeAmount, alice);
+        vm.stopPrank();
+
+        vm.prank(ADMIN);
+        regenStaker.notifyRewardAmount(currentTestCtx.rewardAmount);
+
+        uint256 timeInVotingPeriod = votingEndTime - (votingPeriod / 10);
+        vm.warp(timeInVotingPeriod);
+        assertTrue(block.timestamp >= votingStartTime && block.timestamp <= votingEndTime);
+
+        currentTestCtx.unclaimedBefore = regenStaker.unclaimedReward(currentTestCtx.depositId);
+
+        currentTestCtx.nonce = TokenizedAllocationMechanism(currentTestCtx.allocationMechanism).nonces(alice);
+        currentTestCtx.deadline = block.timestamp + 1 hours;
+        currentTestCtx.netContribution = 0;
+
+        currentTestCtx.digest = _getSignupDigest(
+            currentTestCtx.allocationMechanism,
+            alice,
+            address(regenStaker),
+            currentTestCtx.netContribution,
+            currentTestCtx.nonce,
+            currentTestCtx.deadline
+        );
+        (currentTestCtx.v, currentTestCtx.r, currentTestCtx.s) = _signDigest(currentTestCtx.digest, ALICE_PRIVATE_KEY);
+
+        vm.prank(alice);
+        currentTestCtx.actualContribution = regenStaker.contribute(
+            currentTestCtx.depositId,
+            currentTestCtx.allocationMechanism,
+            0,
+            currentTestCtx.deadline,
+            currentTestCtx.v,
+            currentTestCtx.r,
+            currentTestCtx.s
+        );
+
+        assertEq(currentTestCtx.actualContribution, 0);
+        assertEq(
+            regenStaker.unclaimedReward(currentTestCtx.depositId),
+            currentTestCtx.unclaimedBefore,
+            "Unclaimed rewards should remain unchanged"
+        );
+        assertEq(
+            TokenizedAllocationMechanism(currentTestCtx.allocationMechanism).nonces(alice),
+            currentTestCtx.nonce + 1,
+            "Mechanism nonce should increment"
+        );
+        assertEq(
+            TokenizedAllocationMechanism(currentTestCtx.allocationMechanism).votingPower(alice),
+            0,
+            "Voting power should remain zero"
+        );
+        assertEq(
+            rewardToken.balanceOf(currentTestCtx.allocationMechanism),
+            0,
+            "Allocation mechanism should not receive tokens"
+        );
+    }
+
     function test_Contribute_WithSignature_AndFees() public {
         _clearTestContext();
 

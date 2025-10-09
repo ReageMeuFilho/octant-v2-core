@@ -16,6 +16,8 @@ compoundRewards(depositId) → amount  // reward token = stake token only
 contribute(depositId, mechanism, amount, deadline, v, r, s) → amount
 ```
 
+- `contribute` supports zero `amount` inputs to forward a signature-only registration when the allocation mechanism allows zero-deposit signup. No rewards are moved in that case.
+
 ## Key Parameters
 
 - **Reward Duration**: 7-3000 days (≥30 days recommended for precision)

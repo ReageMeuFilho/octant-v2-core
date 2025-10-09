@@ -560,7 +560,6 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         bytes32 _s
     ) public virtual whenNotPaused nonReentrant returns (uint256 amountContributedToAllocationMechanism) {
         _checkWhitelisted(sharedState.contributionWhitelist, msg.sender);
-        require(_amount > 0, ZeroOperation());
         _revertIfAddressZero(_allocationMechanismAddress);
         require(
             sharedState.allocationMechanismWhitelist.isWhitelisted(_allocationMechanismAddress),
@@ -585,6 +584,19 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
 
         uint256 unclaimedAmount = deposit.scaledUnclaimedRewardCheckpoint / SCALE_FACTOR;
         require(_amount <= unclaimedAmount, CantAfford(_amount, unclaimedAmount));
+
+        if (_amount == 0) {
+            emit RewardContributed(_depositId, msg.sender, _allocationMechanismAddress, 0);
+            TokenizedAllocationMechanism(_allocationMechanismAddress).signupOnBehalfWithSignature(
+                msg.sender,
+                0,
+                _deadline,
+                _v,
+                _r,
+                _s
+            );
+            return 0;
+        }
 
         uint256 fee = claimFeeParameters.feeAmount;
 
