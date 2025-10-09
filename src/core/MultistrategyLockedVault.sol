@@ -306,6 +306,18 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
     }
 
     /**
+     * @notice Cancel a pending regen governance transfer
+     * @dev Can only be called by current regen governance when there is a pending transfer
+     */
+    function cancelRegenGovernance() external override onlyRegenGovernance {
+        address pending = pendingRegenGovernance;
+        if (pending == address(0)) revert NoPendingRegenGovernance();
+
+        pendingRegenGovernance = address(0);
+        emit RegenGovernanceTransferUpdate(regenGovernance, pending, 2);
+    }
+
+    /**
      * @notice Process withdrawal of shares from custody during withdraw/redeem operations
      * @param owner Address of the share owner attempting withdrawal
      * @param shares Number of shares being withdrawn/redeemed
