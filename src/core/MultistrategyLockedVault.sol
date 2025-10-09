@@ -178,13 +178,20 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
      * @dev Can only be called by governance during the grace period
      */
     function cancelRageQuitCooldownPeriodChange() external onlyRegenGovernance {
-        if (pendingRageQuitCooldownPeriod == 0) {
+        uint256 pending = pendingRageQuitCooldownPeriod;
+        if (pending == 0) {
             revert NoPendingRageQuitCooldownPeriodChange();
+        }
+
+        uint256 proposedAt = rageQuitCooldownPeriodChangeTimestamp;
+        if (block.timestamp >= proposedAt + RAGE_QUIT_COOLDOWN_CHANGE_DELAY) {
+            revert RageQuitCooldownPeriodChangeDelayElapsed();
         }
 
         pendingRageQuitCooldownPeriod = 0;
         rageQuitCooldownPeriodChangeTimestamp = 0;
 
+        emit RageQuitCooldownPeriodChangeCancelled(pending, proposedAt, block.timestamp);
         emit PendingRageQuitCooldownPeriodChange(0, 0);
     }
 
@@ -296,6 +303,18 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
         emit RegenGovernanceTransferUpdate(regenGovernance, pending, 1);
         regenGovernance = pending;
         pendingRegenGovernance = address(0);
+    }
+
+    /**
+     * @notice Cancel a pending regen governance transfer
+     * @dev Can only be called by current regen governance when there is a pending transfer
+     */
+    function cancelRegenGovernance() external override onlyRegenGovernance {
+        address pending = pendingRegenGovernance;
+        if (pending == address(0)) revert NoPendingRegenGovernance();
+
+        pendingRegenGovernance = address(0);
+        emit RegenGovernanceTransferUpdate(regenGovernance, pending, 2);
     }
 
     /**
