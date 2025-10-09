@@ -94,6 +94,11 @@ interface IMultistrategyLockedVault is IMultistrategyVault {
     function acceptRegenGovernance() external;
 
     /**
+     * @notice Cancels a pending regen governance transfer.
+     */
+    function cancelRegenGovernance() external;
+
+    /**
      * @notice Cancels an active rage quit for the caller and frees any locked shares.
      */
     function cancelRageQuit() external;
