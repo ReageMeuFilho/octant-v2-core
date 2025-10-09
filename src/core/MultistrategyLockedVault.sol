@@ -156,7 +156,7 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
      * @notice Finalize the rage quit cooldown period change after the grace period
      * @dev Can only be called after the grace period has elapsed
      */
-    function finalizeRageQuitCooldownPeriodChange() external onlyRegenGovernance {
+    function finalizeRageQuitCooldownPeriodChange() external {
         if (pendingRageQuitCooldownPeriod == 0) {
             revert NoPendingRageQuitCooldownPeriodChange();
         }
