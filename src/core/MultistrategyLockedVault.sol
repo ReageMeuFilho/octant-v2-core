@@ -286,7 +286,7 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
      * @custom:governance Only current regen governance can call this function
      */
     function setRegenGovernance(address _regenGovernance) external override onlyRegenGovernance {
-        if (_regenGovernance == address(0)) return;
+        if (_regenGovernance == address(0)) revert InvalidGovernanceAddress();
 
         pendingRegenGovernance = _regenGovernance;
         emit RegenGovernanceTransferUpdate(regenGovernance, _regenGovernance, 0);

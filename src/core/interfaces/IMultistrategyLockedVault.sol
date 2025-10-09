@@ -58,6 +58,7 @@ interface IMultistrategyLockedVault is IMultistrategyVault {
     error RageQuitCooldownPeriodChangeDelayNotElapsed();
     error NoPendingRegenGovernance();
     error RageQuitCooldownPeriodChangeDelayElapsed();
+    error InvalidGovernanceAddress();
 
     /**
      * @notice Initiates a rage quit by locking `shares` until the unlock time is reached.

@@ -127,4 +127,11 @@ contract Finding592Fix is Test {
         assertEq(vault.regenGovernance(), GOVERNANCE, "governance should remain unchanged");
         assertEq(vault.pendingRegenGovernance(), secondNewGovernance, "new pending governance should be set");
     }
+
+    function test_SetRegenGovernance_RevertWhenAddressZero() public {
+        // Try to set governance to address(0)
+        vm.expectRevert(IMultistrategyLockedVault.InvalidGovernanceAddress.selector);
+        vm.prank(GOVERNANCE);
+        vault.setRegenGovernance(address(0));
+    }
 }

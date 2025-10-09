@@ -205,6 +205,7 @@ contract LockedVaultTest is Test {
 
     function test_RegenGovernanceRejectsInvalidAddresses() public {
         vm.startPrank(gov);
+        vm.expectRevert(IMultistrategyLockedVault.InvalidGovernanceAddress.selector);
         vault.setRegenGovernance(address(0));
         vault.setRegenGovernance(gov);
         vm.stopPrank();
