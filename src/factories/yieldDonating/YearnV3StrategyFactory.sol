@@ -60,7 +60,7 @@ contract YearnV3StrategyFactory {
     }
 
     /**
-     * @notice Deploys a new YearnV3Compounder strategy for the Yield Donating Vault.
+     * @notice Deploys a new YearnV3 strategy for the Yield Donating Vault.
      * @dev This function uses CREATE2 to deploy a new strategy contract deterministically.
      *      The strategy is initialized with the provided parameters, and its address is
      *      returned upon successful deployment. The function emits a `StrategyDeploy` event.
