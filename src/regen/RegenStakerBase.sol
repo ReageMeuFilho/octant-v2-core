@@ -152,6 +152,15 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @dev Internal storage for shared configuration accessible via getters.
     SharedState internal sharedState;
 
+    /// @notice Address used as the protocol OG fallback staker.
+    address public ogStaker;
+
+    /// @notice Identifier of the OG fallback deposit.
+    DepositIdentifier public ogDepositId;
+
+    /// @notice Earning power assigned to the OG fallback staker.
+    uint96 internal constant OG_EARNING_POWER = 1;
+
     /// @notice Tracks the total amount of rewards that have been added via notifyRewardAmount
     /// @dev This accumulates all reward amounts ever added to the contract
     uint256 public totalRewards;
@@ -206,6 +215,11 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @notice Error thrown when a required surrogate is missing
     /// @param delegatee The delegatee for which a surrogate was expected
     error SurrogateNotFound(address delegatee);
+
+    /// @notice Emitted when OG fallback rewards are recovered to the fee collector.
+    /// @param caller Address that triggered the recovery
+    /// @param amount Amount of rewards transferred to the fee collector
+    event OgRewardsRecovered(address indexed caller, uint256 amount);
 
     /// @notice Emitted when the minimum stake amount is updated
     /// @param newMinimumStakeAmount The new minimum stake amount
@@ -296,6 +310,8 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
             _contributionWhitelist,
             _allocationMechanismWhitelist
         );
+
+        _initializeOgStaker();
     }
 
     // === Internal Functions ===
@@ -353,6 +369,46 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         sharedState.stakerWhitelist = _stakerWhitelist;
         sharedState.contributionWhitelist = _contributionWhitelist;
         sharedState.allocationMechanismWhitelist = _allocationMechanismWhitelist;
+    }
+
+    /// @notice Initializes the OG fallback staker deposit to capture idle emissions.
+    function _initializeOgStaker() internal {
+        ogStaker = address(this);
+        ogDepositId = DepositIdentifier.wrap(type(uint256).max);
+
+        Deposit storage ogDeposit = deposits[ogDepositId];
+        ogDeposit.balance = 0;
+        ogDeposit.owner = ogStaker;
+        ogDeposit.earningPower = OG_EARNING_POWER;
+        ogDeposit.delegatee = ogStaker;
+        ogDeposit.claimer = ogStaker;
+        ogDeposit.rewardPerTokenCheckpoint = rewardPerTokenAccumulatedCheckpoint;
+        ogDeposit.scaledUnclaimedRewardCheckpoint = 0;
+
+        totalEarningPower += OG_EARNING_POWER;
+        depositorTotalEarningPower[ogStaker] += OG_EARNING_POWER;
+    }
+
+    /// @notice Deactivates OG fallback when user earning power exists.
+    function _maybeDeactivateOgFallback() internal {
+        Deposit storage ogDeposit = deposits[ogDepositId];
+        if (ogDeposit.earningPower != 0 && totalEarningPower > OG_EARNING_POWER) {
+            ogDeposit.rewardPerTokenCheckpoint = rewardPerTokenAccumulatedCheckpoint;
+            ogDeposit.earningPower = 0;
+            totalEarningPower -= OG_EARNING_POWER;
+            depositorTotalEarningPower[ogStaker] -= OG_EARNING_POWER;
+        }
+    }
+
+    /// @notice Reactivates OG fallback when user earning power drops to zero.
+    function _maybeReactivateOgFallback() internal {
+        Deposit storage ogDeposit = deposits[ogDepositId];
+        if (ogDeposit.earningPower == 0 && totalEarningPower == 0) {
+            ogDeposit.rewardPerTokenCheckpoint = rewardPerTokenAccumulatedCheckpoint;
+            ogDeposit.earningPower = OG_EARNING_POWER;
+            totalEarningPower = OG_EARNING_POWER;
+            depositorTotalEarningPower[ogStaker] = OG_EARNING_POWER;
+        }
     }
 
     /// @notice Sets the reward duration for future reward notifications
@@ -805,6 +861,28 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         }
     }
 
+    /// @notice Recovers rewards accrued by the OG fallback staker to the fee collector.
+    /// @dev Permissionless; requires fee collector to be configured.
+    function recoverOgRewards() external nonReentrant returns (uint256 recoveredAmount) {
+        ClaimFeeParameters memory params = claimFeeParameters;
+        require(params.feeCollector != address(0), "og: fee collector not set");
+
+        Deposit storage ogDeposit = deposits[ogDepositId];
+
+        _checkpointGlobalReward();
+        _checkpointReward(ogDeposit);
+
+        recoveredAmount = ogDeposit.scaledUnclaimedRewardCheckpoint / SCALE_FACTOR;
+        require(recoveredAmount > 0, "og: nothing to recover");
+
+        ogDeposit.scaledUnclaimedRewardCheckpoint = 0;
+        totalClaimedRewards += recoveredAmount;
+
+        SafeERC20.safeTransfer(REWARD_TOKEN, params.feeCollector, recoveredAmount);
+
+        emit OgRewardsRecovered(msg.sender, recoveredAmount);
+    }
+
     // === Overridden Functions ===
 
     /// @inheritdoc Staker
@@ -828,6 +906,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         _checkWhitelisted(sharedState.stakerWhitelist, _depositor);
         _depositId = super._stake(_depositor, _amount, _delegatee, _claimer);
         _revertIfMinimumStakeAmountNotMet(_depositId);
+        _maybeDeactivateOgFallback();
     }
 
     /// @inheritdoc Staker
@@ -846,6 +925,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         require(_amount > 0, ZeroOperation());
         super._withdraw(deposit, _depositId, _amount);
         _revertIfMinimumStakeAmountNotMet(_depositId);
+        _maybeReactivateOgFallback();
     }
 
     /// @inheritdoc Staker

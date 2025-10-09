@@ -14,9 +14,11 @@ withdraw(depositId, amount)
 claimReward(depositId) → amount
 compoundRewards(depositId) → amount  // reward token = stake token only
 contribute(depositId, mechanism, amount, deadline, v, r, s) → amount
+recoverOgRewards() → amount
 ```
 
 - `contribute` supports zero `amount` inputs to forward a signature-only registration when the allocation mechanism allows zero-deposit signup. No rewards are moved in that case.
+- `recoverOgRewards` permissionlessly sweeps idle emissions accrued by the OG fallback staker to the configured fee collector. The sweep reverts if no fee collector is set.
 
 ## Key Parameters
 

@@ -271,7 +271,7 @@ contract RegenIntegrationTest is Test {
         assertEq(initialFeeCollector, address(0));
 
         assertEq(localRegenStaker.totalStaked(), 0);
-        assertEq(localRegenStaker.totalEarningPower(), 0);
+        assertEq(localRegenStaker.totalEarningPower(), 1);
         assertEq(localRegenStaker.rewardDuration(), MIN_REWARD_DURATION);
         vm.stopPrank();
     }
@@ -325,7 +325,7 @@ contract RegenIntegrationTest is Test {
         assertEq(initialFeeCollector, address(0));
 
         assertEq(localRegenStaker.totalStaked(), 0);
-        assertEq(localRegenStaker.totalEarningPower(), 0);
+        assertEq(localRegenStaker.totalEarningPower(), 1);
         assertEq(localRegenStaker.rewardDuration(), MIN_REWARD_DURATION);
         vm.stopPrank();
     }
@@ -2940,6 +2940,33 @@ contract RegenIntegrationTest is Test {
         );
         regenStaker.contribute(depositId, allocationMechanism, contributeAmount, deadline, v, r, s);
         vm.stopPrank();
+    }
+
+    function test_OgFallbackAccruesAndRecovers() public {
+        _clearTestContext();
+
+        address feeCollector = makeAddr("feeCollector");
+        vm.prank(ADMIN);
+        regenStaker.setClaimFeeParameters(Staker.ClaimFeeParameters({ feeAmount: 0, feeCollector: feeCollector }));
+
+        uint256 rewardAmount = getRewardAmount();
+        rewardToken.mint(address(regenStaker), rewardAmount);
+        vm.prank(ADMIN);
+        regenStaker.notifyRewardAmount(rewardAmount);
+
+        vm.warp(block.timestamp + regenStaker.rewardDuration());
+
+        address caller = makeAddr("caller");
+        vm.prank(caller);
+        uint256 recovered = regenStaker.recoverOgRewards();
+
+        assertApproxEqAbs(recovered, rewardAmount, 1, "OG recovery should transfer entire emission");
+        assertApproxEqAbs(
+            rewardToken.balanceOf(feeCollector),
+            rewardAmount,
+            1,
+            "Fee collector should receive recovered rewards"
+        );
     }
 
     function test_AllocationMechanismWhitelistIsSet() public view {
