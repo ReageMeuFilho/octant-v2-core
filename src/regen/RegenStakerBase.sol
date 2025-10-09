@@ -152,6 +152,10 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @dev Internal storage for shared configuration accessible via getters.
     SharedState internal sharedState;
 
+    /// @notice Scaled reward emissions accrued during zero earning power periods.
+    /// @dev Stored in SCALE_FACTOR units to preserve precision when adjusting reward rate.
+    uint256 internal backlogScaled;
+
     /// @notice Tracks the total amount of rewards that have been added via notifyRewardAmount
     /// @dev This accumulates all reward amounts ever added to the contract
     uint256 public totalRewards;
@@ -805,6 +809,41 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         }
     }
 
+    /// @inheritdoc Staker
+    /// @dev Accumulates emissions in `backlogScaled` when earning power is zero and later increases
+    ///      the reward rate so the backlog is streamed within the original schedule.
+    function _checkpointGlobalReward() internal virtual override {
+        uint256 lastDistributed = lastTimeRewardDistributed();
+        uint256 elapsed = lastDistributed - lastCheckpointTime;
+
+        if (elapsed != 0 && scaledRewardRate != 0) {
+            if (totalEarningPower == 0) {
+                backlogScaled += scaledRewardRate * elapsed;
+            } else {
+                rewardPerTokenAccumulatedCheckpoint += (scaledRewardRate * elapsed) / totalEarningPower;
+            }
+        }
+
+        lastCheckpointTime = lastDistributed;
+
+        _applyRewardBacklogIfPossible();
+    }
+
+    /// @notice When earning power exists, folds the backlog into `scaledRewardRate`.
+    function _applyRewardBacklogIfPossible() internal {
+        if (backlogScaled == 0 || totalEarningPower == 0) {
+            return;
+        }
+
+        if (rewardEndTime <= block.timestamp) {
+            return;
+        }
+
+        uint256 remaining = rewardEndTime - block.timestamp;
+        scaledRewardRate = (scaledRewardRate * remaining + backlogScaled) / remaining;
+        backlogScaled = 0;
+    }
+
     // === Overridden Functions ===
 
     /// @inheritdoc Staker
@@ -828,6 +867,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         _checkWhitelisted(sharedState.stakerWhitelist, _depositor);
         _depositId = super._stake(_depositor, _amount, _delegatee, _claimer);
         _revertIfMinimumStakeAmountNotMet(_depositId);
+        _applyRewardBacklogIfPossible();
     }
 
     /// @inheritdoc Staker
@@ -951,6 +991,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         _checkWhitelisted(sharedState.stakerWhitelist, deposit.owner);
         super._stakeMore(deposit, _depositId, _amount);
         _revertIfMinimumStakeAmountNotMet(_depositId);
+        _applyRewardBacklogIfPossible();
     }
 
     /// @inheritdoc Staker

@@ -765,6 +765,42 @@ contract RegenIntegrationTest is Test {
         assertApproxEqRel(claimedA + claimedB, totalRewardAmount, ONE_PICO);
     }
 
+    function test_CatchUpRewardRateWhenNoEarningPower() public {
+        _clearTestContext();
+
+        uint256 duration = regenStaker.rewardDuration();
+        uint256 rewardAmount = getRewardAmount();
+        uint256 stakeAmount = getStakeAmount();
+
+        rewardToken.mint(address(regenStaker), rewardAmount);
+        vm.prank(ADMIN);
+        regenStaker.notifyRewardAmount(rewardAmount);
+
+        uint256 initialEnd = regenStaker.rewardEndTime();
+        uint256 halfDuration = duration / 2;
+        vm.warp(block.timestamp + halfDuration);
+
+        address staker = makeAddr("option3Staker");
+        whitelistUser(staker, true, false, true);
+
+        stakeToken.mint(staker, stakeAmount);
+        vm.startPrank(staker);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = regenStaker.stake(stakeAmount, staker);
+        vm.stopPrank();
+
+        assertEq(regenStaker.rewardEndTime(), initialEnd, "rewardEndTime should remain unchanged");
+        assertEq(regenStaker.unclaimedReward(depositId), 0, "no rewards earned immediately after staking");
+
+        vm.warp(initialEnd);
+
+        vm.startPrank(staker);
+        uint256 claimed = regenStaker.claimReward(depositId);
+        vm.stopPrank();
+
+        assertApproxEqRel(claimed, rewardAmount, ONE_MICRO, "reward stream should catch up by deadline");
+    }
+
     function testFuzz_TimeWeightedReward_NoEarningIfNotOnEarningWhitelist(
         uint256 stakeAmountBase,
         uint256 rewardAmountBase
