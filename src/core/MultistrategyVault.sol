@@ -1357,7 +1357,7 @@ contract MultistrategyVault is IMultistrategyVault {
             )
         );
         (address recoveredAddress, , ) = ECDSA.tryRecover(digest, v_, r_, s_);
-        require(recoveredAddress == owner_, "InvalidSignature");
+        require(recoveredAddress == owner_, InvalidSignature());
 
         allowance[owner_][spender_] = amount_;
         nonces[owner_] = nonce + 1;
