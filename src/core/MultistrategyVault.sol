@@ -397,7 +397,7 @@ contract MultistrategyVault is IMultistrategyVault {
      */
     function _enforceRole(address account_, Roles role_) internal view {
         uint256 mask = 1 << uint256(role_);
-        if ((roles[account_] & mask) != mask) revert NotAllowed();
+        require((roles[account_] & mask) == mask, NotAllowed());
     }
 
     /**
