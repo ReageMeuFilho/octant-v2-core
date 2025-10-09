@@ -9,6 +9,7 @@ import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { YieldDonatingTokenizedStrategy } from "src/strategies/yieldDonating/YieldDonatingTokenizedStrategy.sol";
 import { IMultistrategyVault } from "src/core/interfaces/IMultistrategyVault.sol";
 import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import { TokenizedStrategy__InvalidSigner } from "src/errors.sol";
 
 contract Finding658Fix is Test {
     uint256 private constant SECP256K1_N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141;
@@ -87,7 +88,7 @@ contract Finding658Fix is Test {
 
         (uint8 vHigh, bytes32 sHigh) = _toHighS(v, s);
 
-        vm.expectRevert("ERC20: INVALID_SIGNER");
+        vm.expectRevert(TokenizedStrategy__InvalidSigner.selector);
         strategy.permit(owner, spender, amount, deadline, vHigh, r, sHigh);
     }
 

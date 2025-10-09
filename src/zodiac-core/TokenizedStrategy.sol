@@ -341,7 +341,9 @@ abstract contract TokenizedStrategy is ITokenizedStrategy {
             );
 
             (address recoveredAddress, , ) = ECDSA.tryRecover(digest, _v, _r, _s);
-            require(recoveredAddress == _owner, "TokenizedStrategy__InvalidSigner");
+            if (recoveredAddress != _owner) {
+                revert TokenizedStrategy__InvalidSigner();
+            }
 
             _approve(_strategyStorage(), recoveredAddress, _spender, _value);
         }

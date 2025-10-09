@@ -9,6 +9,7 @@ import { Enum } from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 
 import { IBaseStrategy } from "src/zodiac-core/interfaces/IBaseStrategy.sol";
 import { IAvatar } from "zodiac/interfaces/IAvatar.sol";
+import { TokenizedStrategy__InvalidSigner } from "src/errors.sol";
 
 contract MockTokenizedStrategy {
     using Math for uint256;
@@ -1408,7 +1409,7 @@ contract MockTokenizedStrategy {
             );
 
             (address recoveredAddress, , ) = ECDSA.tryRecover(digest, v, r, s);
-            require(recoveredAddress == _owner, "ERC20: INVALID_SIGNER");
+            if (recoveredAddress != _owner) revert TokenizedStrategy__InvalidSigner();
 
             _approve(_strategyStorage(), recoveredAddress, spender, value);
         }

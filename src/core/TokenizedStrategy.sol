@@ -5,6 +5,7 @@ import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import { TokenizedStrategy__InvalidSigner } from "src/errors.sol";
 
 import { IBaseStrategy } from "src/core/interfaces/IBaseStrategy.sol";
 
@@ -1583,7 +1584,9 @@ abstract contract TokenizedStrategy {
             );
 
             (address recoveredAddress, , ) = ECDSA.tryRecover(digest, v, r, s);
-            require(recoveredAddress == owner, "ERC20: INVALID_SIGNER");
+            if (recoveredAddress != owner) {
+                revert TokenizedStrategy__InvalidSigner();
+            }
 
             _approve(_strategyStorage(), recoveredAddress, spender, value);
         }
