@@ -813,7 +813,6 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         }
     }
 
-    // Removed single-use helpers: inlined into contribute for clarity per codebase guideline
 
     /// @notice Atomically updates deposit checkpoint and totalClaimedRewards
     /// @dev Ensures consistent state updates when rewards are consumed
