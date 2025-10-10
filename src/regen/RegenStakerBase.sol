@@ -811,14 +811,12 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         uint256 lastDistributed = lastTimeRewardDistributed();
         uint256 elapsed = lastDistributed - lastCheckpointTime;
 
-        if (elapsed != 0 && scaledRewardRate != 0) {
+        if (elapsed > 0 && scaledRewardRate != 0) {
             if (totalEarningPower == 0) {
                 rewardEndTime += elapsed;
-                lastCheckpointTime = lastDistributed;
-                return;
+            } else {
+                rewardPerTokenAccumulatedCheckpoint += (scaledRewardRate * elapsed) / totalEarningPower;
             }
-
-            rewardPerTokenAccumulatedCheckpoint += (scaledRewardRate * elapsed) / totalEarningPower;
         }
 
         lastCheckpointTime = lastDistributed;
