@@ -1,0 +1,158 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.0;
+
+import { Test } from "forge-std/Test.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+import { RegenStaker } from "src/regen/RegenStaker.sol";
+import { RegenEarningPowerCalculator } from "src/regen/RegenEarningPowerCalculator.sol";
+import { Whitelist } from "src/utils/Whitelist.sol";
+import { IWhitelist } from "src/utils/IWhitelist.sol";
+
+import { MockERC20Staking } from "test/mocks/MockERC20Staking.sol";
+
+import { Staker } from "staker/Staker.sol";
+import { IERC20Staking } from "staker/interfaces/IERC20Staking.sol";
+import { IEarningPowerCalculator } from "staker/interfaces/IEarningPowerCalculator.sol";
+
+/// @dev Minimal allocation mechanism stub expected by contribute()
+contract MockAllocationMechanism {
+    IERC20 public immutable asset;
+
+    constructor(IERC20 _asset) {
+        asset = _asset;
+    }
+
+    function signupOnBehalfWithSignature(address, uint256, uint256, uint8, bytes32, bytes32) external {}
+}
+
+/// @dev Harness exposing helper for seeding unclaimed rewards.
+contract RegenStakerDustHarness is RegenStaker {
+    constructor(
+        IERC20 rewardToken,
+        IERC20Staking stakeToken,
+        IEarningPowerCalculator calculator,
+        uint256 maxBumpTip,
+        address admin,
+        uint128 rewardDuration,
+        uint256 maxClaimFee,
+        uint128 minimumStakeAmount,
+        IWhitelist stakerWhitelist,
+        IWhitelist contributionWhitelist,
+        IWhitelist allocationWhitelist
+    )
+        RegenStaker(
+            rewardToken,
+            stakeToken,
+            calculator,
+            maxBumpTip,
+            admin,
+            rewardDuration,
+            maxClaimFee,
+            minimumStakeAmount,
+            stakerWhitelist,
+            contributionWhitelist,
+            allocationWhitelist
+        )
+    {}
+
+    function seedUnclaimedRewards(Staker.DepositIdentifier depositId, uint256 amount) external {
+        deposits[depositId].scaledUnclaimedRewardCheckpoint = amount * SCALE_FACTOR;
+    }
+}
+
+/// @title Cantina Competition September 2025 – Finding 564 Fix
+/// @notice Verifies that small rewards (≤ fee) are swept to the fee collector.
+contract Cantina564Fix is Test {
+    MockERC20Staking internal stakeAndRewardToken;
+    RegenStakerDustHarness internal regenStaker;
+    MockAllocationMechanism internal allocation;
+    Whitelist internal allocationWhitelist;
+    RegenEarningPowerCalculator internal earningPowerCalculator;
+
+    address internal immutable user = makeAddr("user");
+    address internal immutable feeCollector = makeAddr("feeCollector");
+
+    uint256 internal constant STAKE_AMOUNT = 1 ether;
+    uint256 internal constant FEE_AMOUNT = 10 ether;
+    uint256 internal constant DUST = 5 ether;
+
+    function setUp() public {
+        stakeAndRewardToken = new MockERC20Staking(18);
+        allocationWhitelist = new Whitelist();
+        earningPowerCalculator = new RegenEarningPowerCalculator(address(this), IWhitelist(address(0)));
+
+        regenStaker = new RegenStakerDustHarness(
+            IERC20(address(stakeAndRewardToken)),
+            IERC20Staking(address(stakeAndRewardToken)),
+            IEarningPowerCalculator(address(earningPowerCalculator)),
+            1e18,
+            address(this),
+            uint128(30 days),
+            100 ether,
+            0,
+            IWhitelist(address(0)),
+            IWhitelist(address(0)),
+            allocationWhitelist
+        );
+
+        allocation = new MockAllocationMechanism(IERC20(address(stakeAndRewardToken)));
+        allocationWhitelist.addToWhitelist(address(allocation));
+
+        regenStaker.setClaimFeeParameters(
+            Staker.ClaimFeeParameters({ feeAmount: uint96(FEE_AMOUNT), feeCollector: feeCollector })
+        );
+    }
+
+    function testClaimRewardSweepsDustToCollector() public {
+        Staker.DepositIdentifier depositId = _createDepositWithDust();
+
+        vm.prank(user);
+        uint256 claimed = regenStaker.claimReward(depositId);
+
+        assertEq(claimed, 0, "claimer should not receive dust");
+        assertEq(stakeAndRewardToken.balanceOf(feeCollector), DUST, "collector receives dust");
+        assertEq(regenStaker.unclaimedReward(depositId), 0, "deposit cleared");
+    }
+
+    function testContributeSweepsDustToCollector() public {
+        Staker.DepositIdentifier depositId = _createDepositWithDust();
+
+        vm.prank(user);
+        uint256 contributed = regenStaker.contribute(
+            depositId,
+            address(allocation),
+            DUST,
+            block.timestamp + 1 days,
+            0,
+            bytes32(0),
+            bytes32(0)
+        );
+
+        assertEq(contributed, 0, "no contribution when dust");
+        assertEq(stakeAndRewardToken.balanceOf(feeCollector), DUST, "collector receives dust");
+        assertEq(regenStaker.unclaimedReward(depositId), 0, "deposit cleared");
+    }
+
+    function testCompoundSweepsDustToCollector() public {
+        Staker.DepositIdentifier depositId = _createDepositWithDust();
+
+        vm.prank(user);
+        uint256 compounded = regenStaker.compoundRewards(depositId);
+
+        assertEq(compounded, 0, "no compounding when dust");
+        assertEq(stakeAndRewardToken.balanceOf(feeCollector), DUST, "collector receives dust");
+        assertEq(regenStaker.unclaimedReward(depositId), 0, "deposit cleared");
+    }
+
+    function _createDepositWithDust() internal returns (Staker.DepositIdentifier depositId) {
+        stakeAndRewardToken.mint(user, STAKE_AMOUNT);
+        vm.startPrank(user);
+        stakeAndRewardToken.approve(address(regenStaker), STAKE_AMOUNT);
+        depositId = regenStaker.stake(STAKE_AMOUNT, user, user);
+        vm.stopPrank();
+
+        stakeAndRewardToken.mint(address(regenStaker), DUST);
+        regenStaker.seedUnclaimedRewards(depositId, DUST);
+    }
+}
