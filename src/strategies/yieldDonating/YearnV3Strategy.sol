@@ -56,7 +56,9 @@ contract YearnV3Strategy is BaseHealthCheck {
     }
 
     function availableDepositLimit(address /*_owner*/) public view override returns (uint256) {
-        // todo consider removing idle balance from the limit (tbd)
+        // NOTE: If the yearnVault is a meta-vault that deposits into other vaults (e.g., Morpho Steakhouse),
+        // the maxDeposit value may be inflated when the underlying chain reaches vaults with duplicate
+        // markets in their supplyQueue (like SteakHouse USDC). This could cause temporary DoS for deposits
         uint256 vaultLimit = ITokenizedStrategy(yearnVault).maxDeposit(address(this));
         uint256 idleBalance = IERC20(asset).balanceOf(address(this));
         return vaultLimit > idleBalance ? vaultLimit - idleBalance : 0;

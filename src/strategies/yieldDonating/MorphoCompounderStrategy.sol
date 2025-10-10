@@ -57,7 +57,11 @@ contract MorphoCompounderStrategy is BaseHealthCheck {
     }
 
     function availableDepositLimit(address /*_owner*/) public view override returns (uint256) {
-        uint256 vaultLimit = ITokenizedStrategy(compounderVault).maxDeposit(address(this));
+        // NOTE: When compounderVault points to certain vaults (like Morpho Steakhouse USDC Compounder),
+        // the maxDeposit value may be inflated due to duplicate markets in underlying vault's supplyQueue.
+        // This is because maxDeposit chains through: this strategy → Morpho Steakhouse → SteakHouse USDC,
+        // and SteakHouse USDC's maxDeposit may overstate capacity when duplicate markets exist.
+        uint256 vaultLimit = IERC4626(compounderVault).maxDeposit(address(this));
         uint256 idleBalance = IERC20(asset).balanceOf(address(this));
         return vaultLimit > idleBalance ? vaultLimit - idleBalance : 0;
     }
