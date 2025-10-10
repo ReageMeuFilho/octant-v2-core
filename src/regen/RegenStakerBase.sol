@@ -806,7 +806,9 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     }
 
     /// @inheritdoc Staker
-    /// @dev Pauses emissions by extending `rewardEndTime` while no earning power exists.
+    /// @notice Pauses reward streaming during idle windows (when `totalEarningPower == 0`) by
+    ///         extending `rewardEndTime` by the idle duration; no rewards accrue while idle.
+    /// @dev When earning power is non-zero, accrues `rewardPerTokenAccumulatedCheckpoint` as usual.
     function _checkpointGlobalReward() internal virtual override {
         uint256 lastDistributed = lastTimeRewardDistributed();
         uint256 elapsed = lastDistributed - lastCheckpointTime;
