@@ -73,7 +73,13 @@ contract YearnV3Strategy is BaseHealthCheck {
     }
 
     function _freeFunds(uint256 _amount) internal override {
-        ITokenizedStrategy(yearnVault).withdraw(_amount, address(this), address(this), 10_000); // 10_000 = 100% max loss
+        // NOTE: maxLoss is set to 10_000 (100%) to ensure withdrawals don't revert when the Yearn vault
+        // has unrealized losses. This is necessary because:
+        // 1. When the TokenizedStrategy needs funds, it calls freeFunds() to withdraw from the underlying Yearn vault
+        // 2. Without accepting losses here, any slippage/loss in Yearn would cause the withdrawal to fail
+        // 3. The MultistrategyVault performs its own loss checks after withdrawal via updateDebt's maxLoss parameter
+        // This allows the strategy to always provide liquidity while loss protection is enforced at the vault level.
+        ITokenizedStrategy(yearnVault).withdraw(_amount, address(this), address(this), 10_000);
     }
 
     function _emergencyWithdraw(uint256 _amount) internal override {
