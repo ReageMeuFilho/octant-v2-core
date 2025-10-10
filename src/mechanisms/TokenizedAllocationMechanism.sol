@@ -6,6 +6,7 @@ import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 /// @notice Interface for base allocation mechanism strategy implementations
 /// @dev Follows Yearn V3 pattern where shared implementation calls base strategy via interface
@@ -521,7 +522,9 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     /// @dev Recovers signer address from signature
     function _recover(bytes32 structHash, uint8 v, bytes32 r, bytes32 s) private returns (address) {
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR(), structHash));
-        return ecrecover(digest, v, r, s);
+        (address recovered, , ) = ECDSA.tryRecover(digest, v, r, s);
+        if (recovered == address(0)) revert InvalidSignature();
+        return recovered;
     }
 
     // ---------- Proposal Creation ----------

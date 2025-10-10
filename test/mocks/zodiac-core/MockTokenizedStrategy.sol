@@ -4,10 +4,12 @@ pragma solidity >=0.8.18;
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import { Enum } from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 
 import { IBaseStrategy } from "src/zodiac-core/interfaces/IBaseStrategy.sol";
 import { IAvatar } from "zodiac/interfaces/IAvatar.sol";
+import { TokenizedStrategy__InvalidSigner } from "src/errors.sol";
 
 contract MockTokenizedStrategy {
     using Math for uint256;
@@ -1387,31 +1389,27 @@ contract MockTokenizedStrategy {
         // Unchecked because the only math done is incrementing
         // the owner's nonce which cannot realistically overflow.
         unchecked {
-            address recoveredAddress = ecrecover(
-                keccak256(
-                    abi.encodePacked(
-                        "\x19\x01",
-                        DOMAIN_SEPARATOR(),
-                        keccak256(
-                            abi.encode(
-                                keccak256(
-                                    "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
-                                ),
-                                _owner,
-                                spender,
-                                value,
-                                _strategyStorage().nonces[_owner]++,
-                                deadline
-                            )
+            bytes32 digest = keccak256(
+                abi.encodePacked(
+                    "\x19\x01",
+                    DOMAIN_SEPARATOR(),
+                    keccak256(
+                        abi.encode(
+                            keccak256(
+                                "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+                            ),
+                            _owner,
+                            spender,
+                            value,
+                            _strategyStorage().nonces[_owner]++,
+                            deadline
                         )
                     )
-                ),
-                v,
-                r,
-                s
+                )
             );
 
-            require(recoveredAddress != address(0) && recoveredAddress == _owner, "ERC20: INVALID_SIGNER");
+            (address recoveredAddress, , ) = ECDSA.tryRecover(digest, v, r, s);
+            if (recoveredAddress != _owner) revert TokenizedStrategy__InvalidSigner();
 
             _approve(_strategyStorage(), recoveredAddress, spender, value);
         }
