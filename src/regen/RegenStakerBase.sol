@@ -25,7 +25,7 @@ import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocation
 /// @title RegenStakerBase
 /// @author [Golem Foundation](https://golem.foundation)
 /// @notice Base contract for RegenStaker variants, extending the Staker contract by [ScopeLift](https://scopelift.co).
-/// Provides shared functionality including:
+/// @notice Provides shared functionality including:
 ///         - Variable reward duration (7-3000 days, configurable by admin)
 ///         - Optional reward taxation via claim fees (0 to MAX_CLAIM_FEE)
 ///         - Earning power management with external bumping incentivized by tips (up to maxBumpTip)
