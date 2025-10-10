@@ -91,25 +91,33 @@ contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
     /// @notice Validates sufficient reward token balance for all token scenarios in this variant
     /// @dev Overrides base to include totalStaked for same-token scenarios since stakes are held in main contract
     /// @param _amount The reward amount being added
-    /// @return required The required balance including appropriate obligations
-    function _validateRewardBalance(uint256 _amount) internal view override returns (uint256 required) {
+    /// @return requiredBalance The required balance including appropriate obligations
+    /// @return carryOverAmount Unclaimed rewards carried into the new schedule
+    function _validateRewardBalance(uint256 _amount)
+        internal
+        view
+        override
+        returns (uint256 requiredBalance, uint256 carryOverAmount)
+    {
         uint256 currentBalance = REWARD_TOKEN.balanceOf(address(this));
+
+        carryOverAmount = totalRewards - totalClaimedRewards;
 
         if (address(REWARD_TOKEN) == address(STAKE_TOKEN)) {
             // Same-token scenario: stakes ARE in main contract, so include totalStaked
             // Accounting: totalStaked + totalRewards - totalClaimedRewards + newAmount
-            required = totalStaked + totalRewards - totalClaimedRewards + _amount;
+            requiredBalance = totalStaked + carryOverAmount + _amount;
         } else {
             // Different-token scenario: stakes are separate, only track reward obligations
             // Accounting: totalRewards - totalClaimedRewards + newAmount
-            required = totalRewards - totalClaimedRewards + _amount;
+            requiredBalance = carryOverAmount + _amount;
         }
 
-        if (currentBalance < required) {
-            revert InsufficientRewardBalance(currentBalance, required);
+        if (currentBalance < requiredBalance) {
+            revert InsufficientRewardBalance(currentBalance, requiredBalance);
         }
 
-        return required;
+        return (requiredBalance, carryOverAmount);
     }
 
     /// @inheritdoc Staker
