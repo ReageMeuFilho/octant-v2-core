@@ -765,6 +765,44 @@ contract RegenIntegrationTest is Test {
         assertApproxEqRel(claimedA + claimedB, totalRewardAmount, ONE_PICO);
     }
 
+    function test_PauseRewardScheduleWhenNoEarningPower() public {
+        _clearTestContext();
+
+        uint256 duration = regenStaker.rewardDuration();
+        uint256 rewardAmount = getRewardAmount();
+        uint256 stakeAmount = getStakeAmount();
+
+        rewardToken.mint(address(regenStaker), rewardAmount);
+        vm.prank(ADMIN);
+        regenStaker.notifyRewardAmount(rewardAmount);
+
+        uint256 initialEnd = regenStaker.rewardEndTime();
+        uint256 halfDuration = duration / 2;
+
+        vm.warp(block.timestamp + halfDuration);
+
+        address staker = makeAddr("option1Staker");
+        whitelistUser(staker, true, false, true);
+
+        stakeToken.mint(staker, stakeAmount);
+        vm.startPrank(staker);
+        stakeToken.approve(address(regenStaker), stakeAmount);
+        Staker.DepositIdentifier depositId = regenStaker.stake(stakeAmount, staker);
+        vm.stopPrank();
+
+        uint256 expectedEnd = initialEnd + halfDuration;
+        assertEq(regenStaker.rewardEndTime(), expectedEnd, "rewardEndTime should extend by idle window");
+        assertEq(regenStaker.unclaimedReward(depositId), 0, "no rewards should accrue during pause");
+
+        vm.warp(expectedEnd);
+
+        vm.startPrank(staker);
+        uint256 claimed = regenStaker.claimReward(depositId);
+        vm.stopPrank();
+
+        assertApproxEqRel(claimed, rewardAmount, ONE_MICRO, "reward should stream fully after pause");
+    }
+
     function testFuzz_TimeWeightedReward_NoEarningIfNotOnEarningWhitelist(
         uint256 stakeAmountBase,
         uint256 rewardAmountBase
