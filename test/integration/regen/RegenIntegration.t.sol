@@ -703,10 +703,8 @@ contract RegenIntegrationTest is Test {
         uint256 claimedAmount = regenStaker.claimReward(depositId);
         vm.stopPrank();
 
-        uint256 timeStakedPercent = 100 - joinTimePercent;
-        uint256 expectedReward = (totalRewardAmount * timeStakedPercent) / 100;
-
-        assertApproxEqRel(claimedAmount, expectedReward, ONE_MICRO);
+        // Backlog catch-up: idle emissions are streamed to the first active staker within the original schedule.
+        assertApproxEqRel(claimedAmount, totalRewardAmount, ONE_MICRO);
     }
 
     function testFuzz_ContinuousReward_TwoStakers_DifferentAmounts_ProRataShare(
