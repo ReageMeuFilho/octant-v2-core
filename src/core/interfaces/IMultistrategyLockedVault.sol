@@ -14,6 +14,15 @@ import { IMultistrategyVault } from "./IMultistrategyVault.sol";
  */
 interface IMultistrategyLockedVault is IMultistrategyVault {
     /**
+     * @notice Enum for governance transfer status
+     */
+    enum GovernanceTransferStatus {
+        PROPOSED, // 0 - Governance transfer has been proposed
+        ACCEPTED, // 1 - Governance transfer has been accepted
+        CANCELLED // 2 - Governance transfer has been cancelled
+    }
+
+    /**
      * @notice Storage for lockup information per user
      */
     struct LockupInfo {
@@ -38,7 +47,7 @@ interface IMultistrategyLockedVault is IMultistrategyVault {
     event RegenGovernanceTransferUpdate(
         address indexed previousGovernance,
         address indexed newGovernance,
-        uint8 status
+        GovernanceTransferStatus status
     );
 
     // Add necessary error definitions

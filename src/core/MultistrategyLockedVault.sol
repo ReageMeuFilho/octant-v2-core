@@ -289,7 +289,11 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
         if (_regenGovernance == address(0)) revert InvalidGovernanceAddress();
 
         pendingRegenGovernance = _regenGovernance;
-        emit RegenGovernanceTransferUpdate(regenGovernance, _regenGovernance, 0);
+        emit RegenGovernanceTransferUpdate(
+            regenGovernance,
+            _regenGovernance,
+            IMultistrategyLockedVault.GovernanceTransferStatus.PROPOSED
+        );
     }
 
     /**
@@ -300,7 +304,11 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
         if (pending == address(0)) revert NoPendingRegenGovernance();
         if (msg.sender != pending) revert NotRegenGovernance();
 
-        emit RegenGovernanceTransferUpdate(regenGovernance, pending, 1);
+        emit RegenGovernanceTransferUpdate(
+            regenGovernance,
+            pending,
+            IMultistrategyLockedVault.GovernanceTransferStatus.ACCEPTED
+        );
         regenGovernance = pending;
         pendingRegenGovernance = address(0);
     }
@@ -314,7 +322,11 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
         if (pending == address(0)) revert NoPendingRegenGovernance();
 
         pendingRegenGovernance = address(0);
-        emit RegenGovernanceTransferUpdate(regenGovernance, pending, 2);
+        emit RegenGovernanceTransferUpdate(
+            regenGovernance,
+            pending,
+            IMultistrategyLockedVault.GovernanceTransferStatus.CANCELLED
+        );
     }
 
     /**

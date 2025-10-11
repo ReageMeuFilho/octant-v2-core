@@ -39,7 +39,11 @@ contract Finding592Fix is Test {
         address newGovernance = address(0xBEEF);
 
         vm.expectEmit(true, true, false, true);
-        emit IMultistrategyLockedVault.RegenGovernanceTransferUpdate(GOVERNANCE, newGovernance, 0);
+        emit IMultistrategyLockedVault.RegenGovernanceTransferUpdate(
+            GOVERNANCE,
+            newGovernance,
+            IMultistrategyLockedVault.GovernanceTransferStatus.PROPOSED
+        );
         vm.prank(GOVERNANCE);
         vault.setRegenGovernance(newGovernance);
 
@@ -48,7 +52,11 @@ contract Finding592Fix is Test {
 
         // Pending governance must accept the transfer.
         vm.expectEmit(true, true, false, true);
-        emit IMultistrategyLockedVault.RegenGovernanceTransferUpdate(GOVERNANCE, newGovernance, 1);
+        emit IMultistrategyLockedVault.RegenGovernanceTransferUpdate(
+            GOVERNANCE,
+            newGovernance,
+            IMultistrategyLockedVault.GovernanceTransferStatus.ACCEPTED
+        );
         vm.prank(newGovernance);
         vault.acceptRegenGovernance();
 
@@ -68,7 +76,11 @@ contract Finding592Fix is Test {
 
         // Current governance cancels the transfer
         vm.expectEmit(true, true, false, true);
-        emit IMultistrategyLockedVault.RegenGovernanceTransferUpdate(GOVERNANCE, newGovernance, 2);
+        emit IMultistrategyLockedVault.RegenGovernanceTransferUpdate(
+            GOVERNANCE,
+            newGovernance,
+            IMultistrategyLockedVault.GovernanceTransferStatus.CANCELLED
+        );
         vm.prank(GOVERNANCE);
         vault.cancelRegenGovernance();
 
@@ -120,7 +132,11 @@ contract Finding592Fix is Test {
 
         // Should be able to set up a new transfer
         vm.expectEmit(true, true, false, true);
-        emit IMultistrategyLockedVault.RegenGovernanceTransferUpdate(GOVERNANCE, secondNewGovernance, 0);
+        emit IMultistrategyLockedVault.RegenGovernanceTransferUpdate(
+            GOVERNANCE,
+            secondNewGovernance,
+            IMultistrategyLockedVault.GovernanceTransferStatus.PROPOSED
+        );
         vm.prank(GOVERNANCE);
         vault.setRegenGovernance(secondNewGovernance);
 
