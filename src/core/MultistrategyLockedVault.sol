@@ -224,10 +224,6 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
             revert RageQuitAlreadyInitiated();
         }
 
-        // Available shares = total balance - already locked shares
-        uint256 availableShares = userBalance - custody.lockedShares;
-        if (availableShares < shares) revert InsufficientAvailableShares();
-
         // Lock the shares in custody
         custody.lockedShares = shares;
         custody.unlockTime = block.timestamp + rageQuitCooldownPeriod;
