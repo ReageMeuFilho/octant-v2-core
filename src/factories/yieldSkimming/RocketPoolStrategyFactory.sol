@@ -17,7 +17,7 @@ contract RocketPoolStrategyFactory is BaseStrategyFactory {
 
     // Child-specific StrategyDeploy event for compatibility with existing tests
     event StrategyDeploy(
-        address indexed deployer,
+        address indexed management,
         address indexed donationAddress,
         address indexed strategyAddress,
         string vaultTokenName
