@@ -4,7 +4,6 @@ pragma solidity ^0.8.20;
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
@@ -65,7 +64,7 @@ interface IBaseAllocationStrategy {
 /// @title Tokenized Allocation Mechanism - Shared Implementation
 /// @notice Provides the shared implementation for all allocation mechanisms following the Yearn V3 pattern
 /// @dev This contract handles all standard allocation logic, storage, and state management
-contract TokenizedAllocationMechanism is ReentrancyGuard {
+contract TokenizedAllocationMechanism {
     using SafeERC20 for IERC20;
     using SafeERC20 for ERC20;
     using Math for uint256;
@@ -115,6 +114,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     error Unauthorized();
     error AlreadyInitialized();
     error PausedError();
+    error ReentrantCall();
     error ExpiredSignature(uint256 deadline, uint256 currentTime);
     error InvalidSignature();
     error InvalidSigner(address recovered, address expected);
@@ -191,6 +191,8 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         address pendingOwner;
         bool paused;
         bool initialized;
+        // Reentrancy protection
+        uint8 reentrancyStatus; // 1 = NOT_ENTERED, 2 = ENTERED
         // Voting state
         bool tallyFinalized;
         uint256 proposalIdCounter;
@@ -279,6 +281,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     constructor() {
         AllocationStorage storage s = _getStorage();
         s.initialized = true; // Prevent initialization on the library contract
+        s.reentrancyStatus = 1; // Initialize reentrancy guard to NOT_ENTERED
     }
 
     /// @notice Returns the domain separator, updating it if chain ID changed (fork protection)
@@ -320,6 +323,14 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
     modifier whenNotPaused() {
         if (_getStorage().paused) revert PausedError();
         _;
+    }
+
+    modifier nonReentrant() {
+        AllocationStorage storage s = _getStorage();
+        if (s.reentrancyStatus == 2) revert ReentrantCall();
+        s.reentrancyStatus = 2;
+        _;
+        s.reentrancyStatus = 1;
     }
 
     // ---------- Initialization ----------
@@ -388,6 +399,7 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         s.gracePeriod = _gracePeriod;
         s.startBlock = block.number; // Keep for legacy getter compatibility
         s.initialized = true;
+        s.reentrancyStatus = 1; // Initialize reentrancy guard to NOT_ENTERED
 
         // Set timestamp-based timeline starting from deployment time
         s.startTime = block.timestamp;
