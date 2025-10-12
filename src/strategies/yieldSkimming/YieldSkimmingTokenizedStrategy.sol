@@ -37,7 +37,8 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
     }
 
     // exchange rate storage slot
-    bytes32 private constant YIELD_SKIMMING_STORAGE_SLOT = keccak256("octant.yieldSkimming.exchangeRate");
+    bytes32 private constant YIELD_SKIMMING_STORAGE_SLOT =
+        bytes32(uint256(keccak256("octant.yieldSkimming.exchangeRate")) - 1);
 
     /// @dev Event emitted when harvest is performed
     event Harvest(address indexed caller, uint256 currentRate);

@@ -75,7 +75,7 @@ contract LidoStrategyFactory is BaseStrategyFactory {
         // Deploy using parameter hash to prevent duplicates
         strategyAddress = _deployStrategy(bytecode, parameterHash);
 
-        emit StrategyDeploy(_management, _donationAddress, strategyAddress, _name);
+        emit StrategyDeploy(msg.sender, _donationAddress, strategyAddress, _name);
 
         // Record the deployment
         _recordStrategy(_name, _donationAddress, strategyAddress);
