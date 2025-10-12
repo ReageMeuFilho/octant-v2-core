@@ -9,6 +9,7 @@ import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { IWhitelist } from "src/utils/IWhitelist.sol";
 import { Whitelist } from "src/utils/Whitelist.sol";
 import { Staker } from "staker/Staker.sol";
+import { StakerOnBehalf } from "staker/extensions/StakerOnBehalf.sol";
 
 /// @title Tests for REG-007 Withdrawal Lockup Fix
 /// @notice Validates that the withdrawal lockup vulnerability is properly fixed
@@ -336,5 +337,33 @@ contract RegenStakerWithoutDelegateSurrogateVotesWithdrawalFixTest is Test {
         vm.prank(alice);
         vm.expectRevert(RegenStakerWithoutDelegateSurrogateVotes.DelegationNotSupported.selector);
         staker.alterDelegatee(depositId, newDelegatee);
+    }
+
+    /// @notice Test that alterDelegateeOnBehalf reverts since delegation is not supported
+    function test_alterDelegateeOnBehalfReverts() public {
+        // Alice stakes
+        vm.startPrank(alice);
+        stakeToken.approve(address(staker), STAKE_AMOUNT);
+        Staker.DepositIdentifier depositId = staker.stake(STAKE_AMOUNT, alice, alice);
+        vm.stopPrank();
+
+        // With invalid signature, reverts during signature validation (before reaching _alterDelegatee)
+        vm.expectRevert(StakerOnBehalf.StakerOnBehalf__InvalidSignature.selector);
+        staker.alterDelegateeOnBehalf(depositId, bob, alice, block.timestamp + 1000, "");
+    }
+
+    /// @notice Fuzz test that alterDelegateeOnBehalf always reverts regardless of inputs
+    function testFuzz_alterDelegateeOnBehalfAlwaysReverts(address newDelegatee, uint256 deadline) public {
+        vm.assume(deadline > block.timestamp);
+
+        // Alice stakes
+        vm.startPrank(alice);
+        stakeToken.approve(address(staker), STAKE_AMOUNT);
+        Staker.DepositIdentifier depositId = staker.stake(STAKE_AMOUNT, alice, alice);
+        vm.stopPrank();
+
+        // With invalid signature, reverts during signature validation (before reaching _alterDelegatee)
+        vm.expectRevert(StakerOnBehalf.StakerOnBehalf__InvalidSignature.selector);
+        staker.alterDelegateeOnBehalf(depositId, newDelegatee, alice, deadline, "");
     }
 }

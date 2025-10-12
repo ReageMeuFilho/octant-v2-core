@@ -94,7 +94,6 @@ contract RegenERC1271IntegrationTest is Test {
             10, // maxBumpTip (0.001%)
             admin,
             uint128(REWARD_DURATION),
-            0, // maxClaimFee
             uint128(MIN_STAKE),
             IWhitelist(stakerWhitelist),
             IWhitelist(contributorWhitelist),
