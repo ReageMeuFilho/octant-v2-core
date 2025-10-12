@@ -8,6 +8,8 @@ import { BaseAllocationMechanism, AllocationConfig } from "src/mechanisms/BaseAl
 /// @title Octant Quadratic Funding Mechanism
 /// @notice Extends QuadraticVotingMechanism with whitelist-based access control for signups
 /// @dev Only whitelisted addresses can signup to participate in the allocation mechanism
+/// @dev Inherits single-vote constraint: votes are final and cannot be increased, decreased, or cancelled once cast
+/// @dev Additional voting power from subsequent deposits can only be used on proposals not yet voted on
 contract OctantQFMechanism is QuadraticVotingMechanism {
     /// @notice Whitelist contract for signup access control
     IWhitelist public whitelist;

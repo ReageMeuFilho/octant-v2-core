@@ -9,6 +9,9 @@ import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/I
 /// @title Quadratic Voting Mechanism
 /// @notice Implements quadratic funding for proposal allocation using the ProperQF strategy
 /// @dev Follows the Yearn V3 pattern with minimal implementation surface
+/// @dev IMPORTANT: Users can only vote once per proposal - votes are final and cannot be increased.
+/// @dev Additional voting power from subsequent deposits can only be used on proposals not yet voted on.
+/// @dev UI implementations should communicate this constraint before users purchase additional voting power.
 contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
     // Custom Errors
     error ZeroAddressCannotPropose();
@@ -93,8 +96,10 @@ contract QuadraticVotingMechanism is BaseAllocationMechanism, ProperQF {
         }
     }
 
-    /// @notice Process vote using quadratic funding algorithm
+    /// @notice Process vote using quadratic funding algorithm with single-vote enforcement
     /// @dev The cost of voting is quadratic: to cast `weight` votes, you pay `weight^2` voting power
+    /// @dev Each voter can only vote once per proposal - the vote amount cannot be increased, decreased, or cancelled once cast
+    /// @dev This ensures vote finality and prevents manipulation through vote adjustments
     function _processVoteHook(
         uint256 pid,
         address voter,
