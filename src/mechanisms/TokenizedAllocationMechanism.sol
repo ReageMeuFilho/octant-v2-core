@@ -548,17 +548,8 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
             revert VotingEnded(block.timestamp, s.votingEndTime);
         }
 
-        uint256 existingPid = s.activeProposalByRecipient[recipient];
-        if (existingPid != 0) {
-            ProposalState existingState = _state(existingPid);
-            if (
-                existingState == ProposalState.Pending ||
-                existingState == ProposalState.Active ||
-                existingState == ProposalState.Tallying
-            ) {
-                revert RecipientUsed(recipient);
-            }
-            delete s.activeProposalByRecipient[recipient];
+        if (s.activeProposalByRecipient[recipient] != 0) {
+            revert RecipientUsed(recipient);
         }
         if (bytes(description).length == 0) revert EmptyDescription();
         if (bytes(description).length > 1000) revert DescriptionTooLong(bytes(description).length, 1000);
@@ -738,11 +729,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         }
 
         emit ProposalQueued(pid, s.globalRedemptionStart, sharesToMint);
-
-        uint256 trackedPid = s.activeProposalByRecipient[recipient];
-        if (trackedPid == pid) {
-            delete s.activeProposalByRecipient[recipient];
-        }
     }
 
     // ---------- State Machine ----------
