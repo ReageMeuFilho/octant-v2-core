@@ -192,7 +192,7 @@ contract TokenizedAllocationMechanism {
         bool paused;
         bool initialized;
         // Reentrancy protection
-        uint256 reentrancyStatus; // 1 = NOT_ENTERED, 2 = ENTERED
+        uint8 reentrancyStatus; // 1 = NOT_ENTERED, 2 = ENTERED
         // Voting state
         bool tallyFinalized;
         uint256 proposalIdCounter;

@@ -26,7 +26,7 @@ contract MaliciousReentrantMechanism is QuadraticVotingMechanism {
     }
 
     /// @notice Hook that attempts reentrancy during signup
-    function beforeSignupHook(address /* user */) external override returns (bool) {
+    function _beforeSignupHook(address /* user */) internal override returns (bool) {
         if (!reentrancyAttempted && address(targetMechanism) != address(0)) {
             reentrancyAttempted = true;
 
@@ -69,7 +69,7 @@ contract MaliciousDirectReentrantMechanism is QuadraticVotingMechanism {
     }
 
     /// @notice Hook that attempts reentrancy during signup
-    function beforeSignupHook(address /* user */) external override returns (bool) {
+    function _beforeSignupHook(address /* user */) internal override returns (bool) {
         if (!reentrancyTriggered) {
             reentrancyTriggered = true;
             // This should fail with ReentrantCall error
