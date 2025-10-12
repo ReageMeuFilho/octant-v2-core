@@ -74,7 +74,6 @@ contract REG001_DelegateeWhitelistDemoTest is Test {
             1000, // maxBumpTip
             admin, // admin
             uint128(REWARD_DURATION), // rewardDuration
-            0, // maxClaimFee
             0, // minStakeAmount
             stakerWhitelist,
             contributionWhitelist,

@@ -60,7 +60,6 @@ contract RegenStakerBaseCompoundWhitelistFixTest is Test {
             0, // maxBumpTip
             admin,
             30 days, // rewardDuration
-            0, // maxClaimFee
             0, // minimumStakeAmount
             IWhitelist(address(stakerWhitelist)),
             IWhitelist(address(0)), // no contribution whitelist

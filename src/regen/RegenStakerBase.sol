@@ -25,9 +25,8 @@ import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocation
 /// @title RegenStakerBase
 /// @author [Golem Foundation](https://golem.foundation)
 /// @notice Base contract for RegenStaker variants, extending the Staker contract by [ScopeLift](https://scopelift.co).
-/// @notice This contract provides shared functionality including:
+/// @notice Provides shared functionality including:
 ///         - Variable reward duration (7-3000 days, configurable by admin)
-///         - Optional reward taxation via claim fees (0 to MAX_CLAIM_FEE)
 ///         - Earning power management with external bumping incentivized by tips (up to maxBumpTip)
 ///         - Adjustable minimum stake amount (existing deposits grandfathered with restrictions)
 ///         - Whitelist support for stakers, contributors, and allocation mechanisms
@@ -74,7 +73,6 @@ import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocation
 /// @dev Integer division causes ~1 wei precision loss, negligible due to SCALE_FACTOR (1e36).
 /// @dev This base is abstract, with variants implementing token-specific behaviors (e.g., delegation surrogates).
 /// @dev Earning power updates are required after balance changes; some are automatic, others via bumpEarningPower.
-/// @dev If rewards should not be taxable, set MAX_CLAIM_FEE to 0 in deployment.
 abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, StakerPermitAndStake, StakerOnBehalf {
     using SafeCast for uint256;
 
@@ -241,7 +239,6 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @param _maxBumpTip The max bump tip
     /// @param _admin The admin address
     /// @param _rewardDuration The reward duration
-    /// @param _maxClaimFee The max claim fee
     /// @param _minimumStakeAmount The min stake amount
     /// @param _stakerWhitelist Staker whitelist
     /// @param _contributionWhitelist Contribution whitelist
@@ -254,7 +251,6 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         uint256 _maxBumpTip,
         address _admin,
         uint128 _rewardDuration,
-        uint256 _maxClaimFee,
         uint128 _minimumStakeAmount,
         IWhitelist _stakerWhitelist,
         IWhitelist _contributionWhitelist,
@@ -265,8 +261,10 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         StakerPermitAndStake(IERC20Permit(address(_stakeToken)))
         EIP712(_eip712Name, "1")
     {
-        MAX_CLAIM_FEE = _maxClaimFee;
-        _setClaimFeeParameters(ClaimFeeParameters({ feeAmount: 0, feeCollector: address(0) }));
+        // Fee collection has been eliminated - set MAX_CLAIM_FEE to 0 to disable fees permanently
+        MAX_CLAIM_FEE = 0;
+        // Explicitly initialize claimFeeParameters to zero state for clarity
+        claimFeeParameters = ClaimFeeParameters({ feeAmount: 0, feeCollector: address(0) });
 
         // Enable self-transfers for compound operations when stake and reward tokens are the same
         // This allows compoundRewards to use _stakeTokenSafeTransferFrom with address(this) as source
@@ -535,7 +533,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @param _v Signature component v
     /// @param _r Signature component r
     /// @param _s Signature component s
-    /// @return amountContributedToAllocationMechanism Actual amount contributed (after fees)
+    /// @return amountContributedToAllocationMechanism Actual amount contributed
     function contribute(
         DepositIdentifier _depositId,
         address _allocationMechanismAddress,
@@ -584,19 +582,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
             return 0;
         }
 
-        uint256 fee = claimFeeParameters.feeAmount;
-
-        // Early return if user benefit would be zero or negative
-        // Ensures users always receive some value after fees
-        if (_amount <= fee) {
-            return 0;
-        }
-
-        amountContributedToAllocationMechanism = _calculateNetContribution(_amount, fee);
-
-        // Prevent zero-amount contributions after fee deduction
-        require(amountContributedToAllocationMechanism > 0, ZeroOperation());
-
+        amountContributedToAllocationMechanism = _amount;
         _consumeRewards(deposit, _amount);
 
         // Defensive earning power update - maintaining consistency with base Staker pattern
@@ -641,10 +627,6 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
             _s
         );
 
-        if (fee > 0) {
-            SafeERC20.safeTransfer(REWARD_TOKEN, claimFeeParameters.feeCollector, fee);
-        }
-
         // check that allowance is zero
         require(REWARD_TOKEN.allowance(address(this), _allocationMechanismAddress) == 0, "allowance not zero");
 
@@ -653,7 +635,6 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
 
     /// @notice Compounds rewards by claiming them and immediately restaking them into the same deposit
     /// @dev REQUIREMENT: Only works when REWARD_TOKEN == STAKE_TOKEN, otherwise reverts.
-    /// @dev FEE HANDLING: Claim fees are deducted before compounding. Zero fee results in zero compound.
     /// @dev EARNING POWER: Compounding updates earning power based on new total balance.
     /// @dev GAS OPTIMIZATION: More efficient than separate claim + stake operations.
     /// @dev CLAIMER PERMISSIONS: This function grants claimers the ability to increase deposit stakes
@@ -662,7 +643,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     ///      Claimers cannot withdraw funds or alter deposit parameters, maintaining security boundaries.
     /// @dev Requires contract not paused and uses reentrancy guard
     /// @param _depositId The deposit to compound rewards for
-    /// @return compoundedAmount Amount of rewards compounded (after fees)
+    /// @return compoundedAmount Amount of rewards compounded
     function compoundRewards(
         DepositIdentifier _depositId
     ) external virtual whenNotPaused nonReentrant returns (uint256 compoundedAmount) {
@@ -688,16 +669,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
             return 0;
         }
 
-        ClaimFeeParameters memory feeParams = claimFeeParameters;
-        uint256 fee = feeParams.feeAmount;
-
-        // Early return if user benefit would be zero or negative
-        // Ensures users always receive some value after fees
-        if (unclaimedAmount <= fee) {
-            return 0;
-        }
-
-        compoundedAmount = unclaimedAmount - fee;
+        compoundedAmount = unclaimedAmount;
 
         uint256 tempEarningPower = earningPowerCalculator.getEarningPower(
             deposit.balance,
@@ -723,10 +695,6 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
 
         deposit.balance = newBalance.toUint96();
         deposit.earningPower = newEarningPower.toUint96();
-
-        if (fee > 0) {
-            SafeERC20.safeTransfer(REWARD_TOKEN, feeParams.feeCollector, fee);
-        }
 
         // Transfer compounded rewards using the same pattern as _stakeMore for consistency
         // The surrogate must already exist since the deposit exists (created during initial stake)
@@ -765,20 +733,6 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         }
     }
 
-    /// @notice Calculate net contribution amount after deducting fees
-    /// @dev Pure function for fee calculation
-    /// @param amount The gross amount to contribute
-    /// @param feeAmount The fee amount to deduct
-    /// @return netAmount The amount after fee deduction
-    function _calculateNetContribution(uint256 amount, uint256 feeAmount) internal pure returns (uint256 netAmount) {
-        if (feeAmount == 0) {
-            netAmount = amount;
-        } else {
-            require(amount >= feeAmount, CantAfford(feeAmount, amount));
-            netAmount = amount - feeAmount;
-        }
-    }
-
     /// @notice Atomically updates deposit checkpoint and totalClaimedRewards
     /// @dev Ensures consistent state updates when rewards are consumed
     /// @param _deposit The deposit to update
@@ -813,10 +767,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     // === Overridden Functions ===
 
     /// @inheritdoc Staker
-    /// @notice Overrides to prevent staking 0 tokens.
-    /// @notice Overrides to prevent staking below the minimum stake amount.
-    /// @notice Overrides to prevent staking when the contract is paused.
-    /// @notice Overrides to prevent staking if the staker is not whitelisted.
+    /// @notice Prevents staking 0, staking below the minimum, staking when paused, and staking by non-whitelisted stakers.
     /// @dev Uses reentrancy guard
     /// @param _depositor The depositor address
     /// @param _amount The amount to stake
@@ -836,9 +787,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     }
 
     /// @inheritdoc Staker
-    /// @notice Overrides to prevent pushing the amount below the minimum stake amount.
-    /// @notice Overrides to prevent withdrawing when the contract is paused.
-    /// @notice Overrides to prevent withdrawing 0 tokens.
+    /// @notice Prevents withdrawing 0; prevents withdrawals that drop balance below minimum; disabled when paused.
     /// @dev Uses reentrancy guard
     /// @param deposit The deposit storage
     /// @param _depositId The deposit identifier
@@ -882,10 +831,9 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     }
 
     /// @inheritdoc Staker
-    /// @notice Overrides to prevent claiming when the contract is paused.
-    /// @notice Override to prevent fee collection when user receives no benefit after fees
-    /// @dev Uses reentrancy guard
-    /// @dev Returns 0 without any state changes or transfers if reward <= fee
+    /// @notice Overrides to add pause protection and track totalClaimedRewards for balance validation
+    /// @dev Reuses base Staker logic (with fee=0) and adds totalClaimedRewards tracking
+    /// @dev nonReentrant protects against reentrancy despite updating totalClaimedRewards after transfer
     /// @param _depositId The deposit identifier
     /// @param deposit The deposit storage
     /// @param _claimer The claimer address
@@ -895,20 +843,9 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         Deposit storage deposit,
         address _claimer
     ) internal virtual override whenNotPaused nonReentrant returns (uint256) {
-        _checkpointGlobalReward();
-        _checkpointReward(deposit);
-
-        uint256 _reward = deposit.scaledUnclaimedRewardCheckpoint / SCALE_FACTOR;
-
-        // Early return if user benefit would be zero or negative
-        // Ensures users always receive some value after fees
-        if (_reward <= claimFeeParameters.feeAmount) {
-            return 0;
-        }
-
-        totalClaimedRewards += _reward;
-
-        return super._claimReward(_depositId, deposit, _claimer);
+        uint256 _claimedAmount = super._claimReward(_depositId, deposit, _claimer);
+        totalClaimedRewards += _claimedAmount;
+        return _claimedAmount;
     }
 
     /// @notice Override notifyRewardAmount to use custom reward duration
@@ -939,10 +876,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     }
 
     /// @inheritdoc Staker
-    /// @notice Overrides to prevent staking 0 tokens.
-    /// @notice Overrides to ensure the final stake amount meets the minimum requirement.
-    /// @notice Overrides to prevent staking more when the contract is paused.
-    /// @notice Overrides to prevent staking more if the deposit owner is not whitelisted.
+    /// @notice Prevents staking more when paused or by non-whitelisted owners; ensures non-zero amount and final balance meets minimum.
     /// @dev Uses reentrancy guard; validates deposit.owner against staker whitelist before proceeding
     /// @param deposit The deposit storage
     /// @param _depositId The deposit identifier

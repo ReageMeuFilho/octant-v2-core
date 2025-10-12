@@ -80,7 +80,6 @@ contract RegenStakerBaseClaimerPermissionsDemoTest is Test {
             0, // maxBumpTip
             admin,
             REWARD_DURATION,
-            0, // maxClaimFee
             1e18, // minimumStakeAmount
             IWhitelist(address(stakerWhitelist)),
             IWhitelist(address(stakerWhitelist)),

@@ -53,7 +53,6 @@ contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
     /// @param _maxBumpTip The maximum bump tip.
     /// @param _admin The address of the admin. TRUSTED.
     /// @param _rewardDuration The duration over which rewards are distributed.
-    /// @param _maxClaimFee The maximum claim fee. You can set fees between 0 and _maxClaimFee. _maxClaimFee cannot be changed after deployment.
     /// @param _minimumStakeAmount The minimum stake amount.
     /// @param _stakerWhitelist The whitelist for stakers. Can be address(0) to disable whitelisting.
     /// @param _contributionWhitelist The whitelist for contributors. Can be address(0) to disable whitelisting.
@@ -67,7 +66,6 @@ contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
         uint256 _maxBumpTip,
         address _admin,
         uint128 _rewardDuration,
-        uint256 _maxClaimFee,
         uint128 _minimumStakeAmount,
         IWhitelist _stakerWhitelist,
         IWhitelist _contributionWhitelist,
@@ -80,7 +78,6 @@ contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
             _maxBumpTip,
             _admin,
             _rewardDuration,
-            _maxClaimFee,
             _minimumStakeAmount,
             _stakerWhitelist,
             _contributionWhitelist,

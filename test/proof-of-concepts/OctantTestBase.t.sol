@@ -144,7 +144,6 @@ contract OctantTestBase is Test {
             1000, // maxBumpTip
             admin,
             uint128(REWARD_DURATION),
-            0, // maxClaimFee
             0, // minStakeAmount
             stakerWhitelist,
             contributionWhitelist,

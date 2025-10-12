@@ -54,7 +54,6 @@ contract RegenStakerWithoutDelegateSurrogateVotesWithdrawalFixTest is Test {
             0, // maxBumpTip
             admin,
             30 days, // rewardDuration
-            0, // maxClaimFee
             MIN_STAKE, // minimumStakeAmount
             IWhitelist(address(whitelist)), // stakerWhitelist
             IWhitelist(address(0)), // contributionWhitelist
@@ -191,7 +190,6 @@ contract RegenStakerWithoutDelegateSurrogateVotesWithdrawalFixTest is Test {
             0,
             admin,
             30 days,
-            0,
             MIN_STAKE,
             IWhitelist(address(whitelist)),
             IWhitelist(address(0)),

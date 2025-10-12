@@ -62,7 +62,6 @@ contract RegenStakerFactoryVariantsTest is Test {
             allocationMechanismWhitelist: allocationMechanismWhitelist,
             earningPowerCalculator: calculator,
             maxBumpTip: MAX_BUMP_TIP,
-            maxClaimFee: MAX_CLAIM_FEE,
             minimumStakeAmount: 0,
             rewardDuration: MIN_REWARD_DURATION
         });
@@ -85,7 +84,6 @@ contract RegenStakerFactoryVariantsTest is Test {
             allocationMechanismWhitelist: allocationMechanismWhitelist,
             earningPowerCalculator: calculator,
             maxBumpTip: MAX_BUMP_TIP,
-            maxClaimFee: MAX_CLAIM_FEE,
             minimumStakeAmount: 0,
             rewardDuration: MIN_REWARD_DURATION
         });
@@ -108,7 +106,6 @@ contract RegenStakerFactoryVariantsTest is Test {
             allocationMechanismWhitelist: allocationMechanismWhitelist,
             earningPowerCalculator: calculator,
             maxBumpTip: MAX_BUMP_TIP,
-            maxClaimFee: MAX_CLAIM_FEE,
             minimumStakeAmount: 0,
             rewardDuration: MIN_REWARD_DURATION
         });
@@ -131,7 +128,6 @@ contract RegenStakerFactoryVariantsTest is Test {
             allocationMechanismWhitelist: allocationMechanismWhitelist,
             earningPowerCalculator: calculator,
             maxBumpTip: MAX_BUMP_TIP,
-            maxClaimFee: MAX_CLAIM_FEE,
             minimumStakeAmount: 0,
             rewardDuration: MIN_REWARD_DURATION
         });
@@ -154,7 +150,6 @@ contract RegenStakerFactoryVariantsTest is Test {
             allocationMechanismWhitelist: allocationMechanismWhitelist,
             earningPowerCalculator: calculator,
             maxBumpTip: MAX_BUMP_TIP,
-            maxClaimFee: MAX_CLAIM_FEE,
             minimumStakeAmount: 0,
             rewardDuration: MIN_REWARD_DURATION
         });
@@ -183,7 +178,6 @@ contract RegenStakerFactoryVariantsTest is Test {
             allocationMechanismWhitelist: allocationMechanismWhitelist,
             earningPowerCalculator: calculator,
             maxBumpTip: MAX_BUMP_TIP,
-            maxClaimFee: MAX_CLAIM_FEE,
             minimumStakeAmount: 0,
             rewardDuration: MIN_REWARD_DURATION
         });
@@ -212,7 +206,6 @@ contract RegenStakerFactoryVariantsTest is Test {
             allocationMechanismWhitelist: allocationMechanismWhitelist,
             earningPowerCalculator: calculator,
             maxBumpTip: MAX_BUMP_TIP,
-            maxClaimFee: MAX_CLAIM_FEE,
             minimumStakeAmount: 0,
             rewardDuration: MIN_REWARD_DURATION
         });
@@ -247,7 +240,6 @@ contract RegenStakerFactoryVariantsTest is Test {
             MAX_BUMP_TIP,
             ADMIN,
             MIN_REWARD_DURATION,
-            MAX_CLAIM_FEE,
             0, // minimumStakeAmount
             stakerWhitelist,
             contributionWhitelist,

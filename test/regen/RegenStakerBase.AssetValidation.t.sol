@@ -63,7 +63,6 @@ contract RegenStakerBaseAssetValidationTest is Test {
             1e18, // maxBumpTip
             admin, // admin
             30 days, // rewardDuration
-            1e17, // maxClaimFee
             1e18, // minimumStakeAmount
             IWhitelist(address(whitelist)), // stakerWhitelist
             IWhitelist(address(0)), // contributionWhitelist (none)
