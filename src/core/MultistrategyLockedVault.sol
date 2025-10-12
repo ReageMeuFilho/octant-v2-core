@@ -78,6 +78,8 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
 
     // Regen governance address
     address public regenGovernance;
+    // Pending regen governance awaiting acceptance
+    address public pendingRegenGovernance;
 
     // Cooldown period for rage quit
     uint256 public rageQuitCooldownPeriod;
@@ -154,7 +156,7 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
      * @notice Finalize the rage quit cooldown period change after the grace period
      * @dev Can only be called after the grace period has elapsed
      */
-    function finalizeRageQuitCooldownPeriodChange() external onlyRegenGovernance {
+    function finalizeRageQuitCooldownPeriodChange() external {
         if (pendingRageQuitCooldownPeriod == 0) {
             revert NoPendingRageQuitCooldownPeriodChange();
         }
@@ -176,13 +178,20 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
      * @dev Can only be called by governance during the grace period
      */
     function cancelRageQuitCooldownPeriodChange() external onlyRegenGovernance {
-        if (pendingRageQuitCooldownPeriod == 0) {
+        uint256 pending = pendingRageQuitCooldownPeriod;
+        if (pending == 0) {
             revert NoPendingRageQuitCooldownPeriodChange();
+        }
+
+        uint256 proposedAt = rageQuitCooldownPeriodChangeTimestamp;
+        if (block.timestamp >= proposedAt + RAGE_QUIT_COOLDOWN_CHANGE_DELAY) {
+            revert RageQuitCooldownPeriodChangeDelayElapsed();
         }
 
         pendingRageQuitCooldownPeriod = 0;
         rageQuitCooldownPeriodChangeTimestamp = 0;
 
+        emit RageQuitCooldownPeriodChangeCancelled(pending, proposedAt, block.timestamp);
         emit PendingRageQuitCooldownPeriodChange(0, 0);
     }
 
@@ -276,8 +285,48 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
      *      - Transferring governance to another address
      * @custom:governance Only current regen governance can call this function
      */
-    function setRegenGovernance(address _regenGovernance) external onlyRegenGovernance {
-        regenGovernance = _regenGovernance;
+    function setRegenGovernance(address _regenGovernance) external override onlyRegenGovernance {
+        if (_regenGovernance == address(0)) revert InvalidGovernanceAddress();
+
+        pendingRegenGovernance = _regenGovernance;
+        emit RegenGovernanceTransferUpdate(
+            regenGovernance,
+            _regenGovernance,
+            IMultistrategyLockedVault.GovernanceTransferStatus.PROPOSED
+        );
+    }
+
+    /**
+     * @notice Accept the regen governance transfer
+     */
+    function acceptRegenGovernance() external override {
+        address pending = pendingRegenGovernance;
+        if (pending == address(0)) revert NoPendingRegenGovernance();
+        if (msg.sender != pending) revert NotRegenGovernance();
+
+        emit RegenGovernanceTransferUpdate(
+            regenGovernance,
+            pending,
+            IMultistrategyLockedVault.GovernanceTransferStatus.ACCEPTED
+        );
+        regenGovernance = pending;
+        pendingRegenGovernance = address(0);
+    }
+
+    /**
+     * @notice Cancel a pending regen governance transfer
+     * @dev Can only be called by current regen governance when there is a pending transfer
+     */
+    function cancelRegenGovernance() external override onlyRegenGovernance {
+        address pending = pendingRegenGovernance;
+        if (pending == address(0)) revert NoPendingRegenGovernance();
+
+        pendingRegenGovernance = address(0);
+        emit RegenGovernanceTransferUpdate(
+            regenGovernance,
+            pending,
+            IMultistrategyLockedVault.GovernanceTransferStatus.CANCELLED
+        );
     }
 
     /**
