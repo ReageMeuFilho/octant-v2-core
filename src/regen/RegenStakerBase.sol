@@ -189,20 +189,6 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         uint256 amount
     );
 
-    /// @notice Emitted when rewards are compounded
-    /// @param depositId The deposit identifier
-    /// @param user The user's address
-    /// @param rewardAmount The reward amount compounded
-    /// @param newBalance The new deposit balance
-    /// @param newEarningPower The new earning power
-    event RewardCompounded(
-        DepositIdentifier indexed depositId,
-        address indexed user,
-        uint256 rewardAmount,
-        uint256 newBalance,
-        uint256 newEarningPower
-    );
-
     /// @notice Error thrown when a required surrogate is missing
     /// @param delegatee The delegatee for which a surrogate was expected
     error SurrogateNotFound(address delegatee);
