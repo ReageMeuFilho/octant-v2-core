@@ -193,6 +193,9 @@ library DebtManagementLib {
             }
 
             // Vault is increasing debt with the strategy by sending more funds.
+            // NOTE: For strategies that deposit into meta-vaults (e.g., MorphoCompounderStrategy → Morpho Steakhouse → SteakHouse USDC),
+            // maxDeposit may be inflated if underlying vaults have duplicate markets in their supplyQueue.
+            // This could cause deposit attempts to fail if the actual capacity is lower than reported.
             vars.maxDeposit = IERC4626Payable(strategy).maxDeposit(address(this));
             if (vars.maxDeposit == 0) {
                 result.newDebt = vars.currentDebt;
