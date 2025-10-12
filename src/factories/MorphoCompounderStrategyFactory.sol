@@ -36,7 +36,7 @@ contract MorphoCompounderStrategyFactory {
     address public constant YS_USDC = 0x074134A2784F4F66b6ceD6f68849382990Ff3215;
 
     event StrategyDeploy(
-        address indexed management,
+        address indexed deployer,
         address indexed donationAddress,
         address indexed strategyAddress,
         string vaultTokenName
@@ -125,7 +125,7 @@ contract MorphoCompounderStrategyFactory {
             })
         );
 
-        emit StrategyDeploy(_management, _donationAddress, strategyAddress, _name);
+        emit StrategyDeploy(msg.sender, _donationAddress, strategyAddress, _name);
         return strategyAddress;
     }
 }
