@@ -9,6 +9,7 @@ import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { IWhitelist } from "src/utils/IWhitelist.sol";
 import { Whitelist } from "src/utils/Whitelist.sol";
 import { Staker } from "staker/Staker.sol";
+import { StakerOnBehalf } from "staker/extensions/StakerOnBehalf.sol";
 
 /// @title Tests for REG-007 Withdrawal Lockup Fix
 /// @notice Validates that the withdrawal lockup vulnerability is properly fixed
@@ -346,8 +347,8 @@ contract RegenStakerWithoutDelegateSurrogateVotesWithdrawalFixTest is Test {
         Staker.DepositIdentifier depositId = staker.stake(STAKE_AMOUNT, alice, alice);
         vm.stopPrank();
 
-        // Attempt to alter delegatee on behalf should revert
-        vm.expectRevert(RegenStakerWithoutDelegateSurrogateVotes.DelegationNotSupported.selector);
+        // With invalid signature, reverts during signature validation (before reaching _alterDelegatee)
+        vm.expectRevert(StakerOnBehalf.StakerOnBehalf__InvalidSignature.selector);
         staker.alterDelegateeOnBehalf(depositId, bob, alice, block.timestamp + 1000, "");
     }
 
@@ -361,8 +362,8 @@ contract RegenStakerWithoutDelegateSurrogateVotesWithdrawalFixTest is Test {
         Staker.DepositIdentifier depositId = staker.stake(STAKE_AMOUNT, alice, alice);
         vm.stopPrank();
 
-        // Any attempt to alter delegatee on behalf should revert
-        vm.expectRevert(RegenStakerWithoutDelegateSurrogateVotes.DelegationNotSupported.selector);
+        // With invalid signature, reverts during signature validation (before reaching _alterDelegatee)
+        vm.expectRevert(StakerOnBehalf.StakerOnBehalf__InvalidSignature.selector);
         staker.alterDelegateeOnBehalf(depositId, newDelegatee, alice, deadline, "");
     }
 }

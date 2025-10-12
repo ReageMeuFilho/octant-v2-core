@@ -148,19 +148,7 @@ contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
     /// @inheritdoc Staker
     /// @notice Delegation changes are not supported in this variant
     /// @dev Always reverts since this contract doesn't use delegation surrogates - always uses address(this)
-    function alterDelegatee(DepositIdentifier, address) external pure override {
-        revert DelegationNotSupported();
-    }
-
-    /// @notice Delegation changes are not supported in this variant
-    /// @dev Always reverts since this contract doesn't use delegation surrogates - always uses address(this)
-    function alterDelegateeOnBehalf(DepositIdentifier, address, address, uint256, bytes memory) external pure override {
-        revert DelegationNotSupported();
-    }
-
-    /// @inheritdoc Staker
-    /// @notice Delegation changes are not supported in this variant
-    /// @dev Always reverts since this contract doesn't use delegation surrogates - always uses address(this)
+    /// @dev Both alterDelegatee() and alterDelegateeOnBehalf() call this internal function
     function _alterDelegatee(Deposit storage, DepositIdentifier, address) internal pure override {
         revert DelegationNotSupported();
     }
