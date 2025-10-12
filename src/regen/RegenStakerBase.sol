@@ -826,8 +826,10 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     }
 
     /// @inheritdoc Staker
-    /// @notice Overrides to prevent claiming when the contract is paused.
-    /// @dev Uses reentrancy guard
+    /// @notice Overrides to prevent claiming when the contract is paused and to track totalClaimedRewards.
+    /// @dev Uses reentrancy guard and tracks totalClaimedRewards for reward balance validation
+    /// @dev Cannot use super._claimReward because: (1) would duplicate checkpoint calls, and
+    ///      (2) totalClaimedRewards must be updated before transfers for reentrancy safety
     /// @param _depositId The deposit identifier
     /// @param deposit The deposit storage
     /// @param _claimer The claimer address
@@ -846,6 +848,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
             return 0;
         }
 
+        // Track total claimed rewards for _validateRewardBalance (must be before transfer)
         totalClaimedRewards += _reward;
 
         // Retain sub-wei dust by clearing the scaled checkpoint fully for the consumed reward
