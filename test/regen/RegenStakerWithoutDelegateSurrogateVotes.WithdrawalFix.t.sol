@@ -337,4 +337,32 @@ contract RegenStakerWithoutDelegateSurrogateVotesWithdrawalFixTest is Test {
         vm.expectRevert(RegenStakerWithoutDelegateSurrogateVotes.DelegationNotSupported.selector);
         staker.alterDelegatee(depositId, newDelegatee);
     }
+
+    /// @notice Test that alterDelegateeOnBehalf reverts since delegation is not supported
+    function test_alterDelegateeOnBehalfReverts() public {
+        // Alice stakes
+        vm.startPrank(alice);
+        stakeToken.approve(address(staker), STAKE_AMOUNT);
+        Staker.DepositIdentifier depositId = staker.stake(STAKE_AMOUNT, alice, alice);
+        vm.stopPrank();
+
+        // Attempt to alter delegatee on behalf should revert
+        vm.expectRevert(RegenStakerWithoutDelegateSurrogateVotes.DelegationNotSupported.selector);
+        staker.alterDelegateeOnBehalf(depositId, bob, alice, block.timestamp + 1000, "");
+    }
+
+    /// @notice Fuzz test that alterDelegateeOnBehalf always reverts regardless of inputs
+    function testFuzz_alterDelegateeOnBehalfAlwaysReverts(address newDelegatee, uint256 deadline) public {
+        vm.assume(deadline > block.timestamp);
+
+        // Alice stakes
+        vm.startPrank(alice);
+        stakeToken.approve(address(staker), STAKE_AMOUNT);
+        Staker.DepositIdentifier depositId = staker.stake(STAKE_AMOUNT, alice, alice);
+        vm.stopPrank();
+
+        // Any attempt to alter delegatee on behalf should revert
+        vm.expectRevert(RegenStakerWithoutDelegateSurrogateVotes.DelegationNotSupported.selector);
+        staker.alterDelegateeOnBehalf(depositId, newDelegatee, alice, deadline, "");
+    }
 }
