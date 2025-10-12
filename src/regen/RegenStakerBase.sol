@@ -906,8 +906,10 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @notice Override notifyRewardAmount to use custom reward duration
     /// @dev nonReentrant as a belts-and-braces guard against exotic ERC20 callback reentry
     /// @dev Enforces monotonic reward property: totalRewards can only increase, never decrease.
-    ///      Once rewards are notified, elapsed portions cannot be clawed back. Only unearned
-    ///      future rewards can be recovered by reducing new notifications.
+    ///      Once rewards are notified and time has elapsed, those elapsed portions cannot be
+    ///      clawed back. Admins can adjust future reward rates by notifying new amounts, but
+    ///      the current schedule represents a commitment for its duration and typically won't
+    ///      be changed mid-cycle.
     /// @param _amount The reward amount
     function notifyRewardAmount(uint256 _amount) external virtual override nonReentrant {
         (uint256 requiredBalance, uint256 carryOverAmount) = _validateRewardBalance(_amount);
