@@ -415,13 +415,13 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @dev Can only be called by admin
     /// @param _contributionWhitelist New contribution whitelist contract (address(0) = no restrictions)
     function setContributionWhitelist(IWhitelist _contributionWhitelist) external {
+        _revertIfNotAdmin();
         require(sharedState.contributionWhitelist != _contributionWhitelist, NoOperation());
         // Prevent footgun: ensure distinct from allocation mechanism whitelist
         require(
             address(_contributionWhitelist) != address(sharedState.allocationMechanismWhitelist),
             Staker__InvalidAddress()
         );
-        _revertIfNotAdmin();
         if (address(_contributionWhitelist) == address(0)) {
             emit ContributionWhitelistDisabled();
         } else {
