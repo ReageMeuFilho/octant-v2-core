@@ -100,7 +100,7 @@ abstract contract ProperQF {
         if (voteWeightSquared > contribution) revert SquareRootTooLarge();
 
         // Validate square root approximation within 10% tolerance
-        uint256 actualSqrt = _sqrt(contribution);
+        uint256 actualSqrt = contribution.sqrt();
         uint256 tolerance = actualSqrt / 10; // 10% tolerance
         // Only allow vote weight to be lower than actual sqrt, not higher
         if (voteWeight < actualSqrt - tolerance || voteWeight > actualSqrt) {
@@ -164,21 +164,6 @@ abstract contract ProperQF {
         uint256 weightedQuadratic = (s.totalQuadraticSum * s.alphaNumerator) / s.alphaDenominator;
         uint256 weightedLinear = (s.totalLinearSum * (s.alphaDenominator - s.alphaNumerator)) / s.alphaDenominator;
         return weightedQuadratic + weightedLinear;
-    }
-
-    /**
-     * @dev Computes the square root of a number using the Babylonian method.
-     * @param x The input number.
-     * @return result The square root of the input number.
-     */
-    function _sqrt(uint256 x) internal pure returns (uint256 result) {
-        if (x == 0) return 0;
-        uint256 z = (x + 1) / 2;
-        result = x;
-        while (z < result) {
-            result = z;
-            z = (x / z + z) / 2;
-        }
     }
 
     /**
