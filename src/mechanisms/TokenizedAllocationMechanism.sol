@@ -6,6 +6,7 @@ import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import { IERC1271 } from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 
 /// @notice Interface for base allocation mechanism strategy implementations
 /// @dev Follows Yearn V3 pattern where shared implementation calls base strategy via interface
@@ -481,7 +482,7 @@ contract TokenizedAllocationMechanism {
         _executeSignup(user, deposit, user);
     }
 
-    /// @dev Validates signature parameters
+    /// @dev Validates signature parameters with ERC1271 support for contract signers
     function _validateSignature(
         address expectedSigner,
         bytes32 structHash,
@@ -493,10 +494,33 @@ contract TokenizedAllocationMechanism {
         // Check deadline
         if (block.timestamp > deadline) revert ExpiredSignature(deadline, block.timestamp);
 
-        // Recover signer
-        address recoveredAddress = _recover(structHash, v, r, s);
-        if (recoveredAddress == address(0)) revert InvalidSignature();
-        if (recoveredAddress != expectedSigner) revert InvalidSigner(recoveredAddress, expectedSigner);
+        // Compute EIP712 digest
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR(), structHash));
+
+        // Try ECDSA recovery first
+        (address recovered, , ) = ECDSA.tryRecover(digest, v, r, s);
+
+        // If ECDSA recovery matches expected signer, we're done
+        if (recovered == expectedSigner) {
+            return;
+        }
+
+        // If expectedSigner is a contract, try ERC1271 validation
+        if (expectedSigner.code.length > 0) {
+            // Pack signature components for ERC1271
+            bytes memory signature = abi.encodePacked(r, s, v);
+
+            try IERC1271(expectedSigner).isValidSignature(digest, signature) returns (bytes4 magicValue) {
+                if (magicValue == 0x1626ba7e) {
+                    return; // Valid ERC1271 signature
+                }
+            } catch {
+                // Fall through to revert
+            }
+        }
+
+        // Neither ECDSA nor ERC1271 validation succeeded
+        revert InvalidSigner(recovered, expectedSigner);
     }
 
     /// @dev Internal signup execution logic
@@ -529,14 +553,6 @@ contract TokenizedAllocationMechanism {
 
         s.votingPower[user] = totalPower;
         emit UserRegistered(user, newPower);
-    }
-
-    /// @dev Recovers signer address from signature
-    function _recover(bytes32 structHash, uint8 v, bytes32 r, bytes32 s) private returns (address) {
-        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR(), structHash));
-        (address recovered, , ) = ECDSA.tryRecover(digest, v, r, s);
-        if (recovered == address(0)) revert InvalidSignature();
-        return recovered;
     }
 
     // ---------- Proposal Creation ----------
