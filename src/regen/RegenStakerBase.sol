@@ -916,12 +916,9 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @param _amount The reward amount being added
     /// @return requiredBalance The total token balance required after the reward is notified
     /// @return carryOverAmount Unclaimed rewards that are being carried into the new schedule
-    function _validateRewardBalance(uint256 _amount)
-        internal
-        view
-        virtual
-        returns (uint256 requiredBalance, uint256 carryOverAmount)
-    {
+    function _validateRewardBalance(
+        uint256 _amount
+    ) internal view virtual returns (uint256 requiredBalance, uint256 carryOverAmount) {
         uint256 currentBalance = REWARD_TOKEN.balanceOf(address(this));
 
         // For variants with surrogates: stakes are NOT in main contract

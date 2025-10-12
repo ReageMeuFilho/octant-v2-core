@@ -93,12 +93,9 @@ contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
     /// @param _amount The reward amount being added
     /// @return requiredBalance The required balance including appropriate obligations
     /// @return carryOverAmount Unclaimed rewards carried into the new schedule
-    function _validateRewardBalance(uint256 _amount)
-        internal
-        view
-        override
-        returns (uint256 requiredBalance, uint256 carryOverAmount)
-    {
+    function _validateRewardBalance(
+        uint256 _amount
+    ) internal view override returns (uint256 requiredBalance, uint256 carryOverAmount) {
         uint256 currentBalance = REWARD_TOKEN.balanceOf(address(this));
 
         carryOverAmount = totalRewards - totalClaimedRewards;

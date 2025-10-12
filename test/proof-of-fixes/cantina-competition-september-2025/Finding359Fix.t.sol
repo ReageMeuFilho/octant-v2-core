@@ -78,16 +78,8 @@ contract Cantina359Fix is OctantTestBase {
         ) = regenStaker.latestRewardSchedule();
         assertEq(addedSecond, SECOND_REWARD, "second added amount mismatch");
         assertEq(carrySecond, FIRST_REWARD, "second carry-over mismatch");
-        assertEq(
-            totalScheduledSecond,
-            FIRST_REWARD + SECOND_REWARD,
-            "second total scheduled mismatch"
-        );
-        assertEq(
-            requiredSecond,
-            FIRST_REWARD + SECOND_REWARD,
-            "second required balance mismatch"
-        );
+        assertEq(totalScheduledSecond, FIRST_REWARD + SECOND_REWARD, "second total scheduled mismatch");
+        assertEq(requiredSecond, FIRST_REWARD + SECOND_REWARD, "second required balance mismatch");
         assertEq(durationSecond, REWARD_DURATION, "second duration mismatch");
         assertEq(endTimeSecond, expectedEndTimeSecond, "second end time mismatch");
     }
