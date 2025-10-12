@@ -488,8 +488,6 @@ contract TokenizedAllocationMechanism is ReentrancyGuard {
         // Try ECDSA recovery first
         (address recovered, , ) = ECDSA.tryRecover(digest, v, r, s);
 
-        if (recovered == address(0)) revert InvalidSignature();
-
         // If ECDSA recovery matches expected signer, we're done
         if (recovered == expectedSigner) {
             return;
