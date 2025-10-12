@@ -826,10 +826,9 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     }
 
     /// @inheritdoc Staker
-    /// @notice Overrides to prevent claiming when the contract is paused and to track totalClaimedRewards.
-    /// @dev Uses reentrancy guard and tracks totalClaimedRewards for reward balance validation
-    /// @dev Cannot use super._claimReward because: (1) would duplicate checkpoint calls, and
-    ///      (2) totalClaimedRewards must be updated before transfers for reentrancy safety
+    /// @notice Overrides to add pause protection and track totalClaimedRewards for balance validation
+    /// @dev Reuses base Staker logic (with fee=0) and adds totalClaimedRewards tracking
+    /// @dev nonReentrant protects against reentrancy despite updating totalClaimedRewards after transfer
     /// @param _depositId The deposit identifier
     /// @param deposit The deposit storage
     /// @param _claimer The claimer address
@@ -839,40 +838,9 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         Deposit storage deposit,
         address _claimer
     ) internal virtual override whenNotPaused nonReentrant returns (uint256) {
-        _checkpointGlobalReward();
-        _checkpointReward(deposit);
-
-        uint256 _reward = deposit.scaledUnclaimedRewardCheckpoint / SCALE_FACTOR;
-
-        if (_reward == 0) {
-            return 0;
-        }
-
-        // Track total claimed rewards for _validateRewardBalance (must be before transfer)
-        totalClaimedRewards += _reward;
-
-        // Retain sub-wei dust by clearing the scaled checkpoint fully for the consumed reward
-        deposit.scaledUnclaimedRewardCheckpoint = deposit.scaledUnclaimedRewardCheckpoint - (_reward * SCALE_FACTOR);
-
-        uint256 _newEarningPower = earningPowerCalculator.getEarningPower(
-            deposit.balance,
-            deposit.owner,
-            deposit.delegatee
-        );
-
-        emit RewardClaimed(_depositId, _claimer, _reward, _newEarningPower);
-
-        totalEarningPower = _calculateTotalEarningPower(deposit.earningPower, _newEarningPower, totalEarningPower);
-        depositorTotalEarningPower[deposit.owner] = _calculateTotalEarningPower(
-            deposit.earningPower,
-            _newEarningPower,
-            depositorTotalEarningPower[deposit.owner]
-        );
-        deposit.earningPower = _newEarningPower.toUint96();
-
-        SafeERC20.safeTransfer(REWARD_TOKEN, _claimer, _reward);
-
-        return _reward;
+        uint256 _claimedAmount = super._claimReward(_depositId, deposit, _claimer);
+        totalClaimedRewards += _claimedAmount;
+        return _claimedAmount;
     }
 
     /// @notice Override notifyRewardAmount to use custom reward duration
