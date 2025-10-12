@@ -181,7 +181,7 @@ abstract contract BaseAllocationMechanism is IBaseAllocationStrategy {
         _;
     }
 
-    function beforeSignupHook(address user) external onlySelf returns (bool) {
+    function beforeSignupHook(address user) external virtual onlySelf returns (bool) {
         return _beforeSignupHook(user);
     }
 
