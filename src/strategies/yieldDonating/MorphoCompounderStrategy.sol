@@ -3,7 +3,6 @@ pragma solidity ^0.8.0;
 
 import { BaseHealthCheck } from "src/strategies/periphery/BaseHealthCheck.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import { ITokenizedStrategy } from "src/core/interfaces/ITokenizedStrategy.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -52,23 +51,23 @@ contract MorphoCompounderStrategy is BaseHealthCheck {
         )
     {
         // make sure asset is Morpho's asset
-        require(IERC4626(_compounderVault).asset() == _asset, "Asset mismatch with compounder vault");
+        require(ITokenizedStrategy(_compounderVault).asset() == _asset, "Asset mismatch with compounder vault");
         IERC20(_asset).forceApprove(_compounderVault, type(uint256).max);
         compounderVault = _compounderVault;
     }
 
     function availableDepositLimit(address /*_owner*/) public view override returns (uint256) {
-        uint256 vaultLimit = IERC4626(compounderVault).maxDeposit(address(this));
+        uint256 vaultLimit = ITokenizedStrategy(compounderVault).maxDeposit(address(this));
         uint256 idleBalance = IERC20(asset).balanceOf(address(this));
         return vaultLimit > idleBalance ? vaultLimit - idleBalance : 0;
     }
 
     function availableWithdrawLimit(address /*_owner*/) public view override returns (uint256) {
-        return IERC20(asset).balanceOf(address(this)) + IERC4626(compounderVault).maxWithdraw(address(this));
+        return IERC20(asset).balanceOf(address(this)) + ITokenizedStrategy(compounderVault).maxWithdraw(address(this));
     }
 
     function _deployFunds(uint256 _amount) internal override {
-        IERC4626(compounderVault).deposit(_amount, address(this));
+        ITokenizedStrategy(compounderVault).deposit(_amount, address(this));
     }
 
     function _freeFunds(uint256 _amount) internal override {
@@ -82,8 +81,8 @@ contract MorphoCompounderStrategy is BaseHealthCheck {
 
     function _harvestAndReport() internal view override returns (uint256 _totalAssets) {
         // get strategy's balance in the vault
-        uint256 shares = IERC4626(compounderVault).balanceOf(address(this));
-        uint256 vaultAssets = IERC4626(compounderVault).convertToAssets(shares);
+        uint256 shares = ITokenizedStrategy(compounderVault).balanceOf(address(this));
+        uint256 vaultAssets = ITokenizedStrategy(compounderVault).convertToAssets(shares);
 
         // include idle funds as per BaseStrategy specification
         uint256 idleAssets = IERC20(asset).balanceOf(address(this));
