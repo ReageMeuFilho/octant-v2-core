@@ -71,7 +71,6 @@ contract REG003_ComprehensiveProductionProofTest is Test {
             1000 ether, // maxBumpTip - production value
             admin,
             uint128(PRODUCTION_MIN_DURATION),
-            1 ether, // maxClaimFee - production value
             100 ether, // minStakeAmount - production minimum
             stakerWhitelist,
             contributorWhitelist,
@@ -406,7 +405,6 @@ contract REG003_ComprehensiveProductionProofTest is Test {
             1000 ether, // maxBumpTip
             admin, // admin
             uint128(duration), // rewardDuration - key parameter
-            1 ether, // maxClaimFee
             1, // minStakeAmount - minimal for testing
             testStakerWhitelist,
             new Whitelist(), // contributorWhitelist

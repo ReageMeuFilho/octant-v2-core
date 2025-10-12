@@ -217,7 +217,6 @@ contract RegenIntegrationTest is Test {
             MAX_BUMP_TIP,
             ADMIN,
             uint128(rewardDuration),
-            MAX_CLAIM_FEE,
             0,
             stakerWhitelist,
             contributorWhitelist,
@@ -248,7 +247,6 @@ contract RegenIntegrationTest is Test {
             tipAmount,
             ADMIN,
             uint128(MIN_REWARD_DURATION),
-            feeAmount,
             uint128(minimumStakeAmount),
             IWhitelist(address(0)),
             IWhitelist(address(0)),
@@ -260,7 +258,7 @@ contract RegenIntegrationTest is Test {
         assertEq(localRegenStaker.admin(), ADMIN);
         assertEq(address(localRegenStaker.earningPowerCalculator()), address(calculator));
         assertEq(localRegenStaker.maxBumpTip(), tipAmount);
-        assertEq(localRegenStaker.MAX_CLAIM_FEE(), feeAmount);
+
         assertEq(localRegenStaker.minimumStakeAmount(), minimumStakeAmount);
 
         assertEq(address(localRegenStaker.stakerWhitelist()), address(0));
@@ -299,7 +297,6 @@ contract RegenIntegrationTest is Test {
             tipAmount,
             ADMIN,
             uint128(MIN_REWARD_DURATION),
-            feeAmount,
             uint128(minimumStakeAmount),
             providedStakerWhitelist,
             providedContributorWhitelist,
@@ -311,7 +308,7 @@ contract RegenIntegrationTest is Test {
         assertEq(localRegenStaker.admin(), ADMIN);
         assertEq(address(localRegenStaker.earningPowerCalculator()), address(calculator));
         assertEq(localRegenStaker.maxBumpTip(), tipAmount);
-        assertEq(localRegenStaker.MAX_CLAIM_FEE(), feeAmount);
+
         assertEq(localRegenStaker.minimumStakeAmount(), minimumStakeAmount);
 
         assertEq(address(localRegenStaker.stakerWhitelist()), address(providedStakerWhitelist));
@@ -1465,7 +1462,6 @@ contract RegenIntegrationTest is Test {
             MAX_BUMP_TIP,
             ADMIN,
             uint128(customDuration),
-            MAX_CLAIM_FEE,
             0,
             IWhitelist(address(0)),
             IWhitelist(address(0)),
@@ -1486,7 +1482,6 @@ contract RegenIntegrationTest is Test {
             MAX_BUMP_TIP,
             ADMIN,
             0,
-            MAX_CLAIM_FEE,
             0,
             IWhitelist(address(0)),
             IWhitelist(address(0)),
@@ -1737,7 +1732,6 @@ contract RegenIntegrationTest is Test {
             MAX_BUMP_TIP,
             ADMIN,
             uint128(MIN_REWARD_DURATION),
-            MAX_CLAIM_FEE,
             0,
             stakerWhitelist,
             contributorWhitelist,
@@ -1811,7 +1805,6 @@ contract RegenIntegrationTest is Test {
             MAX_BUMP_TIP,
             ADMIN,
             uint128(MIN_REWARD_DURATION),
-            MAX_CLAIM_FEE,
             0,
             stakerWhitelist,
             contributorWhitelist,
@@ -1858,7 +1851,8 @@ contract RegenIntegrationTest is Test {
         assertEq(compoundRegenStaker.unclaimedReward(depositId), 0);
     }
 
-    function testFuzz_CompoundRewards_WithVariableFees(
+    /// @dev Skipped: Fee collection has been eliminated
+    function skip_testFuzz_CompoundRewards_WithVariableFees(
         uint256 stakeAmountBase,
         uint256 rewardAmountBase,
         uint256 feeAmountBase
@@ -1877,7 +1871,6 @@ contract RegenIntegrationTest is Test {
             MAX_BUMP_TIP,
             ADMIN,
             uint128(MIN_REWARD_DURATION),
-            MAX_CLAIM_FEE,
             0,
             stakerWhitelist,
             contributorWhitelist,
@@ -1960,7 +1953,6 @@ contract RegenIntegrationTest is Test {
             MAX_BUMP_TIP,
             ADMIN,
             uint128(MIN_REWARD_DURATION),
-            MAX_CLAIM_FEE,
             0,
             stakerWhitelist,
             contributorWhitelist,
@@ -2035,7 +2027,6 @@ contract RegenIntegrationTest is Test {
             MAX_BUMP_TIP,
             ADMIN,
             uint128(MIN_REWARD_DURATION),
-            MAX_CLAIM_FEE,
             0,
             stakerWhitelist,
             contributorWhitelist,
@@ -2172,7 +2163,6 @@ contract RegenIntegrationTest is Test {
             MAX_BUMP_TIP,
             ADMIN,
             uint128(MIN_REWARD_DURATION),
-            MAX_CLAIM_FEE,
             0,
             stakerWhitelist,
             contributorWhitelist,
@@ -2242,7 +2232,6 @@ contract RegenIntegrationTest is Test {
             MAX_BUMP_TIP,
             ADMIN,
             uint128(MIN_REWARD_DURATION),
-            MAX_CLAIM_FEE,
             0,
             stakerWhitelist,
             contributorWhitelist,
@@ -2535,7 +2524,8 @@ contract RegenIntegrationTest is Test {
         );
     }
 
-    function test_Contribute_WithSignature_AndFees() public {
+    /// @dev Skipped: Fee collection has been eliminated
+    function skip_test_Contribute_WithSignature_AndFees() public {
         _clearTestContext();
 
         currentTestCtx.stakeAmount = getStakeAmount(1000);

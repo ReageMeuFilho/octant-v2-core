@@ -23,7 +23,6 @@ contract RegenStakerFactory {
         IWhitelist allocationMechanismWhitelist;
         IEarningPowerCalculator earningPowerCalculator;
         uint256 maxBumpTip;
-        uint256 maxClaimFee;
         uint256 minimumStakeAmount;
         uint256 rewardDuration;
     }
@@ -138,7 +137,6 @@ contract RegenStakerFactory {
                 params.maxBumpTip,
                 params.admin,
                 params.rewardDuration,
-                params.maxClaimFee,
                 params.minimumStakeAmount,
                 params.stakerWhitelist,
                 params.contributionWhitelist,

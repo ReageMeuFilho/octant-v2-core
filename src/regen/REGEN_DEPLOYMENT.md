@@ -18,7 +18,6 @@ struct CreateStakerParams {
     IWhitelist allocationMechanismWhitelist; // Required, only audited mechanisms
     IEarningPowerCalculator earningPowerCalculator;
     uint256 maxBumpTip;           // In reward token's smallest unit
-    uint256 maxClaimFee;          // In reward token's smallest unit
     uint256 minimumStakeAmount;   // In stake token's smallest unit
     uint256 rewardDuration;       // 7-3000 days (≥30 days recommended)
 }
@@ -42,7 +41,6 @@ address staker = factory.createStakerWithoutDelegation(params, salt, noDelegatio
 ```solidity
 stakerWhitelist.add(initialStakers);
 allocationMechanismWhitelist.add(auditedMechanisms);
-staker.setClaimFeeParameters(ClaimFeeParameters(feeAmount, feeCollector));
 ```
 
 ## Emergency

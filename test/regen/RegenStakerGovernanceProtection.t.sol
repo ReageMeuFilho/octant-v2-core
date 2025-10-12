@@ -56,7 +56,6 @@ contract RegenStakerGovernanceProtectionTest is Test {
             INITIAL_MAX_BUMP_TIP,
             admin,
             uint128(REWARD_DURATION),
-            0, // maxClaimFee
             INITIAL_MIN_STAKE,
             whitelist,
             whitelist,

@@ -23,7 +23,12 @@ contract MockAllocationMechanism {
         asset = _asset;
     }
 
-    function signupOnBehalfWithSignature(address, uint256, uint256, uint8, bytes32, bytes32) external {}
+    function signupOnBehalfWithSignature(address, uint256 amount, uint256, uint8, bytes32, bytes32) external {
+        // Transfer tokens from the staker contract to consume the allowance
+        if (amount > 0) {
+            asset.transferFrom(msg.sender, address(this), amount);
+        }
+    }
 }
 
 /// @dev Harness exposing helper for seeding unclaimed rewards.
@@ -35,7 +40,6 @@ contract RegenStakerDustHarness is RegenStaker {
         uint256 maxBumpTip,
         address admin,
         uint128 rewardDuration,
-        uint256 maxClaimFee,
         uint128 minimumStakeAmount,
         IWhitelist stakerWhitelist,
         IWhitelist contributionWhitelist,
@@ -48,7 +52,6 @@ contract RegenStakerDustHarness is RegenStaker {
             maxBumpTip,
             admin,
             rewardDuration,
-            maxClaimFee,
             minimumStakeAmount,
             stakerWhitelist,
             contributionWhitelist,
@@ -89,7 +92,6 @@ contract Cantina564Fix is Test {
             1e18,
             address(this),
             uint128(30 days),
-            100 ether,
             0,
             IWhitelist(address(0)),
             IWhitelist(address(0)),
@@ -99,23 +101,23 @@ contract Cantina564Fix is Test {
         allocation = new MockAllocationMechanism(IERC20(address(stakeAndRewardToken)));
         allocationWhitelist.addToWhitelist(address(allocation));
 
-        regenStaker.setClaimFeeParameters(
-            Staker.ClaimFeeParameters({ feeAmount: uint96(FEE_AMOUNT), feeCollector: feeCollector })
-        );
+        // Note: Fee collection has been eliminated, so no setClaimFeeParameters call needed
     }
 
-    function testClaimRewardSweepsDustToCollector() public {
+    /// @notice Test that dust rewards can now be claimed directly (no fee collection)
+    function testClaimRewardAllowsDustClaim() public {
         Staker.DepositIdentifier depositId = _createDepositWithDust();
 
         vm.prank(user);
         uint256 claimed = regenStaker.claimReward(depositId);
 
-        assertEq(claimed, 0, "claimer should not receive dust");
-        assertEq(stakeAndRewardToken.balanceOf(feeCollector), DUST, "collector receives dust");
+        assertEq(claimed, DUST, "claimer receives full dust amount");
+        assertEq(stakeAndRewardToken.balanceOf(user), DUST, "user receives dust tokens");
         assertEq(regenStaker.unclaimedReward(depositId), 0, "deposit cleared");
     }
 
-    function testContributeSweepsDustToCollector() public {
+    /// @notice Test that dust rewards can be contributed (no fee collection)
+    function testContributeAllowsDustContribution() public {
         Staker.DepositIdentifier depositId = _createDepositWithDust();
 
         vm.prank(user);
@@ -129,19 +131,18 @@ contract Cantina564Fix is Test {
             bytes32(0)
         );
 
-        assertEq(contributed, 0, "no contribution when dust");
-        assertEq(stakeAndRewardToken.balanceOf(feeCollector), DUST, "collector receives dust");
+        assertEq(contributed, DUST, "full dust amount contributed");
         assertEq(regenStaker.unclaimedReward(depositId), 0, "deposit cleared");
     }
 
-    function testCompoundSweepsDustToCollector() public {
+    /// @notice Test that dust rewards can be compounded (no fee collection)
+    function testCompoundAllowsDustCompound() public {
         Staker.DepositIdentifier depositId = _createDepositWithDust();
 
         vm.prank(user);
         uint256 compounded = regenStaker.compoundRewards(depositId);
 
-        assertEq(compounded, 0, "no compounding when dust");
-        assertEq(stakeAndRewardToken.balanceOf(feeCollector), DUST, "collector receives dust");
+        assertEq(compounded, DUST, "full dust amount compounded");
         assertEq(regenStaker.unclaimedReward(depositId), 0, "deposit cleared");
     }
 

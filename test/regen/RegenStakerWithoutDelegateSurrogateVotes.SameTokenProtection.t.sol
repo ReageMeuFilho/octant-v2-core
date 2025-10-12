@@ -54,7 +54,6 @@ contract RegenStakerWithoutDelegateSurrogateVotesSameTokenProtectionTest is Test
             0, // maxBumpTip
             admin,
             30 days, // rewardDuration
-            0, // maxClaimFee
             0, // minimumStakeAmount
             IWhitelist(address(0)), // no staker whitelist
             IWhitelist(address(0)), // no contribution whitelist
@@ -69,7 +68,6 @@ contract RegenStakerWithoutDelegateSurrogateVotesSameTokenProtectionTest is Test
             0, // maxBumpTip
             admin,
             30 days, // rewardDuration
-            0, // maxClaimFee
             0, // minimumStakeAmount
             IWhitelist(address(0)), // no staker whitelist
             IWhitelist(address(0)), // no contribution whitelist

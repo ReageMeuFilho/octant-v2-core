@@ -27,7 +27,6 @@ import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocation
 /// @notice Base contract for RegenStaker variants, extending the Staker contract by [ScopeLift](https://scopelift.co).
 /// @notice Provides shared functionality including:
 ///         - Variable reward duration (7-3000 days, configurable by admin)
-///         - Optional reward taxation via claim fees (0 to MAX_CLAIM_FEE)
 ///         - Earning power management with external bumping incentivized by tips (up to maxBumpTip)
 ///         - Adjustable minimum stake amount (existing deposits grandfathered with restrictions)
 ///         - Whitelist support for stakers, contributors, and allocation mechanisms
@@ -74,7 +73,6 @@ import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocation
 /// @dev Integer division causes ~1 wei precision loss, negligible due to SCALE_FACTOR (1e36).
 /// @dev This base is abstract, with variants implementing token-specific behaviors (e.g., delegation surrogates).
 /// @dev Earning power updates are required after balance changes; some are automatic, others via bumpEarningPower.
-/// @dev If rewards should not be taxable, set MAX_CLAIM_FEE to 0 in deployment.
 abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, StakerPermitAndStake, StakerOnBehalf {
     using SafeCast for uint256;
 
@@ -255,7 +253,6 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @param _maxBumpTip The max bump tip
     /// @param _admin The admin address
     /// @param _rewardDuration The reward duration
-    /// @param _maxClaimFee The max claim fee
     /// @param _minimumStakeAmount The min stake amount
     /// @param _stakerWhitelist Staker whitelist
     /// @param _contributionWhitelist Contribution whitelist
@@ -268,7 +265,6 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         uint256 _maxBumpTip,
         address _admin,
         uint128 _rewardDuration,
-        uint256 _maxClaimFee,
         uint128 _minimumStakeAmount,
         IWhitelist _stakerWhitelist,
         IWhitelist _contributionWhitelist,
@@ -279,7 +275,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         StakerPermitAndStake(IERC20Permit(address(_stakeToken)))
         EIP712(_eip712Name, "1")
     {
-        MAX_CLAIM_FEE = _maxClaimFee;
+        MAX_CLAIM_FEE = 0;
         _setClaimFeeParameters(ClaimFeeParameters({ feeAmount: 0, feeCollector: address(0) }));
 
         // Enable self-transfers for compound operations when stake and reward tokens are the same
@@ -549,13 +545,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @param _v Signature component v
     /// @param _r Signature component r
     /// @param _s Signature component s
-    /// @return amountContributedToAllocationMechanism Actual amount contributed (after fees)
-    ///
-    /// Fee and dust handling
-    /// - Conceptually: deduct the claim fee, then use the net for contribution.
-    /// - Always calls the allocation mechanism with the net amount (which may be zero).
-    /// - If `_amount == 0`: emits `RewardContributed` with 0 and performs a zero-amount signup.
-    /// - If `_amount <= fee`: pay `feeCollector` first with the full `_amount`, emit `RewardContributed` with 0, and return 0.
+    /// @return amountContributedToAllocationMechanism Actual amount contributed
     function contribute(
         DepositIdentifier _depositId,
         address _allocationMechanismAddress,
@@ -592,49 +582,46 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         require(_amount <= unclaimedAmount, CantAfford(_amount, unclaimedAmount));
 
         if (_amount == 0) {
-            amountContributedToAllocationMechanism = 0;
-        } else {
-            uint256 currentFeeAmount = claimFeeParameters.feeAmount;
-
-            if (_amount <= currentFeeAmount) {
-                _sweepDustReward(_depositId, deposit, msg.sender, _amount);
-                amountContributedToAllocationMechanism = 0;
-            } else {
-                amountContributedToAllocationMechanism = _calculateNetContribution(_amount, currentFeeAmount);
-                _consumeRewards(deposit, _amount);
-
-                uint256 previousEarningPower = deposit.earningPower;
-                uint256 newEarningPower = earningPowerCalculator.getEarningPower(
-                    deposit.balance,
-                    deposit.owner,
-                    deposit.delegatee
-                );
-                totalEarningPower = _calculateTotalEarningPower(
-                    previousEarningPower,
-                    newEarningPower,
-                    totalEarningPower
-                );
-                depositorTotalEarningPower[deposit.owner] = _calculateTotalEarningPower(
-                    previousEarningPower,
-                    newEarningPower,
-                    depositorTotalEarningPower[deposit.owner]
-                );
-                deposit.earningPower = newEarningPower.toUint96();
-
-                emit RewardClaimed(_depositId, msg.sender, amountContributedToAllocationMechanism, newEarningPower);
-
-                SafeERC20.safeIncreaseAllowance(
-                    REWARD_TOKEN,
-                    _allocationMechanismAddress,
-                    amountContributedToAllocationMechanism
-                );
-            }
+            emit RewardContributed(_depositId, msg.sender, _allocationMechanismAddress, 0);
+            TokenizedAllocationMechanism(_allocationMechanismAddress).signupOnBehalfWithSignature(
+                msg.sender,
+                0,
+                _deadline,
+                _v,
+                _r,
+                _s
+            );
+            return 0;
         }
 
-        ClaimFeeParameters memory feeParamsAtCall = claimFeeParameters;
-        if (amountContributedToAllocationMechanism != 0 && feeParamsAtCall.feeAmount > 0) {
-            SafeERC20.safeTransfer(REWARD_TOKEN, feeParamsAtCall.feeCollector, feeParamsAtCall.feeAmount);
-        }
+        amountContributedToAllocationMechanism = _amount;
+        _consumeRewards(deposit, _amount);
+
+        // Defensive earning power update - maintaining consistency with base Staker pattern
+        uint256 _oldEarningPower = deposit.earningPower;
+        uint256 _newEarningPower = earningPowerCalculator.getEarningPower(
+            deposit.balance,
+            deposit.owner,
+            deposit.delegatee
+        );
+
+        // Update earning power totals before modifying deposit state
+        totalEarningPower = _calculateTotalEarningPower(_oldEarningPower, _newEarningPower, totalEarningPower);
+        depositorTotalEarningPower[deposit.owner] = _calculateTotalEarningPower(
+            _oldEarningPower,
+            _newEarningPower,
+            depositorTotalEarningPower[deposit.owner]
+        );
+        deposit.earningPower = _newEarningPower.toUint96();
+
+        emit RewardClaimed(_depositId, msg.sender, amountContributedToAllocationMechanism, _newEarningPower);
+
+        // approve the allocation mechanism to spend the rewards
+        SafeERC20.safeIncreaseAllowance(
+            REWARD_TOKEN,
+            _allocationMechanismAddress,
+            amountContributedToAllocationMechanism
+        );
 
         emit RewardContributed(
             _depositId,
@@ -652,16 +639,14 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
             _s
         );
 
-        if (amountContributedToAllocationMechanism != 0) {
-            require(REWARD_TOKEN.allowance(address(this), _allocationMechanismAddress) == 0, "allowance not zero");
-        }
+        // check that allowance is zero
+        require(REWARD_TOKEN.allowance(address(this), _allocationMechanismAddress) == 0, "allowance not zero");
 
         return amountContributedToAllocationMechanism;
     }
 
     /// @notice Compounds rewards by claiming them and immediately restaking them into the same deposit
     /// @dev REQUIREMENT: Only works when REWARD_TOKEN == STAKE_TOKEN, otherwise reverts.
-    /// @dev FEE HANDLING: Deduct fee and compound the net; if unclaimed <= fee, pay `feeCollector` first with the full amount and compound 0.
     /// @dev EARNING POWER: Compounding updates earning power based on new total balance.
     /// @dev GAS OPTIMIZATION: More efficient than separate claim + stake operations.
     /// @dev CLAIMER PERMISSIONS: This function grants claimers the ability to increase deposit stakes
@@ -670,7 +655,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     ///      Claimers cannot withdraw funds or alter deposit parameters, maintaining security boundaries.
     /// @dev Requires contract not paused and uses reentrancy guard
     /// @param _depositId The deposit to compound rewards for
-    /// @return compoundedAmount Amount of rewards compounded (after fees)
+    /// @return compoundedAmount Amount of rewards compounded
     function compoundRewards(
         DepositIdentifier _depositId
     ) external virtual whenNotPaused nonReentrant returns (uint256 compoundedAmount) {
@@ -696,17 +681,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
             return 0;
         }
 
-        ClaimFeeParameters memory feeParams = claimFeeParameters;
-        uint256 fee = feeParams.feeAmount;
-
-        if (unclaimedAmount <= fee) {
-            // NOTE: Claimer is responsible for skipping dust claims; if they proceed the fee collector receives it.
-            _sweepDustReward(_depositId, deposit, msg.sender, unclaimedAmount);
-            _revertIfMinimumStakeAmountNotMet(_depositId);
-            return 0;
-        }
-
-        compoundedAmount = unclaimedAmount - fee;
+        compoundedAmount = unclaimedAmount;
 
         uint256 tempEarningPower = earningPowerCalculator.getEarningPower(
             deposit.balance,
@@ -732,10 +707,6 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
 
         deposit.balance = newBalance.toUint96();
         deposit.earningPower = newEarningPower.toUint96();
-
-        if (fee > 0) {
-            SafeERC20.safeTransfer(REWARD_TOKEN, feeParams.feeCollector, fee);
-        }
 
         // Transfer compounded rewards using the same pattern as _stakeMore for consistency
         // The surrogate must already exist since the deposit exists (created during initial stake)
@@ -771,45 +742,6 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     function _checkWhitelisted(IWhitelist whitelist, address user) internal view {
         if (whitelist != IWhitelist(address(0)) && !whitelist.isWhitelisted(user)) {
             revert NotWhitelisted(whitelist, user);
-        }
-    }
-
-    /// @notice Calculate net contribution amount after deducting fees
-    /// @dev Pure function for fee calculation
-    /// @param amount The gross amount to contribute
-    /// @param feeAmount The fee amount to deduct
-    /// @return netAmount The amount after fee deduction
-    function _calculateNetContribution(uint256 amount, uint256 feeAmount) internal pure returns (uint256 netAmount) {
-        if (feeAmount == 0) {
-            netAmount = amount;
-        } else {
-            require(amount >= feeAmount, CantAfford(feeAmount, amount));
-            netAmount = amount - feeAmount;
-        }
-    }
-
-    /// @notice Sweeps dust rewards to the fee collector and emits a zero-benefit claim event
-    /// @dev Returns without side effects when `_amount` is zero
-    /// @dev Consumes the full `amount` from the deposit (updates `totalClaimedRewards` via `_consumeRewards`).
-    ///      Transfers the entire `amount` to the `feeCollector` if a fee is configured (> 0).
-    ///      Emits `RewardClaimed(_depositId, claimant, 0, deposit.earningPower)` to record user-visible outcome.
-    ///      No-op when `amount` is zero.
-    function _sweepDustReward(
-        DepositIdentifier _depositId,
-        Deposit storage deposit,
-        address claimant,
-        uint256 amount
-    ) internal {
-        if (amount == 0) {
-            return;
-        }
-
-        _consumeRewards(deposit, amount);
-        emit RewardClaimed(_depositId, claimant, 0, deposit.earningPower);
-
-        ClaimFeeParameters memory feeParams_ = claimFeeParameters;
-        if (feeParams_.feeAmount > 0) {
-            SafeERC20.safeTransfer(REWARD_TOKEN, feeParams_.feeCollector, amount);
         }
     }
 
@@ -892,7 +824,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     }
 
     /// @inheritdoc Staker
-    /// @notice Prevents claiming when paused; fee-first handling: if reward > fee, pay feeCollector first then the user's net; if reward <= fee, pay feeCollector the full amount and return 0.
+    /// @notice Overrides to prevent claiming when the contract is paused.
     /// @dev Uses reentrancy guard
     /// @param _depositId The deposit identifier
     /// @param deposit The deposit storage
@@ -908,19 +840,11 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
 
         uint256 _reward = deposit.scaledUnclaimedRewardCheckpoint / SCALE_FACTOR;
 
-        ClaimFeeParameters memory feeParams = claimFeeParameters;
-        uint256 feeAmount = feeParams.feeAmount;
-
-        if (_reward <= feeAmount) {
-            // NOTE: Claimer is responsible for skipping dust claims; if they proceed the fee collector receives it.
-            _sweepDustReward(_depositId, deposit, _claimer, _reward);
+        if (_reward == 0) {
             return 0;
         }
 
         totalClaimedRewards += _reward;
-
-        // Compute payout and update deposit state mirroring base Staker semantics
-        uint256 _payout = _reward - feeAmount;
 
         // Retain sub-wei dust by clearing the scaled checkpoint fully for the consumed reward
         deposit.scaledUnclaimedRewardCheckpoint = deposit.scaledUnclaimedRewardCheckpoint - (_reward * SCALE_FACTOR);
@@ -931,7 +855,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
             deposit.delegatee
         );
 
-        emit RewardClaimed(_depositId, _claimer, _payout, _newEarningPower);
+        emit RewardClaimed(_depositId, _claimer, _reward, _newEarningPower);
 
         totalEarningPower = _calculateTotalEarningPower(deposit.earningPower, _newEarningPower, totalEarningPower);
         depositorTotalEarningPower[deposit.owner] = _calculateTotalEarningPower(
@@ -941,13 +865,9 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         );
         deposit.earningPower = _newEarningPower.toUint96();
 
-        // Pay fee collector first, then the user's net payout
-        if (feeAmount > 0) {
-            SafeERC20.safeTransfer(REWARD_TOKEN, feeParams.feeCollector, feeAmount);
-        }
-        SafeERC20.safeTransfer(REWARD_TOKEN, _claimer, _payout);
+        SafeERC20.safeTransfer(REWARD_TOKEN, _claimer, _reward);
 
-        return _payout;
+        return _reward;
     }
 
     /// @notice Override notifyRewardAmount to use custom reward duration

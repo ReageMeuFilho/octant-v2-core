@@ -35,7 +35,6 @@ contract RegenSameTokenInvariant is StdInvariant, Test {
             admin,
             30 days,
             0,
-            0,
             IWhitelist(address(0)),
             IWhitelist(address(0)),
             whitelist

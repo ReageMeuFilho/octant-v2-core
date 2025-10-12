@@ -46,7 +46,6 @@ contract REG008CompoundWhitelistBypassDemoTest is Test {
             admin,
             30 days,
             0,
-            0,
             stakerWhitelist,
             new Whitelist(),
             new Whitelist()
