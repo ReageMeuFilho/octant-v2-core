@@ -275,8 +275,10 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         StakerPermitAndStake(IERC20Permit(address(_stakeToken)))
         EIP712(_eip712Name, "1")
     {
+        // Fee collection has been eliminated - set MAX_CLAIM_FEE to 0 to disable fees permanently
         MAX_CLAIM_FEE = 0;
-        _setClaimFeeParameters(ClaimFeeParameters({ feeAmount: 0, feeCollector: address(0) }));
+        // Note: claimFeeParameters state variable (inherited from Staker) remains uninitialized
+        // This is intentional as fee collection is not used in RegenStaker
 
         // Enable self-transfers for compound operations when stake and reward tokens are the same
         // This allows compoundRewards to use _stakeTokenSafeTransferFrom with address(this) as source

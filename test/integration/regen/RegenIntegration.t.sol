@@ -258,7 +258,6 @@ contract RegenIntegrationTest is Test {
         assertEq(localRegenStaker.admin(), ADMIN);
         assertEq(address(localRegenStaker.earningPowerCalculator()), address(calculator));
         assertEq(localRegenStaker.maxBumpTip(), tipAmount);
-
         assertEq(localRegenStaker.minimumStakeAmount(), minimumStakeAmount);
 
         assertEq(address(localRegenStaker.stakerWhitelist()), address(0));
@@ -308,7 +307,6 @@ contract RegenIntegrationTest is Test {
         assertEq(localRegenStaker.admin(), ADMIN);
         assertEq(address(localRegenStaker.earningPowerCalculator()), address(calculator));
         assertEq(localRegenStaker.maxBumpTip(), tipAmount);
-
         assertEq(localRegenStaker.minimumStakeAmount(), minimumStakeAmount);
 
         assertEq(address(localRegenStaker.stakerWhitelist()), address(providedStakerWhitelist));
