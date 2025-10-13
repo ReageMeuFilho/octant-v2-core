@@ -14,15 +14,6 @@ import { IMultistrategyVault } from "./IMultistrategyVault.sol";
  */
 interface IMultistrategyLockedVault is IMultistrategyVault {
     /**
-     * @notice Enum for governance transfer status
-     */
-    enum GovernanceTransferStatus {
-        PROPOSED, // 0 - Governance transfer has been proposed
-        ACCEPTED, // 1 - Governance transfer has been accepted
-        CANCELLED // 2 - Governance transfer has been cancelled
-    }
-
-    /**
      * @notice Storage for lockup information per user
      */
     struct LockupInfo {
@@ -44,11 +35,7 @@ interface IMultistrategyLockedVault is IMultistrategyVault {
     event PendingRageQuitCooldownPeriodChange(uint256 newPeriod, uint256 effectiveTimestamp);
     event RageQuitCooldownPeriodChangeCancelled(uint256 pendingPeriod, uint256 proposedAt, uint256 cancelledAt);
     event RageQuitCancelled(address indexed user, uint256 freedShares);
-    event RegenGovernanceTransferUpdate(
-        address indexed previousGovernance,
-        address indexed newGovernance,
-        GovernanceTransferStatus status
-    );
+    event RegenGovernanceChanged(address indexed previousGovernance, address indexed newGovernance);
 
     // Add necessary error definitions
     error InvalidRageQuitCooldownPeriod();

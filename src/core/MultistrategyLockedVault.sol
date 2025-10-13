@@ -311,11 +311,7 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
 
         address oldGovernance = regenGovernance;
         regenGovernance = _regenGovernance;
-        emit RegenGovernanceTransferUpdate(
-            oldGovernance,
-            _regenGovernance,
-            IMultistrategyLockedVault.GovernanceTransferStatus.ACCEPTED
-        );
+        emit RegenGovernanceChanged(oldGovernance, _regenGovernance);
     }
 
     /**

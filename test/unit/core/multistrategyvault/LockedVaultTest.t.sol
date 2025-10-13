@@ -183,11 +183,7 @@ contract LockedVaultTest is Test {
 
         vm.startPrank(gov);
         vm.expectEmit(true, true, false, true);
-        emit IMultistrategyLockedVault.RegenGovernanceTransferUpdate(
-            gov,
-            newGovernance,
-            IMultistrategyLockedVault.GovernanceTransferStatus.ACCEPTED
-        );
+        emit IMultistrategyLockedVault.RegenGovernanceChanged(gov, newGovernance);
         vault.setRegenGovernance(newGovernance);
         vm.stopPrank();
 
