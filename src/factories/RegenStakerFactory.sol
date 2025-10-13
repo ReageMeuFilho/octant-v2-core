@@ -168,7 +168,6 @@ contract RegenStakerFactory {
 
         // Emit deployment metadata to facilitate off-chain verification
         // Note: calculatorAddress is sufficient; off-chain tools can query extcodehash themselves
-        // Removed extcodehash to avoid EOFv1 compatibility issues (Prague fork)
         emit StakerDeploy(
             msg.sender,
             params.admin,
