@@ -671,6 +671,13 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
 
         compoundedAmount = unclaimedAmount;
 
+        // Fail-fast: Check balance before expensive state updates
+        // In same-token scenarios, ensure contract has sufficient tokens for compounding
+        uint256 contractBalance = STAKE_TOKEN.balanceOf(address(this));
+        if (contractBalance < compoundedAmount) {
+            revert CantAfford(compoundedAmount, contractBalance);
+        }
+
         uint256 tempEarningPower = earningPowerCalculator.getEarningPower(
             deposit.balance,
             deposit.owner,
