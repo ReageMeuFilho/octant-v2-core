@@ -391,13 +391,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @notice Internal implementation of notifyRewardAmount using custom reward duration
     /// @dev Overrides the base Staker logic to use variable duration
     /// @param _amount The reward amount to notify
-    /// @param carryOverAmount Outstanding rewards carried into the new schedule
-    /// @param requiredBalance Total balance requirement after notification
-    function _notifyRewardAmountWithCustomDuration(
-        uint256 _amount,
-        uint256 carryOverAmount,
-        uint256 requiredBalance
-    ) internal {
+    function _notifyRewardAmountWithCustomDuration(uint256 _amount) internal {
         if (!isRewardNotifier[msg.sender]) revert Staker__Unauthorized("not notifier", msg.sender);
 
         rewardPerTokenAccumulatedCheckpoint = rewardPerTokenAccumulated();
@@ -416,12 +410,16 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
 
         if (scaledRewardRate < SCALE_FACTOR) revert Staker__InvalidRewardRate();
 
+        // Calculate reward schedule metadata before updating totalRewards
+        uint256 carryOverAmount = totalRewards - totalClaimedRewards;
+        uint256 totalScheduledAmount = carryOverAmount + _amount;
+        uint256 requiredBalance = totalScheduledAmount;
+
         // Track total rewards added
         totalRewards += _amount;
 
         emit RewardNotified(_amount, msg.sender);
 
-        uint256 totalScheduledAmount = carryOverAmount + _amount;
         latestRewardSchedule = RewardSchedule({
             addedAmount: _amount,
             carryOverAmount: carryOverAmount,
@@ -912,30 +910,24 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     ///      be changed mid-cycle.
     /// @param _amount The reward amount
     function notifyRewardAmount(uint256 _amount) external virtual override nonReentrant {
-        (uint256 requiredBalance, uint256 carryOverAmount) = _validateRewardBalance(_amount);
-        _notifyRewardAmountWithCustomDuration(_amount, carryOverAmount, requiredBalance);
+        _validateRewardBalance(_amount);
+        _notifyRewardAmountWithCustomDuration(_amount);
     }
 
     /// @notice Validates sufficient reward token balance for all token scenarios
     /// @dev Virtual function allowing variants to implement appropriate balance checks
     /// @param _amount The reward amount being added
-    /// @return requiredBalance The total token balance required after the reward is notified
-    /// @return carryOverAmount Unclaimed rewards that are being carried into the new schedule
-    function _validateRewardBalance(
-        uint256 _amount
-    ) internal view virtual returns (uint256 requiredBalance, uint256 carryOverAmount) {
+    function _validateRewardBalance(uint256 _amount) internal view virtual {
         uint256 currentBalance = REWARD_TOKEN.balanceOf(address(this));
 
         // For variants with surrogates: stakes are NOT in main contract
         // Only track rewards obligations: outstanding rewards + new amount
-        carryOverAmount = totalRewards - totalClaimedRewards;
-        requiredBalance = carryOverAmount + _amount;
+        uint256 carryOverAmount = totalRewards - totalClaimedRewards;
+        uint256 requiredBalance = carryOverAmount + _amount;
 
         if (currentBalance < requiredBalance) {
             revert InsufficientRewardBalance(currentBalance, requiredBalance);
         }
-
-        return (requiredBalance, carryOverAmount);
     }
 
     /// @inheritdoc Staker
