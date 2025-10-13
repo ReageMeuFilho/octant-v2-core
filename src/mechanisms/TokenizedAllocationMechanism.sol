@@ -7,6 +7,7 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import { IERC1271 } from "@openzeppelin/contracts/interfaces/IERC1271.sol";
+import { IWhitelist } from "src/utils/IWhitelist.sol";
 
 /// @notice Interface for base allocation mechanism strategy implementations
 /// @dev Follows Yearn V3 pattern where shared implementation calls base strategy via interface
@@ -82,6 +83,7 @@ contract TokenizedAllocationMechanism {
     error EmptyName();
     error EmptySymbol();
     error RegistrationBlocked(address user);
+    error ContributorNotWhitelisted(address user);
     error VotingEnded(uint256 currentTime, uint256 endTime);
     error AlreadyRegistered(address user);
     error DepositTooLarge(uint256 deposit, uint256 maxAllowed);
@@ -190,6 +192,7 @@ contract TokenizedAllocationMechanism {
         // Access control
         address owner;
         address pendingOwner;
+        IWhitelist contributionWhitelist; // Controls who can signup and get voting power
         bool paused;
         bool initialized;
         // Reentrancy protection
@@ -222,6 +225,8 @@ contract TokenizedAllocationMechanism {
 
     // ---------- Storage Access for Hooks ----------
 
+    /// @notice Emitted when contribution whitelist is updated
+    event ContributionWhitelistSet(IWhitelist indexed whitelist);
     /// @notice Emitted when a user completes registration
     event UserRegistered(address indexed user, uint256 votingPower);
     /// @notice Emitted when a new proposal is created
@@ -529,6 +534,15 @@ contract TokenizedAllocationMechanism {
 
         // Prevent zero address registration
         if (user == address(0)) revert InvalidUser(user);
+
+        // Check contribution whitelist if configured
+        // This is the RIGHT place to enforce access control - at the point of voting power creation
+        // Prevents ALL bypass paths: contribute(), claim→signup(), off-chain compensation, etc.
+        if (address(s.contributionWhitelist) != address(0)) {
+            if (!s.contributionWhitelist.isWhitelisted(user)) {
+                revert ContributorNotWhitelisted(user);
+            }
+        }
 
         // Call hook for validation via interface (Yearn V3 pattern)
         if (!IBaseAllocationStrategy(address(this)).beforeSignupHook(user)) {
@@ -998,6 +1012,21 @@ contract TokenizedAllocationMechanism {
         AllocationStorage storage s = _getStorage();
         s.paused = false;
         emit PausedStatusChanged(false);
+    }
+
+    /// @notice Set the contribution whitelist (controls who can signup for voting power)
+    /// @param _whitelist The whitelist contract address (can be AccessControl in allowlist or blocklist mode)
+    /// @dev Set to address(0) to disable whitelist checks (open access)
+    function setContributionWhitelist(IWhitelist _whitelist) external onlyOwner {
+        AllocationStorage storage s = _getStorage();
+        s.contributionWhitelist = _whitelist;
+        emit ContributionWhitelistSet(_whitelist);
+    }
+
+    /// @notice Get the current contribution whitelist
+    /// @return The contribution whitelist contract
+    function contributionWhitelist() external view returns (IWhitelist) {
+        return _getStorage().contributionWhitelist;
     }
 
     /// @notice Check if contract is paused

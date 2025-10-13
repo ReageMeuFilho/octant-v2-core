@@ -563,6 +563,13 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
             revert Staker__Unauthorized("not claimer or owner", msg.sender);
         }
 
+        // Enforce owner whitelist for governance-influencing operation
+        // Prevents delisted owners from using whitelisted claimers as proxies
+        // This check, combined with TAM-level whitelist, provides complete protection:
+        // - This check: ensures fund SOURCE (deposit.owner) is whitelisted
+        // - TAM check: ensures voting power RECIPIENT (msg.sender) is whitelisted
+        _checkWhitelisted(sharedState.contributionWhitelist, deposit.owner);
+
         _checkpointGlobalReward();
         _checkpointReward(deposit);
 
