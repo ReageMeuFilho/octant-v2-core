@@ -39,7 +39,8 @@ contract RegenStakerFactoryTest is Test {
         address indexed admin,
         address indexed stakerAddress,
         bytes32 salt,
-        RegenStakerFactory.RegenStakerVariant variant
+        RegenStakerFactory.RegenStakerVariant variant,
+        address calculatorAddress
     );
 
     function setUp() public {
@@ -99,7 +100,8 @@ contract RegenStakerFactoryTest is Test {
             admin,
             predictedAddress,
             salt,
-            RegenStakerFactory.RegenStakerVariant.WITH_DELEGATION
+            RegenStakerFactory.RegenStakerVariant.WITH_DELEGATION,
+            address(earningPowerCalculator)
         );
 
         address stakerAddress = factory.createStakerWithDelegation(
