@@ -7,10 +7,38 @@ import { IERC20, IWhitelist, IEarningPowerCalculator } from "src/regen/RegenStak
 /// @title RegenStaker Factory
 /// @notice Deploys RegenStaker contracts with explicit variant selection
 /// @author [Golem Foundation](https://golem.foundation)
+///
 /// @dev SECURITY: Validates deployment bytecode against pre-configured canonical hashes
+///
 /// @dev SECURITY ASSUMPTION: Factory deployer is trusted to provide correct canonical bytecode hashes.
 ///      If deployer is compromised, all future deployments could use unauthorized code.
 ///      This is an acceptable risk given the controlled deployment environment.
+///
+/// @dev TRUST BOUNDARY WARNING:
+///      This factory guarantees CODE IDENTITY only, NOT parameter safety.
+///
+///      The factory validates that deployed bytecode matches canonical, audited code.
+///      However, it does NOT validate constructor parameters, including:
+///      - earningPowerCalculator: Controls reward distribution logic
+///      - admin: Has full control over staker configuration
+///      - Whitelists: Control access to various operations
+///
+///      A malicious actor can deploy a staker with canonical bytecode but inject:
+///      - A malicious earning power calculator (to manipulate rewards)
+///      - Themselves as admin (to change calculator post-deployment)
+///      - Malicious whitelists
+///
+/// @dev OPERATIONAL SECURITY:
+///      Before funding or integrating with ANY RegenStaker instance:
+///      1. Verify the earningPowerCalculator address and its code
+///      2. Verify the admin is a trusted party/governance contract
+///      3. Verify all whitelists are legitimate
+///      4. For official deployments, use published addresses from governance
+///
+///      The StakerDeploy event includes calculator address and codehash
+///      to facilitate verification. For production use, consider requiring
+///      deployments from a governance-approved strict factory that whitelists
+///      acceptable calculators.
 contract RegenStakerFactory {
     mapping(RegenStakerVariant => bytes32) public canonicalBytecodeHash;
 
@@ -33,12 +61,21 @@ contract RegenStakerFactory {
     }
 
     // Events
+    /// @notice Emitted when a new RegenStaker is deployed
+    /// @param deployer Address that called the factory
+    /// @param admin Admin of the newly deployed staker
+    /// @param stakerAddress Address of the deployed staker
+    /// @param salt Deployment salt used
+    /// @param variant The variant of staker deployed
+    /// @param calculatorAddress The earning power calculator address (CRITICAL FOR VERIFICATION)
+    /// @dev calculatorAddress is sufficient for verification; off-chain tools can query code directly
     event StakerDeploy(
         address indexed deployer,
         address indexed admin,
         address indexed stakerAddress,
         bytes32 salt,
-        RegenStakerVariant variant
+        RegenStakerVariant variant,
+        address calculatorAddress
     );
 
     // Errors
@@ -61,6 +98,8 @@ contract RegenStakerFactory {
     /// @param salt Deployment salt for deterministic addressing
     /// @param code Bytecode for WITHOUT_DELEGATION variant
     /// @return stakerAddress Address of deployed contract
+    /// @dev WARNING: This factory validates bytecode but NOT constructor parameters.
+    ///      Verify params.earningPowerCalculator, params.admin, and whitelists before funding!
     function createStakerWithoutDelegation(
         CreateStakerParams calldata params,
         bytes32 salt,
@@ -75,6 +114,8 @@ contract RegenStakerFactory {
     /// @param salt Deployment salt for deterministic addressing
     /// @param code Bytecode for WITH_DELEGATION variant
     /// @return stakerAddress Address of deployed contract
+    /// @dev WARNING: This factory validates bytecode but NOT constructor parameters.
+    ///      Verify params.earningPowerCalculator, params.admin, and whitelists before funding!
     function createStakerWithDelegation(
         CreateStakerParams calldata params,
         bytes32 salt,
@@ -125,7 +166,16 @@ contract RegenStakerFactory {
 
         stakerAddress = Create2.deploy(0, finalSalt, fullBytecode);
 
-        emit StakerDeploy(msg.sender, params.admin, stakerAddress, salt, variant);
+        // Emit deployment metadata to facilitate off-chain verification
+        // Note: calculatorAddress is sufficient; off-chain tools can query extcodehash themselves
+        emit StakerDeploy(
+            msg.sender,
+            params.admin,
+            stakerAddress,
+            salt,
+            variant,
+            address(params.earningPowerCalculator)
+        );
     }
 
     function _encodeConstructorParams(CreateStakerParams calldata params) internal pure returns (bytes memory) {
