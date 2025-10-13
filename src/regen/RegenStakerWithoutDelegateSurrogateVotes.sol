@@ -88,21 +88,22 @@ contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
 
     // === Overridden Functions ===
 
-    /// @notice Validates sufficient reward token balance for all token scenarios in this variant
+    /// @notice Validates sufficient reward token balance and returns the required balance for this variant
     /// @dev Overrides base to include totalStaked for same-token scenarios since stakes are held in main contract
     /// @param _amount The reward amount being added
     /// @return required The required balance including appropriate obligations
-    function _validateRewardBalance(uint256 _amount) internal view override returns (uint256 required) {
+    function _validateAndGetRequiredBalance(uint256 _amount) internal view override returns (uint256 required) {
         uint256 currentBalance = REWARD_TOKEN.balanceOf(address(this));
+        uint256 carryOverAmount = totalRewards - totalClaimedRewards;
 
         if (address(REWARD_TOKEN) == address(STAKE_TOKEN)) {
             // Same-token scenario: stakes ARE in main contract, so include totalStaked
             // Accounting: totalStaked + totalRewards - totalClaimedRewards + newAmount
-            required = totalStaked + totalRewards - totalClaimedRewards + _amount;
+            required = totalStaked + carryOverAmount + _amount;
         } else {
             // Different-token scenario: stakes are separate, only track reward obligations
             // Accounting: totalRewards - totalClaimedRewards + newAmount
-            required = totalRewards - totalClaimedRewards + _amount;
+            required = carryOverAmount + _amount;
         }
 
         if (currentBalance < required) {

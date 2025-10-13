@@ -158,6 +158,20 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @dev This includes claims, compounding, contributions, and tips
     uint256 public totalClaimedRewards;
 
+    /// @notice Summary of the most recently scheduled reward cycle.
+    /// @dev Tracks both the new amount and any carried-over rewards for analytics and UX.
+    struct RewardSchedule {
+        uint256 addedAmount;
+        uint256 carryOverAmount;
+        uint256 totalScheduledAmount;
+        uint256 requiredBalance;
+        uint256 duration;
+        uint256 endTime;
+    }
+
+    /// @notice Cached metadata for the most recent reward schedule.
+    RewardSchedule public latestRewardSchedule;
+
     // === Events ===
     /// @notice Emitted when the staker whitelist is updated
     /// @param whitelist The new whitelist contract address
@@ -174,6 +188,22 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @notice Emitted when the reward duration is updated
     /// @param newDuration The new reward duration in seconds
     event RewardDurationSet(uint256 newDuration);
+
+    /// @notice Emitted when a new reward schedule is created or updated.
+    /// @param addedAmount Newly supplied reward amount for this cycle
+    /// @param carryOverAmount Unclaimed rewards carried over into the new cycle
+    /// @param totalScheduledAmount Total rewards scheduled for distribution this cycle
+    /// @param requiredBalance Total balance the contract must hold after notification
+    /// @param duration Duration over which the rewards will stream
+    /// @param endTime Timestamp when the reward cycle is scheduled to end
+    event RewardScheduleUpdated(
+        uint256 addedAmount,
+        uint256 carryOverAmount,
+        uint256 totalScheduledAmount,
+        uint256 requiredBalance,
+        uint256 duration,
+        uint256 endTime
+    );
 
     /// @notice Emitted when rewards are contributed to an allocation mechanism
     /// @param depositId The deposit identifier
@@ -360,8 +390,14 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
 
     /// @notice Internal implementation of notifyRewardAmount using custom reward duration
     /// @dev Overrides the base Staker logic to use variable duration
+    /// @dev Enforces monotonic reward property: totalRewards can only increase, never decrease.
+    ///      Once rewards are notified and time has elapsed, those elapsed portions cannot be
+    ///      clawed back. Admins can adjust future reward rates by notifying new amounts, but
+    ///      the current schedule represents a commitment for its duration and typically won't
+    ///      be changed mid-cycle.
     /// @param _amount The reward amount to notify
-    function _notifyRewardAmountWithCustomDuration(uint256 _amount) internal {
+    /// @param _requiredBalance The required balance calculated by variant-specific validation
+    function _notifyRewardAmountWithCustomDuration(uint256 _amount, uint256 _requiredBalance) internal {
         if (!isRewardNotifier[msg.sender]) revert Staker__Unauthorized("not notifier", msg.sender);
 
         rewardPerTokenAccumulatedCheckpoint = rewardPerTokenAccumulated();
@@ -380,10 +416,32 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
 
         if (scaledRewardRate < SCALE_FACTOR) revert Staker__InvalidRewardRate();
 
+        // Calculate reward schedule metadata before updating totalRewards
+        uint256 carryOverAmount = totalRewards - totalClaimedRewards;
+        uint256 totalScheduledAmount = carryOverAmount + _amount;
+
         // Track total rewards added
         totalRewards += _amount;
 
         emit RewardNotified(_amount, msg.sender);
+
+        latestRewardSchedule = RewardSchedule({
+            addedAmount: _amount,
+            carryOverAmount: carryOverAmount,
+            totalScheduledAmount: totalScheduledAmount,
+            requiredBalance: _requiredBalance,
+            duration: sharedState.rewardDuration,
+            endTime: rewardEndTime
+        });
+
+        emit RewardScheduleUpdated(
+            _amount,
+            carryOverAmount,
+            totalScheduledAmount,
+            _requiredBalance,
+            sharedState.rewardDuration,
+            rewardEndTime
+        );
     }
 
     /// @notice Sets the whitelist for stakers (who can stake tokens)
@@ -852,21 +910,21 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @dev nonReentrant as a belts-and-braces guard against exotic ERC20 callback reentry
     /// @param _amount The reward amount
     function notifyRewardAmount(uint256 _amount) external virtual override nonReentrant {
-        _validateRewardBalance(_amount);
-        _notifyRewardAmountWithCustomDuration(_amount);
+        uint256 requiredBalance = _validateAndGetRequiredBalance(_amount);
+        _notifyRewardAmountWithCustomDuration(_amount, requiredBalance);
     }
 
-    /// @notice Validates sufficient reward token balance for all token scenarios
+    /// @notice Validates sufficient reward token balance and returns the required balance
     /// @dev Virtual function allowing variants to implement appropriate balance checks
     /// @param _amount The reward amount being added
     /// @return required The required balance for this variant
-    function _validateRewardBalance(uint256 _amount) internal view virtual returns (uint256 required) {
+    function _validateAndGetRequiredBalance(uint256 _amount) internal view virtual returns (uint256 required) {
         uint256 currentBalance = REWARD_TOKEN.balanceOf(address(this));
 
         // For variants with surrogates: stakes are NOT in main contract
-        // Only track rewards obligations: totalRewards - totalClaimedRewards + newAmount
-        // This works for both same-token and different-token scenarios
-        required = totalRewards - totalClaimedRewards + _amount;
+        // Only track rewards obligations: outstanding rewards + new amount
+        uint256 carryOverAmount = totalRewards - totalClaimedRewards;
+        required = carryOverAmount + _amount;
 
         if (currentBalance < required) {
             revert InsufficientRewardBalance(currentBalance, required);
