@@ -377,12 +377,16 @@ contract MultistrategyLockedVault is MultistrategyVault, IMultistrategyLockedVau
      */
     function _transfer(address sender_, address receiver_, uint256 amount_) internal override {
         // Check if sender has locked shares that would prevent this transfer
-        uint256 senderBalance = balanceOf(sender_);
-        uint256 availableShares = senderBalance - custodyInfo[sender_].lockedShares;
+        CustodyInfo memory custody = custodyInfo[sender_];
 
-        // Revert if trying to transfer more than available shares
-        if (amount_ > availableShares) {
-            revert TransferExceedsAvailableShares();
+        if (custody.lockedShares > 0) {
+            uint256 senderBalance = balanceOf(sender_);
+            uint256 availableShares = senderBalance - custody.lockedShares;
+
+            // Revert if trying to transfer more than available shares
+            if (amount_ > availableShares) {
+                revert TransferExceedsAvailableShares();
+            }
         }
 
         // Call parent implementation
