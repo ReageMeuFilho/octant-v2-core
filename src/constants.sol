@@ -2,3 +2,9 @@
 pragma solidity ^0.8.25;
 
 address constant NATIVE_TOKEN = address(0);
+
+enum AccessMode {
+    NONE,
+    ALLOWSET,
+    BLOCKSET
+}

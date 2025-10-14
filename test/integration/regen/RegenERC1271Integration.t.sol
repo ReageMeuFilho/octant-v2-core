@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import { AccessMode } from "src/constants.sol";
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
 import { RegenStaker } from "src/regen/RegenStaker.sol";
 import { RegenStakerBase } from "src/regen/RegenStakerBase.sol";
 import { RegenEarningPowerCalculator } from "src/regen/RegenEarningPowerCalculator.sol";
-import { Whitelist } from "src/utils/Whitelist.sol";
-import { IWhitelist } from "src/utils/IWhitelist.sol";
+import { AddressSet } from "src/utils/AddressSet.sol";
+import { IAddressSet } from "src/utils/IAddressSet.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC20Staking } from "staker/interfaces/IERC20Staking.sol";
-import { IWhitelistedEarningPowerCalculator } from "src/regen/interfaces/IWhitelistedEarningPowerCalculator.sol";
+import { IAccessControlledEarningPowerCalculator } from "src/regen/interfaces/IAccessControlledEarningPowerCalculator.sol";
 import { Staker } from "staker/Staker.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MockERC20Staking } from "test/mocks/MockERC20Staking.sol";
@@ -19,6 +20,7 @@ import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocationMechanism.sol";
 import { QuadraticVotingMechanism } from "src/mechanisms/mechanism/QuadraticVotingMechanism.sol";
+import { OctantQFMechanism } from "src/mechanisms/mechanism/OctantQFMechanism.sol";
 import { AllocationMechanismFactory } from "src/mechanisms/AllocationMechanismFactory.sol";
 import { AllocationConfig } from "src/mechanisms/BaseAllocationMechanism.sol";
 
@@ -34,10 +36,10 @@ contract RegenERC1271IntegrationTest is Test {
 
     // Supporting contracts
     RegenEarningPowerCalculator calculator;
-    Whitelist stakerWhitelist;
-    Whitelist contributorWhitelist;
-    Whitelist allocationMechanismWhitelist;
-    Whitelist earningPowerWhitelist;
+    AddressSet stakerAllowset;
+    AddressSet contributorAllowset;
+    AddressSet allocationMechanismAllowset;
+    AddressSet earningPowerAllowset;
     MockERC20 rewardToken;
     MockERC20Staking stakeToken;
     AllocationMechanismFactory allocationFactory;
@@ -77,14 +79,19 @@ contract RegenERC1271IntegrationTest is Test {
         rewardToken = new MockERC20(18);
         stakeToken = new MockERC20Staking(18);
 
-        // Deploy whitelists
-        stakerWhitelist = new Whitelist();
-        contributorWhitelist = new Whitelist();
-        allocationMechanismWhitelist = new Whitelist();
-        earningPowerWhitelist = new Whitelist();
+        // Deploy allowsets
+        stakerAllowset = new AddressSet();
+        contributorAllowset = new AddressSet();
+        allocationMechanismAllowset = new AddressSet();
+        earningPowerAllowset = new AddressSet();
 
         // Deploy earning power calculator
-        calculator = new RegenEarningPowerCalculator(admin, earningPowerWhitelist);
+        calculator = new RegenEarningPowerCalculator(
+            admin,
+            earningPowerAllowset,
+            IAddressSet(address(0)),
+            AccessMode.ALLOWSET
+        );
 
         // Deploy RegenStaker
         regenStaker = new RegenStaker(
@@ -95,9 +102,10 @@ contract RegenERC1271IntegrationTest is Test {
             admin,
             uint128(REWARD_DURATION),
             uint128(MIN_STAKE),
-            IWhitelist(stakerWhitelist),
-            IWhitelist(contributorWhitelist),
-            IWhitelist(allocationMechanismWhitelist)
+            IAddressSet(stakerAllowset),
+            IAddressSet(address(0)),
+            AccessMode.NONE,
+            IAddressSet(allocationMechanismAllowset)
         );
 
         // Deploy allocation mechanism factory
@@ -116,28 +124,34 @@ contract RegenERC1271IntegrationTest is Test {
             owner: admin
         });
 
-        // Deploy using the factory with quadratic funding parameters
+        // Deploy OctantQFMechanism with no access control (AccessMode.NONE)
         uint256 alphaNumerator = 1; // Default alpha = 1/1 = 1
         uint256 alphaDenominator = 1;
 
-        address payable deployedMechanism = payable(
-            allocationFactory.deployQuadraticVotingMechanism(config, alphaNumerator, alphaDenominator)
+        OctantQFMechanism octantQF = new OctantQFMechanism(
+            allocationFactory.tokenizedAllocationImplementation(),
+            config,
+            alphaNumerator,
+            alphaDenominator,
+            IAddressSet(address(0)), // contributionAllowset
+            IAddressSet(address(0)), // contributionBlockset
+            AccessMode.NONE // no access control
         );
 
-        allocationMechanism = QuadraticVotingMechanism(deployedMechanism);
+        allocationMechanism = QuadraticVotingMechanism(payable(address(octantQF)));
 
-        // Deploy contract signer before whitelisting
+        // Deploy contract signer before allowseting
         contractSigner = new MockERC1271Signer(contractSignerOwner);
 
-        // Setup whitelists
-        stakerWhitelist.addToWhitelist(user);
-        stakerWhitelist.addToWhitelist(address(contractSigner)); // Contract signer needs to be whitelisted as staker
-        contributorWhitelist.addToWhitelist(user);
-        contributorWhitelist.addToWhitelist(address(contractSigner)); // Contract signer needs to be whitelisted as contributor
-        allocationMechanismWhitelist.addToWhitelist(address(allocationMechanism));
-        earningPowerWhitelist.addToWhitelist(address(regenStaker));
-        earningPowerWhitelist.addToWhitelist(user); // User needs earning power
-        earningPowerWhitelist.addToWhitelist(address(contractSigner)); // Contract signer needs earning power
+        // Setup allowsets
+        stakerAllowset.add(user);
+        stakerAllowset.add(address(contractSigner)); // Contract signer needs to be allowseted as staker
+        contributorAllowset.add(user);
+        contributorAllowset.add(address(contractSigner)); // Contract signer needs to be allowseted as contributor
+        allocationMechanismAllowset.add(address(allocationMechanism));
+        earningPowerAllowset.add(address(regenStaker));
+        earningPowerAllowset.add(user); // User needs earning power
+        earningPowerAllowset.add(address(contractSigner)); // Contract signer needs earning power
 
         // Setup reward notifier
         regenStaker.setRewardNotifier(notifier, true);

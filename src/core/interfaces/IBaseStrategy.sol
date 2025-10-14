@@ -32,7 +32,7 @@ interface IBaseStrategy {
     /**
      * @notice Callback for the Strategy to deploy funds during deposit.
      * @dev Part of FR-2. Invoked after deposit/mint so implementations should consider
-     *      sandwich resistance and market impact; can be permissionless unless whitelisted.
+     *      sandwich resistance and market impact; can be permissionless unless in allowset.
      * @param _amount The amount of asset the strategy can deploy.
      */
     function deployFunds(uint256 _amount) external;

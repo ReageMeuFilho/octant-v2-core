@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
+import { AccessMode } from "src/constants.sol";
 import { Test } from "forge-std/Test.sol";
 import { RegenStakerWithoutDelegateSurrogateVotes } from "src/regen/RegenStakerWithoutDelegateSurrogateVotes.sol";
 import { RegenStaker } from "src/regen/RegenStaker.sol";
+import { RegenStakerBase } from "src/regen/RegenStakerBase.sol";
 import { RegenEarningPowerCalculator } from "src/regen/RegenEarningPowerCalculator.sol";
-import { Whitelist } from "src/utils/Whitelist.sol";
-import { IWhitelist } from "src/utils/IWhitelist.sol";
+import { AddressSet } from "src/utils/AddressSet.sol";
+import { IAddressSet } from "src/utils/IAddressSet.sol";
 import { MockERC20Staking } from "test/mocks/MockERC20Staking.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { Staker } from "staker/Staker.sol";
@@ -19,9 +21,9 @@ contract Cantina259Fix is Test {
     RegenStakerWithoutDelegateSurrogateVotes public stakerNoDelegation;
     RegenStaker public stakerWithDelegation;
     RegenEarningPowerCalculator public calculator;
-    Whitelist public stakerWhitelist;
-    Whitelist public earningPowerWhitelist;
-    Whitelist public allocationMechanismWhitelist;
+    AddressSet public stakerAllowset;
+    AddressSet public earningPowerAllowset;
+    AddressSet public allocationMechanismAllowset;
     MockERC20Staking public stakeToken;
 
     address public admin = makeAddr("admin");
@@ -36,22 +38,27 @@ contract Cantina259Fix is Test {
         // Deploy tokens
         stakeToken = new MockERC20Staking(18);
 
-        // Deploy whitelists
-        stakerWhitelist = new Whitelist();
-        earningPowerWhitelist = new Whitelist();
-        allocationMechanismWhitelist = new Whitelist();
+        // Deploy allowsets
+        stakerAllowset = new AddressSet();
+        earningPowerAllowset = new AddressSet();
+        allocationMechanismAllowset = new AddressSet();
 
-        // Whitelist all users
-        stakerWhitelist.addToWhitelist(alice);
-        stakerWhitelist.addToWhitelist(bob);
-        stakerWhitelist.addToWhitelist(charlie);
+        // AddressSet all users
+        stakerAllowset.add(alice);
+        stakerAllowset.add(bob);
+        stakerAllowset.add(charlie);
 
-        earningPowerWhitelist.addToWhitelist(alice);
-        earningPowerWhitelist.addToWhitelist(bob);
-        earningPowerWhitelist.addToWhitelist(charlie);
+        earningPowerAllowset.add(alice);
+        earningPowerAllowset.add(bob);
+        earningPowerAllowset.add(charlie);
 
         // Deploy calculator
-        calculator = new RegenEarningPowerCalculator(admin, earningPowerWhitelist);
+        calculator = new RegenEarningPowerCalculator(
+            admin,
+            earningPowerAllowset,
+            IAddressSet(address(0)),
+            AccessMode.ALLOWSET
+        );
 
         // Deploy stakers
         stakerNoDelegation = new RegenStakerWithoutDelegateSurrogateVotes(
@@ -62,9 +69,10 @@ contract Cantina259Fix is Test {
             admin,
             uint128(REWARD_DURATION),
             0, // minimumStakeAmount
-            IWhitelist(stakerWhitelist),
-            IWhitelist(address(0)), // contribution whitelist can be address(0)
-            IWhitelist(allocationMechanismWhitelist) // allocation mechanism whitelist CANNOT be address(0)
+            IAddressSet(stakerAllowset),
+            IAddressSet(address(0)), // stakerBlockset
+            AccessMode.NONE,
+            IAddressSet(allocationMechanismAllowset) // allocation mechanism allowset CANNOT be address(0)
         );
 
         stakerWithDelegation = new RegenStaker(
@@ -75,14 +83,15 @@ contract Cantina259Fix is Test {
             admin,
             uint128(REWARD_DURATION),
             0, // minimumStakeAmount
-            IWhitelist(stakerWhitelist),
-            IWhitelist(address(0)), // contribution whitelist can be address(0)
-            IWhitelist(allocationMechanismWhitelist) // allocation mechanism whitelist CANNOT be address(0)
+            IAddressSet(stakerAllowset),
+            IAddressSet(address(0)), // stakerBlockset
+            AccessMode.NONE,
+            IAddressSet(allocationMechanismAllowset) // allocation mechanism allowset CANNOT be address(0)
         );
 
-        // Whitelist the staker contracts (test contract is the owner of earningPowerWhitelist)
-        earningPowerWhitelist.addToWhitelist(address(stakerNoDelegation));
-        earningPowerWhitelist.addToWhitelist(address(stakerWithDelegation));
+        // AddressSet the staker contracts (test contract is the owner of earningPowerAllowset)
+        earningPowerAllowset.add(address(stakerNoDelegation));
+        earningPowerAllowset.add(address(stakerWithDelegation));
     }
 
     function testFix_AlterDelegateeReverts() public {

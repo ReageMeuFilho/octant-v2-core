@@ -2,7 +2,9 @@
 pragma solidity ^0.8.0;
 
 import { LinearAllowanceSingletonForGnosisSafe } from "src/zodiac-core/modules/LinearAllowanceSingletonForGnosisSafe.sol";
-import { IWhitelist } from "src/utils/IWhitelist.sol";
+import { IAddressSet } from "src/utils/IAddressSet.sol";
+import { NotInAllowset, InBlockset } from "src/errors.sol";
+import { AccessMode } from "src/constants.sol";
 
 /// @title LinearAllowanceExecutor
 /// @author [Golem Foundation](https://golem.foundation)
@@ -15,40 +17,65 @@ import { IWhitelist } from "src/utils/IWhitelist.sol";
 ///
 /// Assumptions and security model:
 /// - This executor contract instance is configured as the delegate in the LinearAllowance module.
-/// - A module whitelist may be set via `setModuleWhitelist`; `_validateModule` enforces it on calls.
-/// - If `moduleWhitelist` is unset (address(0)), `_validateModule` skips checks and allows any module.
+/// - A module address set may be set via `assignModuleAddressSet`; `_validateModule` enforces it on calls.
+/// - The moduleAccessMode determines how the moduleAddressSet is used:
+///   - NONE: any module is allowed (no validation)
+///   - ALLOWSET: only modules in moduleAddressSet are allowed
+///   - BLOCKSET: any module EXCEPT those in moduleAddressSet are allowed
 abstract contract LinearAllowanceExecutor {
-    /// @notice Whitelist contract for allowance modules to prevent arbitrary external calls
-    IWhitelist public moduleWhitelist;
+    /// @notice Access control mode for module validation
+    AccessMode public moduleAccessMode;
 
-    /// @notice Error thrown when attempting to use a non-whitelisted module
-    error ModuleNotWhitelisted(address module);
+    /// @notice Address set contract for allowance modules to prevent arbitrary external calls
+    IAddressSet public moduleAddressSet;
 
-    /// @notice Emitted when the module whitelist is updated
-    event ModuleWhitelistSet(IWhitelist indexed whitelist);
+    /// @notice Emitted when the module access mode is set
+    event ModuleAccessModeSet(AccessMode indexed mode);
 
-    /// @notice External function to configure the module whitelist used by this executor.
+    /// @notice Emitted when the module address set is assigned
+    event ModuleAddressSetAssigned(IAddressSet indexed addressSet);
+
+    /// @notice External function to configure the module address set used by this executor.
     /// @dev Implementing contracts MUST restrict access (e.g., onlyOwner or governance).
-    /// Setting to address(0) unsets the whitelist in this executor; `_validateModule` then skips checks.
-    /// @param whitelist The whitelist contract address; set to address(0) to unset in this executor.
-    function setModuleWhitelist(IWhitelist whitelist) external virtual;
+    ///      The address set is only used when moduleAccessMode is ALLOWSET or BLOCKSET.
+    ///      Can be address(0) when moduleAccessMode is NONE.
+    /// @param addressSet The address set contract address
+    function assignModuleAddressSet(IAddressSet addressSet) external virtual;
 
-    /// @notice Internal helper that updates the whitelist reference and emits an event.
+    /// @notice Internal helper that updates the address set reference and emits an event.
     /// @dev Does not perform access control; call from a restricted external setter.
-    /// @param whitelist The whitelist contract address; address(0) unsets it so `_validateModule` skips checks.
-    function _setModuleWhitelist(IWhitelist whitelist) internal {
-        moduleWhitelist = whitelist;
-        emit ModuleWhitelistSet(whitelist);
+    /// @param addressSet The address set contract address
+    function _assignModuleAddressSet(IAddressSet addressSet) internal {
+        moduleAddressSet = addressSet;
+        emit ModuleAddressSetAssigned(addressSet);
+    }
+
+    /// @notice External function to configure the module access mode
+    /// @dev Implementing contracts MUST restrict access (e.g., onlyOwner or governance)
+    /// @param mode The access mode (NONE, ALLOWSET, or BLOCKSET)
+    function setModuleAccessMode(AccessMode mode) external virtual;
+
+    /// @notice Internal helper that updates the access mode and emits an event
+    /// @dev Does not perform access control; call from a restricted external setter
+    /// @param mode The access mode to set
+    function _setModuleAccessMode(AccessMode mode) internal {
+        moduleAccessMode = mode;
+        emit ModuleAccessModeSet(mode);
     }
 
     /// @notice Validate that a module is permitted to interact with this executor.
-    /// @dev If no whitelist is configured (moduleWhitelist == address(0)), any module is allowed.
-    /// Reverts with ModuleNotWhitelisted when a whitelist is set and the module is not listed.
+    /// @dev Respects moduleAccessMode:
+    ///      NONE: any module is allowed
+    ///      ALLOWSET: only modules in moduleAddressSet are allowed
+    ///      BLOCKSET: any module EXCEPT those in moduleAddressSet are allowed
     /// @param module The allowance module address to validate.
     function _validateModule(address module) internal view {
-        if (address(moduleWhitelist) != address(0) && !moduleWhitelist.isWhitelisted(module)) {
-            revert ModuleNotWhitelisted(module);
+        if (moduleAccessMode == AccessMode.ALLOWSET) {
+            require(moduleAddressSet.contains(module), NotInAllowset(module));
+        } else if (moduleAccessMode == AccessMode.BLOCKSET) {
+            require(!moduleAddressSet.contains(module), InBlockset(module));
         }
+        // AccessMode.NONE: no validation
     }
 
     /// @notice Accept ETH sent by allowance executions.

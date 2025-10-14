@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
+import { AccessMode } from "src/constants.sol";
 import { Test } from "forge-std/Test.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import { RegenStaker } from "src/regen/RegenStaker.sol";
+import { RegenStakerBase } from "src/regen/RegenStakerBase.sol";
 import { RegenEarningPowerCalculator } from "src/regen/RegenEarningPowerCalculator.sol";
-import { Whitelist } from "src/utils/Whitelist.sol";
-import { IWhitelist } from "src/utils/IWhitelist.sol";
+import { AddressSet } from "src/utils/AddressSet.sol";
+import { IAddressSet } from "src/utils/IAddressSet.sol";
 
 import { MockERC20Staking } from "test/mocks/MockERC20Staking.sol";
 
@@ -21,6 +23,10 @@ contract MockAllocationMechanism {
 
     constructor(IERC20 _asset) {
         asset = _asset;
+    }
+
+    function canSignup(address) external pure returns (bool) {
+        return true; // No access control
     }
 
     function signupOnBehalfWithSignature(address, uint256 amount, uint256, uint8, bytes32, bytes32) external {
@@ -41,9 +47,10 @@ contract RegenStakerDustHarness is RegenStaker {
         address admin,
         uint128 rewardDuration,
         uint128 minimumStakeAmount,
-        IWhitelist stakerWhitelist,
-        IWhitelist contributionWhitelist,
-        IWhitelist allocationWhitelist
+        IAddressSet stakerAllowset,
+        IAddressSet stakerBlockset,
+        AccessMode stakerAccessMode,
+        IAddressSet allocationAllowset
     )
         RegenStaker(
             rewardToken,
@@ -53,9 +60,10 @@ contract RegenStakerDustHarness is RegenStaker {
             admin,
             rewardDuration,
             minimumStakeAmount,
-            stakerWhitelist,
-            contributionWhitelist,
-            allocationWhitelist
+            stakerAllowset,
+            stakerBlockset,
+            stakerAccessMode,
+            allocationAllowset
         )
     {}
 
@@ -70,7 +78,7 @@ contract Cantina564Fix is Test {
     MockERC20Staking internal stakeAndRewardToken;
     RegenStakerDustHarness internal regenStaker;
     MockAllocationMechanism internal allocation;
-    Whitelist internal allocationWhitelist;
+    AddressSet internal allocationAllowset;
     RegenEarningPowerCalculator internal earningPowerCalculator;
 
     address internal immutable user = makeAddr("user");
@@ -82,8 +90,13 @@ contract Cantina564Fix is Test {
 
     function setUp() public {
         stakeAndRewardToken = new MockERC20Staking(18);
-        allocationWhitelist = new Whitelist();
-        earningPowerCalculator = new RegenEarningPowerCalculator(address(this), IWhitelist(address(0)));
+        allocationAllowset = new AddressSet();
+        earningPowerCalculator = new RegenEarningPowerCalculator(
+            address(this),
+            IAddressSet(address(0)),
+            IAddressSet(address(0)),
+            AccessMode.NONE
+        );
 
         regenStaker = new RegenStakerDustHarness(
             IERC20(address(stakeAndRewardToken)),
@@ -93,13 +106,14 @@ contract Cantina564Fix is Test {
             address(this),
             uint128(30 days),
             0,
-            IWhitelist(address(0)),
-            IWhitelist(address(0)),
-            allocationWhitelist
+            IAddressSet(address(0)),
+            IAddressSet(address(0)),
+            AccessMode.NONE,
+            allocationAllowset
         );
 
         allocation = new MockAllocationMechanism(IERC20(address(stakeAndRewardToken)));
-        allocationWhitelist.addToWhitelist(address(allocation));
+        allocationAllowset.add(address(allocation));
 
         // Note: Fee collection has been eliminated, so no setClaimFeeParameters call needed
     }

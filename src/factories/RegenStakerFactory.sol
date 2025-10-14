@@ -2,7 +2,8 @@
 pragma solidity ^0.8.0;
 
 import { Create2 } from "@openzeppelin/contracts/utils/Create2.sol";
-import { IERC20, IWhitelist, IEarningPowerCalculator } from "src/regen/RegenStaker.sol";
+import { IERC20, IAddressSet, IEarningPowerCalculator } from "src/regen/RegenStaker.sol";
+import { AccessMode } from "src/constants.sol";
 
 /// @title RegenStaker Factory
 /// @notice Deploys RegenStaker contracts with explicit variant selection
@@ -21,23 +22,23 @@ import { IERC20, IWhitelist, IEarningPowerCalculator } from "src/regen/RegenStak
 ///      However, it does NOT validate constructor parameters, including:
 ///      - earningPowerCalculator: Controls reward distribution logic
 ///      - admin: Has full control over staker configuration
-///      - Whitelists: Control access to various operations
+///      - Access Control: Allowsets and blocksets control access to various operations
 ///
 ///      A malicious actor can deploy a staker with canonical bytecode but inject:
 ///      - A malicious earning power calculator (to manipulate rewards)
 ///      - Themselves as admin (to change calculator post-deployment)
-///      - Malicious whitelists
+///      - Malicious address sets
 ///
 /// @dev OPERATIONAL SECURITY:
 ///      Before funding or integrating with ANY RegenStaker instance:
 ///      1. Verify the earningPowerCalculator address and its code
 ///      2. Verify the admin is a trusted party/governance contract
-///      3. Verify all whitelists are legitimate
+///      3. Verify all address sets are legitimate
 ///      4. For official deployments, use published addresses from governance
 ///
 ///      The StakerDeploy event includes calculator address and codehash
 ///      to facilitate verification. For production use, consider requiring
-///      deployments from a governance-approved strict factory that whitelists
+///      deployments from a governance-approved strict factory that maintains an allowset of
 ///      acceptable calculators.
 contract RegenStakerFactory {
     mapping(RegenStakerVariant => bytes32) public canonicalBytecodeHash;
@@ -46,9 +47,10 @@ contract RegenStakerFactory {
         IERC20 rewardsToken;
         IERC20 stakeToken;
         address admin;
-        IWhitelist stakerWhitelist;
-        IWhitelist contributionWhitelist;
-        IWhitelist allocationMechanismWhitelist;
+        IAddressSet stakerAllowset;
+        IAddressSet stakerBlockset;
+        AccessMode stakerAccessMode;
+        IAddressSet allocationMechanismAllowset;
         IEarningPowerCalculator earningPowerCalculator;
         uint256 maxBumpTip;
         uint256 minimumStakeAmount;
@@ -99,7 +101,7 @@ contract RegenStakerFactory {
     /// @param code Bytecode for WITHOUT_DELEGATION variant
     /// @return stakerAddress Address of deployed contract
     /// @dev WARNING: This factory validates bytecode but NOT constructor parameters.
-    ///      Verify params.earningPowerCalculator, params.admin, and whitelists before funding!
+    ///      Verify params.earningPowerCalculator, params.admin, and address sets before funding!
     function createStakerWithoutDelegation(
         CreateStakerParams calldata params,
         bytes32 salt,
@@ -115,7 +117,7 @@ contract RegenStakerFactory {
     /// @param code Bytecode for WITH_DELEGATION variant
     /// @return stakerAddress Address of deployed contract
     /// @dev WARNING: This factory validates bytecode but NOT constructor parameters.
-    ///      Verify params.earningPowerCalculator, params.admin, and whitelists before funding!
+    ///      Verify params.earningPowerCalculator, params.admin, and address sets before funding!
     function createStakerWithDelegation(
         CreateStakerParams calldata params,
         bytes32 salt,
@@ -167,7 +169,7 @@ contract RegenStakerFactory {
         stakerAddress = Create2.deploy(0, finalSalt, fullBytecode);
 
         // Emit deployment metadata to facilitate off-chain verification
-        // Note: calculatorAddress is sufficient; off-chain tools can query extcodehash themselves
+
         emit StakerDeploy(
             msg.sender,
             params.admin,
@@ -188,9 +190,10 @@ contract RegenStakerFactory {
                 params.admin,
                 params.rewardDuration,
                 params.minimumStakeAmount,
-                params.stakerWhitelist,
-                params.contributionWhitelist,
-                params.allocationMechanismWhitelist
+                params.stakerAllowset,
+                params.stakerBlockset,
+                params.stakerAccessMode,
+                params.allocationMechanismAllowset
             );
     }
 }

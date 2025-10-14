@@ -24,7 +24,7 @@ contribute(depositId, mechanism, amount, deadline, v, r, s) → amount
 - **Minimum Stake**: Token's smallest unit (e.g., 1e18 for 18-decimal)
 - **Earning Power**: Determines reward share
 
-## Whitelists
+## Access Control (Allowsets/Blocksets)
 
 - **Staker**: Controls staking access (`address(0)` = unrestricted)
 - **Contribution**: Controls contribution access (`address(0)` = unrestricted)
@@ -40,6 +40,8 @@ contribute(depositId, mechanism, amount, deadline, v, r, s) → amount
 ## Error Codes
 
 - `MinimumStakeAmountNotMet`
-- `NotWhitelisted`
+- `StakerNotAllowed`
+- `StakerBlocked`
+- `NotInAllowset`
 - `CompoundingNotSupported`
 - `InvalidRewardDuration`

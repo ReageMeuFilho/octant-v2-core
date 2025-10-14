@@ -11,7 +11,8 @@ import { ITransformer } from "src/zodiac-core/interfaces/ITransformer.sol";
 import { IDragonRouter } from "src/zodiac-core/interfaces/IDragonRouter.sol";
 import { LinearAllowanceExecutor } from "src/zodiac-core/LinearAllowanceExecutor.sol";
 import { ISplitChecker } from "src/zodiac-core/interfaces/ISplitChecker.sol";
-import { IWhitelist } from "src/utils/IWhitelist.sol";
+import { IAddressSet } from "src/utils/IAddressSet.sol";
+import { AccessMode } from "src/constants.sol";
 
 /**
  * @title Dragon Router
@@ -166,12 +167,21 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
     }
 
     /**
-     * @notice Set the whitelist contract for allowance modules
-     * @dev Only DEFAULT_ADMIN_ROLE can manage the whitelist
-     * @param whitelist The address of the whitelist contract (can be address(0) to disable)
+     * @notice Set the address set contract for allowance modules
+     * @dev Only DEFAULT_ADMIN_ROLE can manage the address set
+     * @param addressSet The address of the address set contract (can be address(0) to disable)
      */
-    function setModuleWhitelist(IWhitelist whitelist) external override onlyRole(DEFAULT_ADMIN_ROLE) {
-        _setModuleWhitelist(whitelist);
+    function assignModuleAddressSet(IAddressSet addressSet) external override onlyRole(DEFAULT_ADMIN_ROLE) {
+        _assignModuleAddressSet(addressSet);
+    }
+
+    /**
+     * @notice Set the module access mode for allowance modules
+     * @dev Only DEFAULT_ADMIN_ROLE can manage the access mode
+     * @param mode The access mode (NONE, ALLOWSET, or BLOCKSET)
+     */
+    function setModuleAccessMode(AccessMode mode) external override onlyRole(DEFAULT_ADMIN_ROLE) {
+        _setModuleAccessMode(mode);
     }
 
     /**

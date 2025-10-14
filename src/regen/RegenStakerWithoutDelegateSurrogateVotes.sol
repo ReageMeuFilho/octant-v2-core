@@ -6,8 +6,9 @@
 pragma solidity ^0.8.0;
 
 // === Base Imports ===
-// Note: DelegationSurrogate is now imported via RegenStakerBase
-import { RegenStakerBase, Staker, IERC20, DelegationSurrogate, IWhitelist, IEarningPowerCalculator } from "src/regen/RegenStakerBase.sol";
+
+import { RegenStakerBase, Staker, IERC20, DelegationSurrogate, IAddressSet, IEarningPowerCalculator } from "src/regen/RegenStakerBase.sol";
+import { AccessMode } from "src/constants.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 // === Contract Header ===
@@ -36,7 +37,7 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 /// - Lower gas costs: no surrogate contract deployment
 /// - Simpler integration: contract holds tokens directly
 /// - No voting capabilities through delegation
-/// - Same security model: both variants use owner-centric whitelist authorization
+/// - Same security model: both variants use owner-centric allowset authorization
 ///
 /// @dev USE CASE: Choose this variant for simple ERC20 staking without governance requirements.
 contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
@@ -54,10 +55,11 @@ contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
     /// @param _admin The address of the admin. TRUSTED.
     /// @param _rewardDuration The duration over which rewards are distributed.
     /// @param _minimumStakeAmount The minimum stake amount.
-    /// @param _stakerWhitelist The whitelist for stakers. Can be address(0) to disable whitelisting.
-    /// @param _contributionWhitelist The whitelist for contributors. Can be address(0) to disable whitelisting.
-    /// @param _allocationMechanismWhitelist The whitelist for allocation mechanisms. SECURITY CRITICAL.
-    ///      Only audited and trusted allocation mechanisms should be whitelisted.
+    /// @param _stakerAllowset The allowlist for stakers (ALLOWSET mode). Can be address(0).
+    /// @param _stakerBlockset The blocklist for stakers (BLOCKSET mode). Can be address(0).
+    /// @param _stakerAccessMode The staker access mode (NONE, ALLOWSET, or BLOCKSET).
+    /// @param _allocationMechanismAllowset The allowset for allocation mechanisms. SECURITY CRITICAL.
+    ///      Only audited and trusted allocation mechanisms should be in the allowset.
     ///      Users contribute funds to these mechanisms and may lose funds if mechanisms are malicious.
     constructor(
         IERC20 _rewardsToken,
@@ -67,9 +69,10 @@ contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
         address _admin,
         uint128 _rewardDuration,
         uint128 _minimumStakeAmount,
-        IWhitelist _stakerWhitelist,
-        IWhitelist _contributionWhitelist,
-        IWhitelist _allocationMechanismWhitelist
+        IAddressSet _stakerAllowset,
+        IAddressSet _stakerBlockset,
+        AccessMode _stakerAccessMode,
+        IAddressSet _allocationMechanismAllowset
     )
         RegenStakerBase(
             _rewardsToken,
@@ -79,9 +82,10 @@ contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
             _admin,
             _rewardDuration,
             _minimumStakeAmount,
-            _stakerWhitelist,
-            _contributionWhitelist,
-            _allocationMechanismWhitelist,
+            _stakerAllowset,
+            _stakerBlockset,
+            _stakerAccessMode,
+            _allocationMechanismAllowset,
             "RegenStakerWithoutDelegateSurrogateVotes"
         )
     {}

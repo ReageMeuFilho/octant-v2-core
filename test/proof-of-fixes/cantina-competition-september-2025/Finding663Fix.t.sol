@@ -39,11 +39,11 @@ contract Finding663Fix is Test, OctantTestBase {
         stakeToken.mint(charlie, CHARLIE_STAKE);
         rewardToken.mint(rewardNotifier, REWARD_AMOUNT);
 
-        // Whitelist bump keeper for staking/earning power
+        // AddressSet bump keeper for staking/earning power
         vm.prank(admin);
-        stakerWhitelist.addToWhitelist(charlie);
+        stakerAllowset.add(charlie);
         vm.prank(admin);
-        earningPowerWhitelist.addToWhitelist(charlie);
+        earningPowerAllowset.add(charlie);
 
         vm.startPrank(alice);
         stakeToken.approve(address(regenStaker), ALICE_STAKE);
@@ -73,6 +73,6 @@ contract Finding663Fix is Test, OctantTestBase {
         regenStaker.claimReward(aliceDepositId);
 
         vm.prank(admin);
-        earningPowerWhitelist.removeFromWhitelist(alice);
+        earningPowerAllowset.remove(alice);
     }
 }

@@ -111,7 +111,7 @@ abstract contract BaseStrategy {
      * Since this can only be called after a {deposit} or {mint}
      * delegateCall to the TokenizedStrategy msg.sender == address(this).
      *
-     * Unless a whitelist is implemented this will be entirely permissionless
+     * Unless an allowset is implemented this will be entirely permissionless
      * and thus can be sandwiched or otherwise manipulated.
      *
      * @param _amount The amount of 'asset' that the strategy can
@@ -206,7 +206,7 @@ abstract contract BaseStrategy {
      *
      * This function will be called before any deposit or mints to enforce
      * any limits desired by the strategist. This can be used for either a
-     * traditional deposit limit or for implementing a whitelist etc.
+     * traditional deposit limit or for implementing an allowset etc.
      *
      *   EX:
      *      if(isAllowed[_owner]) return super.availableDepositLimit(_owner);
@@ -254,7 +254,7 @@ abstract contract BaseStrategy {
      * @dev Can deploy up to '_amount' of 'asset' in the yield source.
      *
      * This function is called at the end of a {deposit} or {mint}
-     * call. Meaning that unless a whitelist is implemented it will
+     * call. Meaning that unless an allowset is implemented it will
      * be entirely permissionless and thus can be sandwiched or otherwise
      * manipulated.
      *
@@ -270,7 +270,7 @@ abstract contract BaseStrategy {
      * been accounted for.
      *
      * This function is called during {withdraw} and {redeem} calls.
-     * Meaning that unless a whitelist is implemented it will be
+     * Meaning that unless an allowset is implemented it will be
      * entirely permissionless and thus can be sandwiched or otherwise
      * manipulated.
      *

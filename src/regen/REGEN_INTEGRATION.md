@@ -19,9 +19,9 @@ struct CreateStakerParams {
     IERC20 rewardsToken;
     IERC20 stakeToken;                    // Must be IERC20Staking for WITH_DELEGATION variant
     address admin;
-    IWhitelist stakerWhitelist;           // address(0) = no restrictions
-    IWhitelist contributionWhitelist;     // address(0) = no restrictions  
-    IWhitelist allocationMechanismWhitelist;  // Required, only audited mechanisms
+    IAddressSet stakerAllowset;           // address(0) = no restrictions
+    IAddressSet contributionAllowset;     // address(0) = no restrictions  
+    IAddressSet allocationMechanismAllowset;  // Required, only audited mechanisms
     IEarningPowerCalculator earningPowerCalculator;
     uint256 maxBumpTip;                   // In reward token's smallest unit
     uint256 maxClaimFee;                  // In reward token's smallest unit  
@@ -45,7 +45,7 @@ When setting a claimer for a deposit, be aware of the intended permission model:
 ### What Claimers CAN Do
 - **Claim Rewards**: Withdraw accrued rewards to their address
 - **Compound Rewards**: Reinvest rewards to increase the deposit's stake (when REWARD_TOKEN == STAKE_TOKEN)
-- **Contribute Rewards**: Contribute unclaimed rewards to whitelisted allocation mechanisms (subject to contribution whitelist)
+- **Contribute Rewards**: Contribute unclaimed rewards to approved allocation mechanisms (subject to contribution allowset)
   - **⚠️ IMPORTANT**: When a claimer contributes, the CLAIMER receives the voting power in the allocation mechanism, NOT the deposit owner
   - This means claimers can effectively convert owner's rewards into their own voting power
 
@@ -54,7 +54,7 @@ When setting a claimer for a deposit, be aware of the intended permission model:
 - Call `stakeMore()` directly
 - Alter deposit parameters (delegatee, claimer)
   
-Note: Claimers act as the owner's agent for rewards. They can claim, compound, and contribute rewards (if the contribution whitelist allows them). Owners can revoke the claimer at any time.
+Note: Claimers act as the owner's agent for rewards. They can claim, compound, and contribute rewards (if the contribution allowset allows them). Owners can revoke the claimer at any time.
 
 ### Security Considerations
 - **Trust Model**: Setting a claimer grants them limited staking abilities through compounding AND voting power when contributing
@@ -74,7 +74,7 @@ Note: Claimers act as the owner's agent for rewards. They can claim, compound, a
 - **Surrogate Confusion**: RegenStaker moves tokens to surrogates, check `totalStaked()` not contract balance
 - **Precision Loss**: <30 day reward durations may have ~1% error
 - **Signature Replay**: Use nonces and deadlines in EIP-712 signatures
-- **Whitelist Changes**: Monitor whitelist updates
+- **Access Control Changes**: Monitor access control updates
 - **Allocation Mechanism Trust**: Malicious mechanisms can misappropriate public good contributions
 - **Claimer Permissions**: Claimers can increase stakes via compounding and receive voting power when contributing - this is intended behavior
 - **Token Requirements**: STAKE_TOKEN and REWARD_TOKEN must be standard ERC-20. Fee-on-transfer/deflationary or rebasing tokens are unsupported. Accounting assumes transferred amount equals requested amount; non-standard tokens may break staking, withdrawals, or rewards.

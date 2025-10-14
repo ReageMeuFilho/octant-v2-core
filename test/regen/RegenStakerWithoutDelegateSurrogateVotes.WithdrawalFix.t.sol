@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.23;
 
+import { AccessMode } from "src/constants.sol";
 import { Test } from "forge-std/Test.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { RegenStakerWithoutDelegateSurrogateVotes } from "src/regen/RegenStakerWithoutDelegateSurrogateVotes.sol";
+import { RegenStakerBase } from "src/regen/RegenStakerBase.sol";
 import { RegenEarningPowerCalculator } from "src/regen/RegenEarningPowerCalculator.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
-import { IWhitelist } from "src/utils/IWhitelist.sol";
-import { Whitelist } from "src/utils/Whitelist.sol";
+import { IAddressSet } from "src/utils/IAddressSet.sol";
+import { AddressSet } from "src/utils/AddressSet.sol";
 import { Staker } from "staker/Staker.sol";
 import { StakerOnBehalf } from "staker/extensions/StakerOnBehalf.sol";
 
@@ -19,8 +21,8 @@ contract RegenStakerWithoutDelegateSurrogateVotesWithdrawalFixTest is Test {
     MockERC20 public stakeToken;
     MockERC20 public rewardToken;
     RegenEarningPowerCalculator public earningPowerCalculator;
-    Whitelist public whitelist;
-    Whitelist public allocationWhitelist;
+    AddressSet public allowset;
+    AddressSet public allocationAllowset;
 
     address public admin = makeAddr("admin");
     address public alice = makeAddr("alice");
@@ -37,15 +39,20 @@ contract RegenStakerWithoutDelegateSurrogateVotesWithdrawalFixTest is Test {
         stakeToken = new MockERC20(18);
         rewardToken = new MockERC20(18);
 
-        // Deploy whitelists
-        whitelist = new Whitelist();
-        whitelist.addToWhitelist(alice);
-        whitelist.addToWhitelist(bob);
+        // Deploy allowsets
+        allowset = new AddressSet();
+        allowset.add(alice);
+        allowset.add(bob);
 
-        allocationWhitelist = new Whitelist();
+        allocationAllowset = new AddressSet();
 
         // Deploy earning power calculator
-        earningPowerCalculator = new RegenEarningPowerCalculator(admin, IWhitelist(address(whitelist)));
+        earningPowerCalculator = new RegenEarningPowerCalculator(
+            admin,
+            IAddressSet(address(allowset)),
+            IAddressSet(address(0)),
+            AccessMode.ALLOWSET
+        );
 
         // Deploy staker
         staker = new RegenStakerWithoutDelegateSurrogateVotes(
@@ -56,9 +63,10 @@ contract RegenStakerWithoutDelegateSurrogateVotesWithdrawalFixTest is Test {
             admin,
             30 days, // rewardDuration
             MIN_STAKE, // minimumStakeAmount
-            IWhitelist(address(whitelist)), // stakerWhitelist
-            IWhitelist(address(0)), // contributionWhitelist
-            allocationWhitelist // allocationMechanismWhitelist
+            IAddressSet(address(allowset)), // stakerAllowset
+            IAddressSet(address(0)), // stakerBlockset
+            AccessMode.NONE,
+            allocationAllowset // allocationMechanismAllowset
         );
 
         // Setup notifier
@@ -192,9 +200,10 @@ contract RegenStakerWithoutDelegateSurrogateVotesWithdrawalFixTest is Test {
             admin,
             30 days,
             MIN_STAKE,
-            IWhitelist(address(whitelist)),
-            IWhitelist(address(0)),
-            allocationWhitelist
+            IAddressSet(address(allowset)),
+            IAddressSet(address(0)),
+            AccessMode.NONE,
+            allocationAllowset
         );
 
         vm.prank(admin);
