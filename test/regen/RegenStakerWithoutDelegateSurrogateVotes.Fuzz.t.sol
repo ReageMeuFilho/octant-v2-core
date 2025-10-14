@@ -20,8 +20,8 @@ contract RegenStakerWithoutDelegateSurrogateVotesFuzzTest is Test {
     MockERC20 public token;
     MockERC20 public rewardToken;
     AddressSet public stakerAllowset;
-    AddressSet public contributionWhitelist;
-    AddressSet public allocationWhitelist;
+    AddressSet public contributionAllowset;
+    AddressSet public allocationAllowset;
     RegenEarningPowerCalculator public calculator;
 
     address public admin;
@@ -47,8 +47,8 @@ contract RegenStakerWithoutDelegateSurrogateVotesFuzzTest is Test {
         token = new MockERC20(18);
         rewardToken = new MockERC20(18);
         stakerAllowset = new AddressSet();
-        contributionWhitelist = new AddressSet();
-        allocationWhitelist = new AddressSet();
+        contributionAllowset = new AddressSet();
+        allocationAllowset = new AddressSet();
         calculator = new RegenEarningPowerCalculator(
             admin,
             IAddressSet(address(stakerAllowset)),
@@ -68,7 +68,7 @@ contract RegenStakerWithoutDelegateSurrogateVotesFuzzTest is Test {
             stakerAllowset,
             IAddressSet(address(0)),
             AccessMode.NONE,
-            allocationWhitelist
+            allocationAllowset
         );
 
         differentTokenStaker = new RegenStakerWithoutDelegateSurrogateVotes(
@@ -82,7 +82,7 @@ contract RegenStakerWithoutDelegateSurrogateVotesFuzzTest is Test {
             stakerAllowset,
             IAddressSet(address(0)),
             AccessMode.NONE,
-            allocationWhitelist
+            allocationAllowset
         );
 
         // Setup permissions
@@ -91,11 +91,11 @@ contract RegenStakerWithoutDelegateSurrogateVotesFuzzTest is Test {
         vm.prank(admin);
         differentTokenStaker.setRewardNotifier(rewardNotifier, true);
 
-        // Add users to whitelists
+        // Add users to allowsets
         address[3] memory users = [user1, user2, user3];
         for (uint256 i = 0; i < users.length; i++) {
             stakerAllowset.add(users[i]);
-            contributionWhitelist.add(users[i]);
+            contributionAllowset.add(users[i]);
         }
 
         // Setup user tokens

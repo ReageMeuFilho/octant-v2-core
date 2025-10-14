@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - `RegenEarningPowerCalculator` deployed
-- `Whitelist` contracts deployed (or use `address(0)`)
+- `AddressSet` contracts deployed (or use `address(0)`)
 - Allocation mechanisms deployed and audited
 
 ## Parameters
@@ -13,9 +13,9 @@ struct CreateStakerParams {
     IERC20 rewardsToken;
     IERC20 stakeToken;             // Must be IERC20Staking for WITH_DELEGATION variant
     address admin;                 // Use multisig
-    IWhitelist stakerWhitelist;    // address(0) = no restrictions
-    IWhitelist contributionWhitelist; // address(0) = no restrictions
-    IWhitelist allocationMechanismWhitelist; // Required, only audited mechanisms
+    IAddressSet stakerAllowset;    // address(0) = no restrictions
+    IAddressSet contributionAllowset; // address(0) = no restrictions
+    IAddressSet allocationMechanismAllowset; // Required, only audited mechanisms
     IEarningPowerCalculator earningPowerCalculator;
     uint256 maxBumpTip;           // In reward token's smallest unit
     uint256 minimumStakeAmount;   // In stake token's smallest unit
@@ -39,8 +39,8 @@ address staker = factory.createStakerWithoutDelegation(params, salt, noDelegatio
 ## Post-Deployment
 
 ```solidity
-stakerWhitelist.add(initialStakers);
-allocationMechanismWhitelist.add(auditedMechanisms);
+stakerAllowset.add(initialStakers);
+allocationMechanismAllowset.add(auditedMechanisms);
 ```
 
 ## Emergency
@@ -56,4 +56,4 @@ staker.unpause();  // Resume after resolution
 
 - **Precision Loss**: <30 day durations may have ~1% calculation error
 - **Surrogate Delegation**: Verify IERC20Staking support
-- **Whitelist Lockout**: Changes affect access immediately
+- **Access Control Changes**: Changes affect access immediately

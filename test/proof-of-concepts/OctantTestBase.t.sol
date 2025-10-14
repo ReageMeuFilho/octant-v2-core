@@ -51,11 +51,11 @@ contract OctantTestBase is Test {
     MockERC20Staking public stakeToken;
     MockERC20 public rewardToken;
 
-    // Whitelists
+    // Allowsets
     AddressSet public stakerAllowset;
-    AddressSet public contributionWhitelist;
+    AddressSet public contributionAllowset;
     AddressSet public allocationMechanismAllowset;
-    AddressSet public earningPowerWhitelist;
+    AddressSet public earningPowerAllowset;
 
     // Standard test addresses
     address public admin = makeAddr("admin");
@@ -89,11 +89,11 @@ contract OctantTestBase is Test {
         stakeToken = new MockERC20Staking(18);
         rewardToken = new MockERC20(18);
 
-        // Deploy whitelists
+        // Deploy allowsets
         stakerAllowset = new AddressSet();
-        contributionWhitelist = new AddressSet();
+        contributionAllowset = new AddressSet();
         allocationMechanismAllowset = new AddressSet();
-        earningPowerWhitelist = new AddressSet();
+        earningPowerAllowset = new AddressSet();
 
         // Deploy vault infrastructure
         _deployVaultInfrastructure();
@@ -136,7 +136,7 @@ contract OctantTestBase is Test {
         // Deploy earning power calculator
         earningPowerCalculator = new RegenEarningPowerCalculator(
             admin,
-            earningPowerWhitelist,
+            earningPowerAllowset,
             IAddressSet(address(0)),
             AccessMode.ALLOWSET
         );
@@ -213,14 +213,14 @@ contract OctantTestBase is Test {
         vault.updateMaxDebtForStrategy(address(strategy), type(uint256).max);
         vm.stopPrank();
 
-        // Setup whitelists
+        // Setup allowsets
         vm.startPrank(admin);
         stakerAllowset.add(alice);
         stakerAllowset.add(bob);
-        contributionWhitelist.add(alice);
-        contributionWhitelist.add(bob);
-        earningPowerWhitelist.add(alice);
-        earningPowerWhitelist.add(bob);
+        contributionAllowset.add(alice);
+        contributionAllowset.add(bob);
+        earningPowerAllowset.add(alice);
+        earningPowerAllowset.add(bob);
         allocationMechanismAllowset.add(address(allocationMechanism));
 
         // Mint tokens for testing

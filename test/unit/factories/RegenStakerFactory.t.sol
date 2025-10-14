@@ -28,7 +28,7 @@ contract RegenStakerFactoryTest is Test {
     address public deployer2;
 
     IAddressSet public stakerAllowset;
-    IAddressSet public contributionWhitelist;
+    IAddressSet public contributionAllowset;
     IAddressSet public allocationMechanismAllowset;
 
     uint256 public constant MAX_BUMP_TIP = 1000e18;
@@ -55,7 +55,7 @@ contract RegenStakerFactoryTest is Test {
         earningPowerCalculator = new MockEarningPowerCalculator();
 
         stakerAllowset = new AddressSet();
-        contributionWhitelist = new AddressSet();
+        contributionAllowset = new AddressSet();
         allocationMechanismAllowset = new AddressSet();
 
         // Deploy the factory with both variants' bytecode hashes (this test contract is the deployer)
@@ -268,8 +268,8 @@ contract RegenStakerFactoryTest is Test {
         assertEq(predictedAddress, actualAddress, "Predicted address should match actual address");
     }
 
-    function testCreateStakerWithNullWhitelists() public {
-        bytes32 salt = keccak256("NULL_WHITELIST_SALT");
+    function testCreateStakerWithNullAllowsets() public {
+        bytes32 salt = keccak256("NULL_ALLOWSET_SALT");
 
         vm.prank(deployer1);
         address stakerAddress = factory.createStakerWithDelegation(
@@ -290,13 +290,13 @@ contract RegenStakerFactoryTest is Test {
             getRegenStakerBytecode()
         );
 
-        assertTrue(stakerAddress != address(0), "Staker should be created with null whitelists");
+        assertTrue(stakerAddress != address(0), "Staker should be created with null allowsets");
 
         RegenStaker staker = RegenStaker(stakerAddress);
         assertEq(
             address(staker.stakerAllowset()),
             address(0),
-            "Staker whitelist should be null when address(0) is passed"
+            "Staker allowset should be null when address(0) is passed"
         );
     }
 }

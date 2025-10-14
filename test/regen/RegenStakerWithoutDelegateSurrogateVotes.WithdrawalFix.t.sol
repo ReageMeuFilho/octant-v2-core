@@ -21,8 +21,8 @@ contract RegenStakerWithoutDelegateSurrogateVotesWithdrawalFixTest is Test {
     MockERC20 public stakeToken;
     MockERC20 public rewardToken;
     RegenEarningPowerCalculator public earningPowerCalculator;
-    AddressSet public whitelist;
-    AddressSet public allocationWhitelist;
+    AddressSet public allowset;
+    AddressSet public allocationAllowset;
 
     address public admin = makeAddr("admin");
     address public alice = makeAddr("alice");
@@ -39,17 +39,17 @@ contract RegenStakerWithoutDelegateSurrogateVotesWithdrawalFixTest is Test {
         stakeToken = new MockERC20(18);
         rewardToken = new MockERC20(18);
 
-        // Deploy whitelists
-        whitelist = new AddressSet();
-        whitelist.add(alice);
-        whitelist.add(bob);
+        // Deploy allowsets
+        allowset = new AddressSet();
+        allowset.add(alice);
+        allowset.add(bob);
 
-        allocationWhitelist = new AddressSet();
+        allocationAllowset = new AddressSet();
 
         // Deploy earning power calculator
         earningPowerCalculator = new RegenEarningPowerCalculator(
             admin,
-            IAddressSet(address(whitelist)),
+            IAddressSet(address(allowset)),
             IAddressSet(address(0)),
             AccessMode.ALLOWSET
         );
@@ -63,10 +63,10 @@ contract RegenStakerWithoutDelegateSurrogateVotesWithdrawalFixTest is Test {
             admin,
             30 days, // rewardDuration
             MIN_STAKE, // minimumStakeAmount
-            IAddressSet(address(whitelist)), // stakerAllowset
+            IAddressSet(address(allowset)), // stakerAllowset
             IAddressSet(address(0)), // stakerBlockset
             AccessMode.NONE,
-            allocationWhitelist // allocationMechanismAllowset
+            allocationAllowset // allocationMechanismAllowset
         );
 
         // Setup notifier
@@ -200,10 +200,10 @@ contract RegenStakerWithoutDelegateSurrogateVotesWithdrawalFixTest is Test {
             admin,
             30 days,
             MIN_STAKE,
-            IAddressSet(address(whitelist)),
+            IAddressSet(address(allowset)),
             IAddressSet(address(0)),
             AccessMode.NONE,
-            allocationWhitelist
+            allocationAllowset
         );
 
         vm.prank(admin);

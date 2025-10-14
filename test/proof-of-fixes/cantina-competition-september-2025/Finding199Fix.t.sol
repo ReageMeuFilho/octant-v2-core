@@ -21,9 +21,9 @@ contract Cantina199Fix is Test, OctantTestBase {
         // Recreate initial staking/reward distribution and prep the attack.
         _seedBaseScenario();
 
-        // Admin removes Alice from the whitelist as in the PoC.
+        // Admin removes Alice from the allowset as in the PoC.
         vm.prank(admin);
-        earningPowerWhitelist.remove(alice);
+        earningPowerAllowset.remove(alice);
 
         // Keeper (Charlie) now bumps earning power with zero tip. This must succeed post-fix.
         vm.prank(charlie);
@@ -49,7 +49,7 @@ contract Cantina199Fix is Test, OctantTestBase {
         vm.prank(admin);
         stakerAllowset.add(charlie);
         vm.prank(admin);
-        earningPowerWhitelist.add(charlie);
+        earningPowerAllowset.add(charlie);
 
         vm.startPrank(alice);
         stakeToken.approve(address(regenStaker), ALICE_STAKE);

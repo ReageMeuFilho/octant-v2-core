@@ -22,7 +22,7 @@ contract Cantina259Fix is Test {
     RegenStaker public stakerWithDelegation;
     RegenEarningPowerCalculator public calculator;
     AddressSet public stakerAllowset;
-    AddressSet public earningPowerWhitelist;
+    AddressSet public earningPowerAllowset;
     AddressSet public allocationMechanismAllowset;
     MockERC20Staking public stakeToken;
 
@@ -38,9 +38,9 @@ contract Cantina259Fix is Test {
         // Deploy tokens
         stakeToken = new MockERC20Staking(18);
 
-        // Deploy whitelists
+        // Deploy allowsets
         stakerAllowset = new AddressSet();
-        earningPowerWhitelist = new AddressSet();
+        earningPowerAllowset = new AddressSet();
         allocationMechanismAllowset = new AddressSet();
 
         // AddressSet all users
@@ -48,14 +48,14 @@ contract Cantina259Fix is Test {
         stakerAllowset.add(bob);
         stakerAllowset.add(charlie);
 
-        earningPowerWhitelist.add(alice);
-        earningPowerWhitelist.add(bob);
-        earningPowerWhitelist.add(charlie);
+        earningPowerAllowset.add(alice);
+        earningPowerAllowset.add(bob);
+        earningPowerAllowset.add(charlie);
 
         // Deploy calculator
         calculator = new RegenEarningPowerCalculator(
             admin,
-            earningPowerWhitelist,
+            earningPowerAllowset,
             IAddressSet(address(0)),
             AccessMode.ALLOWSET
         );
@@ -72,7 +72,7 @@ contract Cantina259Fix is Test {
             IAddressSet(stakerAllowset),
             IAddressSet(address(0)), // stakerBlockset
             AccessMode.NONE,
-            IAddressSet(allocationMechanismAllowset) // allocation mechanism whitelist CANNOT be address(0)
+            IAddressSet(allocationMechanismAllowset) // allocation mechanism allowset CANNOT be address(0)
         );
 
         stakerWithDelegation = new RegenStaker(
@@ -86,12 +86,12 @@ contract Cantina259Fix is Test {
             IAddressSet(stakerAllowset),
             IAddressSet(address(0)), // stakerBlockset
             AccessMode.NONE,
-            IAddressSet(allocationMechanismAllowset) // allocation mechanism whitelist CANNOT be address(0)
+            IAddressSet(allocationMechanismAllowset) // allocation mechanism allowset CANNOT be address(0)
         );
 
-        // AddressSet the staker contracts (test contract is the owner of earningPowerWhitelist)
-        earningPowerWhitelist.add(address(stakerNoDelegation));
-        earningPowerWhitelist.add(address(stakerWithDelegation));
+        // AddressSet the staker contracts (test contract is the owner of earningPowerAllowset)
+        earningPowerAllowset.add(address(stakerNoDelegation));
+        earningPowerAllowset.add(address(stakerWithDelegation));
     }
 
     function testFix_AlterDelegateeReverts() public {

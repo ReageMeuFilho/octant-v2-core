@@ -27,7 +27,7 @@ contract RegenStakerBaseClaimerPermissionsDemoTest is Test {
     MockEarningPowerCalculator public earningPowerCalculator;
     OctantQFMechanism public allocationMechanism;
     AddressSet public stakerAllowset;
-    AddressSet public allocationWhitelist;
+    AddressSet public allocationAllowset;
 
     address public admin = makeAddr("admin");
     address public owner;
@@ -70,17 +70,17 @@ contract RegenStakerBaseClaimerPermissionsDemoTest is Test {
             AccessMode.NONE
         );
 
-        // Deploy whitelists
+        // Deploy allowsets
         vm.startPrank(admin);
         stakerAllowset = new AddressSet();
-        allocationWhitelist = new AddressSet();
+        allocationAllowset = new AddressSet();
 
-        // Setup whitelists
+        // Setup allowsets
         (owner, ownerPk) = makeAddrAndKey("owner");
         stakerAllowset.add(owner);
         (claimer, claimerPk) = makeAddrAndKey("claimer");
         stakerAllowset.add(claimer);
-        allocationWhitelist.add(address(allocationMechanism));
+        allocationAllowset.add(address(allocationMechanism));
         vm.stopPrank();
 
         // Deploy RegenStaker with same token for stake/reward (enables compounding)
@@ -96,7 +96,7 @@ contract RegenStakerBaseClaimerPermissionsDemoTest is Test {
             IAddressSet(address(stakerAllowset)),
             IAddressSet(address(0)),
             AccessMode.NONE,
-            IAddressSet(address(allocationWhitelist))
+            IAddressSet(address(allocationAllowset))
         );
 
         // Fund and create deposit with claimer designation
@@ -152,8 +152,8 @@ contract RegenStakerBaseClaimerPermissionsDemoTest is Test {
         regenStaker.withdraw(depositId, 10e18);
     }
 
-    /// @notice Demonstrates that claimers CAN contribute when on contribution whitelist
-    function testDemonstrate_ClaimerCanContributeIfWhitelisted() public {
+    /// @notice Demonstrates that claimers CAN contribute when on contribution allowset
+    function testDemonstrate_ClaimerCanContributeIfAllowseted() public {
         // Progress time to accrue rewards
         vm.warp(block.timestamp + REWARD_DURATION / 4);
 

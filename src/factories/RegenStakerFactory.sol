@@ -22,23 +22,23 @@ import { AccessMode } from "src/constants.sol";
 ///      However, it does NOT validate constructor parameters, including:
 ///      - earningPowerCalculator: Controls reward distribution logic
 ///      - admin: Has full control over staker configuration
-///      - Whitelists: Control access to various operations
+///      - Access Control: Allowsets and blocksets control access to various operations
 ///
 ///      A malicious actor can deploy a staker with canonical bytecode but inject:
 ///      - A malicious earning power calculator (to manipulate rewards)
 ///      - Themselves as admin (to change calculator post-deployment)
-///      - Malicious whitelists
+///      - Malicious address sets
 ///
 /// @dev OPERATIONAL SECURITY:
 ///      Before funding or integrating with ANY RegenStaker instance:
 ///      1. Verify the earningPowerCalculator address and its code
 ///      2. Verify the admin is a trusted party/governance contract
-///      3. Verify all whitelists are legitimate
+///      3. Verify all address sets are legitimate
 ///      4. For official deployments, use published addresses from governance
 ///
 ///      The StakerDeploy event includes calculator address and codehash
 ///      to facilitate verification. For production use, consider requiring
-///      deployments from a governance-approved strict factory that whitelists
+///      deployments from a governance-approved strict factory that maintains an allowset of
 ///      acceptable calculators.
 contract RegenStakerFactory {
     mapping(RegenStakerVariant => bytes32) public canonicalBytecodeHash;
@@ -101,7 +101,7 @@ contract RegenStakerFactory {
     /// @param code Bytecode for WITHOUT_DELEGATION variant
     /// @return stakerAddress Address of deployed contract
     /// @dev WARNING: This factory validates bytecode but NOT constructor parameters.
-    ///      Verify params.earningPowerCalculator, params.admin, and whitelists before funding!
+    ///      Verify params.earningPowerCalculator, params.admin, and address sets before funding!
     function createStakerWithoutDelegation(
         CreateStakerParams calldata params,
         bytes32 salt,
@@ -117,7 +117,7 @@ contract RegenStakerFactory {
     /// @param code Bytecode for WITH_DELEGATION variant
     /// @return stakerAddress Address of deployed contract
     /// @dev WARNING: This factory validates bytecode but NOT constructor parameters.
-    ///      Verify params.earningPowerCalculator, params.admin, and whitelists before funding!
+    ///      Verify params.earningPowerCalculator, params.admin, and address sets before funding!
     function createStakerWithDelegation(
         CreateStakerParams calldata params,
         bytes32 salt,

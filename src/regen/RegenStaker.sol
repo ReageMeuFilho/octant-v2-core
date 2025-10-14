@@ -55,8 +55,8 @@ contract RegenStaker is RegenStakerBase {
     /// @param _stakerAllowset The allowlist for stakers (ALLOWSET mode). Can be address(0).
     /// @param _stakerBlockset The blocklist for stakers (BLOCKSET mode). Can be address(0).
     /// @param _stakerAccessMode The staker access mode (NONE, ALLOWSET, or BLOCKSET).
-    /// @param _allocationMechanismAllowset The whitelist for allocation mechanisms. SECURITY CRITICAL.
-    ///      Only audited and trusted allocation mechanisms should be whitelisted.
+    /// @param _allocationMechanismAllowset The allowset for allocation mechanisms. SECURITY CRITICAL.
+    ///      Only audited and trusted allocation mechanisms should be in the allowset.
     ///      Users contribute funds to these mechanisms and may lose funds if mechanisms are malicious.
     constructor(
         IERC20 _rewardsToken,

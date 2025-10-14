@@ -13,21 +13,21 @@ import { Staker } from "staker/Staker.sol";
 import { RegenStakerBase } from "src/regen/RegenStakerBase.sol";
 
 /// @title Tests for REG-008 Compound Rewards AddressSet Fix
-/// @notice Validates that the whitelist bypass vulnerability in compoundRewards is properly fixed
-/// @dev Addresses REG-008 (OSU-919) - Missing depositor whitelist check when claimer calls compoundRewards
-contract RegenStakerBaseCompoundWhitelistFixTest is Test {
+/// @notice Validates that the allowset bypass vulnerability in compoundRewards is properly fixed
+/// @dev Addresses REG-008 (OSU-919) - Missing depositor allowset check when claimer calls compoundRewards
+contract RegenStakerBaseCompoundAllowsetFixTest is Test {
     RegenStaker public staker;
     MockERC20Staking public stakeToken;
     RegenEarningPowerCalculator public earningPowerCalculator;
     AddressSet public stakerAllowset;
-    AddressSet public earningPowerWhitelist;
-    AddressSet public allocationWhitelist;
+    AddressSet public earningPowerAllowset;
+    AddressSet public allocationAllowset;
 
     address public admin = makeAddr("admin");
     address public notifier = makeAddr("notifier");
     address public depositor = makeAddr("depositor");
-    address public whitelistedClaimer = makeAddr("whitelistedClaimer");
-    address public nonWhitelistedClaimer = makeAddr("nonWhitelistedClaimer");
+    address public allowlistedClaimer = makeAddr("allowlistedClaimer");
+    address public nonAllowsetedClaimer = makeAddr("nonAllowsetedClaimer");
     address public delegatee = makeAddr("delegatee");
 
     uint256 constant INITIAL_BALANCE = 10_000e18;
@@ -45,15 +45,15 @@ contract RegenStakerBaseCompoundWhitelistFixTest is Test {
         // Deploy tokens
         stakeToken = new MockERC20Staking(18);
 
-        // Deploy whitelists
+        // Deploy allowsets
         stakerAllowset = new AddressSet();
-        earningPowerWhitelist = new AddressSet();
-        allocationWhitelist = new AddressSet();
+        earningPowerAllowset = new AddressSet();
+        allocationAllowset = new AddressSet();
 
         // Deploy earning power calculator
         earningPowerCalculator = new RegenEarningPowerCalculator(
             admin,
-            IAddressSet(address(earningPowerWhitelist)),
+            IAddressSet(address(earningPowerAllowset)),
             IAddressSet(address(0)),
             AccessMode.ALLOWSET
         );
@@ -70,7 +70,7 @@ contract RegenStakerBaseCompoundWhitelistFixTest is Test {
             IAddressSet(address(stakerAllowset)),
             IAddressSet(address(0)),
             AccessMode.ALLOWSET,
-            allocationWhitelist
+            allocationAllowset
         );
 
         // Setup notifier
@@ -79,22 +79,22 @@ contract RegenStakerBaseCompoundWhitelistFixTest is Test {
 
         // Fund users
         stakeToken.mint(depositor, INITIAL_BALANCE);
-        stakeToken.mint(whitelistedClaimer, INITIAL_BALANCE);
-        stakeToken.mint(nonWhitelistedClaimer, INITIAL_BALANCE);
+        stakeToken.mint(allowlistedClaimer, INITIAL_BALANCE);
+        stakeToken.mint(nonAllowsetedClaimer, INITIAL_BALANCE);
         stakeToken.mint(notifier, INITIAL_BALANCE);
     }
 
-    /// @notice Test whitelisted owner + whitelisted claimer (should work)
-    function test_whitelistedOwnerWhitelistedClaimer() public {
+    /// @notice Test inAllowset owner + inAllowset claimer (should work)
+    function test_allowlistedOwnerAllowsetedClaimer() public {
         // AddressSet both depositor and claimer
         stakerAllowset.add(depositor);
-        stakerAllowset.add(whitelistedClaimer);
-        earningPowerWhitelist.add(depositor);
+        stakerAllowset.add(allowlistedClaimer);
+        earningPowerAllowset.add(depositor);
 
-        // Depositor stakes with whitelisted claimer
+        // Depositor stakes with inAllowset claimer
         vm.startPrank(depositor);
         stakeToken.approve(address(staker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = staker.stake(STAKE_AMOUNT, delegatee, whitelistedClaimer);
+        Staker.DepositIdentifier depositId = staker.stake(STAKE_AMOUNT, delegatee, allowlistedClaimer);
         vm.stopPrank();
 
         // Add rewards
@@ -103,46 +103,46 @@ contract RegenStakerBaseCompoundWhitelistFixTest is Test {
         // Advance time to earn rewards
         vm.warp(block.timestamp + 15 days);
 
-        // Whitelisted claimer can compound for whitelisted depositor
-        vm.prank(whitelistedClaimer);
+        // Allowseted claimer can compound for inAllowset depositor
+        vm.prank(allowlistedClaimer);
         uint256 compounded = staker.compoundRewards(depositId);
 
         assertGt(compounded, 0, "Should have compounded rewards");
     }
 
-    /// @notice Test non-whitelisted owner + whitelisted claimer (should fail - the fix)
-    function test_nonWhitelistedOwnerWhitelistedClaimer() public {
-        // Initially whitelist depositor to create deposit
+    /// @notice Test non-inAllowset owner + inAllowset claimer (should fail - the fix)
+    function test_nonAllowsetedOwnerAllowsetedClaimer() public {
+        // Initially allowset depositor to create deposit
         stakerAllowset.add(depositor);
-        stakerAllowset.add(whitelistedClaimer);
-        earningPowerWhitelist.add(depositor);
+        stakerAllowset.add(allowlistedClaimer);
+        earningPowerAllowset.add(depositor);
 
-        // Depositor stakes with whitelisted claimer
+        // Depositor stakes with inAllowset claimer
         vm.startPrank(depositor);
         stakeToken.approve(address(staker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = staker.stake(STAKE_AMOUNT, delegatee, whitelistedClaimer);
+        Staker.DepositIdentifier depositId = staker.stake(STAKE_AMOUNT, delegatee, allowlistedClaimer);
         vm.stopPrank();
 
         // Add rewards
         _addRewards();
         vm.warp(block.timestamp + 15 days);
 
-        // Remove depositor from whitelist (e.g., compliance issue)
+        // Remove depositor from allowset (e.g., compliance issue)
         stakerAllowset.remove(depositor);
         assertFalse(stakerAllowset.contains(depositor));
-        assertTrue(stakerAllowset.contains(whitelistedClaimer));
+        assertTrue(stakerAllowset.contains(allowlistedClaimer));
 
-        // Whitelisted claimer CANNOT compound for non-whitelisted depositor (the fix)
-        vm.prank(whitelistedClaimer);
+        // Allowseted claimer CANNOT compound for non-inAllowset depositor (the fix)
+        vm.prank(allowlistedClaimer);
         vm.expectRevert(abi.encodeWithSelector(RegenStakerBase.StakerNotAllowed.selector, depositor));
         staker.compoundRewards(depositId);
     }
 
-    /// @notice Test whitelisted owner calling their own compound (should work)
-    function test_whitelistedOwnerSelfCompound() public {
+    /// @notice Test inAllowset owner calling their own compound (should work)
+    function test_allowlistedOwnerSelfCompound() public {
         // AddressSet depositor
         stakerAllowset.add(depositor);
-        earningPowerWhitelist.add(depositor);
+        earningPowerAllowset.add(depositor);
 
         // Depositor stakes with themselves as claimer
         vm.startPrank(depositor);
@@ -161,11 +161,11 @@ contract RegenStakerBaseCompoundWhitelistFixTest is Test {
         assertGt(compounded, 0, "Should have compounded rewards");
     }
 
-    /// @notice Test non-whitelisted owner calling their own compound (should fail)
-    function test_nonWhitelistedOwnerSelfCompound() public {
-        // Initially whitelist to create deposit
+    /// @notice Test non-inAllowset owner calling their own compound (should fail)
+    function test_nonAllowsetedOwnerSelfCompound() public {
+        // Initially allowset to create deposit
         stakerAllowset.add(depositor);
-        earningPowerWhitelist.add(depositor);
+        earningPowerAllowset.add(depositor);
 
         // Depositor stakes
         vm.startPrank(depositor);
@@ -177,42 +177,42 @@ contract RegenStakerBaseCompoundWhitelistFixTest is Test {
         _addRewards();
         vm.warp(block.timestamp + 15 days);
 
-        // Remove depositor from whitelist
+        // Remove depositor from allowset
         stakerAllowset.remove(depositor);
 
-        // Non-whitelisted depositor cannot compound their own rewards
+        // Non-inAllowset depositor cannot compound their own rewards
         vm.prank(depositor);
         vm.expectRevert(abi.encodeWithSelector(RegenStakerBase.StakerNotAllowed.selector, depositor));
         staker.compoundRewards(depositId);
     }
 
-    /// @notice Test whitelisted owner + non-whitelisted claimer (should work)
-    function test_whitelistedOwnerNonWhitelistedClaimer() public {
+    /// @notice Test inAllowset owner + non-inAllowset claimer (should work)
+    function test_allowlistedOwnerNonAllowsetedClaimer() public {
         // AddressSet only depositor, not the claimer
         stakerAllowset.add(depositor);
-        earningPowerWhitelist.add(depositor);
-        assertFalse(stakerAllowset.contains(nonWhitelistedClaimer));
+        earningPowerAllowset.add(depositor);
+        assertFalse(stakerAllowset.contains(nonAllowsetedClaimer));
 
-        // Depositor stakes with non-whitelisted claimer
+        // Depositor stakes with non-inAllowset claimer
         vm.startPrank(depositor);
         stakeToken.approve(address(staker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = staker.stake(STAKE_AMOUNT, delegatee, nonWhitelistedClaimer);
+        Staker.DepositIdentifier depositId = staker.stake(STAKE_AMOUNT, delegatee, nonAllowsetedClaimer);
         vm.stopPrank();
 
         // Add rewards
         _addRewards();
         vm.warp(block.timestamp + 15 days);
 
-        // Non-whitelisted claimer CAN compound for whitelisted depositor
-        // The implementation only checks that the deposit owner is whitelisted
-        vm.prank(nonWhitelistedClaimer);
+        // Non-inAllowset claimer CAN compound for inAllowset depositor
+        // The implementation only checks that the deposit owner is inAllowset
+        vm.prank(nonAllowsetedClaimer);
         uint256 compounded = staker.compoundRewards(depositId);
         assertGt(compounded, 0, "Should have compounded rewards");
     }
 
     /// @notice Test that legitimate compound operations still work after fix
     function test_legitimateCompoundStillWorks() public {
-        // Setup multiple whitelisted users
+        // Setup multiple inAllowset users
         address alice = makeAddr("alice");
         address bob = makeAddr("bob");
 
@@ -221,8 +221,8 @@ contract RegenStakerBaseCompoundWhitelistFixTest is Test {
 
         stakerAllowset.add(alice);
         stakerAllowset.add(bob);
-        earningPowerWhitelist.add(alice);
-        earningPowerWhitelist.add(bob);
+        earningPowerAllowset.add(alice);
+        earningPowerAllowset.add(bob);
 
         // Alice stakes with Bob as claimer
         vm.startPrank(alice);
@@ -258,13 +258,13 @@ contract RegenStakerBaseCompoundWhitelistFixTest is Test {
         // AddressSet depositor
         stakerAllowset.add(depositor);
         stakerAllowset.add(unauthorizedUser);
-        earningPowerWhitelist.add(depositor);
+        earningPowerAllowset.add(depositor);
 
-        // Depositor stakes with whitelistedClaimer (not unauthorizedUser)
-        stakerAllowset.add(whitelistedClaimer);
+        // Depositor stakes with allowlistedClaimer (not unauthorizedUser)
+        stakerAllowset.add(allowlistedClaimer);
         vm.startPrank(depositor);
         stakeToken.approve(address(staker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = staker.stake(STAKE_AMOUNT, delegatee, whitelistedClaimer);
+        Staker.DepositIdentifier depositId = staker.stake(STAKE_AMOUNT, delegatee, allowlistedClaimer);
         vm.stopPrank();
 
         // Add rewards
@@ -283,57 +283,53 @@ contract RegenStakerBaseCompoundWhitelistFixTest is Test {
         staker.compoundRewards(depositId);
     }
 
-    /// @notice Test scenario where depositor is removed then re-added to whitelist
+    /// @notice Test scenario where depositor is removed then re-added to allowset
     function test_depositorRemovedThenReaddedToAddressSet() public {
         // AddressSet both
         stakerAllowset.add(depositor);
-        stakerAllowset.add(whitelistedClaimer);
-        earningPowerWhitelist.add(depositor);
+        stakerAllowset.add(allowlistedClaimer);
+        earningPowerAllowset.add(depositor);
 
         // Create deposit
         vm.startPrank(depositor);
         stakeToken.approve(address(staker), STAKE_AMOUNT);
-        Staker.DepositIdentifier depositId = staker.stake(STAKE_AMOUNT, delegatee, whitelistedClaimer);
+        Staker.DepositIdentifier depositId = staker.stake(STAKE_AMOUNT, delegatee, allowlistedClaimer);
         vm.stopPrank();
 
         // Add rewards
         _addRewards();
         vm.warp(block.timestamp + 10 days);
 
-        // Remove depositor from whitelist
+        // Remove depositor from allowset
         stakerAllowset.remove(depositor);
 
-        // Claimer cannot compound while depositor is not whitelisted
-        vm.prank(whitelistedClaimer);
+        // Claimer cannot compound while depositor is not inAllowset
+        vm.prank(allowlistedClaimer);
         vm.expectRevert(abi.encodeWithSelector(RegenStakerBase.StakerNotAllowed.selector, depositor));
         staker.compoundRewards(depositId);
 
-        // Re-add depositor to whitelist
+        // Re-add depositor to allowset
         stakerAllowset.add(depositor);
 
         // Now claimer can compound again
-        vm.prank(whitelistedClaimer);
+        vm.prank(allowlistedClaimer);
         uint256 compounded = staker.compoundRewards(depositId);
-        assertGt(compounded, 0, "Should compound after re-whitelisting");
+        assertGt(compounded, 0, "Should compound after re-adding to allowset");
     }
 
     /// @notice Fuzz test various scenarios
-    function testFuzz_compoundWhitelistChecks(
-        bool ownerWhitelisted,
-        bool claimerWhitelisted,
-        bool callerIsOwner
-    ) public {
+    function testFuzz_compoundAllowsetChecks(bool ownerAllowseted, bool claimerAllowseted, bool callerIsOwner) public {
         // Setup based on fuzz inputs
-        if (ownerWhitelisted) {
+        if (ownerAllowseted) {
             stakerAllowset.add(depositor);
-            earningPowerWhitelist.add(depositor);
+            earningPowerAllowset.add(depositor);
         }
-        if (claimerWhitelisted) {
-            stakerAllowset.add(whitelistedClaimer);
+        if (claimerAllowseted) {
+            stakerAllowset.add(allowlistedClaimer);
         }
 
-        // Skip if neither is whitelisted (can't create deposit)
-        if (!ownerWhitelisted) return;
+        // Skip if neither is inAllowset (can't create deposit)
+        if (!ownerAllowseted) return;
 
         // Create deposit
         vm.startPrank(depositor);
@@ -341,7 +337,7 @@ contract RegenStakerBaseCompoundWhitelistFixTest is Test {
         Staker.DepositIdentifier depositId = staker.stake(
             STAKE_AMOUNT,
             delegatee,
-            callerIsOwner ? depositor : whitelistedClaimer
+            callerIsOwner ? depositor : allowlistedClaimer
         );
         vm.stopPrank();
 
@@ -349,17 +345,17 @@ contract RegenStakerBaseCompoundWhitelistFixTest is Test {
         _addRewards();
         vm.warp(block.timestamp + 15 days);
 
-        // Remove owner from whitelist for testing
-        if (!ownerWhitelisted) {
+        // Remove owner from allowset for testing
+        if (!ownerAllowseted) {
             stakerAllowset.remove(depositor);
         }
 
         // Determine who is calling and expected result
-        address caller = callerIsOwner ? depositor : whitelistedClaimer;
+        address caller = callerIsOwner ? depositor : allowlistedClaimer;
 
-        // The implementation only checks that the deposit owner is whitelisted
-        // It doesn't matter if the claimer is whitelisted or not
-        bool shouldSucceed = ownerWhitelisted;
+        // The implementation only checks that the deposit owner is inAllowset
+        // It doesn't matter if the claimer is inAllowset or not
+        bool shouldSucceed = ownerAllowseted;
 
         // Execute compound
         if (shouldSucceed) {

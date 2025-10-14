@@ -26,8 +26,8 @@ contract RegenStakerGovernanceProtectionTest is Test {
     RegenEarningPowerCalculator public earningPowerCalculator;
     MockERC20 public rewardToken;
     MockERC20Staking public stakeToken;
-    AddressSet public whitelist;
-    AddressSet public allocationWhitelist;
+    AddressSet public allowset;
+    AddressSet public allocationAllowset;
 
     address public admin = makeAddr("admin");
     address public rewardNotifier = makeAddr("rewardNotifier");
@@ -44,13 +44,13 @@ contract RegenStakerGovernanceProtectionTest is Test {
         rewardToken = new MockERC20(18);
         stakeToken = new MockERC20Staking(18);
 
-        // Deploy whitelist and calculator
+        // Deploy allowset and calculator
         vm.startPrank(admin);
-        whitelist = new AddressSet();
-        allocationWhitelist = new AddressSet();
+        allowset = new AddressSet();
+        allocationAllowset = new AddressSet();
         earningPowerCalculator = new RegenEarningPowerCalculator(
             admin,
-            whitelist,
+            allowset,
             IAddressSet(address(0)),
             AccessMode.ALLOWSET
         );
@@ -64,15 +64,15 @@ contract RegenStakerGovernanceProtectionTest is Test {
             admin,
             uint128(REWARD_DURATION),
             INITIAL_MIN_STAKE,
-            whitelist,
+            allowset,
             IAddressSet(address(0)),
             AccessMode.NONE,
-            allocationWhitelist
+            allocationAllowset
         );
 
         // Setup permissions
         regenStaker.setRewardNotifier(rewardNotifier, true);
-        whitelist.add(user);
+        allowset.add(user);
         vm.stopPrank();
 
         // Fund users

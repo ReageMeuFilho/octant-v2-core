@@ -19,7 +19,7 @@ import { IAddressSet } from "src/utils/IAddressSet.sol";
 import { NotInAllowset } from "src/errors.sol";
 
 /// @title Cantina Competition September 2025 – Finding 127 Fix
-/// @notice Proves the PROPER architectural fix: contribution whitelist at TAM signup, not RegenStaker
+/// @notice Proves the PROPER architectural fix: contribution allowset at TAM signup, not RegenStaker
 /// @dev This is where voting power is CREATED, so this is where access control belongs
 contract Cantina127Fix is Test {
     // Contracts
@@ -27,10 +27,10 @@ contract Cantina127Fix is Test {
     MockERC20Staking public stakeToken;
     MockERC20 public rewardToken;
     AddressSet public stakerAllowset;
-    AddressSet public regenContributionWhitelist; // RegenStaker's (defense-in-depth)
-    AddressSet public tamContributionWhitelist; // TAM's (the RIGHT place)
-    AddressSet public allocationWhitelist;
-    AddressSet public earningPowerWhitelist;
+    AddressSet public regenContributionAllowset; // RegenStaker's (defense-in-depth)
+    AddressSet public tamContributionAllowset; // TAM's (the RIGHT place)
+    AddressSet public allocationAllowset;
+    AddressSet public earningPowerAllowset;
     OctantQFMechanism public allocationMechanism;
     AllocationMechanismFactory public allocationFactory;
 
@@ -38,7 +38,7 @@ contract Cantina127Fix is Test {
     address public admin = makeAddr("admin");
     address public alice; // The delisted depositor
     uint256 public alicePk;
-    address public bob; // The whitelisted claimer
+    address public bob; // The inAllowset claimer
     uint256 public bobPk;
     address public rewardNotifier = makeAddr("rewardNotifier");
 
@@ -52,14 +52,14 @@ contract Cantina127Fix is Test {
         (bob, bobPk) = makeAddrAndKey("bob");
 
         vm.startPrank(admin);
-        // Deploy tokens and whitelists
+        // Deploy tokens and allowsets
         stakeToken = new MockERC20Staking(18);
         rewardToken = new MockERC20(18);
         stakerAllowset = new AddressSet();
-        regenContributionWhitelist = new AddressSet(); // RegenStaker's
-        tamContributionWhitelist = new AddressSet();
-        allocationWhitelist = new AddressSet();
-        earningPowerWhitelist = new AddressSet();
+        regenContributionAllowset = new AddressSet(); // RegenStaker's
+        tamContributionAllowset = new AddressSet();
+        allocationAllowset = new AddressSet();
+        earningPowerAllowset = new AddressSet();
 
         // Deploy Allocation Mechanism
         allocationFactory = new AllocationMechanismFactory();
@@ -86,15 +86,15 @@ contract Cantina127Fix is Test {
         );
 
         // THE FIX: Set contribution allowset on OctantQF (where voting power is created)
-        allocationMechanism.setContributionAllowset(tamContributionWhitelist);
+        allocationMechanism.setContributionAllowset(tamContributionAllowset);
         allocationMechanism.setAccessMode(AccessMode.ALLOWSET);
 
-        allocationWhitelist.add(address(allocationMechanism));
+        allocationAllowset.add(address(allocationMechanism));
 
         // Deploy RegenStaker
         RegenEarningPowerCalculator calc = new RegenEarningPowerCalculator(
             admin,
-            earningPowerWhitelist,
+            earningPowerAllowset,
             IAddressSet(address(0)), // No blockset for earning power
             AccessMode.ALLOWSET
         );
@@ -109,7 +109,7 @@ contract Cantina127Fix is Test {
             stakerAllowset,
             IAddressSet(address(0)), // No staker blockset
             AccessMode.NONE, // No staker restrictions (contribution control is in TAM)
-            allocationWhitelist
+            allocationAllowset
         );
         regenStaker.setRewardNotifier(rewardNotifier, true);
         vm.stopPrank();
@@ -119,17 +119,17 @@ contract Cantina127Fix is Test {
         rewardToken.mint(rewardNotifier, REWARD_AMOUNT);
     }
 
-    /// @notice Test that TAM-level whitelist blocks delisted users via ALL paths
+    /// @notice Test that TAM-level allowset blocks delisted users via ALL paths
     /// @dev This is the PROPER fix - control at the point of power creation
-    function testFix_TAMWhitelistBlocksAllPaths() public {
-        // Setup: Alice whitelisted everywhere initially
+    function testFix_TAMAllowsetBlocksAllPaths() public {
+        // Setup: Alice inAllowset everywhere initially
         vm.startPrank(admin);
         stakerAllowset.add(alice);
-        regenContributionWhitelist.add(alice); // RegenStaker's (still checked by contribute())
-        regenContributionWhitelist.add(bob); // Bob too for contribute() path
-        tamContributionWhitelist.add(alice); // TAM's (the REAL enforcement)
-        tamContributionWhitelist.add(bob);
-        earningPowerWhitelist.add(alice);
+        regenContributionAllowset.add(alice); // RegenStaker's (still checked by contribute())
+        regenContributionAllowset.add(bob); // Bob too for contribute() path
+        tamContributionAllowset.add(alice); // TAM's (the REAL enforcement)
+        tamContributionAllowset.add(bob);
+        earningPowerAllowset.add(alice);
         vm.stopPrank();
 
         // Alice stakes
@@ -148,13 +148,13 @@ contract Cantina127Fix is Test {
         uint256 aliceRewards = regenStaker.unclaimedReward(depositId);
         assertGe(aliceRewards, CONTRIBUTION_AMOUNT);
 
-        // Admin delists Alice from BOTH whitelists (layered defense)
+        // Admin delists Alice from BOTH allowsets (layered defense)
         vm.startPrank(admin);
-        regenContributionWhitelist.remove(alice); // RegenStaker check (fund source)
-        tamContributionWhitelist.remove(alice); // TAM check (for claim->signup path)
+        regenContributionAllowset.remove(alice); // RegenStaker check (fund source)
+        tamContributionAllowset.remove(alice); // TAM check (for claim->signup path)
         vm.stopPrank();
 
-        // PATH 1: Try contribute() via Bob (whitelisted claimer)
+        // PATH 1: Try contribute() via Bob (in the allowset claimer)
         // Bob provides HIS signature (claimer autonomy) but should FAIL because Alice (fund source) is not eligible
         uint256 deadline = block.timestamp + 1 hours;
         bytes32 digest = _getSignupDigest(bob, address(regenStaker), CONTRIBUTION_AMOUNT, 0, deadline);
@@ -172,7 +172,7 @@ contract Cantina127Fix is Test {
         regenStaker.contribute(depositId, address(allocationMechanism), CONTRIBUTION_AMOUNT, deadline, v, r, s);
 
         // PATH 2: Try claim → direct signup (the bypass path)
-        // Should ALSO FAIL because Alice is not on TAM whitelist
+        // Should ALSO FAIL because Alice is not on TAM allowset
         vm.prank(alice);
         uint256 claimed = regenStaker.claimReward(depositId);
         assertGt(claimed, 0);

@@ -22,7 +22,7 @@ contract RegenStakerWithoutDelegateSurrogateVotesSameTokenProtectionTest is Test
     MockERC20 public rewardToken;
     MockERC20 public differentRewardToken;
     RegenEarningPowerCalculator public earningPowerCalculator;
-    AddressSet public whitelist;
+    AddressSet public allowset;
 
     address public admin = address(0x1);
     address public notifier = address(0x2);
@@ -39,15 +39,15 @@ contract RegenStakerWithoutDelegateSurrogateVotesSameTokenProtectionTest is Test
         rewardToken = new MockERC20(18);
         differentRewardToken = new MockERC20(18);
 
-        // Deploy whitelist (constructor sets msg.sender as owner)
-        whitelist = new AddressSet();
-        whitelist.add(user1);
-        whitelist.add(user2);
+        // Deploy allowset (constructor sets msg.sender as owner)
+        allowset = new AddressSet();
+        allowset.add(user1);
+        allowset.add(user2);
 
         // Deploy earning power calculator
         earningPowerCalculator = new RegenEarningPowerCalculator(
             admin,
-            IAddressSet(address(whitelist)),
+            IAddressSet(address(allowset)),
             IAddressSet(address(0)),
             AccessMode.ALLOWSET
         );
@@ -61,10 +61,10 @@ contract RegenStakerWithoutDelegateSurrogateVotesSameTokenProtectionTest is Test
             admin,
             30 days, // rewardDuration
             0, // minimumStakeAmount
-            IAddressSet(address(0)), // no staker whitelist
+            IAddressSet(address(0)), // no staker allowset
             IAddressSet(address(0)), // stakerBlockset
             AccessMode.NONE,
-            whitelist // allocation mechanism whitelist
+            allowset // allocation mechanism allowset
         );
 
         // Deploy staker with DIFFERENT tokens (safe scenario)
@@ -76,10 +76,10 @@ contract RegenStakerWithoutDelegateSurrogateVotesSameTokenProtectionTest is Test
             admin,
             30 days, // rewardDuration
             0, // minimumStakeAmount
-            IAddressSet(address(0)), // no staker whitelist
+            IAddressSet(address(0)), // no staker allowset
             IAddressSet(address(0)), // stakerBlockset
             AccessMode.NONE,
-            whitelist // allocation mechanism whitelist
+            allowset // allocation mechanism allowset
         );
 
         // Setup admin and notifier

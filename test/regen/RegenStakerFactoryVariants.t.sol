@@ -24,7 +24,7 @@ contract RegenStakerFactoryVariantsTest is Test {
     RegenStakerFactory factory;
     RegenEarningPowerCalculator calculator;
     AddressSet stakerAllowset;
-    AddressSet contributionWhitelist;
+    AddressSet contributionAllowset;
     AddressSet allocationMechanismAllowset;
 
     MockERC20 basicToken;
@@ -48,7 +48,7 @@ contract RegenStakerFactoryVariantsTest is Test {
         stakingToken = new MockERC20Staking(18);
 
         stakerAllowset = new AddressSet();
-        contributionWhitelist = new AddressSet();
+        contributionAllowset = new AddressSet();
         allocationMechanismAllowset = new AddressSet();
 
         calculator = new RegenEarningPowerCalculator(
@@ -258,7 +258,7 @@ contract RegenStakerFactoryVariantsTest is Test {
             MIN_REWARD_DURATION,
             0, // minimumStakeAmount
             stakerAllowset,
-            contributionWhitelist,
+            contributionAllowset,
             allocationMechanismAllowset
         );
 

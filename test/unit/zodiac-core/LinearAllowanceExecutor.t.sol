@@ -17,7 +17,7 @@ contract LinearAllowanceExecutorTest is Test {
     LinearAllowanceSingletonForGnosisSafe public allowanceModule;
     MockSafe public mockSafe;
     MockERC20 public mockToken;
-    AddressSet public moduleWhitelist;
+    AddressSet public moduleAllowset;
 
     uint192 constant DRIP_RATE = 1 ether; // 1 token per day
 
@@ -27,13 +27,13 @@ contract LinearAllowanceExecutorTest is Test {
         allowanceModule = new LinearAllowanceSingletonForGnosisSafe();
         mockSafe = new MockSafe();
         mockToken = new MockERC20(18);
-        moduleWhitelist = new AddressSet();
+        moduleAllowset = new AddressSet();
 
-        // Set the whitelist on the executor
-        executor.assignModuleAddressSet(IAddressSet(address(moduleWhitelist)));
+        // Set the allowset on the executor
+        executor.assignModuleAddressSet(IAddressSet(address(moduleAllowset)));
 
         // AddressSet the allowance module
-        moduleWhitelist.add(address(allowanceModule));
+        moduleAllowset.add(address(allowanceModule));
 
         // Enable module on mock Safe
         mockSafe.enableModule(address(allowanceModule));
@@ -140,27 +140,27 @@ contract LinearAllowanceExecutorTest is Test {
         assertEq(transferredAmount, safeBalance, "Should transfer only the available balance");
     }
 
-    function testModuleWhitelistValidation() public {
-        // Deploy a new module that is not whitelisted
-        LinearAllowanceSingletonForGnosisSafe nonWhitelistedModule = new LinearAllowanceSingletonForGnosisSafe();
+    function testModuleAllowsetValidation() public {
+        // Deploy a new module that is not inAllowset
+        LinearAllowanceSingletonForGnosisSafe nonAllowsetedModule = new LinearAllowanceSingletonForGnosisSafe();
 
-        // Try to use non-whitelisted module - should revert
-        vm.expectRevert(abi.encodeWithSelector(NotInAllowset.selector, address(nonWhitelistedModule)));
-        executor.executeAllowanceTransfer(nonWhitelistedModule, address(mockSafe), NATIVE_TOKEN);
+        // Try to use non-inAllowset module - should revert
+        vm.expectRevert(abi.encodeWithSelector(NotInAllowset.selector, address(nonAllowsetedModule)));
+        executor.executeAllowanceTransfer(nonAllowsetedModule, address(mockSafe), NATIVE_TOKEN);
 
         // AddressSet the module
-        moduleWhitelist.add(address(nonWhitelistedModule));
+        moduleAllowset.add(address(nonAllowsetedModule));
 
         // Now it should work (will revert for different reason - no allowance set)
         vm.expectRevert(); // Different revert reason
-        executor.executeAllowanceTransfer(nonWhitelistedModule, address(mockSafe), NATIVE_TOKEN);
+        executor.executeAllowanceTransfer(nonAllowsetedModule, address(mockSafe), NATIVE_TOKEN);
 
-        // Remove from whitelist
-        moduleWhitelist.remove(address(nonWhitelistedModule));
+        // Remove from allowset
+        moduleAllowset.remove(address(nonAllowsetedModule));
 
-        // Should revert again with whitelist error
-        vm.expectRevert(abi.encodeWithSelector(NotInAllowset.selector, address(nonWhitelistedModule)));
-        executor.executeAllowanceTransfer(nonWhitelistedModule, address(mockSafe), NATIVE_TOKEN);
+        // Should revert again with allowset error
+        vm.expectRevert(abi.encodeWithSelector(NotInAllowset.selector, address(nonAllowsetedModule)));
+        executor.executeAllowanceTransfer(nonAllowsetedModule, address(mockSafe), NATIVE_TOKEN);
     }
 
     function testExecuteMultipleTransfersWithChangingAllowance() public {

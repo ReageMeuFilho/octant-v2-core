@@ -43,7 +43,7 @@ contract Finding663Fix is Test, OctantTestBase {
         vm.prank(admin);
         stakerAllowset.add(charlie);
         vm.prank(admin);
-        earningPowerWhitelist.add(charlie);
+        earningPowerAllowset.add(charlie);
 
         vm.startPrank(alice);
         stakeToken.approve(address(regenStaker), ALICE_STAKE);
@@ -73,6 +73,6 @@ contract Finding663Fix is Test, OctantTestBase {
         regenStaker.claimReward(aliceDepositId);
 
         vm.prank(admin);
-        earningPowerWhitelist.remove(alice);
+        earningPowerAllowset.remove(alice);
     }
 }

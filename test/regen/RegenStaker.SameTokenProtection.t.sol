@@ -18,7 +18,7 @@ contract RegenStakerSameTokenProtectionTest is Test {
     RegenStaker public staker;
     MockERC20Staking public token;
     RegenEarningPowerCalculator public earningPowerCalculator;
-    AddressSet public whitelist;
+    AddressSet public allowset;
 
     address public admin = address(0x1);
     address public notifier = address(0x2);
@@ -33,14 +33,14 @@ contract RegenStakerSameTokenProtectionTest is Test {
         // Deploy token with delegation support
         token = new MockERC20Staking(18);
 
-        // Deploy whitelist
-        whitelist = new AddressSet();
-        whitelist.add(user1);
+        // Deploy allowset
+        allowset = new AddressSet();
+        allowset.add(user1);
 
         // Deploy earning power calculator
         earningPowerCalculator = new RegenEarningPowerCalculator(
             admin,
-            IAddressSet(address(whitelist)),
+            IAddressSet(address(allowset)),
             IAddressSet(address(0)),
             AccessMode.ALLOWSET
         );
@@ -54,10 +54,10 @@ contract RegenStakerSameTokenProtectionTest is Test {
             admin,
             30 days, // rewardDuration
             0, // minimumStakeAmount
-            IAddressSet(address(0)), // no staker whitelist
+            IAddressSet(address(0)), // no staker allowset
             IAddressSet(address(0)),
             AccessMode.NONE,
-            whitelist // allocation mechanism whitelist
+            allowset // allocation mechanism allowset
         );
 
         // Setup admin and notifier
@@ -132,7 +132,7 @@ contract RegenStakerSameTokenProtectionTest is Test {
             IAddressSet(address(0)),
             IAddressSet(address(0)),
             AccessMode.NONE,
-            whitelist
+            allowset
         );
 
         vm.startPrank(admin);

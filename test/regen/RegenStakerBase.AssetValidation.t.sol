@@ -29,8 +29,8 @@ contract RegenStakerBaseAssetValidationTest is Test {
     MockERC20 public rewardToken;
     MockERC20 public wrongToken;
     RegenEarningPowerCalculator public calculator;
-    AddressSet public whitelist;
-    AddressSet public allocationWhitelist;
+    AddressSet public allowset;
+    AddressSet public allocationAllowset;
 
     address public admin = makeAddr("admin");
     address public alice = makeAddr("alice");
@@ -50,14 +50,14 @@ contract RegenStakerBaseAssetValidationTest is Test {
             AccessMode.NONE
         );
 
-        // Deploy whitelists as admin
+        // Deploy allowsets as admin
         vm.startPrank(admin);
-        whitelist = new AddressSet();
-        allocationWhitelist = new AddressSet();
+        allowset = new AddressSet();
+        allocationAllowset = new AddressSet();
 
-        // Setup whitelists
-        whitelist.add(alice);
-        // We'll add mechanisms to the allocation whitelist as needed in tests
+        // Setup allowsets
+        allowset.add(alice);
+        // We'll add mechanisms to the allocation allowset as needed in tests
         vm.stopPrank();
 
         // Deploy RegenStaker with rewardToken
@@ -70,10 +70,10 @@ contract RegenStakerBaseAssetValidationTest is Test {
             admin, // admin
             30 days, // rewardDuration
             1e18, // minimumStakeAmount
-            IAddressSet(address(whitelist)), // stakerAllowset
+            IAddressSet(address(allowset)), // stakerAllowset
             IAddressSet(address(0)),
             AccessMode.NONE,
-            IAddressSet(address(allocationWhitelist)) // allocationMechanismAllowset
+            IAddressSet(address(allocationAllowset)) // allocationMechanismAllowset
         );
 
         // Alice stakes
@@ -98,9 +98,9 @@ contract RegenStakerBaseAssetValidationTest is Test {
         // Deploy mechanism expecting wrong token
         MockMechanism mechanism = new MockMechanism(IERC20(address(wrongToken)));
 
-        // Add mechanism to whitelist
+        // Add mechanism to allowset
         vm.prank(admin);
-        allocationWhitelist.add(address(mechanism));
+        allocationAllowset.add(address(mechanism));
 
         // Expect AssetMismatch error
         vm.expectRevert(
@@ -124,9 +124,9 @@ contract RegenStakerBaseAssetValidationTest is Test {
         // Deploy mechanism expecting correct token
         MockMechanism mechanism = new MockMechanism(IERC20(address(rewardToken)));
 
-        // Add mechanism to whitelist
+        // Add mechanism to allowset
         vm.prank(admin);
-        allocationWhitelist.add(address(mechanism));
+        allocationAllowset.add(address(mechanism));
 
         // The validation should pass the asset check
         // (may still revert for other reasons like signature validation)

@@ -5,8 +5,8 @@ import "forge-std/Test.sol";
 import { AddressSet } from "src/utils/AddressSet.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol"; // For OwnableUnauthorizedAccount error
 
-contract WhitelistTest is Test {
-    AddressSet whitelist;
+contract AllowsetTest is Test {
+    AddressSet allowset;
     address owner;
     address user1;
     address user2;
@@ -21,56 +21,56 @@ contract WhitelistTest is Test {
         nonOwner = makeAddr("nonOwner");
 
         vm.prank(intendedOwner); // Prank as the intended owner for the deployment
-        whitelist = new AddressSet();
+        allowset = new AddressSet();
 
-        owner = intendedOwner; // Assign the 'owner' variable to the actual owner of the whitelist
+        owner = intendedOwner; // Assign the 'owner' variable to the actual owner of the allowset
     }
 
     // --- Constructor & Ownership Tests ---
     function test_Constructor_SetsOwnerCorrectly() public view {
-        assertEq(whitelist.owner(), owner, "Owner should be the intendedOwner");
+        assertEq(allowset.owner(), owner, "Owner should be the intendedOwner");
     }
 
-    // --- isWhitelisted Tests ---
-    function test_IsWhitelisted_InitiallyFalse() public view {
-        assertFalse(whitelist.contains(user1), "User1 should not be whitelisted initially");
-        assertFalse(whitelist.contains(address(0)), "Address(0) should not be whitelisted initially");
+    // --- isAllowseted Tests ---
+    function test_IsAllowseted_InitiallyFalse() public view {
+        assertFalse(allowset.contains(user1), "User1 should not be inAllowset initially");
+        assertFalse(allowset.contains(address(0)), "Address(0) should not be inAllowset initially");
     }
 
-    // --- addToWhitelist Tests ---
-    function test_AddToWhitelist_SingleAccount() public {
+    // --- addToAllowset Tests ---
+    function test_AddToAllowset_SingleAccount() public {
         address[] memory accounts = new address[](1);
         accounts[0] = user1;
 
         vm.prank(owner);
-        whitelist.add(accounts);
+        allowset.add(accounts);
 
-        assertTrue(whitelist.contains(user1), "User1 should be whitelisted after adding");
-        assertFalse(whitelist.contains(user2), "User2 should still not be whitelisted");
+        assertTrue(allowset.contains(user1), "User1 should be inAllowset after adding");
+        assertFalse(allowset.contains(user2), "User2 should still not be inAllowset");
     }
 
-    function test_AddToWhitelist_MultipleAccounts() public {
+    function test_AddToAllowset_MultipleAccounts() public {
         address[] memory accounts = new address[](2);
         accounts[0] = user1;
         accounts[1] = user2;
 
         vm.prank(owner);
-        whitelist.add(accounts);
+        allowset.add(accounts);
 
-        assertTrue(whitelist.contains(user1), "User1 should be whitelisted");
-        assertTrue(whitelist.contains(user2), "User2 should be whitelisted");
-        assertFalse(whitelist.contains(user3), "User3 should not be whitelisted");
+        assertTrue(allowset.contains(user1), "User1 should be inAllowset");
+        assertTrue(allowset.contains(user2), "User2 should be inAllowset");
+        assertFalse(allowset.contains(user3), "User3 should not be inAllowset");
     }
 
-    function test_AddToWhitelist_EmptyList() public {
+    function test_AddToAllowset_EmptyList() public {
         address[] memory accounts = new address[](0);
 
         vm.prank(owner);
         vm.expectRevert();
-        whitelist.add(accounts);
+        allowset.add(accounts);
     }
 
-    function test_AddToWhitelist_AddAddressZero() public {
+    function test_AddToAllowset_AddAddressZero() public {
         address[] memory accounts = new address[](1);
         accounts[0] = address(0);
 
@@ -82,86 +82,86 @@ contract WhitelistTest is Test {
                 "Address zero not allowed."
             )
         );
-        whitelist.add(accounts);
+        allowset.add(accounts);
     }
 
-    function test_AddToWhitelist_AlreadyWhitelisted() public {
+    function test_AddToAllowset_AlreadyAllowseted() public {
         address[] memory accounts = new address[](1);
         accounts[0] = user1;
 
         vm.startPrank(owner);
-        whitelist.add(accounts); // Add once
-        assertTrue(whitelist.contains(user1));
+        allowset.add(accounts); // Add once
+        assertTrue(allowset.contains(user1));
 
         vm.expectRevert(
             abi.encodeWithSelector(AddressSet.IllegalAddressSetOperation.selector, user1, "Address already in set.")
         );
-        whitelist.add(accounts); // Add again
+        allowset.add(accounts); // Add again
         vm.stopPrank();
     }
 
-    function test_RevertIf_AddToWhitelist_NotOwner() public {
+    function test_RevertIf_AddToAllowset_NotOwner() public {
         address[] memory accounts = new address[](1);
         accounts[0] = user1;
 
         vm.startPrank(nonOwner);
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, nonOwner));
-        whitelist.add(accounts);
+        allowset.add(accounts);
         vm.stopPrank();
     }
 
-    // --- removeFromWhitelist Tests ---
-    function test_RemoveFromWhitelist_SingleAccount() public {
+    // --- removeFromAllowset Tests ---
+    function test_RemoveFromAllowset_SingleAccount() public {
         address[] memory addAccounts = new address[](1);
         addAccounts[0] = user1;
         vm.startPrank(owner);
-        whitelist.add(addAccounts);
-        assertTrue(whitelist.contains(user1));
+        allowset.add(addAccounts);
+        assertTrue(allowset.contains(user1));
 
         address[] memory removeAccounts = new address[](1);
         removeAccounts[0] = user1;
-        whitelist.remove(removeAccounts);
+        allowset.remove(removeAccounts);
 
-        assertFalse(whitelist.contains(user1), "User1 should not be whitelisted after removal");
+        assertFalse(allowset.contains(user1), "User1 should not be inAllowset after removal");
         vm.stopPrank();
     }
 
-    function test_RemoveFromWhitelist_MultipleAccounts() public {
+    function test_RemoveFromAllowset_MultipleAccounts() public {
         address[] memory addAccounts = new address[](3);
         addAccounts[0] = user1;
         addAccounts[1] = user2;
         addAccounts[2] = user3;
         vm.startPrank(owner);
-        whitelist.add(addAccounts);
-        assertTrue(whitelist.contains(user1));
-        assertTrue(whitelist.contains(user2));
-        assertTrue(whitelist.contains(user3));
+        allowset.add(addAccounts);
+        assertTrue(allowset.contains(user1));
+        assertTrue(allowset.contains(user2));
+        assertTrue(allowset.contains(user3));
 
         address[] memory removeAccounts = new address[](2);
         removeAccounts[0] = user1;
         removeAccounts[1] = user3;
-        whitelist.remove(removeAccounts);
+        allowset.remove(removeAccounts);
 
-        assertFalse(whitelist.contains(user1), "User1 should be removed");
-        assertTrue(whitelist.contains(user2), "User2 should remain whitelisted");
-        assertFalse(whitelist.contains(user3), "User3 should be removed");
+        assertFalse(allowset.contains(user1), "User1 should be removed");
+        assertTrue(allowset.contains(user2), "User2 should remain inAllowset");
+        assertFalse(allowset.contains(user3), "User3 should be removed");
         vm.stopPrank();
     }
 
-    function test_RemoveFromWhitelist_EmptyList() public {
+    function test_RemoveFromAllowset_EmptyList() public {
         address[] memory addAccounts = new address[](1);
         addAccounts[0] = user1;
         vm.startPrank(owner);
-        whitelist.add(addAccounts);
-        assertTrue(whitelist.contains(user1));
+        allowset.add(addAccounts);
+        assertTrue(allowset.contains(user1));
 
         address[] memory removeAccounts = new address[](0);
         vm.expectRevert();
-        whitelist.remove(removeAccounts);
+        allowset.remove(removeAccounts);
         vm.stopPrank();
     }
 
-    function test_RemoveFromWhitelist_AddressZero() public {
+    function test_RemoveFromAllowset_AddressZero() public {
         vm.startPrank(owner);
         address[] memory removeAccounts = new address[](1);
         removeAccounts[0] = address(0);
@@ -172,28 +172,28 @@ contract WhitelistTest is Test {
                 "Address zero not allowed."
             )
         );
-        whitelist.remove(removeAccounts);
+        allowset.remove(removeAccounts);
         vm.stopPrank();
     }
 
-    function test_RemoveFromWhitelist_AccountNotWhitelisted() public {
+    function test_RemoveFromAllowset_AccountNotAllowseted() public {
         address[] memory accounts = new address[](1);
-        accounts[0] = user1; // user1 is not whitelisted yet
+        accounts[0] = user1; // user1 is not inAllowset yet
 
         vm.prank(owner);
         vm.expectRevert(
             abi.encodeWithSelector(AddressSet.IllegalAddressSetOperation.selector, user1, "Address not in set.")
         );
-        whitelist.remove(accounts);
+        allowset.remove(accounts);
 
-        assertFalse(whitelist.contains(user1), "User1 should remain not whitelisted");
+        assertFalse(allowset.contains(user1), "User1 should remain not inAllowset");
     }
 
-    function test_RevertIf_RemoveFromWhitelist_NotOwner() public {
+    function test_RevertIf_RemoveFromAllowset_NotOwner() public {
         address[] memory addAccounts = new address[](1);
         addAccounts[0] = user1;
         vm.startPrank(owner); // owner adds user1
-        whitelist.add(addAccounts);
+        allowset.add(addAccounts);
         vm.stopPrank(); // Stop owner prank before starting nonOwner prank
 
         address[] memory removeAccounts = new address[](1);
@@ -201,10 +201,10 @@ contract WhitelistTest is Test {
 
         vm.startPrank(nonOwner); // nonOwner tries to remove
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, nonOwner));
-        whitelist.remove(removeAccounts);
+        allowset.remove(removeAccounts);
         vm.stopPrank();
 
-        vm.prank(owner); // Verify user1 still whitelisted as owner didn't remove
-        assertTrue(whitelist.contains(user1), "User1 should still be whitelisted as non-owner failed to remove");
+        vm.prank(owner); // Verify user1 still inAllowset as owner didn't remove
+        assertTrue(allowset.contains(user1), "User1 should still be inAllowset as non-owner failed to remove");
     }
 }

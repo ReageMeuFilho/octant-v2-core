@@ -37,9 +37,9 @@ contract RegenERC1271IntegrationTest is Test {
     // Supporting contracts
     RegenEarningPowerCalculator calculator;
     AddressSet stakerAllowset;
-    AddressSet contributorWhitelist;
+    AddressSet contributorAllowset;
     AddressSet allocationMechanismAllowset;
-    AddressSet earningPowerWhitelist;
+    AddressSet earningPowerAllowset;
     MockERC20 rewardToken;
     MockERC20Staking stakeToken;
     AllocationMechanismFactory allocationFactory;
@@ -79,16 +79,16 @@ contract RegenERC1271IntegrationTest is Test {
         rewardToken = new MockERC20(18);
         stakeToken = new MockERC20Staking(18);
 
-        // Deploy whitelists
+        // Deploy allowsets
         stakerAllowset = new AddressSet();
-        contributorWhitelist = new AddressSet();
+        contributorAllowset = new AddressSet();
         allocationMechanismAllowset = new AddressSet();
-        earningPowerWhitelist = new AddressSet();
+        earningPowerAllowset = new AddressSet();
 
         // Deploy earning power calculator
         calculator = new RegenEarningPowerCalculator(
             admin,
-            earningPowerWhitelist,
+            earningPowerAllowset,
             IAddressSet(address(0)),
             AccessMode.ALLOWSET
         );
@@ -140,18 +140,18 @@ contract RegenERC1271IntegrationTest is Test {
 
         allocationMechanism = QuadraticVotingMechanism(payable(address(octantQF)));
 
-        // Deploy contract signer before whitelisting
+        // Deploy contract signer before allowseting
         contractSigner = new MockERC1271Signer(contractSignerOwner);
 
-        // Setup whitelists
+        // Setup allowsets
         stakerAllowset.add(user);
-        stakerAllowset.add(address(contractSigner)); // Contract signer needs to be whitelisted as staker
-        contributorWhitelist.add(user);
-        contributorWhitelist.add(address(contractSigner)); // Contract signer needs to be whitelisted as contributor
+        stakerAllowset.add(address(contractSigner)); // Contract signer needs to be allowseted as staker
+        contributorAllowset.add(user);
+        contributorAllowset.add(address(contractSigner)); // Contract signer needs to be allowseted as contributor
         allocationMechanismAllowset.add(address(allocationMechanism));
-        earningPowerWhitelist.add(address(regenStaker));
-        earningPowerWhitelist.add(user); // User needs earning power
-        earningPowerWhitelist.add(address(contractSigner)); // Contract signer needs earning power
+        earningPowerAllowset.add(address(regenStaker));
+        earningPowerAllowset.add(user); // User needs earning power
+        earningPowerAllowset.add(address(contractSigner)); // Contract signer needs earning power
 
         // Setup reward notifier
         regenStaker.setRewardNotifier(notifier, true);

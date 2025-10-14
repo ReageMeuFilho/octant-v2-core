@@ -50,7 +50,7 @@ contract RegenStakerDustHarness is RegenStaker {
         IAddressSet stakerAllowset,
         IAddressSet stakerBlockset,
         AccessMode stakerAccessMode,
-        IAddressSet allocationWhitelist
+        IAddressSet allocationAllowset
     )
         RegenStaker(
             rewardToken,
@@ -63,7 +63,7 @@ contract RegenStakerDustHarness is RegenStaker {
             stakerAllowset,
             stakerBlockset,
             stakerAccessMode,
-            allocationWhitelist
+            allocationAllowset
         )
     {}
 
@@ -78,7 +78,7 @@ contract Cantina564Fix is Test {
     MockERC20Staking internal stakeAndRewardToken;
     RegenStakerDustHarness internal regenStaker;
     MockAllocationMechanism internal allocation;
-    AddressSet internal allocationWhitelist;
+    AddressSet internal allocationAllowset;
     RegenEarningPowerCalculator internal earningPowerCalculator;
 
     address internal immutable user = makeAddr("user");
@@ -90,7 +90,7 @@ contract Cantina564Fix is Test {
 
     function setUp() public {
         stakeAndRewardToken = new MockERC20Staking(18);
-        allocationWhitelist = new AddressSet();
+        allocationAllowset = new AddressSet();
         earningPowerCalculator = new RegenEarningPowerCalculator(
             address(this),
             IAddressSet(address(0)),
@@ -109,11 +109,11 @@ contract Cantina564Fix is Test {
             IAddressSet(address(0)),
             IAddressSet(address(0)),
             AccessMode.NONE,
-            allocationWhitelist
+            allocationAllowset
         );
 
         allocation = new MockAllocationMechanism(IERC20(address(stakeAndRewardToken)));
-        allocationWhitelist.add(address(allocation));
+        allocationAllowset.add(address(allocation));
 
         // Note: Fee collection has been eliminated, so no setClaimFeeParameters call needed
     }

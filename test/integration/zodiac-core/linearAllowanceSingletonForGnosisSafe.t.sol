@@ -56,12 +56,12 @@ contract TestLinearAllowanceIntegration is Test {
     /// @notice Storage-based test context for stack optimization
     TestContext internal currentTestCtx;
 
-    /// @notice Helper function to create and whitelist an executor
-    function createWhitelistedExecutor() internal returns (LinearAllowanceExecutorTestHarness) {
+    /// @notice Helper function to create and allowset an executor
+    function createAllowsetedExecutor() internal returns (LinearAllowanceExecutorTestHarness) {
         LinearAllowanceExecutorTestHarness newExecutor = new LinearAllowanceExecutorTestHarness();
-        AddressSet whitelist = new AddressSet();
-        newExecutor.assignModuleAddressSet(IAddressSet(address(whitelist)));
-        whitelist.add(address(allowanceModule));
+        AddressSet allowset = new AddressSet();
+        newExecutor.assignModuleAddressSet(IAddressSet(address(allowset)));
+        allowset.add(address(allowanceModule));
         return newExecutor;
     }
 
@@ -113,10 +113,10 @@ contract TestLinearAllowanceIntegration is Test {
         // Deploy DelegateContract
         vm.startPrank(delegateContractOwner);
         allowanceExecutor = new LinearAllowanceExecutorTestHarness();
-        // Setup whitelist for the allowance module
-        AddressSet whitelist = new AddressSet();
-        allowanceExecutor.assignModuleAddressSet(IAddressSet(address(whitelist)));
-        whitelist.add(address(allowanceModule));
+        // Setup allowset for the allowance module
+        AddressSet allowset = new AddressSet();
+        allowanceExecutor.assignModuleAddressSet(IAddressSet(address(allowset)));
+        allowset.add(address(allowanceModule));
         vm.stopPrank();
     }
 
@@ -367,7 +367,7 @@ contract TestLinearAllowanceIntegration is Test {
         vm.deal(address(failingSafe), 100 ether);
 
         // Create a delegate (executor) that we'll use
-        LinearAllowanceExecutorTestHarness executor = createWhitelistedExecutor();
+        LinearAllowanceExecutorTestHarness executor = createAllowsetedExecutor();
 
         // Set allowance for ETH (using address(0) as native token)
         vm.prank(address(failingSafe));
@@ -387,7 +387,7 @@ contract TestLinearAllowanceIntegration is Test {
         TestERC20 testToken = new TestERC20(100 ether);
 
         // Create a delegate (executor) that we'll use
-        LinearAllowanceExecutorTestHarness executor = createWhitelistedExecutor();
+        LinearAllowanceExecutorTestHarness executor = createAllowsetedExecutor();
 
         // Create an allowance
         vm.prank(address(safe));
@@ -430,16 +430,16 @@ contract TestLinearAllowanceIntegration is Test {
         LinearAllowanceExecutorTestHarness normalExecutor = new LinearAllowanceExecutorTestHarness();
         LinearAllowanceExecutorTestHarness emergencyExecutor = new LinearAllowanceExecutorTestHarness();
 
-        // Create and setup whitelists for both executors
-        AddressSet normalWhitelist = new AddressSet();
-        AddressSet emergencyWhitelist = new AddressSet();
+        // Create and setup allowsets for both executors
+        AddressSet normalAllowset = new AddressSet();
+        AddressSet emergencyAllowset = new AddressSet();
 
-        normalExecutor.assignModuleAddressSet(IAddressSet(address(normalWhitelist)));
-        emergencyExecutor.assignModuleAddressSet(IAddressSet(address(emergencyWhitelist)));
+        normalExecutor.assignModuleAddressSet(IAddressSet(address(normalAllowset)));
+        emergencyExecutor.assignModuleAddressSet(IAddressSet(address(emergencyAllowset)));
 
         // AddressSet the allowance module
-        normalWhitelist.add(address(allowanceModule));
-        emergencyWhitelist.add(address(allowanceModule));
+        normalAllowset.add(address(allowanceModule));
+        emergencyAllowset.add(address(allowanceModule));
 
         // Set identical allowances for both executors
         vm.startPrank(safeAddress);
@@ -531,7 +531,7 @@ contract TestLinearAllowanceIntegration is Test {
     function testRevokeWithPartialUnspentAndAccrual() public {
         uint128 dripRate = 50 ether;
         address safeAddress = address(safeImpl);
-        LinearAllowanceExecutorTestHarness executor = createWhitelistedExecutor();
+        LinearAllowanceExecutorTestHarness executor = createAllowsetedExecutor();
 
         // Set allowance and let some accrue
         vm.prank(safeAddress);
@@ -596,7 +596,7 @@ contract TestLinearAllowanceIntegration is Test {
     function testRevokeAccessControl_OnlySafeCanRevokeItsOwnAllowances() public {
         uint128 dripRate = 100 ether;
         address safeAddress = address(safeImpl);
-        LinearAllowanceExecutorTestHarness executor = createWhitelistedExecutor();
+        LinearAllowanceExecutorTestHarness executor = createAllowsetedExecutor();
 
         // Setup allowance from safe
         vm.prank(safeAddress);
@@ -621,7 +621,7 @@ contract TestLinearAllowanceIntegration is Test {
         uint128 dripRate = 100 ether;
         address safeAddress = address(safeImpl);
         address attacker = makeAddr("attacker");
-        LinearAllowanceExecutorTestHarness executor = createWhitelistedExecutor();
+        LinearAllowanceExecutorTestHarness executor = createAllowsetedExecutor();
 
         // Setup allowance from safe
         vm.prank(safeAddress);
@@ -652,7 +652,7 @@ contract TestLinearAllowanceIntegration is Test {
         address safeAddress = address(safeImpl);
         address randomUser = makeAddr("randomUser");
         address anotherUser = makeAddr("anotherUser");
-        LinearAllowanceExecutorTestHarness executor = createWhitelistedExecutor();
+        LinearAllowanceExecutorTestHarness executor = createAllowsetedExecutor();
 
         // Setup allowances from multiple addresses
         vm.prank(safeAddress);
@@ -692,7 +692,7 @@ contract TestLinearAllowanceIntegration is Test {
     function testRevokeAccessControl_SafeOwnersCanRevokeViaMultisig() public {
         uint128 dripRate = 100 ether;
         address safeAddress = address(safeImpl);
-        LinearAllowanceExecutorTestHarness executor = createWhitelistedExecutor();
+        LinearAllowanceExecutorTestHarness executor = createAllowsetedExecutor();
 
         // Setup allowance
         vm.prank(safeAddress);
@@ -724,7 +724,7 @@ contract TestLinearAllowanceIntegration is Test {
         uint128 dripRate = 100 ether;
         address safeAddress = address(safeImpl);
         address nonOwner = makeAddr("nonOwner");
-        LinearAllowanceExecutorTestHarness executor = createWhitelistedExecutor();
+        LinearAllowanceExecutorTestHarness executor = createAllowsetedExecutor();
 
         // Setup allowance
         vm.prank(safeAddress);
@@ -772,7 +772,7 @@ contract TestLinearAllowanceIntegration is Test {
         uint128 dripRate = 100 ether;
         address safeAddress = address(safeImpl);
         address attacker = makeAddr("attacker");
-        LinearAllowanceExecutorTestHarness executor = createWhitelistedExecutor();
+        LinearAllowanceExecutorTestHarness executor = createAllowsetedExecutor();
 
         // Setup allowance from safe
         vm.prank(safeAddress);
@@ -797,7 +797,7 @@ contract TestLinearAllowanceIntegration is Test {
     function testRevokeAccessControl_MaliciousModuleCannotAbuseFunction() public {
         uint128 dripRate = 100 ether;
         address safeAddress = address(safeImpl);
-        LinearAllowanceExecutorTestHarness executor = createWhitelistedExecutor();
+        LinearAllowanceExecutorTestHarness executor = createAllowsetedExecutor();
 
         // Setup allowance from safe
         vm.prank(safeAddress);
@@ -868,7 +868,7 @@ contract TestLinearAllowanceIntegration is Test {
     function testSetAllowanceAccessControl_OnlySafeCanSetItsOwnAllowances() public {
         uint128 dripRate = 100 ether;
         address safeAddress = address(safeImpl);
-        LinearAllowanceExecutorTestHarness executor = createWhitelistedExecutor();
+        LinearAllowanceExecutorTestHarness executor = createAllowsetedExecutor();
 
         // ✅ TEST: Safe itself can set allowances for delegates
         vm.prank(safeAddress);
@@ -883,7 +883,7 @@ contract TestLinearAllowanceIntegration is Test {
         uint128 dripRate = 100 ether;
         address safeAddress = address(safeImpl);
         address attacker = makeAddr("attacker");
-        LinearAllowanceExecutorTestHarness executor = createWhitelistedExecutor();
+        LinearAllowanceExecutorTestHarness executor = createAllowsetedExecutor();
 
         // ❌ TEST: Attacker tries to set allowances for a Safe they don't control
         vm.prank(attacker);
@@ -901,7 +901,7 @@ contract TestLinearAllowanceIntegration is Test {
         uint128 legitimateDripRate = 50 ether;
         uint128 maliciousDripRate = 1000 ether; // Much higher!
         address safeAddress = address(safeImpl);
-        LinearAllowanceExecutorTestHarness executor = createWhitelistedExecutor();
+        LinearAllowanceExecutorTestHarness executor = createAllowsetedExecutor();
 
         // Setup: Safe sets a legitimate allowance
         vm.prank(safeAddress);
@@ -950,7 +950,7 @@ contract TestLinearAllowanceIntegration is Test {
     function testSetAllowanceAccessControl_SafeOwnersCanSetAllowanceViaMultisig() public {
         uint128 dripRate = 75 ether;
         address safeAddress = address(safeImpl);
-        LinearAllowanceExecutorTestHarness executor = createWhitelistedExecutor();
+        LinearAllowanceExecutorTestHarness executor = createAllowsetedExecutor();
 
         // ✅ TEST: Safe owners can set allowances via Safe's execTransaction mechanism
         bytes memory setAllowanceData = abi.encodeWithSelector(
@@ -971,7 +971,7 @@ contract TestLinearAllowanceIntegration is Test {
     function testSetAllowanceAccessControl_MaliciousModuleGradualIncrease() public {
         uint128 legitimateRate = 10 ether;
         address safeAddress = address(safeImpl);
-        LinearAllowanceExecutorTestHarness executor = createWhitelistedExecutor();
+        LinearAllowanceExecutorTestHarness executor = createAllowsetedExecutor();
 
         // Setup: Safe sets legitimate allowance
         vm.prank(safeAddress);

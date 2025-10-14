@@ -37,7 +37,7 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 /// - Lower gas costs: no surrogate contract deployment
 /// - Simpler integration: contract holds tokens directly
 /// - No voting capabilities through delegation
-/// - Same security model: both variants use owner-centric whitelist authorization
+/// - Same security model: both variants use owner-centric allowset authorization
 ///
 /// @dev USE CASE: Choose this variant for simple ERC20 staking without governance requirements.
 contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
@@ -58,8 +58,8 @@ contract RegenStakerWithoutDelegateSurrogateVotes is RegenStakerBase {
     /// @param _stakerAllowset The allowlist for stakers (ALLOWSET mode). Can be address(0).
     /// @param _stakerBlockset The blocklist for stakers (BLOCKSET mode). Can be address(0).
     /// @param _stakerAccessMode The staker access mode (NONE, ALLOWSET, or BLOCKSET).
-    /// @param _allocationMechanismAllowset The whitelist for allocation mechanisms. SECURITY CRITICAL.
-    ///      Only audited and trusted allocation mechanisms should be whitelisted.
+    /// @param _allocationMechanismAllowset The allowset for allocation mechanisms. SECURITY CRITICAL.
+    ///      Only audited and trusted allocation mechanisms should be in the allowset.
     ///      Users contribute funds to these mechanisms and may lose funds if mechanisms are malicious.
     constructor(
         IERC20 _rewardsToken,

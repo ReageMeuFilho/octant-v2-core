@@ -36,9 +36,9 @@ contract REG003_ComprehensiveProductionProofTest is Test {
     MockERC20 public rewardToken;
     MockERC20Staking public stakeToken;
     AddressSet public stakerAllowset;
-    AddressSet public earningPowerWhitelist;
-    AddressSet public contributorWhitelist;
-    AddressSet public allocationWhitelist;
+    AddressSet public earningPowerAllowset;
+    AddressSet public contributorAllowset;
+    AddressSet public allocationAllowset;
 
     address public admin = makeAddr("admin");
     address public rewardNotifier = makeAddr("rewardNotifier");
@@ -58,15 +58,15 @@ contract REG003_ComprehensiveProductionProofTest is Test {
         rewardToken = new MockERC20(18);
         stakeToken = new MockERC20Staking(18);
 
-        // Deploy whitelists as admin
+        // Deploy allowsets as admin
         vm.startPrank(admin);
         stakerAllowset = new AddressSet();
-        earningPowerWhitelist = new AddressSet();
-        contributorWhitelist = new AddressSet();
-        allocationWhitelist = new AddressSet();
+        earningPowerAllowset = new AddressSet();
+        contributorAllowset = new AddressSet();
+        allocationAllowset = new AddressSet();
         earningPowerCalculator = new RegenEarningPowerCalculator(
             admin,
-            earningPowerWhitelist,
+            earningPowerAllowset,
             IAddressSet(address(0)),
             AccessMode.ALLOWSET
         );
@@ -83,19 +83,19 @@ contract REG003_ComprehensiveProductionProofTest is Test {
             stakerAllowset,
             IAddressSet(address(0)),
             AccessMode.NONE,
-            allocationWhitelist
+            allocationAllowset
         );
 
         // Setup reward notifier
         regenStaker.setRewardNotifier(rewardNotifier, true);
 
-        // Setup whitelists
+        // Setup allowsets
         stakerAllowset.add(alice);
         stakerAllowset.add(bob);
         stakerAllowset.add(charlie);
-        earningPowerWhitelist.add(alice);
-        earningPowerWhitelist.add(bob);
-        earningPowerWhitelist.add(charlie);
+        earningPowerAllowset.add(alice);
+        earningPowerAllowset.add(bob);
+        earningPowerAllowset.add(charlie);
         vm.stopPrank();
 
         // Fund accounts with production-realistic amounts
@@ -403,11 +403,11 @@ contract REG003_ComprehensiveProductionProofTest is Test {
         vm.startPrank(admin);
 
         // Minimal setup - only essential components
-        AddressSet testStakerWhitelist = new AddressSet();
-        AddressSet testEarningPowerWhitelist = new AddressSet();
+        AddressSet testStakerAllowset = new AddressSet();
+        AddressSet testEarningPowerAllowset = new AddressSet();
         RegenEarningPowerCalculator testCalculator = new RegenEarningPowerCalculator(
             admin,
-            testEarningPowerWhitelist,
+            testEarningPowerAllowset,
             IAddressSet(address(0)),
             AccessMode.ALLOWSET
         );
@@ -420,16 +420,16 @@ contract REG003_ComprehensiveProductionProofTest is Test {
             admin, // admin
             uint128(duration), // rewardDuration - key parameter
             1, // minStakeAmount - minimal for testing
-            testStakerWhitelist,
+            testStakerAllowset,
             IAddressSet(address(0)),
             AccessMode.NONE,
-            new AddressSet() // allocationWhitelist
+            new AddressSet() // allocationAllowset
         );
 
         // Setup permissions
         testStaker.setRewardNotifier(admin, true);
-        testStakerWhitelist.add(alice);
-        testEarningPowerWhitelist.add(alice);
+        testStakerAllowset.add(alice);
+        testEarningPowerAllowset.add(alice);
 
         vm.stopPrank();
         return testStaker;

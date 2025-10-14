@@ -28,8 +28,8 @@ contract RegenStakerBaseVotingPowerAssignmentTest is Test {
     MockEarningPowerCalculator public earningPowerCalculator;
     OctantQFMechanism public allocationMechanism;
     AddressSet public stakerAllowset;
-    AddressSet public contributionWhitelist;
-    AddressSet public allocationWhitelist;
+    AddressSet public contributionAllowset;
+    AddressSet public allocationAllowset;
 
     address public admin = makeAddr("admin");
     address public owner;
@@ -77,18 +77,18 @@ contract RegenStakerBaseVotingPowerAssignmentTest is Test {
             AccessMode.NONE
         );
 
-        // Deploy and configure whitelists
+        // Deploy and configure allowsets
         vm.startPrank(admin);
         stakerAllowset = new AddressSet();
-        contributionWhitelist = new AddressSet();
-        allocationWhitelist = new AddressSet();
+        contributionAllowset = new AddressSet();
+        allocationAllowset = new AddressSet();
 
-        // Add both owner and claimer to necessary whitelists
+        // Add both owner and claimer to necessary allowsets
         stakerAllowset.add(owner);
         stakerAllowset.add(claimer);
-        contributionWhitelist.add(owner);
-        contributionWhitelist.add(claimer);
-        allocationWhitelist.add(address(allocationMechanism));
+        contributionAllowset.add(owner);
+        contributionAllowset.add(claimer);
+        allocationAllowset.add(address(allocationMechanism));
         vm.stopPrank();
 
         // Deploy RegenStaker with same token for stake/reward
@@ -104,7 +104,7 @@ contract RegenStakerBaseVotingPowerAssignmentTest is Test {
             IAddressSet(address(stakerAllowset)),
             IAddressSet(address(0)),
             AccessMode.NONE,
-            IAddressSet(address(allocationWhitelist))
+            IAddressSet(address(allocationAllowset))
         );
 
         // Fund and create deposit with claimer designation

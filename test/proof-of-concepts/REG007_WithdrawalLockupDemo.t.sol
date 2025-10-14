@@ -32,10 +32,10 @@ contract REG007WithdrawalLockupDemoTest is Test {
         MockERC20 rewardToken = new MockERC20(18);
         stakeToken = new MockERC20Staking(18);
         AddressSet stakerAllowset = new AddressSet();
-        AddressSet earningPowerWhitelist = new AddressSet();
+        AddressSet earningPowerAllowset = new AddressSet();
         RegenEarningPowerCalculator calc = new RegenEarningPowerCalculator(
             address(this),
-            earningPowerWhitelist,
+            earningPowerAllowset,
             IAddressSet(address(0)),
             AccessMode.ALLOWSET
         );
@@ -55,7 +55,7 @@ contract REG007WithdrawalLockupDemoTest is Test {
         );
 
         stakerAllowset.add(user);
-        earningPowerWhitelist.add(user);
+        earningPowerAllowset.add(user);
         stakeToken.mint(user, STAKE_AMOUNT);
     }
 

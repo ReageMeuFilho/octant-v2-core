@@ -19,7 +19,7 @@ import { MockERC20 } from "test/mocks/MockERC20.sol";
 contract RegenMonotonicRewardInvariant is StdInvariant, Test {
     RegenStakerWithoutDelegateSurrogateVotes public staker;
     MockERC20 public token;
-    AddressSet public whitelist;
+    AddressSet public allowset;
     RegenEarningPowerCalculator public earningPowerCalculator;
     address public admin = address(0xA);
     address public notifier = address(0xB);
@@ -28,11 +28,11 @@ contract RegenMonotonicRewardInvariant is StdInvariant, Test {
 
     function setUp() public {
         token = new MockERC20(18);
-        whitelist = new AddressSet();
-        whitelist.add(user);
+        allowset = new AddressSet();
+        allowset.add(user);
         earningPowerCalculator = new RegenEarningPowerCalculator(
             admin,
-            IAddressSet(address(whitelist)),
+            IAddressSet(address(allowset)),
             IAddressSet(address(0)),
             AccessMode.ALLOWSET
         );
@@ -48,7 +48,7 @@ contract RegenMonotonicRewardInvariant is StdInvariant, Test {
             IAddressSet(address(0)),
             IAddressSet(address(0)),
             AccessMode.NONE,
-            whitelist
+            allowset
         );
 
         vm.prank(admin);

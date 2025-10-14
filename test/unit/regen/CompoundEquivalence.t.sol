@@ -30,7 +30,7 @@ contract CompoundEquivalenceTest is Test {
     RegenEarningPowerCalculator internal calculator;
     RegenStakerWithoutDelegateSurrogateVotes internal stakerA; // compound path
     RegenStakerWithoutDelegateSurrogateVotes internal stakerB; // claim+stakeMore path
-    AddressSet internal allocationWhitelist;
+    AddressSet internal allocationAllowset;
 
     function setUp() public {
         token = new MockERC20Permit(18);
@@ -40,7 +40,7 @@ contract CompoundEquivalenceTest is Test {
             IAddressSet(address(0)),
             AccessMode.NONE
         );
-        allocationWhitelist = new AddressSet();
+        allocationAllowset = new AddressSet();
 
         stakerA = new RegenStakerWithoutDelegateSurrogateVotes(
             token,
@@ -53,7 +53,7 @@ contract CompoundEquivalenceTest is Test {
             IAddressSet(address(0)),
             IAddressSet(address(0)),
             AccessMode.NONE,
-            IAddressSet(address(allocationWhitelist))
+            IAddressSet(address(allocationAllowset))
         );
 
         stakerB = new RegenStakerWithoutDelegateSurrogateVotes(
@@ -67,7 +67,7 @@ contract CompoundEquivalenceTest is Test {
             IAddressSet(address(0)),
             IAddressSet(address(0)),
             AccessMode.NONE,
-            IAddressSet(address(allocationWhitelist))
+            IAddressSet(address(allocationAllowset))
         );
 
         // fund user and stakers for rewards
@@ -161,7 +161,7 @@ contract CompoundEquivalenceTest is Test {
             IAddressSet(address(0)),
             IAddressSet(address(0)),
             AccessMode.NONE,
-            IAddressSet(address(allocationWhitelist))
+            IAddressSet(address(allocationAllowset))
         );
         RegenStakerWithoutDelegateSurrogateVotes B = new RegenStakerWithoutDelegateSurrogateVotes(
             tkn,
@@ -174,7 +174,7 @@ contract CompoundEquivalenceTest is Test {
             IAddressSet(address(0)),
             IAddressSet(address(0)),
             AccessMode.NONE,
-            IAddressSet(address(allocationWhitelist))
+            IAddressSet(address(allocationAllowset))
         );
 
         // fund
