@@ -357,7 +357,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
             InvalidRewardDuration(uint256(_rewardDuration))
         );
         // Align initialization invariants with setters: allocation mechanism allowset cannot be disabled
-        require(address(_allocationMechanismAllowset) != address(0), DisablingAllocationMechanismWhitelistNotAllowed());
+        require(address(_allocationMechanismAllowset) != address(0), DisablingAllocationMechanismAllowsetNotAllowed());
         // Sanity check: Allocation mechanism allowset must be distinct from staker address sets
         require(
             address(_allocationMechanismAllowset) != address(_stakerAllowset) &&
@@ -508,7 +508,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @param _allocationMechanismAllowset New allowset contract (cannot be address(0))
     function setAllocationMechanismAllowset(IAddressSet _allocationMechanismAllowset) external {
         require(sharedState.allocationMechanismAllowset != _allocationMechanismAllowset, NoOperation());
-        require(address(_allocationMechanismAllowset) != address(0), DisablingAllocationMechanismWhitelistNotAllowed());
+        require(address(_allocationMechanismAllowset) != address(0), DisablingAllocationMechanismAllowsetNotAllowed());
         // Prevent footgun: allocation mechanism allowset must be distinct from staker address sets
         require(
             address(_allocationMechanismAllowset) != address(sharedState.stakerAllowset) &&
