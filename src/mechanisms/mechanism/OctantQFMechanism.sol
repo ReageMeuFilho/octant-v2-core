@@ -37,13 +37,30 @@ contract OctantQFMechanism is QuadraticVotingMechanism {
         emit AccessModeSet(_contributionAccessMode);
     }
 
+    /// @notice Hook to validate user eligibility during signup
+    /// @param user The address attempting to register
+    /// @return True if registration should proceed
+    /// @dev Reverts with specific error messages for unauthorized users
     function _beforeSignupHook(address user) internal view virtual override returns (bool) {
-        if (contributionAccessMode == AccessMode.ALLOWSET) {
-            require(contributionAllowset.contains(user), NotInAllowset(user));
-        } else if (contributionAccessMode == AccessMode.BLOCKSET) {
-            require(!contributionBlockset.contains(user), InBlockset(user));
+        if (!_isUserAuthorized(user)) {
+            if (contributionAccessMode == AccessMode.ALLOWSET) {
+                revert NotInAllowset(user);
+            } else {
+                revert InBlockset(user);
+            }
         }
+        return true;
+    }
 
+    /// @dev Internal helper to check access control without reverting
+    /// @param user The address to check
+    /// @return True if user passes access control checks, false otherwise
+    function _isUserAuthorized(address user) internal view returns (bool) {
+        if (contributionAccessMode == AccessMode.ALLOWSET) {
+            return contributionAllowset.contains(user);
+        } else if (contributionAccessMode == AccessMode.BLOCKSET) {
+            return !contributionBlockset.contains(user);
+        }
         return true;
     }
 
@@ -94,11 +111,6 @@ contract OctantQFMechanism is QuadraticVotingMechanism {
     ///      ALLOWSET: returns true if user is in contributionAllowset
     ///      BLOCKSET: returns true if user is NOT in contributionBlockset
     function canSignup(address user) external view returns (bool) {
-        if (contributionAccessMode == AccessMode.ALLOWSET) {
-            return contributionAllowset.contains(user);
-        } else if (contributionAccessMode == AccessMode.BLOCKSET) {
-            return !contributionBlockset.contains(user);
-        }
-        return true;
+        return _isUserAuthorized(user);
     }
 }
