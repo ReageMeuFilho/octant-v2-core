@@ -22,7 +22,6 @@ import { OctantQFMechanism } from "src/mechanisms/mechanism/OctantQFMechanism.so
 // import { SimpleVotingMechanism } from "test/mocks/SimpleVotingMechanism.sol"; // SimpleVotingMechanism removed
 import { AllocationMechanismFactory } from "src/mechanisms/AllocationMechanismFactory.sol";
 import { AllocationConfig } from "src/mechanisms/BaseAllocationMechanism.sol";
-import { AccessMode } from "src/constants.sol";
 
 /**
  * @title RegenIntegrationTest
@@ -2287,8 +2286,18 @@ contract RegenIntegrationTest is Test {
             owner: address(0) // Factory sets msg.sender as owner
         });
 
-        // Deploy QuadraticVotingMechanism instead of SimpleVotingMechanism
-        address allocationMechanism = allocationFactory.deployQuadraticVotingMechanism(config, 50, 100);
+        // Deploy OctantQFMechanism with no access control (so canSignup() always returns true)
+        config.owner = address(this); // Set owner since we're deploying directly
+        OctantQFMechanism octantQF = new OctantQFMechanism(
+            allocationFactory.tokenizedAllocationImplementation(),
+            config,
+            50, // alphaNumerator
+            100, // alphaDenominator
+            IAddressSet(address(0)), // contributionAllowset - null means no restrictions
+            IAddressSet(address(0)), // contributionBlockset
+            AccessMode.NONE // no access control
+        );
+        address allocationMechanism = address(octantQF);
         whitelistAllocationMechanism(allocationMechanism);
         return allocationMechanism;
     }

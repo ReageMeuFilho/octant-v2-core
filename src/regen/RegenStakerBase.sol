@@ -640,16 +640,10 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         // Cantina Finding #127 where delisted owners could use allowlisted claimers as proxies.
 
         // Explicit fund source check: Verify deposit owner is also eligible for this mechanism
-        // Try to check via mechanism's canSignup if available (OctantQFMechanism interface)
-        try OctantQFMechanism(payable(_allocationMechanismAddress)).canSignup(deposit.owner) returns (
-            bool ownerCanSignup
-        ) {
-            if (!ownerCanSignup) {
-                revert DepositOwnerNotEligibleForMechanism(_allocationMechanismAddress, deposit.owner);
-            }
-        } catch {
-            // If mechanism doesn't support canSignup, no additional check
-            // The mechanism being on allocationMechanismAllowset is the governance approval
+        // Assumes mechanism implements canSignup() (OctantQFMechanism interface)
+        bool ownerCanSignup = OctantQFMechanism(payable(_allocationMechanismAddress)).canSignup(deposit.owner);
+        if (!ownerCanSignup) {
+            revert DepositOwnerNotEligibleForMechanism(_allocationMechanismAddress, deposit.owner);
         }
 
         _checkpointGlobalReward();
