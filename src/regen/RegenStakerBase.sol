@@ -37,6 +37,13 @@ import { NotInAllowset } from "src/errors.sol";
 ///         - Reward contribution to approved allocation mechanisms
 ///         - Admin controls (pause/unpause, config updates)
 ///
+/// @dev WITHDRAWAL PROTECTION:
+///      Users can always withdraw their staked tokens, even when the contract is paused.
+///      The pause functionality affects all other operations (stake, claim, contribute, compound)
+///      but explicitly excludes withdrawals to preserve user access to their principal funds.
+///      This design ensures emergency pause can halt new deposits and reward operations while
+///      maintaining user control over their staked assets at all times.
+///
 /// @dev CLAIMER PERMISSION MODEL:
 ///      Claimers are trusted entities designated by deposit owners with specific permissions:
 ///
@@ -553,9 +560,10 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         _setMaxBumpTip(_newMaxBumpTip);
     }
 
-    /// @notice Pauses the contract, disabling all user operations except view functions
+    /// @notice Pauses the contract, disabling user operations except withdrawals and view functions
     /// @dev EMERGENCY USE: Intended for security incidents or critical maintenance.
-    /// @dev SCOPE: Affects stake, withdraw, claim, contribute, and compound operations.
+    /// @dev SCOPE: Affects stake, claim, contribute, and compound operations.
+    /// @dev USER PROTECTION: Withdrawals remain enabled to preserve user access to their funds.
     /// @dev ADMIN ONLY: Only admin can pause. Use emergency procedures for urgent situations.
     function pause() external whenNotPaused {
         _revertIfNotAdmin();
@@ -870,7 +878,9 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     }
 
     /// @inheritdoc Staker
-    /// @notice Prevents withdrawing 0; prevents withdrawals that drop balance below minimum; disabled when paused.
+    /// @notice Prevents withdrawing 0; prevents withdrawals that drop balance below minimum.
+    /// @dev USER PROTECTION: Withdrawals remain enabled even when contract is paused to ensure
+    ///      users can always access their principal funds.
     /// @dev Uses reentrancy guard
     /// @param deposit The deposit storage
     /// @param _depositId The deposit identifier
@@ -879,7 +889,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         Deposit storage deposit,
         DepositIdentifier _depositId,
         uint256 _amount
-    ) internal virtual override whenNotPaused nonReentrant {
+    ) internal virtual override nonReentrant {
         require(_amount > 0, ZeroOperation());
         super._withdraw(deposit, _depositId, _amount);
         _revertIfMinimumStakeAmountNotMet(_depositId);
