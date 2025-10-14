@@ -10,12 +10,11 @@ import { IAddressSet } from "src/utils/IAddressSet.sol";
 import { AllocationConfig } from "src/mechanisms/BaseAllocationMechanism.sol";
 import { ERC20Mock } from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { AccessMode } from "src/constants.sol";
 
 contract OctantQFMechanismTest is Test {
     OctantQFMechanism public mechanism;
     TokenizedAllocationMechanism public implementation;
-    AddressSet public whitelist;
+    AddressSet public allowset;
     ERC20Mock public token;
 
     address public owner = makeAddr("owner");
@@ -38,7 +37,7 @@ contract OctantQFMechanismTest is Test {
     uint256 constant TIMELOCK_DELAY = 50;
     uint256 constant GRACE_PERIOD = 100;
 
-    event WhitelistUpdated(address indexed oldWhitelist, address indexed newWhitelist);
+    event AllowsetUpdated(address indexed oldAllowset, address indexed newAllowset);
 
     function setUp() public {
         vm.startPrank(owner);
@@ -47,8 +46,8 @@ contract OctantQFMechanismTest is Test {
         token = new ERC20Mock();
         token.mint(owner, INITIAL_SUPPLY);
 
-        // Deploy whitelist
-        whitelist = new AddressSet();
+        // Deploy allowset
+        allowset = new AddressSet();
 
         // Deploy TokenizedAllocationMechanism implementation
         implementation = new TokenizedAllocationMechanism();
@@ -72,7 +71,7 @@ contract OctantQFMechanismTest is Test {
             config,
             10000, // alphaNumerator (1.0)
             10000, // alphaDenominator
-            IAddressSet(address(whitelist)), // contributionAllowset
+            IAddressSet(address(allowset)), // contributionAllowset
             IAddressSet(address(0)), // contributionBlockset
             AccessMode.NONE
         );
@@ -94,14 +93,14 @@ contract OctantQFMechanismTest is Test {
 
     // ===== AddressSet Integration Tests =====
 
-    function skip_test_WhitelistedUserCanSignup() public {
+    function skip_test_AllowsetUserCanSignup() public {
         // Configure allowset mode
         vm.startPrank(owner);
-        mechanism.setContributionAllowset(IAddressSet(address(whitelist)));
+        mechanism.setContributionAllowset(IAddressSet(address(allowset)));
         mechanism.setAccessMode(AccessMode.ALLOWSET);
 
         // Add alice to allowset
-        whitelist.add(alice);
+        allowset.add(alice);
         vm.stopPrank();
 
         // Alice approves and signs up
@@ -114,12 +113,12 @@ contract OctantQFMechanismTest is Test {
         assertEq(tam().votingPower(alice), SIGNUP_AMOUNT);
     }
 
-    function test_NonWhitelistedUserCannotSignup() public {
+    function test_NonAllowsetUserCannotSignup() public {
         // Configure allowset mode with only alice allowed
         vm.startPrank(owner);
-        mechanism.setContributionAllowset(IAddressSet(address(whitelist)));
+        mechanism.setContributionAllowset(IAddressSet(address(allowset)));
         mechanism.setAccessMode(AccessMode.ALLOWSET);
-        whitelist.add(alice); // Only alice in allowset, not bob
+        allowset.add(alice); // Only alice in allowset, not bob
         vm.stopPrank();
 
         // Bob is not in allowset
@@ -170,19 +169,19 @@ contract OctantQFMechanismTest is Test {
         // DEPRECATED TEST - whitelist functionality removed
     }
 
-    function skip_test_WhitelistUpdatedEventEmitted() public {
-        // DEPRECATED TEST - whitelist functionality removed
+    function skip_test_AllowsetUpdatedEventEmitted() public {
+        // DEPRECATED TEST - allowset event test removed
     }
 
     // ===== State Transition Tests =====
 
-    function skip_test_AddingToWhitelistAllowsSignup() public {
+    function skip_test_AddingToAllowsetAllowsSignup() public {
         // Initially bob cannot signup
         assertFalse(mechanism.canSignup(bob));
 
-        // Add bob to whitelist
+        // Add bob to allowset
         vm.prank(owner);
-        whitelist.add(bob);
+        allowset.add(bob);
 
         // Now bob can signup
         assertTrue(mechanism.canSignup(bob));
@@ -195,17 +194,17 @@ contract OctantQFMechanismTest is Test {
         assertEq(tam().votingPower(bob), SIGNUP_AMOUNT);
     }
 
-    function test_RemovingFromWhitelistPreventsSignup() public {
+    function test_RemovingFromAllowsetPreventsSignup() public {
         // Configure ALLOWSET mode
         vm.startPrank(owner);
-        mechanism.setContributionAllowset(IAddressSet(address(whitelist)));
+        mechanism.setContributionAllowset(IAddressSet(address(allowset)));
         mechanism.setAccessMode(AccessMode.ALLOWSET);
 
         // Add and then remove alice
-        whitelist.add(alice);
+        allowset.add(alice);
         assertTrue(mechanism.canSignup(alice));
 
-        whitelist.remove(alice);
+        allowset.remove(alice);
         assertFalse(mechanism.canSignup(alice));
         vm.stopPrank();
 
@@ -217,16 +216,16 @@ contract OctantQFMechanismTest is Test {
         vm.stopPrank();
     }
 
-    function test_ChangingWhitelistAffectsAccess() public {
+    function test_ChangingAllowsetAffectsAccess() public {
         // Setup two allowsets
         vm.startPrank(owner);
-        AddressSet whitelist2 = new AddressSet();
+        AddressSet allowset2 = new AddressSet();
 
-        // Add alice to first whitelist, bob to second
-        whitelist.add(alice);
-        whitelist2.add(bob);
+        // Add alice to first allowset, bob to second
+        allowset.add(alice);
+        allowset2.add(bob);
 
-        mechanism.setContributionAllowset(IAddressSet(address(whitelist)));
+        mechanism.setContributionAllowset(IAddressSet(address(allowset)));
         mechanism.setAccessMode(AccessMode.ALLOWSET);
         vm.stopPrank();
 
@@ -236,7 +235,7 @@ contract OctantQFMechanismTest is Test {
 
         // Switch to second allowset
         vm.prank(owner);
-        mechanism.setContributionAllowset(IAddressSet(address(whitelist2)));
+        mechanism.setContributionAllowset(IAddressSet(address(allowset2)));
 
         // Now bob can signup but not alice
         assertFalse(mechanism.canSignup(alice));
@@ -245,14 +244,14 @@ contract OctantQFMechanismTest is Test {
 
     // ===== Integration Tests =====
 
-    function test_FullVoterJourneyForWhitelistedUser() public {
-        // Add alice, bob, and charlie to whitelist
+    function test_FullVoterJourneyForAllowsetUser() public {
+        // Add alice, bob, and charlie to allowset
         vm.startPrank(owner);
         address[] memory voters = new address[](3);
         voters[0] = alice;
         voters[1] = bob;
         voters[2] = charlie;
-        whitelist.add(voters);
+        allowset.add(voters);
         vm.stopPrank();
 
         // All three users signup
@@ -294,9 +293,9 @@ contract OctantQFMechanismTest is Test {
     }
 
     function test_ProposalCreationStillRestrictedToKeeperManagement() public {
-        // AddressSet alice
+        // Add alice to allowset
         vm.prank(owner);
-        whitelist.add(alice);
+        allowset.add(alice);
 
         // Alice signs up
         vm.startPrank(alice);
@@ -319,10 +318,10 @@ contract OctantQFMechanismTest is Test {
 
     // ===== Edge Cases =====
 
-    function skip_test_ZeroAddressWhitelistBehavesAsAllowAll() public {
-        // Set whitelist to zero address
+    function skip_test_ZeroAddressAllowsetBehavesAsAllowAll() public {
+        // Set allowset to zero address
         vm.prank(owner);
-        // DEPRECATED: mechanism.setWhitelist(address(0));
+        // DEPRECATED: mechanism.setContributionAllowset(address(0));
 
         // Anyone can signup
         address[] memory users = new address[](3);
@@ -342,11 +341,11 @@ contract OctantQFMechanismTest is Test {
         }
     }
 
-    function skip_test_WhitelistWithNoUsersBlocksAllSignups() public {
+    function skip_test_AllowsetWithNoUsersBlocksAllSignups() public {
         // AddressSet has no users
-        assertFalse(whitelist.contains(alice));
-        assertFalse(whitelist.contains(bob));
-        assertFalse(whitelist.contains(charlie));
+        assertFalse(allowset.contains(alice));
+        assertFalse(allowset.contains(bob));
+        assertFalse(allowset.contains(charlie));
 
         // No one can signup
         address[] memory users = new address[](3);
@@ -365,10 +364,10 @@ contract OctantQFMechanismTest is Test {
         }
     }
 
-    function test_BatchWhitelistOperations() public {
+    function test_BatchAllowsetOperations() public {
         // Configure ALLOWSET mode
         vm.startPrank(owner);
-        mechanism.setContributionAllowset(IAddressSet(address(whitelist)));
+        mechanism.setContributionAllowset(IAddressSet(address(allowset)));
         mechanism.setAccessMode(AccessMode.ALLOWSET);
 
         // Add multiple users at once
@@ -378,7 +377,7 @@ contract OctantQFMechanismTest is Test {
         usersToAdd[2] = charlie;
 
         for (uint i = 0; i < usersToAdd.length; i++) {
-            whitelist.add(usersToAdd[i]);
+            allowset.add(usersToAdd[i]);
         }
 
         // All can signup
@@ -392,7 +391,7 @@ contract OctantQFMechanismTest is Test {
         usersToRemove[1] = bob;
 
         for (uint i = 0; i < usersToRemove.length; i++) {
-            whitelist.remove(usersToRemove[i]);
+            allowset.remove(usersToRemove[i]);
         }
 
         // Removed users cannot signup

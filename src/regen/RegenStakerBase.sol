@@ -113,6 +113,11 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @param user The user address
     error StakerBlocked(address user);
 
+    /// @notice Error thrown when deposit owner is not eligible for the target mechanism
+    /// @param mechanism The allocation mechanism address
+    /// @param owner The deposit owner address
+    error DepositOwnerNotEligibleForMechanism(address mechanism, address owner);
+
     /// @notice Error thrown when reward notification would corrupt user deposits (same-token scenario)
     /// @param currentBalance The actual token balance in the contract
     /// @param required The minimum balance needed (totalStaked + reward amount)
@@ -640,7 +645,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
             bool ownerCanSignup
         ) {
             if (!ownerCanSignup) {
-                revert NotInAllowset(sharedState.allocationMechanismAllowset, deposit.owner);
+                revert DepositOwnerNotEligibleForMechanism(_allocationMechanismAddress, deposit.owner);
             }
         } catch {
             // If mechanism doesn't support canSignup, no additional check

@@ -2614,7 +2614,7 @@ contract RegenIntegrationTest is Test {
         // Alice is not whitelisted for contribution, defense-in-depth check rejects
         vm.prank(alice);
         vm.expectRevert(
-            abi.encodeWithSelector(RegenStakerBase.NotInAllowset.selector, allocationMechanismAllowset, alice)
+            abi.encodeWithSelector(RegenStakerBase.DepositOwnerNotEligibleForMechanism.selector, allocationMechanism, alice)
         );
         regenStaker.contribute(depositId, allocationMechanism, contributeAmount, deadline, v, r, s);
     }

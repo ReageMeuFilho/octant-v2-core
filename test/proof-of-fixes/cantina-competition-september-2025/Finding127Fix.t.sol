@@ -160,8 +160,8 @@ contract Cantina127Fix is Test {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(bobPk, digest);
 
         vm.prank(bob);
-        // Expect error with allocationWhitelist (list of approved mechanisms) and alice (the ineligible owner)
-        vm.expectRevert(abi.encodeWithSelector(RegenStakerBase.NotInAllowset.selector, allocationWhitelist, alice));
+        // Expect error indicating alice (deposit owner) is not eligible for the mechanism
+        vm.expectRevert(abi.encodeWithSelector(RegenStakerBase.DepositOwnerNotEligibleForMechanism.selector, address(allocationMechanism), alice));
         regenStaker.contribute(depositId, address(allocationMechanism), CONTRIBUTION_AMOUNT, deadline, v, r, s);
 
         // PATH 2: Try claim → direct signup (the bypass path)
