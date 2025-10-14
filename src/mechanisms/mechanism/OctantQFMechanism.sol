@@ -104,12 +104,13 @@ contract OctantQFMechanism is QuadraticVotingMechanism {
     }
 
     /// @notice Checks if a user is eligible to signup/contribute based on current access mode
-    /// @param user The address to check
-    /// @return bool True if user can signup, false otherwise
-    /// @dev Used for defense-in-depth checks. Respects contributionAccessMode:
+    /// @dev Required for allocation mechanism to be compatible with RegenStaker.
+    ///      Used for defense-in-depth checks. Respects contributionAccessMode:
     ///      NONE: always returns true
     ///      ALLOWSET: returns true if user is in contributionAllowset
     ///      BLOCKSET: returns true if user is NOT in contributionBlockset
+    /// @param user The address to check
+    /// @return bool True if user can signup, false otherwise
     function canSignup(address user) external view returns (bool) {
         return _isUserAuthorized(user);
     }
