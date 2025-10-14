@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import { LinearAllowanceSingletonForGnosisSafe } from "src/zodiac-core/modules/LinearAllowanceSingletonForGnosisSafe.sol";
 import { IAddressSet } from "src/utils/IAddressSet.sol";
+import { NotInAllowset } from "src/errors.sol";
 
 /// @title LinearAllowanceExecutor
 /// @author [Golem Foundation](https://golem.foundation)
@@ -20,9 +21,6 @@ import { IAddressSet } from "src/utils/IAddressSet.sol";
 abstract contract LinearAllowanceExecutor {
     /// @notice Address set contract for allowance modules to prevent arbitrary external calls
     IAddressSet public moduleAddressSet;
-
-    /// @notice Error thrown when attempting to use a module not in the address set
-    error ModuleNotInSet(address module);
 
     /// @notice Emitted when the module address set is assigned
     event ModuleAddressSetAssigned(IAddressSet indexed addressSet);
@@ -43,11 +41,11 @@ abstract contract LinearAllowanceExecutor {
 
     /// @notice Validate that a module is permitted to interact with this executor.
     /// @dev If no address set is configured (moduleAddressSet == address(0)), any module is allowed.
-    /// Reverts with ModuleNotInSet when an address set is configured and the module is not in it.
+    /// Reverts with NotInAllowset when an address set is configured and the module is not in it.
     /// @param module The allowance module address to validate.
     function _validateModule(address module) internal view {
         if (address(moduleAddressSet) != address(0) && !moduleAddressSet.contains(module)) {
-            revert ModuleNotInSet(module);
+            revert NotInAllowset(module);
         }
     }
 

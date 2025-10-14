@@ -5,6 +5,7 @@ import { QuadraticVotingMechanism } from "./QuadraticVotingMechanism.sol";
 import { IAddressSet } from "src/utils/IAddressSet.sol";
 import { AccessMode } from "src/constants.sol";
 import { AllocationConfig, TokenizedAllocationMechanism } from "src/mechanisms/BaseAllocationMechanism.sol";
+import { NotInAllowset, InBlockset } from "src/errors.sol";
 
 /// @title Octant Quadratic Funding Mechanism
 /// @notice Extends QuadraticVotingMechanism with access control for signups
@@ -13,9 +14,6 @@ contract OctantQFMechanism is QuadraticVotingMechanism {
     AccessMode public contributionAccessMode;
     IAddressSet public contributionAllowset;
     IAddressSet public contributionBlockset;
-
-    error ContributorNotInAllowset(address user);
-    error ContributorInBlockset(address user);
 
     event ContributionAllowsetAssigned(IAddressSet indexed allowset);
     event ContributionBlocksetAssigned(IAddressSet indexed blockset);
@@ -41,9 +39,9 @@ contract OctantQFMechanism is QuadraticVotingMechanism {
 
     function _beforeSignupHook(address user) internal view virtual override returns (bool) {
         if (contributionAccessMode == AccessMode.ALLOWSET) {
-            require(contributionAllowset.contains(user), ContributorNotInAllowset(user));
+            require(contributionAllowset.contains(user), NotInAllowset(user));
         } else if (contributionAccessMode == AccessMode.BLOCKSET) {
-            require(!contributionBlockset.contains(user), ContributorInBlockset(user));
+            require(!contributionBlockset.contains(user), InBlockset(user));
         }
 
         return true;

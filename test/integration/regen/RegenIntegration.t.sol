@@ -22,6 +22,7 @@ import { OctantQFMechanism } from "src/mechanisms/mechanism/OctantQFMechanism.so
 // import { SimpleVotingMechanism } from "test/mocks/SimpleVotingMechanism.sol"; // SimpleVotingMechanism removed
 import { AllocationMechanismFactory } from "src/mechanisms/AllocationMechanismFactory.sol";
 import { AllocationConfig } from "src/mechanisms/BaseAllocationMechanism.sol";
+import { NotInAllowset } from "src/errors.sol";
 
 /**
  * @title RegenIntegrationTest
@@ -2760,13 +2761,7 @@ contract RegenIntegrationTest is Test {
         rewardToken.approve(allocationMechanism, contributeAmount);
 
         // Should revert with NotWhitelisted for allocation mechanism
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                RegenStakerBase.NotInAllowset.selector,
-                regenStaker.allocationMechanismAllowset(),
-                allocationMechanism
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(NotInAllowset.selector, allocationMechanism));
         regenStaker.contribute(depositId, allocationMechanism, contributeAmount, deadline, v, r, s);
         vm.stopPrank();
     }

@@ -16,6 +16,7 @@ import { AllocationMechanismFactory } from "src/mechanisms/AllocationMechanismFa
 import { AllocationConfig } from "src/mechanisms/BaseAllocationMechanism.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IAddressSet } from "src/utils/IAddressSet.sol";
+import { NotInAllowset } from "src/errors.sol";
 
 /// @title Cantina Competition September 2025 – Finding 127 Fix
 /// @notice Proves the PROPER architectural fix: contribution whitelist at TAM signup, not RegenStaker
@@ -179,7 +180,7 @@ contract Cantina127Fix is Test {
         // Alice now has tokens, tries to signup directly
         vm.startPrank(alice);
         rewardToken.approve(address(allocationMechanism), claimed);
-        vm.expectRevert(abi.encodeWithSelector(OctantQFMechanism.ContributorNotInAllowset.selector, alice));
+        vm.expectRevert(abi.encodeWithSelector(NotInAllowset.selector, alice));
         TokenizedAllocationMechanism(address(allocationMechanism)).signup(claimed);
         vm.stopPrank();
     }

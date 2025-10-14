@@ -22,6 +22,7 @@ import { IEarningPowerCalculator } from "staker/interfaces/IEarningPowerCalculat
 import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocationMechanism.sol";
 import { OctantQFMechanism } from "src/mechanisms/mechanism/OctantQFMechanism.sol";
 import { AccessMode } from "src/constants.sol";
+import { NotInAllowset } from "src/errors.sol";
 
 // === Contract Header ===
 /// @title RegenStakerBase
@@ -100,11 +101,6 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     uint256 public constant MAX_REWARD_DURATION = 3000 days;
 
     // === Custom Errors ===
-    /// @notice Error thrown when an address is not in the required address set
-    /// @param addressSet The address set contract
-    /// @param user The user address
-    error NotInAllowset(IAddressSet addressSet, address user);
-
     /// @notice Error thrown when staker is not in allowset
     /// @param user The user address
     error StakerNotAllowed(address user);
@@ -612,7 +608,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         _revertIfAddressZero(_allocationMechanismAddress);
         require(
             sharedState.allocationMechanismAllowset.contains(_allocationMechanismAddress),
-            NotInAllowset(sharedState.allocationMechanismAllowset, _allocationMechanismAddress)
+            NotInAllowset(_allocationMechanismAddress)
         );
 
         // Validate asset compatibility to fail fast and provide clear error

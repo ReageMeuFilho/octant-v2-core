@@ -10,6 +10,7 @@ import { IAddressSet } from "src/utils/IAddressSet.sol";
 import { AllocationConfig } from "src/mechanisms/BaseAllocationMechanism.sol";
 import { ERC20Mock } from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { NotInAllowset } from "src/errors.sol";
 
 contract OctantQFMechanismTest is Test {
     OctantQFMechanism public mechanism;
@@ -126,7 +127,7 @@ contract OctantQFMechanismTest is Test {
         token.approve(address(mechanism), SIGNUP_AMOUNT);
 
         // Signup should fail
-        vm.expectRevert(abi.encodeWithSelector(OctantQFMechanism.ContributorNotInAllowset.selector, bob));
+        vm.expectRevert(abi.encodeWithSelector(NotInAllowset.selector, bob));
         tam().signup(SIGNUP_AMOUNT);
         vm.stopPrank();
 

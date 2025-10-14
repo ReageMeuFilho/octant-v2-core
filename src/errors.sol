@@ -10,6 +10,10 @@ error ZeroAssets();
 error ERC20InsufficientBalance();
 error AlreadyInitialized();
 
+// Access Control errors
+error NotInAllowset(address user);
+error InBlockset(address user);
+
 // TokenizedStrategy specific errors
 error TokenizedStrategy__NotEmergencyAuthorized();
 error TokenizedStrategy__NotKeeperOrManagement();

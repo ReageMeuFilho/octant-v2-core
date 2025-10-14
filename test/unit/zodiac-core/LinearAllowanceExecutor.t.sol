@@ -10,6 +10,7 @@ import { MockSafe } from "test/mocks/zodiac-core/MockSafe.sol";
 import { NATIVE_TOKEN } from "src/constants.sol";
 import { AddressSet } from "src/utils/AddressSet.sol";
 import { IAddressSet } from "src/utils/IAddressSet.sol";
+import { NotInAllowset } from "src/errors.sol";
 
 contract LinearAllowanceExecutorTest is Test {
     LinearAllowanceExecutorTestHarness public executor;
@@ -144,9 +145,7 @@ contract LinearAllowanceExecutorTest is Test {
         LinearAllowanceSingletonForGnosisSafe nonWhitelistedModule = new LinearAllowanceSingletonForGnosisSafe();
 
         // Try to use non-whitelisted module - should revert
-        vm.expectRevert(
-            abi.encodeWithSelector(LinearAllowanceExecutor.ModuleNotInSet.selector, address(nonWhitelistedModule))
-        );
+        vm.expectRevert(abi.encodeWithSelector(NotInAllowset.selector, address(nonWhitelistedModule)));
         executor.executeAllowanceTransfer(nonWhitelistedModule, address(mockSafe), NATIVE_TOKEN);
 
         // AddressSet the module
@@ -160,9 +159,7 @@ contract LinearAllowanceExecutorTest is Test {
         moduleWhitelist.remove(address(nonWhitelistedModule));
 
         // Should revert again with whitelist error
-        vm.expectRevert(
-            abi.encodeWithSelector(LinearAllowanceExecutor.ModuleNotInSet.selector, address(nonWhitelistedModule))
-        );
+        vm.expectRevert(abi.encodeWithSelector(NotInAllowset.selector, address(nonWhitelistedModule)));
         executor.executeAllowanceTransfer(nonWhitelistedModule, address(mockSafe), NATIVE_TOKEN);
     }
 
