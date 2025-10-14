@@ -298,11 +298,5 @@ contract RegenStakerFactoryTest is Test {
             address(0),
             "Staker whitelist should be null when address(0) is passed"
         );
-        // Contribution whitelist removed from RegenStaker
-        // assertEq(
-        //     address(0),
-        //     address(0),
-        //     "Contribution whitelist should be null when address(0) is passed"
-        // );
     }
 }

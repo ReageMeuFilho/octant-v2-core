@@ -109,7 +109,7 @@ contract RegenEarningPowerCalculatorTest is Test {
             oldEP
         );
         assertEq(newEP, 0, "New EP should be 0 after changing whitelist");
-        assertEq(qualifies, true, "Should qualify for bump after changing whitelist");
+        assertTrue(qualifies, "Should qualify for bump after changing whitelist");
     }
 
     /// @notice Most complex test, covers almost all possible scenarios
@@ -154,7 +154,7 @@ contract RegenEarningPowerCalculatorTest is Test {
 
         (uint256 newEP, bool qualifies) = calculator.getNewEarningPower(stakedAmount, staker1, address(0), oldEP);
         assertEq(newEP, type(uint96).max, "New EP should be capped at uint96 max");
-        assertEq(qualifies, true, "Should qualify for bump when EP increases to cap");
+        assertTrue(qualifies, "Should qualify for bump when EP increases to cap");
     }
 
     function test_GetNewEarningPower_CappedAtUint96Max_RemainsEligible_NoBump() public {
@@ -172,7 +172,7 @@ contract RegenEarningPowerCalculatorTest is Test {
             oldEarningPower
         );
         assertEq(newEP, type(uint96).max, "New EP should remain capped at uint96 max");
-        assertEq(qualifies, false, "Should not qualify for bump when EP remains at cap");
+        assertFalse(qualifies, "Should not qualify for bump when EP remains at cap");
     }
 
     function test_SetWhitelist_AsOwner() public {
@@ -205,7 +205,7 @@ contract RegenEarningPowerCalculatorTest is Test {
     }
 
     function testFuzz_SetWhitelist_ToAddressZero_DisablesIt(uint256 stakedAmount) public {
-        assertEq(calculator.allowset().contains(staker1), false, "Staker1 should not be in allowset");
+        assertFalse(calculator.allowset().contains(staker1), "Staker1 should not be in allowset");
 
         vm.startPrank(owner);
         calculator.setAccessMode(AccessMode.NONE);

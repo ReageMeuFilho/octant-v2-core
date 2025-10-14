@@ -270,7 +270,6 @@ contract RegenIntegrationTest is Test {
         assertEq(localRegenStaker.minimumStakeAmount(), minimumStakeAmount);
 
         assertEq(address(localRegenStaker.stakerAllowset()), address(0));
-        // Contribution whitelist removed from RegenStaker (now only in TAM)
 
         (uint96 initialFeeAmount, address initialFeeCollector) = localRegenStaker.claimFeeParameters();
         assertEq(initialFeeAmount, 0);
@@ -320,7 +319,6 @@ contract RegenIntegrationTest is Test {
         assertEq(localRegenStaker.minimumStakeAmount(), minimumStakeAmount);
 
         assertEq(address(localRegenStaker.stakerAllowset()), address(providedStakerWhitelist));
-        // Contribution whitelist removed from RegenStaker (now only in TAM)
 
         assertEq(Ownable(address(localRegenStaker.stakerAllowset())).owner(), ADMIN);
 
@@ -336,11 +334,6 @@ contract RegenIntegrationTest is Test {
 
     function test_StakerWhitelistIsSet() public view {
         assertEq(address(regenStaker.stakerAllowset()), address(stakerAllowset));
-    }
-
-    function test_ContributionWhitelistIsSet() public view {
-        // Contribution whitelist removed from RegenStaker (now only in TAM)
-        // This test is no longer relevant
     }
 
     function test_EarningPowerWhitelistIsSet() public view {
