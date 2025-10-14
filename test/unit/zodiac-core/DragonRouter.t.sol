@@ -34,7 +34,6 @@ import { DragonTokenizedStrategy } from "src/zodiac-core/vaults/DragonTokenizedS
 
 import { MockStrategy } from "test/mocks/zodiac-core/MockStrategy.sol";
 import { MockYieldSource } from "test/mocks/core/MockYieldSource.sol";
-import { NATIVE_TOKEN } from "src/constants.sol";
 import { BaseTest } from "./Base.t.sol";
 import { console } from "forge-std/console.sol";
 

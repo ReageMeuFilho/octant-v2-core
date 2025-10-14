@@ -727,7 +727,7 @@ abstract contract TokenizedStrategy is ITokenizedStrategy {
         StrategyData storage S = _strategyStorage();
 
         // Make sure we aren't initialized.
-        if (address(S.asset) != address(0)) revert TokenizedStrategy__AlreadyInitialized();
+        if (S.management != address(0)) revert TokenizedStrategy__AlreadyInitialized();
 
         // Set the strategy's underlying asset.
         S.asset = ERC20(_asset);
