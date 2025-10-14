@@ -9,7 +9,7 @@ import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC4626 } from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import { IMockStrategy } from "test/mocks/zodiac-core/IMockStrategy.sol";
-import { MorphoCompounderStrategyFactory } from "src/factories/yieldDonating/MorphoCompounderStrategyFactory.sol";
+import { MorphoCompounderStrategyFactory } from "src/factories/MorphoCompounderStrategyFactory.sol";
 import { YieldDonatingTokenizedStrategy } from "src/strategies/yieldDonating/YieldDonatingTokenizedStrategy.sol";
 
 /// @title MorphoCompounder Yield Donating Test
@@ -100,7 +100,6 @@ contract MorphoCompounderDonatingStrategyTest is Test {
         // Deploy strategy
         strategy = MorphoCompounderStrategy(
             factory.createStrategy(
-                MORPHO_VAULT,
                 params.strategyName,
                 params.management,
                 params.keeper,
