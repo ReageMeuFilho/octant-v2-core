@@ -7,6 +7,7 @@ import { Module } from "zodiac/core/Module.sol";
 import { BaseStrategy } from "src/zodiac-core/BaseStrategy.sol";
 // TokenizedStrategy interface used for internal view delegateCalls.
 import { ITokenizedStrategy } from "src/zodiac-core/interfaces/ITokenizedStrategy.sol";
+import { NATIVE_TOKEN } from "src/constants.sol";
 
 /**
  * @title Dragon Base Strategy
@@ -32,8 +33,6 @@ abstract contract DragonBaseStrategy is BaseStrategy, Module {
     address public tokenizedStrategyImplementation;
 
     uint256 public maxReportDelay;
-
-    address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE; // using this address to represent native ETH
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -202,6 +201,6 @@ abstract contract DragonBaseStrategy is BaseStrategy, Module {
      * @return . Should return true if tend() should be called by keeper or false if not.
      */
     function _tendTrigger() internal view virtual override returns (bool) {
-        return (address(asset) == ETH ? address(this).balance : asset.balanceOf(address(this))) > 0;
+        return (address(asset) == NATIVE_TOKEN ? address(this).balance : asset.balanceOf(address(this))) > 0;
     }
 }
