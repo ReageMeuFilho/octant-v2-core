@@ -14,15 +14,6 @@ import { IMultistrategyVault } from "./IMultistrategyVault.sol";
  */
 interface IMultistrategyLockedVault is IMultistrategyVault {
     /**
-     * @notice Enum for governance transfer status
-     */
-    enum GovernanceTransferStatus {
-        PROPOSED, // 0 - Governance transfer has been proposed
-        ACCEPTED, // 1 - Governance transfer has been accepted
-        CANCELLED // 2 - Governance transfer has been cancelled
-    }
-
-    /**
      * @notice Storage for lockup information per user
      */
     struct LockupInfo {
@@ -44,11 +35,7 @@ interface IMultistrategyLockedVault is IMultistrategyVault {
     event PendingRageQuitCooldownPeriodChange(uint256 newPeriod, uint256 effectiveTimestamp);
     event RageQuitCooldownPeriodChangeCancelled(uint256 pendingPeriod, uint256 proposedAt, uint256 cancelledAt);
     event RageQuitCancelled(address indexed user, uint256 freedShares);
-    event RegenGovernanceTransferUpdate(
-        address indexed previousGovernance,
-        address indexed newGovernance,
-        GovernanceTransferStatus status
-    );
+    event RegenGovernanceChanged(address indexed previousGovernance, address indexed newGovernance);
 
     // Add necessary error definitions
     error InvalidRageQuitCooldownPeriod();
@@ -65,7 +52,6 @@ interface IMultistrategyLockedVault is IMultistrategyVault {
     error TransferExceedsAvailableShares();
     error NoPendingRageQuitCooldownPeriodChange();
     error RageQuitCooldownPeriodChangeDelayNotElapsed();
-    error NoPendingRegenGovernance();
     error RageQuitCooldownPeriodChangeDelayElapsed();
     error InvalidGovernanceAddress();
 
@@ -99,42 +85,21 @@ interface IMultistrategyLockedVault is IMultistrategyVault {
     function setRegenGovernance(address _regenGovernance) external;
 
     /**
-     * @notice Accepts a pending regen governance transfer.
-     */
-    function acceptRegenGovernance() external;
-
-    /**
-     * @notice Cancels a pending regen governance transfer.
-     */
-    function cancelRegenGovernance() external;
-
-    /**
      * @notice Cancels an active rage quit for the caller and frees any locked shares.
      */
     function cancelRageQuit() external;
 
     /**
-     * @notice Returns the pending rage quit cooldown period if any.
-     * @return The pending cooldown period in seconds.
+     * @notice Get the amount of shares that can be transferred by a user
+     * @param user The address to check transferable shares for
+     * @return The amount of shares available for transfer (not locked in custody)
      */
-    function getPendingRageQuitCooldownPeriod() external view returns (uint256);
+    function getTransferableShares(address user) external view returns (uint256);
 
     /**
-     * @notice Returns the timestamp at which the cooldown period change becomes effective.
-     * @return The effective timestamp for the pending cooldown change.
+     * @notice Get the amount of shares available for rage quit initiation
+     * @param user The address to check rage quitable shares for
+     * @return The amount of shares available for initiating rage quit
      */
-    function getRageQuitCooldownPeriodChangeTimestamp() external view returns (uint256);
-
-    /**
-     * @notice Retrieves the custody information for a user.
-     * @param user The address to query.
-     * @return lockedShares The number of shares currently locked for the user.
-     * @return unlockTime The timestamp when the shares become withdrawable.
-     */
-    function getCustodyInfo(address user) external view returns (uint256 lockedShares, uint256 unlockTime);
-
-    /**
-     * @notice Returns the pending regen governance address, if any.
-     */
-    function pendingRegenGovernance() external view returns (address);
+    function getRageQuitableShares(address user) external view returns (uint256);
 }

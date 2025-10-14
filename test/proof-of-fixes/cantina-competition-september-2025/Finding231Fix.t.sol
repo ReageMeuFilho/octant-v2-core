@@ -50,7 +50,7 @@ contract Finding231Fix is Test {
         uint256 newPeriod = 8 days;
         vault.proposeRageQuitCooldownPeriodChange(newPeriod);
 
-        uint256 proposedAt = vault.getRageQuitCooldownPeriodChangeTimestamp();
+        uint256 proposedAt = vault.rageQuitCooldownPeriodChangeTimestamp();
         uint256 cancelTime = proposedAt + vault.RAGE_QUIT_COOLDOWN_CHANGE_DELAY() - 1;
         vm.warp(cancelTime);
 
@@ -61,8 +61,8 @@ contract Finding231Fix is Test {
 
         vault.cancelRageQuitCooldownPeriodChange();
 
-        assertEq(vault.getPendingRageQuitCooldownPeriod(), 0, "pending should clear");
-        assertEq(vault.getRageQuitCooldownPeriodChangeTimestamp(), 0, "timestamp should clear");
+        assertEq(vault.pendingRageQuitCooldownPeriod(), 0, "pending should clear");
+        assertEq(vault.rageQuitCooldownPeriodChangeTimestamp(), 0, "timestamp should clear");
         vm.stopPrank();
     }
 
@@ -71,7 +71,7 @@ contract Finding231Fix is Test {
         uint256 newPeriod = 9 days;
         vault.proposeRageQuitCooldownPeriodChange(newPeriod);
 
-        uint256 proposedAt = vault.getRageQuitCooldownPeriodChangeTimestamp();
+        uint256 proposedAt = vault.rageQuitCooldownPeriodChangeTimestamp();
         vm.warp(proposedAt + vault.RAGE_QUIT_COOLDOWN_CHANGE_DELAY());
 
         vm.expectRevert(IMultistrategyLockedVault.RageQuitCooldownPeriodChangeDelayElapsed.selector);
