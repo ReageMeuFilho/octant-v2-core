@@ -2,11 +2,12 @@
 pragma solidity >=0.8.25;
 
 import { Create2 } from "@openzeppelin/contracts/utils/Create2.sol";
-import { MorphoCompounderStrategy } from "src/strategies/yieldSkimming/MorphoCompounderStrategy.sol";
+import { MorphoCompounderStrategy } from "src/strategies/yieldDonating/MorphoCompounderStrategy.sol";
 import { BaseStrategyFactory } from "src/factories/BaseStrategyFactory.sol";
 
 contract MorphoCompounderStrategyFactory is BaseStrategyFactory {
     address public constant YS_USDC = 0x074134A2784F4F66b6ceD6f68849382990Ff3215;
+    address public constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
 
     event StrategyDeploy(
         address indexed deployer,
@@ -40,6 +41,7 @@ contract MorphoCompounderStrategyFactory is BaseStrategyFactory {
         bytes32 parameterHash = keccak256(
             abi.encode(
                 YS_USDC,
+                USDC,
                 _name,
                 _management,
                 _keeper,
@@ -54,6 +56,7 @@ contract MorphoCompounderStrategyFactory is BaseStrategyFactory {
             type(MorphoCompounderStrategy).creationCode,
             abi.encode(
                 YS_USDC,
+                USDC,
                 _name,
                 _management,
                 _keeper,
