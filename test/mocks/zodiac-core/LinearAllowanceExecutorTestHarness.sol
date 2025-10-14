@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
+import { IAddressSet } from "src/utils/IAddressSet.sol";
 import { LinearAllowanceExecutor } from "src/zodiac-core/LinearAllowanceExecutor.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { NATIVE_TOKEN } from "src/constants.sol";
-import { IWhitelist } from "src/utils/IWhitelist.sol";
 
 /// @title LinearAllowanceExecutorTestHarness
 /// @notice Test implementation of LinearAllowanceExecutor with owner-only withdrawal functionality
@@ -19,11 +19,11 @@ contract LinearAllowanceExecutorTestHarness is LinearAllowanceExecutor, Ownable 
     /// during contract deployment. This ensures immediate access control setup.
     constructor() Ownable(msg.sender) {}
 
-    /// @notice Set the module whitelist contract (owner only)
-    /// @dev Only the owner can set the whitelist contract
-    /// @param whitelist The whitelist contract address (can be address(0) to disable)
-    function setModuleWhitelist(IWhitelist whitelist) external override onlyOwner {
-        _setModuleWhitelist(whitelist);
+    /// @notice Set the module address set contract (owner only)
+    /// @dev Only the owner can set the address set contract
+    /// @param addressSet The address set contract address (can be address(0) to disable)
+    function assignModuleAddressSet(IAddressSet addressSet) external override onlyOwner {
+        _assignModuleAddressSet(addressSet);
     }
 
     /// @notice Enables the contract to receive ETH transfers from allowance executions

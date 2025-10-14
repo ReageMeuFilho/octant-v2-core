@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
+import { AccessMode } from "src/constants.sol";
 import "forge-std/Test.sol";
 import { RegenStaker } from "src/regen/RegenStaker.sol";
+import { RegenStakerBase } from "src/regen/RegenStakerBase.sol";
 import { RegenEarningPowerCalculator } from "src/regen/RegenEarningPowerCalculator.sol";
 import { MockERC20Staking } from "test/mocks/MockERC20Staking.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
-import { Whitelist } from "src/utils/Whitelist.sol";
+import { AddressSet } from "src/utils/AddressSet.sol";
+import { IAddressSet } from "src/utils/IAddressSet.sol";
 import { Staker } from "staker/Staker.sol";
 
 /**
- * @title REG-001 Delegatee Whitelist Architecture Demonstration
+ * @title REG-001 Delegatee AddressSet Architecture Demonstration
  * @dev Demonstrates that delegatee whitelist architecture is CORRECT and SECURE
  *
  * FINDING RECLASSIFIED: REG-001 was initially documented as Medium severity
@@ -38,10 +41,10 @@ contract REG001_DelegateeWhitelistDemoTest is Test {
     RegenEarningPowerCalculator public earningPowerCalculator;
     MockERC20 public rewardToken;
     MockERC20Staking public stakeToken;
-    Whitelist public stakerWhitelist;
-    Whitelist public contributionWhitelist;
-    Whitelist public allocationMechanismWhitelist;
-    Whitelist public earningPowerWhitelist;
+    AddressSet public stakerAllowset;
+    AddressSet public contributionWhitelist;
+    AddressSet public allocationMechanismAllowset;
+    AddressSet public earningPowerWhitelist;
 
     address public admin = makeAddr("admin");
     address public rewardNotifier = makeAddr("rewardNotifier");
@@ -60,11 +63,16 @@ contract REG001_DelegateeWhitelistDemoTest is Test {
         // Deploy contracts
         rewardToken = new MockERC20(18);
         stakeToken = new MockERC20Staking(18);
-        stakerWhitelist = new Whitelist();
-        contributionWhitelist = new Whitelist();
-        allocationMechanismWhitelist = new Whitelist();
-        earningPowerWhitelist = new Whitelist();
-        earningPowerCalculator = new RegenEarningPowerCalculator(address(this), earningPowerWhitelist);
+        stakerAllowset = new AddressSet();
+        contributionWhitelist = new AddressSet();
+        allocationMechanismAllowset = new AddressSet();
+        earningPowerWhitelist = new AddressSet();
+        earningPowerCalculator = new RegenEarningPowerCalculator(
+            address(this),
+            earningPowerWhitelist,
+            IAddressSet(address(0)),
+            AccessMode.ALLOWSET
+        );
 
         // Deploy RegenStaker
         regenStaker = new RegenStaker(
@@ -75,19 +83,20 @@ contract REG001_DelegateeWhitelistDemoTest is Test {
             admin, // admin
             uint128(REWARD_DURATION), // rewardDuration
             0, // minStakeAmount
-            stakerWhitelist,
-            contributionWhitelist,
-            allocationMechanismWhitelist
+            stakerAllowset,
+            IAddressSet(address(0)),
+            AccessMode.ALLOWSET,
+            allocationMechanismAllowset
         );
 
         // Setup reward notifier
         regenStaker.setRewardNotifier(rewardNotifier, true);
 
         // Setup whitelists - ONLY whitelist the actual staker, NOT the delegatee
-        stakerWhitelist.addToWhitelist(whitelistedUser);
+        stakerAllowset.add(whitelistedUser);
         // Note: externalGovernanceDelegatee is deliberately NOT whitelisted
         // Note: nonWhitelistedUser is deliberately NOT whitelisted
-        earningPowerWhitelist.addToWhitelist(whitelistedUser);
+        earningPowerWhitelist.add(whitelistedUser);
 
         // Mint tokens
         rewardToken.mint(rewardNotifier, INITIAL_REWARD_AMOUNT);
@@ -108,8 +117,8 @@ contract REG001_DelegateeWhitelistDemoTest is Test {
         console.log("External governance delegatee (NOT whitelisted):", externalGovernanceDelegatee);
 
         // Verify whitelist status
-        assertTrue(stakerWhitelist.isWhitelisted(whitelistedUser), "User should be whitelisted");
-        assertFalse(stakerWhitelist.isWhitelisted(externalGovernanceDelegatee), "Delegatee should NOT be whitelisted");
+        assertTrue(stakerAllowset.contains(whitelistedUser), "User should be whitelisted");
+        assertFalse(stakerAllowset.contains(externalGovernanceDelegatee), "Delegatee should NOT be whitelisted");
 
         vm.startPrank(whitelistedUser);
         stakeToken.approve(address(regenStaker), USER_STAKE_AMOUNT);
@@ -148,7 +157,7 @@ contract REG001_DelegateeWhitelistDemoTest is Test {
         console.log("External governance delegatee:", externalGovernanceDelegatee);
 
         // Verify whitelist status
-        assertFalse(stakerWhitelist.isWhitelisted(nonWhitelistedUser), "User should NOT be whitelisted");
+        assertFalse(stakerAllowset.contains(nonWhitelistedUser), "User should NOT be whitelisted");
 
         vm.startPrank(nonWhitelistedUser);
         stakeToken.approve(address(regenStaker), USER_STAKE_AMOUNT);
@@ -167,8 +176,8 @@ contract REG001_DelegateeWhitelistDemoTest is Test {
      * @dev Demonstrates stakeMore() uses deposit.owner for whitelist checks
      * This is the CORRECT behavior and shows no inconsistency with stake()
      */
-    function testREG001_StakeMoreUsesDepositOwnerWhitelist() public {
-        console.log("=== REG-001 DEMONSTRATION: StakeMore Uses Deposit Owner for Whitelist ===");
+    function testREG001_StakeMoreUsesDepositOwnerAddressSet() public {
+        console.log("=== REG-001 DEMONSTRATION: StakeMore Uses Deposit Owner for AddressSet ===");
 
         // First, create a deposit
         vm.startPrank(whitelistedUser);
@@ -337,7 +346,7 @@ contract REG001_DelegateeWhitelistDemoTest is Test {
      * This test shows what would happen if delegatees were required to be whitelisted
      */
     function testREG001_WhyDelegateeWhitelistWouldBeWrong() public {
-        console.log("=== REG-001 DEMONSTRATION: Why Delegatee Whitelist Would Be Wrong ===");
+        console.log("=== REG-001 DEMONSTRATION: Why Delegatee AddressSet Would Be Wrong ===");
 
         console.log("ARCHITECTURAL ANALYSIS:");
         console.log("If delegatees were required to be whitelisted, it would:");
@@ -382,7 +391,7 @@ contract REG001_DelegateeWhitelistDemoTest is Test {
      * This addresses the Q3 audit question about why this function exists
      */
     function testREG001_StakeMoreWhitelistTargetFunction() public {
-        console.log("=== REG-001 DEMONSTRATION: StakeMore Whitelist Target Function ===");
+        console.log("=== REG-001 DEMONSTRATION: StakeMore AddressSet Target Function ===");
 
         // Create a deposit
         vm.startPrank(whitelistedUser);

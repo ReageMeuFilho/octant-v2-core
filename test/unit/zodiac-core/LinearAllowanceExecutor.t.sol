@@ -8,15 +8,15 @@ import { LinearAllowanceExecutor } from "src/zodiac-core/LinearAllowanceExecutor
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MockSafe } from "test/mocks/zodiac-core/MockSafe.sol";
 import { NATIVE_TOKEN } from "src/constants.sol";
-import { Whitelist } from "src/utils/Whitelist.sol";
-import { IWhitelist } from "src/utils/IWhitelist.sol";
+import { AddressSet } from "src/utils/AddressSet.sol";
+import { IAddressSet } from "src/utils/IAddressSet.sol";
 
 contract LinearAllowanceExecutorTest is Test {
     LinearAllowanceExecutorTestHarness public executor;
     LinearAllowanceSingletonForGnosisSafe public allowanceModule;
     MockSafe public mockSafe;
     MockERC20 public mockToken;
-    Whitelist public moduleWhitelist;
+    AddressSet public moduleWhitelist;
 
     uint192 constant DRIP_RATE = 1 ether; // 1 token per day
 
@@ -26,13 +26,13 @@ contract LinearAllowanceExecutorTest is Test {
         allowanceModule = new LinearAllowanceSingletonForGnosisSafe();
         mockSafe = new MockSafe();
         mockToken = new MockERC20(18);
-        moduleWhitelist = new Whitelist();
+        moduleWhitelist = new AddressSet();
 
         // Set the whitelist on the executor
-        executor.setModuleWhitelist(IWhitelist(address(moduleWhitelist)));
+        executor.assignModuleAddressSet(IAddressSet(address(moduleWhitelist)));
 
-        // Whitelist the allowance module
-        moduleWhitelist.addToWhitelist(address(allowanceModule));
+        // AddressSet the allowance module
+        moduleWhitelist.add(address(allowanceModule));
 
         // Enable module on mock Safe
         mockSafe.enableModule(address(allowanceModule));
@@ -145,23 +145,23 @@ contract LinearAllowanceExecutorTest is Test {
 
         // Try to use non-whitelisted module - should revert
         vm.expectRevert(
-            abi.encodeWithSelector(LinearAllowanceExecutor.ModuleNotWhitelisted.selector, address(nonWhitelistedModule))
+            abi.encodeWithSelector(LinearAllowanceExecutor.ModuleNotInSet.selector, address(nonWhitelistedModule))
         );
         executor.executeAllowanceTransfer(nonWhitelistedModule, address(mockSafe), NATIVE_TOKEN);
 
-        // Whitelist the module
-        moduleWhitelist.addToWhitelist(address(nonWhitelistedModule));
+        // AddressSet the module
+        moduleWhitelist.add(address(nonWhitelistedModule));
 
         // Now it should work (will revert for different reason - no allowance set)
         vm.expectRevert(); // Different revert reason
         executor.executeAllowanceTransfer(nonWhitelistedModule, address(mockSafe), NATIVE_TOKEN);
 
         // Remove from whitelist
-        moduleWhitelist.removeFromWhitelist(address(nonWhitelistedModule));
+        moduleWhitelist.remove(address(nonWhitelistedModule));
 
         // Should revert again with whitelist error
         vm.expectRevert(
-            abi.encodeWithSelector(LinearAllowanceExecutor.ModuleNotWhitelisted.selector, address(nonWhitelistedModule))
+            abi.encodeWithSelector(LinearAllowanceExecutor.ModuleNotInSet.selector, address(nonWhitelistedModule))
         );
         executor.executeAllowanceTransfer(nonWhitelistedModule, address(mockSafe), NATIVE_TOKEN);
     }

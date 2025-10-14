@@ -8,8 +8,9 @@ import { LinearAllowanceSingletonForGnosisSafe } from "src/zodiac-core/modules/L
 import { NATIVE_TOKEN } from "src/constants.sol";
 import "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
 import { LinearAllowanceExecutorTestHarness } from "test/mocks/zodiac-core/LinearAllowanceExecutorTestHarness.sol";
-import { Whitelist } from "src/utils/Whitelist.sol";
-import { IWhitelist } from "src/utils/IWhitelist.sol";
+import { AddressSet } from "src/utils/AddressSet.sol";
+import { IAddressSet } from "src/utils/IAddressSet.sol";
+
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { ILinearAllowanceSingleton } from "src/zodiac-core/interfaces/ILinearAllowanceSingleton.sol";
 
@@ -58,9 +59,9 @@ contract TestLinearAllowanceIntegration is Test {
     /// @notice Helper function to create and whitelist an executor
     function createWhitelistedExecutor() internal returns (LinearAllowanceExecutorTestHarness) {
         LinearAllowanceExecutorTestHarness newExecutor = new LinearAllowanceExecutorTestHarness();
-        Whitelist whitelist = new Whitelist();
-        newExecutor.setModuleWhitelist(IWhitelist(address(whitelist)));
-        whitelist.addToWhitelist(address(allowanceModule));
+        AddressSet whitelist = new AddressSet();
+        newExecutor.assignModuleAddressSet(IAddressSet(address(whitelist)));
+        whitelist.add(address(allowanceModule));
         return newExecutor;
     }
 
@@ -113,9 +114,9 @@ contract TestLinearAllowanceIntegration is Test {
         vm.startPrank(delegateContractOwner);
         allowanceExecutor = new LinearAllowanceExecutorTestHarness();
         // Setup whitelist for the allowance module
-        Whitelist whitelist = new Whitelist();
-        allowanceExecutor.setModuleWhitelist(IWhitelist(address(whitelist)));
-        whitelist.addToWhitelist(address(allowanceModule));
+        AddressSet whitelist = new AddressSet();
+        allowanceExecutor.assignModuleAddressSet(IAddressSet(address(whitelist)));
+        whitelist.add(address(allowanceModule));
         vm.stopPrank();
     }
 
@@ -430,15 +431,15 @@ contract TestLinearAllowanceIntegration is Test {
         LinearAllowanceExecutorTestHarness emergencyExecutor = new LinearAllowanceExecutorTestHarness();
 
         // Create and setup whitelists for both executors
-        Whitelist normalWhitelist = new Whitelist();
-        Whitelist emergencyWhitelist = new Whitelist();
+        AddressSet normalWhitelist = new AddressSet();
+        AddressSet emergencyWhitelist = new AddressSet();
 
-        normalExecutor.setModuleWhitelist(IWhitelist(address(normalWhitelist)));
-        emergencyExecutor.setModuleWhitelist(IWhitelist(address(emergencyWhitelist)));
+        normalExecutor.assignModuleAddressSet(IAddressSet(address(normalWhitelist)));
+        emergencyExecutor.assignModuleAddressSet(IAddressSet(address(emergencyWhitelist)));
 
-        // Whitelist the allowance module
-        normalWhitelist.addToWhitelist(address(allowanceModule));
-        emergencyWhitelist.addToWhitelist(address(allowanceModule));
+        // AddressSet the allowance module
+        normalWhitelist.add(address(allowanceModule));
+        emergencyWhitelist.add(address(allowanceModule));
 
         // Set identical allowances for both executors
         vm.startPrank(safeAddress);

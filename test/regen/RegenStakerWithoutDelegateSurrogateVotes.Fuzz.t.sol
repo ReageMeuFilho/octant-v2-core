@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.0;
 
+import { AccessMode } from "src/constants.sol";
 import { Test, console2 } from "forge-std/Test.sol";
 import { RegenStakerWithoutDelegateSurrogateVotes } from "src/regen/RegenStakerWithoutDelegateSurrogateVotes.sol";
+import { RegenStakerBase } from "src/regen/RegenStakerBase.sol";
 import { Staker } from "staker/Staker.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
-import { Whitelist } from "src/utils/Whitelist.sol";
+import { AddressSet } from "src/utils/AddressSet.sol";
 import { RegenEarningPowerCalculator } from "src/regen/RegenEarningPowerCalculator.sol";
-import { IWhitelist } from "src/utils/IWhitelist.sol";
+import { IAddressSet } from "src/utils/IAddressSet.sol";
 
 /// @title Fuzz Tests for RegenStakerWithoutDelegateSurrogateVotes
 /// @notice Targeted fuzz testing for critical scenarios and edge cases
@@ -17,9 +19,9 @@ contract RegenStakerWithoutDelegateSurrogateVotesFuzzTest is Test {
 
     MockERC20 public token;
     MockERC20 public rewardToken;
-    Whitelist public stakerWhitelist;
-    Whitelist public contributionWhitelist;
-    Whitelist public allocationWhitelist;
+    AddressSet public stakerAllowset;
+    AddressSet public contributionWhitelist;
+    AddressSet public allocationWhitelist;
     RegenEarningPowerCalculator public calculator;
 
     address public admin;
@@ -44,10 +46,15 @@ contract RegenStakerWithoutDelegateSurrogateVotesFuzzTest is Test {
         // Deploy mock contracts
         token = new MockERC20(18);
         rewardToken = new MockERC20(18);
-        stakerWhitelist = new Whitelist();
-        contributionWhitelist = new Whitelist();
-        allocationWhitelist = new Whitelist();
-        calculator = new RegenEarningPowerCalculator(admin, IWhitelist(address(stakerWhitelist)));
+        stakerAllowset = new AddressSet();
+        contributionWhitelist = new AddressSet();
+        allocationWhitelist = new AddressSet();
+        calculator = new RegenEarningPowerCalculator(
+            admin,
+            IAddressSet(address(stakerAllowset)),
+            IAddressSet(address(0)),
+            AccessMode.ALLOWSET
+        );
 
         // Deploy staker contracts
         staker = new RegenStakerWithoutDelegateSurrogateVotes(
@@ -58,8 +65,9 @@ contract RegenStakerWithoutDelegateSurrogateVotesFuzzTest is Test {
             admin,
             REWARD_DURATION,
             MIN_STAKE,
-            stakerWhitelist,
-            contributionWhitelist,
+            stakerAllowset,
+            IAddressSet(address(0)),
+            AccessMode.NONE,
             allocationWhitelist
         );
 
@@ -71,8 +79,9 @@ contract RegenStakerWithoutDelegateSurrogateVotesFuzzTest is Test {
             admin,
             REWARD_DURATION,
             MIN_STAKE,
-            stakerWhitelist,
-            contributionWhitelist,
+            stakerAllowset,
+            IAddressSet(address(0)),
+            AccessMode.NONE,
             allocationWhitelist
         );
 
@@ -85,8 +94,8 @@ contract RegenStakerWithoutDelegateSurrogateVotesFuzzTest is Test {
         // Add users to whitelists
         address[3] memory users = [user1, user2, user3];
         for (uint256 i = 0; i < users.length; i++) {
-            stakerWhitelist.addToWhitelist(users[i]);
-            contributionWhitelist.addToWhitelist(users[i]);
+            stakerAllowset.add(users[i]);
+            contributionWhitelist.add(users[i]);
         }
 
         // Setup user tokens

@@ -28,7 +28,7 @@
     "format:check": "prettier --config .prettierrc --plugin=prettier-plugin-solidity '{script,src,test,verification}/**/*.sol' -c",
     "lint": "solhint './{src,scripts,test}/**/*.sol'",
     "precommit": "lint-staged",
-    "build": "forge clean && forge compile --sizes",
+    "build": "forge clean && forge compile --sizes --skip test --skip script",
     "build:contracts": "forge clean && forge compile --sizes --skip test --skip script && ./scripts/combine-proxy-abis.sh",
     "test": "forge clean && forge test",
     "test:ci": "forge clean && mkdir -p reports && (forge test --junit > reports/junit.xml || forge test --summary)",

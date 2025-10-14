@@ -2,7 +2,8 @@
 pragma solidity ^0.8.0;
 
 import { Create2 } from "@openzeppelin/contracts/utils/Create2.sol";
-import { IERC20, IWhitelist, IEarningPowerCalculator } from "src/regen/RegenStaker.sol";
+import { IERC20, IAddressSet, IEarningPowerCalculator } from "src/regen/RegenStaker.sol";
+import { AccessMode } from "src/constants.sol";
 
 /// @title RegenStaker Factory
 /// @notice Deploys RegenStaker contracts with explicit variant selection
@@ -46,9 +47,10 @@ contract RegenStakerFactory {
         IERC20 rewardsToken;
         IERC20 stakeToken;
         address admin;
-        IWhitelist stakerWhitelist;
-        IWhitelist contributionWhitelist;
-        IWhitelist allocationMechanismWhitelist;
+        IAddressSet stakerAllowset;
+        IAddressSet stakerBlockset;
+        AccessMode stakerAccessMode;
+        IAddressSet allocationMechanismAllowset;
         IEarningPowerCalculator earningPowerCalculator;
         uint256 maxBumpTip;
         uint256 minimumStakeAmount;
@@ -167,7 +169,7 @@ contract RegenStakerFactory {
         stakerAddress = Create2.deploy(0, finalSalt, fullBytecode);
 
         // Emit deployment metadata to facilitate off-chain verification
-        // Note: calculatorAddress is sufficient; off-chain tools can query extcodehash themselves
+
         emit StakerDeploy(
             msg.sender,
             params.admin,
@@ -188,9 +190,10 @@ contract RegenStakerFactory {
                 params.admin,
                 params.rewardDuration,
                 params.minimumStakeAmount,
-                params.stakerWhitelist,
-                params.contributionWhitelist,
-                params.allocationMechanismWhitelist
+                params.stakerAllowset,
+                params.stakerBlockset,
+                params.stakerAccessMode,
+                params.allocationMechanismAllowset
             );
     }
 }

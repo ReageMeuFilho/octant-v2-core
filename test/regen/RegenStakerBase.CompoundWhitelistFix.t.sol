@@ -1,26 +1,27 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.23;
 
+import { AccessMode } from "src/constants.sol";
 import { Test } from "forge-std/Test.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { RegenStaker } from "src/regen/RegenStaker.sol";
 import { RegenEarningPowerCalculator } from "src/regen/RegenEarningPowerCalculator.sol";
 import { MockERC20Staking } from "test/mocks/MockERC20Staking.sol";
-import { IWhitelist } from "src/utils/IWhitelist.sol";
-import { Whitelist } from "src/utils/Whitelist.sol";
+import { IAddressSet } from "src/utils/IAddressSet.sol";
+import { AddressSet } from "src/utils/AddressSet.sol";
 import { Staker } from "staker/Staker.sol";
 import { RegenStakerBase } from "src/regen/RegenStakerBase.sol";
 
-/// @title Tests for REG-008 Compound Rewards Whitelist Fix
+/// @title Tests for REG-008 Compound Rewards AddressSet Fix
 /// @notice Validates that the whitelist bypass vulnerability in compoundRewards is properly fixed
 /// @dev Addresses REG-008 (OSU-919) - Missing depositor whitelist check when claimer calls compoundRewards
 contract RegenStakerBaseCompoundWhitelistFixTest is Test {
     RegenStaker public staker;
     MockERC20Staking public stakeToken;
     RegenEarningPowerCalculator public earningPowerCalculator;
-    Whitelist public stakerWhitelist;
-    Whitelist public earningPowerWhitelist;
-    Whitelist public allocationWhitelist;
+    AddressSet public stakerAllowset;
+    AddressSet public earningPowerWhitelist;
+    AddressSet public allocationWhitelist;
 
     address public admin = makeAddr("admin");
     address public notifier = makeAddr("notifier");
@@ -45,12 +46,17 @@ contract RegenStakerBaseCompoundWhitelistFixTest is Test {
         stakeToken = new MockERC20Staking(18);
 
         // Deploy whitelists
-        stakerWhitelist = new Whitelist();
-        earningPowerWhitelist = new Whitelist();
-        allocationWhitelist = new Whitelist();
+        stakerAllowset = new AddressSet();
+        earningPowerWhitelist = new AddressSet();
+        allocationWhitelist = new AddressSet();
 
         // Deploy earning power calculator
-        earningPowerCalculator = new RegenEarningPowerCalculator(admin, IWhitelist(address(earningPowerWhitelist)));
+        earningPowerCalculator = new RegenEarningPowerCalculator(
+            admin,
+            IAddressSet(address(earningPowerWhitelist)),
+            IAddressSet(address(0)),
+            AccessMode.ALLOWSET
+        );
 
         // Deploy staker with same token for staking and rewards (to enable compounding)
         staker = new RegenStaker(
@@ -61,8 +67,9 @@ contract RegenStakerBaseCompoundWhitelistFixTest is Test {
             admin,
             30 days, // rewardDuration
             0, // minimumStakeAmount
-            IWhitelist(address(stakerWhitelist)),
-            IWhitelist(address(0)), // no contribution whitelist
+            IAddressSet(address(stakerAllowset)),
+            IAddressSet(address(0)),
+            AccessMode.ALLOWSET,
             allocationWhitelist
         );
 
@@ -79,10 +86,10 @@ contract RegenStakerBaseCompoundWhitelistFixTest is Test {
 
     /// @notice Test whitelisted owner + whitelisted claimer (should work)
     function test_whitelistedOwnerWhitelistedClaimer() public {
-        // Whitelist both depositor and claimer
-        stakerWhitelist.addToWhitelist(depositor);
-        stakerWhitelist.addToWhitelist(whitelistedClaimer);
-        earningPowerWhitelist.addToWhitelist(depositor);
+        // AddressSet both depositor and claimer
+        stakerAllowset.add(depositor);
+        stakerAllowset.add(whitelistedClaimer);
+        earningPowerWhitelist.add(depositor);
 
         // Depositor stakes with whitelisted claimer
         vm.startPrank(depositor);
@@ -106,9 +113,9 @@ contract RegenStakerBaseCompoundWhitelistFixTest is Test {
     /// @notice Test non-whitelisted owner + whitelisted claimer (should fail - the fix)
     function test_nonWhitelistedOwnerWhitelistedClaimer() public {
         // Initially whitelist depositor to create deposit
-        stakerWhitelist.addToWhitelist(depositor);
-        stakerWhitelist.addToWhitelist(whitelistedClaimer);
-        earningPowerWhitelist.addToWhitelist(depositor);
+        stakerAllowset.add(depositor);
+        stakerAllowset.add(whitelistedClaimer);
+        earningPowerWhitelist.add(depositor);
 
         // Depositor stakes with whitelisted claimer
         vm.startPrank(depositor);
@@ -121,21 +128,21 @@ contract RegenStakerBaseCompoundWhitelistFixTest is Test {
         vm.warp(block.timestamp + 15 days);
 
         // Remove depositor from whitelist (e.g., compliance issue)
-        stakerWhitelist.removeFromWhitelist(depositor);
-        assertFalse(stakerWhitelist.isWhitelisted(depositor));
-        assertTrue(stakerWhitelist.isWhitelisted(whitelistedClaimer));
+        stakerAllowset.remove(depositor);
+        assertFalse(stakerAllowset.contains(depositor));
+        assertTrue(stakerAllowset.contains(whitelistedClaimer));
 
         // Whitelisted claimer CANNOT compound for non-whitelisted depositor (the fix)
         vm.prank(whitelistedClaimer);
-        vm.expectRevert(abi.encodeWithSelector(RegenStakerBase.NotWhitelisted.selector, stakerWhitelist, depositor));
+        vm.expectRevert(abi.encodeWithSelector(RegenStakerBase.StakerNotAllowed.selector, depositor));
         staker.compoundRewards(depositId);
     }
 
     /// @notice Test whitelisted owner calling their own compound (should work)
     function test_whitelistedOwnerSelfCompound() public {
-        // Whitelist depositor
-        stakerWhitelist.addToWhitelist(depositor);
-        earningPowerWhitelist.addToWhitelist(depositor);
+        // AddressSet depositor
+        stakerAllowset.add(depositor);
+        earningPowerWhitelist.add(depositor);
 
         // Depositor stakes with themselves as claimer
         vm.startPrank(depositor);
@@ -157,8 +164,8 @@ contract RegenStakerBaseCompoundWhitelistFixTest is Test {
     /// @notice Test non-whitelisted owner calling their own compound (should fail)
     function test_nonWhitelistedOwnerSelfCompound() public {
         // Initially whitelist to create deposit
-        stakerWhitelist.addToWhitelist(depositor);
-        earningPowerWhitelist.addToWhitelist(depositor);
+        stakerAllowset.add(depositor);
+        earningPowerWhitelist.add(depositor);
 
         // Depositor stakes
         vm.startPrank(depositor);
@@ -171,20 +178,20 @@ contract RegenStakerBaseCompoundWhitelistFixTest is Test {
         vm.warp(block.timestamp + 15 days);
 
         // Remove depositor from whitelist
-        stakerWhitelist.removeFromWhitelist(depositor);
+        stakerAllowset.remove(depositor);
 
         // Non-whitelisted depositor cannot compound their own rewards
         vm.prank(depositor);
-        vm.expectRevert(abi.encodeWithSelector(RegenStakerBase.NotWhitelisted.selector, stakerWhitelist, depositor));
+        vm.expectRevert(abi.encodeWithSelector(RegenStakerBase.StakerNotAllowed.selector, depositor));
         staker.compoundRewards(depositId);
     }
 
     /// @notice Test whitelisted owner + non-whitelisted claimer (should work)
     function test_whitelistedOwnerNonWhitelistedClaimer() public {
-        // Whitelist only depositor, not the claimer
-        stakerWhitelist.addToWhitelist(depositor);
-        earningPowerWhitelist.addToWhitelist(depositor);
-        assertFalse(stakerWhitelist.isWhitelisted(nonWhitelistedClaimer));
+        // AddressSet only depositor, not the claimer
+        stakerAllowset.add(depositor);
+        earningPowerWhitelist.add(depositor);
+        assertFalse(stakerAllowset.contains(nonWhitelistedClaimer));
 
         // Depositor stakes with non-whitelisted claimer
         vm.startPrank(depositor);
@@ -212,10 +219,10 @@ contract RegenStakerBaseCompoundWhitelistFixTest is Test {
         stakeToken.mint(alice, INITIAL_BALANCE);
         stakeToken.mint(bob, INITIAL_BALANCE);
 
-        stakerWhitelist.addToWhitelist(alice);
-        stakerWhitelist.addToWhitelist(bob);
-        earningPowerWhitelist.addToWhitelist(alice);
-        earningPowerWhitelist.addToWhitelist(bob);
+        stakerAllowset.add(alice);
+        stakerAllowset.add(bob);
+        earningPowerWhitelist.add(alice);
+        earningPowerWhitelist.add(bob);
 
         // Alice stakes with Bob as claimer
         vm.startPrank(alice);
@@ -248,13 +255,13 @@ contract RegenStakerBaseCompoundWhitelistFixTest is Test {
     function test_unauthorizedClaimerCannotCompound() public {
         address unauthorizedUser = makeAddr("unauthorized");
 
-        // Whitelist depositor
-        stakerWhitelist.addToWhitelist(depositor);
-        stakerWhitelist.addToWhitelist(unauthorizedUser);
-        earningPowerWhitelist.addToWhitelist(depositor);
+        // AddressSet depositor
+        stakerAllowset.add(depositor);
+        stakerAllowset.add(unauthorizedUser);
+        earningPowerWhitelist.add(depositor);
 
         // Depositor stakes with whitelistedClaimer (not unauthorizedUser)
-        stakerWhitelist.addToWhitelist(whitelistedClaimer);
+        stakerAllowset.add(whitelistedClaimer);
         vm.startPrank(depositor);
         stakeToken.approve(address(staker), STAKE_AMOUNT);
         Staker.DepositIdentifier depositId = staker.stake(STAKE_AMOUNT, delegatee, whitelistedClaimer);
@@ -277,11 +284,11 @@ contract RegenStakerBaseCompoundWhitelistFixTest is Test {
     }
 
     /// @notice Test scenario where depositor is removed then re-added to whitelist
-    function test_depositorRemovedThenReaddedToWhitelist() public {
-        // Whitelist both
-        stakerWhitelist.addToWhitelist(depositor);
-        stakerWhitelist.addToWhitelist(whitelistedClaimer);
-        earningPowerWhitelist.addToWhitelist(depositor);
+    function test_depositorRemovedThenReaddedToAddressSet() public {
+        // AddressSet both
+        stakerAllowset.add(depositor);
+        stakerAllowset.add(whitelistedClaimer);
+        earningPowerWhitelist.add(depositor);
 
         // Create deposit
         vm.startPrank(depositor);
@@ -294,15 +301,15 @@ contract RegenStakerBaseCompoundWhitelistFixTest is Test {
         vm.warp(block.timestamp + 10 days);
 
         // Remove depositor from whitelist
-        stakerWhitelist.removeFromWhitelist(depositor);
+        stakerAllowset.remove(depositor);
 
         // Claimer cannot compound while depositor is not whitelisted
         vm.prank(whitelistedClaimer);
-        vm.expectRevert(abi.encodeWithSelector(RegenStakerBase.NotWhitelisted.selector, stakerWhitelist, depositor));
+        vm.expectRevert(abi.encodeWithSelector(RegenStakerBase.StakerNotAllowed.selector, depositor));
         staker.compoundRewards(depositId);
 
         // Re-add depositor to whitelist
-        stakerWhitelist.addToWhitelist(depositor);
+        stakerAllowset.add(depositor);
 
         // Now claimer can compound again
         vm.prank(whitelistedClaimer);
@@ -318,11 +325,11 @@ contract RegenStakerBaseCompoundWhitelistFixTest is Test {
     ) public {
         // Setup based on fuzz inputs
         if (ownerWhitelisted) {
-            stakerWhitelist.addToWhitelist(depositor);
-            earningPowerWhitelist.addToWhitelist(depositor);
+            stakerAllowset.add(depositor);
+            earningPowerWhitelist.add(depositor);
         }
         if (claimerWhitelisted) {
-            stakerWhitelist.addToWhitelist(whitelistedClaimer);
+            stakerAllowset.add(whitelistedClaimer);
         }
 
         // Skip if neither is whitelisted (can't create deposit)
@@ -344,7 +351,7 @@ contract RegenStakerBaseCompoundWhitelistFixTest is Test {
 
         // Remove owner from whitelist for testing
         if (!ownerWhitelisted) {
-            stakerWhitelist.removeFromWhitelist(depositor);
+            stakerAllowset.remove(depositor);
         }
 
         // Determine who is calling and expected result
@@ -361,9 +368,7 @@ contract RegenStakerBaseCompoundWhitelistFixTest is Test {
             assertGt(compounded, 0, "Should compound successfully");
         } else {
             vm.prank(caller);
-            vm.expectRevert(
-                abi.encodeWithSelector(RegenStakerBase.NotWhitelisted.selector, stakerWhitelist, depositor)
-            );
+            vm.expectRevert(abi.encodeWithSelector(RegenStakerBase.StakerNotAllowed.selector, depositor));
             staker.compoundRewards(depositId);
         }
     }

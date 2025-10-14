@@ -40,6 +40,8 @@ contribute(depositId, mechanism, amount, deadline, v, r, s) → amount
 ## Error Codes
 
 - `MinimumStakeAmountNotMet`
-- `NotWhitelisted`
+- `StakerNotAllowed`
+- `StakerBlocked`
+- `NotInAllowset`
 - `CompoundingNotSupported`
 - `InvalidRewardDuration`

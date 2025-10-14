@@ -917,6 +917,18 @@ contract TokenizedAllocationMechanism {
         return _getStorage().globalRedemptionStart;
     }
 
+    function votingStartTime() external view returns (uint256) {
+        return _getStorage().votingStartTime;
+    }
+
+    function votingEndTime() external view returns (uint256) {
+        return _getStorage().votingEndTime;
+    }
+
+    function startTime() external view returns (uint256) {
+        return _getStorage().startTime;
+    }
+
     /// @notice Returns the current nonce for an address
     /// @param account The address to check
     /// @return The current nonce

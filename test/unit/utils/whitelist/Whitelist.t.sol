@@ -2,11 +2,11 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import { Whitelist } from "src/utils/Whitelist.sol";
+import { AddressSet } from "src/utils/AddressSet.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol"; // For OwnableUnauthorizedAccount error
 
 contract WhitelistTest is Test {
-    Whitelist whitelist;
+    AddressSet whitelist;
     address owner;
     address user1;
     address user2;
@@ -21,7 +21,7 @@ contract WhitelistTest is Test {
         nonOwner = makeAddr("nonOwner");
 
         vm.prank(intendedOwner); // Prank as the intended owner for the deployment
-        whitelist = new Whitelist();
+        whitelist = new AddressSet();
 
         owner = intendedOwner; // Assign the 'owner' variable to the actual owner of the whitelist
     }
@@ -33,8 +33,8 @@ contract WhitelistTest is Test {
 
     // --- isWhitelisted Tests ---
     function test_IsWhitelisted_InitiallyFalse() public view {
-        assertFalse(whitelist.isWhitelisted(user1), "User1 should not be whitelisted initially");
-        assertFalse(whitelist.isWhitelisted(address(0)), "Address(0) should not be whitelisted initially");
+        assertFalse(whitelist.contains(user1), "User1 should not be whitelisted initially");
+        assertFalse(whitelist.contains(address(0)), "Address(0) should not be whitelisted initially");
     }
 
     // --- addToWhitelist Tests ---
@@ -43,10 +43,10 @@ contract WhitelistTest is Test {
         accounts[0] = user1;
 
         vm.prank(owner);
-        whitelist.addToWhitelist(accounts);
+        whitelist.add(accounts);
 
-        assertTrue(whitelist.isWhitelisted(user1), "User1 should be whitelisted after adding");
-        assertFalse(whitelist.isWhitelisted(user2), "User2 should still not be whitelisted");
+        assertTrue(whitelist.contains(user1), "User1 should be whitelisted after adding");
+        assertFalse(whitelist.contains(user2), "User2 should still not be whitelisted");
     }
 
     function test_AddToWhitelist_MultipleAccounts() public {
@@ -55,11 +55,11 @@ contract WhitelistTest is Test {
         accounts[1] = user2;
 
         vm.prank(owner);
-        whitelist.addToWhitelist(accounts);
+        whitelist.add(accounts);
 
-        assertTrue(whitelist.isWhitelisted(user1), "User1 should be whitelisted");
-        assertTrue(whitelist.isWhitelisted(user2), "User2 should be whitelisted");
-        assertFalse(whitelist.isWhitelisted(user3), "User3 should not be whitelisted");
+        assertTrue(whitelist.contains(user1), "User1 should be whitelisted");
+        assertTrue(whitelist.contains(user2), "User2 should be whitelisted");
+        assertFalse(whitelist.contains(user3), "User3 should not be whitelisted");
     }
 
     function test_AddToWhitelist_EmptyList() public {
@@ -67,7 +67,7 @@ contract WhitelistTest is Test {
 
         vm.prank(owner);
         vm.expectRevert();
-        whitelist.addToWhitelist(accounts);
+        whitelist.add(accounts);
     }
 
     function test_AddToWhitelist_AddAddressZero() public {
@@ -77,12 +77,12 @@ contract WhitelistTest is Test {
         vm.prank(owner);
         vm.expectRevert(
             abi.encodeWithSelector(
-                Whitelist.IllegalWhitelistOperation.selector,
+                AddressSet.IllegalAddressSetOperation.selector,
                 address(0),
                 "Address zero not allowed."
             )
         );
-        whitelist.addToWhitelist(accounts);
+        whitelist.add(accounts);
     }
 
     function test_AddToWhitelist_AlreadyWhitelisted() public {
@@ -90,13 +90,13 @@ contract WhitelistTest is Test {
         accounts[0] = user1;
 
         vm.startPrank(owner);
-        whitelist.addToWhitelist(accounts); // Add once
-        assertTrue(whitelist.isWhitelisted(user1));
+        whitelist.add(accounts); // Add once
+        assertTrue(whitelist.contains(user1));
 
         vm.expectRevert(
-            abi.encodeWithSelector(Whitelist.IllegalWhitelistOperation.selector, user1, "Address already whitelisted.")
+            abi.encodeWithSelector(AddressSet.IllegalAddressSetOperation.selector, user1, "Address already in set.")
         );
-        whitelist.addToWhitelist(accounts); // Add again
+        whitelist.add(accounts); // Add again
         vm.stopPrank();
     }
 
@@ -106,7 +106,7 @@ contract WhitelistTest is Test {
 
         vm.startPrank(nonOwner);
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, nonOwner));
-        whitelist.addToWhitelist(accounts);
+        whitelist.add(accounts);
         vm.stopPrank();
     }
 
@@ -115,14 +115,14 @@ contract WhitelistTest is Test {
         address[] memory addAccounts = new address[](1);
         addAccounts[0] = user1;
         vm.startPrank(owner);
-        whitelist.addToWhitelist(addAccounts);
-        assertTrue(whitelist.isWhitelisted(user1));
+        whitelist.add(addAccounts);
+        assertTrue(whitelist.contains(user1));
 
         address[] memory removeAccounts = new address[](1);
         removeAccounts[0] = user1;
-        whitelist.removeFromWhitelist(removeAccounts);
+        whitelist.remove(removeAccounts);
 
-        assertFalse(whitelist.isWhitelisted(user1), "User1 should not be whitelisted after removal");
+        assertFalse(whitelist.contains(user1), "User1 should not be whitelisted after removal");
         vm.stopPrank();
     }
 
@@ -132,19 +132,19 @@ contract WhitelistTest is Test {
         addAccounts[1] = user2;
         addAccounts[2] = user3;
         vm.startPrank(owner);
-        whitelist.addToWhitelist(addAccounts);
-        assertTrue(whitelist.isWhitelisted(user1));
-        assertTrue(whitelist.isWhitelisted(user2));
-        assertTrue(whitelist.isWhitelisted(user3));
+        whitelist.add(addAccounts);
+        assertTrue(whitelist.contains(user1));
+        assertTrue(whitelist.contains(user2));
+        assertTrue(whitelist.contains(user3));
 
         address[] memory removeAccounts = new address[](2);
         removeAccounts[0] = user1;
         removeAccounts[1] = user3;
-        whitelist.removeFromWhitelist(removeAccounts);
+        whitelist.remove(removeAccounts);
 
-        assertFalse(whitelist.isWhitelisted(user1), "User1 should be removed");
-        assertTrue(whitelist.isWhitelisted(user2), "User2 should remain whitelisted");
-        assertFalse(whitelist.isWhitelisted(user3), "User3 should be removed");
+        assertFalse(whitelist.contains(user1), "User1 should be removed");
+        assertTrue(whitelist.contains(user2), "User2 should remain whitelisted");
+        assertFalse(whitelist.contains(user3), "User3 should be removed");
         vm.stopPrank();
     }
 
@@ -152,12 +152,12 @@ contract WhitelistTest is Test {
         address[] memory addAccounts = new address[](1);
         addAccounts[0] = user1;
         vm.startPrank(owner);
-        whitelist.addToWhitelist(addAccounts);
-        assertTrue(whitelist.isWhitelisted(user1));
+        whitelist.add(addAccounts);
+        assertTrue(whitelist.contains(user1));
 
         address[] memory removeAccounts = new address[](0);
         vm.expectRevert();
-        whitelist.removeFromWhitelist(removeAccounts);
+        whitelist.remove(removeAccounts);
         vm.stopPrank();
     }
 
@@ -167,12 +167,12 @@ contract WhitelistTest is Test {
         removeAccounts[0] = address(0);
         vm.expectRevert(
             abi.encodeWithSelector(
-                Whitelist.IllegalWhitelistOperation.selector,
+                AddressSet.IllegalAddressSetOperation.selector,
                 address(0),
                 "Address zero not allowed."
             )
         );
-        whitelist.removeFromWhitelist(removeAccounts);
+        whitelist.remove(removeAccounts);
         vm.stopPrank();
     }
 
@@ -182,18 +182,18 @@ contract WhitelistTest is Test {
 
         vm.prank(owner);
         vm.expectRevert(
-            abi.encodeWithSelector(Whitelist.IllegalWhitelistOperation.selector, user1, "Address not whitelisted.")
+            abi.encodeWithSelector(AddressSet.IllegalAddressSetOperation.selector, user1, "Address not in set.")
         );
-        whitelist.removeFromWhitelist(accounts);
+        whitelist.remove(accounts);
 
-        assertFalse(whitelist.isWhitelisted(user1), "User1 should remain not whitelisted");
+        assertFalse(whitelist.contains(user1), "User1 should remain not whitelisted");
     }
 
     function test_RevertIf_RemoveFromWhitelist_NotOwner() public {
         address[] memory addAccounts = new address[](1);
         addAccounts[0] = user1;
         vm.startPrank(owner); // owner adds user1
-        whitelist.addToWhitelist(addAccounts);
+        whitelist.add(addAccounts);
         vm.stopPrank(); // Stop owner prank before starting nonOwner prank
 
         address[] memory removeAccounts = new address[](1);
@@ -201,10 +201,10 @@ contract WhitelistTest is Test {
 
         vm.startPrank(nonOwner); // nonOwner tries to remove
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, nonOwner));
-        whitelist.removeFromWhitelist(removeAccounts);
+        whitelist.remove(removeAccounts);
         vm.stopPrank();
 
         vm.prank(owner); // Verify user1 still whitelisted as owner didn't remove
-        assertTrue(whitelist.isWhitelisted(user1), "User1 should still be whitelisted as non-owner failed to remove");
+        assertTrue(whitelist.contains(user1), "User1 should still be whitelisted as non-owner failed to remove");
     }
 }

@@ -1,15 +1,18 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
+import { AccessMode } from "src/constants.sol";
 import { Test } from "forge-std/Test.sol";
 import { RegenStaker } from "src/regen/RegenStaker.sol";
+import { RegenStakerBase } from "src/regen/RegenStakerBase.sol";
 import { RegenEarningPowerCalculator } from "src/regen/RegenEarningPowerCalculator.sol";
 import { MockERC20Staking } from "test/mocks/MockERC20Staking.sol";
-import { Whitelist } from "src/utils/Whitelist.sol";
+import { AddressSet } from "src/utils/AddressSet.sol";
+import { IAddressSet } from "src/utils/IAddressSet.sol";
 import { Staker } from "staker/Staker.sol";
 
 /**
- * @title REG-008 Compound Whitelist Bypass Demo
+ * @title REG-008 Compound AddressSet Bypass Demo
  * @dev Demonstrates access control bypass in compoundRewards function
  *
  * VULNERABILITY: Non-whitelisted depositors can increase stake via whitelisted claimers
@@ -20,7 +23,7 @@ import { Staker } from "staker/Staker.sol";
 contract REG008CompoundWhitelistBypassDemoTest is Test {
     RegenStaker public regenStaker;
     MockERC20Staking public stakeToken;
-    Whitelist public stakerWhitelist;
+    AddressSet public stakerAllowset;
 
     address public admin = makeAddr("admin");
     address public rewardNotifier = makeAddr("rewardNotifier");
@@ -34,9 +37,14 @@ contract REG008CompoundWhitelistBypassDemoTest is Test {
         vm.startPrank(admin);
 
         stakeToken = new MockERC20Staking(18);
-        stakerWhitelist = new Whitelist();
-        Whitelist earningPowerWhitelist = new Whitelist();
-        RegenEarningPowerCalculator calc = new RegenEarningPowerCalculator(address(this), earningPowerWhitelist);
+        stakerAllowset = new AddressSet();
+        AddressSet earningPowerWhitelist = new AddressSet();
+        RegenEarningPowerCalculator calc = new RegenEarningPowerCalculator(
+            address(this),
+            earningPowerWhitelist,
+            IAddressSet(address(0)),
+            AccessMode.ALLOWSET
+        );
 
         regenStaker = new RegenStaker(
             stakeToken,
@@ -46,18 +54,19 @@ contract REG008CompoundWhitelistBypassDemoTest is Test {
             admin,
             30 days,
             0,
-            stakerWhitelist,
-            new Whitelist(),
-            new Whitelist()
+            stakerAllowset,
+            IAddressSet(address(0)),
+            AccessMode.ALLOWSET,
+            new AddressSet()
         );
 
         regenStaker.setRewardNotifier(rewardNotifier, true);
 
         // Initially whitelist both users
-        stakerWhitelist.addToWhitelist(depositor);
-        stakerWhitelist.addToWhitelist(whitelistedClaimer);
-        earningPowerWhitelist.addToWhitelist(depositor);
-        earningPowerWhitelist.addToWhitelist(whitelistedClaimer);
+        stakerAllowset.add(depositor);
+        stakerAllowset.add(whitelistedClaimer);
+        earningPowerWhitelist.add(depositor);
+        earningPowerWhitelist.add(whitelistedClaimer);
 
         stakeToken.mint(depositor, STAKE_AMOUNT);
         stakeToken.mint(rewardNotifier, REWARD_AMOUNT);
@@ -84,18 +93,16 @@ contract REG008CompoundWhitelistBypassDemoTest is Test {
 
         // Step 3: Admin removes depositor from whitelist (e.g., compliance issue)
         vm.prank(admin);
-        stakerWhitelist.removeFromWhitelist(depositor);
+        stakerAllowset.remove(depositor);
 
         // Verify depositor is no longer whitelisted
-        assertFalse(stakerWhitelist.isWhitelisted(depositor));
-        assertTrue(stakerWhitelist.isWhitelisted(whitelistedClaimer));
+        assertFalse(stakerAllowset.contains(depositor));
+        assertTrue(stakerAllowset.contains(whitelistedClaimer));
 
         // Step 4: Vulnerability FIXED - Whitelisted claimer cannot compound for delisted depositor
         vm.prank(whitelistedClaimer);
         // The compound now properly checks depositor whitelist status and reverts
-        vm.expectRevert(
-            abi.encodeWithSignature("NotWhitelisted(address,address)", address(stakerWhitelist), depositor)
-        );
+        vm.expectRevert(abi.encodeWithSelector(RegenStakerBase.StakerNotAllowed.selector, depositor));
         regenStaker.compoundRewards(depositId);
     }
 
@@ -117,7 +124,7 @@ contract REG008CompoundWhitelistBypassDemoTest is Test {
 
         // Remove depositor from whitelist
         vm.prank(admin);
-        stakerWhitelist.removeFromWhitelist(depositor);
+        stakerAllowset.remove(depositor);
 
         // Direct staking is correctly blocked
         vm.startPrank(depositor);
@@ -130,9 +137,7 @@ contract REG008CompoundWhitelistBypassDemoTest is Test {
 
         // Compound is now also blocked - vulnerability has been fixed
         vm.prank(whitelistedClaimer);
-        vm.expectRevert(
-            abi.encodeWithSignature("NotWhitelisted(address,address)", address(stakerWhitelist), depositor)
-        );
+        vm.expectRevert(abi.encodeWithSelector(RegenStakerBase.StakerNotAllowed.selector, depositor));
         regenStaker.compoundRewards(depositId);
     }
 }

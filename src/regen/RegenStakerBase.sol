@@ -17,9 +17,11 @@ import { StakerOnBehalf } from "staker/extensions/StakerOnBehalf.sol";
 import { StakerPermitAndStake } from "staker/extensions/StakerPermitAndStake.sol";
 
 // Local Imports
-import { IWhitelist } from "src/utils/IWhitelist.sol";
+import { IAddressSet } from "src/utils/IAddressSet.sol";
 import { IEarningPowerCalculator } from "staker/interfaces/IEarningPowerCalculator.sol";
 import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocationMechanism.sol";
+import { OctantQFMechanism } from "src/mechanisms/mechanism/OctantQFMechanism.sol";
+import { AccessMode } from "src/constants.sol";
 
 // === Contract Header ===
 /// @title RegenStakerBase
@@ -29,9 +31,9 @@ import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocation
 ///         - Variable reward duration (7-3000 days, configurable by admin)
 ///         - Earning power management with external bumping incentivized by tips (up to maxBumpTip)
 ///         - Adjustable minimum stake amount (existing deposits grandfathered with restrictions)
-///         - Whitelist support for stakers, contributors, and allocation mechanisms
+///         - Access control for stakers and allocation mechanisms
 ///         - Reward compounding (when REWARD_TOKEN == STAKE_TOKEN)
-///         - Reward contribution to whitelisted allocation mechanisms
+///         - Reward contribution to approved allocation mechanisms
 ///         - Admin controls (pause/unpause, config updates)
 ///
 /// @dev CLAIMER PERMISSION MODEL:
@@ -50,15 +52,15 @@ import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocation
 ///      │ Alter claimer           │ ✓        │ ✗       │
 ///      └─────────────────────────┴──────────┴─────────┘
 ///      * Compounding increases deposit stake (intended behavior)
-///      † Compounding requires the deposit owner to be whitelisted; caller may be owner or claimer
-///      ‡ Claimer may contribute only if on the contribution whitelist; mechanism must be whitelisted
+///      † Compounding bypasses stakerAccessMode checks (no stakerAllowset membership required)
+///      ‡ Mechanism must be on allocationMechanismAllowset; contributor checked via mechanism's contributionAllowset
 ///      § VOTING POWER: The contributor (msg.sender) receives voting power in the allocation mechanism,
 ///         NOT the deposit owner. When a claimer contributes, the claimer gets voting power.
 ///
 ///      When designating a claimer, owners explicitly trust them with:
 ///      1. Claiming accrued rewards on their behalf
 ///      2. Compounding rewards to increase stake position (when REWARD_TOKEN == STAKE_TOKEN)
-///      3. Contributing unclaimed rewards to whitelisted allocation mechanisms (subject to contribution whitelist)
+///      3. Contributing unclaimed rewards to approved allocation mechanisms
 ///      4. Receiving voting power in allocation mechanisms when they contribute (claimer gets voting power, not owner)
 ///
 ///      Security boundaries are maintained:
@@ -76,15 +78,18 @@ import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocation
 abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, StakerPermitAndStake, StakerOnBehalf {
     using SafeCast for uint256;
 
+    // === Enums ===
+
     // === Structs ===
     /// @notice Struct to hold shared configuration state
     /// @dev Groups related configuration variables for better storage efficiency and easier inheritance.
     struct SharedState {
         uint128 rewardDuration;
         uint128 minimumStakeAmount;
-        IWhitelist stakerWhitelist;
-        IWhitelist contributionWhitelist;
-        IWhitelist allocationMechanismWhitelist;
+        IAddressSet stakerAllowset;
+        IAddressSet allocationMechanismAllowset;
+        IAddressSet stakerBlockset;
+        AccessMode stakerAccessMode;
     }
 
     // === Constants ===
@@ -95,10 +100,18 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     uint256 public constant MAX_REWARD_DURATION = 3000 days;
 
     // === Custom Errors ===
-    /// @notice Error thrown when an address is not whitelisted
-    /// @param whitelist The whitelist contract
+    /// @notice Error thrown when an address is not in the required address set
+    /// @param addressSet The address set contract
     /// @param user The user address
-    error NotWhitelisted(IWhitelist whitelist, address user);
+    error NotInAllowset(IAddressSet addressSet, address user);
+
+    /// @notice Error thrown when staker is not in allowset
+    /// @param user The user address
+    error StakerNotAllowed(address user);
+
+    /// @notice Error thrown when staker is blocked
+    /// @param user The user address
+    error StakerBlocked(address user);
 
     /// @notice Error thrown when reward notification would corrupt user deposits (same-token scenario)
     /// @param currentBalance The actual token balance in the contract
@@ -137,7 +150,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @notice Error thrown when no change is made
     error NoOperation();
 
-    /// @notice Error thrown when attempting to disable allocation whitelist
+    /// @notice Error thrown when attempting to disable allocation mechanism allowset
     error DisablingAllocationMechanismWhitelistNotAllowed();
 
     /// @notice Error thrown when reward token doesn't match allocation mechanism's expected asset
@@ -173,17 +186,21 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     RewardSchedule public latestRewardSchedule;
 
     // === Events ===
-    /// @notice Emitted when the staker whitelist is updated
-    /// @param whitelist The new whitelist contract address
-    event StakerWhitelistSet(IWhitelist indexed whitelist);
+    /// @notice Emitted when the staker allowset is updated
+    /// @param allowset The new allowset contract address
+    event StakerAllowsetAssigned(IAddressSet indexed allowset);
 
-    /// @notice Emitted when the contribution whitelist is updated
-    /// @param whitelist The new whitelist contract address
-    event ContributionWhitelistSet(IWhitelist indexed whitelist);
+    /// @notice Emitted when the staker blockset is updated
+    /// @param blockset The new blockset contract address
+    event StakerBlocksetAssigned(IAddressSet indexed blockset);
 
-    /// @notice Emitted when the allocation mechanism whitelist is updated
-    /// @param whitelist The new whitelist contract address
-    event AllocationMechanismWhitelistSet(IWhitelist indexed whitelist);
+    /// @notice Emitted when staker access mode is changed
+    /// @param mode The new access mode
+    event AccessModeSet(AccessMode indexed mode);
+
+    /// @notice Emitted when the allocation mechanism allowset is updated
+    /// @param allowset The new allowset contract address
+    event AllocationMechanismAllowsetAssigned(IAddressSet indexed allowset);
 
     /// @notice Emitted when the reward duration is updated
     /// @param newDuration The new reward duration in seconds
@@ -225,10 +242,6 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @param newMinimumStakeAmount The new minimum stake amount
     event MinimumStakeAmountSet(uint256 newMinimumStakeAmount);
 
-    /// @notice Emitted when a whitelist is disabled (set to address(0))
-    event StakerWhitelistDisabled();
-    event ContributionWhitelistDisabled();
-
     // === Getters ===
     /// @notice Gets the current reward duration
     /// @return The reward duration in seconds
@@ -236,22 +249,28 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         return sharedState.rewardDuration;
     }
 
-    /// @notice Gets the staker whitelist
-    /// @return The staker whitelist contract
-    function stakerWhitelist() external view returns (IWhitelist) {
-        return sharedState.stakerWhitelist;
+    /// @notice Gets the staker allowset
+    /// @return The staker allowset contract
+    function stakerAllowset() external view returns (IAddressSet) {
+        return sharedState.stakerAllowset;
     }
 
-    /// @notice Gets the contribution whitelist
-    /// @return The contribution whitelist contract
-    function contributionWhitelist() external view returns (IWhitelist) {
-        return sharedState.contributionWhitelist;
+    /// @notice Gets the staker blockset
+    /// @return The staker blockset contract
+    function stakerBlockset() external view returns (IAddressSet) {
+        return sharedState.stakerBlockset;
     }
 
-    /// @notice Gets the allocation mechanism whitelist
-    /// @return The allocation mechanism whitelist contract
-    function allocationMechanismWhitelist() external view returns (IWhitelist) {
-        return sharedState.allocationMechanismWhitelist;
+    /// @notice Gets the staker access mode
+    /// @return The current access mode
+    function stakerAccessMode() external view returns (AccessMode) {
+        return sharedState.stakerAccessMode;
+    }
+
+    /// @notice Gets the allocation mechanism allowset
+    /// @return The allocation mechanism allowset contract
+    function allocationMechanismAllowset() external view returns (IAddressSet) {
+        return sharedState.allocationMechanismAllowset;
     }
 
     /// @notice Gets the minimum stake amount
@@ -270,9 +289,10 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @param _admin The admin address
     /// @param _rewardDuration The reward duration
     /// @param _minimumStakeAmount The min stake amount
-    /// @param _stakerWhitelist Staker whitelist
-    /// @param _contributionWhitelist Contribution whitelist
-    /// @param _allocationMechanismWhitelist Allocation mechanism whitelist (cannot be address(0))
+    /// @param _stakerAllowset Staker allowset (for ALLOWSET mode)
+    /// @param _stakerBlockset Staker blockset (for BLOCKSET mode)
+    /// @param _stakerAccessMode Initial staker access mode
+    /// @param _allocationMechanismAllowset Allocation mechanism allowset (cannot be address(0))
     /// @param _eip712Name The EIP712 domain name
     constructor(
         IERC20 _rewardsToken,
@@ -282,9 +302,10 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         address _admin,
         uint128 _rewardDuration,
         uint128 _minimumStakeAmount,
-        IWhitelist _stakerWhitelist,
-        IWhitelist _contributionWhitelist,
-        IWhitelist _allocationMechanismWhitelist,
+        IAddressSet _stakerAllowset,
+        IAddressSet _stakerBlockset,
+        AccessMode _stakerAccessMode,
+        IAddressSet _allocationMechanismAllowset,
         string memory _eip712Name
     )
         Staker(_rewardsToken, _stakeToken, _earningPowerCalculator, _maxBumpTip, _admin)
@@ -306,9 +327,10 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         _initializeSharedState(
             _rewardDuration,
             _minimumStakeAmount,
-            _stakerWhitelist,
-            _contributionWhitelist,
-            _allocationMechanismWhitelist
+            _stakerAllowset,
+            _stakerBlockset,
+            _stakerAccessMode,
+            _allocationMechanismAllowset
         );
     }
 
@@ -317,56 +339,46 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @dev Called by child constructors to set up shared configuration
     /// @param _rewardDuration The duration over which rewards are distributed
     /// @param _minimumStakeAmount The minimum stake amount
-    /// @param _stakerWhitelist The whitelist for stakers
-    /// @param _contributionWhitelist The whitelist for contributors
-    /// @param _allocationMechanismWhitelist The whitelist for allocation mechanisms
+    /// @param _stakerAllowset The allowset for stakers (ALLOWSET mode)
+    /// @param _stakerBlockset The blockset for stakers (BLOCKSET mode)
+    /// @param _stakerAccessMode The initial staker access mode
+    /// @param _allocationMechanismAllowset The allowset for allocation mechanisms
     function _initializeSharedState(
         uint128 _rewardDuration,
         uint128 _minimumStakeAmount,
-        IWhitelist _stakerWhitelist,
-        IWhitelist _contributionWhitelist,
-        IWhitelist _allocationMechanismWhitelist
+        IAddressSet _stakerAllowset,
+        IAddressSet _stakerBlockset,
+        AccessMode _stakerAccessMode,
+        IAddressSet _allocationMechanismAllowset
     ) internal {
         require(
             _rewardDuration >= MIN_REWARD_DURATION && _rewardDuration <= MAX_REWARD_DURATION,
             InvalidRewardDuration(uint256(_rewardDuration))
         );
-        // Align initialization invariants with setters: allocation mechanism whitelist cannot be disabled
+        // Align initialization invariants with setters: allocation mechanism allowset cannot be disabled
+        require(address(_allocationMechanismAllowset) != address(0), DisablingAllocationMechanismWhitelistNotAllowed());
+        // Sanity check: Allocation mechanism allowset must be distinct from staker address sets
         require(
-            address(_allocationMechanismWhitelist) != address(0),
-            DisablingAllocationMechanismWhitelistNotAllowed()
-        );
-        // Sanity check: Allocation mechanism whitelist must be distinct from other whitelists
-        require(
-            address(_allocationMechanismWhitelist) != address(_stakerWhitelist) &&
-                address(_allocationMechanismWhitelist) != address(_contributionWhitelist),
+            address(_allocationMechanismAllowset) != address(_stakerAllowset) &&
+                address(_allocationMechanismAllowset) != address(_stakerBlockset),
             Staker__InvalidAddress()
         );
 
         // Emit events first to match setter ordering
         emit RewardDurationSet(_rewardDuration);
         emit MinimumStakeAmountSet(_minimumStakeAmount);
-
-        if (address(_stakerWhitelist) == address(0)) {
-            emit StakerWhitelistDisabled();
-        } else {
-            emit StakerWhitelistSet(_stakerWhitelist);
-        }
-
-        if (address(_contributionWhitelist) == address(0)) {
-            emit ContributionWhitelistDisabled();
-        } else {
-            emit ContributionWhitelistSet(_contributionWhitelist);
-        }
-
-        emit AllocationMechanismWhitelistSet(_allocationMechanismWhitelist);
+        emit StakerAllowsetAssigned(_stakerAllowset);
+        emit StakerBlocksetAssigned(_stakerBlockset);
+        emit AccessModeSet(_stakerAccessMode);
+        emit AllocationMechanismAllowsetAssigned(_allocationMechanismAllowset);
 
         // Assign to storage after emits for consistency with setters
         sharedState.rewardDuration = _rewardDuration;
         sharedState.minimumStakeAmount = _minimumStakeAmount;
-        sharedState.stakerWhitelist = _stakerWhitelist;
-        sharedState.contributionWhitelist = _contributionWhitelist;
-        sharedState.allocationMechanismWhitelist = _allocationMechanismWhitelist;
+        sharedState.stakerAllowset = _stakerAllowset;
+        sharedState.stakerBlockset = _stakerBlockset;
+        sharedState.stakerAccessMode = _stakerAccessMode;
+        sharedState.allocationMechanismAllowset = _allocationMechanismAllowset;
     }
 
     /// @notice Sets the reward duration for future reward notifications
@@ -444,76 +456,67 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         );
     }
 
-    /// @notice Sets the whitelist for stakers (who can stake tokens)
-    /// @dev ACCESS CONTROL: Use address(0) to disable whitelisting and allow all addresses.
+    /// @notice Sets the allowset for stakers (who can stake tokens)
     /// @dev OPERATIONAL IMPACT: Affects all stake and stakeMore operations immediately.
-    /// @dev GRANDFATHERING: Existing stakers can continue operations regardless of new whitelist.
+    /// @dev GRANDFATHERING: Existing stakers can continue operations regardless of new allowset.
     /// @dev Can only be called by admin
-    /// @param _stakerWhitelist New staker whitelist contract (address(0) = no restrictions)
-    function setStakerWhitelist(IWhitelist _stakerWhitelist) external {
-        require(sharedState.stakerWhitelist != _stakerWhitelist, NoOperation());
-        // Sanity check: staker whitelist must be distinct from allocation mechanism whitelist
-        require(
-            address(_stakerWhitelist) != address(sharedState.allocationMechanismWhitelist),
-            Staker__InvalidAddress()
-        );
+    /// @dev NOTE: Use setAccessMode(AccessMode.NONE) to disable access control, not address(0)
+    /// @param _stakerAllowset New staker allowset contract
+    function setStakerAllowset(IAddressSet _stakerAllowset) external {
+        require(sharedState.stakerAllowset != _stakerAllowset, NoOperation());
+        require(address(_stakerAllowset) != address(sharedState.allocationMechanismAllowset), Staker__InvalidAddress());
         _revertIfNotAdmin();
-        if (address(_stakerWhitelist) == address(0)) {
-            emit StakerWhitelistDisabled();
-        } else {
-            emit StakerWhitelistSet(_stakerWhitelist);
-        }
-        sharedState.stakerWhitelist = _stakerWhitelist;
+        emit StakerAllowsetAssigned(_stakerAllowset);
+        sharedState.stakerAllowset = _stakerAllowset;
     }
 
-    /// @notice Sets the whitelist for contributors (who can contribute rewards)
-    /// @dev ACCESS CONTROL: Use address(0) to disable whitelisting and allow all addresses.
-    /// @dev OPERATIONAL IMPACT: Affects all contribute operations immediately.
-    /// @dev GRANDFATHERING: Existing contributors can continue operations regardless of new whitelist.
+    /// @notice Sets the staker blockset
+    /// @dev OPERATIONAL IMPACT: Affects all stake operations immediately.
     /// @dev Can only be called by admin
-    /// @param _contributionWhitelist New contribution whitelist contract (address(0) = no restrictions)
-    function setContributionWhitelist(IWhitelist _contributionWhitelist) external {
+    /// @dev NOTE: Use setAccessMode(AccessMode.NONE) to disable access control, not address(0)
+    /// @param _stakerBlockset New staker blockset contract
+    function setStakerBlockset(IAddressSet _stakerBlockset) external {
         _revertIfNotAdmin();
-        require(sharedState.contributionWhitelist != _contributionWhitelist, NoOperation());
-        // Prevent footgun: ensure distinct from allocation mechanism whitelist
-        require(
-            address(_contributionWhitelist) != address(sharedState.allocationMechanismWhitelist),
-            Staker__InvalidAddress()
-        );
-        if (address(_contributionWhitelist) == address(0)) {
-            emit ContributionWhitelistDisabled();
-        } else {
-            emit ContributionWhitelistSet(_contributionWhitelist);
-        }
-        sharedState.contributionWhitelist = _contributionWhitelist;
+        require(sharedState.stakerBlockset != _stakerBlockset, NoOperation());
+        require(address(_stakerBlockset) != address(sharedState.allocationMechanismAllowset), Staker__InvalidAddress());
+        emit StakerBlocksetAssigned(_stakerBlockset);
+        sharedState.stakerBlockset = _stakerBlockset;
     }
 
-    /// @notice Sets the whitelist for allocation mechanisms
-    /// @dev SECURITY: Only add thoroughly audited allocation mechanisms to this whitelist.
-    ///      Users will contribute rewards to whitelisted mechanisms and funds cannot be recovered
+    /// @notice Sets the staker access mode
+    /// @dev OPERATIONAL IMPACT: Changes which address set (allowset/blockset) is active
+    /// @dev Can only be called by admin
+    /// @param _mode New access mode (NONE, ALLOWSET, or BLOCKSET)
+    function setAccessMode(AccessMode _mode) external {
+        _revertIfNotAdmin();
+        require(sharedState.stakerAccessMode != _mode, NoOperation());
+        emit AccessModeSet(_mode);
+        sharedState.stakerAccessMode = _mode;
+    }
+
+    /// @notice Sets the allowset for allocation mechanisms
+    /// @dev SECURITY: Only add thoroughly audited allocation mechanisms to this allowset.
+    ///      Users will contribute rewards to approved mechanisms and funds cannot be recovered
     ///      if sent to malicious or buggy implementations.
     /// @dev EVALUATION PROCESS: New mechanisms should undergo comprehensive security audit,
-    ///      integration testing, and governance review before whitelisting.
+    ///      integration testing, and governance review before approval.
     /// @dev OPERATIONAL IMPACT: Changes affect all future contributions. Existing contributions
-    ///      to previously whitelisted mechanisms are not affected.
+    ///      to previously approved mechanisms are not affected.
     /// @dev Can only be called by admin. Cannot set to address(0).
     /// @dev AUDIT NOTE: Changes require governance approval.
-    /// @param _allocationMechanismWhitelist New whitelist contract (cannot be address(0))
-    function setAllocationMechanismWhitelist(IWhitelist _allocationMechanismWhitelist) external {
-        require(sharedState.allocationMechanismWhitelist != _allocationMechanismWhitelist, NoOperation());
+    /// @param _allocationMechanismAllowset New allowset contract (cannot be address(0))
+    function setAllocationMechanismAllowset(IAddressSet _allocationMechanismAllowset) external {
+        require(sharedState.allocationMechanismAllowset != _allocationMechanismAllowset, NoOperation());
+        require(address(_allocationMechanismAllowset) != address(0), DisablingAllocationMechanismWhitelistNotAllowed());
+        // Prevent footgun: allocation mechanism allowset must be distinct from staker address sets
         require(
-            address(_allocationMechanismWhitelist) != address(0),
-            DisablingAllocationMechanismWhitelistNotAllowed()
-        );
-        // Prevent footgun: allocation mechanism whitelist must be distinct from other whitelists
-        require(
-            address(_allocationMechanismWhitelist) != address(sharedState.stakerWhitelist) &&
-                address(_allocationMechanismWhitelist) != address(sharedState.contributionWhitelist),
+            address(_allocationMechanismAllowset) != address(sharedState.stakerAllowset) &&
+                address(_allocationMechanismAllowset) != address(sharedState.stakerBlockset),
             Staker__InvalidAddress()
         );
         _revertIfNotAdmin();
-        emit AllocationMechanismWhitelistSet(_allocationMechanismWhitelist);
-        sharedState.allocationMechanismWhitelist = _allocationMechanismWhitelist;
+        emit AllocationMechanismAllowsetAssigned(_allocationMechanismAllowset);
+        sharedState.allocationMechanismAllowset = _allocationMechanismAllowset;
     }
 
     /// @notice Sets the minimum stake amount
@@ -571,7 +574,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @dev CONTRIBUTION RISK: Contributed funds are transferred to external allocation mechanisms
     ///      for public good causes. Malicious mechanisms may misappropriate funds for unintended
     ///      purposes rather than the stated public good cause.
-    /// @dev TRUST MODEL: Allocation mechanisms must be whitelisted by protocol governance.
+    /// @dev TRUST MODEL: Allocation mechanisms must be approved by protocol governance.
     ///      Only contribute to mechanisms you trust, as the protocol cannot recover funds
     ///      sent to malicious or buggy allocation mechanisms.
     /// @dev VOTING POWER ASSIGNMENT: The contributor (msg.sender) receives voting power in the
@@ -580,12 +583,12 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     ///      as part of the claimer trust model.
     /// @dev SECURITY: This function first withdraws rewards to the contributor, then the contributor
     ///      must have pre-approved the allocation mechanism to pull the tokens.
-    /// @dev SECURITY AUDIT: Ensure allocation mechanisms are immutable post-whitelisting.
+    /// @dev SECURITY AUDIT: Ensure allocation mechanisms are immutable after approval.
     /// @dev AUTHZ: Authorized caller is the deposit owner or the designated claimer; the claimer acts
-    ///      as the owner's agent for rewards and may contribute if on the contribution whitelist.
+    ///      as the owner's agent for rewards. Contribution access control enforced by mechanism.
     /// @dev Requires contract not paused and uses reentrancy guard
     /// @param _depositId The deposit identifier to contribute from
-    /// @param _allocationMechanismAddress Whitelisted allocation mechanism to receive contribution
+    /// @param _allocationMechanismAddress Approved allocation mechanism to receive contribution
     /// @param _amount Amount of unclaimed rewards to contribute (must be <= available rewards)
     /// @param _deadline Signature expiration timestamp
     /// @param _v Signature component v
@@ -601,11 +604,10 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         bytes32 _r,
         bytes32 _s
     ) public virtual whenNotPaused nonReentrant returns (uint256 amountContributedToAllocationMechanism) {
-        _checkWhitelisted(sharedState.contributionWhitelist, msg.sender);
         _revertIfAddressZero(_allocationMechanismAddress);
         require(
-            sharedState.allocationMechanismWhitelist.isWhitelisted(_allocationMechanismAddress),
-            NotWhitelisted(sharedState.allocationMechanismWhitelist, _allocationMechanismAddress)
+            sharedState.allocationMechanismAllowset.contains(_allocationMechanismAddress),
+            NotInAllowset(sharedState.allocationMechanismAllowset, _allocationMechanismAddress)
         );
 
         // Validate asset compatibility to fail fast and provide clear error
@@ -621,16 +623,43 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
             revert Staker__Unauthorized("not claimer or owner", msg.sender);
         }
 
+        // Defense-in-depth dual-check architecture (Cantina Finding #127 fix):
+        // 1. TAM checks msg.sender (claimer/contributor) via beforeSignupHook - receives voting power
+        // 2. RegenStaker checks deposit.owner (fund source) must also be eligible (defense-in-depth)
+        // This prevents delisted owners from using allowlisted claimers as proxies
+        //
+        // IMPORTANT: Voting power goes to msg.sender (claimer), NOT deposit.owner
+        // Per documented permission model (see lines 56-64), the contributor (msg.sender) receives
+        // voting power, preserving claimer autonomy. The owner check here is an additional security
+        // layer to ensure fund sources are also eligible, closing the bypass vector identified in
+        // Cantina Finding #127 where delisted owners could use allowlisted claimers as proxies.
+
+        // Explicit fund source check: Verify deposit owner is also eligible for this mechanism
+        // Try to check via mechanism's canSignup if available (OctantQFMechanism interface)
+        try OctantQFMechanism(payable(_allocationMechanismAddress)).canSignup(deposit.owner) returns (
+            bool ownerCanSignup
+        ) {
+            if (!ownerCanSignup) {
+                revert NotInAllowset(sharedState.allocationMechanismAllowset, deposit.owner);
+            }
+        } catch {
+            // If mechanism doesn't support canSignup, no additional check
+            // The mechanism being on allocationMechanismAllowset is the governance approval
+        }
+
         _checkpointGlobalReward();
         _checkpointReward(deposit);
 
         uint256 unclaimedAmount = deposit.scaledUnclaimedRewardCheckpoint / SCALE_FACTOR;
         require(_amount <= unclaimedAmount, CantAfford(_amount, unclaimedAmount));
 
+        // Special case: Allow zero-amount contributions to enable users to register for voting
+        // without contributing funds. This is useful for participation-only scenarios where
+        // users want to signal support without financial commitment.
         if (_amount == 0) {
             emit RewardContributed(_depositId, msg.sender, _allocationMechanismAddress, 0);
             TokenizedAllocationMechanism(_allocationMechanismAddress).signupOnBehalfWithSignature(
-                msg.sender,
+                msg.sender, // Claimer/contributor receives voting power and provides signature
                 0,
                 _deadline,
                 _v,
@@ -677,7 +706,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         );
 
         TokenizedAllocationMechanism(_allocationMechanismAddress).signupOnBehalfWithSignature(
-            msg.sender,
+            msg.sender, // Claimer/contributor receives voting power and provides signature
             amountContributedToAllocationMechanism,
             _deadline,
             _v,
@@ -716,8 +745,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
             revert Staker__Unauthorized("not claimer or owner", msg.sender);
         }
 
-        // Enforce owner whitelist for stake-increasing operation
-        _checkWhitelisted(sharedState.stakerWhitelist, depositOwner);
+        _checkStakerAccess(depositOwner);
 
         _checkpointGlobalReward();
         _checkpointReward(deposit);
@@ -781,13 +809,15 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         }
     }
 
-    /// @notice Check if user is whitelisted when whitelist is set
-    /// @dev Internal view function, reverts if not whitelisted
-    /// @param whitelist The whitelist to check against
-    /// @param user The user address to check
-    function _checkWhitelisted(IWhitelist whitelist, address user) internal view {
-        if (whitelist != IWhitelist(address(0)) && !whitelist.isWhitelisted(user)) {
-            revert NotWhitelisted(whitelist, user);
+    function _checkStakerAccess(address user) internal view {
+        if (sharedState.stakerAccessMode == AccessMode.ALLOWSET) {
+            if (!sharedState.stakerAllowset.contains(user)) {
+                revert StakerNotAllowed(user);
+            }
+        } else if (sharedState.stakerAccessMode == AccessMode.BLOCKSET) {
+            if (sharedState.stakerBlockset.contains(user)) {
+                revert StakerBlocked(user);
+            }
         }
     }
 
@@ -825,7 +855,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     // === Overridden Functions ===
 
     /// @inheritdoc Staker
-    /// @notice Prevents staking 0, staking below the minimum, staking when paused, and staking by non-whitelisted stakers.
+    /// @notice Prevents staking 0, staking below the minimum, staking when paused, and unauthorized staking.
     /// @dev Uses reentrancy guard
     /// @param _depositor The depositor address
     /// @param _amount The amount to stake
@@ -839,7 +869,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         address _claimer
     ) internal virtual override whenNotPaused nonReentrant returns (DepositIdentifier _depositId) {
         require(_amount > 0, ZeroOperation());
-        _checkWhitelisted(sharedState.stakerWhitelist, _depositor);
+        _checkStakerAccess(_depositor);
         _depositId = super._stake(_depositor, _amount, _delegatee, _claimer);
         _revertIfMinimumStakeAmountNotMet(_depositId);
     }
@@ -934,8 +964,8 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     }
 
     /// @inheritdoc Staker
-    /// @notice Prevents staking more when paused or by non-whitelisted owners; ensures non-zero amount and final balance meets minimum.
-    /// @dev Uses reentrancy guard; validates deposit.owner against staker whitelist before proceeding
+    /// @notice Prevents staking more when paused or by unauthorized owners; ensures non-zero amount and final balance meets minimum.
+    /// @dev Uses reentrancy guard; validates deposit.owner against staker access control before proceeding
     /// @param deposit The deposit storage
     /// @param _depositId The deposit identifier
     /// @param _amount The additional amount to stake
@@ -945,7 +975,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         uint256 _amount
     ) internal virtual override whenNotPaused nonReentrant {
         require(_amount > 0, ZeroOperation());
-        _checkWhitelisted(sharedState.stakerWhitelist, deposit.owner);
+        _checkStakerAccess(deposit.owner);
         super._stakeMore(deposit, _depositId, _amount);
         _revertIfMinimumStakeAmountNotMet(_depositId);
     }

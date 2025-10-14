@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.23;
 
+import { AccessMode } from "src/constants.sol";
 import { Test } from "forge-std/Test.sol";
 
 import { RegenStakerWithoutDelegateSurrogateVotes } from "src/regen/RegenStakerWithoutDelegateSurrogateVotes.sol";
+import { RegenStakerBase } from "src/regen/RegenStakerBase.sol";
 import { Staker } from "staker/Staker.sol";
 import { RegenEarningPowerCalculator } from "src/regen/RegenEarningPowerCalculator.sol";
-import { IWhitelist } from "src/utils/IWhitelist.sol";
-import { Whitelist } from "src/utils/Whitelist.sol";
+import { IAddressSet } from "src/utils/IAddressSet.sol";
+import { AddressSet } from "src/utils/AddressSet.sol";
 import { MockERC20Permit } from "test/mocks/MockERC20Permit.sol";
 
 contract CompoundEquivalenceTest is Test {
@@ -28,12 +30,17 @@ contract CompoundEquivalenceTest is Test {
     RegenEarningPowerCalculator internal calculator;
     RegenStakerWithoutDelegateSurrogateVotes internal stakerA; // compound path
     RegenStakerWithoutDelegateSurrogateVotes internal stakerB; // claim+stakeMore path
-    Whitelist internal allocationWhitelist;
+    AddressSet internal allocationWhitelist;
 
     function setUp() public {
         token = new MockERC20Permit(18);
-        calculator = new RegenEarningPowerCalculator(ADMIN, IWhitelist(address(0)));
-        allocationWhitelist = new Whitelist();
+        calculator = new RegenEarningPowerCalculator(
+            ADMIN,
+            IAddressSet(address(0)),
+            IAddressSet(address(0)),
+            AccessMode.NONE
+        );
+        allocationWhitelist = new AddressSet();
 
         stakerA = new RegenStakerWithoutDelegateSurrogateVotes(
             token,
@@ -43,9 +50,10 @@ contract CompoundEquivalenceTest is Test {
             ADMIN,
             REWARD_DURATION,
             MIN_STAKE,
-            IWhitelist(address(0)),
-            IWhitelist(address(0)),
-            IWhitelist(address(allocationWhitelist))
+            IAddressSet(address(0)),
+            IAddressSet(address(0)),
+            AccessMode.NONE,
+            IAddressSet(address(allocationWhitelist))
         );
 
         stakerB = new RegenStakerWithoutDelegateSurrogateVotes(
@@ -56,9 +64,10 @@ contract CompoundEquivalenceTest is Test {
             ADMIN,
             REWARD_DURATION,
             MIN_STAKE,
-            IWhitelist(address(0)),
-            IWhitelist(address(0)),
-            IWhitelist(address(allocationWhitelist))
+            IAddressSet(address(0)),
+            IAddressSet(address(0)),
+            AccessMode.NONE,
+            IAddressSet(address(allocationWhitelist))
         );
 
         // fund user and stakers for rewards
@@ -149,9 +158,10 @@ contract CompoundEquivalenceTest is Test {
             ADMIN,
             REWARD_DURATION,
             MIN_STAKE,
-            IWhitelist(address(0)),
-            IWhitelist(address(0)),
-            IWhitelist(address(allocationWhitelist))
+            IAddressSet(address(0)),
+            IAddressSet(address(0)),
+            AccessMode.NONE,
+            IAddressSet(address(allocationWhitelist))
         );
         RegenStakerWithoutDelegateSurrogateVotes B = new RegenStakerWithoutDelegateSurrogateVotes(
             tkn,
@@ -161,9 +171,10 @@ contract CompoundEquivalenceTest is Test {
             ADMIN,
             REWARD_DURATION,
             MIN_STAKE,
-            IWhitelist(address(0)),
-            IWhitelist(address(0)),
-            IWhitelist(address(allocationWhitelist))
+            IAddressSet(address(0)),
+            IAddressSet(address(0)),
+            AccessMode.NONE,
+            IAddressSet(address(allocationWhitelist))
         );
 
         // fund

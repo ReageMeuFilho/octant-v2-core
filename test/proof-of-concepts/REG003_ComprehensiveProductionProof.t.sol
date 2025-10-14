@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import { AccessMode } from "src/constants.sol";
 import "forge-std/Test.sol";
 import { RegenStaker } from "src/regen/RegenStaker.sol";
+import { RegenStakerBase } from "src/regen/RegenStakerBase.sol";
 import { RegenEarningPowerCalculator } from "src/regen/RegenEarningPowerCalculator.sol";
-import { Whitelist } from "src/utils/Whitelist.sol";
+import { AddressSet } from "src/utils/AddressSet.sol";
+import { IAddressSet } from "src/utils/IAddressSet.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MockERC20Staking } from "test/mocks/MockERC20Staking.sol";
 import { Staker } from "staker/Staker.sol";
@@ -32,10 +35,10 @@ contract REG003_ComprehensiveProductionProofTest is Test {
     RegenEarningPowerCalculator public earningPowerCalculator;
     MockERC20 public rewardToken;
     MockERC20Staking public stakeToken;
-    Whitelist public stakerWhitelist;
-    Whitelist public earningPowerWhitelist;
-    Whitelist public contributorWhitelist;
-    Whitelist public allocationWhitelist;
+    AddressSet public stakerAllowset;
+    AddressSet public earningPowerWhitelist;
+    AddressSet public contributorWhitelist;
+    AddressSet public allocationWhitelist;
 
     address public admin = makeAddr("admin");
     address public rewardNotifier = makeAddr("rewardNotifier");
@@ -57,11 +60,16 @@ contract REG003_ComprehensiveProductionProofTest is Test {
 
         // Deploy whitelists as admin
         vm.startPrank(admin);
-        stakerWhitelist = new Whitelist();
-        earningPowerWhitelist = new Whitelist();
-        contributorWhitelist = new Whitelist();
-        allocationWhitelist = new Whitelist();
-        earningPowerCalculator = new RegenEarningPowerCalculator(admin, earningPowerWhitelist);
+        stakerAllowset = new AddressSet();
+        earningPowerWhitelist = new AddressSet();
+        contributorWhitelist = new AddressSet();
+        allocationWhitelist = new AddressSet();
+        earningPowerCalculator = new RegenEarningPowerCalculator(
+            admin,
+            earningPowerWhitelist,
+            IAddressSet(address(0)),
+            AccessMode.ALLOWSET
+        );
 
         // Deploy RegenStaker with production-like configuration
         regenStaker = new RegenStaker(
@@ -72,8 +80,9 @@ contract REG003_ComprehensiveProductionProofTest is Test {
             admin,
             uint128(PRODUCTION_MIN_DURATION),
             100 ether, // minStakeAmount - production minimum
-            stakerWhitelist,
-            contributorWhitelist,
+            stakerAllowset,
+            IAddressSet(address(0)),
+            AccessMode.NONE,
             allocationWhitelist
         );
 
@@ -81,12 +90,12 @@ contract REG003_ComprehensiveProductionProofTest is Test {
         regenStaker.setRewardNotifier(rewardNotifier, true);
 
         // Setup whitelists
-        stakerWhitelist.addToWhitelist(alice);
-        stakerWhitelist.addToWhitelist(bob);
-        stakerWhitelist.addToWhitelist(charlie);
-        earningPowerWhitelist.addToWhitelist(alice);
-        earningPowerWhitelist.addToWhitelist(bob);
-        earningPowerWhitelist.addToWhitelist(charlie);
+        stakerAllowset.add(alice);
+        stakerAllowset.add(bob);
+        stakerAllowset.add(charlie);
+        earningPowerWhitelist.add(alice);
+        earningPowerWhitelist.add(bob);
+        earningPowerWhitelist.add(charlie);
         vm.stopPrank();
 
         // Fund accounts with production-realistic amounts
@@ -394,9 +403,14 @@ contract REG003_ComprehensiveProductionProofTest is Test {
         vm.startPrank(admin);
 
         // Minimal setup - only essential components
-        Whitelist testStakerWhitelist = new Whitelist();
-        Whitelist testEarningPowerWhitelist = new Whitelist();
-        RegenEarningPowerCalculator testCalculator = new RegenEarningPowerCalculator(admin, testEarningPowerWhitelist);
+        AddressSet testStakerWhitelist = new AddressSet();
+        AddressSet testEarningPowerWhitelist = new AddressSet();
+        RegenEarningPowerCalculator testCalculator = new RegenEarningPowerCalculator(
+            admin,
+            testEarningPowerWhitelist,
+            IAddressSet(address(0)),
+            AccessMode.ALLOWSET
+        );
 
         RegenStaker testStaker = new RegenStaker(
             testRewardToken,
@@ -407,14 +421,15 @@ contract REG003_ComprehensiveProductionProofTest is Test {
             uint128(duration), // rewardDuration - key parameter
             1, // minStakeAmount - minimal for testing
             testStakerWhitelist,
-            new Whitelist(), // contributorWhitelist
-            new Whitelist() // allocationWhitelist
+            IAddressSet(address(0)),
+            AccessMode.NONE,
+            new AddressSet() // allocationWhitelist
         );
 
         // Setup permissions
         testStaker.setRewardNotifier(admin, true);
-        testStakerWhitelist.addToWhitelist(alice);
-        testEarningPowerWhitelist.addToWhitelist(alice);
+        testStakerWhitelist.add(alice);
+        testEarningPowerWhitelist.add(alice);
 
         vm.stopPrank();
         return testStaker;

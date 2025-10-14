@@ -23,7 +23,7 @@ contract Cantina199Fix is Test, OctantTestBase {
 
         // Admin removes Alice from the whitelist as in the PoC.
         vm.prank(admin);
-        earningPowerWhitelist.removeFromWhitelist(alice);
+        earningPowerWhitelist.remove(alice);
 
         // Keeper (Charlie) now bumps earning power with zero tip. This must succeed post-fix.
         vm.prank(charlie);
@@ -45,11 +45,11 @@ contract Cantina199Fix is Test, OctantTestBase {
         stakeToken.mint(charlie, CHARLIE_STAKE);
         rewardToken.mint(rewardNotifier, REWARD_AMOUNT);
 
-        // Whitelist bump keeper for staking/earning power
+        // AddressSet bump keeper for staking/earning power
         vm.prank(admin);
-        stakerWhitelist.addToWhitelist(charlie);
+        stakerAllowset.add(charlie);
         vm.prank(admin);
-        earningPowerWhitelist.addToWhitelist(charlie);
+        earningPowerWhitelist.add(charlie);
 
         vm.startPrank(alice);
         stakeToken.approve(address(regenStaker), ALICE_STAKE);

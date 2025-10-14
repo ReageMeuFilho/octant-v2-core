@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.23;
 
+import { AccessMode } from "src/constants.sol";
 import { Test } from "forge-std/Test.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { RegenStakerWithoutDelegateSurrogateVotes } from "src/regen/RegenStakerWithoutDelegateSurrogateVotes.sol";
 import { RegenStakerBase } from "src/regen/RegenStakerBase.sol";
 import { RegenEarningPowerCalculator } from "src/regen/RegenEarningPowerCalculator.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
-import { IWhitelist } from "src/utils/IWhitelist.sol";
-import { Whitelist } from "src/utils/Whitelist.sol";
+import { IAddressSet } from "src/utils/IAddressSet.sol";
+import { AddressSet } from "src/utils/AddressSet.sol";
 import { Staker } from "staker/Staker.sol";
 
 /// @title Tests for Same-Token Protection in RegenStakerWithoutDelegateSurrogateVotes
@@ -21,7 +22,7 @@ contract RegenStakerWithoutDelegateSurrogateVotesSameTokenProtectionTest is Test
     MockERC20 public rewardToken;
     MockERC20 public differentRewardToken;
     RegenEarningPowerCalculator public earningPowerCalculator;
-    Whitelist public whitelist;
+    AddressSet public whitelist;
 
     address public admin = address(0x1);
     address public notifier = address(0x2);
@@ -39,12 +40,17 @@ contract RegenStakerWithoutDelegateSurrogateVotesSameTokenProtectionTest is Test
         differentRewardToken = new MockERC20(18);
 
         // Deploy whitelist (constructor sets msg.sender as owner)
-        whitelist = new Whitelist();
-        whitelist.addToWhitelist(user1);
-        whitelist.addToWhitelist(user2);
+        whitelist = new AddressSet();
+        whitelist.add(user1);
+        whitelist.add(user2);
 
         // Deploy earning power calculator
-        earningPowerCalculator = new RegenEarningPowerCalculator(admin, IWhitelist(address(whitelist)));
+        earningPowerCalculator = new RegenEarningPowerCalculator(
+            admin,
+            IAddressSet(address(whitelist)),
+            IAddressSet(address(0)),
+            AccessMode.ALLOWSET
+        );
 
         // Deploy staker with SAME token for staking and rewards (vulnerable scenario)
         staker = new RegenStakerWithoutDelegateSurrogateVotes(
@@ -55,8 +61,9 @@ contract RegenStakerWithoutDelegateSurrogateVotesSameTokenProtectionTest is Test
             admin,
             30 days, // rewardDuration
             0, // minimumStakeAmount
-            IWhitelist(address(0)), // no staker whitelist
-            IWhitelist(address(0)), // no contribution whitelist
+            IAddressSet(address(0)), // no staker whitelist
+            IAddressSet(address(0)), // stakerBlockset
+            AccessMode.NONE,
             whitelist // allocation mechanism whitelist
         );
 
@@ -69,8 +76,9 @@ contract RegenStakerWithoutDelegateSurrogateVotesSameTokenProtectionTest is Test
             admin,
             30 days, // rewardDuration
             0, // minimumStakeAmount
-            IWhitelist(address(0)), // no staker whitelist
-            IWhitelist(address(0)), // no contribution whitelist
+            IAddressSet(address(0)), // no staker whitelist
+            IAddressSet(address(0)), // stakerBlockset
+            AccessMode.NONE,
             whitelist // allocation mechanism whitelist
         );
 

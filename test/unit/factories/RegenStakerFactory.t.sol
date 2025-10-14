@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.0;
 
+import { AccessMode } from "src/constants.sol";
 import { Test } from "forge-std/Test.sol";
 import { RegenStakerFactory } from "src/factories/RegenStakerFactory.sol";
 import { RegenStaker } from "src/regen/RegenStaker.sol";
+import { RegenStakerBase } from "src/regen/RegenStakerBase.sol";
 import { RegenStakerWithoutDelegateSurrogateVotes } from "src/regen/RegenStakerWithoutDelegateSurrogateVotes.sol";
+import { RegenStakerBase } from "src/regen/RegenStakerBase.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC20Staking } from "staker/interfaces/IERC20Staking.sol";
-import { IWhitelist } from "src/utils/IWhitelist.sol";
-import { Whitelist } from "src/utils/Whitelist.sol";
+import { IAddressSet } from "src/utils/IAddressSet.sol";
+import { AddressSet } from "src/utils/AddressSet.sol";
 import { IEarningPowerCalculator } from "staker/interfaces/IEarningPowerCalculator.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MockERC20Staking } from "test/mocks/MockERC20Staking.sol";
@@ -25,9 +28,9 @@ contract RegenStakerFactoryTest is Test {
     address public deployer1;
     address public deployer2;
 
-    IWhitelist public stakerWhitelist;
-    IWhitelist public contributionWhitelist;
-    IWhitelist public allocationMechanismWhitelist;
+    IAddressSet public stakerAllowset;
+    IAddressSet public contributionWhitelist;
+    IAddressSet public allocationMechanismAllowset;
 
     uint256 public constant MAX_BUMP_TIP = 1000e18;
     uint256 public constant MAX_CLAIM_FEE = 500;
@@ -52,9 +55,9 @@ contract RegenStakerFactoryTest is Test {
         stakeToken = new MockERC20Staking(18);
         earningPowerCalculator = new MockEarningPowerCalculator();
 
-        stakerWhitelist = new Whitelist();
-        contributionWhitelist = new Whitelist();
-        allocationMechanismWhitelist = new Whitelist();
+        stakerAllowset = new AddressSet();
+        contributionWhitelist = new AddressSet();
+        allocationMechanismAllowset = new AddressSet();
 
         // Deploy the factory with both variants' bytecode hashes (this test contract is the deployer)
         bytes32 regenStakerBytecodeHash = keccak256(type(RegenStaker).creationCode);
@@ -85,9 +88,10 @@ contract RegenStakerFactoryTest is Test {
             admin,
             REWARD_DURATION,
             MINIMUM_STAKE_AMOUNT,
-            stakerWhitelist,
-            contributionWhitelist,
-            allocationMechanismWhitelist
+            stakerAllowset,
+            IAddressSet(address(0)), // stakerBlockset
+            AccessMode.NONE,
+            allocationMechanismAllowset
         );
         bytes memory bytecode = bytes.concat(getRegenStakerBytecode(), constructorParams);
 
@@ -109,9 +113,10 @@ contract RegenStakerFactoryTest is Test {
                 rewardsToken: rewardsToken,
                 stakeToken: stakeToken,
                 admin: admin,
-                stakerWhitelist: stakerWhitelist,
-                contributionWhitelist: contributionWhitelist,
-                allocationMechanismWhitelist: allocationMechanismWhitelist,
+                stakerAllowset: stakerAllowset,
+                stakerBlockset: IAddressSet(address(0)),
+                stakerAccessMode: AccessMode.NONE,
+                allocationMechanismAllowset: allocationMechanismAllowset,
                 earningPowerCalculator: earningPowerCalculator,
                 maxBumpTip: MAX_BUMP_TIP,
                 minimumStakeAmount: MINIMUM_STAKE_AMOUNT,
@@ -140,9 +145,10 @@ contract RegenStakerFactoryTest is Test {
                 rewardsToken: rewardsToken,
                 stakeToken: stakeToken,
                 admin: admin,
-                stakerWhitelist: stakerWhitelist,
-                contributionWhitelist: contributionWhitelist,
-                allocationMechanismWhitelist: allocationMechanismWhitelist,
+                stakerAllowset: stakerAllowset,
+                stakerBlockset: IAddressSet(address(0)),
+                stakerAccessMode: AccessMode.NONE,
+                allocationMechanismAllowset: allocationMechanismAllowset,
                 earningPowerCalculator: earningPowerCalculator,
                 maxBumpTip: MAX_BUMP_TIP,
                 minimumStakeAmount: MINIMUM_STAKE_AMOUNT,
@@ -157,9 +163,10 @@ contract RegenStakerFactoryTest is Test {
                 rewardsToken: rewardsToken,
                 stakeToken: stakeToken,
                 admin: admin,
-                stakerWhitelist: stakerWhitelist,
-                contributionWhitelist: contributionWhitelist,
-                allocationMechanismWhitelist: allocationMechanismWhitelist,
+                stakerAllowset: stakerAllowset,
+                stakerBlockset: IAddressSet(address(0)),
+                stakerAccessMode: AccessMode.NONE,
+                allocationMechanismAllowset: allocationMechanismAllowset,
                 earningPowerCalculator: earningPowerCalculator,
                 maxBumpTip: MAX_BUMP_TIP + 100,
                 minimumStakeAmount: MINIMUM_STAKE_AMOUNT + 50e18,
@@ -183,9 +190,10 @@ contract RegenStakerFactoryTest is Test {
                 rewardsToken: rewardsToken,
                 stakeToken: stakeToken,
                 admin: admin,
-                stakerWhitelist: stakerWhitelist,
-                contributionWhitelist: contributionWhitelist,
-                allocationMechanismWhitelist: allocationMechanismWhitelist,
+                stakerAllowset: stakerAllowset,
+                stakerBlockset: IAddressSet(address(0)),
+                stakerAccessMode: AccessMode.NONE,
+                allocationMechanismAllowset: allocationMechanismAllowset,
                 earningPowerCalculator: earningPowerCalculator,
                 maxBumpTip: MAX_BUMP_TIP,
                 minimumStakeAmount: MINIMUM_STAKE_AMOUNT,
@@ -201,9 +209,10 @@ contract RegenStakerFactoryTest is Test {
                 rewardsToken: rewardsToken,
                 stakeToken: stakeToken,
                 admin: admin,
-                stakerWhitelist: stakerWhitelist,
-                contributionWhitelist: contributionWhitelist,
-                allocationMechanismWhitelist: allocationMechanismWhitelist,
+                stakerAllowset: stakerAllowset,
+                stakerBlockset: IAddressSet(address(0)),
+                stakerAccessMode: AccessMode.NONE,
+                allocationMechanismAllowset: allocationMechanismAllowset,
                 earningPowerCalculator: earningPowerCalculator,
                 maxBumpTip: MAX_BUMP_TIP,
                 minimumStakeAmount: MINIMUM_STAKE_AMOUNT,
@@ -228,9 +237,10 @@ contract RegenStakerFactoryTest is Test {
             admin,
             REWARD_DURATION,
             MINIMUM_STAKE_AMOUNT,
-            stakerWhitelist,
-            contributionWhitelist,
-            allocationMechanismWhitelist
+            stakerAllowset,
+            IAddressSet(address(0)), // stakerBlockset
+            AccessMode.NONE,
+            allocationMechanismAllowset
         );
         bytes memory bytecode = bytes.concat(getRegenStakerBytecode(), constructorParams);
 
@@ -243,9 +253,10 @@ contract RegenStakerFactoryTest is Test {
                 rewardsToken: rewardsToken,
                 stakeToken: stakeToken,
                 admin: admin,
-                stakerWhitelist: stakerWhitelist,
-                contributionWhitelist: contributionWhitelist,
-                allocationMechanismWhitelist: allocationMechanismWhitelist,
+                stakerAllowset: stakerAllowset,
+                stakerBlockset: IAddressSet(address(0)),
+                stakerAccessMode: AccessMode.NONE,
+                allocationMechanismAllowset: allocationMechanismAllowset,
                 earningPowerCalculator: earningPowerCalculator,
                 maxBumpTip: MAX_BUMP_TIP,
                 minimumStakeAmount: MINIMUM_STAKE_AMOUNT,
@@ -267,9 +278,10 @@ contract RegenStakerFactoryTest is Test {
                 rewardsToken: rewardsToken,
                 stakeToken: stakeToken,
                 admin: admin,
-                stakerWhitelist: IWhitelist(address(0)),
-                contributionWhitelist: IWhitelist(address(0)),
-                allocationMechanismWhitelist: allocationMechanismWhitelist,
+                stakerAllowset: IAddressSet(address(0)),
+                stakerBlockset: IAddressSet(address(0)),
+                stakerAccessMode: AccessMode.NONE,
+                allocationMechanismAllowset: allocationMechanismAllowset,
                 earningPowerCalculator: earningPowerCalculator,
                 maxBumpTip: MAX_BUMP_TIP,
                 minimumStakeAmount: MINIMUM_STAKE_AMOUNT,
@@ -283,14 +295,15 @@ contract RegenStakerFactoryTest is Test {
 
         RegenStaker staker = RegenStaker(stakerAddress);
         assertEq(
-            address(staker.stakerWhitelist()),
+            address(staker.stakerAllowset()),
             address(0),
             "Staker whitelist should be null when address(0) is passed"
         );
-        assertEq(
-            address(staker.contributionWhitelist()),
-            address(0),
-            "Contribution whitelist should be null when address(0) is passed"
-        );
+        // Contribution whitelist removed from RegenStaker
+        // assertEq(
+        //     address(0),
+        //     address(0),
+        //     "Contribution whitelist should be null when address(0) is passed"
+        // );
     }
 }

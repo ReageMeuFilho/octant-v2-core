@@ -2,67 +2,105 @@
 pragma solidity ^0.8.20;
 
 import { QuadraticVotingMechanism } from "./QuadraticVotingMechanism.sol";
-import { IWhitelist } from "src/utils/IWhitelist.sol";
-import { BaseAllocationMechanism, AllocationConfig } from "src/mechanisms/BaseAllocationMechanism.sol";
+import { IAddressSet } from "src/utils/IAddressSet.sol";
+import { AccessMode } from "src/constants.sol";
+import { AllocationConfig, TokenizedAllocationMechanism } from "src/mechanisms/BaseAllocationMechanism.sol";
 
 /// @title Octant Quadratic Funding Mechanism
-/// @notice Extends QuadraticVotingMechanism with whitelist-based access control for signups
-/// @dev Only whitelisted addresses can signup to participate in the allocation mechanism
-/// @dev Inherits single-vote constraint: votes are final and cannot be increased, decreased, or cancelled once cast
-/// @dev Additional voting power from subsequent deposits can only be used on proposals not yet voted on
+/// @notice Extends QuadraticVotingMechanism with access control for signups
+/// @dev Supports dual-mode access control (allowset/blockset) for contribution restrictions
 contract OctantQFMechanism is QuadraticVotingMechanism {
-    /// @notice Whitelist contract for signup access control
-    IWhitelist public whitelist;
+    AccessMode public contributionAccessMode;
+    IAddressSet public contributionAllowset;
+    IAddressSet public contributionBlockset;
 
-    /// @notice Emitted when whitelist contract is updated
-    event WhitelistUpdated(address indexed oldWhitelist, address indexed newWhitelist);
+    error ContributorNotInAllowset(address user);
+    error ContributorInBlockset(address user);
 
-    /// @notice Initialize OctantQFMechanism with whitelist support
-    /// @param _implementation Address of the TokenizedAllocationMechanism implementation
-    /// @param _config Configuration parameters for the allocation mechanism
-    /// @param _alphaNumerator Numerator for alpha parameter (quadratic vs linear weighting)
-    /// @param _alphaDenominator Denominator for alpha parameter
-    /// @param _whitelist Address of the whitelist contract (can be address(0) for open access)
+    event ContributionAllowsetAssigned(IAddressSet indexed allowset);
+    event ContributionBlocksetAssigned(IAddressSet indexed blockset);
+    event AccessModeSet(AccessMode indexed mode);
+
     constructor(
         address _implementation,
         AllocationConfig memory _config,
         uint256 _alphaNumerator,
         uint256 _alphaDenominator,
-        address _whitelist
+        IAddressSet _contributionAllowset,
+        IAddressSet _contributionBlockset,
+        AccessMode _contributionAccessMode
     ) QuadraticVotingMechanism(_implementation, _config, _alphaNumerator, _alphaDenominator) {
-        whitelist = IWhitelist(_whitelist);
-        emit WhitelistUpdated(address(0), _whitelist);
+        contributionAllowset = _contributionAllowset;
+        contributionBlockset = _contributionBlockset;
+        contributionAccessMode = _contributionAccessMode;
+
+        emit ContributionAllowsetAssigned(_contributionAllowset);
+        emit ContributionBlocksetAssigned(_contributionBlockset);
+        emit AccessModeSet(_contributionAccessMode);
     }
 
-    /// @notice Override signup hook to check whitelist
-    /// @param user Address attempting to sign up
-    /// @return True if user is whitelisted or whitelist is disabled
     function _beforeSignupHook(address user) internal view virtual override returns (bool) {
-        // If no whitelist is set, allow all users (open access)
-        if (address(whitelist) == address(0)) {
-            return true;
+        if (contributionAccessMode == AccessMode.ALLOWSET) {
+            require(contributionAllowset.contains(user), ContributorNotInAllowset(user));
+        } else if (contributionAccessMode == AccessMode.BLOCKSET) {
+            require(!contributionBlockset.contains(user), ContributorInBlockset(user));
         }
 
-        // Check if user is whitelisted
-        return whitelist.isWhitelisted(user);
+        return true;
     }
 
-    /// @notice Update the whitelist contract address
-    /// @param _newWhitelist Address of new whitelist contract (address(0) to disable)
-    /// @dev Only callable by the mechanism owner
-    function setWhitelist(address _newWhitelist) external {
-        require(_tokenizedAllocation().owner() == msg.sender, "Only owner can update whitelist");
-
-        address oldWhitelist = address(whitelist);
-        whitelist = IWhitelist(_newWhitelist);
-
-        emit WhitelistUpdated(oldWhitelist, _newWhitelist);
+    /// @notice Sets the contribution allowset (for ALLOWSET mode)
+    /// @param _allowset The new allowset contract
+    /// @dev Non-retroactive. Existing voting power is not affected.
+    function setContributionAllowset(IAddressSet _allowset) external {
+        require(_tokenizedAllocation().owner() == msg.sender, "Only owner");
+        contributionAllowset = _allowset;
+        emit ContributionAllowsetAssigned(_allowset);
     }
 
-    /// @notice Check if an address is allowed to signup
-    /// @param user Address to check
-    /// @return True if user can signup
+    /// @notice Sets the contribution blockset (for BLOCKSET mode)
+    /// @param _blockset The new blockset contract
+    /// @dev Non-retroactive. Existing voting power is not affected.
+    function setContributionBlockset(IAddressSet _blockset) external {
+        require(_tokenizedAllocation().owner() == msg.sender, "Only owner");
+        contributionBlockset = _blockset;
+        emit ContributionBlocksetAssigned(_blockset);
+    }
+
+    /// @notice Sets the contribution access mode
+    /// @param _mode The new access mode (NONE, ALLOWSET, or BLOCKSET)
+    /// @dev Only allowed before voting starts or after tally finalization.
+    ///      Non-retroactive. Existing voting power is not affected.
+    function setAccessMode(AccessMode _mode) external {
+        TokenizedAllocationMechanism tam = _tokenizedAllocation();
+        require(tam.owner() == msg.sender, "Only owner");
+
+        // Safety check: Prevent mode switching during active voting or before finalization
+        // This prevents attackers from gaining voting power mid-vote or front-running mode switches
+        bool beforeVoting = block.timestamp < tam.votingStartTime();
+        bool afterFinalization = tam.tallyFinalized();
+        require(
+            beforeVoting || afterFinalization,
+            "Mode changes only allowed before voting starts or after tally finalization"
+        );
+
+        contributionAccessMode = _mode;
+        emit AccessModeSet(_mode);
+    }
+
+    /// @notice Checks if a user is eligible to signup/contribute based on current access mode
+    /// @param user The address to check
+    /// @return bool True if user can signup, false otherwise
+    /// @dev Used for defense-in-depth checks. Respects contributionAccessMode:
+    ///      NONE: always returns true
+    ///      ALLOWSET: returns true if user is in contributionAllowset
+    ///      BLOCKSET: returns true if user is NOT in contributionBlockset
     function canSignup(address user) external view returns (bool) {
-        return _beforeSignupHook(user);
+        if (contributionAccessMode == AccessMode.ALLOWSET) {
+            return contributionAllowset.contains(user);
+        } else if (contributionAccessMode == AccessMode.BLOCKSET) {
+            return !contributionBlockset.contains(user);
+        }
+        return true;
     }
 }

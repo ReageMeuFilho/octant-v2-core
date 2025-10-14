@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import { LinearAllowanceSingletonForGnosisSafe } from "src/zodiac-core/modules/LinearAllowanceSingletonForGnosisSafe.sol";
-import { IWhitelist } from "src/utils/IWhitelist.sol";
+import { IAddressSet } from "src/utils/IAddressSet.sol";
 
 /// @title LinearAllowanceExecutor
 /// @author [Golem Foundation](https://golem.foundation)
@@ -15,39 +15,39 @@ import { IWhitelist } from "src/utils/IWhitelist.sol";
 ///
 /// Assumptions and security model:
 /// - This executor contract instance is configured as the delegate in the LinearAllowance module.
-/// - A module whitelist may be set via `setModuleWhitelist`; `_validateModule` enforces it on calls.
-/// - If `moduleWhitelist` is unset (address(0)), `_validateModule` skips checks and allows any module.
+/// - A module address set may be set via `setModuleAddressSet`; `_validateModule` enforces it on calls.
+/// - If `moduleAddressSet` is unset (address(0)), `_validateModule` skips checks and allows any module.
 abstract contract LinearAllowanceExecutor {
-    /// @notice Whitelist contract for allowance modules to prevent arbitrary external calls
-    IWhitelist public moduleWhitelist;
+    /// @notice Address set contract for allowance modules to prevent arbitrary external calls
+    IAddressSet public moduleAddressSet;
 
-    /// @notice Error thrown when attempting to use a non-whitelisted module
-    error ModuleNotWhitelisted(address module);
+    /// @notice Error thrown when attempting to use a module not in the address set
+    error ModuleNotInSet(address module);
 
-    /// @notice Emitted when the module whitelist is updated
-    event ModuleWhitelistSet(IWhitelist indexed whitelist);
+    /// @notice Emitted when the module address set is assigned
+    event ModuleAddressSetAssigned(IAddressSet indexed addressSet);
 
-    /// @notice External function to configure the module whitelist used by this executor.
+    /// @notice External function to configure the module address set used by this executor.
     /// @dev Implementing contracts MUST restrict access (e.g., onlyOwner or governance).
-    /// Setting to address(0) unsets the whitelist in this executor; `_validateModule` then skips checks.
-    /// @param whitelist The whitelist contract address; set to address(0) to unset in this executor.
-    function setModuleWhitelist(IWhitelist whitelist) external virtual;
+    /// Setting to address(0) unsets the address set in this executor; `_validateModule` then skips checks.
+    /// @param addressSet The address set contract address; set to address(0) to unset in this executor.
+    function assignModuleAddressSet(IAddressSet addressSet) external virtual;
 
-    /// @notice Internal helper that updates the whitelist reference and emits an event.
+    /// @notice Internal helper that updates the address set reference and emits an event.
     /// @dev Does not perform access control; call from a restricted external setter.
-    /// @param whitelist The whitelist contract address; address(0) unsets it so `_validateModule` skips checks.
-    function _setModuleWhitelist(IWhitelist whitelist) internal {
-        moduleWhitelist = whitelist;
-        emit ModuleWhitelistSet(whitelist);
+    /// @param addressSet The address set contract address; address(0) unsets it so `_validateModule` skips checks.
+    function _assignModuleAddressSet(IAddressSet addressSet) internal {
+        moduleAddressSet = addressSet;
+        emit ModuleAddressSetAssigned(addressSet);
     }
 
     /// @notice Validate that a module is permitted to interact with this executor.
-    /// @dev If no whitelist is configured (moduleWhitelist == address(0)), any module is allowed.
-    /// Reverts with ModuleNotWhitelisted when a whitelist is set and the module is not listed.
+    /// @dev If no address set is configured (moduleAddressSet == address(0)), any module is allowed.
+    /// Reverts with ModuleNotInSet when an address set is configured and the module is not in it.
     /// @param module The allowance module address to validate.
     function _validateModule(address module) internal view {
-        if (address(moduleWhitelist) != address(0) && !moduleWhitelist.isWhitelisted(module)) {
-            revert ModuleNotWhitelisted(module);
+        if (address(moduleAddressSet) != address(0) && !moduleAddressSet.contains(module)) {
+            revert ModuleNotInSet(module);
         }
     }
 
