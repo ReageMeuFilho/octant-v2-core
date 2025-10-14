@@ -1274,7 +1274,7 @@ contract RegenIntegrationTest is Test {
         assertApproxEqRel(claimedByOwner, rewardAmount, ONE_MICRO);
     }
 
-    function testFuzz_WithdrawSucceedsWhenPaused(uint256 stakeAmountBase, uint256 withdrawAmountRatio) public {
+    function testFuzz_RevertIf_WithdrawWhenPaused(uint256 stakeAmountBase, uint256 withdrawAmountRatio) public {
         uint256 minStake = 100;
         uint256 maxStake = 10_000;
         stakeAmountBase = bound(stakeAmountBase, minStake, maxStake);
@@ -1299,68 +1299,11 @@ contract RegenIntegrationTest is Test {
         regenStaker.pause();
         assertTrue(regenStaker.paused());
 
-        // Withdrawal should succeed even when paused (user protection)
-        uint256 balanceBefore = stakeToken.balanceOf(user);
-        vm.prank(user);
-        regenStaker.withdraw(depositId, withdrawAmount);
-
-        uint256 balanceAfter = stakeToken.balanceOf(user);
-        assertEq(balanceAfter - balanceBefore, withdrawAmount, "Withdrawal should succeed when paused");
-
-        // Verify deposit balance was reduced
-        (uint96 balance, , , , , , ) = regenStaker.deposits(depositId);
-        assertEq(balance, stakeAmount - withdrawAmount, "Deposit balance should be reduced");
-
-        vm.prank(ADMIN);
-        regenStaker.unpause();
-        assertFalse(regenStaker.paused());
-    }
-
-    /// @notice Test that withdrawals remain enabled when paused for user protection
-    function test_WithdrawalsEnabledWhenPaused() public {
-        uint256 stakeAmount = getStakeAmount(1000);
-        address user = makeAddr("user");
-        whitelistUser(user, true, false, true);
-
-        stakeToken.mint(user, stakeAmount);
         vm.startPrank(user);
-        stakeToken.approve(address(regenStaker), stakeAmount);
-        Staker.DepositIdentifier depositId = regenStaker.stake(stakeAmount, user);
+        vm.expectRevert(abi.encodeWithSelector(Pausable.EnforcedPause.selector));
+        regenStaker.withdraw(depositId, withdrawAmount);
         vm.stopPrank();
 
-        // Pause the contract
-        vm.prank(ADMIN);
-        regenStaker.pause();
-        assertTrue(regenStaker.paused());
-
-        // Verify other operations are blocked
-        vm.startPrank(user);
-
-        // Staking should fail
-        stakeToken.mint(user, stakeAmount);
-        stakeToken.approve(address(regenStaker), stakeAmount);
-        vm.expectRevert(abi.encodeWithSelector(Pausable.EnforcedPause.selector));
-        regenStaker.stake(stakeAmount, user);
-
-        // Claiming should fail
-        vm.expectRevert(abi.encodeWithSelector(Pausable.EnforcedPause.selector));
-        regenStaker.claimReward(depositId);
-
-        // But withdrawal should succeed (MICA compliance)
-        uint256 withdrawAmount = stakeAmount / 2;
-        uint256 balanceBefore = stakeToken.balanceOf(user);
-        regenStaker.withdraw(depositId, withdrawAmount);
-        uint256 balanceAfter = stakeToken.balanceOf(user);
-
-        assertEq(
-            balanceAfter - balanceBefore,
-            withdrawAmount,
-            "Withdrawal should succeed when paused for user protection"
-        );
-
-        vm.stopPrank();
-
-        // Unpause
         vm.prank(ADMIN);
         regenStaker.unpause();
         assertFalse(regenStaker.paused());

@@ -14,6 +14,7 @@ import { IUniV3Swap } from "src/utils/vendor/0xSplits/IUniV3Swap.sol";
 import { ITransformer } from "src/zodiac-core/interfaces/ITransformer.sol";
 import { ISwapperImpl } from "src/utils/vendor/0xSplits/SwapperImpl.sol";
 import { ISwapRouter } from "src/utils/vendor/uniswap/ISwapRouter.sol";
+import { NATIVE_TOKEN } from "src/constants.sol";
 
 /// @author .
 /// @title Octant Trader
@@ -30,8 +31,6 @@ contract Trader is ITransformer, Ownable, Pausable {
     //////////////////////////////////////////////////////////////*/
 
     uint256 public constant BLOCKS_PER_DAY = 7200;
-    /// @notice Address used to represent native ETH.
-    address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     /// @notice Address of WETH wrapper
     address public immutable WETH_ADDRESS;
     /// @notice Token to be sold.
@@ -217,7 +216,7 @@ contract Trader is ITransformer, Ownable, Pausable {
     /// @return amount of quote token that will be transferred to beneficiary.
     function transform(address fromToken, address toToken, uint256 amount) external payable returns (uint256) {
         if ((fromToken != BASE) || (toToken != QUOTE)) revert Trader__ImpossibleConfiguration();
-        if (fromToken == ETH) {
+        if (fromToken == NATIVE_TOKEN) {
             if (msg.value != amount) revert Trader__ImpossibleConfiguration();
         } else {
             if (msg.value != 0) revert Trader__UnexpectedETH();
@@ -303,7 +302,7 @@ contract Trader is ITransformer, Ownable, Pausable {
         lastHeight = height;
 
         uint256 balance = address(this).balance;
-        if (BASE != ETH) {
+        if (BASE != NATIVE_TOKEN) {
             balance = IERC20(BASE).balanceOf(address(this));
         }
 
@@ -313,7 +312,7 @@ contract Trader is ITransformer, Ownable, Pausable {
 
         spent = spent + saleValue;
 
-        if (BASE == ETH) {
+        if (BASE == NATIVE_TOKEN) {
             payable(swapper).transfer(saleValue);
         } else {
             IERC20(BASE).safeTransfer(swapper, saleValue);
@@ -435,14 +434,14 @@ contract Trader is ITransformer, Ownable, Pausable {
 
     /// @dev This contract deals with native ETH, while Uniswap with WETH. This helper function does address conversion.
     function uniEthWrapper(address token) private view returns (address) {
-        if (token == ETH) return WETH_ADDRESS;
+        if (token == NATIVE_TOKEN) return WETH_ADDRESS;
         else return token;
     }
 
     /// @dev Simplifies checking of balance for ETH and ERC20 tokens. ETH is represented by a particular address.
     /// @return Balance of `token` currency associated with specified `owner`
     function safeBalanceOf(address token, address owner) private view returns (uint256) {
-        if ((token == ETH) || (token == address(0x0))) {
+        if ((token == NATIVE_TOKEN) || (token == address(0x0))) {
             return owner.balance;
         } else {
             return IERC20(token).balanceOf(owner);
@@ -458,7 +457,7 @@ contract Trader is ITransformer, Ownable, Pausable {
         if (saleValue > saleValueHigh) revert Trader__SoftwareError();
 
         uint256 balance = address(this).balance;
-        if (BASE != ETH) {
+        if (BASE != NATIVE_TOKEN) {
             balance = IERC20(BASE).balanceOf(address(this));
         }
 
@@ -472,7 +471,7 @@ contract Trader is ITransformer, Ownable, Pausable {
 
     /// @dev This contract and Splits' Swapper use different addresses to represent ETH. This function does the conversion.
     function splitsEthWrapper(address token) private pure returns (address) {
-        if (token == ETH) return address(0x0);
+        if (token == NATIVE_TOKEN) return address(0x0);
         else return token;
     }
 

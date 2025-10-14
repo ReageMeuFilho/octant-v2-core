@@ -22,6 +22,7 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC4626 } from "@openzeppelin/contracts//interfaces/IERC4626.sol";
 import { ITokenizedStrategy } from "src/zodiac-core/interfaces/ITokenizedStrategy.sol";
 import { DragonRouter } from "src/zodiac-core/DragonRouter.sol";
+import { NATIVE_TOKEN } from "src/constants.sol";
 
 import { ITransformer } from "src/zodiac-core/interfaces/ITransformer.sol";
 import { MockDragonRouterTesting } from "test/mocks/zodiac-core/MockDragonRouterTesting.sol";
@@ -33,6 +34,7 @@ import { DragonTokenizedStrategy } from "src/zodiac-core/vaults/DragonTokenizedS
 
 import { MockStrategy } from "test/mocks/zodiac-core/MockStrategy.sol";
 import { MockYieldSource } from "test/mocks/core/MockYieldSource.sol";
+import { NATIVE_TOKEN } from "src/constants.sol";
 import { BaseTest } from "./Base.t.sol";
 import { console } from "forge-std/console.sol";
 
@@ -97,14 +99,14 @@ contract DragonRouterTest is BaseTest {
         for (uint256 i = 0; i < 3; i++) {
             MockStrategy moduleImplementation = new MockStrategy();
             DragonTokenizedStrategy tokenizedStrategyImplementation = new DragonTokenizedStrategy();
-            MockYieldSource yieldSource = new MockYieldSource(tokenizedStrategyImplementation.ETH());
+            MockYieldSource yieldSource = new MockYieldSource(NATIVE_TOKEN);
             string memory name = "Test Mock Strategy";
             uint256 maxReportDelay = 9;
             testTemps memory temps = _testTemps(
                 address(moduleImplementation),
                 abi.encode(
                     address(tokenizedStrategyImplementation),
-                    tokenizedStrategyImplementation.ETH(),
+                    NATIVE_TOKEN,
                     address(yieldSource),
                     management,
                     keeper,
@@ -116,7 +118,7 @@ contract DragonRouterTest is BaseTest {
             );
             DragonTokenizedStrategy module = DragonTokenizedStrategy(payable(temps.module));
             strategies.push(address(module));
-            assets.push(tokenizedStrategyImplementation.ETH());
+            assets.push(NATIVE_TOKEN);
         }
 
         // Create initialization parameters
@@ -978,7 +980,7 @@ contract DragonRouterTest is BaseTest {
     function test_transferSplit_nativeToken() public {
         address recipient = makeAddr("recipient");
         uint256 amount = 500;
-        address nativeToken = DragonRouter(routerTesting).NATIVE_TOKEN();
+        address nativeToken = NATIVE_TOKEN;
 
         // Add ETH to the test contract to handle the transfers
         vm.deal(address(routerTesting), 1000);
@@ -1003,7 +1005,7 @@ contract DragonRouterTest is BaseTest {
     function test_transferSplit_nativeToken_withTransformer() public {
         address recipient = makeAddr("recipient");
         uint256 amount = 500;
-        address nativeToken = DragonRouter(routerTesting).NATIVE_TOKEN();
+        address nativeToken = NATIVE_TOKEN;
         uint256 transformedAmount = 450; // 90% of original amount (simulating 10% slippage)
 
         // Deploy a real mock transformer that will handle native ETH
