@@ -12,6 +12,7 @@ import { IDragonRouter } from "src/zodiac-core/interfaces/IDragonRouter.sol";
 import { LinearAllowanceExecutor } from "src/zodiac-core/LinearAllowanceExecutor.sol";
 import { ISplitChecker } from "src/zodiac-core/interfaces/ISplitChecker.sol";
 import { IAddressSet } from "src/utils/IAddressSet.sol";
+import { AccessMode } from "src/constants.sol";
 
 /**
  * @title Dragon Router
@@ -172,6 +173,15 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
      */
     function assignModuleAddressSet(IAddressSet addressSet) external override onlyRole(DEFAULT_ADMIN_ROLE) {
         _assignModuleAddressSet(addressSet);
+    }
+
+    /**
+     * @notice Set the module access mode for allowance modules
+     * @dev Only DEFAULT_ADMIN_ROLE can manage the access mode
+     * @param mode The access mode (NONE, ALLOWSET, or BLOCKSET)
+     */
+    function setModuleAccessMode(AccessMode mode) external override onlyRole(DEFAULT_ADMIN_ROLE) {
+        _setModuleAccessMode(mode);
     }
 
     /**

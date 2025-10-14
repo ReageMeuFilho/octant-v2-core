@@ -5,7 +5,7 @@ import { IAddressSet } from "src/utils/IAddressSet.sol";
 import { LinearAllowanceExecutor } from "src/zodiac-core/LinearAllowanceExecutor.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { NATIVE_TOKEN } from "src/constants.sol";
+import { NATIVE_TOKEN, AccessMode } from "src/constants.sol";
 
 /// @title LinearAllowanceExecutorTestHarness
 /// @notice Test implementation of LinearAllowanceExecutor with owner-only withdrawal functionality
@@ -24,6 +24,13 @@ contract LinearAllowanceExecutorTestHarness is LinearAllowanceExecutor, Ownable 
     /// @param addressSet The address set contract address (can be address(0) to disable)
     function assignModuleAddressSet(IAddressSet addressSet) external override onlyOwner {
         _assignModuleAddressSet(addressSet);
+    }
+
+    /// @notice Set the module access mode (owner only)
+    /// @dev Only the owner can set the access mode
+    /// @param mode The access mode (NONE, ALLOWSET, or BLOCKSET)
+    function setModuleAccessMode(AccessMode mode) external override onlyOwner {
+        _setModuleAccessMode(mode);
     }
 
     /// @notice Enables the contract to receive ETH transfers from allowance executions
