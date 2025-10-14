@@ -36,6 +36,7 @@ contribute(depositId, mechanism, amount, deadline, v, r, s) → amount
 - Allocation mechanisms must be audited
 - Malicious mechanisms can misappropriate public good contributions
 - Contract pausable for emergencies
+- **User Protection**: Withdrawals remain enabled even when paused to ensure users can always access their funds
 
 ## Error Codes
 
