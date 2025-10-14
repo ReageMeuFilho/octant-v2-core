@@ -16,12 +16,11 @@ import { IERC4626Payable } from "src/zodiac-core/interfaces/IERC4626Payable.sol"
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IERC20Metadata } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { IERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
+import { NATIVE_TOKEN } from "src/constants.sol";
 
 abstract contract TokenizedStrategy is ITokenizedStrategy {
     using Math for uint256;
     using SafeERC20 for ERC20;
-
-    address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE; // using this address to represent native ETH
 
     /*//////////////////////////////////////////////////////////////
                                CONSTANTS
@@ -127,7 +126,7 @@ abstract contract TokenizedStrategy is ITokenizedStrategy {
     //////////////////////////////////////////////////////////////*/
 
     constructor() {
-        _strategyStorage().asset = ERC20(address(1));
+        _strategyStorage().management = address(1);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -200,7 +199,7 @@ abstract contract TokenizedStrategy is ITokenizedStrategy {
      */
     function tend() external nonReentrant onlyKeepers {
         ERC20 _asset = _strategyStorage().asset;
-        uint256 _balance = address(_asset) == ETH ? address(this).balance : _asset.balanceOf(address(this));
+        uint256 _balance = address(_asset) == NATIVE_TOKEN ? address(this).balance : _asset.balanceOf(address(this));
         // Tend the strategy with the current loose balance.
         IBaseStrategy(address(this)).tendThis(_balance);
     }
@@ -728,7 +727,7 @@ abstract contract TokenizedStrategy is ITokenizedStrategy {
         StrategyData storage S = _strategyStorage();
 
         // Make sure we aren't initialized.
-        if (address(S.asset) != address(0)) revert TokenizedStrategy__AlreadyInitialized();
+        if (S.management != address(0)) revert TokenizedStrategy__AlreadyInitialized();
 
         // Set the strategy's underlying asset.
         S.asset = ERC20(_asset);
@@ -739,7 +738,7 @@ abstract contract TokenizedStrategy is ITokenizedStrategy {
         // Set the Strategy Tokens name.
         S.name = _name;
         // Set decimals based off the `asset`.
-        S.decimals = _asset == ETH ? 18 : ERC20(_asset).decimals();
+        S.decimals = _asset == NATIVE_TOKEN ? 18 : ERC20(_asset).decimals();
 
         S.lastReport = uint96(block.timestamp);
 
@@ -860,7 +859,7 @@ abstract contract TokenizedStrategy is ITokenizedStrategy {
 
         if (msg.sender == target || msg.sender == S.operator) {
             uint256 previousBalance;
-            if (address(_asset) == ETH) {
+            if (address(_asset) == NATIVE_TOKEN) {
                 previousBalance = address(this).balance;
                 IAvatar(target).execTransactionFromModule(address(this), assets, "", Enum.Operation.Call);
                 //slither-disable-next-line incorrect-equality
@@ -880,7 +879,7 @@ abstract contract TokenizedStrategy is ITokenizedStrategy {
                 );
             }
         } else {
-            if (address(_asset) == ETH) {
+            if (address(_asset) == NATIVE_TOKEN) {
                 require(msg.value >= assets, TokenizedStrategy__DepositMoreThanMax());
             } else {
                 require(_asset.transferFrom(msg.sender, address(this), assets), TokenizedStrategy__TransferFailed());
@@ -889,7 +888,7 @@ abstract contract TokenizedStrategy is ITokenizedStrategy {
 
         // We can deploy the full loose balance currently held.
         IBaseStrategy(address(this)).deployFunds(
-            address(_asset) == ETH ? address(this).balance : _asset.balanceOf(address(this))
+            address(_asset) == NATIVE_TOKEN ? address(this).balance : _asset.balanceOf(address(this))
         );
 
         // Adjust total Assets.
@@ -930,7 +929,7 @@ abstract contract TokenizedStrategy is ITokenizedStrategy {
         // Cache `asset` since it is used multiple times..
         ERC20 _asset = S.asset;
 
-        uint256 idle = address(_asset) == ETH ? address(this).balance : _asset.balanceOf(address(this));
+        uint256 idle = address(_asset) == NATIVE_TOKEN ? address(this).balance : _asset.balanceOf(address(this));
         uint256 loss = 0;
         // Check if we need to withdraw funds.
         if (idle < assets) {
@@ -940,7 +939,7 @@ abstract contract TokenizedStrategy is ITokenizedStrategy {
             }
 
             // Return the actual amount withdrawn. Adjust for potential under withdraws.
-            idle = address(_asset) == ETH ? address(this).balance : _asset.balanceOf(address(this));
+            idle = address(_asset) == NATIVE_TOKEN ? address(this).balance : _asset.balanceOf(address(this));
 
             // If we didn't get enough out then we have a loss.
             if (idle < assets) {
@@ -962,7 +961,7 @@ abstract contract TokenizedStrategy is ITokenizedStrategy {
 
         _burn(S, _owner, shares);
 
-        if (address(S.asset) == ETH) {
+        if (address(S.asset) == NATIVE_TOKEN) {
             (bool success, ) = receiver.call{ value: assets }("");
             if (!success) revert TokenizedStrategy__TransferFailed();
         } else {

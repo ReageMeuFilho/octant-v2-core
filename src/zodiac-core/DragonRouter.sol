@@ -12,7 +12,7 @@ import { IDragonRouter } from "src/zodiac-core/interfaces/IDragonRouter.sol";
 import { LinearAllowanceExecutor } from "src/zodiac-core/LinearAllowanceExecutor.sol";
 import { ISplitChecker } from "src/zodiac-core/interfaces/ISplitChecker.sol";
 import { IAddressSet } from "src/utils/IAddressSet.sol";
-import { AccessMode } from "src/constants.sol";
+import { AccessMode, NATIVE_TOKEN } from "src/constants.sol";
 
 /**
  * @title Dragon Router
@@ -33,7 +33,6 @@ contract DragonRouter is AccessControlUpgradeable, ReentrancyGuardUpgradeable, L
     bytes32 public constant GOVERNANCE_ROLE = keccak256("OCTANT_GOVERNANCE_ROLE");
     bytes32 public constant REGEN_GOVERNANCE_ROLE = keccak256("REGEN_GOVERNANCE_ROLE");
     bytes32 public constant SPLIT_DISTRIBUTOR_ROLE = keccak256("SPLIT_DISTRIBUTOR_ROLE");
-    address public constant NATIVE_TOKEN = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES

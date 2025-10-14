@@ -1320,7 +1320,7 @@ contract RegenIntegrationTest is Test {
     function test_WithdrawalsEnabledWhenPaused() public {
         uint256 stakeAmount = getStakeAmount(1000);
         address user = makeAddr("user");
-        whitelistUser(user, true, false, true);
+        authorizeUser(user, true, false, true);
 
         stakeToken.mint(user, stakeAmount);
         vm.startPrank(user);
