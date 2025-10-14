@@ -52,7 +52,7 @@ import { AccessMode } from "src/constants.sol";
 ///      │ Alter claimer           │ ✓        │ ✗       │
 ///      └─────────────────────────┴──────────┴─────────┘
 ///      * Compounding increases deposit stake (intended behavior)
-///      † Compounding bypasses stakerAccessMode checks (no stakerAllowset membership required)
+///      † Compounding requires deposit owner to pass stakerAccessMode checks (allowset/blockset enforcement)
 ///      ‡ Mechanism must be on allocationMechanismAllowset; contributor checked via mechanism's contributionAllowset
 ///      § VOTING POWER: The contributor (msg.sender) receives voting power in the allocation mechanism,
 ///         NOT the deposit owner. When a claimer contributes, the claimer gets voting power.
