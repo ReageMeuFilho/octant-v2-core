@@ -152,7 +152,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     error NoOperation();
 
     /// @notice Error thrown when attempting to disable allocation mechanism allowset
-    error DisablingAllocationMechanismWhitelistNotAllowed();
+    error DisablingAllocationMechanismAllowsetNotAllowed();
 
     /// @notice Error thrown when reward token doesn't match allocation mechanism's expected asset
     /// @param expected The expected token (REWARD_TOKEN)
