@@ -138,7 +138,6 @@ contract OctantQFMechanismTest is Test {
     function test_UsersCanSignupWhenAccessModeNone() public {
         // Ensure mode is NONE (default from constructor)
         // vm.prank(owner);
-        // mechanism.setAccessMode(AccessMode.NONE);
 
         // Anyone can signup now
         vm.startPrank(charlie);
