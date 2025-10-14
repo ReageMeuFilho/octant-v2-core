@@ -25,6 +25,10 @@ contract MockAllocationMechanism {
         asset = _asset;
     }
 
+    function canSignup(address) external pure returns (bool) {
+        return true; // No access control
+    }
+
     function signupOnBehalfWithSignature(address, uint256 amount, uint256, uint8, bytes32, bytes32) external {
         // Transfer tokens from the staker contract to consume the allowance
         if (amount > 0) {

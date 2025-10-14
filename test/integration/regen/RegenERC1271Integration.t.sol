@@ -20,6 +20,7 @@ import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 import { TokenizedAllocationMechanism } from "src/mechanisms/TokenizedAllocationMechanism.sol";
 import { QuadraticVotingMechanism } from "src/mechanisms/mechanism/QuadraticVotingMechanism.sol";
+import { OctantQFMechanism } from "src/mechanisms/mechanism/OctantQFMechanism.sol";
 import { AllocationMechanismFactory } from "src/mechanisms/AllocationMechanismFactory.sol";
 import { AllocationConfig } from "src/mechanisms/BaseAllocationMechanism.sol";
 
@@ -123,15 +124,21 @@ contract RegenERC1271IntegrationTest is Test {
             owner: admin
         });
 
-        // Deploy using the factory with quadratic funding parameters
+        // Deploy OctantQFMechanism with no access control (AccessMode.NONE)
         uint256 alphaNumerator = 1; // Default alpha = 1/1 = 1
         uint256 alphaDenominator = 1;
 
-        address payable deployedMechanism = payable(
-            allocationFactory.deployQuadraticVotingMechanism(config, alphaNumerator, alphaDenominator)
+        OctantQFMechanism octantQF = new OctantQFMechanism(
+            allocationFactory.tokenizedAllocationImplementation(),
+            config,
+            alphaNumerator,
+            alphaDenominator,
+            IAddressSet(address(0)), // contributionAllowset
+            IAddressSet(address(0)), // contributionBlockset
+            AccessMode.NONE // no access control
         );
 
-        allocationMechanism = QuadraticVotingMechanism(deployedMechanism);
+        allocationMechanism = QuadraticVotingMechanism(payable(address(octantQF)));
 
         // Deploy contract signer before whitelisting
         contractSigner = new MockERC1271Signer(contractSignerOwner);
