@@ -498,36 +498,6 @@ contract RegenIntegrationTest is Test {
         assertEq(stakeToken.balanceOf(user), stakeAmount - partialStakeAmount);
     }
 
-    function testFuzz_ContributionWhitelist_DisableAllowsContribution(
-        uint256 stakeAmountBase,
-        uint256 rewardAmountBase
-    ) public {
-        stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
-        rewardAmountBase = bound(rewardAmountBase, regenStaker.rewardDuration(), MAX_REWARD_DURATION + 1_000_000_000);
-
-        uint256 stakeAmount = getStakeAmount(stakeAmountBase);
-        uint256 rewardAmount = getRewardAmount(rewardAmountBase);
-
-        address contributor = makeAddr("contributor");
-
-        whitelistUser(contributor, true, false, true);
-
-        stakeToken.mint(contributor, stakeAmount);
-        rewardToken.mint(address(regenStaker), rewardAmount);
-
-        vm.startPrank(contributor);
-        stakeToken.approve(address(regenStaker), stakeAmount);
-        regenStaker.stake(stakeAmount, contributor);
-        vm.stopPrank();
-
-        vm.prank(ADMIN);
-        regenStaker.notifyRewardAmount(rewardAmount);
-        vm.warp(block.timestamp + regenStaker.rewardDuration());
-
-        // Contribution whitelist removed from RegenStaker (now only in TAM)
-        // This part of the test is no longer relevant
-    }
-
     function testFuzz_EarningPowerWhitelist_DisableGrantsEarningPower(uint256 stakeAmountBase) public {
         stakeAmountBase = bound(stakeAmountBase, 1, 10_000);
         uint256 stakeAmount = getStakeAmount(stakeAmountBase);
