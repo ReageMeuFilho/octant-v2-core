@@ -93,7 +93,7 @@ contract OctantQFMechanismTest is Test {
 
     // ===== AddressSet Integration Tests =====
 
-    function skip_test_AllowsetUserCanSignup() public {
+    function test_AllowsetUserCanSignup() public {
         // Configure allowset mode
         vm.startPrank(owner);
         mechanism.setContributionAllowset(IAddressSet(address(allowset)));
@@ -165,17 +165,15 @@ contract OctantQFMechanismTest is Test {
 
     // ===== Access Control Tests =====
 
-    function skip_test_OnlyOwnerCanSetAddressSet() public {
-        // DEPRECATED TEST - whitelist functionality removed
-    }
-
-    function skip_test_AllowsetUpdatedEventEmitted() public {
-        // DEPRECATED TEST - allowset event test removed
-    }
-
     // ===== State Transition Tests =====
 
-    function skip_test_AddingToAllowsetAllowsSignup() public {
+    function test_AddingToAllowsetAllowsSignup() public {
+        // Configure ALLOWSET mode
+        vm.startPrank(owner);
+        mechanism.setContributionAllowset(IAddressSet(address(allowset)));
+        mechanism.setAccessMode(AccessMode.ALLOWSET);
+        vm.stopPrank();
+
         // Initially bob cannot signup
         assertFalse(mechanism.canSignup(bob));
 
@@ -318,30 +316,13 @@ contract OctantQFMechanismTest is Test {
 
     // ===== Edge Cases =====
 
-    function skip_test_ZeroAddressAllowsetBehavesAsAllowAll() public {
-        // Set allowset to zero address
-        vm.prank(owner);
-        // DEPRECATED: mechanism.setContributionAllowset(address(0));
+    function test_AllowsetWithNoUsersBlocksAllSignups() public {
+        // Configure ALLOWSET mode
+        vm.startPrank(owner);
+        mechanism.setContributionAllowset(IAddressSet(address(allowset)));
+        mechanism.setAccessMode(AccessMode.ALLOWSET);
+        vm.stopPrank();
 
-        // Anyone can signup
-        address[] memory users = new address[](3);
-        users[0] = alice;
-        users[1] = bob;
-        users[2] = charlie;
-
-        for (uint i = 0; i < users.length; i++) {
-            assertTrue(mechanism.canSignup(users[i]));
-
-            vm.startPrank(users[i]);
-            token.approve(address(mechanism), SIGNUP_AMOUNT);
-            tam().signup(SIGNUP_AMOUNT);
-            vm.stopPrank();
-
-            assertEq(tam().votingPower(users[i]), SIGNUP_AMOUNT);
-        }
-    }
-
-    function skip_test_AllowsetWithNoUsersBlocksAllSignups() public {
         // AddressSet has no users
         assertFalse(allowset.contains(alice));
         assertFalse(allowset.contains(bob));

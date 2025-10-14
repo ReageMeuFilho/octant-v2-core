@@ -161,7 +161,13 @@ contract Cantina127Fix is Test {
 
         vm.prank(bob);
         // Expect error indicating alice (deposit owner) is not eligible for the mechanism
-        vm.expectRevert(abi.encodeWithSelector(RegenStakerBase.DepositOwnerNotEligibleForMechanism.selector, address(allocationMechanism), alice));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RegenStakerBase.DepositOwnerNotEligibleForMechanism.selector,
+                address(allocationMechanism),
+                alice
+            )
+        );
         regenStaker.contribute(depositId, address(allocationMechanism), CONTRIBUTION_AMOUNT, deadline, v, r, s);
 
         // PATH 2: Try claim → direct signup (the bypass path)
