@@ -6,6 +6,7 @@ import { console } from "forge-std/console.sol";
 import { MockERC20 } from "test/mocks/MockERC20.sol";
 import { MorphoCompounderStrategy } from "src/strategies/yieldSkimming/MorphoCompounderStrategy.sol";
 import { MorphoCompounderStrategyFactory } from "src/factories/MorphoCompounderStrategyFactory.sol";
+import { BaseStrategyFactory } from "src/factories/BaseStrategyFactory.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { YieldSkimmingTokenizedStrategy } from "src/strategies/yieldSkimming/YieldSkimmingTokenizedStrategy.sol";
@@ -213,9 +214,7 @@ contract MorphoCompounderStrategyFactoryTest is Test {
 
         // Try to deploy the exact same strategy again - should revert
         vm.startPrank(management);
-        vm.expectRevert(
-            abi.encodeWithSelector(MorphoCompounderStrategyFactory.StrategyAlreadyExists.selector, firstAddress)
-        );
+        vm.expectRevert(abi.encodeWithSelector(BaseStrategyFactory.StrategyAlreadyExists.selector, firstAddress));
         factory.createStrategy(
             vaultSharesName,
             management,
