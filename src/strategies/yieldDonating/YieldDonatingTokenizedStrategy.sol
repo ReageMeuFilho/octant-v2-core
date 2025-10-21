@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: AGPL-3.0
 pragma solidity >=0.8.25;
 
 import { TokenizedStrategy, Math } from "src/core/TokenizedStrategy.sol";

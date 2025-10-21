@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.0;
 
 import { BaseStrategy } from "src/core/BaseStrategy.sol";
@@ -10,7 +10,11 @@ import { WadRayMath } from "src/utils/libs/Maths/WadRay.sol";
  *   @title Base Yield Skimming Health Check
  *   @author [Golem Foundation](https://golem.foundation)
  *   @custom:security-contact security@golem.foundation
- *   @notice This contract can be inherited by any Yield Skimming strategy wishing to implement a health check during
+ *   @notice This contract is based on Yearn's BaseHealthCheck from
+ *   https://github.com/yearn/tokenized-strategy-periphery/blob/master/src/Bases/HealthCheck/BaseHealthCheck.sol
+ *   and adapted for Yield Skimming strategies.
+ *
+ *   This contract can be inherited by any Yield Skimming strategy wishing to implement a health check during
  *   the `harvestAndReport` function in order to prevent any unexpected behavior from being permanently recorded as well
  *   as the `checkHealth` modifier.
  *

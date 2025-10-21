@@ -7,7 +7,11 @@ import { ISwapRouter } from "@tokenized-strategy-periphery/interfaces/Uniswap/V3
 
 /**
  *   @title UniswapV3Swapper
- *   @author Yearn.finance
+ *   @author [Golem Foundation](https://golem.foundation)
+ *   @custom:security-contact security@golem.foundation
+ *   @notice This contract is based on Yearn's UniswapV3Swapper from
+ *   https://github.com/yearn/tokenized-strategy-periphery/blob/master/src/swappers/UniswapV3Swapper.sol
+ *
  *   @dev This is a simple contract that can be inherited by any tokenized
  *   strategy that would like to use Uniswap V3 for swaps. It hold all needed
  *   logic to perform both exact input and exact output swaps.

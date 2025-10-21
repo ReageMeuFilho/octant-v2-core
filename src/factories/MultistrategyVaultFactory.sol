@@ -1,5 +1,5 @@
 /* solhint-disable gas-custom-errors */
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.25;
 
 import { Clones } from "@openzeppelin/contracts/proxy/Clones.sol";
