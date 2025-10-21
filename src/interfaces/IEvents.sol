@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity >=0.8.18;
 
+/**
+ * @title IEvents
+ * @author [Golem Foundation](https://golem.foundation)
+ * @custom:security-contact security@golem.foundation
+ * @notice Standard events for strategy and vault operations
+ * @dev Shared event definitions across strategy implementations
+ */
 interface IEvents {
     /*//////////////////////////////////////////////////////////////
                                  EVENTS

@@ -1,26 +1,61 @@
 [profile.default]
 src = "src"
 out = "out"
-libs = ["node_modules", "lib"]
-evm_version = "cancun"
+libs = ["dependencies"]
+exclude = ["script/**/*"]
+evm_version = "prague"
 optimizer = true
-optimizer_runs = 10_000_000
-solc = "0.8.25"
+# Runs changed from 10M to 25k to fit code in EVM
+optimizer_runs = 5
+via_ir = false
+solc = "0.8.30"
 verbosity = 3
-fs_permissions = [{ access = "read-write", path = "./cache/test-artifacts/" }]
-
-[profile.ci]
-fuzz = { runs = 5000 }
-invariant = { runs = 1000 }
-verbosity = 4
+ast = true
+fs_permissions = [
+    { access = "read-write", path = "./cache/test-artifacts/" },
+    { access = "read", path = "./out/" },
+    { access = "read-write", path = "./ci/" }
+]
+build_info = true
+extra_output = ["storageLayout"]
+seed = "0xDEADC0DE"
+fuzz = { runs = 256, max_test_rejects = 65536 }
+deny_warnings = true
 
 [profile.local]
-  fuzz = { runs = 50 }
-  invariant = { runs = 10 }
-  # Speed up compilation and tests during development.
-  optimizer = true
+fuzz = { runs = 50 }
+invariant = { runs = 10 }
+# Speed up compilation and tests during development.
+optimizer = true
+
+[profile.kprove]
+src = 'src'
+out = 'out'
+test = 'proof/kontrol'
+ast = true
 
 [rpc_endpoints]
-mainnet = "${ETHEREUM_NODE_MAINNET}"
+mainnet = "${TEST_RPC_URL}"
+
+[soldeer]
+remappings_version = false
+
+[dependencies]
+"@openzeppelin-contracts" = { version = "5.3.0", git = "https://github.com/OpenZeppelin/openzeppelin-contracts", tag = "v5.3.0" }
+"@openzeppelin-contracts-upgradeable" = { version = "5.3.0", git = "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable", tag = "v5.3.0" }
+abdk-libraries-solidity = { version = "3.2", git = "https://github.com/abdk-consulting/abdk-libraries-solidity", tag = "v3.2" }
+erc4626-tests = { version = "0.0.0", git = "https://github.com/a16z/erc4626-tests", rev = "232ff9ba8194e406967f52ecc5cb52ed764209e9" }
+forge-std = ">=1.9.7"
+gnosisguild-zodiac = "4.1.1"
+hats-protocol = { version = "1.0", git = "https://github.com/hats-protocol/hats-protocol", tag = "v1.0" }
+kontrol-cheatcodes = "v0.0.1"
+safe-global-safe-smart-account = "1.4.1-3"
+solady = { version = "0.1.21", git = "https://github.com/vectorized/solady", tag = "v0.1.21" }
+solbase = { version = "0.0.0", git = "https://github.com/sol-dao/solbase", rev = "e12d00b9ff196667e3199d61971907510948583b" }
+solmate = "6.8.0"
+staker = { version = "1.0.1", git = "https://github.com/withtally/staker", tag = "v1.0.1" }
+surl = { version = "0.0.0", git = "https://github.com/memester-xyz/surl", rev = "5f92a5260c8e0198ca3ee6a16255d6cda4e0887a" }
+tokenized-strategy = { version = "3.0.4", git = "https://github.com/yearn/tokenized-strategy", tag = "v3.0.4" }
+tokenized-strategy-periphery = { version = "3.0.2", git = "https://github.com/yearn/tokenized-strategy-periphery", tag = "v3.0.2" }
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

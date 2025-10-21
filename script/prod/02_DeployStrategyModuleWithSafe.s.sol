@@ -6,10 +6,10 @@ import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxy.sol";
 import "@gnosis.pm/safe-contracts/contracts/proxies/SafeProxyFactory.sol";
 import "forge-std/Script.sol";
 
-import {MockStrategy} from "../../test/mocks/MockStrategy2.sol";
-import {DragonTokenizedStrategy} from "../../src/dragons/DragonTokenizedStrategy.sol";
-import {TestERC20} from "../../src/test/TestERC20.sol";
-import {MockYieldSource} from "../../test/mocks/MockYieldSource.sol";
+import { MockStrategy } from "../../test/mocks/zodiac-core/MockStrategy2.sol";
+import { DragonTokenizedStrategy } from "src/zodiac-core/vaults/DragonTokenizedStrategy.sol";
+import { MockERC20 } from "test/mocks/MockERC20.sol";
+import { MockYieldSource } from "../../test/mocks/core/MockYieldSource.sol";
 
 contract DeployStrategyModuleWithSafe is Script {
     address[] public owners;
@@ -24,7 +24,7 @@ contract DeployStrategyModuleWithSafe is Script {
     address treasury;
     address dragonRouter;
     address tokenizedStrategyImplementation;
-    TestERC20 token;
+    MockERC20 token;
     MockYieldSource yieldSource;
 
     /// @notice change this according to the strategy
@@ -34,7 +34,7 @@ contract DeployStrategyModuleWithSafe is Script {
     function setUp() public {
         // Initialize owners and threshold
         owners = [vm.envAddress("OWNER")];
-        threshold = vm.envUint("THRESHOLD");
+        threshold = vm.envUint("SAFE_THRESHOLD");
 
         // Set the addresses for the Safe singleton and Proxy Factory
         safeSingleton = vm.envAddress("SAFE_SINGLETON");
@@ -58,7 +58,7 @@ contract DeployStrategyModuleWithSafe is Script {
         module = address(mockStrategy);
 
         // Deploy the token
-        token = new TestERC20();
+        token = new MockERC20(18);
 
         // Deploy Mock Yield Source
         yieldSource = new MockYieldSource(address(token));
@@ -73,7 +73,16 @@ contract DeployStrategyModuleWithSafe is Script {
             abi.encodeWithSignature(
                 "deployAndEnableModuleFromSafe(address,bytes,uint256)",
                 module,
-                abi.encode(tokenizedStrategyImplementation, address(token), address(yieldSource), management, keeper, dragonRouter, maxReportDelay, name),
+                abi.encode(
+                    tokenizedStrategyImplementation,
+                    address(token),
+                    address(yieldSource),
+                    management,
+                    keeper,
+                    dragonRouter,
+                    maxReportDelay,
+                    name
+                ),
                 block.timestamp
             ),
             address(0),

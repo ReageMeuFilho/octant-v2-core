@@ -1,0 +1,160 @@
+name: 🤖 Build and deploy tagged version
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+concurrency:
+  group: "build-image"
+  cancel-in-progress: false
+
+jobs:
+  build-image:
+    name: Build Docker Image
+    runs-on:
+      - general
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # use some obscure path to checkout the code with service account perms
+          # this is possible as $GITHUB_WORKSPACE is owned by the same service
+          # account
+          # see: https://github.com/actions/checkout/issues/211
+          path: __local
+
+      - name: Login to Docker registry
+        uses: docker/login-action@v3
+        with:
+          registry: europe-docker.pkg.dev
+          username: _json_key_base64
+          password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/core
+          tags: |
+            type=ref,event=tag
+            type=sha,prefix=,format=long
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: __local
+          file: __local/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/cache:core
+          cache-to: type=registry,ref=${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/cache:core,mode=max
+
+  deploy-contract:
+    name: Deploy contracts
+    runs-on: general
+    needs:
+      - build-image
+    container:
+      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/core:${{ github.ref_name }}
+      credentials:
+        username: _json_key_base64
+        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
+
+    steps:
+      - name: Deploy contracts
+        env:
+          PRIVATE_KEY: "${{ secrets.TESTNET_DEPLOYER_PRIVATE_KEY }}"
+          ETHERSCAN_API_KEY: "${{ secrets.TENDERLY_API_KEY }}"
+          RPC_URL: "${{ vars.TENDERLY_MAINNET_RPC_URL }}"
+          VERIFIER_URL: "${{ vars.TENDERLY_MAINNET_RPC_URL }}/verify/etherscan"
+          MAX_OPEX_SPLIT: "5"
+          MIN_METAPOOL_SPLIT: "0"
+          CONTRACT_ADDRESSES: "/app/ci/contract_addresses.txt"
+          VERSION_TAG: "${{ github.ref_name }}"
+        run: |
+          cd /app
+          mkdir -p ci
+          touch .env
+          yarn deploy:tenderly && (
+            echo "VERSION_TAG=${VERSION_TAG}" >> $CONTRACT_ADDRESSES
+            cp $CONTRACT_ADDRESSES $GITHUB_OUTPUT
+            echo "# Smart contract addresses\n\n| Contract name | Address |\n|---|---|" > $GITHUB_STEP_SUMMARY
+            grep ADDRESS $CONTRACT_ADDRESSES | awk -F '=' '{gsub("_ADDRESS", "", $1); print "| `" $1 "` | `" $2 "` |"}' >> $GITHUB_STEP_SUMMARY
+            echo "\n# Other variables\n\n| Variable | Value |\n|---|---|" >> $GITHUB_STEP_SUMMARY
+            grep -v ADDRESS $CONTRACT_ADDRESSES | awk -F '=' '{print "| `" $1 "` | `" $2 "` |"}' >> $GITHUB_STEP_SUMMARY
+          )
+
+      - name: Upload contract addresses artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract_addresses
+          path: /app/ci/contract_addresses.txt
+
+  update-contract-secret:
+    name: Update secret
+    runs-on:
+      - general
+    needs:
+      - deploy-contract
+    container:
+      image: gcr.io/google.com/cloudsdktool/cloud-sdk:stable
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          apt-get update && apt-get install -y --no-install-recommends jq
+
+      - name: Download artifact with contract addresses
+        uses: actions/download-artifact@v4
+        with:
+          name: contract_addresses
+
+      - name: Add new secret version
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_B64: ${{ secrets.GCP_SECRET_VERSION_ADDER_SERVICE_ACCOUNT }}
+          GCP_PROJECT: ${{ vars.GCP_PROJECT }}
+        run: ci/update_gcp_secret.sh develop
+
+  restart-services:
+    name: Restart develop services
+    runs-on: general
+    needs:
+      - update-contract-secret
+
+    steps:
+      - name: Update frontend contracts
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          repo: golemfoundation/octant-v2-frontend
+          workflow: update-secret-version.yml
+          ref: develop
+          inputs: '{"run-id":"${{ github.run_id }}","env-type":"develop"}'
+          token: "${{ secrets.GH_BOT_TOKEN }}"
+
+      - name: Get last subgraph tag
+        id: last-subgraph-tag
+        run: |
+          echo "Fetching last subgraph tag..."
+          TAG=$(curl -s -H "Authorization: Bearer ${{ secrets.GH_BOT_TOKEN }}" 'https://api.github.com/repos/golemfoundation/octant-v2-subgraph/releases?per_page=1' | jq -r '.[0].tag_name')
+          if [ -z "$TAG" ] || [ $TAG == 'null' ]; then
+            echo "No tags found, exiting."
+            exit 1
+          fi
+          echo "Last subgraph tag: $TAG"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Redeploy subgraph
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          repo: golemfoundation/octant-v2-subgraph
+          workflow: tpl-deploy-app.yml
+          ref: develop
+          inputs: '{"core-run-id":"${{ github.run_id }}","env-type":"develop","image-tag":"${{ steps.last-subgraph-tag.outputs.tag }}"}'
+          token: "${{ secrets.GH_BOT_TOKEN }}"

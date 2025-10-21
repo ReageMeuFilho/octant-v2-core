@@ -1,0 +1,38 @@
+name: NatSpec Documentation Check
+
+on:
+  push:
+    paths:
+      - 'src/**/*.sol'
+      - 'OCTANT_NATSPEC_COOKBOOK.md'
+
+jobs:
+  check-natspec:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Generate documentation
+        run: forge doc
+
+      - name: Upload documentation artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: natspec-documentation
+          path: docs/
+
+      - name: Check NatSpec coverage
+        run: |
+          echo "Checking for undocumented functions..."
+          # Find public/external functions without @notice
+          if grep -rn "function.*\(public\|external\)" src/ | grep -v "@notice"; then
+            echo "⚠️  Found functions without @notice tags"
+            echo "Please add NatSpec documentation"
+            exit 1
+          fi
+          echo "✅ All functions have NatSpec"
