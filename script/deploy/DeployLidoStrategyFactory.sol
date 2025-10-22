@@ -7,7 +7,7 @@ import { LidoStrategyFactory } from "src/factories/LidoStrategyFactory.sol";
 
 contract DeployLidoStrategyFactory is Script {
     // Salt for deterministic deployment
-    bytes32 public constant DEPLOYMENT_SALT = keccak256("OCTANT_LIDO_FACTORY_V1");
+    bytes32 public constant DEPLOYMENT_SALT = keccak256("OCTANT_LIDO_FACTORY_V2");
 
     LidoStrategyFactory public lidoStrategyFactory;
 

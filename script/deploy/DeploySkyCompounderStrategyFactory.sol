@@ -7,7 +7,7 @@ import { SkyCompounderStrategyFactory } from "src/factories/SkyCompounderStrateg
 
 contract DeploySkyCompounderStrategyFactory is Script {
     // Salt for deterministic deployment
-    bytes32 public constant DEPLOYMENT_SALT = keccak256("OCTANT_SKY_COMPOUNDER_FACTORY_V1");
+    bytes32 public constant DEPLOYMENT_SALT = keccak256("OCTANT_SKY_COMPOUNDER_FACTORY_V2");
 
     SkyCompounderStrategyFactory public skyCompounderStrategyFactory;
 

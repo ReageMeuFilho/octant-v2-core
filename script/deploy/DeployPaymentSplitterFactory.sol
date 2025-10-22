@@ -7,7 +7,7 @@ import { PaymentSplitterFactory } from "src/factories/PaymentSplitterFactory.sol
 
 contract DeployPaymentSplitterFactory is Script {
     // Salt for deterministic deployment
-    bytes32 public constant DEPLOYMENT_SALT = keccak256("OCTANT_PAYMENT_SPLITTER_FACTORY_V1");
+    bytes32 public constant DEPLOYMENT_SALT = keccak256("OCTANT_PAYMENT_SPLITTER_FACTORY_V2");
 
     PaymentSplitterFactory public paymentSplitterFactory;
 

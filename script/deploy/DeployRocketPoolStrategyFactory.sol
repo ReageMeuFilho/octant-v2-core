@@ -7,7 +7,7 @@ import { RocketPoolStrategyFactory } from "src/factories/yieldSkimming/RocketPoo
 
 contract DeployRocketPoolStrategyFactory is Script {
     // Salt for deterministic deployment
-    bytes32 public constant DEPLOYMENT_SALT = keccak256("OCTANT_ROCKET_POOL_FACTORY_V1");
+    bytes32 public constant DEPLOYMENT_SALT = keccak256("OCTANT_ROCKET_POOL_FACTORY_V2");
 
     RocketPoolStrategyFactory public rocketPoolStrategyFactory;
 
