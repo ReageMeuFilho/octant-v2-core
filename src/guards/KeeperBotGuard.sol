@@ -2,42 +2,57 @@
 pragma solidity ^0.8.23;
 
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { Enum } from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
+
+interface IGnosisSafe {
+    function execTransactionFromModule(
+        address to,
+        uint256 value,
+        bytes memory data,
+        Enum.Operation operation
+    ) external returns (bool success);
+}
 
 /**
  * @title Keeper Bot Guard
  * @author [Golem Foundation](https://golem.foundation)
  * @custom:security-contact security@golem.foundation
- * @notice Simple guard that allows authorized keeper bots to call report() on strategies
- * @dev This contract serves as a bridge between monitoring systems and our strategy contracts
+ * @notice Guard that allows authorized keeper bots to trigger strategy report() calls through a Safe
+ * @dev This contract should be enabled as a module on a Safe. It uses execTransactionFromModule
+ *      to make the Safe itself call strategy.report().
  */
 contract KeeperBotGuard is Ownable {
-
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
-    
+
     error KeeperBotGuard__NotAuthorizedBot();
     error KeeperBotGuard__InvalidStrategy();
-    error KeeperBotGuard__ReportCallFailed();
+    error KeeperBotGuard__InvalidSafe();
+    error KeeperBotGuard__ModuleTransactionFailed();
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
-    
+
     event BotAuthorized(address indexed bot, bool authorized);
     event StrategyReportCalled(address indexed strategy, address indexed bot);
+    event SafeSet(address indexed safe);
 
     /*//////////////////////////////////////////////////////////////
                             STATE VARIABLES
     //////////////////////////////////////////////////////////////*/
-    
+
+    /// @notice The Safe that this module will use for execution
+    IGnosisSafe public immutable safe;
+
     /// @notice Mapping of authorized keeper bot addresses
     mapping(address => bool) public authorizedBots;
 
     /*//////////////////////////////////////////////////////////////
                               MODIFIERS
     //////////////////////////////////////////////////////////////*/
-    
+
     /// @notice Restricts function calls to authorized keeper bots only
     modifier onlyAuthorizedBot() {
         if (!authorizedBots[msg.sender]) {
@@ -49,16 +64,23 @@ contract KeeperBotGuard is Ownable {
     /*//////////////////////////////////////////////////////////////
                              CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
-    
-    constructor(address _owner) Ownable(_owner) {}
+
+    constructor(address _owner, address _safe) Ownable(_owner) {
+        if (_safe == address(0)) {
+            revert KeeperBotGuard__InvalidSafe();
+        }
+        safe = IGnosisSafe(_safe);
+        emit SafeSet(_safe);
+    }
 
     /*//////////////////////////////////////////////////////////////
                            BOT FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-    
+
     /**
-     * @notice Calls report() on the specified strategy
-     * @dev Can only be called by authorized keeper bots
+     * @notice Triggers the Safe to call report() on the specified strategy
+     * @dev Can only be called by authorized keeper bots. Uses Safe's execTransactionFromModule
+     *      to make the Safe itself call strategy.report(). The Safe must be set as a keeper on the strategy.
      * @param strategy Address of the strategy to call report() on
      */
     function callStrategyReport(address strategy) external onlyAuthorizedBot {
@@ -66,11 +88,19 @@ contract KeeperBotGuard is Ownable {
             revert KeeperBotGuard__InvalidStrategy();
         }
 
-        // Call report() on the strategy
-        (bool success, ) = strategy.call(abi.encodeWithSignature("report()"));
-        
+        // Prepare the call data for strategy.report()
+        bytes memory data = abi.encodeWithSignature("report()");
+
+        // Use the Safe's execTransactionFromModule to execute the call
+        bool success = safe.execTransactionFromModule(
+            strategy,
+            0, // value
+            data,
+            Enum.Operation.Call
+        );
+
         if (!success) {
-            revert KeeperBotGuard__ReportCallFailed();
+            revert KeeperBotGuard__ModuleTransactionFailed();
         }
 
         emit StrategyReportCalled(strategy, msg.sender);
@@ -79,7 +109,7 @@ contract KeeperBotGuard is Ownable {
     /*//////////////////////////////////////////////////////////////
                            ADMIN FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-    
+
     /**
      * @notice Authorizes or deauthorizes a keeper bot
      * @dev Can only be called by contract owner
@@ -97,12 +127,9 @@ contract KeeperBotGuard is Ownable {
      * @param bots Array of bot addresses
      * @param authorized Array of authorization statuses (must match bots array length)
      */
-    function setBotAuthorizationBatch(
-        address[] calldata bots, 
-        bool[] calldata authorized
-    ) external onlyOwner {
+    function setBotAuthorizationBatch(address[] calldata bots, bool[] calldata authorized) external onlyOwner {
         require(bots.length == authorized.length, "Array length mismatch");
-        
+
         for (uint256 i = 0; i < bots.length; i++) {
             authorizedBots[bots[i]] = authorized[i];
             emit BotAuthorized(bots[i], authorized[i]);
@@ -112,7 +139,7 @@ contract KeeperBotGuard is Ownable {
     /*//////////////////////////////////////////////////////////////
                               VIEW FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-    
+
     /**
      * @notice Check if an address is an authorized bot
      * @param bot Address to check
