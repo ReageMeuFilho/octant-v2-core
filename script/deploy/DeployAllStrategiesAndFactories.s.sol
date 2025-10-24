@@ -14,6 +14,7 @@ import { SkyCompounderStrategyFactory } from "src/factories/SkyCompounderStrateg
 import { LidoStrategyFactory } from "src/factories/LidoStrategyFactory.sol";
 import { RocketPoolStrategyFactory } from "src/factories/yieldSkimming/RocketPoolStrategyFactory.sol";
 import { PaymentSplitterFactory } from "src/factories/PaymentSplitterFactory.sol";
+import { YearnV3StrategyFactory } from "src/factories/yieldDonating/YearnV3StrategyFactory.sol";
 
 /**
  * @title DeployAllStrategiesAndFactories
@@ -32,6 +33,7 @@ contract DeployAllStrategiesAndFactories is Script, BatchScript {
     bytes32 public constant LIDO_FACTORY_SALT = keccak256("LIDO_STRATEGY_FACTORY_V2");
     bytes32 public constant ROCKET_POOL_FACTORY_SALT = keccak256("ROCKET_POOL_STRATEGY_FACTORY_V2");
     bytes32 public constant PAYMENT_SPLITTER_FACTORY_SALT = keccak256("PAYMENT_SPLITTER_FACTORY_V2");
+    bytes32 public constant YEARN_V3_FACTORY_SALT = keccak256("YEARN_V3_STRATEGY_FACTORY_V2");
 
     // Deployed addresses (to be logged)
     address public yieldSkimmingStrategy;
@@ -41,6 +43,7 @@ contract DeployAllStrategiesAndFactories is Script, BatchScript {
     address public lidoFactory;
     address public rocketPoolFactory;
     address public paymentSplitterFactory;
+    address public yearnV3Factory;
 
     // Safe address
     address public safe;
@@ -114,6 +117,10 @@ contract DeployAllStrategiesAndFactories is Script, BatchScript {
             PAYMENT_SPLITTER_FACTORY_SALT,
             keccak256(paymentSplitterCreationCode)
         );
+
+        // YearnV3StrategyFactory
+        bytes memory yearnV3CreationCode = type(YearnV3StrategyFactory).creationCode;
+        yearnV3Factory = _computeCreate2Address(CREATE2_FACTORY, YEARN_V3_FACTORY_SALT, keccak256(yearnV3CreationCode));
     }
 
     function _addStrategyDeployments() internal {
@@ -177,6 +184,14 @@ contract DeployAllStrategiesAndFactories is Script, BatchScript {
         );
         addToBatch(CREATE2_FACTORY, 0, paymentSplitterDeployData);
         console.log("- PaymentSplitterFactory at:", paymentSplitterFactory);
+
+        // Deploy YearnV3StrategyFactory
+        bytes memory yearnV3DeployData = abi.encodePacked(
+            YEARN_V3_FACTORY_SALT,
+            type(YearnV3StrategyFactory).creationCode
+        );
+        addToBatch(CREATE2_FACTORY, 0, yearnV3DeployData);
+        console.log("- YearnV3StrategyFactory at:", yearnV3Factory);
     }
 
     function _logDeploymentSummary() internal view {
@@ -191,10 +206,11 @@ contract DeployAllStrategiesAndFactories is Script, BatchScript {
         console.log("- LidoStrategyFactory:", lidoFactory);
         console.log("- RocketPoolStrategyFactory:", rocketPoolFactory);
         console.log("- PaymentSplitterFactory:", paymentSplitterFactory);
+        console.log("- YearnV3StrategyFactory:", yearnV3Factory);
         console.log("\nBatch transaction created:");
         console.log("- Safe will call execTransaction once");
         console.log("- execTransaction calls MultiSendCallOnly");
-        console.log("- MultiSendCallOnly makes 7 calls to CREATE2 factory");
+        console.log("- MultiSendCallOnly makes 8 calls to CREATE2 factory");
         console.log("- CREATE2 factory deploys each contract deterministically");
         console.log("\nTransaction sent to Safe for signing.");
         console.log("========================\n");

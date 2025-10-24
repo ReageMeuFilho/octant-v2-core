@@ -13,6 +13,7 @@ import { SkyCompounderStrategyFactory } from "src/factories/SkyCompounderStrateg
 import { LidoStrategyFactory } from "src/factories/LidoStrategyFactory.sol";
 import { RocketPoolStrategyFactory } from "src/factories/yieldSkimming/RocketPoolStrategyFactory.sol";
 import { PaymentSplitterFactory } from "src/factories/PaymentSplitterFactory.sol";
+import { YearnV3StrategyFactory } from "src/factories/yieldDonating/YearnV3StrategyFactory.sol";
 
 /**
  * @title VerifyDeployedContracts
@@ -34,6 +35,7 @@ contract VerifyDeployedContracts is Script {
     address public lidoFactory;
     address public rocketPoolFactory;
     address public paymentSplitterFactory;
+    address public yearnV3Factory;
 
     // Contract names for verification
     string constant YIELD_SKIMMING_NAME =
@@ -47,6 +49,8 @@ contract VerifyDeployedContracts is Script {
     string constant ROCKET_POOL_FACTORY_NAME =
         "src/factories/yieldSkimming/RocketPoolStrategyFactory.sol:RocketPoolStrategyFactory";
     string constant PAYMENT_SPLITTER_FACTORY_NAME = "src/factories/PaymentSplitterFactory.sol:PaymentSplitterFactory";
+    string constant YEARN_V3_FACTORY_NAME =
+        "src/factories/yieldDonating/YearnV3StrategyFactory.sol:YearnV3StrategyFactory";
 
     function run() public {
         // Prompt user for all contract addresses
@@ -119,6 +123,14 @@ contract VerifyDeployedContracts is Script {
             revert("Invalid PaymentSplitterFactory address");
         }
 
+        // Prompt for YearnV3StrategyFactory
+        try vm.prompt("Enter YearnV3StrategyFactory address") returns (string memory addr) {
+            yearnV3Factory = vm.parseAddress(addr);
+            console.log("[OK] YearnV3StrategyFactory:", yearnV3Factory);
+        } catch {
+            revert("Invalid YearnV3StrategyFactory address");
+        }
+
         console.log("\n=== ALL ADDRESSES COLLECTED ===\n");
     }
 
@@ -145,6 +157,9 @@ contract VerifyDeployedContracts is Script {
 
         // Verify PaymentSplitterFactory
         _verifyContract(paymentSplitterFactory, PAYMENT_SPLITTER_FACTORY_NAME, "PaymentSplitterFactory");
+
+        // Verify YearnV3StrategyFactory
+        _verifyContract(yearnV3Factory, YEARN_V3_FACTORY_NAME, "YearnV3StrategyFactory");
     }
 
     function _verifyContract(address contractAddress, string memory contractName, string memory displayName) internal {
@@ -181,6 +196,7 @@ contract VerifyDeployedContracts is Script {
         console.log("- LidoStrategyFactory:", lidoFactory);
         console.log("- RocketPoolStrategyFactory:", rocketPoolFactory);
         console.log("- PaymentSplitterFactory:", paymentSplitterFactory);
+        console.log("- YearnV3StrategyFactory:", yearnV3Factory);
         console.log("\nNote: Verification is asynchronous. Check Etherscan for final status.");
         console.log("==============================\n");
     }

@@ -16,6 +16,7 @@ The deployment script `DeployAllStrategiesAndFactories.s.sol` deploys the follow
 3. **LidoStrategyFactory** - Factory for deploying Lido yield skimming strategies
 4. **RocketPoolStrategyFactory** - Factory for deploying RocketPool yield skimming strategies
 5. **PaymentSplitterFactory** - Factory for deploying PaymentSplitter contracts with minimal proxies
+6. **YearnV3StrategyFactory** - Factory for deploying YearnV3 yield donating strategies
 
 ## Prerequisites
 
@@ -105,6 +106,7 @@ All contracts are deployed deterministically using CREATE2, which means they wil
 - LidoStrategyFactory: `keccak256("LIDO_STRATEGY_FACTORY_V2")`
 - RocketPoolStrategyFactory: `keccak256("ROCKET_POOL_STRATEGY_FACTORY_V2")`
 - PaymentSplitterFactory: `keccak256("PAYMENT_SPLITTER_FACTORY_V2")`
+- YearnV3StrategyFactory: `keccak256("YEARN_V3_STRATEGY_FACTORY_V2")`
 
 ## What the Script Does
 
@@ -113,7 +115,7 @@ All contracts are deployed deterministically using CREATE2, which means they wil
 3. **Safe Execution Flow**:
    - Safe calls `execTransaction` (once)
    - `execTransaction` calls `MultiSendCallOnly`
-   - `MultiSendCallOnly` makes 7 calls to CREATE2 factory at `0x4e59b44847b379578588920cA78FbF26c0B4956C`
+   - `MultiSendCallOnly` makes 8 calls to CREATE2 factory at `0x4e59b44847b379578588920cA78FbF26c0B4956C`
    - Each call uses calldata format: `salt (32 bytes) + bytecode`
    - CREATE2 factory deploys each contract deterministically
 4. **Sends to Safe Backend**: Submits the transaction to Safe's backend for owner signatures
