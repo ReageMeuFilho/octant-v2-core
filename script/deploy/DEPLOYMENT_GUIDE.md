@@ -65,13 +65,13 @@ forge script script/deploy/DeployAllStrategiesAndFactories.s.sol:DeployAllStrate
   --ffi
 ```
 
-#### Example: Deploying on Base
+#### Example: Deploying on Ethereum
 
 ```bash
-# Set up for Base deployment
-export SAFE_ADDRESS=0x... # Your Safe on Base
-export CHAIN=base
-export ETH_RPC_URL=https://base-mainnet.infura.io/v3/YOUR_PROJECT_ID
+# Set up for Ethereum deployment
+export SAFE_ADDRESS=0x... # Your Safe on Ethereum
+export CHAIN=ethereum
+export ETH_RPC_URL=https://eth-mainnet.infura.io/v3/YOUR_PROJECT_ID
 export PRIVATE_KEY=0x...
 
 # Run deployment with explicit private key
