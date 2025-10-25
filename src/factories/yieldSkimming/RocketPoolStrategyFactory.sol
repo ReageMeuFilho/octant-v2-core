@@ -15,7 +15,11 @@ contract RocketPoolStrategyFactory is BaseStrategyFactory {
     /// @notice rETH token address on mainnet
     address public constant R_ETH = 0xae78736Cd615f374D3085123A210448E74Fc6393;
 
-    // Child-specific StrategyDeploy event for compatibility with existing tests
+    /// @notice Emitted when a new RocketPoolStrategy is deployed
+    /// @param deployer Address that deployed the strategy
+    /// @param donationAddress Dragon router address that receives profit shares
+    /// @param strategyAddress Deployed strategy address
+    /// @param vaultTokenName Strategy share token name
     event StrategyDeploy(
         address indexed deployer,
         address indexed donationAddress,
@@ -24,16 +28,16 @@ contract RocketPoolStrategyFactory is BaseStrategyFactory {
     );
 
     /**
-     * @notice Deploys a new RocketPool strategy for the Yield Skimming Vault.
-     * @dev Uses deterministic deployment based on strategy parameters to prevent duplicates.
-     * @param _name The name of the vault token associated with the strategy.
-     * @param _management The address of the management entity responsible for the strategy.
-     * @param _keeper The address of the keeper responsible for maintaining the strategy.
-     * @param _emergencyAdmin The address of the emergency admin for the strategy.
-     * @param _donationAddress The address where donations from the strategy will be sent.
-     * @param _enableBurning Whether to enable burning shares from dragon router during loss protection.
-     * @param _tokenizedStrategyAddress Address of the tokenized strategy implementation
-     * @return strategyAddress The address of the newly deployed strategy contract.
+     * @notice Deploys a new RocketPool strategy for the Yield Skimming Vault
+     * @dev Uses deterministic deployment based on strategy parameters to prevent duplicates
+     * @param _name Strategy share token name
+     * @param _management Management address (can update params)
+     * @param _keeper Keeper address (calls report)
+     * @param _emergencyAdmin Emergency admin address
+     * @param _donationAddress Dragon router address (receives profit shares)
+     * @param _enableBurning True to enable burning shares during loss protection
+     * @param _tokenizedStrategyAddress TokenizedStrategy implementation address
+     * @return strategyAddress Deployed RocketPoolStrategy address
      */
     function createStrategy(
         string memory _name,

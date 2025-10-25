@@ -72,7 +72,7 @@ abstract contract BaseHealthCheck is BaseStrategy, IBaseHealthCheck {
     /**
      * @notice Returns the current profit limit ratio.
      * @dev Use a getter function to keep the variable private.
-     * @return profitLimitRatio The current profit limit ratio.
+     * @return profitLimitRatio Current profit limit ratio in basis points
      */
     function profitLimitRatio() public view returns (uint256) {
         return _profitLimitRatio;
@@ -81,7 +81,7 @@ abstract contract BaseHealthCheck is BaseStrategy, IBaseHealthCheck {
     /**
      * @notice Returns the current loss limit ratio.
      * @dev Use a getter function to keep the variable private.
-     * @return lossLimitRatio The current loss limit ratio.
+     * @return lossLimitRatio Current loss limit ratio in basis points
      */
     function lossLimitRatio() public view returns (uint256) {
         return _lossLimitRatio;
@@ -90,7 +90,7 @@ abstract contract BaseHealthCheck is BaseStrategy, IBaseHealthCheck {
     /**
      * @notice Set the `profitLimitRatio`.
      * @dev Denominated in basis points. I.E. 1_000 == 10%.
-     * @param _newProfitLimitRatio The new profit limit ratio.
+     * @param _newProfitLimitRatio New profit limit ratio in basis points
      */
     function setProfitLimitRatio(uint256 _newProfitLimitRatio) external onlyManagement {
         _setProfitLimitRatio(_newProfitLimitRatio);
@@ -99,7 +99,7 @@ abstract contract BaseHealthCheck is BaseStrategy, IBaseHealthCheck {
     /**
      * @dev Internally set the profit limit ratio. Denominated
      * in basis points. I.E. 1_000 == 10%.
-     * @param _newProfitLimitRatio The new profit limit ratio.
+     * @param _newProfitLimitRatio New profit limit ratio in basis points
      */
     function _setProfitLimitRatio(uint256 _newProfitLimitRatio) internal {
         require(_newProfitLimitRatio > 0, "!zero profit");
@@ -111,7 +111,7 @@ abstract contract BaseHealthCheck is BaseStrategy, IBaseHealthCheck {
     /**
      * @notice Set the `lossLimitRatio`.
      * @dev Denominated in basis points. I.E. 1_000 == 10%.
-     * @param _newLossLimitRatio The new loss limit ratio.
+     * @param _newLossLimitRatio New loss limit ratio in basis points
      */
     function setLossLimitRatio(uint256 _newLossLimitRatio) external onlyManagement {
         _setLossLimitRatio(_newLossLimitRatio);
@@ -120,7 +120,7 @@ abstract contract BaseHealthCheck is BaseStrategy, IBaseHealthCheck {
     /**
      * @dev Internally set the loss limit ratio. Denominated
      * in basis points. I.E. 1_000 == 10%.
-     * @param _newLossLimitRatio The new loss limit ratio.
+     * @param _newLossLimitRatio New loss limit ratio in basis points
      */
     function _setLossLimitRatio(uint256 _newLossLimitRatio) internal {
         require(_newLossLimitRatio < MAX_BPS, "!loss limit");
@@ -154,7 +154,7 @@ abstract contract BaseHealthCheck is BaseStrategy, IBaseHealthCheck {
      * @dev To be called during a report to make sure the profit
      * or loss being recorded is within the acceptable bound.
      *
-     * @param _newTotalAssets The amount that will be reported.
+     * @param _newTotalAssets Amount that will be reported in asset base units
      */
     function _executeHealthCheck(uint256 _newTotalAssets) internal virtual {
         if (!doHealthCheck) {

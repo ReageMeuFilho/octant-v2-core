@@ -1,0 +1,33 @@
+name: NatSpec Documentation Check
+
+on:
+  push:
+    paths:
+      - 'src/**/*.sol'
+      - 'CONTRIBUTING.md'
+
+jobs:
+  check-natspec:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install dependencies
+        run: forge soldeer install
+
+      - name: Generate documentation
+        run: forge doc
+
+      - name: Upload documentation artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: natspec-documentation
+          path: docs/
+
+      - name: Check NatSpec coverage
+        run: bash scripts/check-natspec.sh

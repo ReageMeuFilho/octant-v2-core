@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.25;
 
-// General errors
+// Centralized custom errors for gas-efficient reverts across Octant contracts.
+// Using custom errors saves ~50 bytes per error vs require(condition, "string").
+
 error Unauthorized();
 error ZeroAddress();
 error ReentrancyGuard__ReentrantCall();
@@ -10,11 +12,9 @@ error ZeroAssets();
 error ERC20InsufficientBalance();
 error AlreadyInitialized();
 
-// Access Control errors
 error NotInAllowset(address user);
 error InBlockset(address user);
 
-// TokenizedStrategy specific errors
 error TokenizedStrategy__NotEmergencyAuthorized();
 error TokenizedStrategy__NotKeeperOrManagement();
 error TokenizedStrategy__NotOperator();
@@ -45,7 +45,6 @@ error TokenizedStrategy__HatsAlreadyInitialized();
 error TokenizedStrategy__InvalidHatsAddress();
 error DragonTokenizedStrategy__ReceiverHasExistingShares();
 
-// DragonTokenizedStrategy specific errors
 error DragonTokenizedStrategy__VaultSharesNotTransferable();
 error DragonTokenizedStrategy__PerformanceFeeIsAlwaysZero();
 error DragonTokenizedStrategy__PerformanceFeeDisabled();
@@ -66,5 +65,5 @@ error DragonTokenizedStrategy__LockupDurationTooShort();
 error DragonTokenizedStrategy__MaxUnlockIsAlwaysZero();
 error DragonTokenizedStrategy__NoOperation();
 error DragonTokenizedStrategy__InvalidReceiver();
-// BaseStrategy specific errors
+
 error BaseStrategy__NotSelf();

@@ -8,6 +8,7 @@ import { AccessMode } from "src/constants.sol";
 /// @title RegenStaker Factory
 /// @notice Deploys RegenStaker contracts with explicit variant selection
 /// @author [Golem Foundation](https://golem.foundation)
+/// @custom:security-contact security@golem.foundation
 ///
 /// @dev SECURITY: Validates deployment bytecode against pre-configured canonical hashes
 ///
@@ -68,8 +69,8 @@ contract RegenStakerFactory {
     /// @param admin Admin of the newly deployed staker
     /// @param stakerAddress Address of the deployed staker
     /// @param salt Deployment salt used
-    /// @param variant The variant of staker deployed
-    /// @param calculatorAddress The earning power calculator address (CRITICAL FOR VERIFICATION)
+    /// @param variant Variant of staker deployed
+    /// @param calculatorAddress Earning power calculator address (CRITICAL FOR VERIFICATION)
     /// @dev calculatorAddress is sufficient for verification; off-chain tools can query code directly
     event StakerDeploy(
         address indexed deployer,
@@ -84,6 +85,9 @@ contract RegenStakerFactory {
     error InvalidBytecode();
     error UnauthorizedBytecode(RegenStakerVariant variant, bytes32 providedHash, bytes32 expectedHash);
 
+    /// @notice Initializes the factory with canonical bytecode hashes for both variants
+    /// @param regenStakerBytecodeHash Canonical hash for WITH_DELEGATION variant
+    /// @param noDelegationBytecodeHash Canonical hash for WITHOUT_DELEGATION variant
     constructor(bytes32 regenStakerBytecodeHash, bytes32 noDelegationBytecodeHash) {
         canonicalBytecodeHash[RegenStakerVariant.WITH_DELEGATION] = regenStakerBytecodeHash;
         canonicalBytecodeHash[RegenStakerVariant.WITHOUT_DELEGATION] = noDelegationBytecodeHash;
@@ -130,7 +134,7 @@ contract RegenStakerFactory {
     /// @notice Predict deterministic deployment address
     /// @param salt Deployment salt
     /// @param deployer Address that will deploy
-    /// @param bytecode The deployment bytecode (including constructor args)
+    /// @param bytecode Deployment bytecode (including constructor args)
     /// @return Predicted contract address
     function predictStakerAddress(
         bytes32 salt,
@@ -143,7 +147,7 @@ contract RegenStakerFactory {
 
     /// @notice Validate bytecode against canonical hash
     /// @param code Bytecode to validate
-    /// @param variant The RegenStaker variant this bytecode represents
+    /// @param variant RegenStaker variant this bytecode represents
     function _validateBytecode(bytes calldata code, RegenStakerVariant variant) internal view {
         if (code.length == 0) revert InvalidBytecode();
 

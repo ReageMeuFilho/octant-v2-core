@@ -3,8 +3,6 @@ pragma solidity >=0.8.25;
 
 import { TokenizedStrategy, Math } from "src/core/TokenizedStrategy.sol";
 import { IBaseStrategy } from "src/core/interfaces/IBaseStrategy.sol";
-
-import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 /**
  * @title YieldDonatingTokenizedStrategy
  * @author [Golem Foundation](https://golem.foundation)
@@ -25,18 +23,20 @@ import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 contract YieldDonatingTokenizedStrategy is TokenizedStrategy {
     using Math for uint256;
 
-    /// @dev Events for donation tracking
-    /// @param dragonRouter Address receiving or burning donation shares
-    /// @param amount Amount of shares minted or burned (denominated in shares)
+    /// @notice Emitted when profit shares are minted to dragon router
+    /// @param dragonRouter Address receiving minted donation shares
+    /// @param amount Amount of shares minted in share base units
     event DonationMinted(address indexed dragonRouter, uint256 amount);
-    /// @dev Emitted when dragon shares are burned to cover losses
+
+    /// @notice Emitted when dragon shares are burned to cover losses
+    /// @param dragonRouter Address whose shares are burned
+    /// @param amount Amount of shares burned in share base units
     event DonationBurned(address indexed dragonRouter, uint256 amount);
     /**
-     * @inheritdoc TokenizedStrategy
+     * @notice Reports strategy performance and distributes profits as donations
      * @dev Mints profit-derived shares to dragon router when newTotalAssets > oldTotalAssets; on loss, attempts
      *      dragon share burning if enabled. Residual loss reduces PPS (no tracked-loss bucket).
      */
-
     function report()
         public
         virtual
@@ -82,7 +82,7 @@ contract YieldDonatingTokenizedStrategy is TokenizedStrategy {
     /**
      * @dev Internal function to handle loss protection for dragon principal
      * @param S Storage struct pointer to access strategy's storage variables
-     * @param loss The amount of loss in terms of asset to protect against
+     * @param loss Amount of loss to protect against in asset base units
      *
      * If burning is enabled, this function will try to burn shares from the dragon router
      * equivalent to the loss amount.

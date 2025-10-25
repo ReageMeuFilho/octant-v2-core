@@ -4,21 +4,31 @@ pragma solidity >=0.8.25;
 import { BaseStrategyFactory } from "src/factories/BaseStrategyFactory.sol";
 import { YearnV3Strategy } from "src/strategies/yieldDonating/YearnV3Strategy.sol";
 
+/**
+ * @title YearnV3StrategyFactory
+ * @author [Golem Foundation](https://golem.foundation)
+ * @custom:security-contact security@golem.foundation
+ * @notice Factory for deploying Yearn v3 yield donating strategies
+ * @dev Deterministic deployment and per-strategy metadata storage
+ */
 contract YearnV3StrategyFactory is BaseStrategyFactory {
     /**
-     * @dev Extended struct to store YearnV3Strategy-specific information.
-     * @param management The address of the management entity responsible for the strategy.
+     * @dev Extended struct to store YearnV3Strategy-specific information
+     * @param management Management address responsible for the strategy
      */
     struct YearnV3StrategyInfo {
         address management;
     }
 
-    /**
-     * @dev Mapping to store YearnV3Strategy-specific information.
-     * Maps strategy address to YearnV3StrategyInfo
-     */
+    /// @dev Mapping to store YearnV3Strategy-specific information
+    /// Maps strategy address to YearnV3StrategyInfo
     mapping(address => YearnV3StrategyInfo) public yearnV3StrategyInfo;
 
+    /// @notice Emitted on successful strategy deployment
+    /// @param management Management address for the deployed strategy
+    /// @param donationAddress Donation destination address for strategy
+    /// @param strategyAddress Deployed strategy address
+    /// @param vaultTokenName Vault token name associated with strategy
     event StrategyDeploy(
         address indexed management,
         address indexed donationAddress,
@@ -27,20 +37,18 @@ contract YearnV3StrategyFactory is BaseStrategyFactory {
     );
 
     /**
-     * @notice Deploys a new YearnV3 strategy for the Yield Donating Vault.
-     * @dev This function uses CREATE2 to deploy a new strategy contract deterministically.
-     *      The strategy is initialized with the provided parameters, and its address is
-     *      returned upon successful deployment. The function emits a `StrategyDeploy` event.
-     * @param _yearnVault The address of the Yearn v3 vault to compound into.
-     * @param _asset The address of the underlying asset.
-     * @param _name The name of the vault token associated with the strategy.
-     * @param _management The address of the management entity responsible for the strategy.
-     * @param _keeper The address of the keeper responsible for maintaining the strategy.
-     * @param _emergencyAdmin The address of the emergency admin for the strategy.
-     * @param _donationAddress The address where donations from the strategy will be sent.
-     * @param _enableBurning Whether to enable burning shares from dragon router during loss protection.
-     * @param _tokenizedStrategyAddress The address of the tokenized strategy implementation.
-     * @return strategyAddress The address of the newly deployed strategy contract.
+     * @notice Deploy a new YearnV3 strategy
+     * @dev Deterministic salt derived from all parameters to avoid duplicates
+     * @param _yearnVault Yearn v3 vault address to compound into
+     * @param _asset Underlying asset address
+     * @param _name Strategy share token name
+     * @param _management Management address (can update params)
+     * @param _keeper Keeper address (calls report)
+     * @param _emergencyAdmin Emergency admin address
+     * @param _donationAddress Dragon router address (receives profit shares)
+     * @param _enableBurning True to enable burning shares during loss protection
+     * @param _tokenizedStrategyAddress TokenizedStrategy implementation address
+     * @return strategyAddress Deployed YearnV3Strategy address
      */
     function createStrategy(
         address _yearnVault,

@@ -27,6 +27,8 @@ import { NotInAllowset } from "src/errors.sol";
 // === Contract Header ===
 /// @title RegenStakerBase
 /// @author [Golem Foundation](https://golem.foundation)
+/// @custom:security-contact security@golem.foundation
+/// @custom:origin https://github.com/ScopeLift/staker
 /// @notice Base contract for RegenStaker variants, extending the Staker contract by [ScopeLift](https://scopelift.co).
 /// @notice Provides shared functionality including:
 ///         - Variable reward duration (7-3000 days, configurable by admin)
@@ -108,62 +110,33 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     uint256 public constant MAX_REWARD_DURATION = 3000 days;
 
     // === Custom Errors ===
-    /// @notice Error thrown when staker is not in allowset
-    /// @param user The user address
+    /// @param user Address that failed allowset check
     error StakerNotAllowed(address user);
-
-    /// @notice Error thrown when staker is blocked
-    /// @param user The user address
+    /// @param user Address found in blockset
     error StakerBlocked(address user);
-
-    /// @notice Error thrown when deposit owner is not eligible for the target mechanism
-    /// @param mechanism The allocation mechanism address
-    /// @param owner The deposit owner address
+    /// @param mechanism Allocation mechanism that rejected contributor
+    /// @param owner Deposit owner attempting contribution
     error DepositOwnerNotEligibleForMechanism(address mechanism, address owner);
-
-    /// @notice Error thrown when reward notification would corrupt user deposits (same-token scenario)
-    /// @param currentBalance The actual token balance in the contract
-    /// @param required The minimum balance needed (totalStaked + reward amount)
+    /// @param currentBalance Actual token balance in contract (in token base units)
+    /// @param required Minimum balance needed for totalStaked plus reward amount (in token base units)
     error InsufficientRewardBalance(uint256 currentBalance, uint256 required);
-
-    /// @notice Error thrown when requested amount exceeds available
-    /// @param requested The requested amount
-    /// @param available The available amount
+    /// @param requested Requested amount in token base units
+    /// @param available Available amount in token base units
     error CantAfford(uint256 requested, uint256 available);
-
-    /// @notice Error thrown when stake amount is below minimum
-    /// @param expected The minimum required
-    /// @param actual The actual amount
+    /// @param expected Minimum stake amount required in token base units
+    /// @param actual Actual stake amount provided in token base units
     error MinimumStakeAmountNotMet(uint256 expected, uint256 actual);
-
-    /// @notice Error thrown for invalid reward duration
-    /// @param rewardDuration The invalid duration
+    /// @param rewardDuration Invalid duration value in seconds
     error InvalidRewardDuration(uint256 rewardDuration);
-
-    /// @notice Error thrown when attempting to change duration during active reward
     error CannotChangeRewardDurationDuringActiveReward();
-
-    /// @notice Error thrown when compounding is not supported
     error CompoundingNotSupported();
-
-    /// @notice Error thrown when raising minimum stake amount during active reward
     error CannotRaiseMinimumStakeAmountDuringActiveReward();
-
-    /// @notice Error thrown when attempting to increase max bump tip during active reward
     error CannotRaiseMaxBumpTipDuringActiveReward();
-
-    /// @notice Error thrown for zero amount operations
     error ZeroOperation();
-
-    /// @notice Error thrown when no change is made
     error NoOperation();
-
-    /// @notice Error thrown when attempting to disable allocation mechanism allowset
     error DisablingAllocationMechanismAllowsetNotAllowed();
-
-    /// @notice Error thrown when reward token doesn't match allocation mechanism's expected asset
-    /// @param expected The expected token (REWARD_TOKEN)
-    /// @param actual The actual token expected by the allocation mechanism
+    /// @param expected Address of REWARD_TOKEN
+    /// @param actual Address of token expected by allocation mechanism
     error AssetMismatch(address expected, address actual);
 
     // === State Variables ===
@@ -195,23 +168,23 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
 
     // === Events ===
     /// @notice Emitted when the staker allowset is updated
-    /// @param allowset The new allowset contract address
+    /// @param allowset Address of new allowset contract controlling staker access
     event StakerAllowsetAssigned(IAddressSet indexed allowset);
 
     /// @notice Emitted when the staker blockset is updated
-    /// @param blockset The new blockset contract address
+    /// @param blockset Address of new blockset contract defining blocked stakers
     event StakerBlocksetAssigned(IAddressSet indexed blockset);
 
     /// @notice Emitted when staker access mode is changed
-    /// @param mode The new access mode
+    /// @param mode New access control mode (NONE, ALLOWSET, or BLOCKSET)
     event AccessModeSet(AccessMode indexed mode);
 
     /// @notice Emitted when the allocation mechanism allowset is updated
-    /// @param allowset The new allowset contract address
+    /// @param allowset Address of new allowset contract defining approved mechanisms
     event AllocationMechanismAllowsetAssigned(IAddressSet indexed allowset);
 
     /// @notice Emitted when the reward duration is updated
-    /// @param newDuration The new reward duration in seconds
+    /// @param newDuration New duration for reward distribution in seconds
     event RewardDurationSet(uint256 newDuration);
 
     /// @notice Emitted when a new reward schedule is created or updated.
@@ -231,58 +204,56 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     );
 
     /// @notice Emitted when rewards are contributed to an allocation mechanism
-    /// @param depositId The deposit identifier
-    /// @param contributor The contributor's address
-    /// @param fundingRound The allocation mechanism address
-    /// @param amount The amount contributed
+    /// @param depositId Deposit being used for contribution
+    /// @param contributor Address making the contribution (receives voting power)
+    /// @param fundingRound Allocation mechanism receiving the contribution
+    /// @param amount Contribution amount in reward token base units
     event RewardContributed(
         DepositIdentifier indexed depositId,
         address indexed contributor,
         address indexed fundingRound,
         uint256 amount
     );
-
-    /// @notice Error thrown when a required surrogate is missing
-    /// @param delegatee The delegatee for which a surrogate was expected
+    /// @param delegatee Address for which surrogate should exist but doesn't
     error SurrogateNotFound(address delegatee);
 
     /// @notice Emitted when the minimum stake amount is updated
-    /// @param newMinimumStakeAmount The new minimum stake amount
+    /// @param newMinimumStakeAmount New minimum stake required in stake token base units
     event MinimumStakeAmountSet(uint256 newMinimumStakeAmount);
 
     // === Getters ===
     /// @notice Gets the current reward duration
-    /// @return The reward duration in seconds
+    /// @return Duration for reward distribution in seconds
     function rewardDuration() external view returns (uint256) {
         return sharedState.rewardDuration;
     }
 
     /// @notice Gets the staker allowset
-    /// @return The staker allowset contract
+    /// @return Allowset contract controlling staker access
     function stakerAllowset() external view returns (IAddressSet) {
         return sharedState.stakerAllowset;
     }
 
     /// @notice Gets the staker blockset
-    /// @return The staker blockset contract
+    /// @return Blockset contract defining blocked stakers
     function stakerBlockset() external view returns (IAddressSet) {
         return sharedState.stakerBlockset;
     }
 
     /// @notice Gets the staker access mode
-    /// @return The current access mode
+    /// @return Current access control mode (NONE, ALLOWSET, or BLOCKSET)
     function stakerAccessMode() external view returns (AccessMode) {
         return sharedState.stakerAccessMode;
     }
 
     /// @notice Gets the allocation mechanism allowset
-    /// @return The allocation mechanism allowset contract
+    /// @return Allowset contract defining approved allocation mechanisms
     function allocationMechanismAllowset() external view returns (IAddressSet) {
         return sharedState.allocationMechanismAllowset;
     }
 
     /// @notice Gets the minimum stake amount
-    /// @return The minimum stake amount in wei
+    /// @return Minimum stake required in stake token base units
     function minimumStakeAmount() external view returns (uint256) {
         return sharedState.minimumStakeAmount;
     }
@@ -290,18 +261,18 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     // === Constructor ===
     /// @notice Constructor for RegenStakerBase
     /// @dev Initializes Staker, extensions, and shared state
-    /// @param _rewardsToken The rewards token
-    /// @param _stakeToken The stake token (must support IERC20Permit)
-    /// @param _earningPowerCalculator The earning power calculator
-    /// @param _maxBumpTip The max bump tip
-    /// @param _admin The admin address
-    /// @param _rewardDuration The reward duration
-    /// @param _minimumStakeAmount The min stake amount
-    /// @param _stakerAllowset Staker allowset (for ALLOWSET mode)
-    /// @param _stakerBlockset Staker blockset (for BLOCKSET mode)
-    /// @param _stakerAccessMode Initial staker access mode
-    /// @param _allocationMechanismAllowset Allocation mechanism allowset (cannot be address(0))
-    /// @param _eip712Name The EIP712 domain name
+    /// @param _rewardsToken Token distributed as staking rewards
+    /// @param _stakeToken Token users stake (must support IERC20Permit)
+    /// @param _earningPowerCalculator Contract calculating earning power from stakes
+    /// @param _maxBumpTip Maximum tip for earning power bumps in reward token base units
+    /// @param _admin Address with admin permissions
+    /// @param _rewardDuration Duration for reward distribution in seconds
+    /// @param _minimumStakeAmount Minimum stake required in stake token base units
+    /// @param _stakerAllowset Allowset contract for ALLOWSET mode (can be address(0))
+    /// @param _stakerBlockset Blockset contract for BLOCKSET mode (can be address(0))
+    /// @param _stakerAccessMode Initial access control mode (NONE, ALLOWSET, or BLOCKSET)
+    /// @param _allocationMechanismAllowset Allowset of approved allocation mechanisms (cannot be address(0))
+    /// @param _eip712Name EIP712 domain name for signature verification
     constructor(
         IERC20 _rewardsToken,
         IERC20 _stakeToken,
@@ -345,12 +316,12 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     // === Internal Functions ===
     /// @notice Initialize shared state with validation
     /// @dev Called by child constructors to set up shared configuration
-    /// @param _rewardDuration The duration over which rewards are distributed
-    /// @param _minimumStakeAmount The minimum stake amount
-    /// @param _stakerAllowset The allowset for stakers (ALLOWSET mode)
-    /// @param _stakerBlockset The blockset for stakers (BLOCKSET mode)
-    /// @param _stakerAccessMode The initial staker access mode
-    /// @param _allocationMechanismAllowset The allowset for allocation mechanisms
+    /// @param _rewardDuration Duration for reward distribution in seconds
+    /// @param _minimumStakeAmount Minimum stake required in stake token base units
+    /// @param _stakerAllowset Allowset contract for ALLOWSET mode (can be address(0))
+    /// @param _stakerBlockset Blockset contract for BLOCKSET mode (can be address(0))
+    /// @param _stakerAccessMode Initial access control mode (NONE, ALLOWSET, or BLOCKSET)
+    /// @param _allocationMechanismAllowset Allowset of approved allocation mechanisms
     function _initializeSharedState(
         uint128 _rewardDuration,
         uint128 _minimumStakeAmount,
@@ -415,8 +386,8 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     ///      clawed back. Admins can adjust future reward rates by notifying new amounts, but
     ///      the current schedule represents a commitment for its duration and typically won't
     ///      be changed mid-cycle.
-    /// @param _amount The reward amount to notify
-    /// @param _requiredBalance The required balance calculated by variant-specific validation
+    /// @param _amount Reward amount to notify in reward token base units
+    /// @param _requiredBalance Required contract balance calculated by variant-specific validation
     function _notifyRewardAmountWithCustomDuration(uint256 _amount, uint256 _requiredBalance) internal {
         if (!isRewardNotifier[msg.sender]) revert Staker__Unauthorized("not notifier", msg.sender);
 
@@ -596,7 +567,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     /// @dev AUTHZ: Authorized caller is the deposit owner or the designated claimer; the claimer acts
     ///      as the owner's agent for rewards. Contribution access control enforced by mechanism.
     /// @dev Requires contract not paused and uses reentrancy guard
-    /// @param _depositId The deposit identifier to contribute from
+    /// @param _depositId Deposit identifier to contribute from
     /// @param _allocationMechanismAddress Approved allocation mechanism to receive contribution
     /// @param _amount Amount of unclaimed rewards to contribute (must be <= available rewards)
     /// @param _deadline Signature expiration timestamp
@@ -731,9 +702,12 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
     ///      through compounding. This is INTENDED BEHAVIOR - when an owner designates a claimer, they
     ///      explicitly trust them with both reward claiming AND limited staking operations (compounding).
     ///      Claimers cannot withdraw funds or alter deposit parameters, maintaining security boundaries.
+    /// @dev STAKER ACCESS: The deposit OWNER (not the caller/claimer) must pass stakerAccessMode checks.
+    ///      If ALLOWSET mode active, owner must be in allowset. If BLOCKSET mode active, owner must not
+    ///      be in blockset. Claimer's access status is not checked.
     /// @dev Requires contract not paused and uses reentrancy guard
-    /// @param _depositId The deposit to compound rewards for
-    /// @return compoundedAmount Amount of rewards compounded
+    /// @param _depositId Deposit to compound rewards for
+    /// @return compoundedAmount Amount of rewards compounded (returns 0 if no unclaimed rewards available)
     function compoundRewards(
         DepositIdentifier _depositId
     ) external virtual whenNotPaused nonReentrant returns (uint256 compoundedAmount) {
@@ -804,7 +778,8 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
 
     /// @notice Internal helper to check minimum stake amount
     /// @dev Reverts if balance is below minimum and not zero
-    /// @param _depositId The deposit to check
+    ///      Exception: Zero balance is allowed (permits full withdrawal to 0)
+    /// @param _depositId Deposit to check eligibility for
     function _revertIfMinimumStakeAmountNotMet(DepositIdentifier _depositId) internal view {
         Deposit storage deposit = deposits[_depositId];
         if (deposit.balance < sharedState.minimumStakeAmount && deposit.balance > 0) {
@@ -826,8 +801,8 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
 
     /// @notice Atomically updates deposit checkpoint and totalClaimedRewards
     /// @dev Ensures consistent state updates when rewards are consumed
-    /// @param _deposit The deposit to update
-    /// @param _amount The amount of rewards being claimed
+    /// @param _deposit Deposit storage reference to update
+    /// @param _amount Amount of rewards being claimed
     function _consumeRewards(Deposit storage _deposit, uint256 _amount) internal {
         if (_amount > 0) {
             uint256 scaledAmount = _amount * SCALE_FACTOR;
@@ -836,7 +811,6 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         }
     }
 
-    /// @inheritdoc Staker
     /// @notice Pauses reward streaming during idle windows (when `totalEarningPower == 0`) by
     ///         extending `rewardEndTime` by the idle duration; no rewards accrue while idle.
     /// @dev When earning power is non-zero, accrues `rewardPerTokenAccumulatedCheckpoint` as usual.
@@ -857,14 +831,13 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
 
     // === Overridden Functions ===
 
-    /// @inheritdoc Staker
     /// @notice Prevents staking 0, staking below the minimum, staking when paused, and unauthorized staking.
     /// @dev Uses reentrancy guard
-    /// @param _depositor The depositor address
-    /// @param _amount The amount to stake
-    /// @param _delegatee The delegatee address
-    /// @param _claimer The claimer address
-    /// @return _depositId The deposit identifier
+    /// @param _depositor Address making the deposit
+    /// @param _amount Amount to stake
+    /// @param _delegatee Address to receive voting power delegation
+    /// @param _claimer Address authorized to claim rewards
+    /// @return _depositId Deposit identifier for the created deposit
     function _stake(
         address _depositor,
         uint256 _amount,
@@ -877,14 +850,13 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         _revertIfMinimumStakeAmountNotMet(_depositId);
     }
 
-    /// @inheritdoc Staker
     /// @notice Prevents withdrawing 0; prevents withdrawals that drop balance below minimum.
     /// @dev USER PROTECTION: Withdrawals remain enabled even when contract is paused to ensure
     ///      users can always access their principal funds.
     /// @dev Uses reentrancy guard
-    /// @param deposit The deposit storage
-    /// @param _depositId The deposit identifier
-    /// @param _amount The amount to withdraw
+    /// @param deposit Deposit storage reference
+    /// @param _depositId Deposit identifier
+    /// @param _amount Amount to withdraw
     function _withdraw(
         Deposit storage deposit,
         DepositIdentifier _depositId,
@@ -895,12 +867,11 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         _revertIfMinimumStakeAmountNotMet(_depositId);
     }
 
-    /// @inheritdoc Staker
     /// @notice Overrides to add reentrancy protection.
     /// @dev Uses reentrancy guard
-    /// @param deposit The deposit storage
-    /// @param _depositId The deposit identifier
-    /// @param _newDelegatee The new delegatee
+    /// @param deposit Deposit storage reference
+    /// @param _depositId Deposit identifier
+    /// @param _newDelegatee Address to receive voting power delegation
     function _alterDelegatee(
         Deposit storage deposit,
         DepositIdentifier _depositId,
@@ -909,12 +880,11 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         super._alterDelegatee(deposit, _depositId, _newDelegatee);
     }
 
-    /// @inheritdoc Staker
     /// @notice Overrides to add reentrancy protection.
     /// @dev Uses reentrancy guard
-    /// @param deposit The deposit storage
-    /// @param _depositId The deposit identifier
-    /// @param _newClaimer The new claimer
+    /// @param deposit Deposit storage reference
+    /// @param _depositId Deposit identifier
+    /// @param _newClaimer Address authorized to claim rewards
     function _alterClaimer(
         Deposit storage deposit,
         DepositIdentifier _depositId,
@@ -923,14 +893,13 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         super._alterClaimer(deposit, _depositId, _newClaimer);
     }
 
-    /// @inheritdoc Staker
     /// @notice Overrides to add pause protection and track totalClaimedRewards for balance validation
     /// @dev Reuses base Staker logic (with fee=0) and adds totalClaimedRewards tracking
     /// @dev nonReentrant protects against reentrancy despite updating totalClaimedRewards after transfer
-    /// @param _depositId The deposit identifier
-    /// @param deposit The deposit storage
-    /// @param _claimer The claimer address
-    /// @return The claimed amount
+    /// @param _depositId Deposit identifier
+    /// @param deposit Deposit storage reference
+    /// @param _claimer Address authorized to claim rewards
+    /// @return Claimed amount in reward token base units
     function _claimReward(
         DepositIdentifier _depositId,
         Deposit storage deposit,
@@ -943,7 +912,7 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
 
     /// @notice Override notifyRewardAmount to use custom reward duration
     /// @dev nonReentrant as a belts-and-braces guard against exotic ERC20 callback reentry
-    /// @param _amount The reward amount
+    /// @param _amount Reward amount in reward token base units
     function notifyRewardAmount(uint256 _amount) external virtual override nonReentrant {
         uint256 requiredBalance = _validateAndGetRequiredBalance(_amount);
         _notifyRewardAmountWithCustomDuration(_amount, requiredBalance);
@@ -951,8 +920,8 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
 
     /// @notice Validates sufficient reward token balance and returns the required balance
     /// @dev Virtual function allowing variants to implement appropriate balance checks
-    /// @param _amount The reward amount being added
-    /// @return required The required balance for this variant
+    /// @param _amount Reward amount in reward token base units being added
+    /// @return required Required balance for this variant in reward token base units
     function _validateAndGetRequiredBalance(uint256 _amount) internal view virtual returns (uint256 required) {
         uint256 currentBalance = REWARD_TOKEN.balanceOf(address(this));
 
@@ -968,12 +937,11 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         return required;
     }
 
-    /// @inheritdoc Staker
     /// @notice Prevents staking more when paused or by unauthorized owners; ensures non-zero amount and final balance meets minimum.
     /// @dev Uses reentrancy guard; validates deposit.owner against staker access control before proceeding
-    /// @param deposit The deposit storage
-    /// @param _depositId The deposit identifier
-    /// @param _amount The additional amount to stake
+    /// @param deposit Deposit storage reference
+    /// @param _depositId Deposit identifier
+    /// @param _amount Additional stake amount in stake token base units
     function _stakeMore(
         Deposit storage deposit,
         DepositIdentifier _depositId,
@@ -985,13 +953,12 @@ abstract contract RegenStakerBase is Staker, Pausable, ReentrancyGuard, EIP712, 
         _revertIfMinimumStakeAmountNotMet(_depositId);
     }
 
-    /// @inheritdoc Staker
     /// @notice Override to add nonReentrant modifier and fix checks-effects-interactions pattern
     /// @dev Adds reentrancy protection and corrects state update ordering
     /// @dev Updates state BEFORE external transfer to prevent reentrancy vulnerabilities
-    /// @param _depositId The deposit identifier to bump earning power for
-    /// @param _tipReceiver The receiver of the reward for updating a deposit's earning power
-    /// @param _requestedTip The amount of tip requested by the third-party
+    /// @param _depositId Deposit identifier to bump earning power for
+    /// @param _tipReceiver Address receiving tip for updating earning power
+    /// @param _requestedTip Tip amount requested in reward token base units
     function bumpEarningPower(
         DepositIdentifier _depositId,
         address _tipReceiver,

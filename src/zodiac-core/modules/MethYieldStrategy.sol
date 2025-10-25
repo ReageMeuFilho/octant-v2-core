@@ -68,7 +68,8 @@ contract MethYieldStrategy is DragonBaseStrategy, IMethYieldStrategy {
     }
 
     /**
-     * @inheritdoc IMethYieldStrategy
+     * @notice Returns the last reported mETH to ETH exchange rate
+     * @return Exchange rate with 18 decimals precision
      */
     function getLastReportedExchangeRate() public view returns (uint256) {
         return lastReportedExchangeRate;
@@ -107,7 +108,7 @@ contract MethYieldStrategy is DragonBaseStrategy, IMethYieldStrategy {
 
     /**
      * @notice Captures yield by calculating the increase in ETH value based on exchange rate changes
-     * @return profitInMeth The profit in mETH terms calculated from exchange rate appreciation
+     * @return profitInMeth Profit in mETH terms calculated from exchange rate appreciation
      * @dev Uses ray math for precise calculations and converts ETH profit to mETH
      */
     function _harvestAndReport() internal virtual override returns (uint256) {
@@ -142,7 +143,7 @@ contract MethYieldStrategy is DragonBaseStrategy, IMethYieldStrategy {
 
     /**
      * @notice Gets the current exchange rate from the Mantle staking contract
-     * @return The current exchange rate (mETH to ETH ratio, scaled by 1e18)
+     * @return Current exchange rate (mETH to ETH ratio, scaled by 1e18)
      * @dev Uses the Mantle staking contract as the authoritative source for exchange rates
      */
     function _getCurrentExchangeRate() internal view virtual returns (uint256) {
