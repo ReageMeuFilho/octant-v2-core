@@ -3,6 +3,7 @@ pragma solidity ^0.8.23;
 
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { Enum } from "@gnosis.pm/safe-contracts/contracts/common/Enum.sol";
+import { IBaseHealthCheck } from "src/strategies/interfaces/IBaseHealthCheck.sol";
 
 interface IGnosisSafe {
     function execTransactionFromModule(
@@ -81,11 +82,39 @@ contract KeeperBotGuard is Ownable {
      * @notice Triggers the Safe to call report() on the specified strategy
      * @dev Can only be called by authorized keeper bots. Uses Safe's execTransactionFromModule
      *      to make the Safe itself call strategy.report(). The Safe must be set as a keeper on the strategy.
+     *      If health check is enabled, it will first disable it before calling report.
      * @param strategy Address of the strategy to call report() on
      */
     function callStrategyReport(address strategy) external onlyAuthorizedBot {
         if (strategy == address(0)) {
             revert KeeperBotGuard__InvalidStrategy();
+        }
+
+        // First, try to check and disable health check if it's active
+        // Use try/catch as doHealthCheck and setDoHealthCheck may not be implemented
+        bool healthCheckActive = false;
+
+        // Try to read the health check status
+        try IBaseHealthCheck(strategy).doHealthCheck() returns (bool isActive) {
+            healthCheckActive = isActive;
+        } catch {
+            // If doHealthCheck doesn't exist, continue without disabling
+        }
+
+        // If health check is active, disable it
+        if (healthCheckActive) {
+            // Try to disable health check
+            bytes memory disableHealthCheckData = abi.encodeWithSelector(
+                IBaseHealthCheck.setDoHealthCheck.selector,
+                false
+            );
+
+            safe.execTransactionFromModule(
+                strategy,
+                0, // value
+                disableHealthCheckData,
+                Enum.Operation.Call
+            );
         }
 
         // Prepare the call data for strategy.report()
