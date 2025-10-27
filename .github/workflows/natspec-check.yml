@@ -8,17 +8,21 @@ on:
 
 jobs:
   check-natspec:
-    runs-on: ubuntu-latest
+    runs-on: general
+    container:
+      image: ${{ vars.GCP_DOCKER_IMAGE_REGISTRY }}/node-extended:f4f41461
+      credentials:
+        username: _json_key_base64
+        password: ${{ secrets.GCP_DOCKER_IMAGES_REGISTRY_SERVICE_ACCOUNT }}
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-
-      - name: Install dependencies
-        run: forge soldeer install
+      - name: Init env
+        run: |
+          yarn install
+          forge soldeer install
 
       - name: Generate documentation
         run: forge doc
