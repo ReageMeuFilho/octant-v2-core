@@ -5,7 +5,9 @@ import { IERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/IER
 
 /**
  * @title Yearn V3 Tokenized Strategy Interface
- * @author yearn.finance
+ * @author yearn.finance; port maintained by [Golem Foundation](https://golem.foundation)
+ * @custom:security-contact security@golem.foundation
+ * @custom:ported-from https://github.com/yearn/tokenized-strategy/blob/master/src/interfaces/ITokenizedStrategy.sol
  * @notice Interface that implements the 4626 standard and the implementation functions
  * for the TokenizedStrategy contract.
  */
@@ -56,7 +58,9 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
     event UpdateDragonRouter(address indexed newDragonRouter);
 
     /**
-     * @notice Emitted when a pending dragon router change is initiated.
+     * @notice Emitted when a pending dragon router change is initiated
+     * @param newDragonRouter Proposed dragon router address
+     * @param effectiveTimestamp Timestamp when change can be finalized
      */
     event PendingDragonRouterChange(address indexed newDragonRouter, uint256 effectiveTimestamp);
 
@@ -65,14 +69,14 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Used to initialize storage for a newly deployed strategy.
-     * @param _asset Address of the underlying asset.
-     * @param _name Name the strategy will use.
-     * @param _management Address to set as the strategies `management`.
-     * @param _keeper Address to set as strategies `keeper`.
-     * @param _emergencyAdmin Address to set as strategy's `emergencyAdmin`.
-     * @param _dragonRouter Address that receives minted shares from yield in specialized strategies.
-     * @param _enableBurning Whether to enable burning shares from dragon router during loss protection.
+     * @notice Used to initialize storage for a newly deployed strategy
+     * @param _asset Underlying asset address
+     * @param _name Strategy name
+     * @param _management Management address
+     * @param _keeper Keeper address
+     * @param _emergencyAdmin Emergency admin address
+     * @param _dragonRouter Dragon router address (receives minted shares from yield)
+     * @param _enableBurning True to enable burning shares during loss protection
      */
     function initialize(
         address _asset,
@@ -89,40 +93,40 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Withdraws `assets` from `owners` shares and sends
-     * the underlying tokens to `receiver`.
-     * @dev This includes an added parameter to allow for losses.
-     * @param assets The amount of underlying to withdraw.
-     * @param receiver The address to receive `assets`.
-     * @param owner The address whose shares are burnt.
-     * @param maxLoss The amount of acceptable loss in Basis points.
-     * @return shares The actual amount of shares burnt.
+     * @notice Withdraws assets from owner's shares and sends underlying tokens to receiver
+     * @dev This includes an added parameter to allow for losses
+     * @param assets Amount of underlying to withdraw
+     * @param receiver Address to receive assets
+     * @param owner Address whose shares are burnt
+     * @param maxLoss Maximum acceptable loss in basis points (1 bps = 0.01%)
+     * @return shares Actual amount of shares burnt
      */
     function withdraw(uint256 assets, address receiver, address owner, uint256 maxLoss) external returns (uint256);
 
     /**
-     * @notice Redeems exactly `shares` from `owner` and
-     * sends `assets` of underlying tokens to `receiver`.
-     * @dev This includes an added parameter to allow for losses.
-     * @param shares The amount of shares burnt.
-     * @param receiver The address to receive `assets`.
-     * @param owner The address whose shares are burnt.
-     * @param maxLoss The amount of acceptable loss in Basis points.
-     * @return The actual amount of underlying withdrawn.
+     * @notice Redeems exactly shares from owner and sends underlying tokens to receiver
+     * @dev This includes an added parameter to allow for losses
+     * @param shares Amount of shares burnt
+     * @param receiver Address to receive assets
+     * @param owner Address whose shares are burnt
+     * @param maxLoss Maximum acceptable loss in basis points (1 bps = 0.01%)
+     * @return Actual amount of underlying withdrawn
      */
     function redeem(uint256 shares, address receiver, address owner, uint256 maxLoss) external returns (uint256);
 
     /**
-     * @notice Variable `maxLoss` is ignored.
-     * @dev Accepts a `maxLoss` variable in order to match the multi
-     * strategy vaults ABI.
+     * @notice Variable maxLoss is ignored
+     * @dev Accepts a maxLoss variable in order to match the multi strategy vaults ABI
+     * @param owner Address to check maximum withdrawal for
+     * @return Maximum withdrawable amount
      */
     function maxWithdraw(address owner, uint256 /*maxLoss*/) external view returns (uint256);
 
     /**
-     * @notice Variable `maxLoss` is ignored.
-     * @dev Accepts a `maxLoss` variable in order to match the multi
-     * strategy vaults ABI.
+     * @notice Variable maxLoss is ignored
+     * @dev Accepts a maxLoss variable in order to match the multi strategy vaults ABI
+     * @param owner Address to check maximum redemption for
+     * @return Maximum redeemable shares
      */
     function maxRedeem(address owner, uint256 /*maxLoss*/) external view returns (uint256);
 
@@ -132,19 +136,19 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
 
     /**
      * @notice Require a caller is `management`.
-     * @param _sender The original msg.sender.
+     * @param _sender Original msg.sender
      */
     function requireManagement(address _sender) external view;
 
     /**
      * @notice Require a caller is the `keeper` or `management`.
-     * @param _sender The original msg.sender.
+     * @param _sender Original msg.sender
      */
     function requireKeeperOrManagement(address _sender) external view;
 
     /**
      * @notice Require a caller is the `management` or `emergencyAdmin`.
-     * @param _sender The original msg.sender.
+     * @param _sender Original msg.sender
      */
     function requireEmergencyAuthorized(address _sender) external view;
 
@@ -175,13 +179,13 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
 
     /**
      * @notice Get the API version for this TokenizedStrategy.
-     * @return The API version for this TokenizedStrategy
+     * @return API version for this TokenizedStrategy
      */
     function apiVersion() external view returns (string memory);
 
     /**
      * @notice Get the price per share.
-     * @return The price per share.
+     * @return Price per share
      */
     function pricePerShare() external view returns (uint256);
 
@@ -229,7 +233,7 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
 
     /**
      * @notice The timestamp of the last time protocol fees were charged.
-     * @return The last report.
+     * @return Last report timestamp in seconds
      */
     function lastReport() external view returns (uint256);
 
@@ -288,7 +292,7 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
 
     /**
      * @notice Updates the name for the strategy.
-     * @param _newName The new name for the strategy.
+     * @param _newName New strategy name
      */
     function setName(string calldata _newName) external;
 
@@ -300,7 +304,7 @@ interface ITokenizedStrategy is IERC4626, IERC20Permit {
     /**
      * @notice To manually withdraw funds from the yield source after a
      * strategy has been shutdown.
-     * @param _amount The amount of asset to attempt to free.
+     * @param _amount Amount of asset to withdraw
      */
     function emergencyWithdraw(uint256 _amount) external;
 }

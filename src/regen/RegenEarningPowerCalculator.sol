@@ -13,21 +13,53 @@ import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { AccessMode } from "src/constants.sol";
 
-/// @title RegenEarningPowerCalculator
-/// @author [Golem Foundation](https://golem.foundation)
-/// @notice Contract that calculates earning power based on staked amounts with optional access control
-/// @dev This calculator returns the minimum of the staked amount and uint96 max value as earning power.
-/// Supports dual-mode access control: ALLOWSET (only approved addresses) or BLOCKSET (all except blocked).
+/**
+ * @title RegenEarningPowerCalculator
+ * @author [Golem Foundation](https://golem.foundation)
+ * @custom:security-contact security@golem.foundation
+ * @notice Calculates staking earning power with access control
+ * @dev Linear earning power calculation with access control gates
+ *
+ *      EARNING POWER FORMULA:
+ *      earningPower = min(stakedAmount, type(uint96).max)
+ *
+ *      ACCESS CONTROL MODES:
+ *      - NONE: Everyone has access (permissionless)
+ *      - ALLOWSET: Only addresses in allowset
+ *      - BLOCKSET: All except addresses in blockset
+ *
+ *      BEHAVIOR:
+ *      - If user has access: earningPower = staked amount (capped at uint96 max)
+ *      - If user lacks access: earningPower = 0 (no rewards)
+ *
+ *      BUMP QUALIFICATION:
+ *      User qualifies for earning power bump when:
+ *      - Access status changes (added/removed from set)
+ *      - Staked amount changes
+ *      - Old earning power ≠ new earning power
+ *
+ * @custom:security Access control determines reward eligibility
+ */
 contract RegenEarningPowerCalculator is IAccessControlledEarningPowerCalculator, Ownable, ERC165 {
+    // ============================================
+    // STATE VARIABLES
+    // ============================================
+
     /// @notice The allowset contract that determines which addresses are eligible to earn power (ALLOWSET mode)
     /// @dev Active only when accessMode == AccessMode.ALLOWSET
     IAddressSet public override allowset;
 
     /// @notice The blockset contract that determines which addresses are blocked from earning (BLOCKSET mode)
+    /// @dev Active only when accessMode == AccessMode.BLOCKSET
     IAddressSet public blockset;
 
     /// @notice Current access mode for earning power
+    /// @dev Determines which address set is active
     AccessMode public accessMode;
+
+    // ============================================
+    // EVENTS
+    // ============================================
 
     /// @notice Emitted when blockset is updated
     event BlocksetAssigned(IAddressSet indexed blockset);
@@ -35,12 +67,19 @@ contract RegenEarningPowerCalculator is IAccessControlledEarningPowerCalculator,
     /// @notice Emitted when access mode is changed
     event AccessModeSet(AccessMode indexed mode);
 
-    /// @notice Initializes the RegenEarningPowerCalculator with an owner and address sets
-    /// @param _owner The address that will own this contract
-    /// @param _allowset The allowset contract address
-    /// @param _blockset The blockset contract address
-    /// @param _accessMode The initial access mode (NONE, ALLOWSET, or BLOCKSET)
-    /// @dev NOTE: AccessMode determines which address set is active, not address(0) checks
+    // ============================================
+    // CONSTRUCTOR
+    // ============================================
+
+    /**
+     * @notice Initializes the RegenEarningPowerCalculator with access control configuration
+     * @dev Sets all address sets and access mode during deployment
+     *      NOTE: AccessMode determines which address set is active, not address(0) checks
+     * @param _owner Address that will own this contract
+     * @param _allowset Allowset contract address (active in ALLOWSET mode)
+     * @param _blockset Blockset contract address (active in BLOCKSET mode)
+     * @param _accessMode Initial access mode (NONE, ALLOWSET, or BLOCKSET)
+     */
     constructor(address _owner, IAddressSet _allowset, IAddressSet _blockset, AccessMode _accessMode) Ownable(_owner) {
         allowset = _allowset;
         blockset = _blockset;
@@ -50,7 +89,22 @@ contract RegenEarningPowerCalculator is IAccessControlledEarningPowerCalculator,
         emit AccessModeSet(_accessMode);
     }
 
-    function _hasAccess(address staker) internal view returns (bool) {
+    // ============================================
+    // INTERNAL FUNCTIONS
+    // ============================================
+
+    /**
+     * @notice Check if staker has access based on current access mode
+     * @dev Internal helper to centralize access control logic
+     *
+     *      ACCESS LOGIC:
+     *      - NONE: Always returns true
+     *      - ALLOWSET: Returns allowset.contains(staker)
+     *      - BLOCKSET: Returns !blockset.contains(staker)
+     * @param staker Address to check
+     * @return hasAccess True if staker has access to earn rewards
+     */
+    function _hasAccess(address staker) internal view returns (bool hasAccess) {
         if (accessMode == AccessMode.ALLOWSET) {
             return allowset.contains(staker);
         } else if (accessMode == AccessMode.BLOCKSET) {
@@ -59,33 +113,49 @@ contract RegenEarningPowerCalculator is IAccessControlledEarningPowerCalculator,
         return true;
     }
 
-    /// @notice Returns the earning power of a staker
-    /// @param stakedAmount The amount of staked tokens
-    /// @param staker The address of the staker
-    /// @return The earning power of the staker
-    /// @dev Returns staked amount (capped at uint96 max) if staker has access, 0 otherwise
+    // ============================================
+    // EXTERNAL FUNCTIONS
+    // ============================================
+
+    /**
+     * @notice Returns the earning power of a staker
+     * @dev Earning power = staked amount (capped at uint96 max) if has access, else 0
+     *
+     *      FORMULA:
+     *      - Has access: min(stakedAmount, type(uint96).max)
+     *      - No access: 0
+     * @param stakedAmount Amount of staked tokens in token base units
+     * @param staker Address of staker
+     * @return earningPower Calculated earning power (0 if no access)
+     */
     function getEarningPower(
         uint256 stakedAmount,
         address staker,
         address /*_delegatee*/
-    ) external view override returns (uint256) {
+    ) external view override returns (uint256 earningPower) {
         if (!_hasAccess(staker)) {
             return 0;
         }
         return Math.min(stakedAmount, uint256(type(uint96).max));
     }
 
-    /// @notice Returns the new earning power of a staker
-    /// @param stakedAmount The amount of staked tokens
-    /// @param staker The address of the staker
-    /// @param oldEarningPower The old earning power of the staker
-    /// @return newCalculatedEarningPower The new earning power of the staker
-    /// @return qualifiesForBump Boolean indicating if the staker qualifies for a bump
-    /// @dev Calculates new earning power based on access control status and staked amount.
-    /// A staker qualifies for a bump whenever their earning power changes, which can happen when:
-    /// - They are added/removed from access control sets
-    /// - Their staked amount changes
-    /// This ensures deposits are updated promptly when access status changes.
+    /**
+     * @notice Returns the new earning power and bump qualification status
+     * @dev Calculates new earning power based on access control and staked amount
+     *      A staker qualifies for a bump whenever their earning power changes
+     *
+     *      BUMP QUALIFICATION CONDITIONS:
+     *      - Access status changed (added/removed from set)
+     *      - Staked amount changed
+     *      - Any change where: newEarningPower ≠ oldEarningPower
+     *
+     *      This ensures deposits are updated promptly when access status changes.
+     * @param stakedAmount Amount of staked tokens in token base units
+     * @param staker Address of staker
+     * @param oldEarningPower Previous earning power value
+     * @return newCalculatedEarningPower New earning power (0 if no access)
+     * @return qualifiesForBump True if earning power changed
+     */
     function getNewEarningPower(
         uint256 stakedAmount,
         address staker,
@@ -101,33 +171,49 @@ contract RegenEarningPowerCalculator is IAccessControlledEarningPowerCalculator,
         qualifiesForBump = newCalculatedEarningPower != oldEarningPower;
     }
 
-    /// @notice Sets the allowset for the earning power calculator (ALLOWSET mode)
-    /// @param _allowset The allowset to set
-    /// @dev NOTE: Use setAccessMode(AccessMode.NONE) to disable access control
+    /**
+     * @notice Sets the allowset for the earning power calculator (ALLOWSET mode)
+     * @dev Only callable by owner. Use setAccessMode(AccessMode.NONE) to disable access control
+     * @param _allowset Allowset contract address to set
+     * @custom:security Only owner can modify access control
+     */
     function setAllowset(IAddressSet _allowset) public override onlyOwner {
         allowset = _allowset;
         emit AllowsetAssigned(_allowset);
     }
 
-    /// @notice Sets the blockset for the earning power calculator (BLOCKSET mode)
-    /// @param _blockset The blockset to set
-    /// @dev NOTE: Use setAccessMode(AccessMode.NONE) to disable access control
+    /**
+     * @notice Sets the blockset for the earning power calculator (BLOCKSET mode)
+     * @dev Only callable by owner. Use setAccessMode(AccessMode.NONE) to disable access control
+     * @param _blockset Blockset contract address to set
+     * @custom:security Only owner can modify access control
+     */
     function setBlockset(IAddressSet _blockset) public onlyOwner {
         blockset = _blockset;
         emit BlocksetAssigned(_blockset);
     }
 
-    /// @notice Sets the access mode for the earning power calculator
-    /// @param _mode The access mode to set (NONE, ALLOWSET, or BLOCKSET)
-    /// @dev Non-retroactive. Existing deposits require bumpEarningPower() to reflect changes.
+    /**
+     * @notice Sets the access mode for the earning power calculator
+     * @dev Non-retroactive. Existing deposits require bumpEarningPower() to reflect changes
+     *      Only callable by owner
+     * @param _mode Access mode to set (NONE, ALLOWSET, or BLOCKSET)
+     * @custom:security Only owner can change access mode
+     * @custom:security Non-retroactive - requires manual bumping to apply to existing deposits
+     */
     function setAccessMode(AccessMode _mode) public onlyOwner {
         accessMode = _mode;
         emit AccessModeSet(_mode);
     }
 
-    /// @inheritdoc ERC165
-    /// @dev Additionally supports the IAccessControlledEarningPowerCalculator interface
-    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165, IERC165) returns (bool) {
+    /**
+     * @notice Checks interface support including IAccessControlledEarningPowerCalculator
+     * @param interfaceId Interface identifier to check
+     * @return supported True if interface is supported
+     */
+    function supportsInterface(
+        bytes4 interfaceId
+    ) public view virtual override(ERC165, IERC165) returns (bool supported) {
         return
             interfaceId == type(IAccessControlledEarningPowerCalculator).interfaceId ||
             super.supportsInterface(interfaceId);

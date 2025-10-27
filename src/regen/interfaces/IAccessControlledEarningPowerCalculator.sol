@@ -13,13 +13,15 @@ import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol
 /// @author [Golem Foundation](https://golem.foundation)
 /// @notice This interface extends IEarningPowerCalculator with dual-mode address set access control
 interface IAccessControlledEarningPowerCalculator is IEarningPowerCalculator, IERC165 {
+    /// @notice Emitted when allowset is assigned
+    /// @param allowset New allowset contract address
     event AllowsetAssigned(IAddressSet indexed allowset);
 
-    /// @notice Sets the allowset for the earning power calculator
-    /// @param _allowset The allowset to set
+    /// @notice Sets the allowset controlling calculator access
+    /// @param _allowset New allowset contract (restricts who can calculate earning power)
     function setAllowset(IAddressSet _allowset) external;
 
     /// @notice Returns the allowset for the earning power calculator
-    /// @return The allowset
+    /// @return Current allowset contract address
     function allowset() external view returns (IAddressSet);
 }

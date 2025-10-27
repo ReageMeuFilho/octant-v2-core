@@ -5,29 +5,70 @@ import { IAddressSet } from "./IAddressSet.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { EnumerableSet } from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-/// @title AddressSet
-/// @author [Golem Foundation](https://golem.foundation)
-/// @notice Managed set of addresses using OpenZeppelin's EnumerableSet
-/// @dev Provides enumerable address set functionality with owner-only modifications
-///      Can be used for allowlists, denylists, or any address collection
+/**
+ * @title AddressSet
+ * @author [Golem Foundation](https://golem.foundation)
+ * @custom:security-contact security@golem.foundation
+ * @notice Managed set of addresses for allowlists and blocklists
+ * @dev Wrapper around OpenZeppelin's EnumerableSet with owner controls
+ *
+ *      USE CASES:
+ *      - Allowlists: Control who can interact with a contract
+ *      - Blocklists: Prevent specific addresses from interacting
+ *      - Registry: Track set of authorized addresses
+ *
+ *      FEATURES:
+ *      - O(1) add, remove, contains operations
+ *      - Enumerable (can iterate through all addresses)
+ *      - Owner-only modifications
+ *      - Batch operations supported
+ *      - Duplicate prevention
+ *
+ *      GAS CONSIDERATIONS:
+ *      - Add: ~40k gas first time, ~20k subsequent
+ *      - Remove: ~20k gas
+ *      - Contains: ~200 gas (view)
+ *      - Batch operations save gas vs multiple transactions
+ */
 contract AddressSet is IAddressSet, Ownable {
     using EnumerableSet for EnumerableSet.AddressSet;
+
+    // ============================================
+    // ERRORS
+    // ============================================
 
     error IllegalAddressSetOperation(address account, string reason);
     error EmptyArray();
 
+    // ============================================
+    // EVENTS
+    // ============================================
+
+    /// @notice Emitted when an address is added to or removed from the set
+    /// @param account Address that was modified
+    /// @param operation Type of operation (Add or Remove)
     event AddressSetAltered(address indexed account, AddressSetOperation indexed operation);
 
+    // ============================================
+    // ENUMS
+    // ============================================
+
+    /// @notice Operation types for address set modifications
     enum AddressSetOperation {
         Add,
         Remove
     }
 
+    // ============================================
+    // STATE VARIABLES
+    // ============================================
+
+    /// @notice Internal EnumerableSet storage
+    /// @dev Uses OpenZeppelin's gas-optimized implementation
     EnumerableSet.AddressSet private _addresses;
 
     constructor() Ownable(msg.sender) {}
 
-    /// @inheritdoc IAddressSet
     function contains(address account) external view override returns (bool) {
         return _addresses.contains(account);
     }
@@ -44,7 +85,6 @@ contract AddressSet is IAddressSet, Ownable {
         return _addresses.length();
     }
 
-    /// @inheritdoc IAddressSet
     function add(address[] memory accounts) external override onlyOwner {
         require(accounts.length > 0, EmptyArray());
 
@@ -59,7 +99,6 @@ contract AddressSet is IAddressSet, Ownable {
         }
     }
 
-    /// @inheritdoc IAddressSet
     function add(address account) external override onlyOwner {
         if (account == address(0)) {
             revert IllegalAddressSetOperation(account, "Address zero not allowed.");

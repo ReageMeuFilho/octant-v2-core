@@ -2,22 +2,17 @@
 pragma solidity ^0.8.25;
 
 /**
- * @title Yearn V3 Vault Interface
- * @author yearn.finance
- * @notice
- *   The Yearn VaultV3 is designed as a non-opinionated system to distribute funds of
- *   depositors for a specific `asset` into different opportunities (aka Strategies)
- *   and manage accounting in a robust way.
- *
- *   Depositors receive shares (aka vaults tokens) proportional to their deposit amount.
- *   Vault tokens are yield-bearing and can be redeemed at any time to get back deposit
- *   plus any yield generated.
+ * @title MultistrategyVault Interface
+ * @author yearn.finance; port maintained by [Golem Foundation](https://golem.foundation)
+ * @custom:security-contact security@golem.foundation
+ * @custom:ported-from https://github.com/yearn/yearn-vaults-v3/blob/master/contracts/interfaces/IVault.sol
+ * @notice Interface for MultistrategyVault ERC4626-compliant vault with multiple strategies
+ * @dev Defines all external functions, events, errors, and types for the vault
  */
 interface IMultistrategyVault {
-    /*//////////////////////////////////////////////////////////////
-                                 ERRORS
-    //////////////////////////////////////////////////////////////*/
-
+    // ============================================
+    // ERRORS
+    // ============================================
     error AlreadyInitialized();
     error AlreadyShutdown();
     error ZeroAddress();
@@ -60,43 +55,64 @@ interface IMultistrategyVault {
     error Reentrancy();
     error NoSharesToRedeem();
 
-    /*//////////////////////////////////////////////////////////////
-                                 ENUMS
-    //////////////////////////////////////////////////////////////*/
+    // ============================================
+    // ENUMS
+    // ============================================
 
     /**
-     * @notice Each permissioned function has its own Role.
-     * Roles can be combined in any combination or all kept separate.
+     * @notice Roles for permissioned vault operations
+     * @dev Roles are bitmasked - multiple roles can be combined for a single address
+     *      Each role grants specific privileges. Set via setRole, addRole, removeRole
      */
     enum Roles {
-        ADD_STRATEGY_MANAGER, // Can add strategies to the vault
-        REVOKE_STRATEGY_MANAGER, // Can remove strategies from the vault
-        FORCE_REVOKE_MANAGER, // Can force remove a strategy causing a loss
-        ACCOUNTANT_MANAGER, // Can set the accountant that assess fees
-        QUEUE_MANAGER, // Can set the default withdrawal queue
-        REPORTING_MANAGER, // Calls report for strategies
-        DEBT_MANAGER, // Adds and removes debt from strategies
-        MAX_DEBT_MANAGER, // Can set the max debt for a strategy
-        DEPOSIT_LIMIT_MANAGER, // Sets deposit limit and module for the vault
-        WITHDRAW_LIMIT_MANAGER, // Sets the withdraw limit module
-        MINIMUM_IDLE_MANAGER, // Sets the minimum total idle the vault should keep
-        PROFIT_UNLOCK_MANAGER, // Sets the profit_max_unlock_time
-        DEBT_PURCHASER, // Can purchase bad debt from the vault
-        EMERGENCY_MANAGER // Can shutdown vault in an emergency
+        /// @notice Can add new strategies to vault via addStrategy()
+        ADD_STRATEGY_MANAGER,
+        /// @notice Can remove strategies (soft revoke, requires 0 debt) via revokeStrategy()
+        REVOKE_STRATEGY_MANAGER,
+        /// @notice Can force remove strategies (hard revoke, realizes losses) via forceRevokeStrategy()
+        FORCE_REVOKE_MANAGER,
+        /// @notice Can set accountant contract for fee assessment via setAccountant()
+        ACCOUNTANT_MANAGER,
+        /// @notice Can set default withdrawal queue via setDefaultQueue()
+        QUEUE_MANAGER,
+        /// @notice Can call processReport() to update strategy accounting
+        REPORTING_MANAGER,
+        /// @notice Can call updateDebt() to rebalance strategy allocations
+        DEBT_MANAGER,
+        /// @notice Can set maximum debt limit per strategy via updateMaxDebtForStrategy()
+        MAX_DEBT_MANAGER,
+        /// @notice Can set deposit limits via setDepositLimit() and setDepositLimitModule()
+        DEPOSIT_LIMIT_MANAGER,
+        /// @notice Can set withdrawal limits via setWithdrawLimitModule()
+        WITHDRAW_LIMIT_MANAGER,
+        /// @notice Can set minimum idle reserves via setMinimumTotalIdle()
+        MINIMUM_IDLE_MANAGER,
+        /// @notice Can set profit unlock duration via setProfitMaxUnlockTime()
+        PROFIT_UNLOCK_MANAGER,
+        /// @notice Can purchase bad debt via buyDebt() in emergencies
+        DEBT_PURCHASER,
+        /// @notice Can permanently shutdown vault via shutdownVault()
+        EMERGENCY_MANAGER
     }
 
     /**
-     * @notice Type of change to a strategy.
+     * @notice Type of strategy modification
+     * @dev Used in StrategyChanged event
      */
     enum StrategyChangeType {
+        /// @notice Strategy was added to vault
         ADDED,
+        /// @notice Strategy was revoked from vault
         REVOKED
     }
 
     /**
-     * @notice Rounding direction for calculations.
+     * @notice Rounding direction for share/asset conversions
+     * @dev Determines rounding behavior in mathematical operations
+     *      ROUND_DOWN favors vault (deposits), ROUND_UP favors user (withdrawals)
      */
     enum Rounding {
+        /// @notice Round down (floor): Favors vault in conversions
         ROUND_DOWN,
         ROUND_UP
     }
@@ -146,8 +162,8 @@ interface IMultistrategyVault {
      * @notice Parameters for a strategy.
      * @param activation Timestamp when the strategy was added.
      * @param lastReport Timestamp of the strategies last report.
-     * @param currentDebt The current assets the strategy holds.
-     * @param maxDebt The max assets the strategy can hold.
+     * @param currentDebt The current assets the strategy holds
+     * @param maxDebt The max assets the strategy can hold
      */
     struct StrategyParams {
         uint256 activation;
@@ -185,12 +201,12 @@ interface IMultistrategyVault {
 
     /**
      * @notice State for a redeem operation.
-     * @param requestedAssets The requested assets to redeem.
+     * @param requestedAssets The requested assets to redeem
      * @param currentTotalIdle The current total idle of the vault.
      * @param currentTotalDebt The current total debt of the vault.
      * @param asset The asset of the vault.
      * @param withdrawalStrategies The strategies to withdraw from.
-     * @param assetsNeeded The assets needed to fulfill the redeem request.
+     * @param assetsNeeded The assets needed to fulfill the redeem request
      * @param previousBalance The previous balance of the vault.
      */
     struct RedeemState {
@@ -228,10 +244,10 @@ interface IMultistrategyVault {
 
     /**
      * @notice State for a withdrawal operation.
-     * @param requestedAssets The requested assets to withdraw.
+     * @param requestedAssets The requested assets to withdraw
      * @param currentTotalIdle The current total idle of the vault.
      * @param currentTotalDebt The current total debt of the vault.
-     * @param assetsNeeded The assets needed to fulfill the withdrawal request.
+     * @param assetsNeeded The assets needed to fulfill the withdrawal request
      * @param previousBalance The previous balance of the vault.
      */
     struct WithdrawalState {

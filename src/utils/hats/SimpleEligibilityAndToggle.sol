@@ -6,6 +6,8 @@ import { IHatsToggle } from "src/utils/hats/interfaces/IHatsToggle.sol";
 
 /**
  * @title SimpleEligibilityAndToggle
+ * @author [Golem Foundation](https://golem.foundation)
+ * @custom:security-contact security@golem.foundation
  * @notice A simple pass-through implementation of IHatsEligibility and IHatsToggle
  * @dev Always returns true for both eligibility and toggle checks
  */

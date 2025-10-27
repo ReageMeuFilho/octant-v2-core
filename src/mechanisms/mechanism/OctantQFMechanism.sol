@@ -8,17 +8,38 @@ import { AllocationConfig, TokenizedAllocationMechanism } from "src/mechanisms/B
 import { NotInAllowset, InBlockset } from "src/errors.sol";
 
 /// @title Octant Quadratic Funding Mechanism
-/// @notice Extends QuadraticVotingMechanism with access control for signups
-/// @dev Supports dual-mode access control (allowset/blockset) for contribution restrictions
+/// @author [Golem Foundation](https://golem.foundation)
+/// @custom:security-contact security@golem.foundation
+/// @notice Quadratic funding mechanism with configurable signup access control.
+/// @dev Extends `QuadraticVotingMechanism` and integrates allowset/blockset access modes
+///      to restrict who can register during contribution windows. Owner-only control via
+///      underlying `TokenizedAllocationMechanism` ownership checks.
 contract OctantQFMechanism is QuadraticVotingMechanism {
+    /// @notice Current access mode for signup eligibility (NONE, ALLOWSET, BLOCKSET)
     AccessMode public contributionAccessMode;
+    /// @notice Address set used when `contributionAccessMode == ALLOWSET`
     IAddressSet public contributionAllowset;
+    /// @notice Address set used when `contributionAccessMode == BLOCKSET`
     IAddressSet public contributionBlockset;
 
+    /// @notice Emitted when the allowset contract is assigned
+    /// @param allowset New allowset contract
     event ContributionAllowsetAssigned(IAddressSet indexed allowset);
+    /// @notice Emitted when the blockset contract is assigned
+    /// @param blockset New blockset contract
     event ContributionBlocksetAssigned(IAddressSet indexed blockset);
+    /// @notice Emitted when the contribution access mode is updated
+    /// @param mode New access mode (NONE, ALLOWSET, BLOCKSET)
     event AccessModeSet(AccessMode indexed mode);
 
+    /// @notice Construct a new OctantQF mechanism
+    /// @param _implementation Address of shared TokenizedAllocationMechanism implementation
+    /// @param _config Allocation configuration struct
+    /// @param _alphaNumerator Alpha numerator (dimensionless; 1.0 = denominator)
+    /// @param _alphaDenominator Alpha denominator (must be > 0)
+    /// @param _contributionAllowset Address set used in ALLOWSET mode
+    /// @param _contributionBlockset Address set used in BLOCKSET mode
+    /// @param _contributionAccessMode Initial access mode (NONE, ALLOWSET, BLOCKSET)
     constructor(
         address _implementation,
         AllocationConfig memory _config,
@@ -38,7 +59,7 @@ contract OctantQFMechanism is QuadraticVotingMechanism {
     }
 
     /// @notice Hook to validate user eligibility during signup
-    /// @param user The address attempting to register
+    /// @param user Address attempting to register
     /// @return True if registration should proceed
     /// @dev Reverts with specific error messages for unauthorized users
     function _beforeSignupHook(address user) internal view virtual override returns (bool) {
@@ -53,7 +74,7 @@ contract OctantQFMechanism is QuadraticVotingMechanism {
     }
 
     /// @dev Internal helper to check access control without reverting
-    /// @param user The address to check
+    /// @param user Address to check
     /// @return True if user passes access control checks, false otherwise
     function _isUserAuthorized(address user) internal view returns (bool) {
         if (contributionAccessMode == AccessMode.ALLOWSET) {
@@ -65,8 +86,9 @@ contract OctantQFMechanism is QuadraticVotingMechanism {
     }
 
     /// @notice Sets the contribution allowset (for ALLOWSET mode)
-    /// @param _allowset The new allowset contract
+    /// @param _allowset New allowset contract address
     /// @dev Non-retroactive. Existing voting power is not affected.
+    /// @custom:security Only owner via underlying mechanism ownership check
     function setContributionAllowset(IAddressSet _allowset) external {
         require(_tokenizedAllocation().owner() == msg.sender, "Only owner");
         contributionAllowset = _allowset;
@@ -74,8 +96,9 @@ contract OctantQFMechanism is QuadraticVotingMechanism {
     }
 
     /// @notice Sets the contribution blockset (for BLOCKSET mode)
-    /// @param _blockset The new blockset contract
+    /// @param _blockset New blockset contract address
     /// @dev Non-retroactive. Existing voting power is not affected.
+    /// @custom:security Only owner via underlying mechanism ownership check
     function setContributionBlockset(IAddressSet _blockset) external {
         require(_tokenizedAllocation().owner() == msg.sender, "Only owner");
         contributionBlockset = _blockset;
@@ -83,9 +106,10 @@ contract OctantQFMechanism is QuadraticVotingMechanism {
     }
 
     /// @notice Sets the contribution access mode
-    /// @param _mode The new access mode (NONE, ALLOWSET, or BLOCKSET)
+    /// @param _mode New access mode (NONE, ALLOWSET, or BLOCKSET)
     /// @dev Only allowed before voting starts or after tally finalization.
     ///      Non-retroactive. Existing voting power is not affected.
+    /// @custom:security Only owner via underlying mechanism; blocked during active voting
     function setAccessMode(AccessMode _mode) external {
         TokenizedAllocationMechanism tam = _tokenizedAllocation();
         require(tam.owner() == msg.sender, "Only owner");
@@ -109,8 +133,8 @@ contract OctantQFMechanism is QuadraticVotingMechanism {
     ///      NONE: always returns true
     ///      ALLOWSET: returns true if user is in contributionAllowset
     ///      BLOCKSET: returns true if user is NOT in contributionBlockset
-    /// @param user The address to check
-    /// @return bool True if user can signup, false otherwise
+    /// @param user Address to check
+    /// @return canSignup_ True if user can signup, false otherwise
     function canSignup(address user) external view returns (bool) {
         return _isUserAuthorized(user);
     }
