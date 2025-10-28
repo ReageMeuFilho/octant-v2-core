@@ -149,7 +149,7 @@ function deposit(uint256 assets, address receiver)
 
 **Original Golem Code**:
 ```solidity
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: AGPL-3.0
 
 /**
  * @title YourContract
@@ -172,7 +172,7 @@ function deposit(uint256 assets, address receiver)
 
 **Design-Inspired (Not Derivative)**:
 ```solidity
-// SPDX-License-Identifier: MIT  // ← Can use MIT
+// SPDX-License-Identifier: AGPL-3.0  // ← Use AGPL-3.0
 
 /**
  * @author [Golem Foundation](https://golem.foundation)
