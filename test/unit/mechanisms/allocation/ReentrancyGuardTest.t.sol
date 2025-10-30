@@ -195,7 +195,7 @@ contract ReentrancyGuardTest is Test {
         TokenizedAllocationMechanism(address(maliciousMechanism)).signup(1e18);
 
         // Verify the user was registered despite the reentrancy attempt
-        uint256 votingPower = TokenizedAllocationMechanism(address(maliciousMechanism)).getRemainingVotingPower(user);
+        uint256 votingPower = TokenizedAllocationMechanism(address(maliciousMechanism)).votingPower(user);
         assertGt(votingPower, 0, "User should have voting power after signup");
 
         // Verify subsequent operations work normally
@@ -203,7 +203,7 @@ contract ReentrancyGuardTest is Test {
         vm.prank(user2);
         TokenizedAllocationMechanism(address(maliciousMechanism)).signup(1e18);
 
-        uint256 votingPower2 = TokenizedAllocationMechanism(address(maliciousMechanism)).getRemainingVotingPower(user2);
+        uint256 votingPower2 = TokenizedAllocationMechanism(address(maliciousMechanism)).votingPower(user2);
         assertGt(votingPower2, 0, "Second user should also have voting power");
     }
 
@@ -294,7 +294,7 @@ contract ReentrancyStorageCollisionTest is Test {
         TokenizedAllocationMechanism(mechanismAddr).signup(1e18);
 
         // Verify the user was successfully registered
-        uint256 votingPower = TokenizedAllocationMechanism(mechanismAddr).getRemainingVotingPower(address(0x2));
+        uint256 votingPower = TokenizedAllocationMechanism(mechanismAddr).votingPower(address(0x2));
         assertGt(votingPower, 0, "User should have voting power after successful signup");
 
         // Verify that our reentrancy guard is working by testing normal operations continue to work
@@ -306,7 +306,7 @@ contract ReentrancyStorageCollisionTest is Test {
         vm.prank(address(0x3));
         TokenizedAllocationMechanism(mechanismAddr).signup(1e18);
 
-        uint256 votingPower2 = TokenizedAllocationMechanism(mechanismAddr).getRemainingVotingPower(address(0x3));
+        uint256 votingPower2 = TokenizedAllocationMechanism(mechanismAddr).votingPower(address(0x3));
         assertGt(votingPower2, 0, "Second user should also have voting power");
     }
 }

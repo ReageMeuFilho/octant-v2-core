@@ -1073,11 +1073,6 @@ contract TokenizedAllocationMechanism is IERC20 {
 
     // ---------- View Functions ----------
 
-    /// @notice Get remaining voting power for an address
-    function getRemainingVotingPower(address voter) external view returns (uint256) {
-        return _getStorage().votingPower[voter];
-    }
-
     /// @notice Get total number of proposals created
     function getProposalCount() external view returns (uint256) {
         return _getStorage().proposalIdCounter;
