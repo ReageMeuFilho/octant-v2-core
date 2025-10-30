@@ -603,12 +603,16 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         if (from == S.dragonRouter) {
             // Dragon sends shares: dragon loses debt obligation, users gain debt obligation
             require(YS.dragonRouterDebtInAssetValue >= transferAmount, "Insufficient dragon debt");
-            YS.dragonRouterDebtInAssetValue -= transferAmount;
+            unchecked {
+                YS.dragonRouterDebtInAssetValue -= transferAmount;
+            }
             YS.totalDebtOwedToUserInAssetValue += transferAmount;
         } else if (to == S.dragonRouter) {
             // User sends shares to dragon: users lose debt obligation, dragon gains debt obligation
             require(YS.totalDebtOwedToUserInAssetValue >= transferAmount, "Insufficient user debt");
-            YS.totalDebtOwedToUserInAssetValue -= transferAmount;
+            unchecked {
+                YS.totalDebtOwedToUserInAssetValue -= transferAmount;
+            }
             YS.dragonRouterDebtInAssetValue += transferAmount;
         }
     }
