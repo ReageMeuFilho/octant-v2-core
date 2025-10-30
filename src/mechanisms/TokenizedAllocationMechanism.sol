@@ -379,8 +379,6 @@ contract TokenizedAllocationMechanism is IERC20 {
         address keeper;
         /// @notice Management address authorized to update configuration
         address management;
-        /// @notice Address with emergency privileges equal to management
-        address emergencyAdmin;
         /// @notice Decimals used by asset and this shares token
         uint8 decimals;
         // Mappings
@@ -447,10 +445,6 @@ contract TokenizedAllocationMechanism is IERC20 {
     /// @param previousManagement Old management address
     /// @param newManagement New management address
     event ManagementUpdated(address indexed previousManagement, address indexed newManagement);
-    /// @notice Emitted when emergency admin is updated
-    /// @param previousEmergencyAdmin Old emergency admin address
-    /// @param newEmergencyAdmin New emergency admin address
-    event EmergencyAdminUpdated(address indexed previousEmergencyAdmin, address indexed newEmergencyAdmin);
     /// @notice Emitted when contract is paused/unpaused
     /// @param paused True if paused, false if unpaused
     event PausedStatusChanged(bool paused);
@@ -641,7 +635,6 @@ contract TokenizedAllocationMechanism is IERC20 {
         // Set management roles to owner
         s.management = _owner;
         s.keeper = _owner;
-        s.emergencyAdmin = _owner;
         s.decimals = ERC20(address(_asset)).decimals();
 
         // Initialize EIP712 domain separator
@@ -1247,15 +1240,6 @@ contract TokenizedAllocationMechanism is IERC20 {
         emit ManagementUpdated(oldManagement, newManagement);
     }
 
-    /// @notice Update emergency admin address
-    function setEmergencyAdmin(address newEmergencyAdmin) external onlyOwner {
-        if (newEmergencyAdmin == address(0)) revert Unauthorized();
-        AllocationStorage storage s = _getStorage();
-        address oldEmergencyAdmin = s.emergencyAdmin;
-        s.emergencyAdmin = newEmergencyAdmin;
-        emit EmergencyAdminUpdated(oldEmergencyAdmin, newEmergencyAdmin);
-    }
-
     /// @notice Emergency pause all operations
     function pause() external onlyOwner {
         AllocationStorage storage s = _getStorage();
@@ -1426,11 +1410,6 @@ contract TokenizedAllocationMechanism is IERC20 {
     /// @notice Returns the keeper address
     function keeper() external view returns (address) {
         return _getStorage().keeper;
-    }
-
-    /// @notice Returns the emergency admin address
-    function emergencyAdmin() external view returns (address) {
-        return _getStorage().emergencyAdmin;
     }
 
     /// @notice Returns the decimals used for the token (always 18)
