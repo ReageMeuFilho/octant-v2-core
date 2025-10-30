@@ -84,7 +84,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         // Checking max deposit will also check if shutdown.
         require(assets <= _maxDeposit(S, receiver), "ERC4626: deposit more than max");
 
-        // Issue shares based on value (1 share = 1 ETH value, expect in case of uncovered loss)
+        // Issue shares based on value (1 share = 1 ETH value, except in case of uncovered loss)
         shares = assets.mulDiv(currentRate, WadRayMath.RAY);
         require(shares != 0, "ZERO_SHARES");
 
@@ -102,7 +102,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
      * @dev Implements insolvency protection and tracks ETH value debt
      * @param shares Amount of shares to mint
      * @param receiver Address to receive the shares
-     * @return assets Amount of assets deposited in asset base units (1 share = 1 ETH value, expect in case of uncovered loss)
+     * @return assets Amount of assets deposited in asset base units (1 share = 1 ETH value, except in case of uncovered loss)
      */
     function mint(uint256 shares, address receiver) external override nonReentrant returns (uint256 assets) {
         // Block mints during vault insolvency
@@ -122,7 +122,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         // Checking max mint will also check if shutdown
         require(shares <= _maxMint(S, receiver), "ERC4626: mint more than max");
 
-        // Calculate assets needed based on value (1 share = 1 ETH value, expect in case of uncovered loss)
+        // Calculate assets needed based on value (1 share = 1 ETH value, except in case of uncovered loss)
         assets = shares.mulDiv(WadRayMath.RAY, currentRate, Math.Rounding.Ceil);
         require(assets != 0, "ZERO_ASSETS");
 
@@ -149,7 +149,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
 
     /**
      * @notice Redeem shares from the strategy with value debt tracking
-     * @dev Shares represent ETH value (1 share = 1 ETH value, expect in case of uncovered loss)
+     * @dev Shares represent ETH value (1 share = 1 ETH value, except in case of uncovered loss)
      * @param shares Amount of shares to redeem
      * @param receiver Address to receive the assets
      * @param owner Address whose shares are being redeemed
@@ -169,7 +169,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         _requireDragonSolvency(owner);
 
         // Calculate actual value returned for debt tracking (before redemption)
-        uint256 valueToReturn = shares; // 1 share = 1 ETH value, expect in case of uncovered loss (regardless of actual assets received)
+        uint256 valueToReturn = shares; // 1 share = 1 ETH value, except in case of uncovered loss (regardless of actual assets received)
 
         // Validate inputs and check limits (replaces super.redeem validation)
         require(shares <= _maxRedeem(S, owner), "ERC4626: redeem more than max");
@@ -225,7 +225,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
         require((shares = _convertToShares(S, assets, Math.Rounding.Ceil)) != 0, "ZERO_SHARES");
 
         // Calculate actual value returned for debt tracking (before withdrawal)
-        uint256 valueToReturn = shares; // 1 share = 1 ETH value, expect in case of uncovered loss
+        uint256 valueToReturn = shares; // 1 share = 1 ETH value, except in case of uncovered loss
         _withdraw(S, receiver, owner, assets, shares, maxLoss);
 
         // Update value debt after successful withdrawal (only for users)
@@ -454,7 +454,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
             // Yield captured! Mint profit shares to dragon
             uint256 profitValue = currentValue - YS.totalDebtOwedToUserInAssetValue - YS.dragonRouterDebtInAssetValue;
 
-            uint256 profitShares = profitValue; // 1 share = 1 ETH value, expect in case of uncovered loss
+            uint256 profitShares = profitValue; // 1 share = 1 ETH value, except in case of uncovered loss
 
             // Convert profit value to assets for reporting
             profit = profitValue.mulDiv(WadRayMath.RAY, currentRate);
@@ -528,7 +528,7 @@ contract YieldSkimmingTokenizedStrategy is TokenizedStrategy {
      * @param S Strategy storage
      * @param assets Amount of assets to convert
      * @param rounding Rounding mode for division
-     * @return Amount of shares equivalent in value (1 share = 1 ETH value, expect in case of uncovered loss)
+     * @return Amount of shares equivalent in value (1 share = 1 ETH value, except in case of uncovered loss)
      */
     function _convertToShares(
         StrategyData storage S,
