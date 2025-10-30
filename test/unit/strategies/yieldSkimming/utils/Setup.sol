@@ -44,7 +44,8 @@ contract Setup is Test {
     uint256 public minFuzzAmount = 10_000;
     uint256 public profitMaxUnlockTime = 10 days;
 
-    bytes32 public constant BASE_STRATEGY_STORAGE = bytes32(uint256(keccak256("octant.base.strategy.storage")) - 1);
+    bytes32 public constant BASE_STRATEGY_STORAGE =
+        bytes32(uint256(keccak256("octant.tokenized.strategy.storage")) - 1);
 
     function setUp() public virtual {
         // Deploy the mock factory first for deterministic location

@@ -231,7 +231,7 @@ contract RegenERC1271IntegrationTest is Test {
         assertEq(contributedAmount, contributionAmount, "Should have contributed requested amount");
 
         // Verify contract signer received voting power
-        uint256 votingPower = TokenizedAllocationMechanism(address(allocationMechanism)).getRemainingVotingPower(
+        uint256 votingPower = TokenizedAllocationMechanism(address(allocationMechanism)).votingPower(
             address(contractSigner)
         );
         assertGt(votingPower, 0, "Contract signer should have voting power");
@@ -291,8 +291,9 @@ contract RegenERC1271IntegrationTest is Test {
         );
 
         // Verify vote was cast
-        uint256 remainingVotingPower = TokenizedAllocationMechanism(address(allocationMechanism))
-            .getRemainingVotingPower(address(contractSigner));
+        uint256 remainingVotingPower = TokenizedAllocationMechanism(address(allocationMechanism)).votingPower(
+            address(contractSigner)
+        );
         assertLt(remainingVotingPower, votingPower, "Voting power should have decreased after voting");
     }
 
@@ -357,7 +358,7 @@ contract RegenERC1271IntegrationTest is Test {
         // Verify contribution was successful
         assertEq(contributedAmount, contributionAmount, "EOA should still be able to contribute");
         assertGt(
-            TokenizedAllocationMechanism(address(allocationMechanism)).getRemainingVotingPower(user),
+            TokenizedAllocationMechanism(address(allocationMechanism)).votingPower(user),
             0,
             "EOA should have voting power"
         );

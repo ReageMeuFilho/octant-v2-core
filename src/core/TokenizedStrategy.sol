@@ -475,17 +475,17 @@ abstract contract TokenizedStrategy {
     ///      - Strategy contracts delegatecall to this implementation
     ///      - Delegatecall executes in the context of the calling contract's storage
     ///      - Without a custom slot, storage variables would collide
-    ///      - This slot is deterministically generated from "octant.base.strategy.storage"
+    ///      - This slot is deterministically generated from "octant.tokenized.strategy.storage"
     ///
     ///      CALCULATION (ERC-7201):
-    ///      keccak256(abi.encode(uint256(keccak256("octant.base.strategy.storage")) - 1)) & ~bytes32(uint256(0xff))
+    ///      keccak256(abi.encode(uint256(keccak256("octant.tokenized.strategy.storage")) - 1)) & ~bytes32(uint256(0xff))
     ///      See: https://eips.ethereum.org/EIPS/eip-7201
     ///
     ///      SAFETY:
     ///      Strategists can use any storage in their strategy contract without
     ///      worrying about colliding with TokenizedStrategy's storage
     bytes32 internal constant BASE_STRATEGY_STORAGE =
-        keccak256(abi.encode(uint256(keccak256("octant.base.strategy.storage")) - 1)) & ~bytes32(uint256(0xff));
+        keccak256(abi.encode(uint256(keccak256("octant.tokenized.strategy.storage")) - 1)) & ~bytes32(uint256(0xff));
 
     /*//////////////////////////////////////////////////////////////
                             STORAGE GETTER

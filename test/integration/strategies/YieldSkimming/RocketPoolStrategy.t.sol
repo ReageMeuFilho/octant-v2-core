@@ -1107,7 +1107,7 @@ contract RocketPoolStrategyTest is Test {
         // 1. Total vault value (in ETH terms) = 250e18 rETH × 1.5 rate = 375e18 ETH
         // 2. Total user debt (what we owe) = 325e18 shares × 1 ETH/share = 325e18 ETH
         // 3. Excess value = 375e18 - 325e18 = 50e18 ETH
-        // 4. Dragon shares minted = 50e18 (1 share = 1 ETH value)
+        // 4. Dragon shares minted = 50e18 (1 share = 1 ETH value, except in case of uncovered loss)
         // 5. Profit reported = 50e18 ETH ÷ 1.5 rate = 33.333e18 rETH
         assertEq(data.profit1, 33333333333333333333, "Should report 33.333e18 profit");
         assertEq(data.loss1, 0, "Should report no loss in first report");
@@ -1693,7 +1693,7 @@ contract RocketPoolStrategyTest is Test {
         state.totalAssets = vault.totalAssets();
         state.totalSupply = vault.totalSupply();
         state.exchangeRate = IYieldSkimmingStrategy(address(strategy)).getCurrentExchangeRate();
-        state.userDebt = YieldSkimmingTokenizedStrategy(address(vault)).getTotalUserDebtInAssetValue();
+        state.userDebt = YieldSkimmingTokenizedStrategy(address(vault)).gettotalDebtOwedToUserInAssetValue();
         state.dragonDebt = YieldSkimmingTokenizedStrategy(address(vault)).getDragonRouterDebtInAssetValue();
         state.dragonShares = vault.balanceOf(donationAddress);
         state.isInsolvent = YieldSkimmingTokenizedStrategy(address(vault)).isVaultInsolvent();
@@ -1986,7 +1986,7 @@ contract RocketPoolStrategyTest is Test {
         vm.stopPrank();
         
         // Calculate expected shares based on conversion rate
-        // In YieldSkimming, initially 1 share = 1 ETH value
+        // In YieldSkimming, initially 1 share = 1 ETH value, except in case of uncovered loss
         // Exchange rate is in WAD (18 decimals), so shares = assets * exchangeRate / WAD
         uint256 expectedInitialShares = depositAmount * initialExchangeRate / 1e18;
         uint256 aliceInitialShares = vault.balanceOf(alice);
@@ -2048,7 +2048,7 @@ contract RocketPoolStrategyTest is Test {
         // Store initial state for comparison
         uint256 initialTotalAssets = vault.totalAssets();
         uint256 initialTotalSupply = vault.totalSupply();
-        uint256 initialUserDebt = YieldSkimmingTokenizedStrategy(address(vault)).getTotalUserDebtInAssetValue();
+        uint256 initialUserDebt = YieldSkimmingTokenizedStrategy(address(vault)).gettotalDebtOwedToUserInAssetValue();
         uint256 initialDragonDebt = YieldSkimmingTokenizedStrategy(address(vault)).getDragonRouterDebtInAssetValue();
         
         console.log("\n=== Initial State ===");
@@ -2071,7 +2071,7 @@ contract RocketPoolStrategyTest is Test {
         state.aliceSharesAfterRedeem1 = vault.balanceOf(alice);
         state.totalAssetsAfterRedeem1 = vault.totalAssets();
         state.totalSupplyAfterRedeem1 = vault.totalSupply();
-        state.userDebtAfterRedeem1 = YieldSkimmingTokenizedStrategy(address(vault)).getTotalUserDebtInAssetValue();
+        state.userDebtAfterRedeem1 = YieldSkimmingTokenizedStrategy(address(vault)).gettotalDebtOwedToUserInAssetValue();
         
         // Verify against preview
         assertEq(state.assetsReceived1, expectedAssetsFromRedeem, "Simple redeem should match previewRedeem");
@@ -2094,7 +2094,7 @@ contract RocketPoolStrategyTest is Test {
         state.aliceSharesAfterRedeem2 = vault.balanceOf(alice);
         state.totalAssetsAfterRedeem2 = vault.totalAssets();
         state.totalSupplyAfterRedeem2 = vault.totalSupply();
-        state.userDebtAfterRedeem2 = YieldSkimmingTokenizedStrategy(address(vault)).getTotalUserDebtInAssetValue();
+        state.userDebtAfterRedeem2 = YieldSkimmingTokenizedStrategy(address(vault)).gettotalDebtOwedToUserInAssetValue();
         
         // Verify both redeem variants produce identical results
         assertEq(state.assetsReceived1, state.assetsReceived2, "Both redeem variants should return same assets");
@@ -2132,7 +2132,7 @@ contract RocketPoolStrategyTest is Test {
         state.aliceSharesAfterWithdraw4 = vault.balanceOf(alice);
         state.totalAssetsAfterWithdraw4 = vault.totalAssets();
         state.totalSupplyAfterWithdraw4 = vault.totalSupply();
-        state.userDebtAfterWithdraw4 = YieldSkimmingTokenizedStrategy(address(vault)).getTotalUserDebtInAssetValue();
+        state.userDebtAfterWithdraw4 = YieldSkimmingTokenizedStrategy(address(vault)).gettotalDebtOwedToUserInAssetValue();
         
         // Verify against preview
         assertEq(state.sharesBurned4, expectedSharesFromWithdraw, "Withdraw should burn expected shares from previewWithdraw");

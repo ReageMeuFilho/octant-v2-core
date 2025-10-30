@@ -159,15 +159,11 @@ contract RegenStakerBaseVotingPowerAssignmentTest is Test {
         assertEq(contributed, CONTRIBUTION_AMOUNT, "Contribution amount mismatch");
 
         // CRITICAL ASSERTION: Owner gets the voting power
-        uint256 ownerVotingPower = TokenizedAllocationMechanism(address(allocationMechanism)).getRemainingVotingPower(
-            owner
-        );
+        uint256 ownerVotingPower = TokenizedAllocationMechanism(address(allocationMechanism)).votingPower(owner);
         assertEq(ownerVotingPower, CONTRIBUTION_AMOUNT, "Owner should have voting power equal to contribution");
 
         // CRITICAL ASSERTION: Claimer has NO voting power
-        uint256 claimerVotingPower = TokenizedAllocationMechanism(address(allocationMechanism)).getRemainingVotingPower(
-            claimer
-        );
+        uint256 claimerVotingPower = TokenizedAllocationMechanism(address(allocationMechanism)).votingPower(claimer);
         assertEq(claimerVotingPower, 0, "Claimer should have no voting power when owner contributes");
     }
 
@@ -207,15 +203,11 @@ contract RegenStakerBaseVotingPowerAssignmentTest is Test {
         assertEq(contributed, CONTRIBUTION_AMOUNT, "Contribution amount mismatch");
 
         // CRITICAL ASSERTION: Claimer gets the voting power (contributor principle)
-        uint256 claimerVotingPower = TokenizedAllocationMechanism(address(allocationMechanism)).getRemainingVotingPower(
-            claimer
-        );
+        uint256 claimerVotingPower = TokenizedAllocationMechanism(address(allocationMechanism)).votingPower(claimer);
         assertEq(claimerVotingPower, CONTRIBUTION_AMOUNT, "Claimer should have voting power as contributor");
 
         // CRITICAL ASSERTION: Owner has NO voting power
-        uint256 ownerVotingPower = TokenizedAllocationMechanism(address(allocationMechanism)).getRemainingVotingPower(
-            owner
-        );
+        uint256 ownerVotingPower = TokenizedAllocationMechanism(address(allocationMechanism)).votingPower(owner);
         assertEq(ownerVotingPower, 0, "Owner should have no voting power when claimer contributes");
     }
 
@@ -231,12 +223,8 @@ contract RegenStakerBaseVotingPowerAssignmentTest is Test {
         _contributeAsClaimer(halfContribution);
 
         // CRITICAL ASSERTION: Each contributor gets their own voting power
-        uint256 ownerVotingPower = TokenizedAllocationMechanism(address(allocationMechanism)).getRemainingVotingPower(
-            owner
-        );
-        uint256 claimerVotingPower = TokenizedAllocationMechanism(address(allocationMechanism)).getRemainingVotingPower(
-            claimer
-        );
+        uint256 ownerVotingPower = TokenizedAllocationMechanism(address(allocationMechanism)).votingPower(owner);
+        uint256 claimerVotingPower = TokenizedAllocationMechanism(address(allocationMechanism)).votingPower(claimer);
 
         assertEq(ownerVotingPower, halfContribution, "Owner gets voting power from own contribution");
         assertEq(claimerVotingPower, halfContribution, "Claimer gets voting power from own contribution");
@@ -319,9 +307,7 @@ contract RegenStakerBaseVotingPowerAssignmentTest is Test {
         regenStaker.contribute(depositId, address(allocationMechanism), CONTRIBUTION_AMOUNT, deadline, v, r, s);
 
         // Verify no voting power was assigned
-        uint256 ownerVotingPower = TokenizedAllocationMechanism(address(allocationMechanism)).getRemainingVotingPower(
-            owner
-        );
+        uint256 ownerVotingPower = TokenizedAllocationMechanism(address(allocationMechanism)).votingPower(owner);
         assertEq(ownerVotingPower, 0, "Owner should have no voting power after failed contribution");
     }
 }

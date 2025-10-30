@@ -55,7 +55,7 @@ contract YieldSkimmingHealthCheckLogic is BaseYieldSkimmingHealthCheck {
         return exchangeRateDecimalsStored;
     }
 
-    function getTotalUserDebtInAssetValue() external view returns (uint256) {
+    function gettotalDebtOwedToUserInAssetValue() external view returns (uint256) {
         return totalUserDebtStored;
     }
 

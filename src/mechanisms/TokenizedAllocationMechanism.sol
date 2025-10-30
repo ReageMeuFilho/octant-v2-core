@@ -117,7 +117,7 @@ interface IBaseAllocationStrategy {
  * @custom:security State machine enforces proper proposal progression
  * @custom:security Timelock provides security delay before fund distribution
  */
-contract TokenizedAllocationMechanism {
+contract TokenizedAllocationMechanism is IERC20 {
     using SafeERC20 for IERC20;
     using SafeERC20 for ERC20;
     using Math for uint256;
@@ -379,8 +379,6 @@ contract TokenizedAllocationMechanism {
         address keeper;
         /// @notice Management address authorized to update configuration
         address management;
-        /// @notice Address with emergency privileges equal to management
-        address emergencyAdmin;
         /// @notice Decimals used by asset and this shares token
         uint8 decimals;
         // Mappings
@@ -447,10 +445,6 @@ contract TokenizedAllocationMechanism {
     /// @param previousManagement Old management address
     /// @param newManagement New management address
     event ManagementUpdated(address indexed previousManagement, address indexed newManagement);
-    /// @notice Emitted when emergency admin is updated
-    /// @param previousEmergencyAdmin Old emergency admin address
-    /// @param newEmergencyAdmin New emergency admin address
-    event EmergencyAdminUpdated(address indexed previousEmergencyAdmin, address indexed newEmergencyAdmin);
     /// @notice Emitted when contract is paused/unpaused
     /// @param paused True if paused, false if unpaused
     event PausedStatusChanged(bool paused);
@@ -465,17 +459,6 @@ contract TokenizedAllocationMechanism {
     event Swept(address indexed token, address indexed receiver, uint256 amount);
 
     // Additional events from DistributionMechanism
-    /// @notice Emitted when the allowance of a `spender` for an `owner` is set by a call to {approve}
-    /// @param owner Token owner address
-    /// @param spender Address approved to spend on behalf of owner
-    /// @param value New allowance amount (shares, 18 decimals)
-    event Approval(address indexed owner, address indexed spender, uint256 value);
-    /// @notice Emitted when shares are transferred
-    /// @param from Sender address
-    /// @param to Receiver address
-    /// @param value Amount transferred (shares, 18 decimals)
-    event Transfer(address indexed from, address indexed to, uint256 value);
-    /// @notice Emitted when shares are redeemed for underlying assets
     /// @param caller Address initiating the redemption
     /// @param receiver Address receiving the underlying assets
     /// @param owner Owner of the shares being redeemed
@@ -652,7 +635,6 @@ contract TokenizedAllocationMechanism {
         // Set management roles to owner
         s.management = _owner;
         s.keeper = _owner;
-        s.emergencyAdmin = _owner;
         s.decimals = ERC20(address(_asset)).decimals();
 
         // Initialize EIP712 domain separator
@@ -1091,11 +1073,6 @@ contract TokenizedAllocationMechanism {
 
     // ---------- View Functions ----------
 
-    /// @notice Get remaining voting power for an address
-    function getRemainingVotingPower(address voter) external view returns (uint256) {
-        return _getStorage().votingPower[voter];
-    }
-
     /// @notice Get total number of proposals created
     function getProposalCount() external view returns (uint256) {
         return _getStorage().proposalIdCounter;
@@ -1256,15 +1233,6 @@ contract TokenizedAllocationMechanism {
         address oldManagement = s.management;
         s.management = newManagement;
         emit ManagementUpdated(oldManagement, newManagement);
-    }
-
-    /// @notice Update emergency admin address
-    function setEmergencyAdmin(address newEmergencyAdmin) external onlyOwner {
-        if (newEmergencyAdmin == address(0)) revert Unauthorized();
-        AllocationStorage storage s = _getStorage();
-        address oldEmergencyAdmin = s.emergencyAdmin;
-        s.emergencyAdmin = newEmergencyAdmin;
-        emit EmergencyAdminUpdated(oldEmergencyAdmin, newEmergencyAdmin);
     }
 
     /// @notice Emergency pause all operations
@@ -1437,11 +1405,6 @@ contract TokenizedAllocationMechanism {
     /// @notice Returns the keeper address
     function keeper() external view returns (address) {
         return _getStorage().keeper;
-    }
-
-    /// @notice Returns the emergency admin address
-    function emergencyAdmin() external view returns (address) {
-        return _getStorage().emergencyAdmin;
     }
 
     /// @notice Returns the decimals used for the token (always 18)

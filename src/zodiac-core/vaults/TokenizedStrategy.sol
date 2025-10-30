@@ -69,7 +69,8 @@ abstract contract TokenizedStrategy is ITokenizedStrategy {
      * @dev Custom storage slot for StrategyData struct (EIP-1967-style deterministic slot)
      * @dev Updates delegatecall to this slot in the calling contract's storage
      */
-    bytes32 internal constant BASE_STRATEGY_STORAGE = bytes32(uint256(keccak256("octant.base.strategy.storage")) - 1);
+    bytes32 internal constant BASE_STRATEGY_STORAGE =
+        bytes32(uint256(keccak256("octant.tokenized.strategy.storage")) - 1);
 
     /*//////////////////////////////////////////////////////////////
                             MODIFIERS
