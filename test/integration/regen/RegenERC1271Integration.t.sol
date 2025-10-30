@@ -291,8 +291,9 @@ contract RegenERC1271IntegrationTest is Test {
         );
 
         // Verify vote was cast
-        uint256 remainingVotingPower = TokenizedAllocationMechanism(address(allocationMechanism))
-            .votingPower(address(contractSigner));
+        uint256 remainingVotingPower = TokenizedAllocationMechanism(address(allocationMechanism)).votingPower(
+            address(contractSigner)
+        );
         assertLt(remainingVotingPower, votingPower, "Voting power should have decreased after voting");
     }
 
