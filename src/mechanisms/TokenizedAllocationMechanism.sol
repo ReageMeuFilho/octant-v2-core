@@ -117,7 +117,7 @@ interface IBaseAllocationStrategy {
  * @custom:security State machine enforces proper proposal progression
  * @custom:security Timelock provides security delay before fund distribution
  */
-contract TokenizedAllocationMechanism {
+contract TokenizedAllocationMechanism is IERC20 {
     using SafeERC20 for IERC20;
     using SafeERC20 for ERC20;
     using Math for uint256;
@@ -465,17 +465,6 @@ contract TokenizedAllocationMechanism {
     event Swept(address indexed token, address indexed receiver, uint256 amount);
 
     // Additional events from DistributionMechanism
-    /// @notice Emitted when the allowance of a `spender` for an `owner` is set by a call to {approve}
-    /// @param owner Token owner address
-    /// @param spender Address approved to spend on behalf of owner
-    /// @param value New allowance amount (shares, 18 decimals)
-    event Approval(address indexed owner, address indexed spender, uint256 value);
-    /// @notice Emitted when shares are transferred
-    /// @param from Sender address
-    /// @param to Receiver address
-    /// @param value Amount transferred (shares, 18 decimals)
-    event Transfer(address indexed from, address indexed to, uint256 value);
-    /// @notice Emitted when shares are redeemed for underlying assets
     /// @param caller Address initiating the redemption
     /// @param receiver Address receiving the underlying assets
     /// @param owner Owner of the shares being redeemed
