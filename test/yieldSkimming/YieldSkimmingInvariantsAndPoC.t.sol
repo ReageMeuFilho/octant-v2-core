@@ -166,7 +166,7 @@ contract YieldSkimmingInvariantSuite is StdInvariant, Setup {
      */
     function _getTrackedObligationsValue() internal view returns (uint256) {
         IYieldSkimmingStrategy ys = IYieldSkimmingStrategy(address(strategy));
-        return ys.getTotalUserDebtInAssetValue() + ys.getDragonRouterDebtInAssetValue();
+        return ys.gettotalDebtOwedToUserInAssetValue() + ys.getDragonRouterDebtInAssetValue();
     }
 
     /**
@@ -269,7 +269,7 @@ contract YieldSkimmingExploitPoC is Setup {
         assertEq(strategy.totalSupply(), 50e18, "post-burn supply is 50");
 
         // POST-FIX EXPECTATION: user debt remains 50e18 (not zero)
-        uint256 userDebtPost = IYieldSkimmingStrategy(address(strategy)).getTotalUserDebtInAssetValue();
+        uint256 userDebtPost = IYieldSkimmingStrategy(address(strategy)).gettotalDebtOwedToUserInAssetValue();
         assertEq(userDebtPost, 50e18, "POST-FIX: userDebt must not reset to 0");
 
         // 5) No fabricated profit on next report
@@ -309,7 +309,7 @@ contract YieldSkimmingExploitPoC is Setup {
         assertEq(strategy.totalSupply(), 50e18, "post-burn supply is 50");
 
         // POST-FIX EXPECTATION: user debt remains 50e18 (not zero)
-        uint256 userDebtPost = IYieldSkimmingStrategy(address(strategy)).getTotalUserDebtInAssetValue();
+        uint256 userDebtPost = IYieldSkimmingStrategy(address(strategy)).gettotalDebtOwedToUserInAssetValue();
         assertEq(userDebtPost, 50e18, "POST-FIX: withdraw path preserves debt");
 
         // 5) No fabricated profit on next report

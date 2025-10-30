@@ -42,7 +42,7 @@ interface IYieldSkimmingStrategy {
      * @dev Units: value-shares where 1 share = 1 unit of asset value
      * @return userDebtInAssetValue Users’ combined value debt
      */
-    function getTotalUserDebtInAssetValue() external view returns (uint256 userDebtInAssetValue);
+    function gettotalDebtOwedToUserInAssetValue() external view returns (uint256 userDebtInAssetValue);
 
     /**
      * @notice Total ETH-value debt owed to dragon router
