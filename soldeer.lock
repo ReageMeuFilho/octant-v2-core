@@ -1,0 +1,100 @@
+[[dependencies]]
+name = "@openzeppelin-contracts"
+version = "5.3.0"
+git = "https://github.com/OpenZeppelin/openzeppelin-contracts"
+rev = "e4f70216d759d8e6a64144a9e1f7bbeed78e7079"
+
+[[dependencies]]
+name = "@openzeppelin-contracts-upgradeable"
+version = "5.3.0"
+git = "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable"
+rev = "60b305a8f3ff0c7688f02ac470417b6bbf1c4d27"
+
+[[dependencies]]
+name = "abdk-libraries-solidity"
+version = "3.2"
+git = "https://github.com/abdk-consulting/abdk-libraries-solidity"
+rev = "5e1e7c11b35f8313d3f7ce11c1b86320d7c0b554"
+
+[[dependencies]]
+name = "erc4626-tests"
+version = "0.0.0"
+git = "https://github.com/a16z/erc4626-tests"
+rev = "232ff9ba8194e406967f52ecc5cb52ed764209e9"
+
+[[dependencies]]
+name = "forge-std"
+version = "1.9.7"
+url = "https://soldeer-revisions.s3.amazonaws.com/forge-std/1_9_7_28-04-2025_15:55:08_forge-std-1.9.zip"
+checksum = "8d9e0a885fa8ee6429a4d344aeb6799119f6a94c7c4fe6f188df79b0dce294ba"
+integrity = "9e60fdba82bc374df80db7f2951faff6467b9091873004a3d314cf0c084b3c7d"
+
+[[dependencies]]
+name = "gnosisguild-zodiac"
+version = "4.1.1"
+url = "https://soldeer-revisions.s3.amazonaws.com/gnosisguild-zodiac/4_1_1_09-04-2025_08:22:21_gnosisguild-zodiac-4.1.zip"
+checksum = "2dd7afecc00cf9a3726a5c49186cb56b2d747a521c8eaa8ec4c5caa2c9ef3946"
+integrity = "75b8ae4192d22cbd83ced3faef669c2b0ec6bb70da521ee785cd3c44e9b90c7e"
+
+[[dependencies]]
+name = "hats-protocol"
+version = "1.0"
+git = "https://github.com/hats-protocol/hats-protocol"
+rev = "9d1275f29d390344e81d0e0561f868ab6b0e1257"
+
+[[dependencies]]
+name = "kontrol-cheatcodes"
+version = "v0.0.1"
+url = "https://soldeer-revisions.s3.amazonaws.com/kontrol-cheatcodes/v0_0_1_09-10-2024_14:58:17_src.zip"
+checksum = "d922504d621d8f04011bcb7f963394616916fbf56247b1f9fec84b274d2f6d23"
+integrity = "62e433b52a322dc7d9eba1b75b5dda15d922bb22bd4d9a362b534bb76d286936"
+
+[[dependencies]]
+name = "safe-global-safe-smart-account"
+version = "1.4.1-3"
+url = "https://soldeer-revisions.s3.amazonaws.com/safe-global-safe-smart-account/1_4_1-3_04-10-2024_19:23:24_safe-global-safe-smart-account-1.4.zip"
+checksum = "c1a19ae2fbc8448d24b1f561f7f93072edf0b628b6acfc46369043131fd4ba93"
+integrity = "036adada50297472c6d8361056a7c8617f28013cb1989b37b389184cd3ca5336"
+
+[[dependencies]]
+name = "solady"
+version = "0.1.21"
+git = "https://github.com/vectorized/solady"
+rev = "6da40ac63da5657d6c4d3ce3e3a99bc5862dda53"
+
+[[dependencies]]
+name = "solbase"
+version = "0.0.0"
+git = "https://github.com/sol-dao/solbase"
+rev = "e12d00b9ff196667e3199d61971907510948583b"
+
+[[dependencies]]
+name = "solmate"
+version = "6.8.0"
+url = "https://soldeer-revisions.s3.amazonaws.com/solmate/6_8_0_29-10-2024_19:01:45_solmate.zip"
+checksum = "e3ec0f0182cb3bbedecf8a0bcc39897266534a795ec732b2b03dafa285d78a5b"
+integrity = "a22e5a352de0231f671ee8adf5667bbe83c50012670083987bd1099a69feb429"
+
+[[dependencies]]
+name = "staker"
+version = "1.0.1"
+git = "https://github.com/withtally/staker"
+rev = "b5b6f98daf53cf1d678ab3cc219223890b5cda3b"
+
+[[dependencies]]
+name = "surl"
+version = "0.0.0"
+git = "https://github.com/memester-xyz/surl"
+rev = "5f92a5260c8e0198ca3ee6a16255d6cda4e0887a"
+
+[[dependencies]]
+name = "tokenized-strategy"
+version = "3.0.4"
+git = "https://github.com/yearn/tokenized-strategy"
+rev = "82806289f967590c4efbf6bc3d237e4e7f0a0966"
+
+[[dependencies]]
+name = "tokenized-strategy-periphery"
+version = "3.0.2"
+git = "https://github.com/yearn/tokenized-strategy-periphery"
+rev = "d732e918b208a9b2c33c71ea0ea9e8eb880cfc6e"

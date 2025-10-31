@@ -1,0 +1,70 @@
+[build.default]
+foundry-project-root       = '.'
+regen                      = true
+rekompile                  = true
+verbose                    = false
+debug                      = false
+require                    = 'test/kontrol/octant-lemmas.k'
+module-import              = 'YearnPolygonUsdcStrategyTest:OCTANT-LEMMAS'
+auxiliary-lemmas           = true
+
+[prove.default]
+foundry-project-root       = '.'
+schedule                   = 'CANCUN'
+verbose                    = false
+debug                      = false
+max-depth                  = 100000
+max-iterations             = 10000
+reinit                     = false
+cse                        = false
+workers                    = 1
+max-frontier-parallel      = 6
+maintenance-rate           = 128
+assume-defined             = false
+no-log-succ-rewrites       = true
+no-stack-checks            = true
+optimize-kcfg              = true
+kore-rpc-command           = 'kore-rpc-booster --no-post-exec-simplify --equation-max-recursion 20 --equation-max-iterations 1000 --fallback-on Aborted'
+failure-information        = true
+counterexample-information = true
+minimize-proofs            = false
+fail-fast                  = true
+smt-timeout                = 60000
+smt-retry-limit            = 0
+break-every-step           = false
+break-on-jumpi             = false
+break-on-calls             = false
+break-on-storage           = false
+break-on-basic-blocks      = false
+break-on-cheatcodes        = false
+auto_abstract              = true
+run-constructor            = false
+match-test                 = [
+        "YearnPolygonUsdcStrategyTest.testDeposit(uint256,address)",
+        "YearnPolygonUsdcStrategyTest.testDepositWithLockup(uint256,address,uint256)",
+        "YearnPolygonUsdcStrategyTest.testMint(uint256,address)",
+        "YearnPolygonUsdcStrategyTest.testMintWithLockup(uint256,address,uint256)",
+        "YearnPolygonUsdcStrategyTest.testWithdraw(uint256,address,address,uint256)",
+        #"YearnPolygonUsdcStrategyTest.testWithdrawWithLossReverts(uint256,address,address,uint256)",
+        "YearnPolygonUsdcStrategyTest.testWithdrawRevert(uint256,address,address,uint256)",
+        "YearnPolygonUsdcStrategyTest.testRedeem(uint256,address,address,uint256)",
+        "YearnPolygonUsdcStrategyTest.testRedeemRevert(uint256,address,address,uint256)",
+        #"YearnPolygonUsdcStrategyTest.testMaxRedeemAllwaysReverts(uint256,address,address,uint256)",
+        "YearnPolygonUsdcStrategyTest.testInitiateRageQuit()",
+        "YearnPolygonUsdcStrategyTest.testReport()",
+        "YearnPolygonUsdcStrategyTest.testReportWithLoss()",
+        "YearnPolygonUsdcStrategyTest.testTend()",
+        "YearnPolygonUsdcStrategyTest.testSetPendingManagement(address)",
+        #"YearnPolygonUsdcStrategyTest.testSetPendingManagementRevert(address,address)",
+        #"YearnPolygonUsdcStrategyTest.testAcceptManagement(address)",
+        #"YearnPolygonUsdcStrategyTest.testAcceptManagementRevert(address,address)",
+        "YearnPolygonUsdcStrategyTest.testSetKeeper(address)",
+        #"YearnPolygonUsdcStrategyTest.testSetKeeperRevert(address,address)",
+        "YearnPolygonUsdcStrategyTest.testSetEmergencyAdmin(address)",
+        #"YearnPolygonUsdcStrategyTest.testSetEmergencyAdminRevert(address,address)",
+    ]
+
+[show.default]
+foundry-project-root       = '.'
+verbose                    = false
+debug                      = false

@@ -1,31 +1,30 @@
-# IDE
-.idea
-
-# Compiler files
-cache/
-out/
-coverage/
-
-# Ignores development broadcast logs
-!/broadcast
-/broadcast/*/31337/
-/broadcast/**/dry-run/
-
-# Docs
-docs/
-
-# Dotenv file
-.env
-
-# Direnv file
-.envrc
-
-# Github CI secrets for local CI runner (https://github.com/nektos/act)
-/.secrets
-
-# npm/pnpm related files
-node_modules/
-.venv
-
-# direnv files
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
 .direnv/
+.cursor/
+.idea/
+.specstory/
+.venv/
+/dependencies/
+broadcast/
+cache/
+coverage/
+node_modules/
+reports/
+out/
+
+.secrets
+.env
+.envrc
+.DS_Store
+ci/contract_addresses.txt
+lcov.info
+gasreport.txt
+output.json
+package.tgz
+
